@@ -273,7 +273,6 @@ export const en = {
       restoreConfirm: 'Restore this version? It replaces all views on this device and is saved as the newest version.',
       adoptView: 'Take a view',
       adoptViewNamed: 'Take “{name}”',
-      defaultViewName: 'Overview',
       noViews: 'This version has no views this app version can read.',
       newer: 'Newer',
       older: 'Older',

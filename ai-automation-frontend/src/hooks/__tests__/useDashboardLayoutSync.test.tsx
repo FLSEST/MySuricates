@@ -222,6 +222,23 @@ describe('useDashboardLayoutSync', () => {
     expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v1', dirty: true });
   });
 
+  it('shows the tooLarge message when the server rejects the save as too large (413)', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    serve({
+      latest: () => summary('v1'),
+      onPost: () => HttpResponse.json({ error: 'payload too large' }, { status: 413 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.saveSnapshot());
+
+    expect(useToastStore.getState().toasts.map((t) => t.message)).toContain(
+      'The dashboard layout is too large to save (at most 256 KiB). Remove widgets or views and try again.',
+    );
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v1', dirty: true });
+  });
+
   it('shows an error toast instead of a conflict when a 409 turns out to be our own base version', async () => {
     customizeLocally();
     useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
@@ -311,6 +328,8 @@ describe('useDashboardLayoutSync', () => {
 
     expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
     expect(calls).toContain('post');
+    // Appending a view (not replacing one) shows the user the result.
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
   });
 
   it('keeps an edit made while a save is in flight as a local change', async () => {
@@ -558,6 +577,26 @@ describe('useDashboardLayoutSync', () => {
 
     await act(() => result.current.adoptView('v1', 'ops'));
 
+    expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(remoteLayout.views[0]?.widgets);
+    expect(calls).toContain('post');
+  });
+
+  it('replaces an existing view without asking when this device has no unsaved changes', async () => {
+    useDashboardLayoutStore.setState({
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: localWidgets }],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v2', dirty: false });
+    const oldLayout = {
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: remoteLayout.views[0]!.widgets }],
+    };
+    const calls = serve({ latest: () => summary('v2'), versions: { v1: { ...summary('v1', { viewCount: 2 }), layout: oldLayout } } });
+    const confirm = vi.spyOn(window, 'confirm');
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.adoptView('v1', 'ops'));
+
+    expect(confirm).not.toHaveBeenCalled();
     expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual(remoteLayout.views[0]?.widgets);
     expect(calls).toContain('post');
   });

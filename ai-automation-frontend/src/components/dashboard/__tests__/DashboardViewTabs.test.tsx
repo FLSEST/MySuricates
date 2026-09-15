@@ -56,8 +56,16 @@ describe('DashboardViewTabs', () => {
     expect(useDashboardSyncStore.getState().dirty).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add view' }));
-    expect(tabNames()).toEqual(['Overview', 'Overview (copy)', 'Overview']);
+    expect(tabNames()).toEqual(['Overview', 'Overview (copy)']);
     expect(layout().activeViewId).toBe(layout().views[2]?.id);
+    const field = nameField();
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute('placeholder', 'Overview');
+
+    fireEvent.change(field, { target: { value: 'Third' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(tabNames()).toEqual(['Overview', 'Overview (copy)', 'Third']);
+    expect(layout().views[0]?.name).toBe('');
   });
 
   it('renames the active view inline, trimmed and cut by code points', () => {

@@ -54,12 +54,14 @@ function TabButton({ view, label, active, onSelect }: TabButtonProps) {
 interface RenameFieldProps {
   initialName: string;
   label: string;
+  /** Shown while the field is empty, so a freshly added, still-unnamed view never looks like a blank box. */
+  placeholder: string;
   onCommit: (name: string) => void;
   onCancel: () => void;
 }
 
 /** Inline name field: Enter or leaving the field saves, Escape cancels. Cuts by code points while typing. */
-function RenameField({ initialName, label, onCommit, onCancel }: RenameFieldProps) {
+function RenameField({ initialName, label, placeholder, onCommit, onCancel }: RenameFieldProps) {
   const [draft, setDraft] = useState(initialName);
   // Enter/Escape unmount the field, which can fire blur as well — finish exactly once.
   const finished = useRef(false);
@@ -74,6 +76,7 @@ function RenameField({ initialName, label, onCommit, onCancel }: RenameFieldProp
     <input
       autoFocus
       aria-label={label}
+      placeholder={placeholder}
       value={draft}
       onChange={(e) => setDraft(truncateCodePoints(e.target.value, LAYOUT_LIMITS.nameLength))}
       onKeyDown={(e) => {
@@ -122,7 +125,13 @@ function SortableTab({ view, label, active, disabled, renaming, onSelect, onRena
         <GripVertical className="h-3.5 w-3.5" />
       </button>
       {renaming ? (
-        <RenameField initialName={view.name} label={t.dashboard.views.nameLabel} onCommit={onRename} onCancel={onCancelRename} />
+        <RenameField
+          initialName={view.name}
+          label={t.dashboard.views.nameLabel}
+          placeholder={t.dashboard.views.defaultName}
+          onCommit={onRename}
+          onCancel={onCancelRename}
+        />
       ) : (
         <TabButton view={view} label={label} active={active} onSelect={onSelect} />
       )}
@@ -236,7 +245,10 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
             size="sm"
             icon={<Plus className="h-3.5 w-3.5" />}
             disabled={disabled || atLimit}
-            onClick={() => addView()}
+            onClick={() => {
+              const id = addView();
+              if (id) setRenamingId(id);
+            }}
             aria-label={t.dashboard.views.add}
             title={atLimit ? limitHint : t.dashboard.views.add}
           />

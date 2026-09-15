@@ -96,7 +96,7 @@ export function LayoutHistoryRow({ version, isCurrent, busy, onRestore, onAdoptV
             views.map((view) => (
               <Button key={view.id} variant="secondary" size="sm" disabled={busy} onClick={() => onAdoptView(version.id, view.id)}>
                 {/* Function replacer: view.name is user-provided, a plain-string 2nd arg would give $&/$'/$` special meaning. */}
-                {t.dashboard.history.adoptViewNamed.replace('{name}', () => view.name || t.dashboard.history.defaultViewName)}
+                {t.dashboard.history.adoptViewNamed.replace('{name}', () => view.name || t.dashboard.views.defaultName)}
               </Button>
             ))
           )}

@@ -275,7 +275,6 @@ export const de: TranslationKeys = {
       restoreConfirm: 'Diese Version wiederherstellen? Sie ersetzt alle Ansichten auf diesem Gerät und wird als neueste Version gespeichert.',
       adoptView: 'Ansicht übernehmen',
       adoptViewNamed: '„{name}“ übernehmen',
-      defaultViewName: 'Übersicht',
       noViews: 'Diese Version enthält keine Ansichten, die diese App-Version lesen kann.',
       newer: 'Neuer',
       older: 'Älter',

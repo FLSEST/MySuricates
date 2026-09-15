@@ -33,6 +33,10 @@ function isConflict(err: unknown): boolean {
   return !!err && typeof err === 'object' && (err as { status?: number }).status === 409;
 }
 
+function isTooLarge(err: unknown): boolean {
+  return !!err && typeof err === 'object' && (err as { status?: number }).status === 413;
+}
+
 function notify(type: 'error' | 'warning', message: string) {
   useToastStore.getState().addToast(type, message);
 }
@@ -160,6 +164,11 @@ export function useDashboardLayoutSync() {
         }
         return;
       }
+      if (isTooLarge(err)) {
+        // The client-side guard above missed it (e.g. a stale size limit) — same message either way.
+        notify('error', getTranslations().dashboard.sync.tooLarge);
+        return;
+      }
       notify('error', apiErrorMessage(err, getTranslations().dashboard.sync.saveFailed));
     }
   };
@@ -216,14 +225,19 @@ export function useDashboardLayoutSync() {
       const local = useDashboardLayoutStore.getState().views.find((v) => v.id === viewId);
       // Replacing a view can be undone from the history — unless this device has unsaved changes.
       if (local && hasLocalLayoutChanges()) {
-        const name = local.name || t.dashboard.history.defaultViewName;
+        const name = local.name || t.dashboard.views.defaultName;
         if (!window.confirm(t.dashboard.history.adoptViewConfirm.replace('{name}', () => name))) return;
       }
       if (!useDashboardLayoutStore.getState().upsertView(view)) {
         notify('warning', t.dashboard.history.adoptViewLimit.replace('{max}', () => String(LAYOUT_LIMITS.views)));
         return;
       }
+      const baseBefore = useDashboardSyncStore.getState().baseVersionId;
       await persistSnapshot(false);
+      // Appended (did not exist locally) and the save actually went through — show the user the result.
+      if (!local && useDashboardSyncStore.getState().baseVersionId !== baseBefore) {
+        useDashboardLayoutStore.getState().setActiveView(viewId);
+      }
     })),
   };
 }

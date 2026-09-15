@@ -56,4 +56,50 @@ describe('useDashboardViewParam', () => {
     expect(location).toHaveAttribute('data-navigation', 'REPLACE');
     expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
   });
+
+  it('activates a view named in the link once it arrives via a later remote layout', async () => {
+    useDashboardLayoutStore.setState({ activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [] }] });
+    const location = renderAt('/?view=ops');
+
+    await waitFor(() => expect(location.textContent).toBe('?view=default'));
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('default');
+
+    act(() => {
+      useDashboardLayoutStore.getState().applyRemoteLayout({
+        activeViewId: 'default',
+        views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }],
+      });
+    });
+
+    await waitFor(() => expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops'));
+    await waitFor(() => expect(location.textContent).toBe('?view=ops'));
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+  });
+
+  it('drops the pending view from the link once the user switches views before it arrives', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'other', name: 'Other', widgets: [] }],
+    });
+    const location = renderAt('/?view=ops');
+    await waitFor(() => expect(location.textContent).toBe('?view=default'));
+
+    act(() => useDashboardLayoutStore.getState().setActiveView('other'));
+    await waitFor(() => expect(location.textContent).toBe('?view=other'));
+
+    act(() => {
+      useDashboardLayoutStore.getState().applyRemoteLayout({
+        activeViewId: 'other',
+        views: [
+          { id: 'default', name: '', widgets: [] },
+          { id: 'other', name: 'Other', widgets: [] },
+          { id: 'ops', name: 'Ops', widgets: [] },
+        ],
+      });
+    });
+
+    // The pending link was dropped — the user's own choice stays active.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('other');
+  });
 });
