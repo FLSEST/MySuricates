@@ -14,7 +14,7 @@ class TextStagesTest {
 
     @Test
     void normalize_removesAnsiCrTrailingSpaceAndBlankRuns() {
-        String input = "\n\n[31mERROR[0m  \r\nzeile\r\n\n\n\nende   \n\n";
+        String input = "\n\n\u001B[31mERROR\u001B[0m  \r\nzeile\r\n\n\n\nende   \n\n";
 
         StageResult r = new TextNormalizeStage().apply(input, Map.of(), guard);
 

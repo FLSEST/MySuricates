@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 final class TextNormalizeStage implements CompressionStage {
 
     private static final Pattern ANSI = Pattern.compile(
-            "\\[[0-?]*[ -/]*[@-~]|\\][^]*(?:|\\\\)|[@-Z\\\\-_]");
+            "\u001B\\[[0-?]*[ -/]*[@-~]|\u001B\\][^\u0007\u001B]*(?:\u0007|\u001B\\\\)|\u001B[@-Z\\\\-_]");
 
     @Override
     public String op() {
