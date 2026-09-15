@@ -79,6 +79,13 @@ public class BlockConfigSummaryFormatter {
                 Object inputType = cfg.get("input_type");
                 if (inputType != null) sb.append("     input_type: ").append(inputType).append("\n");
             }
+            case "compress", "compress-ai" -> {
+                Object source = cfg.get("source");
+                if (source != null) sb.append("     source: ").append(source).append("\n");
+                if (cfg.get("stages") instanceof List<?> stages) sb.append("     stages: ").append(stages.size()).append("\n");
+                Object instruction = cfg.get("instruction");
+                if (instruction != null) sb.append("     instruction: ").append(AssistantFormatUtils.truncate(String.valueOf(instruction).trim(), 200)).append("\n");
+            }
             default -> {
                 cfg.forEach((k, v) -> {
                     if (v != null && !String.valueOf(v).isBlank()) {

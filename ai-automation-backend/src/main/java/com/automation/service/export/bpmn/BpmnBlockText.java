@@ -15,7 +15,8 @@ final class BpmnBlockText {
             Map.entry("skill-capability", "Skill"), Map.entry("integration", "Integration"),
             Map.entry("document", "Dokument"), Map.entry("approval", "Freigabe"),
             Map.entry("human-input", "Eingabe"), Map.entry("sub-workflow", "Sub-Workflow"),
-            Map.entry("retry", "Retry"));
+            Map.entry("retry", "Retry"), Map.entry("compress", "Komprimierung"),
+            Map.entry("compress-ai", "KI-Komprimierung"));
 
     private BpmnBlockText() {}
 
@@ -32,6 +33,8 @@ final class BpmnBlockText {
             case "integration" -> joinNonBlank(str(c, "provider"), str(c, "action"));
             case "document" -> str(c, "file_path");
             case "skill-capability" -> str(c, "capability");
+            case "compress" -> str(c, "source");
+            case "compress-ai" -> joinNonBlank(str(c, "source"), str(c, "instruction"));
             default -> str(c, "command");
         };
     }
@@ -48,6 +51,9 @@ final class BpmnBlockText {
             case "while" -> "Wiederholen solange: " + firstLine(str(c, "condition_command"), 200);
             case "foreach" -> "Iteriert über: " + str(c, "variable_name");
             case "retry" -> "Automatische Wiederholung bei Fehler";
+            case "compress" -> "Komprimierung: " + compressScript(c);
+            case "compress-ai" -> "KI-Komprimierung von " + str(c, "source")
+                    + (str(c, "instruction").isBlank() ? "" : ": " + firstLine(str(c, "instruction"), 200));
             default -> firstLine(str(c, "command"), 200);
         };
     }
@@ -94,6 +100,21 @@ final class BpmnBlockText {
             }
         }
         return result;
+    }
+
+    /** Readable stage chain of a compress block, e.g. "source(backend_tests) | lines.tail(50) | text.truncate(18000)". */
+    static String compressScript(Map<String, Object> c) {
+        StringBuilder sb = new StringBuilder("source(").append(str(c, "source")).append(")");
+        if (c != null && c.get("stages") instanceof List<?> stages) {
+            for (Object stage : stages) {
+                if (!(stage instanceof Map<?, ?> m)) continue;
+                sb.append(" | ").append(m.get("op"));
+                Object arg = m.containsKey("max_chars") ? m.get("max_chars")
+                        : m.containsKey("lines") ? m.get("lines") : m.get("count");
+                if (arg != null) sb.append("(").append(arg).append(")");
+            }
+        }
+        return sb.toString();
     }
 
     /** Verschachtelte Block-Maps (switch cases[].blocks / default) -> BlockDefinitions. */

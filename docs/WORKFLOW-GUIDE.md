@@ -63,7 +63,7 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstuetzt 17 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstuetzt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
 ### Allgemeine Block-Eigenschaften
 
@@ -72,8 +72,8 @@ Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese 
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
-| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
-| `model` | string | null | **Nur KI-faehige Bloecke**: Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
+| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
+| `model` | string | null | **Nur KI-faehige Bloecke** (inkl. `compress-ai`): Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
 | `effort` | string | null | **Nur KI-faehige Bloecke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur fuer diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
 
 Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
@@ -293,6 +293,8 @@ Wertet einen Ausdruck aus und leitet die Ausfuehrung zum passenden Case weiter. 
 Jeder Case hat:
 - `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
 - `blocks`: Liste von Block-Definitionen bei Treffer
+
+Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
 ```json
 {
@@ -580,6 +582,64 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 
 ---
 
+### `compress` / `compress-ai` — Ausgaben sichtbar verdichten
+
+Verdichten die Ausgabe **genau eines** früheren Blocks, bevor sie an Folgeschritte geht. Das Original bleibt unverändert unter `{{ block.<quelle>.output }}`; der Komprimierungsblock hat seine eigene Ausgabe `{{ block.<name>.output }}`. Die Komprimierung ist **endgültig** — wer alles sehen will, referenziert das Original.
+
+**Ausgabeformat** (beide Typen):
+
+```
+## backend_tests — FAILED · exit 1 · 312 s · 740.808 → 17.950 Zeichen
+Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · text.truncate (−96.004 Zeichen)
+
+<verdichteter Inhalt>
+```
+
+Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Logtext. Gate- und TODO-Marker in Komprimierungs-Ausgaben werden beim Run-Abschluss **nicht** ausgewertet — maßgeblich bleibt der Originalschritt.
+
+**`compress`** (Regeln, 0 Tokens):
+
+| Config-Schluessel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `source` | string | **erforderlich** | Blockname eines früheren Top-Level-Blocks oder `"previous"` |
+| `stages` | Liste | **erforderlich** | Stufen `{ "op": …, … }`, laufen der Reihe nach |
+| `max_chars` | int | 20000 | harte Obergrenze inkl. Kopfzeilen; darüber wird head/tail gekürzt |
+| `timeout_seconds` | int | 30 | Zeitbudget (schützt vor aufwendigen Regex) |
+
+| Stufe | Optionen | Wirkung |
+|---|---|---|
+| `text.normalize` | — | ANSI, CR, Leerraum am Zeilenende, Leerzeilen-Folgen |
+| `text.truncate` | `max_chars`, `keep` (`head`/`tail`/`head_tail`) | kürzen an Zeilengrenzen, Hinweis zählt zum Limit |
+| `lines.filter` | `include`, `exclude` (Regex-Listen), `before`, `after` | Treffer mit Kontext behalten / Zeilen entfernen |
+| `lines.replace` | `pattern`, `replacement` | Regex-Ersetzung je Zeile (z. B. Zeitstempel weg) |
+| `lines.dedupe` | `count`, `consecutive_only` | Wiederholungen entfernen, optional `37× …` |
+| `lines.head` / `lines.tail` | `lines` | erste / letzte n Zeilen |
+| `markdown.section` | `headings` (Regex, ohne Groß/Klein), `level` | nur passende Abschnitte |
+| `json.select` | `paths` (`items[].title`, `meta.count`) | nur diese Felder, gültiges JSON |
+| `json.limit` | `path`, `count` | Array kürzen |
+| `json.sort` | `path`, `by`, `order` | Array sortieren, fehlende Werte zuletzt |
+| `json.to_lines` | `path`, `template` (`{title} — {url}`) | ein Eintrag pro Zeile — einfache geschweifte Klammern |
+
+JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
+
+**`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Wegen `--setting-sources local` gelten Claude-Einstellungen auf Benutzerebene (z. B. `env` oder `apiKeyHelper` in `~/.claude/settings.json`) für diesen Aufruf **nicht**. Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl — läuft der Workflow mit einem anderen Provider, im Block `"provider": "CLAUDE"` setzen. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
+
+```json
+[
+  { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },
+  { "type": "compress", "name": "backend_kompakt", "config": { "source": "backend_tests", "stages": [
+      { "op": "text.normalize" },
+      { "op": "lines.filter", "exclude": ["^\\s+at "] },
+      { "op": "lines.dedupe", "count": true },
+      { "op": "text.truncate", "max_chars": 18000, "keep": "head_tail" } ] } },
+  { "type": "simple", "name": "report", "config": { "command": "Bewerte:\n{{ block.backend_kompakt.output }}" } }
+]
+```
+
+**Nicht erlaubt:** als verschachtelter Block in `switch` (wird abgelehnt).
+
+---
+
 ## 3. Template-Variablen
 
 ### Variablen-Syntax
@@ -703,6 +763,8 @@ Block 1 (shell): Rohdaten sammeln (git log, find, grep, Metriken)
 Block 2 (simple): Analysieren und kategorisieren
 Block 3 (simple): Bericht mit handlungsorientierten Empfehlungen erstellen
 ```
+
+**Große Ausgaben:** zwischen Shell und KI einen `compress`-Block setzen; bei sehr großen Logs `compress` → `compress-ai`.
 
 ---
 

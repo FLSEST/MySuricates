@@ -237,7 +237,7 @@ See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRU
 - **Provider routing**: All block executors pass `context.getProvider()` as `providerId` via `HostExecutionRequest.builder()`. Setting `"provider": "CODEX"` in workflow JSON applies to every non-shell block. `AiProviderRegistry.resolve()` falls back to the configured default provider.
 - **Soft-Delete**: Workflows use `@SQLRestriction("deleted_at IS NULL")`. Projects use `archived_at` with repository filter methods (not `@SQLRestriction`, because it would break eager-loaded `Workflow.project`).
 - **ESLint**: Flat config (`eslint.config.js`, ESLint 9+) with `typescript-eslint`, `react-hooks`, `react-refresh`. Test files: `no-explicit-any` disabled.
-- **Block types**: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input, integration, document, todo-create, todo-update, todo-close — see [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for details
+- **Block types**: simple, shell, retry, conditional, foreach, while, switch, agentic, approval, sub-workflow, skill-capability, human-input, integration, document, todo-create, todo-update, todo-close, compress, compress-ai — see [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) for details
 
 For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 

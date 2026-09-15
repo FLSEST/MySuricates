@@ -3,6 +3,7 @@ package com.automation.service.system;
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.ChainConfig;
+import com.automation.config.CompressionConfig;
 import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
@@ -56,6 +57,7 @@ public class ExecutionSettingsService {
     private final RunRetentionConfig runRetentionConfig;
     private final DashboardLayoutConfig dashboardLayoutConfig;
     private final ModelCatalogService modelCatalogService;
+    private final CompressionConfig compressionConfig;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -79,7 +81,8 @@ public class ExecutionSettingsService {
             WishConfig wishConfig,
             RunRetentionConfig runRetentionConfig,
             DashboardLayoutConfig dashboardLayoutConfig,
-            ModelCatalogService modelCatalogService) {
+            ModelCatalogService modelCatalogService,
+            CompressionConfig compressionConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -99,6 +102,7 @@ public class ExecutionSettingsService {
         this.runRetentionConfig = runRetentionConfig;
         this.dashboardLayoutConfig = dashboardLayoutConfig;
         this.modelCatalogService = modelCatalogService;
+        this.compressionConfig = compressionConfig;
         this.appliers = buildAppliers();
     }
 
@@ -136,6 +140,7 @@ public class ExecutionSettingsService {
         m.put("wish-default-shell-timeout-seconds", v -> wishConfig.setDefaultShellTimeoutSeconds(Integer.parseInt(v)));
         m.put("wish-default-agentic-total-timeout-seconds", v -> wishConfig.setDefaultAgenticTotalTimeoutSeconds(Integer.parseInt(v)));
         m.put("model-catalog-ttl-seconds", v -> modelCatalogService.setTtlSeconds(Integer.parseInt(v)));
+        m.put("compress-ai-max-input-chars", v -> compressionConfig.setMaxAiInputChars(Integer.parseInt(v)));
         return m;
     }
 
@@ -198,6 +203,7 @@ public class ExecutionSettingsService {
         result.put("wishDefaultShellTimeoutSeconds", wishConfig.getDefaultShellTimeoutSeconds());
         result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
         result.put("modelCatalogTtlSeconds", modelCatalogService.getTtlSeconds());
+        result.put("compressAiMaxInputChars", compressionConfig.getMaxAiInputChars());
         result.put("activeRuns", executionRegistry.getActiveRunCount());   // running + queued
         result.put("queuedRuns", executionRegistry.getQueuedRunCount());
         return result;

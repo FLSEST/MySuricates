@@ -63,7 +63,7 @@ Access in block configs with `{{ filepath }}` or `{{ language }}`.
 
 ## 2. Block Type Reference
 
-MySuricates supports 17 block types. Each block has a `type` and a `config` map.
+MySuricates supports 19 block types. Each block has a `type` and a `config` map.
 
 ### Common Block Properties
 
@@ -72,6 +72,8 @@ In addition to its type-specific config fields, every block also supports these 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Behavior on failure: `"stop"` (terminate workflow) or `"continue"` (proceed with next block) |
+| `provider` | string | null | **AI-capable blocks only** (`simple`, `agentic`, `skill-capability`, `compress-ai` and the inline `command` of `retry`, `foreach`, `while`, `conditional`, `switch`): AI provider for this block only (`CLAUDE`, `PI`, `CODEX`; for `compress-ai` only `CLAUDE`). Precedence block > workflow > system default. On the `integration` block, `provider` instead names the integration provider (`google-calendar`, …). |
+| `model` | string | null | **AI-capable blocks only** (including `compress-ai`): model for this block only (CLI alias `opus`/`sonnet`, concrete id or pi `<backend>/<model>`). Precedence block > workflow > provider default. If a block sets a *different* `provider` than the workflow, the workflow model is not inherited (model ids are provider-specific). |
 
 Additionally, every block supports an optional top-level field (not inside `config`):
 
@@ -288,6 +290,8 @@ Evaluates an expression and routes execution to the matching case. Like a switch
 Each case has:
 - `value`: String to match against (pipe-separated alternatives: `"error|critical"`)
 - `blocks`: List of block definitions to execute on match
+
+Nested blocks in `cases` and `default` are limited to `shell` and `simple` — other types (including `compress`/`compress-ai`) are rejected with an error message.
 
 ```json
 {
@@ -539,6 +543,64 @@ Reads a file (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, ...) and extracts pla
 
 ---
 
+### `compress` / `compress-ai` — Visibly Condense Outputs
+
+Condense the output of **exactly one** earlier block before it reaches subsequent steps. The original stays untouched under `{{ block.<source>.output }}`; the compression block has its own output `{{ block.<name>.output }}`. Compression is **final** — anyone who needs to see everything references the original.
+
+**Output format** (both types):
+
+```
+## backend_tests — FAILED · exit 1 · 312 s · 740.808 → 17.950 Zeichen
+Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · text.truncate (−96.004 Zeichen)
+
+<condensed content>
+```
+
+Status and exit code come from the stored step data, never from the log text. Gate and TODO markers inside compression outputs are **not** evaluated at run completion — the original step remains authoritative.
+
+**`compress`** (rule-based, 0 tokens):
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `source` | string | **required** | Block name of an earlier top-level block, or `"previous"` |
+| `stages` | list | **required** | Stages `{ "op": …, … }`, run in order |
+| `max_chars` | int | 20000 | hard ceiling including header lines; above it, head/tail is trimmed |
+| `timeout_seconds` | int | 30 | time budget (guards against expensive regex) |
+
+| Stage | Options | Effect |
+|---|---|---|
+| `text.normalize` | — | ANSI, CR, trailing whitespace, runs of blank lines |
+| `text.truncate` | `max_chars`, `keep` (`head`/`tail`/`head_tail`) | trims at line boundaries, the notice counts toward the limit |
+| `lines.filter` | `include`, `exclude` (regex lists), `before`, `after` | keep matches with context / drop lines |
+| `lines.replace` | `pattern`, `replacement` | regex replacement per line (e.g. strip timestamps) |
+| `lines.dedupe` | `count`, `consecutive_only` | remove repeats, optionally `37× …` |
+| `lines.head` / `lines.tail` | `lines` | first / last n lines |
+| `markdown.section` | `headings` (regex, case-insensitive), `level` | only matching sections |
+| `json.select` | `paths` (`items[].title`, `meta.count`) | only these fields, valid JSON |
+| `json.limit` | `path`, `count` | trim an array |
+| `json.sort` | `path`, `by`, `order` | sort an array, missing values last |
+| `json.to_lines` | `path`, `template` (`{title} — {url}`) | one entry per line — simple curly-brace placeholders |
+
+JSON stages need JSON as input and must come before text stages.
+
+**`compress-ai`** (one tool-less AI call): `source` (required), `instruction` (plain text, placeholders are **not** resolved), `max_chars` (default 4000, minimum 500), `model`, `effort`, `timeout_seconds`. Runs in a fresh, private working directory per call (no project `CLAUDE.md`, no MCP servers, no plugin hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Because of `--setting-sources local`, user-level Claude settings (e.g. `env` or `apiKeyHelper` in `~/.claude/settings.json`) are **not** applied to this call. Only provider `CLAUDE`; a different `provider` fails — if the workflow runs on another provider, set `"provider": "CLAUDE"` on the block. Inputs above the `compress-ai-max-input-chars` setting (default 60,000) fail without making the call — put a `compress` block before it instead.
+
+```json
+[
+  { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },
+  { "type": "compress", "name": "backend_kompakt", "config": { "source": "backend_tests", "stages": [
+      { "op": "text.normalize" },
+      { "op": "lines.filter", "exclude": ["^\\s+at "] },
+      { "op": "lines.dedupe", "count": true },
+      { "op": "text.truncate", "max_chars": 18000, "keep": "head_tail" } ] } },
+  { "type": "simple", "name": "report", "config": { "command": "Bewerte:\n{{ block.backend_kompakt.output }}" } }
+]
+```
+
+**Not allowed:** nested inside a `switch` block (rejected).
+
+---
+
 ## 3. Template Variables
 
 ### Variable Syntax
@@ -648,6 +710,8 @@ Block 1 (shell): Collect raw data (git log, find, grep, metrics)
 Block 2 (simple): Analyze and categorize
 Block 3 (simple): Create report with actionable recommendations
 ```
+
+**Large outputs:** put a `compress` block between shell and AI; for very large logs, `compress` → `compress-ai`.
 
 ---
 

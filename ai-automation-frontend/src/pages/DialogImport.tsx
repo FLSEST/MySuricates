@@ -25,6 +25,7 @@ const blockTypeVariant: Record<string, BadgeVariant> = {
   shell: 'accent', 'sub-workflow': 'accent',
   approval: 'warning', 'human-input': 'warning',
   retry: 'default', foreach: 'default', while: 'default', conditional: 'default',
+  compress: 'accent', 'compress-ai': 'success',
 };
 
 // ── Hilfsfunktionen ──────────────────────────────────────
@@ -212,7 +213,7 @@ function SuggestionPanel({
       const updated: BlockDefinition[] = [...editedBlocks];
       const prev = updated[editingBlock.index];
       if (!prev) return;
-      updated[editingBlock.index] = { type: prev.type, config, requiredCapabilities: prev.requiredCapabilities };
+      updated[editingBlock.index] = { ...prev, config };
       setEditedBlocks(updated);
       setEditingBlock(null);
     } catch {

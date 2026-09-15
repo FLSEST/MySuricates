@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import type { StepResult } from '../../types';
 import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMetadata';
 import { StepCardFrame, StepCardHeader } from './StepCardChrome';
+import { CompressionPanel } from './CompressionPanel';
 
 export function ExecutionStepCard({ step }: { step: StepResult }) {
   const t = useT();
@@ -32,6 +33,7 @@ export function ExecutionStepCard({ step }: { step: StepResult }) {
       </div>
       <div className="flex-1 min-w-0">
         <StepCardHeader step={step} />
+        <CompressionPanel step={step} />
         {(provider || model || showRequestedModel || facts.length > 0) && (
           <div className="flex flex-wrap gap-2 mb-2">
             {provider && (

@@ -23,7 +23,7 @@ export type StepKind = 'ai' | 'deterministic' | 'human' | 'unknown';
 
 const HUMAN_BLOCK_TYPES = new Set(['approval', 'human-input']);
 /** Blocks that always call the AI — used while their AI metadata is not written yet (running, failed early). */
-const ALWAYS_AI_BLOCK_TYPES = new Set(['simple', 'agentic', 'skill-capability']);
+const ALWAYS_AI_BLOCK_TYPES = new Set(['simple', 'agentic', 'skill-capability', 'compress-ai']);
 const WRAPPER_BLOCK_TYPES = new Set(['foreach', 'while', 'retry', 'conditional', 'switch']);
 /** Keys every finished wrapper writes; together with a missing `aiRequest` they prove no inner AI call ran. */
 const WRAPPER_RESULT_KEYS = ['totalItems', 'iterationCount', 'attempts', 'conditionMet', 'matchedCase'];
@@ -114,4 +114,35 @@ export function persistedForEachItems(step: StepResult): ForEachItemState[] {
 export function persistedTotalItems(step: StepResult): number | null {
   const total = step.metadata?.totalItems;
   return typeof total === 'number' ? total : null;
+}
+
+export interface CompressionFacts {
+  source: { block: string | null; stepIndex: number | null; status: string | null; exitCode: number | null } | null;
+  inChars: number;
+  outChars: number;
+  maxChars: number | null;
+  capped: boolean;
+  stages: Array<{ op: string; inChars: number; outChars: number; note: string | null }>;
+}
+
+/** The `metadata.compression` contract of compress / compress-ai steps; null for every other step. */
+export function compressionFacts(step: StepResult): CompressionFacts | null {
+  const raw = step.metadata?.compression;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const c = raw as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' ? v : null);
+  const str = (v: unknown) => (typeof v === 'string' ? v : null);
+  const src = c.source && typeof c.source === 'object' ? (c.source as Record<string, unknown>) : null;
+  return {
+    source: src ? { block: str(src.block), stepIndex: num(src.stepIndex), status: str(src.status), exitCode: num(src.exitCode) } : null,
+    inChars: num(c.inChars) ?? 0,
+    outChars: num(c.outChars) ?? 0,
+    maxChars: num(c.maxChars),
+    capped: c.capped === true,
+    stages: Array.isArray(c.stages)
+      ? c.stages
+          .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+          .map((s) => ({ op: str(s.op) ?? '?', inChars: num(s.inChars) ?? 0, outChars: num(s.outChars) ?? 0, note: str(s.note) }))
+      : [],
+  };
 }

@@ -772,4 +772,18 @@ class SwitchBlockExecutorTest {
         assertThat(result.getMetadata()).containsEntry("matchedCase", "none").containsEntry("expression", "unknown");
         result.getMetadata().put("x", 1);
     }
+
+    @Test
+    void execute_nestedCompressBlock_isRejectedWithoutAnyCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "compress", "config", Map.of("source", "x", "stages", List.of()))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getOutput()).contains("Blocktyp 'compress' wird in switch nicht unterstützt");
+        verifyNoInteractions(commandExecutor);
+    }
 }

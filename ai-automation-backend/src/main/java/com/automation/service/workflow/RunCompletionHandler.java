@@ -48,7 +48,7 @@ public class RunCompletionHandler {
         List<Map<String, Object>> gateItems = new ArrayList<>();
         Map<String, Integer> gateCountsByStatus = new HashMap<>();
         for (StepResult step : run.getSteps()) {
-            if (step.getOutput() != null) {
+            if (step.getOutput() != null && !isDerivedOutput(step)) {
                 var parsedGate = GateStatusOutputParser.parse(step.getOutput());
                 if (parsedGate.isPresent()) {
                     var gate = parsedGate.get();
@@ -84,7 +84,7 @@ public class RunCompletionHandler {
         // Parse todo_item markers from ALL blocks — collect granular TODO items
         List<TodoOutputParser.ParsedTodoItem> allTodoItems = new ArrayList<>();
         for (StepResult step : run.getSteps()) {
-            if (step.getOutput() != null) {
+            if (step.getOutput() != null && !isDerivedOutput(step)) {
                 allTodoItems.addAll(TodoOutputParser.parse(step.getOutput()));
             }
         }
@@ -141,5 +141,10 @@ public class RunCompletionHandler {
                 log.warn("Failed to record DLQ entry for run {}: {}", run.getId(), dlqError.getMessage());
             }
         }
+    }
+
+    /** Compression steps copy their source's text; markers stay authoritative only on the original step (6e5d6e2c). */
+    private static boolean isDerivedOutput(StepResult step) {
+        return step.getMetadata() != null && Boolean.TRUE.equals(step.getMetadata().get("derivedOutput"));
     }
 }

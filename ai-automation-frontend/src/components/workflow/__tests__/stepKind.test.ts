@@ -69,4 +69,9 @@ describe('stepKind', () => {
       expect(stepKind(step({ blockType: type, metadata: { exitCode: 0 } }))).toBe('deterministic');
     }
   });
+
+  it('classifies compress as deterministic and compress-ai as AI even before AI metadata exists', () => {
+    expect(stepKind({ id: 'a', stepIndex: 0, input: '', output: '', status: 'COMPLETED', durationMs: 1, error: null, blockType: 'compress', metadata: {} })).toBe('deterministic');
+    expect(stepKind({ id: 'b', stepIndex: 1, input: '', output: '', status: 'RUNNING', durationMs: 1, error: null, blockType: 'compress-ai', metadata: {} })).toBe('ai');
+  });
 });

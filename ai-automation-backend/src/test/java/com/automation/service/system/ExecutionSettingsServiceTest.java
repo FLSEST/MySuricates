@@ -2,6 +2,7 @@ package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
+import com.automation.config.CompressionConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
@@ -54,6 +55,7 @@ class ExecutionSettingsServiceTest {
     private WishConfig wishConfig;
     private RunRetentionConfig runRetentionConfig;
     private DashboardLayoutConfig dashboardLayoutConfig;
+    private CompressionConfig compressionConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -72,13 +74,15 @@ class ExecutionSettingsServiceTest {
         wishConfig = new WishConfig();
         runRetentionConfig = new RunRetentionConfig();
         dashboardLayoutConfig = new DashboardLayoutConfig();
+        compressionConfig = new CompressionConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
                 hostClaudeService, hostClaudeConfig, chainConfig,
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService
+                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
+                compressionConfig
         );
     }
 

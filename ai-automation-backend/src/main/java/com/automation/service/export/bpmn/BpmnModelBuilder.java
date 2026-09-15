@@ -107,8 +107,8 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         String type = block.getType() == null ? "" : block.getType();
         Map<String, Object> config = block.getConfig();
         BpmnModel.Kind kind = switch (type) {
-            case "shell" -> SCRIPT_TASK;
-            case "simple", "agentic", "skill-capability", "integration", "document" -> SERVICE_TASK;
+            case "shell", "compress" -> SCRIPT_TASK;
+            case "simple", "agentic", "skill-capability", "integration", "document", "compress-ai" -> SERVICE_TASK;
             case "approval", "human-input" -> USER_TASK;
             case "sub-workflow" -> CALL_ACTIVITY;
             case "retry" -> "shell".equals(BpmnBlockText.str(config, "execution_mode")) ? SCRIPT_TASK : SERVICE_TASK;
@@ -126,7 +126,12 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         n.blockType = type;
         n.blockName = block.getName();
         if (kind == SCRIPT_TASK) {
-            n.script = BpmnBlockText.str(config, "command");
+            if ("compress".equals(type)) {
+                n.script = BpmnBlockText.compressScript(config);
+                n.scriptFormat = "mysuricates-compress";
+            } else {
+                n.script = BpmnBlockText.str(config, "command");
+            }
         }
         if (kind == CALL_ACTIVITY) {
             n.calledElement = BpmnBlockText.str(config, "workflow_id");

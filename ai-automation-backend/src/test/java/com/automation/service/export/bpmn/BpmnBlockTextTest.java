@@ -49,4 +49,24 @@ class BpmnBlockTextTest {
         assertThat(defs.get(1).getType()).isNull();
         assertThat(defs.get(1).getConfig()).isEmpty();
     }
+
+    @Test
+    void compressScript_listsSourceAndStagesWithMainArgument() {
+        Map<String, Object> config = Map.of("source", "backend_tests", "stages", List.of(
+                Map.of("op", "text.normalize"),
+                Map.of("op", "lines.tail", "lines", 50),
+                Map.of("op", "text.truncate", "max_chars", 18000, "keep", "head_tail")));
+
+        assertThat(BpmnBlockText.compressScript(config))
+                .isEqualTo("source(backend_tests) | text.normalize | lines.tail(50) | text.truncate(18000)");
+    }
+
+    @Test
+    void labelsAndNamesForCompressionBlocks() {
+        assertThat(BpmnBlockText.label("compress")).isEqualTo("Komprimierung");
+        assertThat(BpmnBlockText.label("compress-ai")).isEqualTo("KI-Komprimierung");
+        BlockDefinition ai = BlockDefinition.builder().type("compress-ai")
+                .config(Map.of("source", "kompakt", "instruction", "Fehler nennen")).build();
+        assertThat(BpmnBlockText.documentationFor(ai)).isEqualTo("KI-Komprimierung von kompakt: Fehler nennen");
+    }
 }
