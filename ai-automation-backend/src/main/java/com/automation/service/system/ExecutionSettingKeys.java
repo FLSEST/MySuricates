@@ -43,7 +43,8 @@ final class ExecutionSettingKeys {
             Map.entry("wish-workflow-wait-minutes",        new long[]{1, 120}),
             Map.entry("wish-default-shell-timeout-seconds",             new long[]{30, 3600}),
             Map.entry("wish-default-agentic-total-timeout-seconds",     new long[]{60, 86400}),
-            Map.entry("model-catalog-ttl-seconds",         new long[]{30, 86400})
+            Map.entry("model-catalog-ttl-seconds",         new long[]{30, 86400}),
+            Map.entry("compress-ai-max-input-chars",       new long[]{1000, 400000})
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -75,7 +76,8 @@ final class ExecutionSettingKeys {
             Map.entry("wishWorkflowWaitMinutes",                    "wish-workflow-wait-minutes"),
             Map.entry("wishDefaultShellTimeoutSeconds",             "wish-default-shell-timeout-seconds"),
             Map.entry("wishDefaultAgenticTotalTimeoutSeconds",      "wish-default-agentic-total-timeout-seconds"),
-            Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds")
+            Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds"),
+            Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars")
     );
 
     /**

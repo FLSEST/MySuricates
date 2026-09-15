@@ -226,6 +226,17 @@ class HostClaudeServiceTest {
         assertThat(cmd).doesNotContain("--disallowed-tools");
     }
 
+    @Test
+    void buildActionCommand_noTools_disablesAllBuiltInTools() {
+        HostClaudeService service = createService(null, true, List.of("Bash"));
+        List<String> cmd = service.buildActionCommand("verdichte", null, "sys", AiProvider.NO_TOOLS, null);
+
+        int idx = cmd.indexOf("--tools");
+        assertThat(idx).isGreaterThanOrEqualTo(0);
+        assertThat(cmd.get(idx + 1)).isEmpty();
+        assertThat(cmd).doesNotContain("--dangerously-skip-permissions", "--allowed-tools", "--allowedTools");
+    }
+
     // --- effort mapping ---
 
     @Test
