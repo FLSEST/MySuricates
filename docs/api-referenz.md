@@ -2248,9 +2248,10 @@ Speichert einen Snapshot. Body höchstens 256 KiB; unbekannte Felder → 400.
 ```
 
 - **201** neue Version; **200** Inhalt identisch mit der neuesten Version (keine neue Zeile).
+- Der Dedupe-Hash (\`contentHash\`) lässt \`activeViewId\` aus: Die angezeigte Ansicht wählt jedes Gerät selbst, ein Snapshot, der sich nur darin unterscheidet, legt keine neue Version an (**200**). Gespeichert und geprüft (muss auf eine Ansicht zeigen) wird \`activeViewId\` weiterhin.
 - **409 `STATE_CONFLICT`**: Die neueste Version ist nicht `baseVersionId` — ein anderes Gerät hat gespeichert. `"force": true` speichert trotzdem.
 - **413**: Body größer als `automation.dashboard.layout.max-request-bytes` (Default 262144).
-- Grenzen wie im Frontend (`LAYOUT_LIMITS`): ≤ 20 Ansichten, ≤ 100 Widgets je Ansicht, IDs `^[a-z0-9][a-z0-9-]*$` mit ≤ 80 Zeichen, Namen ≤ 80, `config` nur string (≤ 500) / Zahl / boolean mit ≤ 20 Keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
+- Grenzen wie im Frontend (`LAYOUT_LIMITS`): ≤ 20 Ansichten, ≤ 100 Widgets je Ansicht, IDs `^[a-z0-9][a-z0-9-]*$` mit ≤ 80 Zeichen, Ansichtsnamen ≤ 80 Unicode-Codepoints, `config` nur string (≤ 500) / Zahl / boolean mit ≤ 20 Keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
 
 ### `PATCH /api/v1/dashboard/layouts/{id}`
 
