@@ -8,6 +8,7 @@ import com.automation.service.dashboard.DashboardLayoutVersionService;
 import com.automation.service.dashboard.DashboardLayoutVersionService.SaveResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +68,18 @@ class DashboardLayoutVersionIntegrationTest {
         assertThat(again.created()).isFalse();
         assertThat(again.version().getId()).isEqualTo(first);
         assertThat(repository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void a_save_that_only_switches_the_active_view_is_not_a_new_version() {
+        String first = service.save(twoViews("default", null)).version().getId();
+
+        SaveResult switched = service.save(twoViews("ops", first));
+
+        assertThat(switched.created()).isFalse();
+        assertThat(switched.version().getId()).isEqualTo(first);
+        assertThat(repository.count()).isEqualTo(1);
+        assertThat(service.get(first).getContent()).startsWith("{\"activeViewId\":\"default\",");
     }
 
     @Test
@@ -139,6 +152,17 @@ class DashboardLayoutVersionIntegrationTest {
         view.put("id", "default");
         view.put("name", "");
         view.putArray("widgets").addObject().put("instanceId", widgetType).put("type", widgetType);
+        return body;
+    }
+
+    private JsonNode twoViews(String activeViewId, String baseVersionId) {
+        ObjectNode body = (ObjectNode) body("todos", baseVersionId, false);
+        ObjectNode layout = (ObjectNode) body.get("layout");
+        layout.put("activeViewId", activeViewId);
+        ObjectNode ops = ((ArrayNode) layout.get("views")).addObject();
+        ops.put("id", "ops");
+        ops.put("name", "Ops");
+        ops.putArray("widgets");
         return body;
     }
 

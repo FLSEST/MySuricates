@@ -77,7 +77,41 @@ class DashboardLayoutValidatorTest {
                         + "{\"instanceId\":\"todos\",\"type\":\"todos\"},"
                         + "{\"instanceId\":\"note-1a2b3c4d\",\"type\":\"note\",\"size\":\"full\","
                         + "\"config\":{\"count\":3,\"on\":true,\"text\":\"hi\"}}]}]}");
-        assertThat(save.contentHash()).isEqualTo(DashboardLayoutValidator.sha256Hex(save.canonicalContent()));
+        // The hash leaves out activeViewId (chosen per device), the stored content keeps it.
+        assertThat(save.contentHash()).isEqualTo(DashboardLayoutValidator.sha256Hex(
+                "{\"views\":[{\"id\":\"default\",\"name\":\"\",\"widgets\":["
+                        + "{\"instanceId\":\"todos\",\"type\":\"todos\"},"
+                        + "{\"instanceId\":\"note-1a2b3c4d\",\"type\":\"note\",\"size\":\"full\","
+                        + "\"config\":{\"count\":3,\"on\":true,\"text\":\"hi\"}}]}]}"));
+    }
+
+    @Test
+    void layouts_that_differ_only_in_the_active_view_hash_equally() {
+        ObjectNode first = validBody();
+        ((ArrayNode) layout(first).get("views")).addObject().put("id", "ops").put("name", "Ops").putArray("widgets");
+        ObjectNode second = first.deepCopy();
+        layout(second).put("activeViewId", "ops");
+
+        ValidatedLayoutSave a = validator.validateSave(first);
+        ValidatedLayoutSave b = validator.validateSave(second);
+
+        assertThat(b.contentHash()).isEqualTo(a.contentHash());
+        assertThat(a.canonicalContent()).startsWith("{\"activeViewId\":\"default\",");
+        assertThat(b.canonicalContent()).startsWith("{\"activeViewId\":\"ops\",");
+    }
+
+    @Test
+    void view_names_are_limited_by_code_points_not_utf16_units() {
+        String grinning = "😀";
+        ObjectNode atLimit = validBody();
+        view(atLimit, 0).put("name", grinning.repeat(80));
+        assertThat(validator.validateSave(atLimit).canonicalContent()).contains(grinning.repeat(80));
+
+        ObjectNode overLimit = validBody();
+        view(overLimit, 0).put("name", grinning.repeat(81));
+        assertThatThrownBy(() -> validator.validateSave(overLimit))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name must be a string of at most 80 characters");
     }
 
     @Test

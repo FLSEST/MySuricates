@@ -87,7 +87,9 @@ final class DashboardLayoutCanonicalizer {
         ObjectNode out = CANONICAL.createObjectNode();
         out.put("id", requiredId(view.get("id"), path + ".id"));
         JsonNode name = view.get("name");
-        if (name == null || !name.isTextual() || name.textValue().length() > MAX_NAME_LENGTH) {
+        // Code points, not UTF-16 units: the frontend cuts view names by code points too.
+        if (name == null || !name.isTextual()
+                || name.textValue().codePointCount(0, name.textValue().length()) > MAX_NAME_LENGTH) {
             throw invalid(path + ".name must be a string of at most " + MAX_NAME_LENGTH + " characters");
         }
         out.put("name", name.textValue());

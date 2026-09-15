@@ -48,7 +48,17 @@ public class DashboardLayoutValidator {
         ObjectNode canonical = DashboardLayoutCanonicalizer.canonicalLayout(body.get("layout"));
         String content = DashboardLayoutCanonicalizer.write(canonical);
         return new ValidatedLayoutSave(deviceLabel, formatVersion.intValue(), baseVersionId,
-                force != null && force.asBoolean(false), content, sha256Hex(content), canonical.get("views").size());
+                force != null && force.asBoolean(false), content, contentHash(canonical), canonical.get("views").size());
+    }
+
+    /**
+     * Dedupe hash: the canonical layout without activeViewId. Each device chooses the shown view itself,
+     * so saves that differ only in it are the same version. The stored content still keeps it.
+     */
+    static String contentHash(ObjectNode canonicalLayout) {
+        ObjectNode content = canonicalLayout.deepCopy();
+        content.remove("activeViewId");
+        return sha256Hex(DashboardLayoutCanonicalizer.write(content));
     }
 
     /** Name for a rename; {@code null} clears it. */
