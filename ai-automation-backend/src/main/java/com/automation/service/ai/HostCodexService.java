@@ -5,6 +5,7 @@ import com.automation.service.live.LiveOutput;
 import com.automation.service.system.ApiKeyService;
 import com.automation.util.LineListener;
 import com.automation.util.ProcessDrain;
+import com.automation.util.ProcessTracking;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -109,6 +110,9 @@ public class HostCodexService {
             log.debug("Host Codex exec (prompt length: {} chars, workDir: {}, timeout: {}s)",
                     prompt.length(), workingDirectory, timeoutSeconds);
             Process proc = pb.start();
+            // Registered with the running step (if any), so cancelling the run kills codex
+            ProcessTracking.Tracker tracker = ProcessTracking.current();
+            tracker.started(proc);
 
             // Write prompt to stdin to avoid E2BIG on large prompts
             try (OutputStream stdin = proc.getOutputStream()) {
@@ -164,6 +168,8 @@ public class HostCodexService {
             } catch (ExecutionException | TimeoutException e) {
                 proc.destroyForcibly();
                 throw new IOException("Failed to read Codex output", e);
+            } finally {
+                tracker.finished(proc);
             }
         } finally {
             Files.deleteIfExists(outputFile);

@@ -1,23 +1,34 @@
 package com.automation.executor;
 
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
-/** Resolves cancellation racing with process creation without leaving an unregistered child. */
+/**
+ * Processes a run currently waits on — a shell block's process and a Claude/pi/Codex CLI can both be
+ * registered. Resolves cancellation racing with process creation without leaving an unregistered child.
+ */
 final class RunProcessRegistration {
-    private final AtomicReference<Process> active = new AtomicReference<>();
+    private final Set<Process> active = ConcurrentHashMap.newKeySet();
 
     void register(Process process, AtomicBoolean cancelled) {
-        active.set(process);
-        if (cancelled.get() && active.compareAndSet(process, null)) terminate(process);
+        active.add(process);
+        if (cancelled.get() && active.remove(process)) terminate(process);
+    }
+
+    void unregister(Process process) {
+        active.remove(process);
     }
 
     void cancel() {
-        terminate(active.getAndSet(null));
+        for (Process process : List.copyOf(active)) {
+            if (active.remove(process)) terminate(process);
+        }
     }
 
     void clear() {
-        active.set(null);
+        active.clear();
     }
 
     private static void terminate(Process process) {

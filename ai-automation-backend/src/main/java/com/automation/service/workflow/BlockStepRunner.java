@@ -11,6 +11,7 @@ import com.automation.repository.ContainerRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.live.LiveOutput;
+import com.automation.util.ProcessTracking;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -67,11 +68,13 @@ public class BlockStepRunner {
     public void runStep(StepResult step, BlockDefinition block, BlockExecutor executor, ExecutionContext context,
                         WorkflowRun run, String containerId) {
         // Execute the block — with optional output validation + retry. Output of the processes it
-        // starts streams into the live log under this step's index, nested blocks included.
+        // starts streams into the live log under this step's index, nested blocks included, and
+        // those processes are registered with the run so a cancel kills them.
         StepResult result;
         try {
             result = LiveOutput.bind(liveLog.sinkFor(run.getId(), step.getStepIndex(), block.getName()),
-                    () -> executeValidated(step, block, executor, context, run));
+                    () -> ProcessTracking.bind(context.processTracker(),
+                            () -> executeValidated(step, block, executor, context, run)));
         } finally {
             liveLog.flush(run.getId()); // live lines must reach the client before the final step message
         }

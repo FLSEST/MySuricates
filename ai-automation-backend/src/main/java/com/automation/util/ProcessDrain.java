@@ -31,6 +31,17 @@ public final class ProcessDrain {
      * @throws IOException on timeout ("{label} timed out after N seconds"), interruption or read failure
      */
     public static String drain(Process proc, int timeoutSeconds, String label, LineListener live) throws IOException {
+        // Inside a workflow step the run can now kill this process on cancel (see ProcessTracking)
+        ProcessTracking.Tracker tracker = ProcessTracking.current();
+        tracker.started(proc);
+        try {
+            return drainTracked(proc, timeoutSeconds, label, live);
+        } finally {
+            tracker.finished(proc);
+        }
+    }
+
+    private static String drainTracked(Process proc, int timeoutSeconds, String label, LineListener live) throws IOException {
         InputStream stdout = proc.getInputStream();
         CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
             try { return readAll(stdout, live); }

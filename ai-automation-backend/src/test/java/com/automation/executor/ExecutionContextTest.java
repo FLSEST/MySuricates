@@ -151,6 +151,35 @@ class ExecutionContextTest {
         assertThat(context.shouldStop()).isTrue();
     }
 
+    @Test
+    void cancelKillsAHostCliProcessDrainedInsideTheStep() throws Exception {
+        // A Claude/pi CLI started by a step is drained via ProcessDrain under the step's tracker
+        Process cli = new ProcessBuilder("/bin/sh", "-c", "sleep 60").start();
+        java.util.concurrent.CountDownLatch registered = new java.util.concurrent.CountDownLatch(1);
+        com.automation.util.ProcessTracking.Tracker stepTracker = context.processTracker();
+        com.automation.util.ProcessTracking.Tracker observed = new com.automation.util.ProcessTracking.Tracker() {
+            @Override public void started(Process process) { stepTracker.started(process); registered.countDown(); }
+            @Override public void finished(Process process) { stepTracker.finished(process); }
+        };
+        java.util.concurrent.CompletableFuture<Long> drained = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            long start = System.nanoTime();
+            com.automation.util.ProcessTracking.bind(observed, () -> {
+                try {
+                    return com.automation.util.ProcessDrain.drain(cli, 60, "Host Claude action", com.automation.util.LineListener.NONE);
+                } catch (java.io.IOException e) {
+                    return e.getMessage();
+                }
+            });
+            return java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
+        });
+        assertThat(registered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+
+        context.cancel();
+
+        assertThat(drained.get(10, java.util.concurrent.TimeUnit.SECONDS)).isLessThan(10);
+        assertThat(cli.isAlive()).isFalse();
+    }
+
     // --- resolveTemplateShellSafe tests ---
 
     @Test

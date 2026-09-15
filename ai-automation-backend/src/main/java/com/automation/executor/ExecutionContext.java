@@ -1,6 +1,7 @@
 package com.automation.executor;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.util.ProcessTracking;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -261,6 +262,14 @@ public class ExecutionContext {
 
     public void clearProcess() {
         activeProcess.clear();
+    }
+
+    /** Registers the processes a step starts via {@link ProcessTracking} (host AI CLIs), so {@link #cancel()} kills them. */
+    public ProcessTracking.Tracker processTracker() {
+        return new ProcessTracking.Tracker() {
+            @Override public void started(Process process) { registerProcess(process); }
+            @Override public void finished(Process process) { activeProcess.unregister(process); }
+        };
     }
 
     public CompletableFuture<String> requestApproval(ApprovalRequest request) {

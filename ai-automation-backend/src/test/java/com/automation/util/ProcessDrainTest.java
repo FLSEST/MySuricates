@@ -84,4 +84,25 @@ class ProcessDrainTest {
         assertThat(result).isEqualTo(input);
         assertThat(lines).containsExactly("eins", "zwei");
     }
+
+    @Test
+    void reportsTheProcessToTheBoundTrackerForItsWholeRuntime() throws Exception {
+        List<String> events = new CopyOnWriteArrayList<>();
+        ProcessTracking.Tracker tracker = new ProcessTracking.Tracker() {
+            @Override public void started(Process process) { events.add("started:" + process.isAlive()); }
+            @Override public void finished(Process process) { events.add("finished"); }
+        };
+
+        String out = ProcessTracking.bind(tracker, () -> {
+            try {
+                return ProcessDrain.drain(start("sleep 0.2; echo done"), 5, "test", LineListener.NONE);
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        assertThat(out).isEqualTo("done");
+        assertThat(events).containsExactly("started:true", "finished");
+        assertThat(ProcessTracking.current()).isSameAs(ProcessTracking.Tracker.NONE);
+    }
 }
