@@ -218,6 +218,9 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
   it('asks before replacing local changes with a newer server layout', async () => {
     useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    // Genuinely different from the remote's empty default view below — otherwise the mount check's
+    // content comparison (spec item 7) would find them equal and sync silently instead of asking.
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [{ instanceId: 'todos', type: 'todos' }] }] });
     let posted: { force?: boolean } | undefined;
     server.use(
       http.get('/api/v1/dashboard/layouts', () => HttpResponse.json({
@@ -243,5 +246,30 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
     await waitFor(() => expect(posted?.force).toBe(true));
     await waitFor(() => expect(screen.queryByTestId('layout-sync-conflict')).not.toBeInTheDocument());
+  });
+
+  it('renders a device label containing replacement patterns literally, not as an interpreted pattern', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    // Genuinely different from the remote's empty default view below, so the mount check finds a
+    // real conflict (spec item 7) instead of syncing silently.
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [{ instanceId: 'todos', type: 'todos' }] }] });
+    const maliciousLabel = '$&{time}';
+    server.use(
+      http.get('/api/v1/dashboard/layouts', () => HttpResponse.json({
+        content: [{ id: 'v2', createdAt: '2026-09-15T10:00:00Z', deviceLabel: maliciousLabel, formatVersion: 2, viewCount: 1, contentHash: 'h2' }],
+        page: 0, size: 1, totalElements: 1, totalPages: 1,
+      })),
+      http.get('/api/v1/dashboard/layouts/:id', () => HttpResponse.json({
+        id: 'v2', createdAt: '2026-09-15T10:00:00Z', deviceLabel: maliciousLabel, formatVersion: 2, viewCount: 1, contentHash: 'h2',
+        layout: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [] }] },
+      })),
+    );
+    await renderDashboard();
+
+    const banner = await screen.findByTestId('layout-sync-conflict');
+    // A plain-string replacement would expand "$&" into the matched placeholder text
+    // ("{device}") instead of the literal label — that must not happen.
+    expect(banner).toHaveTextContent('$&{time}');
+    expect(banner).not.toHaveTextContent('{device}');
   });
 });

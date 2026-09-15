@@ -60,6 +60,11 @@ export const useDashboardSyncStore = create<DashboardSyncState>()(
           dirty: stored.dirty === true,
         };
       },
+      // First-ever hydration (no stored entry yet) must write the generated device label back to
+      // storage right away, instead of waiting for the next unrelated state change.
+      onRehydrateStorage: () => (state) => {
+        if (state) state.setDeviceLabel(state.deviceLabel);
+      },
     },
   ),
 );

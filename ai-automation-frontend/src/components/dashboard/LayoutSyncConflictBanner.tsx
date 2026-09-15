@@ -15,9 +15,13 @@ interface LayoutSyncConflictBannerProps {
 export function LayoutSyncConflictBanner({ remote, busy, onKeepRemote, onKeepLocal }: LayoutSyncConflictBannerProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
+  // Function replacers: a plain-string second argument to replace() gives $&/$'/$` special
+  // meaning, so a device label containing one of those (or a literal "{time}") could otherwise
+  // reinsert template internals or hijack the next replacement. {device} goes last since it is the
+  // only free-text value, so nothing it contains is itself subject to a later .replace() call.
   const message = t.dashboard.sync.conflict
-    .replace('{device}', remote.deviceLabel)
-    .replace('{time}', formatDateTime(remote.createdAt, locale));
+    .replace('{time}', () => formatDateTime(remote.createdAt, locale))
+    .replace('{device}', () => remote.deviceLabel);
 
   return (
     <div

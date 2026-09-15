@@ -40,6 +40,15 @@ describe('dashboardSyncStore', () => {
     });
   });
 
+  it('persists the generated device label on first hydration', async () => {
+    localStorage.removeItem('dashboard-sync');
+
+    await useDashboardSyncStore.persist.rehydrate();
+
+    const stored = JSON.parse(localStorage.getItem('dashboard-sync') ?? '{}');
+    expect(stored.state?.deviceLabel).toBe(useDashboardSyncStore.getState().deviceLabel);
+  });
+
   it('rehydrates corrupt data with safe values', async () => {
     localStorage.setItem('dashboard-sync', JSON.stringify({
       version: 1,

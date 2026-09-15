@@ -72,6 +72,9 @@ export function useDashboardLayoutSync() {
   const [busy, setBusy] = useState(false);
   // Once the user acts, a late answer of the initial check must not overwrite the result.
   const userActed = useRef(false);
+  // Serializes saveSnapshot/keepLocal/restore/adopt: a save that starts while another is still in
+  // flight must run only after it, so it reads the baseVersionId the prior save just set.
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +92,14 @@ export function useDashboardLayoutSync() {
         const version = await fetchDashboardLayoutVersion(latest.id);
         if (cancelled || userActed.current) return;
         if (hasLocalLayoutChanges()) {
+          // The local layout was never actually changed against this version's content (e.g. a
+          // customized layout that happens to match what another device just saved) — no real
+          // conflict, just adopt its id as the base.
+          const remoteLayout = layoutFromVersion(version);
+          if (remoteLayout && JSON.stringify(remoteLayout) === JSON.stringify(currentLayout())) {
+            useDashboardSyncStore.getState().markSynced(version.id);
+            return;
+          }
           setConflict(latest);
           return;
         }
@@ -112,7 +123,7 @@ export function useDashboardLayoutSync() {
     }
   };
 
-  const persistSnapshot = async (force: boolean) => {
+  const doPersistSnapshot = async (force: boolean) => {
     const { deviceLabel, baseVersionId } = useDashboardSyncStore.getState();
     // Captured up front: an edit made while the request is in flight must not be reported as saved.
     const layout = currentLayout();
@@ -135,7 +146,9 @@ export function useDashboardLayoutSync() {
     } catch (err) {
       if (isConflict(err)) {
         const latest = await fetchLatestDashboardLayoutVersion().catch(() => null);
-        if (latest) {
+        // Only a genuinely newer version is a conflict to resolve; a missing list result or the
+        // version we are already based on means the 409 was transient — report it as a save failure.
+        if (latest && latest.id !== useDashboardSyncStore.getState().baseVersionId) {
           setConflict(latest);
         } else {
           notify('error', getTranslations().dashboard.sync.saveFailed);
@@ -144,6 +157,13 @@ export function useDashboardLayoutSync() {
       }
       notify('error', apiErrorMessage(err, getTranslations().dashboard.sync.saveFailed));
     }
+  };
+
+  /** Chains onto any save already in flight so it reads the baseVersionId that one just set. */
+  const persistSnapshot = (force: boolean): Promise<void> => {
+    const chained = saveChain.current.then(() => doPersistSnapshot(force));
+    saveChain.current = chained;
+    return chained;
   };
 
   const loadAndThen = async (task: () => Promise<void>) => {

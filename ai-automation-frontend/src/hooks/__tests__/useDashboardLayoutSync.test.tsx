@@ -133,6 +133,20 @@ describe('useDashboardLayoutSync', () => {
     await waitFor(() => expect(result.current.conflict?.id).toBe('v2'));
   });
 
+  it('marks synced instead of conflicting when the never-synced local layout already matches the server', async () => {
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: remoteLayout.views[0]!.widgets }] });
+    serve({
+      latest: () => summary('v2'),
+      versions: { v2: { ...summary('v2'), layout: remoteLayout } },
+    });
+
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await waitFor(() => expect(useDashboardSyncStore.getState().baseVersionId).toBe('v2'));
+    expect(result.current.conflict).toBeNull();
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v2', dirty: false });
+  });
+
   it('does nothing when the newest server version is the base', async () => {
     useDashboardSyncStore.setState({ baseVersionId: 'v2' });
     const calls = serve({ latest: () => summary('v2') });
@@ -203,6 +217,21 @@ describe('useDashboardLayoutSync', () => {
 
     expect(result.current.conflict?.id).toBe('v2');
     expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v1', dirty: true });
+  });
+
+  it('shows an error toast instead of a conflict when a 409 turns out to be our own base version', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    serve({
+      latest: () => summary('v1'),
+      onPost: () => HttpResponse.json({ code: 'STATE_CONFLICT', error: 'changed' }, { status: 409 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.saveSnapshot());
+
+    expect(result.current.conflict).toBeNull();
+    expect(useToastStore.getState().toasts.some((t) => t.type === 'error')).toBe(true);
   });
 
   it('keepLocal saves with force and clears the conflict', async () => {
@@ -300,6 +329,39 @@ describe('useDashboardLayoutSync', () => {
     await savePromise;
 
     expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v3', dirty: true });
+  });
+
+  it('serializes concurrent saves so the second reads the baseVersionId the first one set', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    const { promise: postGate, release } = gate();
+    const posted: Array<{ baseVersionId?: string | null }> = [];
+    let responseId = 'v2';
+    const calls = serve({
+      latest: () => summary('v1'),
+      beforePost: postGate,
+      onPost: (body) => {
+        posted.push(body as { baseVersionId?: string | null });
+        const id = responseId;
+        responseId = 'v3';
+        return HttpResponse.json(summary(id), { status: 201 });
+      },
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(async () => {
+      const save1 = result.current.saveSnapshot();
+      const save2 = result.current.saveSnapshot();
+      await waitFor(() => expect(calls).toContain('post'));
+      release();
+      await Promise.all([save1, save2]);
+    });
+
+    expect(posted).toHaveLength(2);
+    expect(posted[0]?.baseVersionId).toBe('v1');
+    expect(posted[1]?.baseVersionId).toBe('v2');
+    expect(result.current.conflict).toBeNull();
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v3', dirty: false });
   });
 
   it('re-checks for a local edit made while the version detail fetch is in flight', async () => {
