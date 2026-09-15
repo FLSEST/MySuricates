@@ -34,4 +34,12 @@ class StageChainTest {
         assertThat(o.stageMetadata().getFirst()).containsEntry("op", "lines.dedupe").containsEntry("inChars", 5);
         assertThat(o.notes().getFirst()).isEqualTo("lines.dedupe (−1 Zeilen)");
     }
+
+    @Test
+    void parse_jsonStageAfterTextStage_isConfigError() {
+        assertThatThrownBy(() -> StageChain.parse(List.of(
+                Map.of("op", "json.to_lines", "template", "{a}"),
+                Map.of("op", "json.limit", "count", 1))))
+                .isInstanceOf(CompressionException.class).hasMessageContaining("erwartet JSON");
+    }
 }

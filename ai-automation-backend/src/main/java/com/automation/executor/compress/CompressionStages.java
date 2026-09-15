@@ -18,6 +18,11 @@ public final class CompressionStages {
         register(new LinesDedupeStage());
         register(LinesHeadTailStage.head());
         register(LinesHeadTailStage.tail());
+        register(new MarkdownSectionStage());
+        register(new JsonSelectStage());
+        register(new JsonLimitStage());
+        register(new JsonSortStage());
+        register(new JsonToLinesStage());
     }
 
     private CompressionStages() {
