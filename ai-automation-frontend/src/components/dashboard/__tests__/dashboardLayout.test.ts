@@ -12,10 +12,13 @@ import {
   sanitizeLayout,
   setWidgetHidden,
   updateWidgetConfig,
+  type DashboardLayout,
+  type DashboardView,
   type WidgetInstance,
   type WidgetTypeInfo,
 } from '../dashboardLayout';
 import { useDashboardLayoutStore } from '../../../stores/dashboardLayoutStore';
+import { useDashboardSyncStore } from '../../../stores/dashboardSyncStore';
 
 const TYPES: WidgetTypeInfo[] = [{ id: 'a' }, { id: 'b' }, { id: 'note', multiple: true }, { id: 'c' }];
 const single = (id: string, extra: Partial<WidgetInstance> = {}): WidgetInstance => ({ instanceId: id, type: id, ...extra });
@@ -227,6 +230,7 @@ describe('dashboardLayoutStore', () => {
   beforeEach(() => {
     localStorage.clear();
     useDashboardLayoutStore.setState(createDefaultLayout());
+    useDashboardSyncStore.setState({ baseVersionId: null, dirty: false });
   });
 
   it('updates and resets only the active view', () => {
@@ -282,5 +286,43 @@ describe('dashboardLayoutStore', () => {
     const { activeViewId, views } = useDashboardLayoutStore.getState();
     expect({ activeViewId, views }).toEqual(createDefaultLayout());
     expect(localStorage.getItem('dashboard-layout')).toBe(newer);
+  });
+
+  it('marks local edits as unsynced, but not layouts loaded from the server', () => {
+    useDashboardLayoutStore.getState().applyRemoteLayout({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [single('a')] }],
+    });
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual([single('a')]);
+
+    useDashboardLayoutStore.getState().setActiveViewWidgets([single('b')]);
+    expect(useDashboardSyncStore.getState().dirty).toBe(true);
+
+    useDashboardSyncStore.setState({ dirty: false });
+    useDashboardLayoutStore.getState().resetActiveView();
+    expect(useDashboardSyncStore.getState().dirty).toBe(true);
+  });
+
+  it('sanitizes a server layout before applying it', () => {
+    useDashboardLayoutStore.getState().applyRemoteLayout({ activeViewId: 'x', views: 'garbage' } as unknown as DashboardLayout);
+    const { activeViewId, views } = useDashboardLayoutStore.getState();
+    expect({ activeViewId, views }).toEqual(createDefaultLayout());
+  });
+
+  it('replaces a view with the same id or appends it, within the view limit', () => {
+    const ops: DashboardView = { id: 'ops', name: 'Ops', widgets: [single('a')] };
+    useDashboardLayoutStore.getState().upsertView(ops);
+    expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
+    expect(useDashboardSyncStore.getState().dirty).toBe(true);
+
+    useDashboardLayoutStore.getState().upsertView({ ...ops, name: 'Betrieb' });
+    expect(useDashboardLayoutStore.getState().views[1]?.name).toBe('Betrieb');
+
+    useDashboardLayoutStore.setState({
+      views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => ({ id: `v${i}`, name: '', widgets: [] })),
+    });
+    useDashboardLayoutStore.getState().upsertView({ id: 'one-too-many', name: '', widgets: [] });
+    expect(useDashboardLayoutStore.getState().views).toHaveLength(LAYOUT_LIMITS.views);
   });
 });
