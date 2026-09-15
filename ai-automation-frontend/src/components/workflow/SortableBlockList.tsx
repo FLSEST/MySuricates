@@ -83,6 +83,7 @@ export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlo
               block={block}
               onEdit={onEditBlock}
               onRemove={onRemoveBlock}
+              allBlocks={displayBlocks}
             />
           ))}
         </div>

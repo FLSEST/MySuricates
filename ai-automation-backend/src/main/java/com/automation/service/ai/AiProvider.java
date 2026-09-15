@@ -9,6 +9,12 @@ import java.util.List;
  */
 public interface AiProvider {
 
+    /**
+     * Sentinel for {@code allowedTools}: the call gets no built-in tools at all (Claude: {@code --tools ""}).
+     * Only compress-ai uses it, and only with the Claude provider.
+     */
+    List<String> NO_TOOLS = List.of("");
+
     /** Unique provider identifier, e.g. "CLAUDE", "CODEX". */
     String getId();
 

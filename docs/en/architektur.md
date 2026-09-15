@@ -194,7 +194,7 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct Mappers (Entity ↔ DTO)
 ├── executor/            Workflow Execution Engine
-│   └── blocks/          17 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
+│   └── blocks/          19 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Configuration classes, Seeders (Skill, Template, OnboardingProfile)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
@@ -267,7 +267,7 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 
 **Container row:** `ContainerService.createAndStartContainer` updates an existing `containers` row (upsert) instead of deleting and re-inserting it — the delete was un-scheduled during flush by the `Project.container` cascade, so the following INSERT failed on `UNIQUE(containers.project_id)`. The per-project lock now stays in the map (removing it under contention creates a second monitor), and `lastActivityAt` is stamped by a JPQL update (`ContainerRepository.touchActivity`) rather than a detached merge.
 
-### Block Types (14 total)
+### Block Types (16 total)
 
 | Type | Executor | Description |
 |---|---|---|
@@ -285,6 +285,8 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 | `human-input` | `HumanInputBlockExecutor` | Collects user input via WebSocket, stores as context variable |
 | `integration` | `IntegrationBlockExecutor` | Executes an action on an external integration provider |
 | `document` | `DocumentBlockExecutor` | Extracts text from PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
+| `compress` | `CompressBlockExecutor` | Rule-based compression of an earlier block output (stage chain, 0 tokens) |
+| `compress-ai` | `CompressAiBlockExecutor` | Tool-less AI compression of an earlier block output with input/output limits |
 
 **Template variables** (`{{ variable }}`, `${varName}`) are resolved at runtime in the `ExecutionContext`. `{{ previous_output }}` contains the output of the previous block.
 

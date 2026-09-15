@@ -83,7 +83,10 @@ final class WorkflowFixtures {
                         block("document", null, Map.of("file_path", "docs/report.md", "mode", "append")),
                         block("todo-create", null, Map.of("title", "Neu", "priority", "HIGH", "tags", List.of("bug"))),
                         block("todo-update", null, Map.of("todo_id", "{{ todo_id }}", "status", "IN_PROGRESS")),
-                        block("todo-close", null, Map.of("todo_id", "{{ todo_id }}")))),
+                        block("todo-close", null, Map.of("todo_id", "{{ todo_id }}")),
+                        block("compress", "kompakt", Map.of("source", "Build", "max_chars", 5000,
+                                "stages", List.of(Map.of("op", "lines.tail", "lines", 50)))),
+                        block("compress-ai", null, Map.of("source", "kompakt", "instruction", "Fehler nennen", "max_chars", 1000)))),
                 workflow("Unbekannt", List.of(block("quantum", null, Map.of()))),
                 workflow("Sonderzeichen & <Umlaute> \"Ä\"", List.of(
                         block("shell", "A & B <C>", Map.of(

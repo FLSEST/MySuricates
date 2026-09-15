@@ -39,7 +39,7 @@ class SourceSizeRatchetTest {
 
     /** Relative to src/main/java, forward slashes. Value = ceiling (current size when listed). */
     static final Map<String, Integer> ALLOWLIST = Map.ofEntries(
-            entry("com/automation/service/ai/HostClaudeService.java", 436),
+            entry("com/automation/service/ai/HostClaudeService.java", 411),
             entry("com/automation/service/assistant/AssistantActionSuggestionService.java", 427),
             entry("com/automation/service/cli/CommandExecutorService.java", 365),
             entry("com/automation/service/cli/ContainerShellService.java", 350),

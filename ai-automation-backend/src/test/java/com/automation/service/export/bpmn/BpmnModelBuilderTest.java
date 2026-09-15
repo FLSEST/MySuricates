@@ -224,4 +224,20 @@ class BpmnModelBuilderTest {
         assertThat(sub.documentation).startsWith("Wiederholen solange:");
         assertThat(sub.children.get(1).kind).isEqualTo(BpmnModel.Kind.SCRIPT_TASK);
     }
+
+    @Test
+    void komprimierungsBloeckeWerdenScriptUndServiceTask() {
+        BpmnModel model = build(WorkflowFixtures.workflow("Komprimierung", List.of(
+                WorkflowFixtures.block("compress", "kompakt", Map.of("source", "Build",
+                        "stages", List.of(Map.of("op", "lines.tail", "lines", 50)))),
+                WorkflowFixtures.block("compress-ai", null, Map.of("source", "kompakt", "instruction", "Fehler nennen")))));
+
+        BpmnModel.Node compress = model.nodes.stream().filter(n -> "compress".equals(n.blockType)).findFirst().orElseThrow();
+        BpmnModel.Node ai = model.nodes.stream().filter(n -> "compress-ai".equals(n.blockType)).findFirst().orElseThrow();
+        assertThat(compress.kind).isEqualTo(BpmnModel.Kind.SCRIPT_TASK);
+        assertThat(compress.scriptFormat).isEqualTo("mysuricates-compress");
+        assertThat(compress.script).isEqualTo("source(Build) | lines.tail(50)");
+        assertThat(compress.warning).isNull();
+        assertThat(ai.kind).isEqualTo(BpmnModel.Kind.SERVICE_TASK);
+    }
 }

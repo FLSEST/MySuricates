@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  formatMetadataValue, persistedForEachItems, persistedTotalItems, stepMetadataSummary, wrapperFacts,
+  compressionFacts, formatMetadataValue, persistedForEachItems, persistedTotalItems, stepMetadataSummary, wrapperFacts,
 } from '../stepMetadata';
 import type { StepResult } from '../../../types';
 
@@ -63,5 +63,28 @@ describe('stepMetadata', () => {
     expect(persistedForEachItems(step(undefined))).toEqual([]);
     expect(persistedForEachItems(step({ items: 'nope' }))).toEqual([]);
     expect(persistedTotalItems(step({ totalItems: 'x' }))).toBeNull();
+  });
+});
+
+describe('compressionFacts', () => {
+  it('reads the compression contract and ignores other steps', () => {
+    const facts = compressionFacts({
+      id: 's', stepIndex: 3, input: '', output: '', status: 'COMPLETED', durationMs: 1, error: null,
+      metadata: {
+        derivedOutput: true,
+        compression: {
+          source: { block: 'backend_tests', stepIndex: 0, status: 'FAILED', exitCode: 1 },
+          inChars: 740808, outChars: 17950, maxChars: 20000, capped: false,
+          stages: [{ op: 'lines.filter', inChars: 736706, outChars: 150220, note: '−8.914 Zeilen' }],
+        },
+      },
+    });
+
+    expect(facts).toEqual({
+      source: { block: 'backend_tests', stepIndex: 0, status: 'FAILED', exitCode: 1 },
+      inChars: 740808, outChars: 17950, maxChars: 20000, capped: false,
+      stages: [{ op: 'lines.filter', inChars: 736706, outChars: 150220, note: '−8.914 Zeilen' }],
+    });
+    expect(compressionFacts({ id: 's', stepIndex: 0, input: '', output: '', status: 'COMPLETED', durationMs: 1, error: null, metadata: {} })).toBeNull();
   });
 });

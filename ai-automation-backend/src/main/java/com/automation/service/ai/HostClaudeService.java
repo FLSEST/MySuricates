@@ -309,32 +309,7 @@ public class HostClaudeService {
             cmd.add(systemPrompt);
         }
 
-        boolean hasCallWhitelist = callAllowedTools != null && !callAllowedTools.isEmpty();
-        if (hasCallWhitelist) {
-            // Per-call strict whitelist: drop skip-permissions, let the CLI enforce the list.
-            // Other tools (Edit, Write, Bash, …) are unavailable to the model.
-            // Emit one --allowed-tools flag per tool, mirroring the global CliPermissionsConfig
-            // pattern below — the CLI accepts both space-separated and repeated flag forms, the
-            // repeated form is less ambiguous and survives shell-quoting edge cases.
-            for (String tool : callAllowedTools) {
-                cmd.add("--allowed-tools");
-                cmd.add(tool);
-            }
-        } else {
-            if (permissionsConfig.isSkipPermissions()) {
-                cmd.add("--dangerously-skip-permissions");
-            }
-            for (String tool : permissionsConfig.getAllowedTools()) {
-                cmd.add("--allowedTools");
-                cmd.add(tool);
-            }
-        }
-        if (callDisallowedTools != null && !callDisallowedTools.isEmpty()) {
-            for (String tool : callDisallowedTools) {
-                cmd.add("--disallowed-tools");
-                cmd.add(tool);
-            }
-        }
+        ClaudeToolFlags.apply(cmd, callAllowedTools, callDisallowedTools, permissionsConfig);
 
         if (config.getMaxTokens() != null) {
             cmd.add("--max-tokens");

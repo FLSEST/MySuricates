@@ -177,6 +177,13 @@ public class SwitchBlockExecutor implements BlockExecutor {
      */
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
+        if (type != null && !"shell".equals(type) && !"simple".equals(type)) {
+            Instant now = Instant.now();
+            return StepResult.builder().stepIndex(context.nextStepIndex()).status(StepStatus.FAILED)
+                    .input("switch: " + type)
+                    .output("Blocktyp '" + type + "' wird in switch nicht unterstützt — nur shell und simple (89dd9e34)")
+                    .startedAt(now).completedAt(now).durationMs(0L).build();
+        }
         Map<String, Object> nestedConfig = nestedBlock.getConfig();
         boolean isShell = ExecutionMode.isShell(nestedConfig) || "shell".equals(type);
         int shellTimeout = ((Number) nestedConfig.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();

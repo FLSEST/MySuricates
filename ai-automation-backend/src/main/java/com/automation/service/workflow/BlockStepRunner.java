@@ -98,6 +98,7 @@ public class BlockStepRunner {
         context.recordOutput(block.getName(), step.getOutput());
         context.setDerivedVariable("step_" + step.getStepIndex() + "_output",
                 step.getOutput() != null ? step.getOutput() : "");
+        context.getSourceSteps().record(block.getName(), step);
 
         // Persist context delta for potential future resume
         if (step.getStatus() == StepStatus.COMPLETED) {

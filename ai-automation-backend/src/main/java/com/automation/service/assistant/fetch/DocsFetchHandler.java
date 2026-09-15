@@ -189,6 +189,24 @@ public class DocsFetchHandler {
                     **Block type: document** — OCR/document processing (PDF, images).
                     Required config: file_path (string or template variable).
                     Optional: extract_mode (text/structured), language (hint for OCR).
+                    """),
+            Map.entry("compress", """
+                    **Block type: compress** — Deterministic compression of ONE earlier block output. No AI, 0 tokens.
+                    Required config: source (block name or "previous"), stages (list of {op, …}).
+                    Stages: text.normalize, text.truncate{max_chars,keep=head|tail|head_tail}, lines.filter{include,exclude,before,after},
+                    lines.replace{pattern,replacement}, lines.dedupe{count,consecutive_only}, lines.head{lines}, lines.tail{lines},
+                    markdown.section{headings,level}, json.select{paths}, json.limit{path,count}, json.sort{path,by,order}, json.to_lines{path,template "{field}"}.
+                    Optional: max_chars (default 20000, hard cap incl. header), timeout_seconds (default 30).
+                    Output: header with the source's stored status/exit code, stage line, blank line, content. Reference it via {{ block.<name>.output }}.
+                    Example: { "source": "backend_tests", "stages": [{"op":"lines.filter","exclude":["^\\\\s+at "]},{"op":"text.truncate","max_chars":18000}] }
+                    """),
+            Map.entry("compress-ai", """
+                    **Block type: compress-ai** — AI compression of ONE earlier block output: single Claude call without tools.
+                    Required config: source (block name or "previous").
+                    Optional: instruction (literal text, no placeholders), max_chars (default 4000), model, effort, timeout_seconds,
+                    provider (only "CLAUDE" — set "provider": "CLAUDE" when the workflow uses another provider).
+                    Input above setting compress-ai-max-input-chars (default 60000) fails without a call — put a compress block before it.
+                    Example: { "source": "backend_kompakt", "instruction": "Name failing tests with cause, one line each", "model": "haiku" }
                     """)
     );
 

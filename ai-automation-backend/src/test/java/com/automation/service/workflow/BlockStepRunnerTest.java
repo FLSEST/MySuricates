@@ -356,4 +356,22 @@ class BlockStepRunnerTest {
         assertThat(LiveOutput.current()).isSameAs(LiveOutputSink.NOOP);
         verify(liveLog).flush("run-1");
     }
+
+    // ── runStep: source index ──────────────────────────────────────────────
+
+    @Test
+    void runStep_recordsFinishedStepInSourceIndex() {
+        BlockDefinition block = block("backend_tests", null);
+        StepResult executed = result(StepStatus.FAILED, "boom");
+        executed.getMetadata().put("exitCode", 2);
+        when(blockExecutor.execute(eq(block), any())).thenReturn(executed);
+        StepResult step = runner.startStep(run, 0, block);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        var source = context.getSourceSteps().find("backend_tests").orElseThrow();
+        assertThat(source.status()).isEqualTo(StepStatus.FAILED);
+        assertThat(source.exitCode()).isEqualTo(2);
+        assertThat(source.blockType()).isEqualTo("simple");
+    }
 }

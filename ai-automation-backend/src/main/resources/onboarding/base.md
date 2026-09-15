@@ -139,6 +139,8 @@ Headers: X-API-Key: $API_KEY
 | `approval` | Warten auf Genehmigung |
 | `sub-workflow` | Verschachtelter Workflow |
 | `human-input` | User-Eingabe |
+| `compress` | Ausgabe regelbasiert verdichten |
+| `compress-ai` | Ausgabe per KI verdichten |
 
 ### Regeln
 

@@ -21,11 +21,12 @@ import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeade
 import { WorkflowDetailSidebar } from '../components/workflow/WorkflowDetailSidebar';
 import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModals';
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
+import { blockFromDraft, draftFromBlock, emptyDraft, type BlockDraft } from '../components/workflow/blockEdit';
 import { useT } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { buildDefinitionText, blockLineRanges } from '../utils/workflowDefinition';
 import { readContextSchema } from '../utils/contextSchema';
-import type { BlockDefinition, BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
+import type { BlockType, OptimizeResult, UpdateWorkflowRequest } from '../types';
 
 export function WorkflowDetail() {
   const { id } = useParams<{ id: string }>();
@@ -51,11 +52,7 @@ export function WorkflowDetail() {
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [showEditBlock, setShowEditBlock] = useState(false);
   const [editBlockIndex, setEditBlockIndex] = useState<number>(-1);
-  const [editBlock, setEditBlock] = useState<{ type: BlockType; config: string; skillIds: string[] }>({
-    type: 'simple',
-    config: '{}',
-    skillIds: [],
-  });
+  const [editBlock, setEditBlock] = useState<BlockDraft>(emptyDraft('simple', '{}'));
   const [showAddSkill, setShowAddSkill] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [showEditInstructions, setShowEditInstructions] = useState(false);
@@ -63,11 +60,7 @@ export function WorkflowDetail() {
   const [optimizeResult, setOptimizeResult] = useState<OptimizeResult | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
   const [editForm, setEditForm] = useState({ name: '', description: '', icon: '' });
-  const [newBlock, setNewBlock] = useState<{ type: BlockType; config: string; skillIds: string[] }>({
-    type: 'simple',
-    config: JSON.stringify({ command: '' }, null, 2),
-    skillIds: [],
-  });
+  const [newBlock, setNewBlock] = useState<BlockDraft>(emptyDraft());
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
@@ -141,14 +134,13 @@ export function WorkflowDetail() {
 
   const handleAddBlock = () => {
     try {
-      const config = JSON.parse(newBlock.config);
-      const block: BlockDefinition = { type: newBlock.type, config, ...(newBlock.skillIds.length > 0 ? { skillIds: newBlock.skillIds } : {}) };
+      const block = blockFromDraft(newBlock);
       updateWorkflow.mutate(
         { id: workflow.id, data: { blocks: [...workflow.blocks, block] } },
         {
           onSuccess: () => {
             setShowAddBlock(false);
-            setNewBlock({ type: 'simple', config: JSON.stringify({ command: '' }, null, 2), skillIds: [] });
+            setNewBlock(emptyDraft());
           },
         }
       );
@@ -166,7 +158,7 @@ export function WorkflowDetail() {
     const block = workflow.blocks[index];
     if (!block) return;
     setEditBlockIndex(index);
-    setEditBlock({ type: block.type, config: JSON.stringify(block.config, null, 2), skillIds: block.skillIds ?? [] });
+    setEditBlock(draftFromBlock(block));
     setBlockReveal(revealText ? { text: revealText, nonce: Date.now() } : null);
     setShowEditBlock(true);
   };
@@ -178,6 +170,7 @@ export function WorkflowDetail() {
     'skill-capability': 'capability', 'sub-workflow': 'workflow_id',
     conditional: 'condition', switch: 'expression', foreach: 'variable_name',
     while: 'condition_command', document: 'file_path',
+    compress: 'source', 'compress-ai': 'source',
   };
 
   /** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */
@@ -210,9 +203,8 @@ export function WorkflowDetail() {
 
   const handleSaveBlock = () => {
     try {
-      const config = JSON.parse(editBlock.config);
       const blocks = [...workflow.blocks];
-      blocks[editBlockIndex] = { type: editBlock.type, config, ...(editBlock.skillIds.length > 0 ? { skillIds: editBlock.skillIds } : {}) };
+      blocks[editBlockIndex] = blockFromDraft(editBlock, workflow.blocks[editBlockIndex]);
       updateWorkflow.mutate(
         { id: workflow.id, data: { blocks } },
         { onSuccess: () => setShowEditBlock(false) }

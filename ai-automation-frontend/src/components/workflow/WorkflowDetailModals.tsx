@@ -2,6 +2,8 @@ import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
+import type { BlockDraft } from './blockEdit';
+import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
 import { useT } from '../../i18n';
 import { BLOCK_TYPES } from '../../types';
 import type {
@@ -32,8 +34,8 @@ interface WorkflowDetailModalsProps {
 
   showAddBlock: boolean;
   setShowAddBlock: (v: boolean) => void;
-  newBlock: { type: BlockType; config: string; skillIds: string[] };
-  setNewBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
+  newBlock: BlockDraft;
+  setNewBlock: (v: BlockDraft) => void;
   onAddBlock: () => void;
   allWorkflows: WorkflowListItem[] | undefined;
   allSkills: AvailableSkill[];
@@ -41,8 +43,8 @@ interface WorkflowDetailModalsProps {
   showEditBlock: boolean;
   setShowEditBlock: (v: boolean) => void;
   editBlockIndex: number;
-  editBlock: { type: BlockType; config: string; skillIds: string[] };
-  setEditBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
+  editBlock: BlockDraft;
+  setEditBlock: (v: BlockDraft) => void;
   onSaveBlock: () => void;
   editBlockRevealText?: string;
   editBlockRevealNonce?: number;
@@ -237,6 +239,8 @@ export function WorkflowDetailModals({
                 'todo-create': { title: '', description: '', priority: 'MEDIUM', tags: [], variable_name: 'todo_id' },
                 'todo-update': { id: '{{ todo_id }}', title: '', description: '' },
                 'todo-close': { id: '{{ todo_id }}' },
+                compress: { source: '', stages: [{ op: 'text.normalize' }, { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' }], max_chars: 20000 },
+                'compress-ai': { source: '', instruction: '', max_chars: 4000, provider: 'CLAUDE' },
               };
               setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type], null, 2) });
             }}
@@ -245,6 +249,27 @@ export function WorkflowDetailModals({
               label: t.workflows.blockTypes[type],
             }))}
           />
+          <Input
+            label={t.workflows.blockName}
+            value={newBlock.name}
+            onChange={(e) => setNewBlock({ ...newBlock, name: e.target.value })}
+            placeholder="backend_tests"
+            hint={t.workflows.blockNameHint}
+          />
+          {newBlock.type === 'compress' && (
+            <Select
+              label={t.workflows.compression.preset}
+              value=""
+              onChange={(e) => {
+                const preset = e.target.value as CompressPresetId;
+                if (preset) setNewBlock({ ...newBlock, config: applyPreset(newBlock.config, preset) });
+              }}
+              options={[
+                { value: '', label: t.workflows.compression.presetNone },
+                ...(Object.keys(COMPRESS_PRESETS) as CompressPresetId[]).map((id) => ({ value: id, label: t.workflows.compression.presets[id] })),
+              ]}
+            />
+          )}
           {newBlock.type === 'sub-workflow' && (
             <Select
               label={t.workflows.selectSubWorkflow}
@@ -331,6 +356,27 @@ export function WorkflowDetailModals({
               label: t.workflows.blockTypes[type],
             }))}
           />
+          <Input
+            label={t.workflows.blockName}
+            value={editBlock.name}
+            onChange={(e) => setEditBlock({ ...editBlock, name: e.target.value })}
+            placeholder="backend_tests"
+            hint={t.workflows.blockNameHint}
+          />
+          {editBlock.type === 'compress' && (
+            <Select
+              label={t.workflows.compression.preset}
+              value=""
+              onChange={(e) => {
+                const preset = e.target.value as CompressPresetId;
+                if (preset) setEditBlock({ ...editBlock, config: applyPreset(editBlock.config, preset) });
+              }}
+              options={[
+                { value: '', label: t.workflows.compression.presetNone },
+                ...(Object.keys(COMPRESS_PRESETS) as CompressPresetId[]).map((id) => ({ value: id, label: t.workflows.compression.presets[id] })),
+              ]}
+            />
+          )}
           {editBlock.type === 'sub-workflow' && (
             <Select
               label={t.workflows.selectSubWorkflow}

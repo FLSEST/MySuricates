@@ -225,6 +225,7 @@ export const BLOCK_TYPES = [
   'simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch',
   'skill-capability', 'approval', 'agentic', 'sub-workflow', 'human-input',
   'integration', 'document', 'todo-create', 'todo-update', 'todo-close',
+  'compress', 'compress-ai',
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -235,7 +236,7 @@ export type BlockType = (typeof BLOCK_TYPES)[number];
  * are included because their inline `command` runs through the AI provider unless shell mode.
  */
 export const AI_BLOCK_TYPES: readonly BlockType[] = [
-  'simple', 'agentic', 'skill-capability', 'retry', 'foreach', 'while', 'conditional', 'switch',
+  'simple', 'agentic', 'skill-capability', 'retry', 'foreach', 'while', 'conditional', 'switch', 'compress-ai',
 ];
 
 export interface BlockDefinition {

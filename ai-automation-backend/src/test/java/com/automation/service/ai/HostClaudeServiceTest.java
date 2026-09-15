@@ -226,6 +226,21 @@ class HostClaudeServiceTest {
         assertThat(cmd).doesNotContain("--disallowed-tools");
     }
 
+    @Test
+    void buildActionCommand_noTools_disablesAllBuiltInTools() {
+        HostClaudeService service = createService(null, true, List.of("Bash"));
+        List<String> cmd = service.buildActionCommand("verdichte", null, "sys", AiProvider.NO_TOOLS, null);
+
+        int idx = cmd.indexOf("--tools");
+        assertThat(idx).isGreaterThanOrEqualTo(0);
+        assertThat(cmd.get(idx + 1)).isEmpty();
+        assertThat(cmd).doesNotContain("--dangerously-skip-permissions", "--allowed-tools", "--allowedTools");
+        assertThat(cmd).contains("--strict-mcp-config");
+        int settingSourcesIdx = cmd.indexOf("--setting-sources");
+        assertThat(settingSourcesIdx).isGreaterThanOrEqualTo(0);
+        assertThat(cmd.get(settingSourcesIdx + 1)).isEqualTo("local");
+    }
+
     // --- effort mapping ---
 
     @Test

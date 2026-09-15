@@ -205,6 +205,7 @@ public class WorkflowExecutor {
                     instructions, model, provider, effort, resumePreviousOutput, run.getDefinitionHash(), run.getTriggerSource()));
 
             executionRegistry.promote(runId, context);
+            if (skipToStepIndex > 0) ResumeOutputSeeder.seed(context, run.getSteps(), skipToStepIndex); // f9384e48
             Project executionProject = isolated
                     ? workspaces.prepare(run, project, workflowMeta, context, run.getMetadata().containsKey("workspace")) : project;
             executionContextFactory.writeProjectContextFiles(executionProject, workflowId, skills);
