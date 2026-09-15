@@ -223,6 +223,15 @@ export const en = {
     widgetNoData: 'No data right now — shown again as soon as there is some.',
     widgetFailed: 'This widget could not be displayed.',
     dataUnavailable: 'Dashboard data unavailable:',
+    filter: {
+      label: 'Filter of this view',
+      project: 'Project',
+      allProjects: 'All projects',
+      unknownProject: 'Unknown project',
+      days: 'Last {days} days',
+      active: 'Filtered:',
+      hint: 'Applies to charts, cost and statistics of the selected period. Todos, schedules, projects and the overall numbers (workflows, runs today, success rate, top workflows) stay unfiltered.',
+    },
     views: {
       label: 'Dashboard views',
       defaultName: 'Overview',

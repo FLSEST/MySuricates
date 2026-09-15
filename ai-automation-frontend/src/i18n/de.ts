@@ -225,6 +225,15 @@ export const de: TranslationKeys = {
     widgetNoData: 'Derzeit keine Daten – erscheint wieder, sobald welche da sind.',
     widgetFailed: 'Dieses Widget konnte nicht angezeigt werden.',
     dataUnavailable: 'Dashboard-Daten nicht verfügbar:',
+    filter: {
+      label: 'Filter dieser Ansicht',
+      project: 'Projekt',
+      allProjects: 'Alle Projekte',
+      unknownProject: 'Unbekanntes Projekt',
+      days: 'Letzte {days} Tage',
+      active: 'Gefiltert:',
+      hint: 'Gilt für Diagramme, Kosten und Statistiken im gewählten Zeitraum. Todos, Zeitpläne, Projekte und die Gesamtzahlen (Workflows, Ausführungen heute, Erfolgsrate, Top-Workflows) bleiben ungefiltert.',
+    },
     views: {
       label: 'Dashboard-Ansichten',
       defaultName: 'Übersicht',
