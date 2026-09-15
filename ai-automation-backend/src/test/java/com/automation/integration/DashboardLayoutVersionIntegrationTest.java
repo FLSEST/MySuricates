@@ -96,6 +96,15 @@ class DashboardLayoutVersionIntegrationTest {
     }
 
     @Test
+    void retention_below_one_still_keeps_the_newest_version() {
+        config.setRetentionCount(0);
+        String v1 = service.save(body("todos", null, false)).version().getId();
+        String v2 = service.save(body("recent-runs", v1, false)).version().getId();
+
+        assertThat(repository.findAll()).extracting(DashboardLayoutVersion::getId).contains(v2);
+    }
+
+    @Test
     void newest_version_follows_save_order_even_within_one_millisecond() {
         String v1 = service.save(body("todos", null, false)).version().getId();
         String v2 = service.save(body("recent-runs", v1, false)).version().getId();

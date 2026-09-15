@@ -69,7 +69,8 @@ public class DashboardLayoutVersionService {
                 .contentHash(save.contentHash())
                 .content(save.canonicalContent())
                 .build());
-        repository.pruneUnnamed(config.getRetentionCount());
+        // A configured retention of 0 (or negative) must never delete the version just saved above.
+        repository.pruneUnnamed(Math.max(1, config.getRetentionCount()));
         return new SaveResult(version, true);
     }
 

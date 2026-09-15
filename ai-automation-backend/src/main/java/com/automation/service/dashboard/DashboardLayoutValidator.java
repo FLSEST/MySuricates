@@ -209,7 +209,12 @@ public class DashboardLayoutValidator {
             } else if (value.isBoolean()) {
                 out.put(key, value.booleanValue());
             } else if (value.isNumber() && Double.isFinite(value.doubleValue())) {
-                out.set(key, value);
+                // Rebuilt through our own factory rather than copying the parsed node: an integral
+                // double (3.0) must canonicalize identically to an int (3) so equal layouts hash equally.
+                double d = value.doubleValue();
+                out.set(key, d == Math.rint(d) && Math.abs(d) < 1e15
+                        ? CANONICAL.getNodeFactory().numberNode((long) d)
+                        : CANONICAL.getNodeFactory().numberNode(d));
             } else {
                 throw invalid(path + "." + echo(key) + " must be a string (at most " + MAX_CONFIG_STRING
                         + " characters), a finite number or a boolean");

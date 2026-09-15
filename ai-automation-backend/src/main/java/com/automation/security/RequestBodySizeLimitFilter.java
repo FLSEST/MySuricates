@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
 
@@ -29,6 +30,8 @@ import java.io.IOException;
 @Slf4j
 public abstract class RequestBodySizeLimitFilter extends OncePerRequestFilter {
 
+    private static final UrlPathHelper PATH_HELPER = new UrlPathHelper();
+
     /** Exact request URI the limit applies to (POST only). */
     protected abstract String targetPath();
 
@@ -37,8 +40,9 @@ public abstract class RequestBodySizeLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        // Decoded path so a percent-encoded target path (e.g. %6Cayouts) cannot slip past the guard.
         return !("POST".equalsIgnoreCase(request.getMethod())
-                && targetPath().equals(request.getRequestURI()));
+                && targetPath().equals(PATH_HELPER.getPathWithinApplication(request)));
     }
 
     @Override

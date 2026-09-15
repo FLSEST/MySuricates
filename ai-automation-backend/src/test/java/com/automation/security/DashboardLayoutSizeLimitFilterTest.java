@@ -51,6 +51,19 @@ class DashboardLayoutSizeLimitFilterTest {
     }
 
     @Test
+    void percentEncodedPath_isStillLimited() throws Exception {
+        var req = new MockHttpServletRequest("POST", "/api/v1/dashboard/%6Cayouts");
+        req.setContent(new byte[300_000]);
+        var res = new MockHttpServletResponse();
+        var chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        verify(chain, never()).doFilter(req, res);
+        assertThat(res.getStatus()).isEqualTo(413);
+    }
+
+    @Test
     void otherMethodsAndPaths_areNotLimited() throws Exception {
         var patch = new MockHttpServletRequest("PATCH", "/api/v1/dashboard/layouts/version-1");
         patch.setContent(new byte[300_000]);

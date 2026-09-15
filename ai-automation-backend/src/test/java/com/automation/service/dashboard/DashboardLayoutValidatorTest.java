@@ -93,6 +93,20 @@ class DashboardLayoutValidatorTest {
     }
 
     @Test
+    void integral_double_config_values_canonicalize_the_same_as_ints() {
+        ObjectNode intBody = validBody();
+        config(intBody).put("count", 3);
+        ObjectNode doubleBody = validBody();
+        config(doubleBody).put("count", 3.0d);
+
+        ValidatedLayoutSave intSave = validator.validateSave(intBody);
+        ValidatedLayoutSave doubleSave = validator.validateSave(doubleBody);
+
+        assertThat(doubleSave.canonicalContent()).isEqualTo(intSave.canonicalContent());
+        assertThat(doubleSave.contentHash()).isEqualTo(intSave.contentHash());
+    }
+
+    @Test
     void accepts_missing_base_and_force() {
         ObjectNode body = validBody();
         body.remove("baseVersionId");

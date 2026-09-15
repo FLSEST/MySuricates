@@ -3,7 +3,7 @@ package com.automation.security;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Caps POST /api/v1/dashboard/layouts — a full layout (20 views × 100 widgets) stays well below 256 KiB. */
+/** Caps POST /api/v1/dashboard/layouts at 256 KiB — typical layouts are a few KiB; a maximal one (20 views × 100 configured widgets) comes close to the limit. */
 @Component
 public class DashboardLayoutSizeLimitFilter extends RequestBodySizeLimitFilter {
 
