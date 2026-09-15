@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Check, History, Pencil, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui';
 import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
-import { useDashboard } from '../hooks/useLearning';
+import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
+import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
+import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import { useDashboardLayout } from '../hooks/useDashboardLayout';
 import { hasLocalLayoutChanges, useDashboardLayoutSync } from '../hooks/useDashboardLayoutSync';
 import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
@@ -32,10 +34,18 @@ function LiveClock() {
   );
 }
 
+/** The active view's filter decides what the page's one learning-dashboard query loads (spec E4). */
 export function Dashboard() {
+  const filter = useDashboardLayoutStore((s) => (s.views.find((v) => v.id === s.activeViewId) ?? s.views[0])?.filter);
+  return (
+    <DashboardDataProvider filter={filter}>
+      <DashboardPage />
+    </DashboardDataProvider>
+  );
+}
+
+function DashboardPage() {
   const t = useT();
-  // Widgets load their own data and show skeletons; the page only reports a failed dashboard query.
-  const { error, refetch } = useDashboard();
   const layout = useDashboardLayout();
   const [editMode, setEditMode] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -105,24 +115,7 @@ export function Dashboard() {
         />
       )}
 
-      {error && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger-subtle px-4 py-3"
-        >
-          <p className="min-w-0 text-sm text-text">
-            {t.dashboard.dataUnavailable} <span className="text-text-secondary">{error.message}</span>
-          </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<RotateCcw className="w-3.5 h-3.5" />}
-            onClick={() => refetch()}
-          >
-            {t.common.retry}
-          </Button>
-        </div>
-      )}
+      <DashboardDataErrorBanner />
 
       {editMode && (
         <HiddenWidgetsBar widgets={layout.hidden} onShow={(id) => layout.setHidden(id, false)} />

@@ -2,7 +2,7 @@ import {
   FolderKanban, GitBranch, Zap, TrendingUp, Coins, CalendarClock, CalendarRange, Info,
 } from 'lucide-react';
 import { Card } from '../ui';
-import { useDashboard } from '../../hooks/useLearning';
+import { useDashboardData } from './dashboardDataContext';
 import { useProjects } from '../../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
 import { useSystemInfo } from '../../hooks/useSystem';
@@ -44,7 +44,7 @@ export function ActiveProjectsStat() {
 
 export function TotalWorkflowsStat() {
   const t = useT();
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
@@ -58,7 +58,7 @@ export function TotalWorkflowsStat() {
 
 export function RunsTodayStat() {
   const t = useT();
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
@@ -72,7 +72,7 @@ export function RunsTodayStat() {
 
 export function SuccessRateStat() {
   const t = useT();
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
@@ -86,13 +86,13 @@ export function SuccessRateStat() {
 
 export function TotalCostStat() {
   const t = useT();
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading, days } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
   const cost = stats?.totalCostUsd30d;
   return (
     <StatCard
       icon={<Coins className="w-4 h-4 text-warning" />}
-      label={t.dashboard.totalCost}
+      label={t.dashboard.totalCostDays.replace('{days}', () => String(days))}
       value={!stats ? '-' : cost != null && cost > 0
         ? `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`
         : '$0.00'}

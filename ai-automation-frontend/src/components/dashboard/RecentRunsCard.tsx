@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
-import { useDashboard } from '../../hooks/useLearning';
+import { useDashboardData } from './dashboardDataContext';
 import { useT, useI18nStore } from '../../i18n';
 import { formatDuration, formatRelativeTime, formatDateTime } from '../../utils/formatTime';
 import type { WorkflowRun } from '../../types';
@@ -12,7 +12,7 @@ export function RecentRunsCard() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="twoThirds" />;
 
   return (

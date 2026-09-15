@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, GitBranch, Zap } from 'lucide-react';
 import { Card, CardHeader, Button } from '../ui';
-import { useDashboard } from '../../hooks/useLearning';
+import { useDashboardData } from './dashboardDataContext';
 import { useT } from '../../i18n';
 
 export function QuickActionsCard() {
   const t = useT();
   const navigate = useNavigate();
-  const { data: stats } = useDashboard();
+  const { data: stats } = useDashboardData();
 
   return (
     <Card>

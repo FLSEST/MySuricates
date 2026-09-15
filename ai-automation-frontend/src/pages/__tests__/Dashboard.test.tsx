@@ -160,7 +160,7 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     );
     renderWithProviders(<Dashboard />);
 
-    expect(await screen.findByText(/Dashboard data unavailable/)).toBeInTheDocument();
+    expect(await screen.findByTestId('dashboard-data-error')).toHaveTextContent('Dashboard data unavailable');
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(await screen.findByText('Test Todo')).toBeInTheDocument();
     // No fake zeros without data.
@@ -271,5 +271,26 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     // ("{device}") instead of the literal label — that must not happen.
     expect(banner).toHaveTextContent('$&{time}');
     expect(banner).not.toHaveTextContent('{device}');
+  });
+
+  it('loads the dashboard data once for the active view and its filter', async () => {
+    const searches: string[] = [];
+    server.use(
+      http.get('/api/v1/learning/dashboard', ({ request }) => {
+        searches.push(new URL(request.url).search);
+        return HttpResponse.json(DASHBOARD);
+      }),
+    );
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [], filter: { days: 7, projectId: 'p1' } }] });
+
+    const { queryClient } = renderWithProviders(<Dashboard />);
+    expect(await screen.findByText('Recent Runs')).toBeInTheDocument();
+
+    expect(searches.length).toBeGreaterThan(0);
+    expect(searches.every((search) => search === '?days=7&projectId=p1')).toBe(true);
+    const queries = queryClient.getQueryCache().findAll({ queryKey: ['learning', 'dashboard'] });
+    expect(queries).toHaveLength(1);
+    expect(queries[0]?.getObserversCount()).toBe(1);
+    expect(slot('stat-total-cost')).toHaveTextContent('Cost (7d)');
   });
 });

@@ -197,6 +197,7 @@ export const de: TranslationKeys = {
     noRecentRuns: 'Keine aktuellen Workflow-Ausführungen',
     topWorkflows: 'Top Workflows',
     totalCost: 'Kosten (30T)',
+    totalCostDays: 'Kosten ({days}T)',
     plannedToday: 'Geplant heute',
     plannedThisWeek: 'Geplant Woche',
     version: 'Version',

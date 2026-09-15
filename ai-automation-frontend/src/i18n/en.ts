@@ -195,6 +195,7 @@ export const en = {
     noRecentRuns: 'No recent workflow runs',
     topWorkflows: 'Top Workflows',
     totalCost: 'Cost (30d)',
+    totalCostDays: 'Cost ({days}d)',
     plannedToday: 'Planned Today',
     plannedThisWeek: 'Planned This Week',
     version: 'Version',
