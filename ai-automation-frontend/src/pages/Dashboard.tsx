@@ -54,7 +54,7 @@ function DashboardPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const sync = useDashboardLayoutSync();
   useDashboardViewParam();
-  // While a server version is loaded, restored or saved, the layout can change underneath: no edits.
+  // While a version is restored, adopted or saved (`busy`), the layout can change underneath: no edits.
   const locked = sync.busy;
 
   const toggleEditMode = () => {
