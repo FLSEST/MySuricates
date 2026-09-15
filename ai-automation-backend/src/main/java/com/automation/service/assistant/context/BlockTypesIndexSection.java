@@ -30,7 +30,8 @@ public class BlockTypesIndexSection implements AssistantContextSection {
             new BlockTypeEntry("document", "OCR/document processing (PDF, images)"),
             new BlockTypeEntry("todo-create", "Creates a TODO natively (title, priority, tags), stores its id in a variable"),
             new BlockTypeEntry("todo-update", "Updates fields of an existing TODO by id (title, description, priority, tags)"),
-            new BlockTypeEntry("todo-close", "Sets an existing TODO to DONE by id")
+            new BlockTypeEntry("todo-close", "Sets an existing TODO to DONE by id"),
+            new BlockTypeEntry("compress", "Deterministic compression of ONE earlier block output (stages: text/lines/markdown/json), visible step, no AI")
     );
 
     @Override

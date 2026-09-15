@@ -49,6 +49,7 @@ class BlockTypesIndexSectionTest {
                 .contains("[todo-create]")
                 .contains("[todo-update]")
                 .contains("[todo-close]")
+                .contains("[compress]")
                 .contains("<fetch type=\"block-spec\"");
     }
 

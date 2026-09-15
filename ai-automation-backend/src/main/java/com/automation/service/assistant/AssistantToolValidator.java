@@ -26,7 +26,7 @@ public class AssistantToolValidator {
     static final Set<String> KNOWN_BLOCK_TYPES = Set.of(
             "simple", "shell", "retry", "conditional", "foreach", "while", "switch",
             "agentic", "approval", "sub-workflow", "skill-capability", "human-input",
-            "integration", "document", "todo-create", "todo-update", "todo-close");
+            "integration", "document", "todo-create", "todo-update", "todo-close", "compress");
 
     /** Block types whose config must contain a non-blank {@code command}. */
     private static final Set<String> COMMAND_BLOCK_TYPES =
