@@ -22,6 +22,7 @@ class BpmnModel {
         String blockType;       // Original-Block-Typ (z. B. "shell", "conditional") für verlustfreien Reimport
         String blockName;       // Original-Block-Name (nur wenn gesetzt) für verlustfreien Reimport
         String script;          // nur SCRIPT_TASK
+        String scriptFormat;    // nur SCRIPT_TASK: null = bash
         String calledElement;   // nur CALL_ACTIVITY
         String loop;            // null | "multiInstanceSequential" | "standardLoop"
         String defaultFlowId;   // nur EXCLUSIVE_GATEWAY mit Default-Pfad

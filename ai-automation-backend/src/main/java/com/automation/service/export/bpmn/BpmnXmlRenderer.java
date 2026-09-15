@@ -71,7 +71,7 @@ class BpmnXmlRenderer {
             el.setAttribute("name", n.name);
         }
         if (n.kind == BpmnModel.Kind.SCRIPT_TASK) {
-            el.setAttribute("scriptFormat", "bash");
+            el.setAttribute("scriptFormat", n.scriptFormat != null ? n.scriptFormat : "bash");
         }
         if (n.kind == BpmnModel.Kind.CALL_ACTIVITY && n.calledElement != null && !n.calledElement.isBlank()) {
             el.setAttribute("calledElement", n.calledElement);
