@@ -31,7 +31,14 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
       name: 'dashboard-layout',
       version: LAYOUT_FORMAT_VERSION,
       partialize: ({ activeViewId, views }) => ({ activeViewId, views }),
-      migrate: (persisted, version) => sanitizeLayout(migrateLayout(persisted, version)),
+      migrate: (persisted, version) => {
+        // Data written by a newer app version: refuse (zustand then keeps the default in memory and
+        // does not write) instead of overwriting it with an older format.
+        if (version > LAYOUT_FORMAT_VERSION) {
+          throw new Error(`dashboard-layout: stored format ${version} is newer than ${LAYOUT_FORMAT_VERSION}`);
+        }
+        return sanitizeLayout(migrateLayout(persisted, version));
+      },
       // Per-browser data — never trust its shape.
       merge: (persisted, current) => ({ ...current, ...sanitizeLayout(persisted) }),
     },

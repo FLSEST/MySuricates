@@ -4,6 +4,7 @@ import {
   addWidgetInstance,
   createDefaultLayout,
   createInstanceId,
+  isCustomizedLayout,
   migrateLayout,
   moveWidget,
   normalizeWidgets,
@@ -43,6 +44,17 @@ describe('normalizeWidgets', () => {
       single('b'),
     ]);
   });
+
+  it('drops singletons stored under another id and multi instances that take a singleton id', () => {
+    const stored: WidgetInstance[] = [
+      { instanceId: 'b', type: 'a' },
+      { instanceId: 'a', type: 'note' },
+      { instanceId: 'note-1', type: 'note' },
+    ];
+    expect(normalizeWidgets(stored, TYPES)).toEqual([
+      { instanceId: 'note-1', type: 'note' }, single('a'), single('b'), single('c'),
+    ]);
+  });
 });
 
 describe('moveWidget', () => {
@@ -68,11 +80,35 @@ describe('instance operations', () => {
   });
 
   it('adds, reconfigures and removes multi instances', () => {
-    const added = addWidgetInstance([single('a')], 'note', { text: 'hello' }, 'note-abc');
+    const added = addWidgetInstance([single('a')], TYPES, 'note', { text: 'hello' }, 'note-abc');
     expect(added).toEqual([single('a'), { instanceId: 'note-abc', type: 'note', config: { text: 'hello' } }]);
     const updated = updateWidgetConfig(added, 'note-abc', { text: 'bye', pinned: true });
     expect(updated[1]).toEqual({ instanceId: 'note-abc', type: 'note', config: { text: 'bye', pinned: true } });
     expect(removeWidgetInstance(updated, 'note-abc')).toEqual([single('a')]);
+  });
+
+  it('refuses to add singletons, unknown types and ids that are taken', () => {
+    const widgets: WidgetInstance[] = [single('a'), { instanceId: 'note-1', type: 'note' }];
+    expect(addWidgetInstance(widgets, TYPES, 'a', {}, 'a-2')).toBe(widgets);
+    expect(addWidgetInstance(widgets, TYPES, 'unknown', {}, 'unknown-1')).toBe(widgets);
+    expect(addWidgetInstance(widgets, TYPES, 'note', {}, 'note-1')).toBe(widgets);
+    expect(addWidgetInstance(widgets, TYPES, 'note', {}, 'b')).toBe(widgets);
+    expect(addWidgetInstance(widgets, TYPES, 'note', {}, 'note-2')).toEqual([...widgets, { instanceId: 'note-2', type: 'note' }]);
+  });
+
+  it('removes an empty config instead of storing {}', () => {
+    expect(updateWidgetConfig([{ instanceId: 'note-1', type: 'note', config: { text: 'x' } }], 'note-1', {}))
+      .toEqual([{ instanceId: 'note-1', type: 'note' }]);
+  });
+
+  it('recognizes layouts that differ from the default', () => {
+    expect(isCustomizedLayout(createDefaultLayout())).toBe(false);
+    expect(isCustomizedLayout({ activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [single('a')] }] })).toBe(true);
+    expect(isCustomizedLayout({ activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [], filter: { days: 7 } }] })).toBe(true);
+    expect(isCustomizedLayout({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }],
+    })).toBe(true);
   });
 
   it('creates instance ids that are valid, type-prefixed and unique', () => {
@@ -137,6 +173,26 @@ describe('sanitizeLayout', () => {
         { id: 'plan', name: 'P'.repeat(LAYOUT_LIMITS.nameLength), widgets: [] },
       ],
     });
+  });
+
+  it('keeps only the first widget per instance id within a view', () => {
+    const layout = sanitizeLayout({
+      activeViewId: 'default',
+      views: [{
+        id: 'default',
+        name: '',
+        widgets: [
+          { instanceId: 'a', type: 'a', hidden: true },
+          { instanceId: 'a', type: 'a' },
+          { instanceId: 'note-1', type: 'note' },
+          { instanceId: 'note-1', type: 'note', config: { text: 'x' } },
+        ],
+      }],
+    });
+    expect(layout.views[0]?.widgets).toEqual([
+      { instanceId: 'a', type: 'a', hidden: true },
+      { instanceId: 'note-1', type: 'note' },
+    ]);
   });
 });
 
@@ -212,5 +268,19 @@ describe('dashboardLayoutStore', () => {
     await useDashboardLayoutStore.persist.rehydrate();
     const { activeViewId, views } = useDashboardLayoutStore.getState();
     expect({ activeViewId, views }).toEqual(createDefaultLayout());
+  });
+
+  it('leaves a layout from a newer app version untouched instead of overwriting it', async () => {
+    const newer = JSON.stringify({
+      version: 3,
+      state: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [], futureField: true }] },
+    });
+    localStorage.setItem('dashboard-layout', newer);
+
+    await useDashboardLayoutStore.persist.rehydrate();
+
+    const { activeViewId, views } = useDashboardLayoutStore.getState();
+    expect({ activeViewId, views }).toEqual(createDefaultLayout());
+    expect(localStorage.getItem('dashboard-layout')).toBe(newer);
   });
 });
