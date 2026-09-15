@@ -14,8 +14,15 @@ final class ClaudeToolFlags {
                       CliPermissionsConfig permissionsConfig) {
         if (AiProvider.NO_TOOLS.equals(callAllowedTools)) {
             // No built-in tools (compress-ai): the model can only answer from the prompt.
+            // --tools "" alone still leaves MCP servers (e.g. plugin context7) reachable and lets
+            // SessionStart plugin hooks fire — --strict-mcp-config drops MCP wiring, --setting-sources
+            // local keeps only project/local settings (no user/managed hooks). Verified with the real
+            // CLI: init event then lists no tools and no mcp servers.
             cmd.add("--tools");
             cmd.add("");
+            cmd.add("--strict-mcp-config");
+            cmd.add("--setting-sources");
+            cmd.add("local");
             return;
         }
         boolean hasCallWhitelist = callAllowedTools != null && !callAllowedTools.isEmpty();

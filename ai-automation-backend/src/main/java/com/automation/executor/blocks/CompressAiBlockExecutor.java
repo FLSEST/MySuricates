@@ -24,13 +24,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * compress-ai — condenses one earlier block output with a single AI call that has no tools, runs in a
- * neutral empty directory (no project CLAUDE.md), gets only the source text and a literal instruction,
- * and is bounded on input (setting) and output (max_chars, deterministic cut).
+ * private per-call empty directory (no project CLAUDE.md, deleted again after the call), gets only the
+ * source text and a literal instruction, and is bounded on input (setting) and output (max_chars,
+ * deterministic cut).
  */
 @Component
 @RequiredArgsConstructor
@@ -66,17 +68,23 @@ public class CompressAiBlockExecutor implements BlockExecutor {
                         + " kann nicht ohne Werkzeuge aufgerufen werden — im Block \"provider\": \"CLAUDE\" setzen");
             }
             String prompt = CompressAiPrompt.build(instruction, Math.max(CompressionOutput.MIN_BODY_CHARS, maxChars - HEADER_RESERVE), src.text());
-            StepResult ai = commandExecutor.executeStepOnHost(HostExecutionRequest.builder()
-                    .projectPath(neutralWorkdir())
-                    .block(BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", prompt))).build())
-                    .stepIndex(stepIndex)
-                    .systemPrompt(CompressAiPrompt.SYSTEM)
-                    .model(context.modelFor(block))
-                    .timeoutSeconds(timeout)
-                    .providerId(providerId)
-                    .effort(context.effortFor(block))
-                    .allowedTools(AiProvider.NO_TOOLS)
-                    .build());
+            Path workdir = createNeutralWorkdir();
+            StepResult ai;
+            try {
+                ai = commandExecutor.executeStepOnHost(HostExecutionRequest.builder()
+                        .projectPath(workdir.toString())
+                        .block(BlockDefinition.builder().type("simple").config(new HashMap<>(Map.of("command", prompt))).build())
+                        .stepIndex(stepIndex)
+                        .systemPrompt(CompressAiPrompt.SYSTEM)
+                        .model(context.modelFor(block))
+                        .timeoutSeconds(timeout)
+                        .providerId(providerId)
+                        .effort(context.effortFor(block))
+                        .allowedTools(AiProvider.NO_TOOLS)
+                        .build());
+            } finally {
+                cleanupWorkdir(workdir);
+            }
             Map<String, Object> metadata = new HashMap<>(ai.getMetadata() != null ? ai.getMetadata() : Map.of());
             String input = "compress-ai " + src.label() + " (" + CompressionNumbers.fmt(src.text().length()) + " Zeichen): "
                     + (instruction.isBlank() ? "(Standard-Zusammenfassung)" : instruction);
@@ -110,12 +118,31 @@ public class CompressAiBlockExecutor implements BlockExecutor {
                 .input(input).output(output).status(status).metadata(metadata).build();
     }
 
-    /** Empty directory outside any project, so the CLI does not load a project CLAUDE.md into the prompt. */
-    private static String neutralWorkdir() {
+    /**
+     * Fresh, private directory outside any project for exactly one call, so the CLI does not load a
+     * project (or a planted) CLAUDE.md / .claude/settings*.json into the prompt. Never reused across
+     * calls — a shared fixed directory could be pre-seeded by an earlier run or another process.
+     */
+    private static Path createNeutralWorkdir() {
         try {
-            return Files.createDirectories(Path.of(System.getProperty("java.io.tmpdir"), "mysuricates-compress-ai")).toString();
+            return Files.createTempDirectory("mysuricates-compress-ai-");
         } catch (IOException e) {
             throw new CompressionException("Arbeitsverzeichnis für compress-ai nicht anlegbar: " + e.getMessage());
+        }
+    }
+
+    /** Best-effort recursive delete of the per-call directory — cleanup failure must never mask the step result. */
+    private static void cleanupWorkdir(Path dir) {
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                    // best effort — a leftover temp dir must not fail the step
+                }
+            });
+        } catch (IOException ignored) {
+            // best effort — a leftover temp dir must not fail the step
         }
     }
 }

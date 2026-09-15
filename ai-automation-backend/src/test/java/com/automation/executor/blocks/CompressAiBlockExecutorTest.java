@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,7 +82,8 @@ class CompressAiBlockExecutorTest {
         verify(commandExecutor).executeStepOnHost(captor.capture());
         HostExecutionRequest req = captor.getValue();
         assertThat(req.allowedTools()).isEqualTo(AiProvider.NO_TOOLS);
-        assertThat(req.projectPath()).endsWith("mysuricates-compress-ai");
+        Path workdir = Path.of(req.projectPath());
+        assertThat(workdir.getFileName().toString()).startsWith("mysuricates-compress-ai-");
         assertThat(req.systemPrompt()).isEqualTo(CompressAiPrompt.SYSTEM);
         String prompt = String.valueOf(req.block().getConfig().get("command"));
         assertThat(prompt).contains("<quelle>\nLOG ").contains("Nenne Fehler {{ open_todos }}");
@@ -90,6 +93,7 @@ class CompressAiBlockExecutorTest {
                 .contains("\nZusammenfassung: KI (CLAUDE)\n\n2 Tests fehlgeschlagen: A, B");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("aiRequest").containsKey("compression");
         assertThat(r.getInput()).doesNotContain("x".repeat(100)).contains("Nenne Fehler");
+        assertThat(Files.exists(workdir)).as("per-call workdir is deleted again after execute").isFalse();
     }
 
     @Test

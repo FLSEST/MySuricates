@@ -235,6 +235,10 @@ class HostClaudeServiceTest {
         assertThat(idx).isGreaterThanOrEqualTo(0);
         assertThat(cmd.get(idx + 1)).isEmpty();
         assertThat(cmd).doesNotContain("--dangerously-skip-permissions", "--allowed-tools", "--allowedTools");
+        assertThat(cmd).contains("--strict-mcp-config");
+        int settingSourcesIdx = cmd.indexOf("--setting-sources");
+        assertThat(settingSourcesIdx).isGreaterThanOrEqualTo(0);
+        assertThat(cmd.get(settingSourcesIdx + 1)).isEqualTo("local");
     }
 
     // --- effort mapping ---
