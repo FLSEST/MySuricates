@@ -14,6 +14,8 @@ import java.util.regex.Pattern;
 final class TemplateResolver {
 
     private static final Pattern SENTINEL = Pattern.compile("\\x00untrusted-\\d+\\x00");
+    /** {@code {{x}}} or {@code {{ x }}} — exactly the two spellings the resolver has always supported. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{( ?)([^{}\\s]+)\\1\\}\\}");
 
     private TemplateResolver() {}
 
@@ -109,28 +111,37 @@ final class TemplateResolver {
         return out.toString();
     }
 
+    /**
+     * One pass over the template: every placeholder is looked up once and the inserted value is never
+     * scanned again, so a value that itself contains {@code {{ … }}} (a log, an AI answer) stays literal.
+     */
     private static String substitute(String template, String previousOutput, Map<String, String> blockOutputs,
                                      Map<String, Object> vars, boolean escape) {
         if (template == null) return null;
-
-        String resolved = template;
-        String previous = value(previousOutput != null ? previousOutput : "", escape);
-        resolved = resolved.replace("{{ previous_output }}", previous);
-        resolved = resolved.replace("{{previous_output}}", previous);
-
-        for (Map.Entry<String, String> entry : blockOutputs.entrySet()) {
-            String value = value(entry.getValue() == null ? "" : entry.getValue(), escape);
-            resolved = resolved.replace("{{ block." + entry.getKey() + ".output }}", value);
-            resolved = resolved.replace("{{block." + entry.getKey() + ".output}}", value);
+        Matcher matcher = PLACEHOLDER.matcher(template);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String raw = lookup(matcher.group(2), previousOutput, blockOutputs, vars);
+            String replacement = raw == null ? matcher.group() : value(raw, escape);
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
+        matcher.appendTail(out);
+        return out.toString();
+    }
 
-        for (Map.Entry<String, Object> entry : vars.entrySet()) {
-            String value = value(String.valueOf(entry.getValue()), escape);
-            resolved = resolved.replace("{{ " + entry.getKey() + " }}", value);
-            resolved = resolved.replace("{{" + entry.getKey() + "}}", value);
+    /** Value for one placeholder key, or null when unknown (the placeholder then stays literal). */
+    private static String lookup(String key, String previousOutput, Map<String, String> blockOutputs,
+                                 Map<String, Object> vars) {
+        if ("previous_output".equals(key)) return previousOutput != null ? previousOutput : "";
+        if (key.startsWith("block.") && key.endsWith(".output") && key.length() > "block..output".length()) {
+            String name = key.substring("block.".length(), key.length() - ".output".length());
+            if (blockOutputs.containsKey(name)) {
+                String output = blockOutputs.get(name);
+                return output == null ? "" : output;
+            }
         }
-
-        return resolved;
+        if (vars.containsKey(key)) return String.valueOf(vars.get(key));
+        return null;
     }
 
     private static String value(String raw, boolean escape) {
