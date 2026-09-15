@@ -373,6 +373,41 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     expect(useDashboardLayoutStore.getState().views[0]?.filter).toEqual({ projectId: 'p1', days: 7 });
   });
 
+  it('releases the edit lock after a save fails', async () => {
+    server.use(http.post('/api/v1/dashboard/layouts', () => HttpResponse.json({ error: 'boom' }, { status: 500 })));
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide: Recent Runs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeEnabled());
+  });
+
+  it('reloads the dashboard data with the other view’s filter when switching tabs', async () => {
+    const searches: string[] = [];
+    server.use(
+      http.get('/api/v1/learning/dashboard', ({ request }) => {
+        searches.push(new URL(request.url).search);
+        return HttpResponse.json(DASHBOARD);
+      }),
+    );
+    useDashboardLayoutStore.setState({
+      activeViewId: 'default',
+      views: [
+        { id: 'default', name: '', widgets: [], filter: { days: 7, projectId: 'p1' } },
+        { id: 'ops', name: 'Ops', widgets: [], filter: { projectId: 'p2' } },
+      ],
+    });
+
+    await renderDashboard();
+    await waitFor(() => expect(searches).toContain('?days=7&projectId=p1'));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Ops' }));
+
+    await waitFor(() => expect(searches).toContain('?projectId=p2'));
+  });
+
   it('locks editing while a server version is being applied', async () => {
     useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
     useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [{ instanceId: 'todos', type: 'todos' }] }] });
