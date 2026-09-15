@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Pencil, RotateCcw } from 'lucide-react';
-import { Button, Spinner } from '../components/ui';
-import { ErrorState } from '../components/shared/ErrorState';
+import { Button } from '../components/ui';
 import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
 import { useDashboard } from '../hooks/useLearning';
 import { useDashboardLayout } from '../hooks/useDashboardLayout';
@@ -32,22 +31,10 @@ function LiveClock() {
 
 export function Dashboard() {
   const t = useT();
-  // Widgets read the same query; the page only gates loading and errors.
-  const { isLoading, error, refetch } = useDashboard();
+  // Widgets load their own data and show skeletons; the page only reports a failed dashboard query.
+  const { error, refetch } = useDashboard();
   const layout = useDashboardLayout();
   const [editMode, setEditMode] = useState(false);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner text={t.common.loading} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <ErrorState message={error.message} onRetry={() => refetch()} />;
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -85,6 +72,25 @@ export function Dashboard() {
           <LiveClock />
         </div>
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger-subtle px-4 py-3"
+        >
+          <p className="min-w-0 text-sm text-text">
+            {t.dashboard.dataUnavailable} <span className="text-text-secondary">{error.message}</span>
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RotateCcw className="w-3.5 h-3.5" />}
+            onClick={() => refetch()}
+          >
+            {t.common.retry}
+          </Button>
+        </div>
+      )}
 
       {editMode && (
         <HiddenWidgetsBar widgets={layout.hidden} onShow={(id) => layout.setHidden(id, false)} />

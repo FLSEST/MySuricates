@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import type { TranslationKeys } from '../../i18n/en';
 import type { ModuleName } from '../../types';
-import type { WidgetSize } from './dashboardLayout';
+import type { WidgetConfig, WidgetSize } from './dashboardLayout';
 import {
   ActiveProjectsStat, TotalWorkflowsStat, RunsTodayStat, SuccessRateStat, TotalCostStat,
   PlannedTodayStat, PlannedThisWeekStat, BuildInfoStat,
@@ -16,18 +16,27 @@ import { TodosWidget } from './TodosWidget';
 import { RecentRunsCard } from './RecentRunsCard';
 import { QuickActionsCard } from './QuickActionsCard';
 
+/** Props every widget component receives. Singletons can ignore them. */
+export interface WidgetProps {
+  instanceId: string;
+  /** Validated plain values; the widget checks the keys it needs itself. */
+  config: WidgetConfig;
+}
+
 export interface DashboardWidgetDef {
-  /** Stable id — persisted in users' layouts, never rename. */
+  /** Stable id — persisted in users' layouts as instance type, never rename. */
   id: string;
   /** Unique label for the edit mode (hidden list, drag handles). */
   label: (t: TranslationKeys) => string;
   size: WidgetSize;
   /** Hidden entirely when the backend reports the module disabled. */
   module?: ModuleName;
+  /** Can be added several times with its own config; never added automatically, can also be removed (not only hidden). */
+  multiple?: boolean;
   /**
    * Loads its own data. May render nothing (e.g. no data yet) — the grid then collapses its slot.
    */
-  component: ComponentType;
+  component: ComponentType<WidgetProps>;
 }
 
 /** Registry order is the default layout; new widgets are appended to customized layouts. */

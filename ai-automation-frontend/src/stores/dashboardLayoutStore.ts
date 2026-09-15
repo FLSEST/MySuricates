@@ -1,20 +1,22 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {
+  LAYOUT_FORMAT_VERSION,
   createDefaultLayout,
+  migrateLayout,
   sanitizeLayout,
   type DashboardLayout,
-  type WidgetPlacement,
+  type WidgetInstance,
 } from '../components/dashboard/dashboardLayout';
 
 interface DashboardLayoutState extends DashboardLayout {
   /** Replaces the widget list of the active view. */
-  setActiveViewWidgets: (widgets: WidgetPlacement[]) => void;
+  setActiveViewWidgets: (widgets: WidgetInstance[]) => void;
   /** Back to the default layout for the active view. */
   resetActiveView: () => void;
 }
 
-function updateActiveView(state: DashboardLayout, widgets: WidgetPlacement[]): Pick<DashboardLayout, 'views'> {
+function updateActiveView(state: DashboardLayout, widgets: WidgetInstance[]): Pick<DashboardLayout, 'views'> {
   return { views: state.views.map((v) => (v.id === state.activeViewId ? { ...v, widgets } : v)) };
 }
 
@@ -27,9 +29,9 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
     }),
     {
       name: 'dashboard-layout',
-      // Bump together with a `migrate` when the stored format changes.
-      version: 1,
+      version: LAYOUT_FORMAT_VERSION,
       partialize: ({ activeViewId, views }) => ({ activeViewId, views }),
+      migrate: (persisted, version) => sanitizeLayout(migrateLayout(persisted, version)),
       // Per-browser data — never trust its shape.
       merge: (persisted, current) => ({ ...current, ...sanitizeLayout(persisted) }),
     },

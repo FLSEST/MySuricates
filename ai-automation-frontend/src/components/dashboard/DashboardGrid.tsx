@@ -17,20 +17,35 @@ import { CSS } from '@dnd-kit/utilities';
 import { EyeOff, GripVertical, Plus } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
+import type { WidgetConfig } from './dashboardLayout';
+import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_SIZE_CLASSES } from './widgetRegistry';
 
 interface DashboardGridProps {
   widgets: ResolvedWidget[];
   editMode: boolean;
-  onMove: (activeId: string, overId: string) => void;
-  onHide: (id: string) => void;
+  onMove: (activeInstanceId: string, overInstanceId: string) => void;
+  onHide: (instanceId: string) => void;
 }
 
 // grid + minmax(0,1fr) lets the card fill the slot in both axes without overflowing (charts).
 const SLOT_CLASSES = 'grid grid-cols-1 grow min-w-0';
 
-function widgetSizeClasses({ def, placement }: ResolvedWidget): string {
-  return WIDGET_SIZE_CLASSES[placement.size ?? def.size];
+const NO_CONFIG: WidgetConfig = Object.freeze({});
+
+function widgetSizeClasses({ def, instance }: ResolvedWidget): string {
+  return WIDGET_SIZE_CLASSES[instance.size ?? def.size];
+}
+
+/** The widget inside its error boundary. Renders no DOM of its own, so empty widgets stay empty. */
+function WidgetContent({ widget }: { widget: ResolvedWidget }) {
+  const t = useT();
+  const Widget = widget.def.component;
+  return (
+    <WidgetFrame label={widget.def.label(t)}>
+      <Widget instanceId={widget.instance.instanceId} config={widget.instance.config ?? NO_CONFIG} />
+    </WidgetFrame>
+  );
 }
 
 export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGridProps) {
@@ -42,15 +57,17 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
   if (!editMode) {
     return (
       <div className="flex flex-wrap gap-4">
-        {widgets.map((widget) => {
-          const Widget = widget.def.component;
+        {widgets.map((widget) => (
           // empty:hidden collapses widgets that render nothing (no data yet).
-          return (
-            <div key={widget.def.id} data-widget-id={widget.def.id} className={`${SLOT_CLASSES} ${widgetSizeClasses(widget)} empty:hidden`}>
-              <Widget />
-            </div>
-          );
-        })}
+          <div
+            key={widget.instance.instanceId}
+            data-widget-id={widget.instance.instanceId}
+            data-widget-type={widget.def.id}
+            className={`${SLOT_CLASSES} ${widgetSizeClasses(widget)} empty:hidden`}
+          >
+            <WidgetContent widget={widget} />
+          </div>
+        ))}
       </div>
     );
   }
@@ -61,10 +78,10 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={widgets.map((w) => w.def.id)} strategy={rectSortingStrategy}>
+      <SortableContext items={widgets.map((w) => w.instance.instanceId)} strategy={rectSortingStrategy}>
         <div className="flex flex-wrap gap-4 pt-3">
           {widgets.map((widget) => (
-            <SortableWidget key={widget.def.id} widget={widget} onHide={onHide} />
+            <SortableWidget key={widget.instance.instanceId} widget={widget} onHide={onHide} />
           ))}
         </div>
       </SortableContext>
@@ -72,17 +89,17 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
   );
 }
 
-function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (id: string) => void }) {
+function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (instanceId: string) => void }) {
   const t = useT();
-  const { def } = widget;
+  const { def, instance } = widget;
   const label = def.label(t);
-  const Widget = def.component;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: def.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: instance.instanceId });
 
   return (
     <div
       ref={setNodeRef}
-      data-widget-id={def.id}
+      data-widget-id={instance.instanceId}
+      data-widget-type={def.id}
       // Translate, not Transform: slots differ in size and must not be scaled while sorting.
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={`${SLOT_CLASSES} ${widgetSizeClasses(widget)} relative rounded-xl outline-2 outline-dashed outline-offset-2 ${
@@ -91,7 +108,7 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
     >
       {/* Content stays visible but inert — no navigation while arranging. */}
       <div className="peer grid grid-cols-1 select-none" inert>
-        <Widget />
+        <WidgetContent widget={widget} />
       </div>
       <div className="hidden peer-empty:flex min-h-20 flex-col justify-center rounded-xl border border-card-border bg-surface-raised px-4 py-3">
         <p className="text-sm font-medium text-text-secondary truncate">{label}</p>
@@ -110,7 +127,7 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
         </button>
         <button
           type="button"
-          onClick={() => onHide(def.id)}
+          onClick={() => onHide(instance.instanceId)}
           className="rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-danger"
           aria-label={`${t.dashboard.hideWidget}: ${label}`}
           title={t.dashboard.hideWidget}
@@ -122,7 +139,7 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
   );
 }
 
-export function HiddenWidgetsBar({ widgets, onShow }: { widgets: ResolvedWidget[]; onShow: (id: string) => void }) {
+export function HiddenWidgetsBar({ widgets, onShow }: { widgets: ResolvedWidget[]; onShow: (instanceId: string) => void }) {
   const t = useT();
   return (
     <div className="rounded-xl border border-dashed border-accent/40 bg-accent/5 px-4 py-3 space-y-2">
@@ -130,13 +147,13 @@ export function HiddenWidgetsBar({ widgets, onShow }: { widgets: ResolvedWidget[
       {widgets.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-text-tertiary">{t.dashboard.hiddenWidgets}</span>
-          {widgets.map(({ def }) => {
+          {widgets.map(({ def, instance }) => {
             const label = def.label(t);
             return (
               <button
-                key={def.id}
+                key={instance.instanceId}
                 type="button"
-                onClick={() => onShow(def.id)}
+                onClick={() => onShow(instance.instanceId)}
                 className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-accent hover:text-text"
                 aria-label={`${t.dashboard.showWidget}: ${label}`}
               >

@@ -6,12 +6,14 @@ import { useDashboard } from '../../hooks/useLearning';
 import { useT, useI18nStore } from '../../i18n';
 import { formatDuration, formatRelativeTime, formatDateTime } from '../../utils/formatTime';
 import type { WorkflowRun } from '../../types';
+import { WidgetSkeleton } from './WidgetSkeleton';
 
 export function RecentRunsCard() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
-  const { data: stats } = useDashboard();
+  const { data: stats, isLoading } = useDashboard();
+  if (isLoading) return <WidgetSkeleton size="twoThirds" />;
 
   return (
     <Card padding={false}>

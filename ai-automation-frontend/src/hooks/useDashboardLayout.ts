@@ -2,15 +2,13 @@ import { useMemo } from 'react';
 import { useSystemModules } from './useModules';
 import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import {
-  moveWidget, normalizePlacements, setWidgetHidden, type WidgetPlacement,
+  moveWidget, normalizeWidgets, setWidgetHidden, type WidgetInstance,
 } from '../components/dashboard/dashboardLayout';
-import {
-  DASHBOARD_WIDGETS, DASHBOARD_WIDGET_IDS, type DashboardWidgetDef,
-} from '../components/dashboard/widgetRegistry';
+import { DASHBOARD_WIDGETS, type DashboardWidgetDef } from '../components/dashboard/widgetRegistry';
 
 export interface ResolvedWidget {
   def: DashboardWidgetDef;
-  placement: WidgetPlacement;
+  instance: WidgetInstance;
 }
 
 const WIDGETS_BY_ID = new Map(DASHBOARD_WIDGETS.map((w) => [w.id, w]));
@@ -26,8 +24,8 @@ export function useDashboardLayout() {
   const storedWidgets = (views.find((v) => v.id === activeViewId) ?? views[0])?.widgets;
 
   // Full list incl. hidden and module-disabled widgets, so edits keep their positions.
-  const placements = useMemo(
-    () => normalizePlacements(storedWidgets ?? [], DASHBOARD_WIDGET_IDS),
+  const widgets = useMemo(
+    () => normalizeWidgets(storedWidgets ?? [], DASHBOARD_WIDGETS),
     [storedWidgets],
   );
 
@@ -35,21 +33,23 @@ export function useDashboardLayout() {
     // Optimistic while module status is unknown, like useModuleEnabled.
     const moduleEnabled = (def: DashboardWidgetDef) =>
       !def.module || (modules?.modules.find((m) => m.name === def.module)?.enabled ?? true);
-    const available = placements
-      .map((placement) => ({ def: WIDGETS_BY_ID.get(placement.id)!, placement }))
+    const available = widgets
+      .map((instance) => ({ def: WIDGETS_BY_ID.get(instance.type)!, instance }))
       .filter((w) => moduleEnabled(w.def));
     return {
-      visible: available.filter((w) => !w.placement.hidden),
-      hidden: available.filter((w) => w.placement.hidden),
+      visible: available.filter((w) => !w.instance.hidden),
+      hidden: available.filter((w) => w.instance.hidden),
     };
-  }, [placements, modules]);
+  }, [widgets, modules]);
 
   return {
     visible,
     hidden,
     isCustomized: (storedWidgets?.length ?? 0) > 0,
-    move: (activeId: string, overId: string) => setActiveViewWidgets(moveWidget(placements, activeId, overId)),
-    setHidden: (id: string, isHidden: boolean) => setActiveViewWidgets(setWidgetHidden(placements, id, isHidden)),
+    move: (activeInstanceId: string, overInstanceId: string) =>
+      setActiveViewWidgets(moveWidget(widgets, activeInstanceId, overInstanceId)),
+    setHidden: (instanceId: string, isHidden: boolean) =>
+      setActiveViewWidgets(setWidgetHidden(widgets, instanceId, isHidden)),
     reset: resetActiveView,
   };
 }

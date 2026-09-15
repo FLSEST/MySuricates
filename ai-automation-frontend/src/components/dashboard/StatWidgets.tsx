@@ -7,6 +7,7 @@ import { useProjects } from '../../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useT } from '../../i18n';
+import { WidgetSkeleton } from './WidgetSkeleton';
 
 function StatCard({ icon, label, value, accent }: {
   icon: React.ReactNode;
@@ -29,13 +30,13 @@ function StatCard({ icon, label, value, accent }: {
 
 export function ActiveProjectsStat() {
   const t = useT();
-  const { data: projects } = useProjects();
-  const activeProjects = projects?.filter((p) => p.status === 'RUNNING').length ?? 0;
+  const { data: projects, isLoading } = useProjects();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<FolderKanban className="w-4 h-4 text-accent" />}
       label={t.dashboard.activeProjects}
-      value={activeProjects}
+      value={projects ? projects.filter((p) => p.status === 'RUNNING').length : '-'}
       accent="bg-accent/10"
     />
   );
@@ -43,12 +44,13 @@ export function ActiveProjectsStat() {
 
 export function TotalWorkflowsStat() {
   const t = useT();
-  const { data: stats } = useDashboard();
+  const { data: stats, isLoading } = useDashboard();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<GitBranch className="w-4 h-4 text-success" />}
       label={t.dashboard.totalWorkflows}
-      value={stats?.totalWorkflows ?? 0}
+      value={stats?.totalWorkflows ?? '-'}
       accent="bg-success-subtle"
     />
   );
@@ -56,12 +58,13 @@ export function TotalWorkflowsStat() {
 
 export function RunsTodayStat() {
   const t = useT();
-  const { data: stats } = useDashboard();
+  const { data: stats, isLoading } = useDashboard();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<Zap className="w-4 h-4 text-warning" />}
       label={t.dashboard.runsToday}
-      value={stats?.runsToday ?? 0}
+      value={stats?.runsToday ?? '-'}
       accent="bg-warning-subtle"
     />
   );
@@ -69,7 +72,8 @@ export function RunsTodayStat() {
 
 export function SuccessRateStat() {
   const t = useT();
-  const { data: stats } = useDashboard();
+  const { data: stats, isLoading } = useDashboard();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<TrendingUp className="w-4 h-4 text-accent" />}
@@ -82,13 +86,14 @@ export function SuccessRateStat() {
 
 export function TotalCostStat() {
   const t = useT();
-  const { data: stats } = useDashboard();
+  const { data: stats, isLoading } = useDashboard();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   const cost = stats?.totalCostUsd30d;
   return (
     <StatCard
       icon={<Coins className="w-4 h-4 text-warning" />}
       label={t.dashboard.totalCost}
-      value={cost != null && cost > 0
+      value={!stats ? '-' : cost != null && cost > 0
         ? `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`
         : '$0.00'}
       accent="bg-warning-subtle"
@@ -98,12 +103,13 @@ export function TotalCostStat() {
 
 export function PlannedTodayStat() {
   const t = useT();
-  const { data: remainingToday } = useRemainingToday();
+  const { data: remainingToday, isLoading } = useRemainingToday();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<CalendarClock className="w-4 h-4 text-blue-500" />}
       label={t.dashboard.plannedToday}
-      value={remainingToday?.count ?? 0}
+      value={remainingToday?.count ?? '-'}
       accent="bg-blue-500/10"
     />
   );
@@ -111,12 +117,13 @@ export function PlannedTodayStat() {
 
 export function PlannedThisWeekStat() {
   const t = useT();
-  const { data: remainingThisWeek } = useRemainingThisWeek();
+  const { data: remainingThisWeek, isLoading } = useRemainingThisWeek();
+  if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
       icon={<CalendarRange className="w-4 h-4 text-violet-500" />}
       label={t.dashboard.plannedThisWeek}
-      value={remainingThisWeek?.count ?? 0}
+      value={remainingThisWeek?.count ?? '-'}
       accent="bg-violet-500/10"
     />
   );
