@@ -17,6 +17,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +32,12 @@ import java.util.concurrent.TimeoutException;
 @Service
 @Slf4j
 public class HostCodexService {
+
+    /**
+     * Line prefixes of tool-execution errors that mean Codex' sandbox never started — e.g. bwrap
+     * without user namespaces ("bwrap: setting up uid map: Permission denied").
+     */
+    private static final List<String> SANDBOX_FAILURE_PREFIXES = List.of("bwrap:");
 
     private final SummarizationConfig config;
     /**
@@ -131,14 +140,19 @@ public class HostCodexService {
                     throw new IOException("Codex failed with exit code " + exitCode + ": " + truncate(stderr, 200));
                 }
 
+                String processOutput = new String(outputFuture.get(1, TimeUnit.SECONDS), StandardCharsets.UTF_8);
+
                 // Read result from output file
                 if (Files.exists(outputFile) && Files.size(outputFile) > 0) {
-                    return Files.readString(outputFile).trim();
+                    String answer = Files.readString(outputFile).trim();
+                    failOnBrokenSandbox(processOutput, answer);
+                    return answer;
                 }
 
                 // Fallback: use stdout
-                String stdout = new String(outputFuture.get(1, TimeUnit.SECONDS)).trim();
+                String stdout = processOutput.trim();
                 if (!stdout.isEmpty()) {
+                    failOnBrokenSandbox(stdout, null);
                     return stdout;
                 }
 
@@ -154,6 +168,37 @@ public class HostCodexService {
         } finally {
             Files.deleteIfExists(outputFile);
         }
+    }
+
+    /**
+     * Exit code 0 and an answer do not prove Codex could work: when its sandbox fails to start,
+     * every tool call errors and Codex still answers without having read a single file. Such a
+     * block must fail instead of passing an answer without codebase on to the next step.
+     */
+    private static void failOnBrokenSandbox(String processOutput, String answer) throws IOException {
+        Optional<String> failure = sandboxFailure(processOutput, answer);
+        if (failure.isPresent()) {
+            log.warn("Codex sandbox is not working on this host: {}", failure.get());
+            throw new IOException("Codex sandbox is not working on this host (" + failure.get()
+                    + ") — the block ran without file access. Use provider PI with an openai-codex/… model instead.");
+        }
+    }
+
+    /**
+     * Finds a sandbox start failure in Codex' own process output. Lines that also appear in the final
+     * answer are ignored, so a model merely writing about bwrap does not fail the block.
+     */
+    static Optional<String> sandboxFailure(String processOutput, String answer) {
+        if (processOutput == null) {
+            return Optional.empty();
+        }
+        Set<String> answerLines = answer == null ? Set.of()
+                : answer.lines().map(String::trim).collect(Collectors.toSet());
+        return processOutput.lines()
+                .map(String::trim)
+                .filter(line -> SANDBOX_FAILURE_PREFIXES.stream().anyMatch(line::startsWith))
+                .filter(line -> !answerLines.contains(line))
+                .findFirst();
     }
 
     /**

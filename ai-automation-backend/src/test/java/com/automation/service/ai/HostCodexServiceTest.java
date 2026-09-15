@@ -198,4 +198,40 @@ class HostCodexServiceTest {
         assertThat(result).isEqualTo("final answer");
         assertThat(lines).containsExactly("LINE:thinking…", "LINE:running tests");
     }
+
+    // --- Broken sandbox (bwrap) must fail the block instead of passing a blind answer ---
+
+    @Test
+    void sandboxFailure_detectsBwrapErrorsFromToolExecution() {
+        String output = String.join("\n",
+                "exec bash -lc 'ls src' in /work",
+                "bwrap: setting up uid map: Permission denied",
+                "codex",
+                "I could not read the repository, so here is a general answer.");
+
+        assertThat(HostCodexService.sandboxFailure(output, "I could not read the repository, so here is a general answer."))
+                .contains("bwrap: setting up uid map: Permission denied");
+    }
+
+    @Test
+    void sandboxFailure_ignoresOutputWithoutSandboxErrors() {
+        String output = "exec bash -lc 'ls src' in /work\nMain.java\ncodex\nAll good.";
+
+        assertThat(HostCodexService.sandboxFailure(output, "All good.")).isEmpty();
+        assertThat(HostCodexService.sandboxFailure(null, "All good.")).isEmpty();
+    }
+
+    @Test
+    void sandboxFailure_ignoresTheModelQuotingTheErrorInItsAnswer() {
+        String answer = "Explanation of the log line:\nbwrap: setting up uid map: Permission denied\nmeans user namespaces are off.";
+        String output = "codex\n" + answer;
+
+        assertThat(HostCodexService.sandboxFailure(output, answer)).isEmpty();
+    }
+
+    @Test
+    void sandboxFailure_toleratesIndentedToolOutput() {
+        assertThat(HostCodexService.sandboxFailure("  bwrap: Creating new namespace failed: Operation not permitted\n", "done"))
+                .contains("bwrap: Creating new namespace failed: Operation not permitted");
+    }
 }
