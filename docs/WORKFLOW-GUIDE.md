@@ -72,8 +72,8 @@ Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese 
 | Config-Schluessel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
-| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
-| `model` | string | null | **Nur KI-faehige Bloecke**: Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
+| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
+| `model` | string | null | **Nur KI-faehige Bloecke** (inkl. `compress-ai`): Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
 | `effort` | string | null | **Nur KI-faehige Bloecke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur fuer diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
 
 Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
@@ -293,6 +293,8 @@ Wertet einen Ausdruck aus und leitet die Ausfuehrung zum passenden Case weiter. 
 Jeder Case hat:
 - `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
 - `blocks`: Liste von Block-Definitionen bei Treffer
+
+Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
 ```json
 {
@@ -620,7 +622,7 @@ Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Log
 
 JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
 
-**`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
+**`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Wegen `--setting-sources local` gelten Claude-Einstellungen auf Benutzerebene (z. B. `env` oder `apiKeyHelper` in `~/.claude/settings.json`) für diesen Aufruf **nicht**. Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl — läuft der Workflow mit einem anderen Provider, im Block `"provider": "CLAUDE"` setzen. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
 
 ```json
 [

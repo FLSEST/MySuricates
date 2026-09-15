@@ -149,7 +149,7 @@ Response: 201 Created
 | `integration` | `description`, `provider`, `action`, `params?` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior) |
 | `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Text-Extraktion aus Dokumenten via Tika (PDF mit Text-Layer, DOCX, …) — kein OCR |
 | `compress` | `description`, `source`, `stages`, `max_chars?`, `timeout_seconds?` | Regelbasierte Komprimierung einer Blockausgabe |
-| `compress-ai` | `description`, `source`, `instruction?`, `max_chars?`, `model?`, `effort?` | KI-Komprimierung einer Blockausgabe (nur CLAUDE, ohne Tools) |
+| `compress-ai` | `description`, `source`, `instruction?`, `max_chars?`, `model?`, `effort?`, `provider` (nur `CLAUDE`; setzen, wenn der Workflow einen anderen Provider nutzt), `timeout_seconds?` | KI-Komprimierung einer Blockausgabe (nur CLAUDE, ohne Tools) |
 | `todo-create` | `description`, `title`, `priority?`, `tags?`, `project_id?`, `source?`, `source_agent?`, `variable_name?` | TODO anlegen (`variable_name` default `todo_id`) |
 | `todo-update` | `description`, `id`, `title?`, `description?`, `priority?`, `tags?` | TODO ändern |
 | `todo-close` | `description`, `id` | TODO auf DONE setzen |

@@ -203,7 +203,8 @@ public class DocsFetchHandler {
             Map.entry("compress-ai", """
                     **Block type: compress-ai** — AI compression of ONE earlier block output: single Claude call without tools.
                     Required config: source (block name or "previous").
-                    Optional: instruction (literal text, no placeholders), max_chars (default 4000), model, effort, timeout_seconds.
+                    Optional: instruction (literal text, no placeholders), max_chars (default 4000), model, effort, timeout_seconds,
+                    provider (only "CLAUDE" — set "provider": "CLAUDE" when the workflow uses another provider).
                     Input above setting compress-ai-max-input-chars (default 60000) fails without a call — put a compress block before it.
                     Example: { "source": "backend_kompakt", "instruction": "Name failing tests with cause, one line each", "model": "haiku" }
                     """)
