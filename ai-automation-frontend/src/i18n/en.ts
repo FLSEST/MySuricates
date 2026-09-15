@@ -305,6 +305,8 @@ export const en = {
     deleteConfirm: 'All runs and history will be deleted.',
     iconLabel: 'Icon (Emoji)',
     blockType: 'Block Type',
+    blockName: 'Block name',
+    blockNameHint: 'Optional. Later steps reference the output as {{ block.<name>.output }} — letters, digits, _ and -.',
     blockConfig: 'Configuration (JSON)',
     blockSkills: 'Block Skills',
     blockSkillsHint: 'Additional skills activated for this block only (added to workflow-level skills).',

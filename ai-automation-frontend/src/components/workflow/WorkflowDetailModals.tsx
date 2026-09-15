@@ -2,6 +2,7 @@ import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
+import type { BlockDraft } from './blockEdit';
 import { useT } from '../../i18n';
 import { BLOCK_TYPES } from '../../types';
 import type {
@@ -32,8 +33,8 @@ interface WorkflowDetailModalsProps {
 
   showAddBlock: boolean;
   setShowAddBlock: (v: boolean) => void;
-  newBlock: { type: BlockType; config: string; skillIds: string[] };
-  setNewBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
+  newBlock: BlockDraft;
+  setNewBlock: (v: BlockDraft) => void;
   onAddBlock: () => void;
   allWorkflows: WorkflowListItem[] | undefined;
   allSkills: AvailableSkill[];
@@ -41,8 +42,8 @@ interface WorkflowDetailModalsProps {
   showEditBlock: boolean;
   setShowEditBlock: (v: boolean) => void;
   editBlockIndex: number;
-  editBlock: { type: BlockType; config: string; skillIds: string[] };
-  setEditBlock: (v: { type: BlockType; config: string; skillIds: string[] }) => void;
+  editBlock: BlockDraft;
+  setEditBlock: (v: BlockDraft) => void;
   onSaveBlock: () => void;
   editBlockRevealText?: string;
   editBlockRevealNonce?: number;
@@ -245,6 +246,13 @@ export function WorkflowDetailModals({
               label: t.workflows.blockTypes[type],
             }))}
           />
+          <Input
+            label={t.workflows.blockName}
+            value={newBlock.name}
+            onChange={(e) => setNewBlock({ ...newBlock, name: e.target.value })}
+            placeholder="backend_tests"
+            hint={t.workflows.blockNameHint}
+          />
           {newBlock.type === 'sub-workflow' && (
             <Select
               label={t.workflows.selectSubWorkflow}
@@ -330,6 +338,13 @@ export function WorkflowDetailModals({
               value: type,
               label: t.workflows.blockTypes[type],
             }))}
+          />
+          <Input
+            label={t.workflows.blockName}
+            value={editBlock.name}
+            onChange={(e) => setEditBlock({ ...editBlock, name: e.target.value })}
+            placeholder="backend_tests"
+            hint={t.workflows.blockNameHint}
           />
           {editBlock.type === 'sub-workflow' && (
             <Select

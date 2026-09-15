@@ -307,6 +307,8 @@ export const de: TranslationKeys = {
     deleteConfirm: 'Alle Ausführungen und der Verlauf werden gelöscht.',
     iconLabel: 'Icon (Emoji)',
     blockType: 'Blocktyp',
+    blockName: 'Blockname',
+    blockNameHint: 'Optional. Folgeschritte referenzieren die Ausgabe als {{ block.<name>.output }} — Buchstaben, Ziffern, _ und -.',
     blockConfig: 'Konfiguration (JSON)',
     blockSkills: 'Block-Skills',
     blockSkillsHint: 'Zusätzliche Skills, die nur für diesen Block aktiviert werden (ergänzend zu Workflow-Skills).',
