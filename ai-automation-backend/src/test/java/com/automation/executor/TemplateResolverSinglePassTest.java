@@ -46,6 +46,22 @@ class TemplateResolverSinglePassTest {
     }
 
     @Test
+    void keysWithSpaces_resolveLikeBefore() {
+        Map<String, String> outputs = Map.of("Build Report", "OK");
+
+        assertThat(TemplateResolver.resolve("R: {{ block.Build Report.output }} / {{block.Build Report.output}}", "", outputs, Map.of()))
+                .isEqualTo("R: OK / OK");
+    }
+
+    @Test
+    void asymmetricOrDoubleSpacing_staysLiteral_evenWithSpacesAllowedInKeys() {
+        Map<String, Object> vars = new HashMap<>(Map.of("a", "1"));
+
+        assertThat(TemplateResolver.resolve("{{ a}} {{a }} {{  a  }}", "", Map.of(), vars))
+                .isEqualTo("{{ a}} {{a }} {{  a  }}");
+    }
+
+    @Test
     void unknownBlockName_keepsPlaceholder_dottedNameWorks() {
         Map<String, String> outputs = Map.of("a.b", "AB");
 
