@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -29,8 +30,7 @@ public class RetryBlockExecutor implements BlockExecutor {
         int maxRetries = ((Number) config.getOrDefault("max_retries", 3)).intValue();
         int delaySeconds = ((Number) config.getOrDefault("delay", 5)).intValue();
         boolean exponentialBackoff = Boolean.TRUE.equals(config.get("exponential_backoff"));
-        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
-        boolean isShell = "shell".equals(executionMode);
+        boolean isShell = ExecutionMode.isShell(config);
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         String rawCommand = (String) config.get("command");
         String command = isShell

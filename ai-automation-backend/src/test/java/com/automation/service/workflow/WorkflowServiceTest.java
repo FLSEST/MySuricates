@@ -158,6 +158,31 @@ class WorkflowServiceTest {
     }
 
     @Test
+    void create_rejectsUnknownExecutionMode() {
+        List<BlockDefinition> blocks = List.of(BlockDefinition.builder().type("foreach")
+                .config(new java.util.HashMap<>(Map.of("execution_mode", "shel", "command", "echo {{ item }}"))).build());
+        var request = new CreateWorkflowRequest("proj-1", "Typo", null, null, blocks, null, null, null, null, null, null, null, null);
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+
+        assertThatThrownBy(() -> workflowService.create(request, ChangeSource.USER))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown execution_mode 'shel'");
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
+    void update_rejectsUnknownExecutionModeInNewBlocks() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        List<BlockDefinition> blocks = List.of(BlockDefinition.builder().type("while")
+                .config(new java.util.HashMap<>(Map.of("execution_mode", "pi"))).build());
+        var request = new UpdateWorkflowRequest(null, null, null, blocks, null, null, null, null, null);
+
+        assertThatThrownBy(() -> workflowService.update("wf-1", request, ChangeSource.USER))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(workflowRepository, never()).save(any());
+    }
+
+    @Test
     void update_updatesOnlyNonNullFields() {
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));

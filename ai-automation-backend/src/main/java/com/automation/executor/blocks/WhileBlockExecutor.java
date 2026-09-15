@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -34,8 +35,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         String command = (String) config.get("command");
         String conditionCommand = (String) config.get("condition_command");
         int maxIterations = ((Number) config.getOrDefault("max_iterations", MAX_ITERATIONS)).intValue();
-        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
-        boolean isShell = "shell".equals(executionMode);
+        boolean isShell = ExecutionMode.isShell(config);
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")

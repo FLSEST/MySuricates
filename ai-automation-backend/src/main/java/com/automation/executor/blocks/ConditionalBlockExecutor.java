@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -27,8 +28,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
     @Override
     public StepResult execute(BlockDefinition block, ExecutionContext context) {
         Map<String, Object> config = block.getConfig();
-        String executionMode = (String) config.getOrDefault("execution_mode", "claude");
-        boolean isShell = "shell".equals(executionMode);
+        boolean isShell = ExecutionMode.isShell(config);
         // Shell-Modus: gleiche Regel wie Shell/While/Retry — untrusted Werte immer single-quoted,
         // alle Werte bei shell_escape_variables. Claude-Modus bleibt roh (Prompt, keine Shell).
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));

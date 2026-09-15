@@ -5,6 +5,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -177,8 +178,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
         Map<String, Object> nestedConfig = nestedBlock.getConfig();
-        String executionMode = (String) nestedConfig.getOrDefault("execution_mode", "claude");
-        boolean isShell = "shell".equals(executionMode) || "shell".equals(type);
+        boolean isShell = ExecutionMode.isShell(nestedConfig) || "shell".equals(type);
         int shellTimeout = ((Number) nestedConfig.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = nestedConfig.containsKey("timeout_seconds")
                 ? ((Number) nestedConfig.get("timeout_seconds")).intValue()

@@ -222,7 +222,7 @@ Retries a command up to N times with a pause between attempts.
 | `max_retries` | int | 3 | Maximum retry attempts |
 | `delay` | int | 5 | Pause between attempts (seconds) |
 | `exponential_backoff` | bool | false | Double pause on each attempt |
-| `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Execution timeout per attempt |
 
 ```json
@@ -252,7 +252,7 @@ Evaluates a condition and executes one of two branches.
 | `condition` | string | **required** | Condition to evaluate |
 | `then_command` | string | null | Command if condition is true (if null, nothing is executed) |
 | `else_command` | string | null | Command if condition is false |
-| `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Execution timeout |
 
 ```json
@@ -326,7 +326,7 @@ Executes a command for each item in a list.
 | `items_command` | string | — | Shell command, one item per line (only for `items_source: "command"`) |
 | `items` | list | — | Inline list of items (only for `items_source: "list"`) |
 | `command` | string | **required** | Command per item |
-| `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Timeout per iteration |
 
 ```json
@@ -358,7 +358,7 @@ Repeats a command until a condition is met or the maximum iteration count is rea
 | `condition_command` | string | null | Condition evaluated each iteration. Without `condition_command`, the loop runs until `max_iterations` or command failure |
 | `command` | string | **required** | Command per iteration |
 | `max_iterations` | int | 100 | Maximum loop iterations |
-| `execution_mode` | string | `"claude"` | `"claude"` (AI) or `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Execution timeout per iteration |
 
 ```json

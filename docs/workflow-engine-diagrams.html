@@ -315,7 +315,7 @@ flowchart LR
     <tbody>
       <tr><td><code>simple</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Ja (default)</td></tr>
       <tr><td><code>shell</code></td><td>shell</td><td><code>timeout_seconds</code></td><td>Ja</td></tr>
-      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/claude, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
+      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/ai, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
       <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command, <code>timeout_seconds</code></td><td>Aggregiertes Ergebnis</td></tr>
       <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code>, <code>timeout_seconds</code></td><td>Ja bei innerem Fail</td></tr>
       <tr><td><code>conditional</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Branch-spezifisch</td></tr>

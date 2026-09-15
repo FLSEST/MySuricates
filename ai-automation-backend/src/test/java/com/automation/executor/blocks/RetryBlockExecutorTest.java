@@ -48,6 +48,19 @@ class RetryBlockExecutorTest {
     }
 
     @Test
+    void execute_unknownExecutionMode_failsInsteadOfRunningAsAi() {
+        BlockDefinition block = BlockDefinition.builder()
+                .type("retry")
+                .config(new HashMap<>(Map.of("command", "npm test", "max_retries", 1, "delay", 0, "execution_mode", "shel")))
+                .build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> executor.execute(block, context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unknown execution_mode 'shel'");
+        org.mockito.Mockito.verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
     void execute_successOnFirstAttempt_returnsCompleted() {
         StepResult success = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("passed").build();

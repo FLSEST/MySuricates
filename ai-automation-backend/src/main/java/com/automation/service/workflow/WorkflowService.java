@@ -9,6 +9,7 @@ import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.executor.ExecutionMode;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
@@ -69,6 +70,7 @@ public class WorkflowService {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", request.projectId()));
         BlockNameRules.rejectReservedNames(request.blocks());
+        ExecutionMode.rejectUnknown(request.blocks());
 
         Workflow workflow = Workflow.builder()
                 .project(project)
@@ -125,6 +127,7 @@ public class WorkflowService {
         }
         if (request.blocks() != null) {
             BlockNameRules.rejectReservedNames(request.blocks());
+            ExecutionMode.rejectUnknown(request.blocks());
             workflow.setBlocks(request.blocks());
         }
         if (request.instructions() != null) {

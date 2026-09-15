@@ -227,7 +227,7 @@ Wiederholt einen Befehl bis zu N Mal mit einer Pause zwischen den Versuchen.
 | `max_retries` | int | 3 | Maximale Wiederholungsversuche |
 | `delay` | int | 5 | Pause zwischen Versuchen (Sekunden) |
 | `exponential_backoff` | bool | false | Pause bei jedem Versuch verdoppeln |
-| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Versuch |
 
 ```json
@@ -257,7 +257,7 @@ Wertet eine Bedingung aus und fuehrt einen von zwei Zweigen aus.
 | `condition` | string | **erforderlich** | Auszuwertende Bedingung |
 | `then_command` | string | null | Befehl wenn Bedingung wahr (wenn null, wird nichts ausgefuehrt) |
 | `else_command` | string | null | Befehl wenn Bedingung falsch |
-| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
 
 ```json
@@ -331,7 +331,7 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 | `items_command` | string | — | Shell-Befehl, ein Item pro Zeile (nur bei `items_source: "command"`) |
 | `items` | list | — | Inline-Liste von Items (nur bei `items_source: "list"`) |
 | `command` | string | **erforderlich** | Befehl pro Item |
-| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
 | `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Bloecke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
 
@@ -366,7 +366,7 @@ Wiederholt einen Befehl bis eine Bedingung erfuellt ist oder die maximale Iterat
 | `condition_command` | string | null | Bedingung, die jede Iteration ausgewertet wird. Ohne `condition_command` laeuft die Schleife bis `max_iterations` oder Kommando-Fehler |
 | `command` | string | **erforderlich** | Befehl pro Iteration |
 | `max_iterations` | int | 100 | Maximale Schleifendurchlaeufe |
-| `execution_mode` | string | `"claude"` | `"claude"` (KI) oder `"shell"` |
+| `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Iteration |
 
 ```json
