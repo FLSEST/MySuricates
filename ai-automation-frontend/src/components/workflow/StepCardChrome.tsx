@@ -67,7 +67,11 @@ function isBlockType(type: string): type is BlockType {
 export function StepCardFrame({ step, children }: { step: StepResult; children: ReactNode }) {
   const kind = stepKind(step);
   return (
-    <div className={`flex gap-3 py-3 pl-3 border-l-2 ${KIND_STYLES[kind].stripe}`} data-step-kind={kind}>
+    <div
+      id={`step-${step.stepIndex}`}
+      className={`flex gap-3 py-3 pl-3 border-l-2 ${KIND_STYLES[kind].stripe}`}
+      data-step-kind={kind}
+    >
       {children}
     </div>
   );

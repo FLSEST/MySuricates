@@ -48,4 +48,27 @@ describe('ExecutionStepCard', () => {
     render(<ExecutionStepCard step={step({ blockType: 'future-block' })} />);
     expect(screen.getByText('future-block')).toBeInTheDocument();
   });
+
+  it('shows a prominent compression panel with source link and stage table', () => {
+    const { container } = render(<ExecutionStepCard step={step({
+      stepIndex: 4, blockType: 'compress',
+      output: '## backend_tests — FAILED · exit 1\nStufen: lines.filter\n\nkurz',
+      metadata: {
+        derivedOutput: true,
+        compression: {
+          source: { block: 'backend_tests', stepIndex: 0, status: 'FAILED', exitCode: 1 },
+          inChars: 1000, outChars: 250, maxChars: 20000, capped: true,
+          stages: [{ op: 'lines.filter', inChars: 1000, outChars: 250, note: '−12 Zeilen' }],
+        },
+      },
+    })} />);
+
+    const panel = screen.getByTestId('compression-panel');
+    expect(panel).toHaveTextContent('compressed 1,000 → 250 chars (−75 %)');
+    expect(panel).toHaveTextContent('cut to the limit');
+    expect(screen.getByRole('link', { name: /Source: backend_tests \(FAILED · exit 1\)/ })).toHaveAttribute('href', '#step-0');
+    expect(screen.getByText('lines.filter')).toBeInTheDocument();
+    expect(screen.getByText('−12 Zeilen')).toBeInTheDocument();
+    expect(container.querySelector('#step-4')).not.toBeNull();
+  });
 });
