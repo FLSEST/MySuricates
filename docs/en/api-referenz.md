@@ -2234,7 +2234,7 @@ Saves a snapshot. Body at most 256 KiB; unknown fields → 400.
 ```
 
 - **201** new version; **200** content identical to the newest version (no new row).
-- The dedupe hash (\`contentHash\`) leaves out \`activeViewId\`: each device chooses the shown view itself, so a snapshot that differs only in it creates no new version (**200**). \`activeViewId\` is still stored and validated (must reference a view).
+- The dedupe hash (`contentHash`) leaves out `activeViewId`: each device chooses the shown view itself, so a snapshot that differs only in it creates no new version (**200**). `activeViewId` is still stored and validated (must reference a view).
 - **409 `STATE_CONFLICT`**: the newest version is not `baseVersionId` — another device saved. `"force": true` saves anyway.
 - **413**: body larger than `automation.dashboard.layout.max-request-bytes` (default 262144).
 - Limits as in the frontend (`LAYOUT_LIMITS`): ≤ 20 views, ≤ 100 widgets per view, ids `^[a-z0-9][a-z0-9-]*$` with ≤ 80 characters, view names ≤ 80 Unicode code points, `config` only string (≤ 500) / number / boolean with ≤ 20 keys `^[a-zA-Z][a-zA-Z0-9]{0,39}$`, `filter.days` 1–365.
