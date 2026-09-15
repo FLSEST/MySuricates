@@ -65,6 +65,7 @@ export function compressedSourcesUsed(block: BlockDefinition, blocks: BlockDefin
     if (names.has(name) && name !== block.name && !found.includes(name)) found.push(name);
   };
   if (isCompressionBlock(block.type) && typeof block.config.source === 'string') add(block.config.source);
-  for (const match of JSON.stringify(block.config).matchAll(/\{\{ ?block\.([^{}\s]+)\.output ?\}\}/g)) add(match[1]!);
+  // Same spellings as the backend resolver: {{block.x.output}} or {{ block.x.output }}, names may contain spaces
+  for (const match of JSON.stringify(block.config).matchAll(/\{\{( ?)block\.([^{}]+?)\.output\1\}\}/g)) add(match[2]!);
   return found;
 }

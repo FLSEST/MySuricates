@@ -71,4 +71,22 @@ describe('ExecutionStepCard', () => {
     expect(screen.getByText('−12 Zeilen')).toBeInTheDocument();
     expect(container.querySelector('#step-4')).not.toBeNull();
   });
+
+  it('shows growth as a plus percentage, never a double sign', () => {
+    render(<ExecutionStepCard step={step({
+      stepIndex: 2, blockType: 'compress',
+      output: '## feed — COMPLETED\nStufen: json.select\n\n{"a":100.0}',
+      metadata: {
+        derivedOutput: true,
+        compression: {
+          source: { block: 'feed', stepIndex: 0, status: 'COMPLETED', exitCode: null },
+          inChars: 200, outChars: 250, maxChars: 20000, capped: false, stages: [],
+        },
+      },
+    })} />);
+
+    const panel = screen.getByTestId('compression-panel');
+    expect(panel).toHaveTextContent('compressed 200 → 250 chars (+25 %)');
+    expect(panel.textContent).not.toContain('−-');
+  });
 });

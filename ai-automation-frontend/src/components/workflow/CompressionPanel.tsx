@@ -10,7 +10,8 @@ export function CompressionPanel({ step }: { step: StepResult }) {
   const facts = compressionFacts(step);
   if (!facts) return null;
   const fmt = (n: number) => n.toLocaleString(locale);
-  const percent = facts.inChars > 0 ? Math.round((1 - facts.outChars / facts.inChars) * 1000) / 10 : 0;
+  const change = facts.inChars > 0 ? Math.round(Math.abs(1 - facts.outChars / facts.inChars) * 1000) / 10 : 0;
+  const percent = `${facts.outChars > facts.inChars ? '+' : '−'}${change.toLocaleString(locale)} %`;
   const src = facts.source;
 
   return (
@@ -18,7 +19,7 @@ export function CompressionPanel({ step }: { step: StepResult }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-info-subtle px-2 py-0.5 font-medium text-info">
           <Shrink className="h-3 w-3" />
-          {t.badge.replace('{in}', fmt(facts.inChars)).replace('{out}', fmt(facts.outChars)).replace('{percent}', `−${percent.toLocaleString(locale)} %`)}
+          {t.badge.replace('{in}', fmt(facts.inChars)).replace('{out}', fmt(facts.outChars)).replace('{percent}', percent)}
         </span>
         {src && src.stepIndex !== null && (
           <a href={`#step-${src.stepIndex}`} className="text-accent hover:underline">

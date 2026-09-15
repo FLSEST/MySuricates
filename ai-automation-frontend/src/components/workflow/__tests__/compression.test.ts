@@ -43,4 +43,16 @@ describe('compression helpers', () => {
     expect(compressedSourcesUsed(blocks[2], blocks)).toEqual(['backend_kompakt']);
     expect(compressedSourcesUsed(blocks[1], blocks)).toEqual([]);
   });
+
+  it('counts only the symmetric spellings the backend resolves', () => {
+    const blocks: BlockDefinition[] = [
+      { type: 'compress', name: 'kompakt', config: { source: 'x', stages: [] } },
+      { type: 'compress', name: 'Build Report', config: { source: 'x', stages: [] } },
+      { type: 'simple', name: 'asym', config: { command: 'A {{ block.kompakt.output}} B {{block.kompakt.output }}' } },
+      { type: 'simple', name: 'spaced', config: { command: 'R {{ block.Build Report.output }}' } },
+    ];
+
+    expect(compressedSourcesUsed(blocks[2], blocks)).toEqual([]);
+    expect(compressedSourcesUsed(blocks[3], blocks)).toEqual(['Build Report']);
+  });
 });
