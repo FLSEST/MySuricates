@@ -72,6 +72,8 @@ public class ExecutionContext {
     @Builder.Default
     private final Map<String, String> blockOutputs = new ConcurrentHashMap<>();
 
+    @Builder.Default private final SourceStepIndex sourceSteps = new SourceStepIndex(); // compress sources, see SourceStepIndex
+
     @Builder.Default
     private final AtomicInteger stepCounter = new AtomicInteger(0);
 
