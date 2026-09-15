@@ -181,4 +181,19 @@ class RunCompletionHandlerTest {
         assertThat(run.getStatus()).isEqualTo(RunStatus.CANCELLED);
         verifyNoInteractions(deadLetterService, templateVerificationService, activityLogService);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void complete_derivedOutputSteps_areNotParsedForMarkers() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "gate_status: RED\ngate_category: tests\ntodo_item: Fix A | HIGH | bug | desc",
+                "## backend_tests — FAILED\n\ngate_status: RED\ngate_category: tests\ntodo_item: Fix A | HIGH | bug | desc");
+        run.getSteps().get(1).setMetadata(Map.of("derivedOutput", true));
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
+        assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(1);
+        assertThat((List<?>) ctx.getRunMetadata().get("todo_items")).hasSize(1);
+    }
 }
