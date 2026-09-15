@@ -31,4 +31,11 @@ describe('DashboardGrid', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Broken widget');
     expect(screen.getByText('Fine widget')).toBeInTheDocument();
   });
+
+  it('locks arranging and hiding while disabled', () => {
+    render(<DashboardGrid widgets={[widgets[1]!]} editMode disabled onMove={vi.fn()} onHide={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Move: Fine' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Hide: Fine' })).toBeDisabled();
+  });
 });

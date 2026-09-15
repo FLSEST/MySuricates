@@ -4,11 +4,14 @@ import { Button } from '../components/ui';
 import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
+import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFilterBar';
+import { DashboardViewTabs } from '../components/dashboard/DashboardViewTabs';
+import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
+import { LayoutSyncConflictBanner } from '../components/dashboard/LayoutSyncConflictBanner';
 import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import { useDashboardLayout } from '../hooks/useDashboardLayout';
 import { hasLocalLayoutChanges, useDashboardLayoutSync } from '../hooks/useDashboardLayoutSync';
-import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
-import { LayoutSyncConflictBanner } from '../components/dashboard/LayoutSyncConflictBanner';
+import { useDashboardViewParam } from '../hooks/useDashboardViewParam';
 import { useT } from '../i18n';
 
 function useLiveClock() {
@@ -50,6 +53,9 @@ function DashboardPage() {
   const [editMode, setEditMode] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const sync = useDashboardLayoutSync();
+  useDashboardViewParam();
+  // While a server version is loaded, restored or saved, the layout can change underneath: no edits.
+  const locked = sync.busy;
 
   const toggleEditMode = () => {
     // Leaving edit mode is the save point of the version history (spec E1).
@@ -85,6 +91,7 @@ function DashboardPage() {
                 size="sm"
                 icon={<RotateCcw className="w-3.5 h-3.5" />}
                 onClick={layout.reset}
+                disabled={locked}
                 aria-label={t.dashboard.resetLayout}
                 title={t.dashboard.resetLayout}
               >
@@ -96,6 +103,7 @@ function DashboardPage() {
               size="sm"
               icon={editMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
               onClick={toggleEditMode}
+              disabled={locked}
               aria-label={editMode ? t.dashboard.doneEditing : t.dashboard.editDashboard}
               aria-pressed={editMode}
             >
@@ -117,22 +125,33 @@ function DashboardPage() {
 
       <DashboardDataErrorBanner />
 
+      {/* Collapses when there is a single view and no filter to show. */}
+      <div className="space-y-3 empty:hidden">
+        <DashboardViewTabs editMode={editMode} disabled={locked} />
+        <DashboardViewFilterBar editMode={editMode} disabled={locked} />
+      </div>
+
       {editMode && (
-        <HiddenWidgetsBar widgets={layout.hidden} onShow={(id) => layout.setHidden(id, false)} />
+        <HiddenWidgetsBar
+          widgets={layout.hidden}
+          disabled={locked}
+          onShow={(instanceId) => layout.setHidden(instanceId, false)}
+        />
       )}
 
       <DashboardGrid
         widgets={layout.visible}
         editMode={editMode}
+        disabled={locked}
         onMove={layout.move}
-        onHide={(id) => layout.setHidden(id, true)}
+        onHide={(instanceId) => layout.setHidden(instanceId, true)}
       />
 
       <LayoutHistoryDialog
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         busy={sync.busy}
-        onRestore={(id) => void sync.restoreVersion(id)}
+        onRestore={(versionId) => void sync.restoreVersion(versionId)}
         onAdoptView={(versionId, viewId) => void sync.adoptView(versionId, viewId)}
       />
     </div>

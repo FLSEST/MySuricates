@@ -24,6 +24,8 @@ import { WIDGET_SIZE_CLASSES } from './widgetRegistry';
 interface DashboardGridProps {
   widgets: ResolvedWidget[];
   editMode: boolean;
+  /** Locks arranging and hiding (e.g. while a server version is applied). */
+  disabled?: boolean;
   onMove: (activeInstanceId: string, overInstanceId: string) => void;
   onHide: (instanceId: string) => void;
 }
@@ -48,7 +50,7 @@ function WidgetContent({ widget }: { widget: ResolvedWidget }) {
   );
 }
 
-export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGridProps) {
+export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onHide }: DashboardGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -73,7 +75,7 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
   }
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    if (over && active.id !== over.id) onMove(String(active.id), String(over.id));
+    if (!disabled && over && active.id !== over.id) onMove(String(active.id), String(over.id));
   };
 
   return (
@@ -81,7 +83,7 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
       <SortableContext items={widgets.map((w) => w.instance.instanceId)} strategy={rectSortingStrategy}>
         <div className="flex flex-wrap gap-4 pt-3">
           {widgets.map((widget) => (
-            <SortableWidget key={widget.instance.instanceId} widget={widget} onHide={onHide} />
+            <SortableWidget key={widget.instance.instanceId} widget={widget} disabled={disabled} onHide={onHide} />
           ))}
         </div>
       </SortableContext>
@@ -89,11 +91,15 @@ export function DashboardGrid({ widgets, editMode, onMove, onHide }: DashboardGr
   );
 }
 
-function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (instanceId: string) => void }) {
+function SortableWidget({ widget, disabled, onHide }: {
+  widget: ResolvedWidget;
+  disabled: boolean;
+  onHide: (instanceId: string) => void;
+}) {
   const t = useT();
   const { def, instance } = widget;
   const label = def.label(t);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: instance.instanceId });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: instance.instanceId, disabled });
 
   return (
     <div
@@ -119,7 +125,8 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
           type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab touch-none rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-text active:cursor-grabbing"
+          disabled={disabled}
+          className="cursor-grab touch-none rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-text active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`${t.dashboard.moveWidget}: ${label}`}
           title={t.dashboard.moveWidget}
         >
@@ -128,7 +135,8 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
         <button
           type="button"
           onClick={() => onHide(instance.instanceId)}
-          className="rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-danger"
+          disabled={disabled}
+          className="rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`${t.dashboard.hideWidget}: ${label}`}
           title={t.dashboard.hideWidget}
         >
@@ -139,7 +147,12 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
   );
 }
 
-export function HiddenWidgetsBar({ widgets, onShow }: { widgets: ResolvedWidget[]; onShow: (instanceId: string) => void }) {
+export function HiddenWidgetsBar({ widgets, disabled = false, onShow }: {
+  widgets: ResolvedWidget[];
+  /** Locks showing widgets again (e.g. while a server version is applied). */
+  disabled?: boolean;
+  onShow: (instanceId: string) => void;
+}) {
   const t = useT();
   return (
     <div className="rounded-xl border border-dashed border-accent/40 bg-accent/5 px-4 py-3 space-y-2">
@@ -154,7 +167,8 @@ export function HiddenWidgetsBar({ widgets, onShow }: { widgets: ResolvedWidget[
                 key={instance.instanceId}
                 type="button"
                 onClick={() => onShow(instance.instanceId)}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-accent hover:text-text"
+                disabled={disabled}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-accent hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={`${t.dashboard.showWidget}: ${label}`}
               >
                 <Plus className="w-3 h-3" />

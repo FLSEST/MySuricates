@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse, delay } from 'msw';
+import { useLocation } from 'react-router-dom';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { modulesFixture } from '../../test/modules';
@@ -53,6 +54,11 @@ function widgetOrder(): string[] {
 
 function slot(id: string): HTMLElement | null {
   return document.querySelector(`[data-widget-id="${id}"]`);
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{location.search}</output>;
 }
 
 async function renderDashboard() {
@@ -292,5 +298,107 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]?.getObserversCount()).toBe(1);
     expect(slot('stat-total-cost')).toHaveTextContent('Cost (7d)');
+  });
+
+  it('opens the view named in the link and switches views without saving', async () => {
+    let posts = 0;
+    server.use(http.post('/api/v1/dashboard/layouts', () => {
+      posts += 1;
+      return HttpResponse.json({}, { status: 201 });
+    }));
+    useDashboardLayoutStore.setState({
+      activeViewId: 'default',
+      views: [
+        { id: 'default', name: '', widgets: [] },
+        { id: 'ops', name: 'Ops', widgets: [{ instanceId: 'recent-runs', type: 'recent-runs', hidden: true }] },
+      ],
+    });
+    renderWithProviders(<><Dashboard /><LocationProbe /></>, { route: '/?view=ops' });
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Ops' })).toHaveAttribute('aria-selected', 'true'));
+    expect(await screen.findByText('Test Todo')).toBeInTheDocument();
+    expect(slot('recent-runs')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+
+    expect(await screen.findByText('Recent Runs')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('?view=default'));
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(posts).toBe(0);
+  });
+
+  it('adds and names a view in edit mode and saves all views when done', async () => {
+    let posted: { layout?: { activeViewId: string; views: { id: string; name: string }[] } } | undefined;
+    server.use(
+      http.post('/api/v1/dashboard/layouts', async ({ request }) => {
+        posted = (await request.json()) as typeof posted;
+        return HttpResponse.json({ id: 'v1', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Laptop', formatVersion: 2, viewCount: 2, contentHash: 'h' }, { status: 201 });
+      }),
+    );
+    renderWithProviders(<><Dashboard /><LocationProbe /></>);
+    expect(await screen.findByText('Recent Runs')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add view' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename view' }));
+    const nameField = screen.getByRole('textbox', { name: 'View name' });
+    fireEvent.change(nameField, { target: { value: 'Costs' } });
+    fireEvent.keyDown(nameField, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    await waitFor(() => expect(posted?.layout?.views.map((v) => v.name)).toEqual(['', 'Costs']));
+    const newViewId = posted?.layout?.views[1]?.id ?? '';
+    expect(newViewId).toMatch(/^view-[0-9a-f]{8}$/);
+    expect(posted?.layout?.activeViewId).toBe(newViewId);
+    expect(screen.getByTestId('location')).toHaveTextContent(`?view=${newViewId}`);
+  });
+
+  it('filters the active view from edit mode and reloads the dashboard data for it', async () => {
+    const searches: string[] = [];
+    server.use(
+      http.get('/api/v1/learning/dashboard', ({ request }) => {
+        searches.push(new URL(request.url).search);
+        return HttpResponse.json(DASHBOARD);
+      }),
+    );
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    expect(await screen.findByRole('option', { name: 'Test Project' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), { target: { value: 'p1' } });
+    fireEvent.click(screen.getByRole('button', { name: '7d' }));
+
+    await waitFor(() => expect(searches).toContain('?days=7&projectId=p1'));
+    expect(useDashboardLayoutStore.getState().views[0]?.filter).toEqual({ projectId: 'p1', days: 7 });
+  });
+
+  it('locks editing while a server version is being applied', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [{ instanceId: 'todos', type: 'todos' }] }] });
+    const remote = { id: 'v2', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Desktop', formatVersion: 2, viewCount: 1, contentHash: 'h2' };
+    let releaseDetail = () => {};
+    const detailGate = new Promise<void>((resolve) => {
+      releaseDetail = resolve;
+    });
+    let detailCalls = 0;
+    server.use(
+      http.get('/api/v1/dashboard/layouts', () => HttpResponse.json({ content: [remote], page: 0, size: 1, totalElements: 1, totalPages: 1 })),
+      http.get('/api/v1/dashboard/layouts/:id', async () => {
+        detailCalls += 1;
+        // The mount check gets its answer at once; "Use that version" waits until the test releases it.
+        if (detailCalls > 1) await detailGate;
+        return HttpResponse.json({ ...remote, layout: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [] }] } });
+      }),
+    );
+    await renderDashboard();
+    const banner = await screen.findByTestId('layout-sync-conflict');
+
+    fireEvent.click(within(banner).getByRole('button', { name: 'Use that version' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeDisabled());
+    releaseDetail();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeEnabled());
+    expect(screen.queryByTestId('layout-sync-conflict')).not.toBeInTheDocument();
   });
 });
