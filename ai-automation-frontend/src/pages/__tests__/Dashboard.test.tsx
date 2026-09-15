@@ -8,6 +8,7 @@ import { modulesFixture } from '../../test/modules';
 import { useI18nStore } from '../../i18n';
 import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../../stores/dashboardSyncStore';
+import { useToastStore } from '../../stores/toastStore';
 import { createDefaultLayout } from '../../components/dashboard/dashboardLayout';
 import { DASHBOARD_WIDGET_IDS } from '../../components/dashboard/widgetRegistry';
 import type { DashboardData } from '../../types';
@@ -41,6 +42,7 @@ beforeEach(() => {
   useI18nStore.setState({ locale: 'en' });
   useDashboardLayoutStore.setState(createDefaultLayout());
   useDashboardSyncStore.setState({ deviceLabel: 'Laptop', baseVersionId: null, dirty: false });
+  useToastStore.setState({ toasts: [] });
   server.use(
     http.get('/api/v1/learning/dashboard', () => HttpResponse.json(DASHBOARD)),
     http.get('/api/v1/system/info', () => HttpResponse.json({ version: '1.0.0', buildType: 'SNAPSHOT' })),
@@ -374,13 +376,27 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
   });
 
   it('releases the edit lock after a save fails', async () => {
-    server.use(http.post('/api/v1/dashboard/layouts', () => HttpResponse.json({ error: 'boom' }, { status: 500 })));
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(http.post('/api/v1/dashboard/layouts', async () => {
+      await gate;
+      return HttpResponse.json({ error: 'boom' }, { status: 500 });
+    }));
     await renderDashboard();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hide: Recent Runs' }));
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
+    // The toggle already reads "Edit dashboard" again (leaving edit mode is instant), but it stays
+    // locked while the save is held in flight.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeDisabled());
+
+    release();
+
+    await waitFor(() => expect(useToastStore.getState().toasts.some((t) => t.message.startsWith('Could not save the dashboard layout'))).toBe(true));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeEnabled());
   });
 
