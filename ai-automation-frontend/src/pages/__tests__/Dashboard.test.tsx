@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { modulesFixture } from '../../test/modules';
 import { useI18nStore } from '../../i18n';
 import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
+import { useDashboardSyncStore } from '../../stores/dashboardSyncStore';
 import { createDefaultLayout } from '../../components/dashboard/dashboardLayout';
 import { DASHBOARD_WIDGET_IDS } from '../../components/dashboard/widgetRegistry';
 import type { DashboardData } from '../../types';
@@ -38,6 +39,7 @@ beforeEach(() => {
   localStorage.clear();
   useI18nStore.setState({ locale: 'en' });
   useDashboardLayoutStore.setState(createDefaultLayout());
+  useDashboardSyncStore.setState({ deviceLabel: 'Laptop', baseVersionId: null, dirty: false });
   server.use(
     http.get('/api/v1/learning/dashboard', () => HttpResponse.json(DASHBOARD)),
     http.get('/api/v1/system/info', () => HttpResponse.json({ version: '1.0.0', buildType: 'SNAPSHOT' })),
@@ -179,5 +181,67 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
     const expected = ['quick-actions', ...DASHBOARD_WIDGET_IDS.filter((id) => id !== 'quick-actions' && id !== 'stat-version')];
     expect(widgetOrder()).toEqual(expected);
+  });
+
+  it('saves a snapshot when finishing an edit that changed something', async () => {
+    let posted: { layout?: { views: { widgets: unknown[] }[] } } | undefined;
+    server.use(
+      http.post('/api/v1/dashboard/layouts', async ({ request }) => {
+        posted = (await request.json()) as typeof posted;
+        return HttpResponse.json({ id: 'v1', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Laptop', formatVersion: 2, viewCount: 1, contentHash: 'h' }, { status: 201 });
+      }),
+    );
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hide: Recent Runs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    await waitFor(() => expect(posted?.layout?.views[0]?.widgets).toContainEqual({ instanceId: 'recent-runs', type: 'recent-runs', hidden: true }));
+    await waitFor(() => expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v1', dirty: false }));
+  });
+
+  it('does not save when an edit changed nothing', async () => {
+    let posts = 0;
+    server.use(http.post('/api/v1/dashboard/layouts', () => {
+      posts += 1;
+      return HttpResponse.json({}, { status: 201 });
+    }));
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(posts).toBe(0);
+  });
+
+  it('asks before replacing local changes with a newer server layout', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    let posted: { force?: boolean } | undefined;
+    server.use(
+      http.get('/api/v1/dashboard/layouts', () => HttpResponse.json({
+        content: [{ id: 'v2', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Desktop', formatVersion: 2, viewCount: 1, contentHash: 'h2' }],
+        page: 0, size: 1, totalElements: 1, totalPages: 1,
+      })),
+      // The sync hook's mount check re-reads the version's content before deciding, so the
+      // detail GET (not only the list) must be mocked too — see useDashboardLayoutSync.test.tsx.
+      http.get('/api/v1/dashboard/layouts/:id', () => HttpResponse.json({
+        id: 'v2', createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Desktop', formatVersion: 2, viewCount: 1, contentHash: 'h2',
+        layout: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [] }] },
+      })),
+      http.post('/api/v1/dashboard/layouts', async ({ request }) => {
+        posted = (await request.json()) as typeof posted;
+        return HttpResponse.json({ id: 'v3', createdAt: '2026-09-15T10:01:00Z', deviceLabel: 'Laptop', formatVersion: 2, viewCount: 1, contentHash: 'h3' }, { status: 201 });
+      }),
+    );
+    await renderDashboard();
+
+    const banner = await screen.findByTestId('layout-sync-conflict');
+    expect(banner).toHaveTextContent('Desktop');
+    fireEvent.click(within(banner).getByRole('button', { name: 'Keep mine as newest version' }));
+
+    await waitFor(() => expect(posted?.force).toBe(true));
+    await waitFor(() => expect(screen.queryByTestId('layout-sync-conflict')).not.toBeInTheDocument());
   });
 });

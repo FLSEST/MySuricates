@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Check, Pencil, RotateCcw } from 'lucide-react';
+import { Check, History, Pencil, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui';
 import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
 import { useDashboard } from '../hooks/useLearning';
 import { useDashboardLayout } from '../hooks/useDashboardLayout';
+import { hasLocalLayoutChanges, useDashboardLayoutSync } from '../hooks/useDashboardLayoutSync';
+import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
+import { LayoutSyncConflictBanner } from '../components/dashboard/LayoutSyncConflictBanner';
 import { useT } from '../i18n';
 
 function useLiveClock() {
@@ -35,6 +38,14 @@ export function Dashboard() {
   const { error, refetch } = useDashboard();
   const layout = useDashboardLayout();
   const [editMode, setEditMode] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const sync = useDashboardLayoutSync();
+
+  const toggleEditMode = () => {
+    // Leaving edit mode is the save point of the version history (spec E1).
+    if (editMode && hasLocalLayoutChanges()) void sync.saveSnapshot();
+    setEditMode((v) => !v);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -46,6 +57,18 @@ export function Dashboard() {
         </div>
         <div className="flex items-start gap-3 shrink-0">
           <div className="flex items-center gap-2 pt-1">
+            {editMode && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<History className="w-3.5 h-3.5" />}
+                onClick={() => setHistoryOpen(true)}
+                aria-label={t.dashboard.history.open}
+                title={t.dashboard.history.open}
+              >
+                <span className="hidden sm:inline">{t.dashboard.history.open}</span>
+              </Button>
+            )}
             {editMode && layout.isCustomized && (
               <Button
                 variant="ghost"
@@ -62,7 +85,7 @@ export function Dashboard() {
               variant={editMode ? 'primary' : 'secondary'}
               size="sm"
               icon={editMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
-              onClick={() => setEditMode((v) => !v)}
+              onClick={toggleEditMode}
               aria-label={editMode ? t.dashboard.doneEditing : t.dashboard.editDashboard}
               aria-pressed={editMode}
             >
@@ -72,6 +95,15 @@ export function Dashboard() {
           <LiveClock />
         </div>
       </div>
+
+      {sync.conflict && (
+        <LayoutSyncConflictBanner
+          remote={sync.conflict}
+          busy={sync.busy}
+          onKeepRemote={() => void sync.keepRemote()}
+          onKeepLocal={() => void sync.keepLocal()}
+        />
+      )}
 
       {error && (
         <div
@@ -101,6 +133,14 @@ export function Dashboard() {
         editMode={editMode}
         onMove={layout.move}
         onHide={(id) => layout.setHidden(id, true)}
+      />
+
+      <LayoutHistoryDialog
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        busy={sync.busy}
+        onRestore={(id) => void sync.restoreVersion(id)}
+        onAdoptView={(versionId, viewId) => void sync.adoptView(versionId, viewId)}
       />
     </div>
   );
