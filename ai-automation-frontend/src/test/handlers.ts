@@ -293,4 +293,9 @@ export const handlers = [
     HttpResponse.json({ id: 'n1', enabled: false }),
   ),
   http.delete(`${BASE}/notifications/:id`, () => new HttpResponse(null, { status: 204 })),
+
+  // Dashboard layout history — empty by default
+  http.get(`${BASE}/dashboard/layouts`, () =>
+    HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }),
+  ),
 ];

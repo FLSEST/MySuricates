@@ -224,6 +224,15 @@ export const de: TranslationKeys = {
     widgetNoData: 'Derzeit keine Daten – erscheint wieder, sobald welche da sind.',
     widgetFailed: 'Dieses Widget konnte nicht angezeigt werden.',
     dataUnavailable: 'Dashboard-Daten nicht verfügbar:',
+    sync: {
+      conflict: 'Das Dashboard wurde auf „{device}“ ({time}) geändert, seit dieses Gerät zuletzt gespeichert hat.',
+      keepRemote: 'Diese Version übernehmen',
+      keepLocal: 'Meinen Stand als neueste Version speichern',
+      saveFailed: 'Dashboard-Layout konnte nicht gespeichert werden',
+      loadFailed: 'Dashboard-Layout konnte nicht geladen werden',
+      newerFormat: 'Diese Dashboard-Version stammt aus einer neueren App-Version und kann hier nicht geladen werden.',
+    },
+    history: { renamed: 'Version benannt', renameFailed: 'Version konnte nicht benannt werden' },
   },
   projects: {
     title: 'Projekte',

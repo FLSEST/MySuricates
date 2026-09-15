@@ -222,6 +222,15 @@ export const en = {
     widgetNoData: 'No data right now — shown again as soon as there is some.',
     widgetFailed: 'This widget could not be displayed.',
     dataUnavailable: 'Dashboard data unavailable:',
+    sync: {
+      conflict: 'The dashboard was changed on “{device}” ({time}) since this device last saved.',
+      keepRemote: 'Use that version',
+      keepLocal: 'Keep mine as newest version',
+      saveFailed: 'Could not save the dashboard layout',
+      loadFailed: 'Could not load the dashboard layout',
+      newerFormat: 'This dashboard version comes from a newer app version and cannot be loaded here.',
+    },
+    history: { renamed: 'Version renamed', renameFailed: 'Could not rename the version' },
   },
   projects: {
     title: 'Projects',

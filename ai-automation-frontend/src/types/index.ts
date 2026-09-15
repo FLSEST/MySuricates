@@ -166,6 +166,21 @@ export interface WorkflowVersion {
   definitionHash?: string | null;
 }
 
+export interface DashboardLayoutVersionSummary {
+  id: string;
+  createdAt: string;
+  deviceLabel: string;
+  name?: string | null;
+  formatVersion: number;
+  viewCount: number;
+  contentHash: string;
+}
+
+export interface DashboardLayoutVersion extends DashboardLayoutVersionSummary {
+  /** Stored layout; always run it through migrateLayout + sanitizeLayout before use. */
+  layout: unknown;
+}
+
 // ── Workflow Template ────────────────────────────────────
 export interface TemplateVerification {
   projectId: string;
