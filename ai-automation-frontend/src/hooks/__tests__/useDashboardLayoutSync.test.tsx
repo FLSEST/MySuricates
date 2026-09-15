@@ -25,31 +25,52 @@ const remoteLayout = {
 const localWidgets = [{ instanceId: 'todos', type: 'todos' }];
 
 interface Serve {
+  /** Throwing (instead of returning) simulates the list endpoint itself failing (500). */
   latest: () => DashboardLayoutVersionSummary | null;
   versions?: Record<string, DashboardLayoutVersion>;
   onPost?: (body: unknown) => ReturnType<typeof HttpResponse.json>;
+  /** Delays the detail GET response until this resolves — to land an edit while it is in flight. */
+  beforeDetail?: Promise<unknown>;
+  /** Delays the POST response until this resolves — to land an edit while a save is in flight. */
+  beforePost?: Promise<unknown>;
 }
 
-function serve({ latest, versions = {}, onPost }: Serve) {
+function serve({ latest, versions = {}, onPost, beforeDetail, beforePost }: Serve) {
   const calls: string[] = [];
   server.use(
     http.get('/api/v1/dashboard/layouts', () => {
       calls.push('list');
-      const item = latest();
+      let item: DashboardLayoutVersionSummary | null;
+      try {
+        item = latest();
+      } catch {
+        return HttpResponse.json({ error: 'list failed' }, { status: 500 });
+      }
       return HttpResponse.json({ content: item ? [item] : [], page: 0, size: 1, totalElements: item ? 1 : 0, totalPages: item ? 1 : 0 });
     }),
-    http.get('/api/v1/dashboard/layouts/:id', ({ params }) => {
+    http.get('/api/v1/dashboard/layouts/:id', async ({ params }) => {
       calls.push(`get:${String(params.id)}`);
+      if (beforeDetail) await beforeDetail;
       const version = versions[String(params.id)];
       return version ? HttpResponse.json(version) : HttpResponse.json({ error: 'not found' }, { status: 404 });
     }),
     http.post('/api/v1/dashboard/layouts', async ({ request }) => {
       const body = await request.json();
       calls.push('post');
+      if (beforePost) await beforePost;
       return onPost ? onPost(body) : HttpResponse.json(summary('saved'), { status: 201 });
     }),
   );
   return calls;
+}
+
+/** A promise this test releases manually, to pin down which side of an await an action lands on. */
+function gate(): { promise: Promise<void>; release: () => void } {
+  let release: () => void = () => {};
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
 }
 
 let queryClient: QueryClient;
@@ -87,7 +108,12 @@ describe('useDashboardLayoutSync', () => {
   it('reports a conflict instead of overwriting local changes', async () => {
     customizeLocally();
     useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
-    serve({ latest: () => summary('v2', { deviceLabel: 'Desktop' }) });
+    // The mount check now always reads the version's content before deciding, to be able to
+    // re-check for a race with a local edit — so the detail GET must resolve too.
+    serve({
+      latest: () => summary('v2', { deviceLabel: 'Desktop' }),
+      versions: { v2: { ...summary('v2', { deviceLabel: 'Desktop' }), layout: remoteLayout } },
+    });
 
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
@@ -97,7 +123,10 @@ describe('useDashboardLayoutSync', () => {
 
   it('treats a customized layout that was never synced as a local change', async () => {
     customizeLocally();
-    serve({ latest: () => summary('v2') });
+    serve({
+      latest: () => summary('v2'),
+      versions: { v2: { ...summary('v2'), layout: remoteLayout } },
+    });
 
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
@@ -111,6 +140,10 @@ describe('useDashboardLayoutSync', () => {
     const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
 
     await waitFor(() => expect(calls).toContain('list'));
+    // Let the mount check actually finish before asserting on what it did *not* do.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     expect(calls).not.toContain('get:v2');
     expect(result.current.conflict).toBeNull();
   });
@@ -178,6 +211,7 @@ describe('useDashboardLayoutSync', () => {
     let posted: { force?: boolean } | undefined;
     serve({
       latest: () => summary('v2'),
+      versions: { v2: { ...summary('v2'), layout: remoteLayout } },
       onPost: (body) => {
         posted = body as { force?: boolean };
         return HttpResponse.json(summary('v3'), { status: 201 });
@@ -245,5 +279,80 @@ describe('useDashboardLayoutSync', () => {
 
     expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
     expect(calls).toContain('post');
+  });
+
+  it('keeps an edit made while a save is in flight as a local change', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    const { promise: postGate, release } = gate();
+    const calls = serve({
+      latest: () => summary('v1'),
+      beforePost: postGate,
+      onPost: () => HttpResponse.json(summary('v3'), { status: 201 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    const savePromise = act(() => result.current.saveSnapshot());
+    await waitFor(() => expect(calls).toContain('post'));
+    // Lands strictly between the request being sent and its response arriving.
+    useDashboardLayoutStore.getState().setActiveViewWidgets([{ instanceId: 'recent-runs', type: 'recent-runs' }]);
+    release();
+    await savePromise;
+
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v3', dirty: true });
+  });
+
+  it('re-checks for a local edit made while the version detail fetch is in flight', async () => {
+    const { promise: detailGate, release } = gate();
+    const calls = serve({
+      latest: () => summary('v2'),
+      versions: { v2: { ...summary('v2'), layout: remoteLayout } },
+      beforeDetail: detailGate,
+    });
+
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await waitFor(() => expect(calls).toContain('get:v2'));
+    // The version summary already matched with no local changes — the edit lands only now.
+    useDashboardLayoutStore.getState().setActiveViewWidgets(localWidgets);
+    release();
+
+    await waitFor(() => expect(result.current.conflict?.id).toBe('v2'));
+    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual(localWidgets);
+  });
+
+  it('keeps the layout dirty when a restore fails to save', async () => {
+    useDashboardSyncStore.setState({ baseVersionId: 'v2' });
+    serve({
+      latest: () => summary('v2'),
+      versions: { v1: { ...summary('v1'), layout: remoteLayout } },
+      onPost: () => HttpResponse.json({ error: 'save failed' }, { status: 500 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.restoreVersion('v1'));
+
+    expect(useDashboardSyncStore.getState()).toMatchObject({ baseVersionId: 'v2', dirty: true });
+    expect(useToastStore.getState().toasts.some((t) => t.type === 'error')).toBe(true);
+  });
+
+  it('shows an error toast when the version check after a 409 also fails', async () => {
+    customizeLocally();
+    useDashboardSyncStore.setState({ baseVersionId: 'v1', dirty: true });
+    let listCalls = 0;
+    serve({
+      latest: () => {
+        listCalls += 1;
+        if (listCalls > 1) throw new Error('list failed');
+        return summary('v1');
+      },
+      onPost: () => HttpResponse.json({ code: 'STATE_CONFLICT', error: 'changed' }, { status: 409 }),
+    });
+    const { result } = renderHook(() => useDashboardLayoutSync(), { wrapper });
+
+    await act(() => result.current.saveSnapshot());
+
+    expect(result.current.conflict).toBeNull();
+    expect(useToastStore.getState().toasts.some((t) => t.type === 'error')).toBe(true);
   });
 });

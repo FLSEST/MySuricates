@@ -45,9 +45,8 @@ export function layoutFromVersion(version: DashboardLayoutVersion): DashboardLay
   return sanitizeLayout(migrateLayout(version.layout, version.formatVersion));
 }
 
-/** Loads a version into the local layout. False when it cannot be read (newer format). */
-async function applyVersion(id: string): Promise<boolean> {
-  const version = await fetchDashboardLayoutVersion(id);
+/** Applies an already-fetched version's layout. False when it cannot be read (newer format). */
+function applyFetchedVersion(version: DashboardLayoutVersion): boolean {
   const layout = layoutFromVersion(version);
   if (!layout) {
     notify('warning', getTranslations().dashboard.sync.newerFormat);
@@ -56,6 +55,11 @@ async function applyVersion(id: string): Promise<boolean> {
   useDashboardLayoutStore.getState().applyRemoteLayout(layout);
   useDashboardSyncStore.getState().markSynced(version.id);
   return true;
+}
+
+/** Fetches and applies a version by id. False when it cannot be read (newer format). */
+async function applyVersion(id: string): Promise<boolean> {
+  return applyFetchedVersion(await fetchDashboardLayoutVersion(id));
 }
 
 /**
@@ -76,11 +80,19 @@ export function useDashboardLayoutSync() {
         const latest = await fetchLatestDashboardLayoutVersion();
         if (cancelled || userActed.current || !latest) return;
         if (latest.id === useDashboardSyncStore.getState().baseVersionId) return;
+        if (latest.formatVersion > LAYOUT_FORMAT_VERSION) {
+          notify('warning', getTranslations().dashboard.sync.newerFormat);
+          return;
+        }
+        // Re-check after the detail fetch too: an edit made while it was in flight must not be
+        // silently discarded by applying the fetched version underneath it.
+        const version = await fetchDashboardLayoutVersion(latest.id);
+        if (cancelled || userActed.current) return;
         if (hasLocalLayoutChanges()) {
           setConflict(latest);
-        } else {
-          await applyVersion(latest.id);
+          return;
         }
+        applyFetchedVersion(version);
       } catch {
         // Offline or older backend: keep working locally; the next save tries again.
       }
@@ -102,21 +114,32 @@ export function useDashboardLayoutSync() {
 
   const persistSnapshot = async (force: boolean) => {
     const { deviceLabel, baseVersionId } = useDashboardSyncStore.getState();
+    // Captured up front: an edit made while the request is in flight must not be reported as saved.
+    const layout = currentLayout();
     try {
       const saved = await saveDashboardLayoutVersion({
         deviceLabel,
         formatVersion: LAYOUT_FORMAT_VERSION,
-        layout: currentLayout(),
+        layout,
         baseVersionId,
         force,
       });
       useDashboardSyncStore.getState().markSynced(saved.id);
+      if (JSON.stringify(currentLayout()) !== JSON.stringify(layout)) {
+        // Something changed the layout after it was captured above — the base moved, but that
+        // change itself is still unsaved.
+        useDashboardSyncStore.getState().markDirty();
+      }
       setConflict(null);
       await queryClient.invalidateQueries({ queryKey: DASHBOARD_LAYOUT_VERSIONS_KEY });
     } catch (err) {
       if (isConflict(err)) {
         const latest = await fetchLatestDashboardLayoutVersion().catch(() => null);
-        if (latest) setConflict(latest);
+        if (latest) {
+          setConflict(latest);
+        } else {
+          notify('error', getTranslations().dashboard.sync.saveFailed);
+        }
         return;
       }
       notify('error', apiErrorMessage(err, getTranslations().dashboard.sync.saveFailed));
@@ -141,7 +164,16 @@ export function useDashboardLayoutSync() {
     })),
     keepLocal: () => run(() => persistSnapshot(true)),
     restoreVersion: (id: string) => run(() => loadAndThen(async () => {
-      if (await applyVersion(id)) await persistSnapshot(true);
+      const version = await fetchDashboardLayoutVersion(id);
+      const layout = layoutFromVersion(version);
+      if (!layout) {
+        notify('warning', getTranslations().dashboard.sync.newerFormat);
+        return;
+      }
+      useDashboardLayoutStore.getState().applyRemoteLayout(layout);
+      // Not yet synced: if the save below fails, the layout must not look saved to this version.
+      useDashboardSyncStore.getState().markDirty();
+      await persistSnapshot(true);
     })),
     adoptView: (versionId: string, viewId: string) => run(() => loadAndThen(async () => {
       const layout = layoutFromVersion(await fetchDashboardLayoutVersion(versionId));
