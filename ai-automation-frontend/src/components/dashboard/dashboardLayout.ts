@@ -90,6 +90,99 @@ export function createInstanceId(type: string): string {
   return `${type}-${generateId().slice(0, 8)}`;
 }
 
+/** New view id: `view-` + 8 hex characters, valid for the backend's id pattern. */
+export function createViewId(): string {
+  return `view-${generateId().slice(0, 8)}`;
+}
+
+/** Cuts after `max` Unicode code points, so a surrogate pair (e.g. an emoji) is never split. */
+export function truncateCodePoints(value: string, max: number): string {
+  const codePoints = Array.from(value);
+  return codePoints.length <= max ? value : codePoints.slice(0, max).join('');
+}
+
+/** A view name as stored: trimmed, at most LAYOUT_LIMITS.nameLength code points (the backend counts code points too). */
+export function cleanViewName(name: string): string {
+  return truncateCodePoints(name.trim(), LAYOUT_LIMITS.nameLength).trim();
+}
+
+/**
+ * What a layout version stores apart from the active view. The shown view is chosen per device, so
+ * comparisons between a local and a server layout must ignore it.
+ */
+export function layoutContentKey(layout: DashboardLayout): string {
+  return JSON.stringify(layout.views);
+}
+
+/*
+ * View operations. Each returns the same layout object when nothing changes (unknown id, limit
+ * reached, same value), so callers can tell a real edit from a no-op by identity.
+ */
+
+/** Appends an empty view and makes it the active one. */
+export function addLayoutView(layout: DashboardLayout, name: string, id: string): DashboardLayout {
+  if (layout.views.length >= LAYOUT_LIMITS.views || layout.views.some((v) => v.id === id)) return layout;
+  return { activeViewId: id, views: [...layout.views, { id, name: cleanViewName(name), widgets: [] }] };
+}
+
+export function renameLayoutView(layout: DashboardLayout, viewId: string, name: string): DashboardLayout {
+  const cleaned = cleanViewName(name);
+  const view = layout.views.find((v) => v.id === viewId);
+  if (!view || view.name === cleaned) return layout;
+  return { ...layout, views: layout.views.map((v) => (v.id === viewId ? { ...v, name: cleaned } : v)) };
+}
+
+/** Copies widgets and filter of a view into a new view right after it and makes the copy active. */
+export function duplicateLayoutView(layout: DashboardLayout, viewId: string, name: string, id: string): DashboardLayout {
+  const index = layout.views.findIndex((v) => v.id === viewId);
+  const source = layout.views[index];
+  if (!source || layout.views.length >= LAYOUT_LIMITS.views || layout.views.some((v) => v.id === id)) return layout;
+  const copy: DashboardView = { id, name: cleanViewName(name), widgets: [...source.widgets] };
+  if (source.filter) copy.filter = { ...source.filter };
+  const views = [...layout.views];
+  views.splice(index + 1, 0, copy);
+  return { activeViewId: id, views };
+}
+
+/** Removes a view but never the last one; a removed active view hands over to the next view (or the previous one). */
+export function removeLayoutView(layout: DashboardLayout, viewId: string): DashboardLayout {
+  const index = layout.views.findIndex((v) => v.id === viewId);
+  if (index < 0 || layout.views.length <= 1) return layout;
+  const views = layout.views.filter((v) => v.id !== viewId);
+  if (layout.activeViewId !== viewId) return { ...layout, views };
+  const neighbour = views[index] ?? views[index - 1];
+  if (!neighbour) return layout;
+  return { activeViewId: neighbour.id, views };
+}
+
+/** Moves a view onto the position of another one (tab drag); views in between keep their order. */
+export function moveLayoutView(layout: DashboardLayout, draggedViewId: string, overViewId: string): DashboardLayout {
+  const from = layout.views.findIndex((v) => v.id === draggedViewId);
+  const to = layout.views.findIndex((v) => v.id === overViewId);
+  const moved = layout.views[from];
+  if (!moved || to < 0 || from === to) return layout;
+  const views = [...layout.views];
+  views.splice(from, 1);
+  views.splice(to, 0, moved);
+  return { ...layout, views };
+}
+
+export function selectLayoutView(layout: DashboardLayout, viewId: string): DashboardLayout {
+  if (layout.activeViewId === viewId || !layout.views.some((v) => v.id === viewId)) return layout;
+  return { ...layout, activeViewId: viewId };
+}
+
+/** Sets the data filter of a view; invalid parts are dropped and an empty filter removes the field. */
+export function setLayoutViewFilter(layout: DashboardLayout, viewId: string, filter: DashboardViewFilter): DashboardLayout {
+  const view = layout.views.find((v) => v.id === viewId);
+  if (!view) return layout;
+  const cleaned = sanitizeFilter(filter);
+  if (cleaned?.projectId === view.filter?.projectId && cleaned?.days === view.filter?.days) return layout;
+  const next: DashboardView = { id: view.id, name: view.name, widgets: view.widgets };
+  if (cleaned) next.filter = cleaned;
+  return { ...layout, views: layout.views.map((v) => (v.id === viewId ? next : v)) };
+}
+
 /**
  * Drops instances of unknown types, duplicate instance ids, singletons stored under another id and
  * multi instances that use a singleton's id, then appends missing singletons in registry order.
@@ -261,7 +354,7 @@ function sanitizeView(value: unknown): DashboardView | null {
   if (!isId(id)) return null;
   const view: DashboardView = {
     id,
-    name: typeof name === 'string' ? name.slice(0, LAYOUT_LIMITS.nameLength) : '',
+    name: typeof name === 'string' ? truncateCodePoints(name, LAYOUT_LIMITS.nameLength) : '',
     widgets: Array.isArray(widgets) ? uniqueInstances(widgets.map(sanitizeInstance)).slice(0, LAYOUT_LIMITS.widgetsPerView) : [],
   };
   const cleanFilter = sanitizeFilter(filter);

@@ -1,16 +1,27 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   LAYOUT_LIMITS,
+  addLayoutView,
   addWidgetInstance,
+  cleanViewName,
   createDefaultLayout,
   createInstanceId,
+  createViewId,
+  duplicateLayoutView,
   isCustomizedLayout,
+  layoutContentKey,
   migrateLayout,
+  moveLayoutView,
   moveWidget,
   normalizeWidgets,
+  removeLayoutView,
   removeWidgetInstance,
+  renameLayoutView,
   sanitizeLayout,
+  selectLayoutView,
+  setLayoutViewFilter,
   setWidgetHidden,
+  truncateCodePoints,
   updateWidgetConfig,
   type DashboardLayout,
   type DashboardView,
@@ -128,6 +139,86 @@ describe('instance operations', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('view operations', () => {
+  const view = (id: string, extra: Partial<DashboardView> = {}): DashboardView => ({ id, name: '', widgets: [], ...extra });
+  const twoViews: DashboardLayout = {
+    activeViewId: 'default',
+    views: [view('default'), view('ops', { name: 'Ops', widgets: [single('a')], filter: { days: 7 } })],
+  };
+
+  it('creates view ids that follow the id rules', () => {
+    const first = createViewId();
+    expect(first).toMatch(/^view-[0-9a-f]{8}$/);
+    expect(first).not.toBe(createViewId());
+  });
+
+  it('trims names and cuts them by code points, never inside an emoji', () => {
+    const tooLong = '😀'.repeat(LAYOUT_LIMITS.nameLength + 5);
+    expect(cleanViewName('  Betrieb  ')).toBe('Betrieb');
+    expect(cleanViewName(tooLong)).toBe('😀'.repeat(LAYOUT_LIMITS.nameLength));
+    expect(truncateCodePoints('a😀b', 2)).toBe('a😀');
+    expect(sanitizeLayout({ activeViewId: 'x', views: [{ id: 'x', name: tooLong, widgets: [] }] }).views[0]?.name)
+      .toBe('😀'.repeat(LAYOUT_LIMITS.nameLength));
+  });
+
+  it('adds an empty view, shows it and respects the view limit', () => {
+    expect(addLayoutView(twoViews, '  Kosten ', 'view-00000001')).toEqual({
+      activeViewId: 'view-00000001',
+      views: [...twoViews.views, view('view-00000001', { name: 'Kosten' })],
+    });
+    expect(addLayoutView(twoViews, '', 'ops')).toBe(twoViews);
+    const full: DashboardLayout = { activeViewId: 'v0', views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => view(`v${i}`)) };
+    expect(addLayoutView(full, '', 'view-00000002')).toBe(full);
+  });
+
+  it('renames a view and leaves unknown views and unchanged names alone', () => {
+    expect(renameLayoutView(twoViews, 'ops', ' Betrieb ').views[1]?.name).toBe('Betrieb');
+    expect(renameLayoutView(twoViews, 'ops', 'Ops')).toBe(twoViews);
+    expect(renameLayoutView(twoViews, 'missing', 'x')).toBe(twoViews);
+  });
+
+  it('duplicates widgets and filter right after the original and shows the copy', () => {
+    const copied = duplicateLayoutView(twoViews, 'ops', 'Ops (copy)', 'view-00000003');
+    expect(copied.activeViewId).toBe('view-00000003');
+    expect(copied.views[2]).toEqual({ id: 'view-00000003', name: 'Ops (copy)', widgets: [single('a')], filter: { days: 7 } });
+    expect(copied.views[2]?.widgets).not.toBe(twoViews.views[1]?.widgets);
+    expect(duplicateLayoutView(twoViews, 'default', 'Copy', 'view-00000004').views.map((v) => v.id))
+      .toEqual(['default', 'view-00000004', 'ops']);
+    expect(duplicateLayoutView(twoViews, 'missing', 'x', 'view-00000005')).toBe(twoViews);
+  });
+
+  it('removes a view, hands the active view to a neighbour and keeps the last view', () => {
+    expect(removeLayoutView({ ...twoViews, activeViewId: 'ops' }, 'ops')).toEqual({ activeViewId: 'default', views: [view('default')] });
+    const three: DashboardLayout = { activeViewId: 'b', views: [view('a'), view('b'), view('c')] };
+    expect(removeLayoutView(three, 'b')).toEqual({ activeViewId: 'c', views: [view('a'), view('c')] });
+    expect(removeLayoutView(three, 'a')).toEqual({ activeViewId: 'b', views: [view('b'), view('c')] });
+    const last: DashboardLayout = { activeViewId: 'a', views: [view('a')] };
+    expect(removeLayoutView(last, 'a')).toBe(last);
+    expect(removeLayoutView(three, 'missing')).toBe(three);
+  });
+
+  it('reorders views and switches only to existing views', () => {
+    expect(moveLayoutView(twoViews, 'ops', 'default').views.map((v) => v.id)).toEqual(['ops', 'default']);
+    expect(moveLayoutView(twoViews, 'ops', 'ops')).toBe(twoViews);
+    expect(selectLayoutView(twoViews, 'ops').activeViewId).toBe('ops');
+    expect(selectLayoutView(twoViews, 'default')).toBe(twoViews);
+    expect(selectLayoutView(twoViews, 'missing')).toBe(twoViews);
+  });
+
+  it('sets a cleaned filter and removes an empty one', () => {
+    expect(setLayoutViewFilter(twoViews, 'default', { projectId: 'p1', days: 400 }).views[0])
+      .toEqual(view('default', { filter: { projectId: 'p1' } }));
+    expect(setLayoutViewFilter(twoViews, 'ops', { days: 7 })).toBe(twoViews);
+    expect(setLayoutViewFilter(twoViews, 'ops', {}).views[1]).toEqual(view('ops', { name: 'Ops', widgets: [single('a')] }));
+    expect(setLayoutViewFilter(twoViews, 'missing', { days: 7 })).toBe(twoViews);
+  });
+
+  it('compares layout content without the active view', () => {
+    expect(layoutContentKey({ ...twoViews, activeViewId: 'ops' })).toBe(layoutContentKey(twoViews));
+    expect(layoutContentKey(renameLayoutView(twoViews, 'ops', 'Betrieb'))).not.toBe(layoutContentKey(twoViews));
   });
 });
 
@@ -312,7 +403,7 @@ describe('dashboardLayoutStore', () => {
 
   it('replaces a view with the same id or appends it, within the view limit', () => {
     const ops: DashboardView = { id: 'ops', name: 'Ops', widgets: [single('a')] };
-    useDashboardLayoutStore.getState().upsertView(ops);
+    expect(useDashboardLayoutStore.getState().upsertView(ops)).toBe(true);
     expect(useDashboardLayoutStore.getState().views.map((v) => v.id)).toEqual(['default', 'ops']);
     expect(useDashboardSyncStore.getState().dirty).toBe(true);
 
@@ -322,7 +413,92 @@ describe('dashboardLayoutStore', () => {
     useDashboardLayoutStore.setState({
       views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => ({ id: `v${i}`, name: '', widgets: [] })),
     });
-    useDashboardLayoutStore.getState().upsertView({ id: 'one-too-many', name: '', widgets: [] });
+    expect(useDashboardLayoutStore.getState().upsertView({ id: 'one-too-many', name: '', widgets: [] })).toBe(false);
     expect(useDashboardLayoutStore.getState().views).toHaveLength(LAYOUT_LIMITS.views);
+  });
+
+  it('switches the active view without marking a local change', () => {
+    useDashboardLayoutStore.setState({ views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }] });
+
+    useDashboardLayoutStore.getState().setActiveView('ops');
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+    useDashboardLayoutStore.getState().setActiveView('missing');
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+  });
+
+  it('marks view edits as local changes, but only when they change something', () => {
+    const store = () => useDashboardLayoutStore.getState();
+    const dirty = () => useDashboardSyncStore.getState().dirty;
+    const clean = () => useDashboardSyncStore.setState({ dirty: false });
+
+    const added = store().addView() ?? '';
+    expect(added).toMatch(/^view-[0-9a-f]{8}$/);
+    expect(store().activeViewId).toBe(added);
+    expect(dirty()).toBe(true);
+
+    clean();
+    store().renameView(added, '  Kosten ');
+    expect(store().views[1]?.name).toBe('Kosten');
+    expect(dirty()).toBe(true);
+
+    clean();
+    store().renameView(added, 'Kosten');
+    expect(dirty()).toBe(false);
+
+    const copy = store().duplicateView(added, 'Kosten (Kopie)') ?? '';
+    expect(store().views.map((v) => v.id)).toEqual(['default', added, copy]);
+    expect(store().activeViewId).toBe(copy);
+    expect(dirty()).toBe(true);
+
+    clean();
+    store().setViewFilter('default', { days: 7 });
+    expect(store().views[0]?.filter).toEqual({ days: 7 });
+    expect(dirty()).toBe(true);
+
+    clean();
+    store().moveView(copy, 'default');
+    expect(store().views.map((v) => v.id)).toEqual([copy, 'default', added]);
+    expect(dirty()).toBe(true);
+
+    clean();
+    expect(store().removeView(copy)).toBe(true);
+    expect(store().activeViewId).toBe('default');
+    expect(dirty()).toBe(true);
+  });
+
+  it('refuses to remove the last view and to add views past the limit', () => {
+    expect(useDashboardLayoutStore.getState().removeView('default')).toBe(false);
+
+    useDashboardLayoutStore.setState({
+      activeViewId: 'v0',
+      views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => ({ id: `v${i}`, name: '', widgets: [] })),
+    });
+    expect(useDashboardLayoutStore.getState().addView()).toBeNull();
+    expect(useDashboardLayoutStore.getState().duplicateView('v0', 'Copy')).toBeNull();
+
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+  });
+
+  it('keeps the local active view when a server layout has it, otherwise shows its first view', () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'ops',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }],
+    });
+
+    useDashboardLayoutStore.getState().applyRemoteLayout({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [single('a')] }, { id: 'ops', name: 'Betrieb', widgets: [] }],
+    });
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('ops');
+    expect(useDashboardLayoutStore.getState().views[1]?.name).toBe('Betrieb');
+
+    useDashboardLayoutStore.getState().applyRemoteLayout({
+      activeViewId: 'plan',
+      views: [{ id: 'start', name: '', widgets: [] }, { id: 'plan', name: 'Plan', widgets: [] }],
+    });
+    expect(useDashboardLayoutStore.getState().activeViewId).toBe('start');
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
   });
 });
