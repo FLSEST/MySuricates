@@ -113,6 +113,14 @@ class TodoRepositoryTest {
     }
 
     @Test
+    void should_count_zero_per_status_on_an_empty_table() {
+        // SUM over zero rows is NULL — the primitive record constructor must still get 0 (fresh install)
+        TodoCountResponse counts = repository.countGroupedByStatus();
+
+        assertThat(counts).isEqualTo(new TodoCountResponse(0, 0, 0, 0, 0));
+    }
+
+    @Test
     void should_find_open_todo_by_composite_key() {
         Todo todo = Todo.builder()
                 .title("Composite-Key-Match")

@@ -25,12 +25,13 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     long countBySource(Todo.Source source);
 
+    /** COALESCE: SUM over an empty table is NULL, which the primitive record fields cannot take. */
     @Query("SELECT new com.automation.dto.response.TodoCountResponse("
-         + "SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), "
-         + "SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), "
-         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), "
-         + "SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END), "
-         + "SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END)) FROM Todo t")
+         + "COALESCE(SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END), 0)) FROM Todo t")
     TodoCountResponse countGroupedByStatus();
 
     /**
