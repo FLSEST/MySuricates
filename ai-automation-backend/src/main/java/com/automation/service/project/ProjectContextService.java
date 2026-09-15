@@ -18,7 +18,7 @@ import java.util.List;
 @Slf4j
 public class ProjectContextService {
 
-    private static final String CONTEXT_FILE_PATH = ".claude/rules/project-context.md";
+    private static final String CONTEXT_FILE_PATH = com.automation.service.ai.RunContextFiles.PROJECT_CONTEXT;
     private static final List<String> PROBE_FILES = List.of(
             "README.md", "README.rst", "README.txt",
             "package.json", "pom.xml", "build.gradle", "Cargo.toml",

@@ -13,7 +13,9 @@ import java.util.List;
  * AI provider backed by the OpenAI Codex CLI on the host.
  * Adapts limitations: no system prompt (merged into user prompt),
  * no token tracking (estimated), no effort flag. The model is passed via {@code -m};
- * available slugs come from {@code CodexModelCatalogSource}.
+ * available slugs come from {@code CodexModelCatalogSource}. Codex does not load
+ * {@code .claude/rules/}, so skills, workflow memory and project context are merged into the prompt
+ * ({@link RunContextFiles}).
  */
 @Component
 @RequiredArgsConstructor
@@ -37,7 +39,8 @@ public class CodexAiProvider implements AiProvider {
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
         // Merge system prompt into user prompt since Codex doesn't support --system-prompt
         // Reasoning is always read-only (analysis only, no file writes)
-        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), true);
+        String fullPrompt = mergeSystemPrompt(
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()), request.prompt(), true);
         Path workDir = request.workingDirectory() != null ? Path.of(request.workingDirectory()) : null;
         int timeout = request.timeoutSeconds() != null
                 ? request.timeoutSeconds()
@@ -57,7 +60,8 @@ public class CodexAiProvider implements AiProvider {
             log.debug("Codex provider ignores effort '{}' (no CLI reasoning flag)", request.effort());
         }
         boolean readOnly = request.readOnly();
-        String fullPrompt = mergeSystemPrompt(request.systemPrompt(), request.prompt(), readOnly);
+        String fullPrompt = mergeSystemPrompt(
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()), request.prompt(), readOnly);
         Path workDir = request.workingDirectory() != null ? Path.of(request.workingDirectory()) : null;
         int timeout = request.timeoutSeconds() != null
                 ? request.timeoutSeconds()

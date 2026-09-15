@@ -483,7 +483,7 @@ Blocks can bring their own skills via the `skillIds` field, which apply additive
 - `BlockDefinition.skillIds` — optional list of skill IDs that are activated only for this block
 - `BlockSkillContext` (extracted from `WorkflowExecutor`) merges workflow-level skills + block-level skills before each block execution and restores the workflow baseline afterwards
 - After block execution, the baseline skill state is restored
-- Skill context is provided file-based via `.claude/rules/skills-context.md` in the project directory (`CommandExecutorService.writeSkillContextToProject()`)
+- Skill context is provided file-based via `.claude/rules/skills-context.md` in the project directory (`CommandExecutorService.writeSkillContextToProject()`); the Claude CLI reads `.claude/rules/` itself, pi (`--no-context-files`) and Codex get project context, skills and workflow memory appended to the system prompt via `RunContextFiles`
 - Frontend: Skill picker toggles in the add/edit block modals, zap icon indicator on `SortableBlock`
 
 ## Model Selection

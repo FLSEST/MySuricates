@@ -211,4 +211,20 @@ class CodexAiProviderTest {
         assertThat(result).doesNotContain("=== INSTRUCTIONS ===");
         assertThat(result).contains("=== YOUR RESPONSE ===");
     }
+
+    @Test
+    void runContextFilesAreMergedIntoTheCodexPrompt(@org.junit.jupiter.api.io.TempDir Path project) throws IOException {
+        Path context = project.resolve(RunContextFiles.PROJECT_CONTEXT);
+        java.nio.file.Files.createDirectories(context.getParent());
+        java.nio.file.Files.writeString(context, "## Project\nSpring Boot backend");
+        when(hostCodexService.execute(anyString(), eq(project), eq(90), eq(false), isNull())).thenReturn("done");
+
+        provider.executeAction(new AiProvider.ActionRequest("do it", null, "instructions", project.toString(), 90, false, false));
+
+        org.mockito.ArgumentCaptor<String> prompt = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(hostCodexService).execute(prompt.capture(), eq(project), eq(90), eq(false), isNull());
+        assertThat(prompt.getValue())
+                .contains("=== SYSTEM INSTRUCTIONS ===\ninstructions\n\n## Project\nSpring Boot backend")
+                .contains("=== TASK ===\ndo it");
+    }
 }

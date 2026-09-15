@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CommandExecutorService {
 
-    private static final String SKILLS_CONTEXT_FILE = ".claude/rules/skills-context.md";
+    private static final String SKILLS_CONTEXT_FILE = com.automation.service.ai.RunContextFiles.SKILLS_CONTEXT;
 
     private final CliSessionManager sessionManager;
     private final ShellCommandService shellCommandService;

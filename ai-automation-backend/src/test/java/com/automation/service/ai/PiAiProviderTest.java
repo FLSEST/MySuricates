@@ -152,4 +152,24 @@ class PiAiProviderTest {
         assertThat(result).contains("Hi there");
         assertThat(result).contains("=== YOUR RESPONSE ===");
     }
+
+    @Test
+    void runContextFilesReachPiThroughTheSystemPrompt(@org.junit.jupiter.api.io.TempDir java.nio.file.Path project) throws IOException {
+        java.nio.file.Path skills = project.resolve(RunContextFiles.SKILLS_CONTEXT);
+        java.nio.file.Files.createDirectories(skills.getParent());
+        java.nio.file.Files.writeString(skills, "## Skills\nreview carefully");
+        java.nio.file.Files.writeString(project.resolve(RunContextFiles.WORKFLOW_MEMORY), "## Memory\nuse mvnw");
+        String dir = project.toString();
+        String expectedSystem = "instructions\n\n## Skills\nreview carefully\n\n## Memory\nuse mvnw";
+        when(hostPiService.executeAction(eq("do it"), isNull(), eq(expectedSystem), eq(dir), isNull(), anyBoolean(), isNull(), isNull(), isNull()))
+                .thenReturn(new HostPiService.ActionResult("ok", 0));
+        when(hostPiService.reason(eq("think"), eq(expectedSystem), isNull(), eq(dir), isNull(), isNull(), isNull()))
+                .thenReturn(new HostPiService.ReasoningResult("thought"));
+
+        provider.executeAction(new AiProvider.ActionRequest("do it", null, "instructions", dir));
+        provider.reason(new AiProvider.ReasoningRequest("think", "instructions", null, dir, null, null, null));
+
+        verify(hostPiService).executeAction(eq("do it"), isNull(), eq(expectedSystem), eq(dir), isNull(), anyBoolean(), isNull(), isNull(), isNull());
+        verify(hostPiService).reason(eq("think"), eq(expectedSystem), isNull(), eq(dir), isNull(), isNull(), isNull());
+    }
 }

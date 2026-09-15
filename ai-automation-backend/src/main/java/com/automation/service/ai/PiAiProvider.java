@@ -12,6 +12,8 @@ import java.util.List;
  * Wraps {@link HostPiService}. Supports system prompt + model selection (with backend routing
  * via the {@code "<backend>/<model-id>"} model-string convention). Token tracking is currently
  * estimated — pi's {@code --mode json} stream could provide real counts in a follow-up.
+ * pi runs with {@code --no-context-files}, so skills, workflow memory and project context reach it
+ * through the system prompt ({@link RunContextFiles}).
  */
 @Component
 @RequiredArgsConstructor
@@ -50,7 +52,7 @@ public class PiAiProvider implements AiProvider {
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
         HostPiService.ReasoningResult result = hostPiService.reason(
                 request.prompt(),
-                request.systemPrompt(),
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()),
                 request.model(),
                 request.workingDirectory(),
                 request.maxTurns(),
@@ -68,7 +70,7 @@ public class PiAiProvider implements AiProvider {
         HostPiService.ActionResult result = hostPiService.executeAction(
                 request.prompt(),
                 request.model(),
-                request.systemPrompt(),
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()),
                 request.workingDirectory(),
                 request.timeoutSeconds(),
                 request.priority(),

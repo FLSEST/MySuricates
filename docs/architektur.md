@@ -521,7 +521,7 @@ Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv 
 - `BlockDefinition.skillIds` — optionale Liste von Skill-IDs, die nur für diesen Block aktiviert werden
 - `BlockSkillContext` (aus `WorkflowExecutor` herausgelöst) merged Workflow-Level-Skills + Block-Level-Skills vor jeder Block-Ausführung und stellt danach den Workflow-Stand wieder her
 - Nach der Block-Ausführung wird der Baseline-Skill-Zustand wiederhergestellt
-- Skill-Kontext wird dateibasiert über `.claude/rules/skills-context.md` im Projektverzeichnis bereitgestellt (`CommandExecutorService.writeSkillContextToProject()`)
+- Skill-Kontext wird dateibasiert über `.claude/rules/skills-context.md` im Projektverzeichnis bereitgestellt (`CommandExecutorService.writeSkillContextToProject()`); die Claude CLI liest `.claude/rules/` selbst, pi (`--no-context-files`) und Codex bekommen Projekt-Kontext, Skills und Workflow-Memory über `RunContextFiles` als System-Prompt-Anhang
 - Frontend: Skill-Picker-Toggles in den Add/Edit-Block-Modals, Zap-Icon-Indikator auf `SortableBlock`
 
 ## Model Selection

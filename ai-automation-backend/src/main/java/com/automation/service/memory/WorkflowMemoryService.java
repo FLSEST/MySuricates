@@ -25,7 +25,7 @@ import java.util.Optional;
 @Slf4j
 public class WorkflowMemoryService {
 
-    private static final String MEMORY_FILE_PATH = ".claude/rules/project-memory.md";
+    private static final String MEMORY_FILE_PATH = com.automation.service.ai.RunContextFiles.WORKFLOW_MEMORY;
 
     private final WorkflowMemoryRepository memoryRepository;
     private final WorkflowRunRepository runRepository;
