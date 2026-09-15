@@ -50,7 +50,7 @@ export function Reports() {
         </aside>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto rounded-xl border border-border bg-surface-raised p-6">
+        <div className="flex-1 min-w-0 overflow-y-auto rounded-xl border border-card-border bg-surface-raised p-6">
           {!activeReport ? (
             <div className="flex flex-col items-center justify-center h-full text-text-secondary gap-3">
               <ClipboardList className="w-10 h-10 opacity-40" />

@@ -17,16 +17,16 @@ export interface NavTileConfig {
 
 /** Shared accent hue per area — single source for tiles and Simple sub-pages. */
 export const AREA_COLORS: Record<NavTileId, string> = {
-  workflows: '#818cf8',
-  results: '#34d399',
-  projects: '#fbbf24',
-  schedules: '#a78bfa',
-  todos: '#fb7185',
-  activity: '#38bdf8',
-  factory: '#f472b6',
-  integrations: '#2dd4bf',
-  reports: '#fb923c',
-  wishes: '#a3e635',
+  workflows: 'var(--color-chart-1)',
+  results: 'var(--color-success)',
+  projects: 'var(--color-chart-2)',
+  schedules: 'var(--color-chart-3)',
+  todos: 'var(--color-warning)',
+  activity: 'var(--color-info)',
+  factory: 'var(--color-chart-5)',
+  integrations: 'var(--color-chart-6)',
+  reports: 'var(--color-chart-4)',
+  wishes: 'var(--color-chart-7)',
 };
 
 /** Curated everyday areas reachable from the Simple home — NOT all 21 routes. */

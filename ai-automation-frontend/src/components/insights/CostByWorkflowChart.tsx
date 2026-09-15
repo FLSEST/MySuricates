@@ -3,7 +3,7 @@ import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 import type { CostByWorkflowEntry } from '../../types';
 
-const COLORS = ['var(--color-accent)', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+const COLORS = ['var(--color-accent)', 'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)', 'var(--color-chart-6)', 'var(--color-chart-7)', 'var(--color-chart-8)'];
 
 function shortName(name: string): string {
   return name.length > 24 ? name.substring(0, 22) + '...' : name;

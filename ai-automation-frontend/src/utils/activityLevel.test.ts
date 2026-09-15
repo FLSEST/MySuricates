@@ -3,13 +3,13 @@ import { levelColor, relativeTime } from './activityLevel';
 
 describe('levelColor', () => {
   it('maps known levels', () => {
-    expect(levelColor('ERROR')).toBe('#fb7185');
-    expect(levelColor('WARN')).toBe('#fbbf24');
-    expect(levelColor('INFO')).toBe('#38bdf8');
-    expect(levelColor('DEBUG')).toBe('#5b6678');
+    expect(levelColor('ERROR')).toBe('var(--color-danger)');
+    expect(levelColor('WARN')).toBe('var(--color-warning)');
+    expect(levelColor('INFO')).toBe('var(--color-info)');
+    expect(levelColor('DEBUG')).toBe('var(--color-text-tertiary)');
   });
   it('falls back for unknown levels', () => {
-    expect(levelColor('WHATEVER')).toBe('#5b6678');
+    expect(levelColor('WHATEVER')).toBe('var(--color-text-tertiary)');
   });
 });
 

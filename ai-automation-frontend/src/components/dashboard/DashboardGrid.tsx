@@ -93,7 +93,7 @@ function SortableWidget({ widget, onHide }: { widget: ResolvedWidget; onHide: (i
       <div className="peer grid grid-cols-1 select-none" inert>
         <Widget />
       </div>
-      <div className="hidden peer-empty:flex min-h-20 flex-col justify-center rounded-xl border border-border bg-surface-raised px-4 py-3">
+      <div className="hidden peer-empty:flex min-h-20 flex-col justify-center rounded-xl border border-card-border bg-surface-raised px-4 py-3">
         <p className="text-sm font-medium text-text-secondary truncate">{label}</p>
         <p className="text-xs text-text-tertiary">{t.dashboard.widgetNoData}</p>
       </div>

@@ -225,7 +225,7 @@ export function Sidebar() {
         className={`flex flex-col items-center ${collapsed && !isMobile ? 'px-2 py-3' : 'px-3 pt-4 pb-3'}`}
         style={{ borderBottom: '1px solid var(--color-sidebar-border)' }}
       >
-        <MeerkatIcon className="text-accent" size={collapsed && !isMobile ? 48 : 140} />
+        <MeerkatIcon className="text-(--color-accent)" size={collapsed && !isMobile ? 48 : 140} />
         {showLabels ? (
           <>
             <span className="mt-1.5 text-lg font-bold tracking-tight text-[var(--color-sidebar-text)]">
@@ -234,8 +234,8 @@ export function Sidebar() {
             {systemInfo?.environment && (
               <span className={`text-[10px] font-semibold uppercase tracking-widest mt-0.5 px-2 py-0.5 rounded-full ${
                 systemInfo.environment === 'Produktiv'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-amber-500/20 text-amber-400'
+                  ? 'bg-success-subtle text-success'
+                  : 'bg-warning-subtle text-warning'
               }`}>
                 {systemInfo.environment}
               </span>

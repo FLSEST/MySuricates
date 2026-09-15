@@ -3,7 +3,7 @@ import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 import type { TriggerDistribution } from '../../types';
 
-const COLORS = ['var(--color-text-secondary)', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b'];
+const COLORS = ['var(--color-text-secondary)', 'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)'];
 
 export function TriggerDistributionChart({ data }: { data?: TriggerDistribution }) {
   const t = useT();

@@ -2,7 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 
-const COLORS = ['var(--color-accent)', '#3b82f6'];
+const COLORS = ['var(--color-accent)', 'var(--color-chart-1)'];
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

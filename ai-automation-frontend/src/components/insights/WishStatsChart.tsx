@@ -3,7 +3,7 @@ import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 import type { WishStats } from '../../types';
 
-const COLORS = ['var(--color-success)', 'var(--color-danger)', '#3b82f6'];
+const COLORS = ['var(--color-success)', 'var(--color-danger)', 'var(--color-info)'];
 
 export function WishStatsChart({ data }: { data?: WishStats }) {
   const t = useT();

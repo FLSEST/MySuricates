@@ -1,10 +1,10 @@
 const LEVEL_COLOR: Record<string, string> = {
-  ERROR: '#fb7185', WARN: '#fbbf24', INFO: '#38bdf8', DEBUG: '#5b6678',
+  ERROR: 'var(--color-danger)', WARN: 'var(--color-warning)', INFO: 'var(--color-info)', DEBUG: 'var(--color-text-tertiary)',
 };
 
 /** Color for an activity log level. Pure. */
 export function levelColor(level: string): string {
-  return LEVEL_COLOR[level] ?? '#5b6678';
+  return LEVEL_COLOR[level] ?? 'var(--color-text-tertiary)';
 }
 
 /** Compact, language-neutral relative time: "<1m", "15m", "3h", "2d". Pure. */

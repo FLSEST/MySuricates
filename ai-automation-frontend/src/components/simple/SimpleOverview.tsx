@@ -46,10 +46,10 @@ export function SimpleOverview() {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Pill color="#34d399" value={today.green} label={t.simple.home.ranLabel} onClick={() => navigate('/runs')} />
-      <Pill color="#fb7185" value={today.failed} label={t.simple.home.failedLabel} onClick={() => navigate('/runs')} />
-      <Pill color="#a78bfa" value={remaining?.count ?? 0} label={t.simple.home.scheduledLabel} onClick={() => navigate('/schedules')} />
-      <Pill color="#fbbf24" value={todoCount?.open ?? 0} label={t.simple.home.tasksLabel} onClick={() => navigate('/todos')} />
+      <Pill color="var(--color-success)" value={today.green} label={t.simple.home.ranLabel} onClick={() => navigate('/runs')} />
+      <Pill color="var(--color-danger)" value={today.failed} label={t.simple.home.failedLabel} onClick={() => navigate('/runs')} />
+      <Pill color="var(--color-ai)" value={remaining?.count ?? 0} label={t.simple.home.scheduledLabel} onClick={() => navigate('/schedules')} />
+      <Pill color="var(--color-warning)" value={todoCount?.open ?? 0} label={t.simple.home.tasksLabel} onClick={() => navigate('/todos')} />
     </div>
   );
 }

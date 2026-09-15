@@ -17,20 +17,37 @@
   --color-text-tertiary: #8c7e6e;
   --color-text-inverse: #231e19;
   --color-accent: #eba44a;
+  --color-accent-text: #eba44a;
+  --color-accent-emphasis: #eba44a;
   --color-accent-hover: #f2ba62;
   --color-accent-subtle: #3d2e14;
   --color-success: #6cc66c;
+  --color-success-text: #6cc66c;
   --color-success-subtle: #1e3320;
   --color-warning: #eba44a;
+  --color-warning-text: #eba44a;
   --color-warning-subtle: #3d2e14;
   --color-danger: #e07272;
+  --color-danger-text: #e07272;
   --color-danger-subtle: #3d1f1f;
   --color-ai: #b58ee8;
+  --color-ai-text: #b58ee8;
   --color-ai-subtle: #362d34;
   --color-human: #56c2b0;
+  --color-human-text: #56c2b0;
   --color-human-subtle: #2a332d;
   --color-info: #6aa6e0;
+  --color-info-text: #6aa6e0;
   --color-info-subtle: #2c3033;
+  --color-chart-1: #3b82f6;
+  --color-chart-2: #10b981;
+  --color-chart-3: #8b5cf6;
+  --color-chart-4: #ef4444;
+  --color-chart-5: #ec4899;
+  --color-chart-6: #14b8a6;
+  --color-chart-7: #6366f1;
+  --color-chart-8: #f97316;
+  --color-card-border: #4a3f33;
   --color-sidebar: #1a1614;
   --color-sidebar-border: #342b23;
   --color-sidebar-hover: #252019;
@@ -57,24 +74,52 @@
   --color-text-tertiary: var(--color-text-tertiary);
   --color-text-inverse: var(--color-text-inverse);
 
+  /* Accent/status/role: --color-<name> is the fill (bg/border/ring/fill/stroke, charts),
+     text-<name> reads the readable text variant, bg-accent the button-safe emphasis. */
   --color-accent: var(--color-accent);
+  --color-accent-text: var(--color-accent-text);
+  --color-accent-emphasis: var(--color-accent-emphasis);
+  --text-color-accent: var(--color-accent-text);
+  --background-color-accent: var(--color-accent-emphasis);
   --color-accent-hover: var(--color-accent-hover);
   --color-accent-subtle: var(--color-accent-subtle);
 
   --color-success: var(--color-success);
+  --color-success-text: var(--color-success-text);
+  --text-color-success: var(--color-success-text);
   --color-success-subtle: var(--color-success-subtle);
 
   --color-warning: var(--color-warning);
+  --color-warning-text: var(--color-warning-text);
+  --text-color-warning: var(--color-warning-text);
   --color-warning-subtle: var(--color-warning-subtle);
 
   --color-danger: var(--color-danger);
+  --color-danger-text: var(--color-danger-text);
+  --text-color-danger: var(--color-danger-text);
   --color-danger-subtle: var(--color-danger-subtle);
   --color-ai: var(--color-ai);
+  --color-ai-text: var(--color-ai-text);
+  --text-color-ai: var(--color-ai-text);
   --color-ai-subtle: var(--color-ai-subtle);
   --color-human: var(--color-human);
+  --color-human-text: var(--color-human-text);
+  --text-color-human: var(--color-human-text);
   --color-human-subtle: var(--color-human-subtle);
   --color-info: var(--color-info);
+  --color-info-text: var(--color-info-text);
+  --text-color-info: var(--color-info-text);
   --color-info-subtle: var(--color-info-subtle);
+
+  --color-chart-1: var(--color-chart-1);
+  --color-chart-2: var(--color-chart-2);
+  --color-chart-3: var(--color-chart-3);
+  --color-chart-4: var(--color-chart-4);
+  --color-chart-5: var(--color-chart-5);
+  --color-chart-6: var(--color-chart-6);
+  --color-chart-7: var(--color-chart-7);
+  --color-chart-8: var(--color-chart-8);
+  --color-card-border: var(--color-card-border);
 
   --color-sidebar: var(--color-sidebar);
   --color-sidebar-border: var(--color-sidebar-border);

@@ -21,8 +21,8 @@ export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
           <AreaChart data={chartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
             <defs>
               <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="5%" stopColor="var(--color-chart-3)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--color-chart-3)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -32,7 +32,7 @@ export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
               formatter={(value: number) => [`$${value.toFixed(4)}`, t.insights.cost]}
             />
-            <Area type="monotone" dataKey="cost" stroke="#f59e0b" strokeWidth={2} fill="url(#costGradient)" />
+            <Area type="monotone" dataKey="cost" stroke="var(--color-chart-3)" strokeWidth={2} fill="url(#costGradient)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

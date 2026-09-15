@@ -3,8 +3,8 @@ import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 import type { TodoStats } from '../../types';
 
-const STATUS_COLORS = ['#f59e0b', '#3b82f6', 'var(--color-success)', 'var(--color-text-tertiary)'];
-const SOURCE_COLORS = ['var(--color-accent)', '#8b5cf6', '#10b981'];
+const STATUS_COLORS = ['var(--color-warning)', 'var(--color-info)', 'var(--color-success)', 'var(--color-text-tertiary)'];
+const SOURCE_COLORS = ['var(--color-accent)', 'var(--color-chart-1)', 'var(--color-chart-2)'];
 
 export function TodoStatsChart({ data }: { data?: TodoStats }) {
   const t = useT();

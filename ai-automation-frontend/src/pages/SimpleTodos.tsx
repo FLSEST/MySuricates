@@ -12,7 +12,7 @@ import { AREA_COLORS } from '../utils/homeTiles';
 import type { Todo, TodoPriority } from '../types';
 
 const PRIORITY_COLOR: Record<string, string> = {
-  CRITICAL: '#fb7185', HIGH: '#fbbf24', MEDIUM: '#38bdf8', LOW: '#5b6678',
+  CRITICAL: 'var(--color-danger)', HIGH: 'var(--color-warning)', MEDIUM: 'var(--color-info)', LOW: 'var(--color-text-tertiary)',
 };
 const PRIO_RANK: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
@@ -112,14 +112,14 @@ export function SimpleTodos() {
     <SimpleRow key={td.id} color={AREA_COLORS.todos}>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <StatusDots current={td.status} onChange={(s) => updateStatus.mutate({ id: td.id, status: s })} />
-        <span className="w-1 h-5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[td.priority] ?? '#5b6678' }} />
+        <span className="w-1 h-5 rounded-full shrink-0" style={{ background: PRIORITY_COLOR[td.priority] ?? 'var(--color-text-tertiary)' }} />
         <button
           onClick={() => openDetail(td)}
           className="text-sm font-medium text-text truncate text-left min-w-0 flex-1 hover:text-accent transition-colors"
         >
           {td.title}
         </button>
-        {isOverdue(td) && <span className="text-[11px] font-medium shrink-0" style={{ color: '#fb7185' }}>{t.simple.todos.overdue}</span>}
+        {isOverdue(td) && <span className="text-[11px] font-medium shrink-0" style={{ color: 'var(--color-danger-text)' }}>{t.simple.todos.overdue}</span>}
       </div>
       {td.linkedWorkflowId && td.status !== 'DONE' && (
         isResolving(td) ? (

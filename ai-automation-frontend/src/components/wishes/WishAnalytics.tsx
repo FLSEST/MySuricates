@@ -5,7 +5,7 @@ import { usePlatformStats } from '../../hooks/useLearning';
 import { usePersistedState } from '../../hooks/usePersistedState';
 import { useT } from '../../i18n';
 
-const COLORS = ['var(--color-success)', 'var(--color-danger)', '#3b82f6'];
+const COLORS = ['var(--color-success)', 'var(--color-danger)', 'var(--color-info)'];
 
 export function WishAnalytics() {
   const t = useT();

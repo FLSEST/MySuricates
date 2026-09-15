@@ -2,10 +2,10 @@ import type { ReactNode, CSSProperties } from 'react';
 
 /** Status → dot color (shared by Simple home, workflows, runs, schedules). */
 const STATUS_DOT: Record<string, string> = {
-  COMPLETED: '#34d399', COMPLETED_WITH_ERRORS: '#34d399',
-  FAILED: '#fb7185', RUNNING: '#38bdf8', PAUSED: '#fbbf24',
-  PENDING: '#5b6678', CANCELLED: '#5b6678', INTERRUPTED: '#fbbf24',
-  STOPPED: '#5b6678', STARTING: '#fbbf24', ERROR: '#fb7185',
+  COMPLETED: 'var(--color-success)', COMPLETED_WITH_ERRORS: 'var(--color-success)',
+  FAILED: 'var(--color-danger)', RUNNING: 'var(--color-info)', PAUSED: 'var(--color-warning)',
+  PENDING: 'var(--color-text-tertiary)', CANCELLED: 'var(--color-text-tertiary)', INTERRUPTED: 'var(--color-warning)',
+  STOPPED: 'var(--color-text-tertiary)', STARTING: 'var(--color-warning)', ERROR: 'var(--color-danger)',
 };
 
 /** Canonical Simple-page container: width + vertical rhythm + fade-in. */
@@ -84,5 +84,5 @@ export function SimpleRow({
 /** 7×7 status dot. Renders nothing without a status. */
 export function StatusDot({ status }: { status?: string }) {
   if (!status) return null;
-  return <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: STATUS_DOT[status] ?? '#5b6678' }} />;
+  return <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: STATUS_DOT[status] ?? 'var(--color-text-tertiary)' }} />;
 }

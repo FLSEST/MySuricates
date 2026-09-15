@@ -95,7 +95,7 @@ export function ActivityLog() {
       </div>
 
       {/* Table */}
-      <div className="bg-surface-raised border border-border rounded-xl overflow-hidden">
+      <div className="bg-surface-raised border border-card-border rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-text-secondary">{t.common.loading}</div>
         ) : !data || data.content.length === 0 ? (

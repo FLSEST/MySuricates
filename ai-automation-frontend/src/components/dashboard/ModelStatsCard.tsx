@@ -11,10 +11,10 @@ interface ModelStatsCardProps {
 
 const BAR_COLORS = [
   'var(--color-accent)',
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
+  'var(--color-chart-1)',
+  'var(--color-chart-2)',
+  'var(--color-chart-3)',
+  'var(--color-chart-4)',
 ];
 
 function shortModelName(model: string): string {

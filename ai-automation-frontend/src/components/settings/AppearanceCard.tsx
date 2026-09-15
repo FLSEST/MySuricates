@@ -7,6 +7,7 @@ import { THEMES, getTheme, type ThemeAppearance, type ThemeDefinition } from '..
 
 const COLOR_KEYS: Array<{ key: keyof ThemeTokens; label: string }> = [
   { key: '--color-accent', label: 'Accent' },
+  { key: '--color-accent-text', label: 'Accent Text' },
   { key: '--color-accent-hover', label: 'Accent Hover' },
   { key: '--color-success', label: 'Success' },
   { key: '--color-warning', label: 'Warning' },

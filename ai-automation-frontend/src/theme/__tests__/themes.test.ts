@@ -6,26 +6,15 @@ import {
   findTheme,
   getTheme,
 } from '../themes';
+import { contrast, oklabDistance, toOklch } from '../color';
+import { TAILWIND_PALETTE_VARS, tailwindPaletteVars } from '../derive';
 import type { ThemeTokens } from '../tokens';
 
 type Key = keyof ThemeTokens;
 
-// WCAG 2.x relative luminance / contrast ratio
-function luminance(hex: string): number {
-  const [r, g, b] = [1, 3, 5].map((i) => {
-    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
 const SURFACES: Key[] = ['--color-surface', '--color-surface-secondary', '--color-surface-raised'];
 const STATUS = ['accent', 'success', 'warning', 'danger', 'ai', 'human', 'info'] as const;
+const CHARTS = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => `--color-chart-${i}` as Key);
 
 describe('theme registry', () => {
   it('has unique ids and names', () => {
@@ -46,6 +35,12 @@ describe('theme registry', () => {
   it('getTheme falls back to the default dark theme for unknown ids', () => {
     expect(findTheme('does-not-exist')).toBeUndefined();
     expect(getTheme('does-not-exist').id).toBe(DEFAULT_DARK_THEME_ID);
+  });
+
+  it('keeps the stock Tailwind palette for the MySuricates themes only', () => {
+    expect(getTheme('suricate-dark').hues).toBeUndefined();
+    expect(getTheme('suricate-light').hues).toBeUndefined();
+    expect(THEMES.filter((t) => !t.id.startsWith('suricate-')).every((t) => t.hues)).toBe(true);
   });
 });
 
@@ -69,17 +64,34 @@ describe.each(THEMES)('theme $id', (theme) => {
     for (const bg of SURFACES) expectContrast('--color-text-tertiary', bg, 3);
   });
 
-  it('keeps accent, status and role colors readable as text', () => {
+  it('keeps the text variants of accent, status and role colors readable', () => {
     for (const name of STATUS) {
-      for (const bg of SURFACES) expectContrast(`--color-${name}`, bg, 4.5);
-      expectContrast(`--color-${name}`, `--color-${name}-subtle`, 4.5);
+      for (const bg of SURFACES) expectContrast(`--color-${name}-text`, bg, 4.5);
+      expectContrast(`--color-${name}-text`, `--color-${name}-subtle`, 4.5);
     }
     expectContrast('--color-accent-hover', '--color-surface', 4.5);
   });
 
-  it('keeps inverse text readable on accent buttons', () => {
-    expectContrast('--color-text-inverse', '--color-accent', 4.5);
+  it('draws accent, status and role fills visibly (graphics ≥ 3:1)', () => {
+    for (const name of STATUS) {
+      for (const bg of SURFACES) expectContrast(`--color-${name}`, bg, 3);
+    }
+  });
+
+  it('keeps inverse text readable on solid accent buttons', () => {
+    expectContrast('--color-text-inverse', '--color-accent-emphasis', 4.5);
     expectContrast('--color-text-inverse', '--color-accent-hover', 4.5);
+  });
+
+  it('draws visible, distinguishable chart series', () => {
+    for (const chart of CHARTS) for (const bg of SURFACES) expectContrast(chart, bg, 3);
+    const firstFive = CHARTS.slice(0, 5).map((k) => tk[k]);
+    for (const [i, a] of firstFive.entries()) {
+      expect(oklabDistance(a, tk['--color-accent']), `chart-${i + 1} vs accent`).toBeGreaterThan(5);
+      for (const [j, b] of firstFive.entries()) {
+        if (j > i) expect(oklabDistance(a, b), `chart-${i + 1} vs chart-${j + 1}`).toBeGreaterThan(5);
+      }
+    }
   });
 
   it('keeps sidebar and assistant text readable', () => {
@@ -94,10 +106,43 @@ describe.each(THEMES)('theme $id', (theme) => {
     }
   });
 
-  it('draws visible borders', () => {
+  it('draws visible borders; card borders are either the border or invisible', () => {
     for (const bg of ['--color-surface', '--color-surface-raised'] as Key[]) {
       expectContrast('--color-border', bg, 1.3);
       expectContrast('--color-border-strong', bg, 1.6);
+    }
+    expect([tk['--color-border'], tk['--color-surface-raised']]).toContain(tk['--color-card-border']);
+  });
+});
+
+describe.each(THEMES.filter((t) => t.hues))('palette theme $id', (theme) => {
+  const tk = theme.tokens;
+  const dark = theme.appearance === 'dark';
+  const cards = [tk['--color-surface'], tk['--color-surface-raised']];
+
+  it('uses recognizable hues for success, warning and danger', () => {
+    const hue = (k: Key) => toOklch(tk[k]).h;
+    expect(hue('--color-success')).toBeGreaterThanOrEqual(120);
+    expect(hue('--color-success')).toBeLessThanOrEqual(163);
+    expect(hue('--color-warning')).toBeGreaterThanOrEqual(40);
+    expect(hue('--color-warning')).toBeLessThanOrEqual(105);
+    const danger = hue('--color-danger');
+    expect(danger >= 340 || danger <= 45, `danger hue ${danger}`).toBe(true);
+  });
+
+  it('remaps every Tailwind palette class onto readable palette colors', () => {
+    const vars = tailwindPaletteVars(theme);
+    expect(Object.keys(vars).sort()).toEqual([...TAILWIND_PALETTE_VARS].sort());
+    const textShades = dark ? [100, 200, 300, 400] : [600, 700, 800, 900];
+    for (const family of ['red', 'amber', 'green', 'emerald', 'teal', 'blue', 'violet', 'purple', 'pink']) {
+      for (const shade of textShades) {
+        for (const bg of cards) {
+          expect(contrast(vars[`--color-${family}-${shade}`]!, bg), `${family}-${shade}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      for (const bg of cards) {
+        expect(contrast(vars[`--color-${family}-500`]!, bg), `${family}-500`).toBeGreaterThanOrEqual(3);
+      }
     }
   });
 });

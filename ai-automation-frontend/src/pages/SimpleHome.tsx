@@ -100,7 +100,7 @@ export function SimpleHome() {
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
             >
-              <Sparkles className="w-[18px] h-[18px]" style={{ color: '#aab4ff' }} />
+              <Sparkles className="w-[18px] h-[18px]" style={{ color: 'var(--color-ai)' }} />
             </div>
             <input
               value={assistantInput}

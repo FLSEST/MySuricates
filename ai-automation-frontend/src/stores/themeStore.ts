@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { applyTheme, type ThemeTokens } from '../theme/tokens';
+import { applyTheme, removeCssVars, setCssVars, type ThemeTokens } from '../theme/tokens';
+import { TAILWIND_PALETTE_VARS, tailwindPaletteVars } from '../theme/derive';
 import {
   DEFAULT_DARK_THEME_ID,
   DEFAULT_LIGHT_THEME_ID,
@@ -93,7 +94,11 @@ export const useThemeStore = create<ThemeState>()(
       apply: () => {
         const { themeId, overrides } = get();
         const theme = getTheme(themeId);
-        applyTheme({ ...theme.tokens, ...overrides[theme.id] });
+        const tokens = { ...theme.tokens, ...overrides[theme.id] };
+        applyTheme(tokens);
+        // Palette themes also recolor Tailwind's palette classes (blue-500 …); MySuricates keeps the stock ones
+        if (theme.hues) setCssVars(tailwindPaletteVars(theme, tokens));
+        else removeCssVars(TAILWIND_PALETTE_VARS);
         // Tailwind `dark:` variant, Monaco and xterm follow the theme's appearance
         document.documentElement.classList.toggle('dark', theme.appearance === 'dark');
       },

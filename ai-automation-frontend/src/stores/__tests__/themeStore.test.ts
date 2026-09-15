@@ -34,6 +34,15 @@ describe('themeStore', () => {
     expect(root.classList.contains('dark')).toBe(false);
   });
 
+  it('remaps Tailwind palette classes for palette themes and restores them for MySuricates', () => {
+    useThemeStore.getState().setTheme('nord');
+    expect(cssVar('--color-blue-500')).not.toBe('');
+    expect(cssVar('--color-emerald-400')).not.toBe('');
+    useThemeStore.getState().setTheme('suricate-light');
+    expect(cssVar('--color-blue-500')).toBe('');
+    expect(cssVar('--color-emerald-400')).toBe('');
+  });
+
   it('setTheme ignores unknown theme ids', () => {
     useThemeStore.getState().setTheme('nope');
     expect(useThemeStore.getState().themeId).toBe('suricate-dark');

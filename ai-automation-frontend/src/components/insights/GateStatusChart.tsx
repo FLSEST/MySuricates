@@ -5,7 +5,7 @@ import type { GateStatusEntry } from '../../types';
 
 const GATE_COLORS: Record<string, string> = {
   GREEN: 'var(--color-success)',
-  YELLOW: '#f59e0b',
+  YELLOW: 'var(--color-warning)',
   RED: 'var(--color-danger)',
 };
 

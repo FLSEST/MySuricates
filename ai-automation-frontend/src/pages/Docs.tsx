@@ -86,7 +86,7 @@ export function Docs() {
         </aside>
 
         {/* Content */}
-        <div className="flex-1 min-w-0 overflow-y-auto rounded-xl border border-border bg-surface-raised p-6">
+        <div className="flex-1 min-w-0 overflow-y-auto rounded-xl border border-card-border bg-surface-raised p-6">
           {!activeGroup ? (
             <div className="flex flex-col items-center justify-center h-full text-text-secondary gap-3">
               <BookOpen className="w-10 h-10 opacity-40" />
