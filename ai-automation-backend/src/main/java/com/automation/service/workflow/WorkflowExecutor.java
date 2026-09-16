@@ -150,18 +150,18 @@ public class WorkflowExecutor {
         final String runId = run.getId();
         final String workflowId = workflow.getId();
         final String workflowName = workflow.getName();
-        submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, 0, null));
+        submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, ResumePlan.FRESH, null));
 
         return run;
     }
 
     /**
      * Core execution loop.
-     * @param skipToStepIndex for resume: skip blocks with index < this value (0 = no skip)
+     * @param resume for resume: which blocks already ran and where the new segment's step indices start
      * @param resumePreviousOutput for resume: pre-seed previousOutput from the last completed step
      */
     private void executeBlocks(String runId, String workflowId, String workflowName, WorkflowSnapshot wf,
-                               Map<String, Object> inputContext, int skipToStepIndex, String resumePreviousOutput) {
+                               Map<String, Object> inputContext, ResumePlan resume, String resumePreviousOutput) {
         Project project = wf.project();
         List<BlockDefinition> blocks = wf.blocks();
         List<Skill> skills = wf.skills();
@@ -184,12 +184,12 @@ public class WorkflowExecutor {
             executionSemaphore.acquire();
             semaphoreAcquired = true;
             run = runRepository.findById(runId).orElseThrow();
-            if (skipToStepIndex == 0) {
-                // Fresh run: start with empty step list
-                run.setSteps(new ArrayList<>());
-            } else {
+            if (resume.resuming()) {
                 // Resuming: keep existing completed steps from DB
                 run.setSteps(new ArrayList<>(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId)));
+            } else {
+                // Fresh run: start with empty step list
+                run.setSteps(new ArrayList<>());
             }
 
             if (executionRegistry.cancelRequested(runId)) {   // cancel arrived while still queued
@@ -204,13 +204,19 @@ public class WorkflowExecutor {
                     runId, workflowId, workflowName, project, containerId, inputContext,
                     instructions, model, provider, effort, resumePreviousOutput, run.getDefinitionHash(), run.getTriggerSource()));
 
+            context.startStepIndicesAt(resume.firstStepIndex());
             executionRegistry.promote(runId, context);
-            if (skipToStepIndex > 0) ResumeOutputSeeder.seed(context, run.getSteps(), skipToStepIndex); // f9384e48
+            if (resume.resuming()) ResumeOutputSeeder.seed(context, run.getSteps(), resume.blocksToSkip()); // f9384e48
             Project executionProject = isolated
                     ? workspaces.prepare(run, project, workflowMeta, context, run.getMetadata().containsKey("workspace")) : project;
             executionContextFactory.writeProjectContextFiles(executionProject, workflowId, skills);
 
+            int blockPosition = 0;
             for (BlockDefinition block : blocks) {
+                // Resume: blocks of the earlier segment are skipped by position. Step indices are not
+                // comparable across segments — wrapper blocks consumed extra ones (TODO 1be423b4).
+                if (blockPosition++ < resume.blocksToSkip()) continue;
+
                 if (context.shouldStop()) {
                     run.setStatus(RunStatus.CANCELLED);
                     break;
@@ -225,16 +231,6 @@ public class WorkflowExecutor {
 
                 // Pre-create RUNNING placeholder so UI shows the step immediately
                 int stepIndex = context.preAllocateStepIndex();
-
-                // For resumed runs: skip blocks that already completed in the previous execution
-                if (stepIndex < skipToStepIndex) {
-                    // Restore baseline skill context if this block had extra skills
-                    if (hasBlockSkills) {
-                        skillContext.restore(executionProject, skills);
-                    }
-                    continue;
-                }
-
                 StepResult step = stepRunner.startStep(run, stepIndex, block);
                 stepRunner.runStep(step, block, executor, context, run, containerId);
 
@@ -396,9 +392,8 @@ public class WorkflowExecutor {
             throw new WorkflowExecutionException("Run " + runId + " cannot be resumed: status is " + run.getStatus());
         }
 
-        List<StepResult> completedSteps = stepResultRepository
-                .findByWorkflowRunIdOrderByStepIndexAsc(runId)
-                .stream()
+        List<StepResult> persistedSteps = stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId);
+        List<StepResult> completedSteps = persistedSteps.stream()
                 .filter(s -> s.getStatus() == StepStatus.COMPLETED)
                 .toList();
 
@@ -407,7 +402,7 @@ public class WorkflowExecutor {
             return execute(run.getWorkflow(), run.getInputContext(), TriggerSource.RESUME);
         }
 
-        int resumeFromIndex = completedSteps.isEmpty() ? 0 : completedSteps.getLast().getStepIndex() + 1;
+        ResumePlan plan = ResumePlan.after(persistedSteps);
 
         // Reconstruct context: inputContext + step outputs from DB + accumulated user vars (contextDelta)
         Map<String, Object> reconstructed = new HashMap<>(run.getInputContext() != null ? run.getInputContext() : Map.of());
@@ -434,7 +429,7 @@ public class WorkflowExecutor {
 
         // Announce first: a failing log write leaves the run INTERRUPTED, not RUNNING-with-nobody.
         activityLogService.info(LogCategory.EXECUTION,
-                "Resuming workflow from step " + resumeFromIndex + ": " + workflow.getName(),
+                "Resuming workflow after " + plan.blocksToSkip() + " completed block(s): " + workflow.getName(),
                 "WorkflowExecutor", runId, workflow.getId());
 
         // Reset run to RUNNING — the resumed segment runs today's definition, so provenance is re-taken
@@ -447,11 +442,10 @@ public class WorkflowExecutor {
 
         final String wfId = workflow.getId();
         final String wfName = workflow.getName();
-        final int resumeIdx = resumeFromIndex;
         executionRegistry.registerProvisional(runId); // controllable as soon as it is RUNNING
         try {
             broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
-            submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, resumeIdx, previousOutput));
+            submitExecution(runId, () -> executeBlocks(runId, wfId, wfName, wf, contextForResume, plan, previousOutput));
         } catch (Throwable t) {
             executionRegistry.unregister(runId); // no thread took over — do not leave it registered
             throw t;

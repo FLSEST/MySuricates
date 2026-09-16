@@ -15,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,7 +31,6 @@ class IntegrationBlockExecutorTest {
 
     private IntegrationBlockExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final AtomicInteger stepCounter = new AtomicInteger(0);
 
     @BeforeEach
     void setUp() {
@@ -264,7 +262,6 @@ class IntegrationBlockExecutorTest {
     private ExecutionContext createContext() {
         return ExecutionContext.builder()
                 .workflowRunId("test-run-1")
-                .stepCounter(stepCounter)
                 .build();
     }
 }

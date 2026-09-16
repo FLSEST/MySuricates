@@ -20,10 +20,12 @@ final class ResumeOutputSeeder {
     private ResumeOutputSeeder() {
     }
 
-    static void seed(ExecutionContext context, List<StepResult> persistedSteps, int skipToStepIndex) {
+    /** {@code blocksToSkip} counts blocks, not step indices — see {@link ResumePlan}. */
+    static void seed(ExecutionContext context, List<StepResult> persistedSteps, int blocksToSkip) {
         persistedSteps.stream()
-                .filter(s -> s.getStepIndex() < skipToStepIndex && FINISHED.contains(s.getStatus()))
                 .sorted(Comparator.comparingInt(StepResult::getStepIndex))
+                .limit(blocksToSkip)
+                .filter(s -> FINISHED.contains(s.getStatus()))
                 .forEach(s -> {
                     String name = s.getMetadata() != null && s.getMetadata().get("blockName") instanceof String n
                             && !n.isBlank() ? n : null;

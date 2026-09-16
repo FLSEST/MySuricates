@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
@@ -75,10 +74,7 @@ public class ExecutionContext {
     @Builder.Default private final SourceStepIndex sourceSteps = new SourceStepIndex(); // compress sources, see SourceStepIndex
 
     @Builder.Default
-    private final AtomicInteger stepCounter = new AtomicInteger(0);
-
-    @Builder.Default
-    private final AtomicInteger preAllocatedIndex = new AtomicInteger(-1);
+    private final StepIndexCounter stepIndices = new StepIndexCounter();
 
     @Builder.Default
     private final AtomicBoolean paused = new AtomicBoolean(false);
@@ -101,19 +97,18 @@ public class ExecutionContext {
     @Builder.Default
     private final RunProcessRegistration activeProcess = new RunProcessRegistration();
 
-    /**
-     * Reserve the next step index for a RUNNING placeholder.
-     * The subsequent call to nextStepIndex() will return this same value.
-     */
+    /** Reserves the next step index for a RUNNING placeholder; see {@link StepIndexCounter}. */
     public int preAllocateStepIndex() {
-        int idx = stepCounter.getAndIncrement();
-        preAllocatedIndex.set(idx);
-        return idx;
+        return stepIndices.preAllocate();
     }
 
     public int nextStepIndex() {
-        int pre = preAllocatedIndex.getAndSet(-1);
-        return pre >= 0 ? pre : stepCounter.getAndIncrement();
+        return stepIndices.next();
+    }
+
+    /** Resume: starts this segment's step indices above the ones already persisted. */
+    public void startStepIndicesAt(int firstIndex) {
+        stepIndices.startAt(firstIndex);
     }
 
     public void setRunMetadata(String key, Object value) {
