@@ -1,0 +1,153 @@
+{
+  "name": {
+    "de": "Public Readiness — Evidenz",
+    "en": "Public Readiness — Evidence"
+  },
+  "description": {
+    "de": "Sammelt deterministisch Evidenz zur Veroeffentlichungsreife: Inventar, Geheimnisse, oeffentliche Oberflaeche, Doku, Screenshots, Tests, toter Code, Architektur, Abhaengigkeiten, Hygiene. Ein KI-Aufruf fasst die Befunde zusammen.",
+    "en": "Deterministically collects publication-readiness evidence: inventory, secrets, public surface, docs, screenshots, tests, dead code, architecture, dependencies, hygiene. One AI call consolidates the findings."
+  },
+  "icon": "🔍",
+  "category": "QUALITY",
+  "tags": [
+    "release",
+    "public-readiness",
+    "audit",
+    "gate",
+    "report"
+  ],
+  "model": "opus",
+  "effort": "high",
+  "instructions": "Du sammelst Evidenz zur Veroeffentlichungsreife dieses Repositories.\n\nEvidenz zuerst: Die Shell-Bloecke liefern Fakten, der KI-Block deutet sie. Erfinde nichts, was nicht in den Blockausgaben steht — wenn eine Angabe fehlt, schreibe das hin.\n\nOeffentlich unbedenklich: Nenne niemals Geheimnisse, Token, Datenbankinhalte, private Schluessel, private Mailadressen oder Zugangsdaten. Schwaerze mit [REDACTED].\n\nKeine unkontrollierten Artefakte: Lege keine Dateien an, veroeffentliche nichts, pushe nichts, loesche nichts. Die Ausgabe ist Entwurf und Evidenz, bis ein Mensch sie uebernimmt.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Geprueft wird der Commit {{ workspace_source_sha }}.",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "public_angle": "A living lab for controlled agentic development and self-improving workflow systems.",
+    "audience": "technical readers evaluating the repository"
+  },
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "inventar",
+      "config": {
+        "description": "Repo-Inventar und Marker-Dateien",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || { echo 'gate_status: RED'; echo 'gate_category: public-readiness'; echo 'gate_description: Arbeitsverzeichnis nicht erreichbar'; exit 0; }\nbash scripts/public-readiness/safe-inventory.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "geheimnisse",
+      "config": {
+        "description": "Secret-Risiko: Dateinamen und Zaehler, nie Werte",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/secret-risk-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc — bei diesem Skript bedeutet 1 einen Befund, keinen Fehler)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "oberflaeche",
+      "config": {
+        "description": "Oeffentliche Oberflaeche: REST-Pfade, Frontend-Routen, Build-Variablen",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/public-surface-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "doku",
+      "config": {
+        "description": "Doku-Vollstaendigkeit und Narrativ-Marker",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/docs-check.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "screenshots",
+      "config": {
+        "description": "Screenshot-Storyboard und Fixture-Lage",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/screenshot-plan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "tests",
+      "config": {
+        "description": "Test-/Quell-Verhaeltnis je Modul",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/test-map.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "toter_code",
+      "config": {
+        "description": "TODO-/FIXME-Marker, Backup-Dateien, tote Pfade",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/dead-code-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "architektur",
+      "config": {
+        "description": "Schichtung und Paketform",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/architecture-gap-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "abhaengigkeiten",
+      "config": {
+        "description": "Lockfiles und Abhaengigkeits-Inventar (ohne Netzzugriff)",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/dependency-risk-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "hygiene",
+      "config": {
+        "description": "Hygiene-Gate und Pool-Neutralitaet — uebersetzt Exitcodes in ein Gate-Urteil",
+        "command": "set -uo pipefail\ncd \"{{ execution_path }}\" || exit 0\n\necho '## Hygiene-Gate (getrackter Bestand)'\nHYG_OUT=$(bash scripts/ci/public-hygiene.sh --tracked 2>&1)\nHYG_RC=$?\necho \"$HYG_OUT\" | head -80\necho \"Exitcode: $HYG_RC\"\necho ''\n\necho '## Pool-Neutralitaet (getrackte Definitionen)'\nPOOL_OUT=$(bash scripts/ci/pool-neutrality.sh workflow-pool 2>&1)\nPOOL_RC=$?\necho \"$POOL_OUT\" | head -80\necho \"Exitcode: $POOL_RC\"\necho ''\n\nif [ \"$HYG_RC\" -ne 0 ] || [ \"$POOL_RC\" -ne 0 ]; then\n  echo 'gate_status: RED'\n  echo 'gate_category: public-hygiene'\n  echo \"gate_description: Hygiene-Gate $HYG_RC, Pool-Neutralitaet $POOL_RC — Befunde vor Veroeffentlichung beheben\"\nelse\n  echo 'gate_status: GREEN'\n  echo 'gate_category: public-hygiene'\n  echo 'gate_description: Hygiene-Gate und Pool-Neutralitaet ohne Befund'\nfi\nexit 0",
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "name": "report",
+      "config": {
+        "label": "Befunde zusammenfassen (Opus)",
+        "timeout_seconds": 3000,
+        "command": "Fasse die Evidenz zur Veroeffentlichungsreife zusammen. Alle Angaben unten stammen aus deterministischen Skripten dieses Repositories. Verwende ausschliesslich diese Angaben — wenn etwas fehlt, schreibe das hin, statt es zu ergaenzen.\n\n## Inventar\n{{ block.inventar.output }}\n\n## Geheimnisse\n{{ block.geheimnisse.output }}\n\n## Oeffentliche Oberflaeche\n{{ block.oberflaeche.output }}\n\n## Dokumentation\n{{ block.doku.output }}\n\n## Screenshots\n{{ block.screenshots.output }}\n\n## Tests\n{{ block.tests.output }}\n\n## Toter Code\n{{ block.toter_code.output }}\n\n## Architektur\n{{ block.architektur.output }}\n\n## Abhaengigkeiten\n{{ block.abhaengigkeiten.output }}\n\n## Hygiene\n{{ block.hygiene.output }}\n\n## Vorheriger Bericht (fuer den Trend)\n{{ previous_report }}\n\n---\n\nErzeuge genau zwei Teile.\n\n**Teil 1 — Befundtabelle.** Eine Zeile je Befund, nach Schwere sortiert:\n\n| Bereich | Befund | Beleg (Skript und Zahl) | Schwere | Was vor der Veroeffentlichung zu tun ist |\n|---|---|---|---|---|\n\nJede Zeile MUSS in der Belegspalte eine konkrete Zahl oder einen Dateinamen aus den Abschnitten oben nennen. Findest du fuer einen Bereich keine belastbare Angabe, schreibe eine Zeile mit Schwere `unklar` und der Begruendung, welche Angabe fehlte.\n\nNenne ausserdem ausdruecklich, was sich gegenueber dem vorherigen Bericht **veraendert** hat — neu, behoben, unveraendert.\n\n**Teil 2 — Audit-Envelope.** Schliesse die Ausgabe mit genau einem HTML-Kommentar ab, der den vollstaendigen Stand aller Befunde traegt (kein Delta, immer der komplette Schnappschuss). `ruleKey` und `subject` bilden die Identitaet eines Befunds ueber Laeufe hinweg und muessen deshalb stabil und maschinenlesbar sein:\n\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"public.secrets.tracked-file\",\"subject\":\"pfad/zur/datei\",\"severity\":\"HIGH\",\"title\":\"Kurztitel\",\"description\":\"Was und warum\",\"evidence\":\"Skriptname: Zahl oder Zeile\",\"tags\":[\"public-readiness\"]}]}\n-->\n\nErlaubte `severity`-Werte: CRITICAL, HIGH, MEDIUM, LOW. Gibt es keine Befunde, schreibe `\"findings\": []`.\n\nGib KEINEN `gate_status` aus. Das Gate-Urteil stammt aus den Skripten oben und darf von dieser Zusammenfassung nicht ueberschrieben werden."
+      }
+    }
+  ],
+  "metadata": {
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit",
+      "install_npm": false
+    },
+    "audit": {
+      "enabled": true,
+      "key": "project.public-readiness",
+      "category": "public-readiness",
+      "reportBlock": "report",
+      "schemaVersion": 1
+    }
+  }
+}

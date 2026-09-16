@@ -1,0 +1,67 @@
+{
+  "name": {
+    "de": "Public Readiness — TODO-Vorschlag",
+    "en": "Public Readiness — Reviewed TODO Proposal"
+  },
+  "description": {
+    "de": "Wandelt Befunde der Evidenz- und Behauptungsstufe nach menschlicher Freigabe in TODOs um. Laeuft bewusst nicht im Zeitplan: der Freigabe-Block wartet bis zu 24 Stunden und wuerde einen geplanten Kettenlauf tagelang offen halten.",
+    "en": "Turns findings from the evidence and claims stages into TODOs after human approval. Deliberately not scheduled: the approval block waits up to 24 hours and would keep a scheduled chain run open for days."
+  },
+  "icon": "🗳️",
+  "category": "QUALITY",
+  "tags": [
+    "release",
+    "public-readiness",
+    "todos"
+  ],
+  "model": "opus",
+  "effort": "medium",
+  "instructions": "Du schlaegst TODOs aus vorliegenden Befunden vor und emittierst sie erst nach menschlicher Freigabe.\n\nEvidenz zuerst: Schlage nur vor, was in den uebergebenen Befunden steht. Erfinde keine Aufgaben und leite keine aus allgemeinem Wissen ueber Software ab.\n\nKeine Dubletten: Gegen die Liste der offenen TODOs pruefen. Was dort schon steht, wird nicht erneut vorgeschlagen — nenne es stattdessen als bereits erfasst.\n\nOeffentlich unbedenklich: Keine Geheimnisse, Token, privaten Pfade oder personenbezogenen Daten in Titeln oder Beschreibungen. Schwaerze mit [REDACTED].\n\nKeine unkontrollierten Artefakte: Lege keine Dateien an und aendere nichts im Repository.",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {},
+  "blocks": [
+    {
+      "type": "simple",
+      "name": "kandidaten",
+      "config": {
+        "label": "TODO-Kandidaten vorschlagen",
+        "timeout_seconds": 1200,
+        "command": "Schlage aus den folgenden Befunden TODO-Kandidaten vor.\n\n## Befunde der vorgelagerten Stufe\n{{ previous_chain_output }}\n\n## Bereits offene TODOs (nicht doppelt vorschlagen)\n{{ open_todos }}\n\n---\n\nRegeln:\n\n1. Ein Kandidat je Befund, der vor der Veroeffentlichung wirklich erledigt sein muss. Befunde, die nur zur Kenntnis dienen, werden keine TODOs.\n2. Steht in den Befunden nichts Belastbares — etwa weil dieser Workflow einzeln statt in der Kette laeuft und der Abschnitt oben leer oder unaufgeloest ist —, schlage **nichts** vor und schreibe das ausdruecklich hin.\n3. Pruefe jeden Kandidaten gegen die Liste der offenen TODOs. Treffer werden nicht vorgeschlagen, sondern unter \"bereits erfasst\" genannt, mit der erkannten TODO-Kennung.\n4. Der Titel ist ein knapper Imperativ auf Deutsch.\n\nGib eine Tabelle aus:\n\n| # | Titel (Imperativ) | Prioritaet | Tags | Begruendung mit Beleg aus den Befunden |\n|---|---|---|---|---|\n\nErlaubte Prioritaeten: CRITICAL, HIGH, MEDIUM, LOW.\n\nDanach ein Abschnitt \"bereits erfasst\" und ein Abschnitt \"bewusst kein TODO\" mit je einer kurzen Begruendung.\n\nEmittiere in diesem Block noch **keine** todo_item-Marker — darueber entscheidet der naechste Schritt."
+      }
+    },
+    {
+      "type": "approval",
+      "name": "freigabe",
+      "config": {
+        "question": "Sollen aus den vorgeschlagenen Kandidaten TODOs angelegt werden?",
+        "options": [
+          "Ja",
+          "Nein",
+          "Nur die mit Prioritaet HIGH und CRITICAL"
+        ],
+        "variable_name": "prd_todo_freigabe",
+        "timeout_minutes": 1440,
+        "on_no": "continue"
+      }
+    },
+    {
+      "type": "simple",
+      "name": "marker",
+      "config": {
+        "label": "Freigegebene TODO-Marker emittieren",
+        "timeout_seconds": 600,
+        "command": "Emittiere die freigegebenen TODO-Marker.\n\n## Vorgeschlagene Kandidaten\n{{ block.kandidaten.output }}\n\n## Entscheidung des Menschen\n{{ prd_todo_freigabe }}\n\n---\n\nVerhalten je nach Entscheidung:\n\n- **Ja** — emittiere fuer jeden Kandidaten der Tabelle genau einen Marker.\n- **Nur die mit Prioritaet HIGH und CRITICAL** — emittiere nur diese, und nenne die uebergangenen namentlich.\n- **Nein**, leere oder unklare Entscheidung — emittiere **keinen** Marker und schreibe hin, dass nichts angelegt wurde.\n\nMarkerformat, jeder Marker auf einer eigenen Zeile, ohne Einrueckung, ohne Aufzaehlungszeichen, ohne Text davor in derselben Zeile:\n\ntodo_item: Titel im Imperativ | HIGH | release,public-readiness | Beschreibung mit Beleg\n\nDie Tags beginnen immer mit `release,public-readiness`, danach optional weitere.\n\nSchreibe zum Schluss eine Zeile, wie viele Marker emittiert wurden und auf welcher Entscheidung das beruht."
+      }
+    }
+  ],
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "approval"
+    },
+    "autoMemoryExtraction": {
+      "enabled": false
+    }
+  }
+}

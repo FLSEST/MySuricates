@@ -1,0 +1,59 @@
+{
+  "name": {
+    "de": "Public Readiness — Behauptungen",
+    "en": "Public Readiness — Claims"
+  },
+  "description": {
+    "de": "Prueft jede oeffentliche Behauptung des README gegen Belege im Repository und stuft sie ein: belegt, teilweise belegt, unbelegt, riskant. Fuer Unbelegtes schlaegt er eine vorsichtigere Formulierung vor.",
+    "en": "Checks every public claim in the README against evidence in the repository and classifies it: supported, partially supported, unsupported, risky. Proposes safer wording for anything unsupported."
+  },
+  "icon": "⚖️",
+  "category": "QUALITY",
+  "tags": [
+    "release",
+    "public-readiness",
+    "documentation",
+    "gate"
+  ],
+  "model": "fable",
+  "effort": "high",
+  "instructions": "Du pruefst oeffentliche Behauptungen gegen Belege.\n\nEvidenz zuerst: Der Shell-Block liefert die Behauptungen woertlich und ein deterministisch erhobenes Faktenblatt. Pruefe jede Behauptung gegen diese Belege und, wo noetig, gegen das Repository selbst. Eine Behauptung ohne Beleg ist unbelegt — auch wenn sie plausibel klingt.\n\nOeffentlich unbedenklich: Nenne niemals Geheimnisse, Token, Datenbankinhalte, private Schluessel, private Mailadressen oder Zugangsdaten. Schwaerze mit [REDACTED].\n\nKeine unkontrollierten Artefakte: Lege keine Dateien an, aendere nichts, veroeffentliche nichts. Die Ausgabe ist ein Entwurf, bis ein Mensch sie uebernimmt.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Geprueft wird der Commit {{ workspace_source_sha }}.",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "public_angle": "A living lab for controlled agentic development and self-improving workflow systems.",
+    "audience": "technical readers evaluating the repository"
+  },
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "behauptungen",
+      "config": {
+        "description": "README woertlich plus deterministisches Faktenblatt",
+        "command": "set -uo pipefail\ncd \"{{ execution_path }}\" || { echo 'gate_status: RED'; echo 'gate_category: public-claims'; echo 'gate_description: Arbeitsverzeichnis nicht erreichbar'; exit 0; }\nB=ai-automation-backend\nF=ai-automation-frontend\n\necho '===== TEIL 1 — ZU PRUEFENDE BEHAUPTUNGEN (README.de.md, woertlich) ====='\nif [ -f README.de.md ]; then cat README.de.md; else echo 'README.de.md fehlt'; fi\n\necho ''\necho '===== TEIL 2 — FAKTENBLATT (deterministisch aus dem Repository erhoben) ====='\necho \"Erhoben am: $(date -u +%Y-%m-%d) UTC\"\necho \"Geprueter Commit: $(git rev-parse --short HEAD 2>/dev/null || echo '?')\"\necho \"Commits gesamt: $(git rev-list --count HEAD 2>/dev/null || echo '?')\"\necho \"Erster Commit: $(git log --reverse --format=%ad --date=short 2>/dev/null | head -1)\"\necho \"Verschiedene Autor-Mailadressen: $(git log --format='%ae' 2>/dev/null | sort -u | wc -l)\"\necho ''\necho '--- Backend ---'\necho \"REST-Controller (*Controller.java): $(find $B/src/main/java -name '*Controller.java' 2>/dev/null | wc -l)\"\necho \"Flyway-Migrationen: $(find $B/src/main/resources/db/migration -name 'V*.sql' 2>/dev/null | wc -l)\"\necho \"Hoechste Migrationsnummer: $(find $B/src/main/resources/db/migration -name 'V*.sql' 2>/dev/null | sed 's#.*/V\\([0-9]*\\)__.*#\\1#' | sort -n | tail -1)\"\necho \"Java-Zeilen main (inkl. Leer- und Kommentarzeilen): $(find $B/src/main/java -name '*.java' -exec cat {} + 2>/dev/null | wc -l)\"\necho \"Java-Testklassen (*Test.java): $(find $B/src/test/java -name '*Test.java' 2>/dev/null | wc -l)\"\necho \"Block-Executor-Klassen: $(find $B/src/main/java -path '*executor/blocks*' -name '*BlockExecutor.java' 2>/dev/null | wc -l)\"\necho \"Built-in-Templates (JSON): $(find $B/src/main/resources/templates/builtin -name '*.json' 2>/dev/null | wc -l)\"\necho \"Built-in-Skill-Kennungen (eindeutig): $(grep -rho '\"builtin-[a-z0-9-]*\"' $B/src/main/java/com/automation/config 2>/dev/null | sort -u | wc -l)\"\necho \"Integrations-Provider (implements IntegrationProvider): $(grep -rl 'implements IntegrationProvider' $B/src/main/java 2>/dev/null | wc -l)\"\necho ''\necho '--- Frontend ---'\necho \"TS/TSX-Zeilen in src: $(find $F/src \\( -name '*.ts' -o -name '*.tsx' \\) -exec cat {} + 2>/dev/null | wc -l)\"\necho \"Frontend-Testdateien: $(find $F/src -name '*.test.ts' -o -name '*.test.tsx' 2>/dev/null | wc -l)\"\necho ''\necho '--- Versionen (pom.xml, Kopf) ---'\nsed -n '1,45p' $B/pom.xml 2>/dev/null\necho ''\necho '--- Versionen (package.json, Auszug) ---'\ngrep -E '\"(react|typescript|vite|tailwindcss|zustand)\"' $F/package.json 2>/dev/null\necho ''\necho '===== TEIL 3 — NICHT AUS DEM REPOSITORY PRUEFBAR ====='\necho 'Die folgenden Behauptungen des README beziehen sich auf den Betrieb der laufenden Instanz.'\necho 'Workflow-Shell-Bloecke duerfen weder die Datenbank noch die REST-API lesen, deshalb kann'\necho 'dieser Lauf sie nicht pruefen. Sie sind als datierte Beobachtung einzustufen, die vor der'\necho 'Veroeffentlichung frisch zu erheben ist:'\necho '  - Zahl der Runs (README: \"rund 2 400\")'\necho '  - Zahl der Audit-Befunde und deren Statusverteilung (README: \"89 Befunde\")'\necho '  - Testzahlen aus einem Suite-Lauf (README: Backend 7 633, Frontend 496) — hier steht nur'\necho '    die Zahl der Testklassen bzw. Testdateien, nicht die Zahl der ausgefuehrten Tests.'\nexit 0",
+        "timeout_seconds": 300,
+        "on_failure": "continue"
+      }
+    },
+    {
+      "type": "skill-capability",
+      "name": "pruefung",
+      "skillIds": [
+        "builtin-fact-checker"
+      ],
+      "config": {
+        "description": "Behauptungen gegen Belege pruefen (Fable)",
+        "capability": "verify_claims",
+        "timeout_seconds": 3000,
+        "input": "Pruefe jede oeffentliche Behauptung des README gegen die Belege.\n\nDie Behauptungen und das Faktenblatt stehen hier:\n\n{{ previous_output }}\n\nBefunde aus der vorgelagerten Evidenz-Stufe (kann leer sein, wenn dieser Workflow einzeln laeuft — dann ignoriere diesen Abschnitt; steht hier unaufgeloest der Platzhaltername statt Inhalt, ist er ebenfalls als leer zu behandeln):\n\n{{ previous_chain_output }}\n\n---\n\nAuftrag:\n\n1. Ziehe aus TEIL 1 jede pruefbare Behauptung heraus — besonders die Zahlentabelle, die Tabelle der vier Forschungsfragen, den Abschnitt Reifegrad und den Tech-Stack. Auch Formulierungen wie \"laeuft taeglich\", \"nie unter Last betrieben\" oder \"die Schulden sind gezaehlt\" sind Behauptungen.\n2. Pruefe jede gegen TEIL 2. Reicht das Faktenblatt nicht, lies im Repository nach und nenne die Fundstelle.\n3. Behauptungen aus TEIL 3 stufst du als `datiert` ein — nicht als unbelegt und nicht als belegt.\n\nGib eine Tabelle aus:\n\n| # | Behauptung (woertlich, gekuerzt) | Beleg mit Fundstelle | Einstufung | Vorsichtigere Formulierung |\n|---|---|---|---|---|\n\nEinstufungen: `belegt`, `teilweise belegt`, `unbelegt`, `riskant`, `datiert`.\nDie Spalte \"Vorsichtigere Formulierung\" bleibt bei `belegt` leer und ist bei allem anderen Pflicht.\n\nNenne danach unter der Ueberschrift \"Vor der Veroeffentlichung zu aendern\" die Zeilen des README, die angepasst werden muessen, jeweils mit alter und neuer Fassung.\n\nZum Schluss der Ausgabe stehen genau diese drei Zeilen, jede fuer sich allein, ohne Einrueckung, ohne Aufzaehlungszeichen, ohne weiteren Text davor in derselben Zeile:\n\ngate_status: RED wenn eine Behauptung riskant ist, YELLOW wenn eine unbelegt oder teilweise belegt ist, sonst GREEN\ngate_category: public-claims\ngate_description: kurze Begruendung in einem Satz"
+      }
+    }
+  ],
+  "metadata": {
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit",
+      "install_npm": false
+    }
+  }
+}
