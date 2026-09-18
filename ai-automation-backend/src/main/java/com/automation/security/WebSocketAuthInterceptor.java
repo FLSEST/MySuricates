@@ -58,12 +58,14 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
         if (legacyApiKeyParam) {
             log.warn("WebSocket handshake rejected: apiKey query parameter is no longer accepted "
                     + "(use POST /api/v1/ws-ticket), from {}", request.getRemoteAddress());
-        } else if (ticket != null) {
+        } else if (ticket != null && !ticket.isBlank()) {
             // Ein vorgelegtes Ticket, das nicht zieht: abgelaufen, schon verbraucht — oder geraten.
             log.warn("WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}",
                     request.getRemoteAddress());
         } else {
-            // Ganz ohne Parameter klopfen Browser, Health-Checks und Crawler an — kein Vorfall.
+            // Kein oder leeres Ticket: Browser/Health-Checks/Crawler klopfen ganz ohne Parameter an,
+            // und useWebSocket.ts haengt bei fehlgeschlagenem Ticket-Abruf bewusst ein leeres
+            // ?ticket= an — beides kein Vorfall.
             log.debug("WebSocket handshake rejected: no ticket presented by {}", request.getRemoteAddress());
         }
         response.setStatusCode(HttpStatus.UNAUTHORIZED);

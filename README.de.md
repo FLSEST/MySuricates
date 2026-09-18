@@ -40,8 +40,8 @@ isolierten Worktree:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, rund 1 240 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 62 000 Zeilen, 42 REST-Controller, 73 Flyway-Migrationen |
+| Entstanden seit | 2026-02-15, rund 1 320 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.4, rund 62 000 Zeilen, 43 REST-Controller, 73 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 56 000 Zeilen |
 | Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 — Lauf vom 2026-09-12 |
 | Bausteine | 19 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
