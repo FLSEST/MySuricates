@@ -369,12 +369,23 @@ run_perf_gate "$TMP/perf-facts.out"
 check "vollstaendiges Blatt: GREEN durchgereicht" 'grep -qx "gate_status: GREEN" "$TMP/perf-gate.out"'
 check "vollstaendiges Blatt: performance"         'grep -qx "gate_category: performance" "$TMP/perf-gate.out"'
 check "Gate laeuft ohne stderr"                   '[ ! -s "$TMP/perf-gate.err" ]'
-grep -v '^FAKT repository_loop_count: ' "$TMP/perf-facts.out" > "$TMP/perf-facts-luecke.out"
-run_perf_gate "$TMP/perf-facts-luecke.out"
-check "fehlende Pflicht-FAKT-Zeile: RED"           'grep -qx "gate_status: RED" "$TMP/perf-gate.out"'
-check "fehlende Pflicht-FAKT-Zeile: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/perf-gate.out"'
-check "Grund nennt das fehlende Feld" \
-  'grep "^gate_description:" "$TMP/perf-gate.out" | grep -q "repository_loop_count"'
+# Je Pflichtfeld ein eigener RED-Lauf, strukturgleich zu Abschnitt 4: auch hier stehen die
+# Pflichtfelder dreimal (Echo im Messblock, Schleife im Gate, Aufzaehlung im Report-Prompt),
+# und nur der Abgleich ueber die PFLICHT-FAKTEN-Zeile merkt, wenn eine Liste driftet.
+PERF_FIELDS="$(mandatory_fields "$TMP/perf-facts.out")"
+check "Performance: Pflichtfeld-Liste nicht leer" '[ -n "$PERF_FIELDS" ]'
+for FIELD in $PERF_FIELDS; do
+  grep -v "^FAKT $FIELD: " "$TMP/perf-facts.out" > "$TMP/perf-facts-luecke.out"
+  run_perf_gate "$TMP/perf-facts-luecke.out"
+  check "ohne $FIELD: RED/audit-invalid mit Begruendung" \
+    'grep -qx "gate_status: RED" "$TMP/perf-gate.out" \
+       && grep -qx "gate_category: audit-invalid" "$TMP/perf-gate.out" \
+       && grep "^gate_description:" "$TMP/perf-gate.out" | grep -q "$FIELD"'
+  check "Report-Prompt nennt Pflichtfeld $FIELD" 'grep -q "$FIELD" "$TMP/perf-prompt.txt"'
+done
+run_perf_gate "$TMP/empty.txt"
+check "ohne Faktenblatt: RED"           'grep -qx "gate_status: RED" "$TMP/perf-gate.out"'
+check "ohne Faktenblatt: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/perf-gate.out"'
 
 echo "8) Performance-Audit: Report-Prompt bindet die KI ans Faktenblatt"
 check "Prompt nutzt das Faktenblatt"    'grep -q "block.facts.output" "$TMP/perf-prompt.txt"'
