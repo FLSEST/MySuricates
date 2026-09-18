@@ -107,6 +107,9 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `CONTEXT-PII` | no personal key in `defaultContext` (children, address, IBAN, CV …) | token comparison; the key is the signal — even with a placeholder as its value |
 | `BLOCK-TYPE` | every block type is in the registry, including those nested inside a `switch` (`cases[].blocks` and `default` — the only places where a block contains a block; the other wrappers run strings) | list comparison |
 | `REPO-DEP` | an entry with `scope: portable` mentions none of the repo markers (`ai-automation-backend`, `ai-automation-frontend`, `scripts/`, `mvnw`, `workflow-pool/`) | substring search |
+| `SELF-API` | the definition does not call our own REST API | an `/api/v1/<endpoint>` together with a caller (`curl`, `wget`, `requests.`, `urllib`, `fetch(`, `http.client`) or an HTTP verb in front of it; the auth-free `/api/v1/system/{health,info,auth-status}` are allowed as a liveness probe |
+| `CREDENTIAL` | the definition neither reads nor sets credentials | substring `X-API-Key` or `app_settings` — no exceptions |
+| `DB-DIRECT` | the definition does not read the database directly | `sqlite3` anywhere, or `automation.db` together with a read access (`SELECT`, `INSERT INTO`, `.tables`, …); looking at the file size (`stat`, `du`) stays allowed |
 | `PARSE` | the file is valid JSON and an object | `json.load` |
 
 ### The block type registry
@@ -121,20 +124,40 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 `human-input`, `integration`, `retry`, `shell`, `simple`, `skill-capability`,
 `sub-workflow`, `switch`, `todo-close`, `todo-create`, `todo-update`, `while`
 
+### Own REST API, credentials, database — and why the patterns are two-stage
+
+The house rule is in `CLAUDE.md`: workflow blocks call neither our own REST API nor the
+database. Everything a workflow needs in terms of platform data is injected by the
+`WorkflowExecutor` as a context variable (`{{ open_todos }}`, `{{ previous_report }}`,
+`{{ workflow_run_id }}`, …). In a **published** definition a second problem comes on top: a
+prompt explaining how to fetch the API key from `app_settings` is a set of instructions for
+extracting credentials — every reader installs them along with the entry.
+
+Two of the three patterns would be useless as a single stage, so they require a second marker:
+
+- `/api/v1/` on its own is not a call. `mocking-gap-audit` carries the string as a **search
+  pattern** in a list of network markers, right next to `fetch(` and `axios.`. What gets
+  reported is therefore a concrete endpoint (`/api/v1/todos`, not the bare prefix) together
+  with a caller nearby.
+- `automation.db` on its own is not database access. `mysuricates-performance-audit` only looks
+  at the **file size** via `stat -c %s` and says so in a comment. What is forbidden is reading
+  the contents, which bypasses Hibernate and the single connection (pool size 1).
+
+To write TODOs, use the block types `todo-create`, `todo-update` and `todo-close`. To merely
+react to a finding, print `gate_status:` at the end and set `metadata.autoTodo.enabled` — then
+the platform creates the TODO, keeps it current across runs and closes it again on GREEN. That
+is exactly how `system-performance-analysis` was reworked (TODO 1ccdc6d5): the agentic block
+that called `POST /api/v1/todos` via curl and was told to fetch the key from `app_settings` is
+gone.
+
 ### What the gate cannot check
 
-Three criteria remain a reading task and belong to the release step (section 4):
+Two criteria remain a reading task and belong to the release step (section 4):
 
 - **No prompt tailored to a person.** `CONTEXT-PII` catches the key in `defaultContext`, not a
   phrasing inside the prompt itself.
 - **No dependency on scripts outside the repository.** `PATH-ABS` and `PATH-HOME` catch the
   obvious case; a tool that only happens to be on one machine's `PATH` is invisible to the gate.
-- **No call to our own REST API from inside the definition.** A prompt instructing the AI to
-  `POST /api/v1/todos` via curl with an `X-API-Key` (possibly telling it to read the key from
-  `app_settings`) breaks the house rule "workflow blocks call neither the REST API nor the DB",
-  and in a published definition it doubles as instructions for extracting credentials. The
-  block types `todo-create`, `todo-update` and `todo-close` exist for this. The gate cannot tell
-  an example request body from an instruction.
 
 ## 4. How entries come about and are maintained
 

@@ -303,7 +303,7 @@ All implement `AssistantContextSection` with `append(StringBuilder sb, boolean c
 5. **SkillsIndexSection** — Max 20 entries, desc: 80 characters
 6. **IntegrationsIndexSection** — All providers with connected/disconnected status
 7. **ChainsIndexSection** — Max 15 entries, desc: 80 characters
-8. **BlockTypesIndexSection** — 14 block types (static list; it lags behind the 17 registered block executors — the three `todo-*` types are missing)
+8. **BlockTypesIndexSection** — 19 block types (static list; in sync with the 19 registered block executors, pinned by `BlockTypeListsGuardTest`)
 9. **FailedWorkflowsContextSection** — Broken workflows via `WorkflowDebugService`, error: 160 characters
 
 ### Additional on **OVERVIEW** Pages
