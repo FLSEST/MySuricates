@@ -1,9 +1,9 @@
 # Workflow Memory — Architektur & Datenfluss
 
-## Uebersicht
+## Übersicht
 
 Das Workflow Memory Feature extrahiert wiederverwendbares Wissen aus vergangenen Workflow-Runs
-und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt zwei Provider:
+und stellt es bei zukünftigen Ausführungen als Kontext bereit. Es unterstützt zwei Provider:
 **Claude CLI** und **OpenAI Codex CLI**, beide laufen direkt auf dem Host.
 
 ---
@@ -33,7 +33,7 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
  │  │     └── Alle Steps aus allen geladenen Runs                  │
  │  │                                                               │
  │  ├─ 3. Preprocessing ◄── ConversationPreprocessor               │
- │  │     ├── Code-Bloecke komprimieren (>30 Zeilen)               │
+ │  │     ├── Code-Blöcke komprimieren (>30 Zeilen)               │
  │  │     ├── Data-Dumps komprimieren (>20 Zeilen)                 │
  │  │     ├── Meta-Kommentare entfernen                            │
  │  │     ├── Wiederholte Fehler zusammenfassen                    │
@@ -86,7 +86,7 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
 | Eigenschaft       | ClaudeSummarizer              | CodexSummarizer               |
 |-------------------|-------------------------------|-------------------------------|
 | CLI               | `claude -p`                   | `codex exec -`                |
-| Prompt-Uebergabe  | stdin                         | stdin (`-` Placeholder)       |
+| Prompt-Übergabe  | stdin                         | stdin (`-` Placeholder)       |
 | Max Turns         | 1 (kein Tool-Use)             | — (codex exec default)        |
 | Output-Methode    | Stream-JSON parsen            | `-o` Flag (Temp-Datei)        |
 | Instruktionen     | `CLAUDE.md` im Working Dir    | `AGENTS.md` im Working Dir    |
@@ -95,7 +95,7 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
 
 ---
 
-## 3. Datenflussdiagramm — Memory bei Workflow-Ausfuehrung nutzen
+## 3. Datenflussdiagramm — Memory bei Workflow-Ausführung nutzen
 
 ```
   WorkflowExecutor.execute(workflow)
@@ -109,15 +109,15 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
   │     │   └── Schreibt .claude/rules/project-memory.md ins Projekt
   │     │
   │     └── Falls nicht vorhanden:
-  │         └── Loescht alte project-memory.md (Aufraeum-Logik)
+  │         └── Löscht alte project-memory.md (Aufräum-Logik)
   │
   ├─ 2. Block-Execution startet
   │     └── Claude CLI liest CLAUDE.md + .claude/rules/*.md automatisch
-  │         └── Workflow Memory ist als Kontext verfuegbar
+  │         └── Workflow Memory ist als Kontext verfügbar
   │
   └─ 3. Run-Ergebnis wird gespeichert
         └── WorkflowRun + StepResults in SQLite
-            └── Kann spaeter fuer neue Memory-Extraktion genutzt werden
+            └── Kann später für neue Memory-Extraktion genutzt werden
 ```
 
 ---
@@ -158,21 +158,21 @@ und stellt es bei zukuenftigen Ausfuehrungen als Kontext bereit. Es unterstuetzt
 
 ```
 ~/.autotrigger/summarization/           ← Konfigurierbar via application.yml
-├── claude/                             ← Working Dir fuer ClaudeSummarizer
+├── claude/                             ← Working Dir für ClaudeSummarizer
 │   └── CLAUDE.md                       ← Instruktionen (aus resources kopiert)
-└── codex/                              ← Working Dir fuer CodexSummarizer
+└── codex/                              ← Working Dir für CodexSummarizer
     └── AGENTS.md                       ← Instruktionen (aus resources kopiert)
 
 ai-automation-backend/src/main/resources/
 ├── agent-instructions.md               ← Base Instructions (Block-Execution)
 └── summarization/
-    ├── claude-summarizer.md            ← Template fuer CLAUDE.md
-    └── codex-summarizer.md             ← Template fuer AGENTS.md
+    ├── claude-summarizer.md            ← Template für CLAUDE.md
+    └── codex-summarizer.md             ← Template für AGENTS.md
 ```
 
 `SummarizationSetupService` kopiert die Templates beim Backend-Start
-in die Working Directories. Aenderungen an den Resource-Dateien werden
-beim naechsten Neustart uebernommen.
+in die Working Directories. Änderungen an den Resource-Dateien werden
+beim nächsten Neustart übernommen.
 
 ---
 
@@ -195,7 +195,7 @@ automation:
 | `POST`   | `/api/v1/workflows/{id}/memory/extract`            | Wissen extrahieren (async, ~30-60s) |
 | `PUT`    | `/api/v1/workflows/{id}/memory/{memId}`            | Title/Content aktualisieren         |
 | `PUT`    | `/api/v1/workflows/{id}/memory/{memId}/activate`   | Memory aktivieren                   |
-| `DELETE` | `/api/v1/workflows/{id}/memory/{memId}`            | Memory loeschen                     |
+| `DELETE` | `/api/v1/workflows/{id}/memory/{memId}`            | Memory löschen                     |
 
 ### Error Responses (POST /extract)
 
@@ -211,7 +211,7 @@ automation:
 ## 8. Auto-Memory-Extraktion
 
 Der `AutoMemoryExtractionListener` extrahiert und aktiviert Memory automatisch
-nach erfolgreichen Workflow-Runs. Die Konfiguration erfolgt per Workflow ueber
+nach erfolgreichen Workflow-Runs. Die Konfiguration erfolgt per Workflow über
 das `metadata`-Feld.
 
 ### Aktivierung (Workflow-Metadata)
@@ -235,11 +235,11 @@ das `metadata`-Feld.
   │
   ├─ 1. isAutoMemoryEnabled(workflowMetadata) → true?
   │
-  ├─ 2. Erfolgreiche Runs seit letzter Extraktion zaehlen
+  ├─ 2. Erfolgreiche Runs seit letzter Extraktion zählen
   │     └── WorkflowRunRepository.countByWorkflowIdAndStatusAndCompletedAtAfter()
   │
   ├─ 3. Schwellwert (interval) erreicht?
-  │     └── Nein → Abbruch (naechster Run zaehlt weiter)
+  │     └── Nein → Abbruch (nächster Run zählt weiter)
   │
   └─ 4. extractAndActivate(workflowId, "CLAUDE")
         ├── Extrahiert Knowledge aus den letzten 10 Runs
@@ -248,6 +248,6 @@ das `metadata`-Feld.
         └── Schreibt project-memory.md ins Projekt (falls projectPath vorhanden)
 ```
 
-- Laeuft asynchron (`@Async @EventListener`) — blockiert den Workflow-Run nicht
+- Läuft asynchron (`@Async @EventListener`) — blockiert den Workflow-Run nicht
 - Verwendet immer Provider `CLAUDE`
-- Auch `autoMemoryExtraction: true` (boolean statt Map) wird unterstuetzt (nutzt Default-Interval 5)
+- Auch `autoMemoryExtraction: true` (boolean statt Map) wird unterstützt (nutzt Default-Interval 5)
