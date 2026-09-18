@@ -838,6 +838,26 @@ Response (DTO) → React Query Cache → UI Update
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
 
+**Global server bucket, per-path client lock — the asymmetry is deliberate.** The server counts in
+*one* bucket per client IP across all endpoints, so a 429 means "you as a whole are too fast". The
+client (`api/client.ts`) in contrast remembers the lock **per endpoint pattern** (the path without
+its query and with IDs replaced, so `/executions/{id}` does not get one key per run) and adds a
+**short global lock (2 s)** across all paths.
+
+The consequence: after a 429 storm the client releases individual patterns again once the 2 s are
+over, and each pattern collects its own 429 until its `Retry-After` lock is in place. That is the
+intended trade-off — a permanent global lock would also block exactly the calls that lead out of the
+state: `POST /ws-ticket` (every reconnect needs one) and `GET /system/auth-status` (otherwise the
+guards keep showing "not authenticated"). The short global lock takes the peak off the storm without
+closing those paths.
+
+**An empty `?ticket=` in the handshake is the client fallback.** If `POST /ws-ticket` runs into a
+lock (or fails otherwise), `useWebSocket` sets `wsTicket = ''` in `beforeConnect` and the handshake
+goes out with an empty `?ticket=`. The interceptor refuses it, stompjs schedules the next attempt
+with a growing delay — that is the intended path, rather than an unhandled promise rejection that
+would tear the reconnect cycle apart. An empty ticket in the server logs is therefore not an attack
+but a client whose ticket request did not get through.
+
 ### Request Size Limit
 
 - **Filter:** `ActivityLogSizeLimitFilter`

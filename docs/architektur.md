@@ -876,6 +876,26 @@ Response (DTO) → React Query Cache → UI-Update
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
+**Server-Eimer global, Client-Sperre pro Pfad — die Asymmetrie ist Absicht.** Der Server zählt in
+*einem* Eimer pro Client-IP über alle Endpunkte hinweg; ein 429 bedeutet also „du insgesamt bist zu
+schnell". Der Client (`api/client.ts`) merkt sich die Sperre dagegen **pro Endpunkt-Muster** (der
+Pfad ohne Query und mit ersetzten IDs, damit `/executions/{id}` nicht pro Run einen eigenen
+Schlüssel bekommt) und legt zusätzlich eine **kurze globale Sperre (2 s)** über alle Pfade.
+
+Daraus folgt: Nach einem 429-Sturm lässt der Client nach den 2 s wieder einzelne Muster los, und
+jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Das ist bewusst so
+gewählt — eine dauerhafte globale Sperre würde genau die Aufrufe mitsperren, die aus dem Zustand
+herausführen: `POST /ws-ticket` (jeder Reconnect braucht eins) und `GET /system/auth-status` (die
+Guards zeigen sonst dauerhaft „nicht authentifiziert"). Die kurze globale Sperre nimmt dem Sturm die
+Spitze, ohne diese Pfade zu verschließen.
+
+**Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
+(oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake
+geht mit leerem `?ticket=` raus. Der Interceptor lehnt ihn ab, stompjs plant den nächsten Versuch
+mit wachsendem Abstand — das ist der gewollte Weg, statt einer offenen Promise-Ablehnung, die den
+Reconnect-Zyklus abreißen ließe. Ein leeres Ticket in den Server-Logs ist also kein Angriff, sondern
+ein Client, dessen Ticket-Abruf gerade nicht durchkam.
+
 ### Request-Size-Limit
 
 - **Filter:** `ActivityLogSizeLimitFilter`
