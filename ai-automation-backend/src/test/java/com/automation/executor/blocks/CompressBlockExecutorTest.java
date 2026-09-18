@@ -18,10 +18,14 @@ class CompressBlockExecutorTest {
 
     private final CompressBlockExecutor executor = new CompressBlockExecutor();
 
+    /** Mirrors the UI preset "java-log" (frontend {@code components/workflow/compression.ts}). */
     private static final List<Map<String, Object>> JAVA_LOG_STAGES = List.of(
             Map.of("op", "text.normalize"),
             Map.of("op", "lines.filter", "exclude", List.of("^\\s+at ", ":: Spring Boot ::", "^[\\s/\\\\|()_'`=.,-]+$")),
-            Map.of("op", "lines.replace", "pattern", "^\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z?\\s*", "replacement", ""),
+            Map.of("op", "text.normalize"),
+            Map.of("op", "lines.replace",
+                    "pattern", "^(?:\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+Z?|\\d{2}:\\d{2}:\\d{2}[.,]\\d+)\\s*",
+                    "replacement", ""),
             Map.of("op", "lines.dedupe", "count", true),
             Map.of("op", "text.truncate", "max_chars", 18000, "keep", "head_tail"));
 
@@ -83,6 +87,20 @@ class CompressBlockExecutorTest {
         assertThat(r.getOutput()).contains("Failures: 2").contains("keepsFailures:42");
         assertThat(r.getOutput()).doesNotContain("\tat com.automation");
         assertThat(ctx.getBlockOutput("backend_tests")).isEqualTo(log);
+    }
+
+    /** Pilot run 301e29f4: the lines start with a time only, so lines.replace did not match and dedupe folded nothing. */
+    @Test
+    void javaLogPreset_foldsLinesThatStartWithATimeOnly() {
+        String log = ("21:32:58.761 [main] INFO c.a.SomeTest : Started SomeTest in 1.2 seconds\n").repeat(3)
+                + "21:33:01.004 [main] ERROR c.a.Foo : expected in test\n";
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.FAILED, 1, log);
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests", "stages", JAVA_LOG_STAGES)), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(r.getOutput()).endsWith("\n\n3× [main] INFO c.a.SomeTest : Started SomeTest in 1.2 seconds"
+                + "\n[main] ERROR c.a.Foo : expected in test");
     }
 
     @Test

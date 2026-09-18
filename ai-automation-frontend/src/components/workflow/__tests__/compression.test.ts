@@ -27,6 +27,24 @@ describe('compression helpers', () => {
     expect(next.stages).toEqual(COMPRESS_PRESETS['java-log']);
   });
 
+  it('strips both log timestamp forms and normalises again after the filter (java-log)', () => {
+    const stages = COMPRESS_PRESETS['java-log'];
+    const ops = stages.map((s) => s.op as string);
+    const replace = stages.find((s) => s.op === 'lines.replace') as { pattern: string };
+    const timestamps = new RegExp(replace.pattern);
+
+    // the filter leaves runs of blank lines behind — normalize runs again right after it
+    expect(ops.filter((op) => op === 'text.normalize')).toHaveLength(2);
+    expect(ops[ops.indexOf('lines.filter') + 1]).toBe('text.normalize');
+    // Maven/Spring log lines start with a time only, not with an ISO date
+    expect('21:32:58.761 [main] INFO c.a.SomeTest : Started'.replace(timestamps, ''))
+      .toBe('[main] INFO c.a.SomeTest : Started');
+    expect('2026-09-14T10:54:00.123Z  INFO 4711 --- [main] c.a.SomeTest : Started'.replace(timestamps, ''))
+      .toBe('INFO 4711 --- [main] c.a.SomeTest : Started');
+    expect('[ERROR] Tests run: 2140, Failures: 2'.replace(timestamps, ''))
+      .toBe('[ERROR] Tests run: 2140, Failures: 2');
+  });
+
   it('leaves invalid JSON untouched', () => {
     expect(applyPreset('{kaputt', 'npm-build')).toBe('{kaputt');
   });
