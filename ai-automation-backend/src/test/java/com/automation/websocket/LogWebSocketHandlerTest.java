@@ -67,24 +67,15 @@ class LogWebSocketHandlerTest {
                 .isTrue();
     }
 
+    /**
+     * TODO 7adaf187: this class must not grow its own broadcast helpers again —
+     * {@code ExecutionBroadcaster}/{@code RunLiveLogService} own publishing to the run topic.
+     */
     @Test
-    void broadcastLogMessage_sendsToCorrectTopic() {
-        Map<String, Object> logData = Map.of("type", "log", "message", "step completed");
-
-        handler.broadcastLogMessage("run-1", logData);
-
-        verify(messagingTemplate).convertAndSend("/topic/executions/run-1/logs", logData);
-    }
-
-    @Test
-    void broadcastStatusChange_sendsStatusMap() {
-        handler.broadcastStatusChange("run-1", RunStatus.COMPLETED);
-
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), captor.capture());
-        assertThat(captor.getValue().get("type")).isEqualTo("status");
-        assertThat(captor.getValue().get("status")).isEqualTo(RunStatus.COMPLETED);
+    void should_notExposeBroadcastHelpers_soPublishingStaysWithExecutionBroadcaster() {
+        assertThat(LogWebSocketHandler.class.getMethods())
+                .extracting(java.lang.reflect.Method::getName)
+                .doesNotContain("broadcastLogMessage", "broadcastStatusChange");
     }
 
     @Test
