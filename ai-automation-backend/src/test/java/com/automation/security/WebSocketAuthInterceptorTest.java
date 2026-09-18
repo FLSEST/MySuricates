@@ -168,6 +168,19 @@ class WebSocketAuthInterceptorTest {
     }
 
     @Test
+    void blankTicketIsOnlyLoggedAtDebug() {
+        // Der bewusste Client-Fallback bei fehlgeschlagenem Ticket-Abruf (useWebSocket.ts) haengt
+        // ?ticket= leer an — das ist kein Faelschungsversuch und darf kein WARN "forged" erzeugen.
+        when(servletRequest.getParameter("ticket")).thenReturn("");
+
+        List<ILoggingEvent> events = captureLogs(() ->
+                interceptor.beforeHandshake(request, response, handler, new HashMap<>()));
+
+        assertThat(events).isNotEmpty();
+        assertThat(events).allSatisfy(event -> assertThat(event.getLevel()).isEqualTo(Level.DEBUG));
+    }
+
+    @Test
     void blankApiKeyAllowsAll() {
         when(apiKeyService.getEffectiveApiKey()).thenReturn("");
 
