@@ -921,8 +921,14 @@ ohnehin geladen (Sidebar) und braucht keinen API-Key, also entsteht dafür kein 
 Gesetzt werden sie über `automation.security.rate-limit.client-global-backoff-seconds` bzw.
 `client-default-retry-after-seconds`; fehlende oder nicht-positive Werte lässt der Client liegen und
 bleibt bei seinen Konstanten. Hintergrund: Eine Instanz mit anderem `requests-per-minute` macht fest
-verdrahtete Client-Zahlen zu Raterei (37b98c97). Weil der Filter bei jedem 429 ein `Retry-After`
-sendet, greift der 10-s-Default ohnehin nur noch, wenn ein Proxy den Header verschluckt.
+verdrahtete Client-Zahlen zu Raterei (37b98c97).
+
+Der `Retry-After`-Header kommt **nur vom `RateLimitFilter`**. Die beiden anderen 429-Quellen senden
+ihn nicht: der Webhook-Limiter (`WebhookController` → `WebhookRateLimiter`, leere 429-Antwort) und
+`TOKEN_BUDGET_EXCEEDED` (`ErrorCode`/`GlobalExceptionHandler`, ein Budget- statt Zeitproblem — hier
+hilft Warten gar nicht). Für den Browser-Client heißt das: bei einem 429 auf `/api/v1` greift
+praktisch immer der Header, der `defaultRetryAfterSeconds`-Wert nur bei diesen Sonderfällen oder
+wenn ein Proxy den Header verschluckt.
 
 Daraus folgt: Nach einem 429-Sturm lässt der Client nach spätestens 2 s wieder einzelne Muster los,
 und jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Die kurze

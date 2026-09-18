@@ -13,6 +13,19 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
+# Liest automation.modules.preset so, wie ein YAML-Parser es sieht — die Probe darauf, dass eine
+# geschriebene Datei noch das bedeutet, was sie soll. Ohne PyYAML (nicht vorausgesetzt) liefert
+# die Funktion "skipped", der zugehoerige check laeuft dann ins Leere statt falsch rot zu werden.
+HAVE_YAML=0; python3 -c 'import yaml' 2>/dev/null && HAVE_YAML=1
+yaml_preset() {
+  [ "$HAVE_YAML" = 1 ] || { echo skipped; return 0; }
+  python3 -c 'import sys,yaml; d=yaml.safe_load(open(sys.argv[1])) or {}; print(((d.get("automation") or {}).get("modules") or {}).get("preset"))' "$1" 2>/dev/null
+}
+yaml_expect() {  # $1 = Datei, $2 = erwartetes Preset
+  local got; got="$(yaml_preset "$1")"
+  [ "$got" = "$2" ] || [ "$got" = skipped ]
+}
+
 echo "1) validation"
 check "core, research and full are valid"  'module_preset_valid core && module_preset_valid research && module_preset_valid full'
 check "unknown and empty presets are rejected" '! module_preset_valid everything && ! module_preset_valid ""'
@@ -141,6 +154,7 @@ ADD3="$TMP/add3/config/application.yml"; mkdir -p "$(dirname "$ADD3")"
 printf 'logging:\n  level:\n    root: INFO\n' > "$ADD3"
 module_preset_update "$ADD3" full; RC=$?
 check "appends a whole automation block (rc=$RC)"      '[ "$RC" -eq 0 ] && grep -q "^automation:$" "$ADD3" && grep -q "^    preset: full$" "$ADD3"'
+check "the appended block parses as the preset"        'yaml_expect "$ADD3" full'
 check "keeps the unrelated top-level keys"             'grep -q "^logging:$" "$ADD3" && grep -q "^    root: INFO$" "$ADD3"'
 
 echo "13) module_preset_update: Abbruch statt Raten"
@@ -153,6 +167,38 @@ SCALAR="$TMP/scalar.yml"
 printf 'automation:\n  modules: core\n' > "$SCALAR"; cp "$SCALAR" "$TMP/scalar.orig"
 module_preset_update "$SCALAR" full 2>/dev/null; RC=$?
 check "a scalar automation.modules aborts (rc=$RC)"     '[ "$RC" -eq 5 ] && diff "$TMP/scalar.orig" "$SCALAR" >/dev/null'
+CRLF="$TMP/crlf.yml"
+printf 'automation:\r\n  modules:\r\n    preset: core\r\n' > "$CRLF"; cp "$CRLF" "$TMP/crlf.orig"
+module_preset_update "$CRLF" full; RC=$?
+# CRLF darf nicht dazu fuehren, dass keine Zeile als Schluessel erkannt wird und ein zweiter
+# automation:-Block angehaengt wird — Spring liest mit allowDuplicateKeys(false) und startet dann
+# nicht mehr (Review Fix-Runde 1).
+check "CRLF: nur die Preset-Zeile geaendert (rc=$RC)"   '[ "$RC" -eq 0 ] && [ "$(grep -c "^automation:" "$CRLF")" -eq 1 ]'
+check "CRLF: der neue Wert steht drin"                  'grep -q "preset: full" "$CRLF"'
+check "CRLF: ein Parser liest das neue Preset"          'yaml_expect "$CRLF" full'
+check "CRLF: die Zeilenenden bleiben CRLF"              '[ "$(grep -c $'\''\r$'\'' "$CRLF")" -eq 3 ]'
+NOKEY="$TMP/nokey.yml"
+printf -- '- eins\n- zwei\n' > "$NOKEY"; cp "$NOKEY" "$TMP/nokey.orig"
+module_preset_update "$NOKEY" full 2>/dev/null; RC=$?
+check "Inhalt ohne erkennbaren Schluessel bricht ab (rc=$RC)" '[ "$RC" -eq 5 ] && diff "$TMP/nokey.orig" "$NOKEY" >/dev/null'
+EMPTYVAL="$TMP/emptyval.yml"
+printf 'automation:\n  modules:\n    preset:\n' > "$EMPTYVAL"
+module_preset_update "$EMPTYVAL" research; RC=$?
+# Ohne Leerzeichen entstuende "preset:research" — YAML liest das als Schluessel-Skalar.
+check "leerer Preset-Wert bekommt ein Leerzeichen (rc=$RC)" '[ "$RC" -eq 0 ] && grep -q "^    preset: research$" "$EMPTYVAL"'
+check "und ein Parser liest research"                       'yaml_expect "$EMPTYVAL" research'
+EMPTYCOMMENT="$TMP/emptycomment.yml"
+printf 'automation:\n  modules:\n    preset:   # spaeter setzen\n' > "$EMPTYCOMMENT"
+module_preset_update "$EMPTYCOMMENT" full; RC=$?
+# Leerzeichen vor dem Wert und vor dem # — sonst waere der Wert "full#..." statt "full".
+check "leerer Wert mit Kommentar bleibt lesbar (rc=$RC)"    '[ "$RC" -eq 0 ] && grep -q "^    preset:  *full  *# spaeter setzen$" "$EMPTYCOMMENT"'
+check "und ein Parser liest full, nicht full#..."           'yaml_expect "$EMPTYCOMMENT" full'
+RO="$TMP/readonly.yml"
+printf 'automation:\n  modules:\n    preset: core\n' > "$RO"; cp "$RO" "$TMP/readonly.orig"; chmod a-w "$RO"
+ERR="$(module_preset_update "$RO" full 2>&1)"; RC=$?
+chmod u+w "$RO"
+check "nicht schreibbare Datei meldet rc 1"             '[ "$RC" -eq 1 ] && diff "$TMP/readonly.orig" "$RO" >/dev/null'
+check "und nennt den Grund statt einer Bash-Meldung"    '[[ "$ERR" == *module_preset_update* ]] && [[ "$ERR" != *"Permission denied"* ]]'
 module_preset_update "$TMP/missing.yml" core 2>/dev/null; RC=$?
 check "a missing file returns 4 and writes nothing"     '[ "$RC" -eq 4 ] && [ ! -e "$TMP/missing.yml" ]'
 BAD="$TMP/bad.yml"; printf 'automation:\n  modules:\n    preset: core\n' > "$BAD"; cp "$BAD" "$TMP/bad.orig"

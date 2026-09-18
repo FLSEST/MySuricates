@@ -3,9 +3,18 @@ package com.automation.config;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.validation.ValidationBindHandler;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RateLimitConfigTest {
 
@@ -48,6 +57,44 @@ class RateLimitConfigTest {
     @Test
     void should_return120_when_requestsPerMinuteDefaultIsQueried() {
         assertThat(config.getRequestsPerMinute()).isEqualTo(120);
+    }
+
+    @Test
+    void should_haveValidatedAnnotation_when_classIsInspected() {
+        // Ohne @Validated bliebe @Min beim Binden wirkungslos.
+        assertThat(RateLimitConfig.class.isAnnotationPresent(Validated.class)).isTrue();
+    }
+
+    @Test
+    void should_rejectNonPositiveClientValues_when_theyAreBound() {
+        // Ein negativer Wert soll dort auffallen, wo er gesetzt wird (Start), nicht erst im
+        // Browser-Client — der wirft ihn weg und rät wieder (37b98c97).
+        assertThatThrownBy(() -> bind("client-global-backoff-seconds", "-1"))
+                .hasMessageContaining("Failed to bind properties")
+                .hasStackTraceContaining("clientGlobalBackoffSeconds");
+        assertThatThrownBy(() -> bind("client-default-retry-after-seconds", "0"))
+                .hasMessageContaining("Failed to bind properties")
+                .hasStackTraceContaining("clientDefaultRetryAfterSeconds");
+    }
+
+    @Test
+    void should_bindPositiveClientValues_when_theyAreConfigured() {
+        RateLimitConfig bound = bind("client-global-backoff-seconds", "5");
+        assertThat(bound.getClientGlobalBackoffSeconds()).isEqualTo(5);
+        assertThat(bound.getClientDefaultRetryAfterSeconds()).isEqualTo(10); // unveränderter Default
+    }
+
+    /** Bindet eine einzelne Property so, wie Spring Boot es beim Start täte — inklusive Validierung. */
+    private RateLimitConfig bind(String key, String value) {
+        MapConfigurationPropertySource source = new MapConfigurationPropertySource(
+                Map.of("automation.security.rate-limit." + key, value));
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+        return new Binder(source)
+                .bind("automation.security.rate-limit",
+                        Bindable.of(RateLimitConfig.class),
+                        new ValidationBindHandler(validator))
+                .orElseGet(RateLimitConfig::new);
     }
 
     @Test

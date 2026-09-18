@@ -142,14 +142,19 @@ module_preset_write() {
 # Everything else (comments, order, other values, indentation, the trailing comment of the
 # preset line itself) stays byte-identical; nothing is regenerated.
 #
-# $1 = file, $2 = preset. Returns 0 on success, 2 = unknown preset, 4 = file does not exist
-# (that is module_preset_write's job), 5 = the place is not unambiguous — the file is then left
-# untouched and a reason goes to stderr. Deliberately no YAML parser: the awk below tracks the
-# key path by indentation and refuses to guess whenever the file is not plain `key: value` YAML.
+# $1 = file, $2 = preset. Returns 0 on success, 1 = die Datei ist nicht schreibbar, 2 = unknown
+# preset, 4 = file does not exist (that is module_preset_write's job), 5 = the place is not
+# unambiguous — the file is then left untouched and a reason goes to stderr. Deliberately no YAML
+# parser: the awk below tracks the key path by indentation and refuses to guess whenever the file
+# is not plain `key: value` YAML.
 module_preset_update() {
   local file="$1" preset="$2" tmp rc
   module_preset_valid "$preset" || return 2
   [ -f "$file" ] || return 4
+  if [ ! -w "$file" ]; then
+    echo "module_preset_update: $file ist nicht schreibbar" >&2
+    return 1
+  fi
   tmp="$(mktemp)" || return 1
   awk -v preset="$preset" '
     function fail(msg) { print "module_preset_update: " msg > "/dev/stderr"; failed = 1; exit 1 }
@@ -159,13 +164,20 @@ module_preset_update() {
       n = NR
       depth = 0
       targets = 0; target = 0
+      content = 0; keys = 0
+      eol = (n > 0 && lines[1] ~ /\r$/) ? "\r" : ""   # eingefuegte Zeilen folgen den Zeilenenden der Datei
       autom = 0; autom_n = 0; autom_ind = -1; autom_child = -1; autom_scalar = 0
       mods = 0; mods_n = 0; mods_ind = -1; mods_child = -1; mods_scalar = 0
       for (i = 1; i <= n; i++) {
-        line = lines[i]
+        # Analyse immer auf der Zeile ohne CR — sonst scheitert jedes Schluessel-Muster an dem
+        # \r hinter dem Doppelpunkt und eine CRLF-Datei sieht aus wie eine ohne Schluessel.
+        # Ausgegeben und ersetzt wird die Originalzeile, die Zeilenenden bleiben also, wie sie sind.
+        line = lines[i]; sub(/\r$/, "", line)
         if (line ~ /^[ \t]*($|#)/) continue
+        content++
         if (line ~ /\t/) fail("Tabulatoren in " FILENAME " — Preset-Zeile bitte von Hand aendern")
         if (line !~ /^ *[A-Za-z0-9_.-]+:([ ]|$)/) continue   # Listen, Blockskalare: ignorieren
+        keys++
         ind = match(line, /[^ ]/) - 1
         key = line; sub(/^ */, "", key); sub(/:.*$/, "", key)
         value = line; sub(/^ *[A-Za-z0-9_.-]+:[ ]*/, "", value); sub(/[ ]*#.*$/, "", value)
@@ -189,24 +201,32 @@ module_preset_update() {
       if (autom_n > 1) fail("mehrere automation:-Bloecke — bitte von Hand aendern")
       if (mods_n > 1) fail("mehrere automation.modules:-Bloecke — bitte von Hand aendern")
       if (autom_scalar || mods_scalar) fail("automation(.modules) ist kein Block — bitte von Hand aendern")
+      # Inhalt, aber kein einziger erkannter Schluessel: die Datei ist nicht das, wofuer wir sie
+      # halten. Dann darf vor allem der Anhaenge-Zweig nicht greifen — ein zweiter
+      # automation:-Block laesst Spring (allowDuplicateKeys(false)) gar nicht mehr starten.
+      if (content > 0 && keys == 0) fail(FILENAME " enthaelt keine erkennbare key: value-Zeile — bitte von Hand aendern")
 
       if (targets == 1) {
         line = lines[target]
         match(line, /^ *(automation\.modules\.)?preset:[ ]*/)
         head = substr(line, 1, RLENGTH)
         rest = substr(line, RLENGTH + 1)
-        sub(/^[^ #]+/, "", rest)            # nur den alten Wert ersetzen, Kommentar bleibt
+        sub(/^[^ #\r]+/, "", rest)          # nur den alten Wert ersetzen, Kommentar bleibt
+        # Fehlt der Wert ganz (`preset:` von Hand geleert), fehlt auch das Leerzeichen dahinter —
+        # ohne es entstuende `preset:full`, was YAML als Skalar liest.
+        if (head !~ / $/) head = head " "
+        if (rest != "" && rest !~ /^[ \r]/) rest = " " rest
         lines[target] = head preset rest
       } else if (mods_n == 1) {
         ind = (mods_child >= 0) ? mods_child : mods_ind + 2
-        insert_at = mods; insert_text = sprintf("%*s%s", ind, "", "preset: " preset)
+        insert_at = mods; insert_text = sprintf("%*s%s%s", ind, "", "preset: " preset, eol)
       } else if (autom_n == 1) {
         ind = (autom_child >= 0) ? autom_child : autom_ind + 2
         step = ind - autom_ind
         insert_at = autom
-        insert_text = sprintf("%*s%s\n%*s%s", ind, "", "modules:", ind + step, "", "preset: " preset)
+        insert_text = sprintf("%*s%s%s\n%*s%s%s", ind, "", "modules:", eol, ind + step, "", "preset: " preset, eol)
       } else {
-        append_text = "automation:\n  modules:\n    preset: " preset
+        append_text = "automation:" eol "\n  modules:" eol "\n    preset: " preset eol
       }
 
       for (i = 1; i <= n; i++) {
@@ -218,7 +238,12 @@ module_preset_update() {
   ' "$file" > "$tmp"
   rc=$?
   if [ "$rc" -ne 0 ]; then rm -f "$tmp"; return 5; fi
-  cat "$tmp" > "$file" || { rm -f "$tmp"; return 1; }   # cat, nicht mv: Rechte/Inode bleiben
+  # cat, nicht mv: Rechte und Inode der Nutzerdatei bleiben.
+  if ! cat "$tmp" > "$file" 2>/dev/null; then
+    rm -f "$tmp"
+    echo "module_preset_update: $file konnte nicht geschrieben werden" >&2
+    return 1
+  fi
   rm -f "$tmp"
 }
 

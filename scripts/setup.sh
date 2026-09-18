@@ -354,12 +354,19 @@ LOCAL_CONFIG="${BACKEND_DIR}/config/application.yml"
 if [ -e "$LOCAL_CONFIG" ]; then
   if [ "$FORCE_PRESET" = 1 ]; then
     # --force fasst nur die Preset-Zeile an; alles andere in der Datei bleibt, wie es ist.
-    if module_preset_update "$LOCAL_CONFIG" "$PRESET"; then
-      ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} in ai-automation-backend/config/application.yml gesetzt (nur diese Zeile)"
-      echo "      Wirksam nach einem Backend-Neustart (Übersicht: Settings → Module & Härtung)"
-    else
-      warn "Preset-Zeile konnte nicht eindeutig gesetzt werden — in config/application.yml von Hand anpassen"
-    fi
+    module_preset_update "$LOCAL_CONFIG" "$PRESET"; PRESET_RC=$?
+    case "$PRESET_RC" in
+      0)
+        ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} in ai-automation-backend/config/application.yml gesetzt (nur diese Zeile)"
+        echo "      Wirksam nach einem Backend-Neustart (Übersicht: Settings → Module & Härtung)"
+        ;;
+      1)
+        warn "config/application.yml ist nicht schreibbar — Preset dort von Hand anpassen"
+        ;;
+      *)
+        warn "Preset-Zeile konnte nicht eindeutig gesetzt werden (Grund siehe oben) — in config/application.yml von Hand anpassen"
+        ;;
+    esac
   else
     ok "config/application.yml vorhanden — Modul-Konfiguration bleibt unverändert"
     [ -n "$PRESET" ] && warn "--preset ${PRESET} ignoriert; mit ${C_BLD}--force${C_RST} wird dort nur die Zeile automation.modules.preset ersetzt"

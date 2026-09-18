@@ -880,8 +880,14 @@ to the client via `applyServerRateLimitConfig()` — the endpoint is loaded at s
 `automation.security.rate-limit.client-global-backoff-seconds` and
 `client-default-retry-after-seconds`; missing or non-positive values are ignored and the client
 keeps its constants. Background: an instance with a different `requests-per-minute` turns
-hard-wired client numbers into guesswork (37b98c97). Since the filter sends a `Retry-After` on every
-429, the 10 s default now only applies when a proxy swallows the header.
+hard-wired client numbers into guesswork (37b98c97).
+
+The `Retry-After` header comes **from the `RateLimitFilter` only**. The two other sources of a 429
+do not send it: the webhook limiter (`WebhookController` → `WebhookRateLimiter`, an empty 429) and
+`TOKEN_BUDGET_EXCEEDED` (`ErrorCode`/`GlobalExceptionHandler` — a budget problem, not a timing one,
+where waiting does not help at all). For the browser client that means: a 429 on `/api/v1` almost
+always carries the header, and the `defaultRetryAfterSeconds` value only applies in those special
+cases or when a proxy swallows the header.
 
 The consequence: after a 429 storm the client releases individual patterns again after at most 2 s,
 and each pattern collects its own 429 until its `Retry-After` lock is in place. The short global lock

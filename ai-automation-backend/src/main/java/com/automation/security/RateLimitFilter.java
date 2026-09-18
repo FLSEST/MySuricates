@@ -92,10 +92,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    private static class ClientBucket {
+    /** Package-private, damit {@code RateLimitFilterTest} das Fenster mit festen Zeitpunkten prüfen kann. */
+    static class ClientBucket {
         private final AtomicInteger count = new AtomicInteger(0);
-        private volatile long windowStart = System.currentTimeMillis();
+        private volatile long windowStart;
         private final Object windowLock = new Object();
+
+        ClientBucket() {
+            this(System.currentTimeMillis());
+        }
+
+        ClientBucket(long windowStart) {
+            this.windowStart = windowStart;
+        }
 
         boolean tryConsume(int limit) {
             long now = System.currentTimeMillis();
