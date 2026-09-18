@@ -142,6 +142,28 @@ HYGIENE_POOL_DB_FILES=("automation.db")
 HYGIENE_POOL_DB_ACCESS=("sqlite3" "SELECT " "INSERT INTO" "UPDATE " "DELETE FROM" ".tables" ".schema")
 
 # ---------------------------------------------------------------------------
+# Generische Build-Namen: in .git/info/exclude UND .gitignore erlaubt
+#
+# check_gitignore_leaks (public-hygiene.sh) meldet sonst jeden Namen aus der
+# lokalen exclude-Datei, der auch in .gitignore auftaucht, als Leck. Diese
+# Namen sind zu generisch, um etwas Persoenliches zu verraten — jedes
+# Node/Java/Python-Projekt erzeugt sie. Die Regel bleibt fuer alles andere in
+# Kraft, insbesondere workflow-pool/* (siehe TODO 819b387e).
+# ---------------------------------------------------------------------------
+HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES=(
+  "node_modules" "target" "dist" "build" ".venv" "__pycache__" "*.log"
+)
+
+# hygiene_gitignore_leak_is_generic <basisname>
+hygiene_gitignore_leak_is_generic() {
+  local base="$1" n
+  for n in "${HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES[@]}"; do
+    [ "$base" = "$n" ] && return 0
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung
 #
 # Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.

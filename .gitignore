@@ -24,6 +24,9 @@ docs/superpowers/
 
 # Frontend build artifacts
 ai-automation-frontend/node_modules/
+# Worktrees legen node_modules als Symlink an (kein Verzeichnis) - die Zeile
+# oben (mit Schraegstrich) greift dafuer nicht.
+ai-automation-frontend/node_modules
 ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/

@@ -229,6 +229,7 @@ check_gitignore_leaks() {
     # Muster wie *.bak oder sehr kurze Namen taugen nicht als Signal.
     case "$base" in *'*'*|*'?'*|*'['*) continue ;; esac
     [ "${#base}" -lt 6 ] && continue
+    hygiene_gitignore_leak_is_generic "$base" && continue
     line="$(grep -nF -- "$base" .gitignore | head -1 | cut -d: -f1)"
     [ -n "$line" ] && annotate ".gitignore" "$line" "nennt '$base' — der Name steht in $exclude und wird durch .gitignore oeffentlich"
   done < "$exclude"

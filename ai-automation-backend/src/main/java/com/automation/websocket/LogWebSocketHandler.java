@@ -16,6 +16,28 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Tracks per-run subscribers on {@code /topic/executions/{runId}/logs} and sends a newly
+ * subscribed client its current status immediately, instead of making it wait for the next event.
+ *
+ * <p><b>Not a raw {@code WebSocketHandler}</b> (TODO a47e0d0f found it unregistered anywhere and
+ * asked whether that made it dead code or a forgotten registration — neither): it is a plain
+ * {@code @Component} whose {@code @EventListener} methods react to the STOMP session lifecycle
+ * events ({@link SessionSubscribeEvent}, {@link SessionDisconnectEvent}) that Spring's message
+ * broker publishes for every subscription on the {@code /ws} STOMP endpoint, which {@code
+ * WebSocketConfig} registers with {@code WebSocketAuthInterceptor} already applied at the HTTP
+ * handshake (pinned by {@code WebSocketConfigTest#should_addAuthInterceptor_when_registeringStompEndpoints}
+ * and, for the listener wiring itself, {@code
+ * LogWebSocketHandlerTest#should_beWiredAsStompSessionEventListener_notARawWebSocketHandler}).
+ * There is nothing to add to {@code RawWebSocketConfig}, which registers raw handlers such as
+ * {@code TerminalWebSocketHandler} on their own path instead — a different, unrelated mechanism.
+ * The frontend confirms a live consumer: {@code useWebSocket.ts} subscribes to exactly this topic.
+ *
+ * <p>{@link #broadcastLogMessage} and {@link #broadcastStatusChange} are currently unused in
+ * production — {@code ExecutionBroadcaster}/{@code RunLiveLogService} publish to the same topic
+ * and are what every real call site uses. Kept for now since {@code LogWebSocketHandlerTest}
+ * exercises them directly; a follow-up can remove them once nothing still expects the public API.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j

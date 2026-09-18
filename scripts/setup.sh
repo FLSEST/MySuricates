@@ -353,7 +353,7 @@ else
       PRESET="core"
     fi
   fi
-  if module_preset_write "$LOCAL_CONFIG" "$PRESET"; then
+  if module_preset_write "$LOCAL_CONFIG" "$PRESET" "$TEXT_LANG"; then
     ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} → ai-automation-backend/config/application.yml"
     echo "      Später ändern: Datei bearbeiten und Backend neu starten (Übersicht: Settings → Module & Härtung)"
   else

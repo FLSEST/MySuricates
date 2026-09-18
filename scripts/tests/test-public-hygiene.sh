@@ -366,6 +366,15 @@ OUT=$(cd "$REPO" && bash scripts/public-readiness/doc-facts-check.sh 2>&1); RC=$
 check "keine Zahlen-Drift in docs/ und README.de.md (exit 0)" '[ "$RC" -eq 0 ]'
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
 
+echo "21) check_gitignore_leaks nimmt generische Build-Namen aus (TODO 819b387e)"
+make_repo "$TMP/leak"
+( cd "$TMP/leak" && printf 'ai-automation-frontend/node_modules/\nworkflow-pool/privat.json\n' >> .gitignore && $GIT add .gitignore && $GIT commit -q -m gitignore )
+( cd "$TMP/leak" && printf 'ai-automation-frontend/node_modules\nworkflow-pool/privat.json\n' > .git/info/exclude )
+OUT=$(cd "$TMP/leak" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "generischer Name node_modules bleibt unbeanstandet" '! grep -q "node_modules" <<<"$OUT"'
+check "workflow-pool-Eintrag weiterhin als Leck erkannt"    'grep -q "privat.json" <<<"$OUT"'
+check "Gate meldet weiterhin einen Verstoss (exit 1)"       '[ "$RC" -eq 1 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -78,14 +78,30 @@ module_preset_valid() {
   esac
 }
 
-# Writes the local override config with the chosen preset.
-# $1 = target file, $2 = preset. Returns 3 if the file already exists (left untouched), 2 on bad preset.
-module_preset_write() {
-  local file="$1" preset="$2"
-  module_preset_valid "$preset" || return 2
-  [ -e "$file" ] && return 3
-  mkdir -p "$(dirname "$file")" || return 1
-  cat > "$file" <<EOF
+# Comment header of the generated config/application.yml, one language per case. The module
+# catalog (module-catalog.generated.sh / modules.<lang>.json) only carries per-module texts, no
+# generic header — so unknown/unsupported languages fall back to the German default below rather
+# than searching a text that was never generated.
+# $1 = language.
+module_preset_config_header() {
+  case "${1:-de}" in
+    en) cat <<'EOF'
+# Local override config (not in Git — see .gitignore).
+# Spring Boot loads ./config/application.yml in addition to the classpath config, with higher
+# priority; the working directory at dev start is ai-automation-backend/.
+#
+# Optional modules are read at startup only (change ⇒ restart the backend):
+#   preset: core      platform core only (workflows, runs, projects, TODOs, schedules)
+#   preset: research  core + chains, assistant, insights, memory, audit center, BPMN
+#   preset: full      all modules, incl. integrations, webhooks, remote access, terminal, staging
+# Individual modules override the preset, e.g.:
+#   automation.modules.webhooks: true
+# Optional workflow hardening (independent of the preset):
+#   automation.hardening.sealing: true
+# Overview with status and snippets: Settings → "Module & Hardening".
+EOF
+      ;;
+    *) cat <<'EOF'
 # Lokale Override-Config (nicht im Git — siehe .gitignore).
 # Spring Boot lädt ./config/application.yml zusätzlich zur Classpath-Config und mit
 # höherer Priorität; beim Dev-Start ist das Arbeitsverzeichnis ai-automation-backend/.
@@ -99,11 +115,27 @@ module_preset_write() {
 # Optionale Workflow-Härtung (unabhängig vom Preset):
 #   automation.hardening.sealing: true
 # Übersicht mit Status und Snippets: Settings → „Module & Härtung“.
-
-automation:
-  modules:
-    preset: ${preset}
 EOF
+      ;;
+  esac
+}
+
+# Writes the local override config with the chosen preset.
+# $1 = target file, $2 = preset, $3 = header language (de|en, default de — see
+# module_preset_config_header). Returns 3 if the file already exists (left untouched), 2 on bad
+# preset.
+module_preset_write() {
+  local file="$1" preset="$2" lang="${3:-de}"
+  module_preset_valid "$preset" || return 2
+  [ -e "$file" ] && return 3
+  mkdir -p "$(dirname "$file")" || return 1
+  {
+    module_preset_config_header "$lang"
+    echo
+    echo "automation:"
+    echo "  modules:"
+    echo "    preset: ${preset}"
+  } > "$file"
 }
 
 # The handful of sentences around the module list. The module texts themselves are never
