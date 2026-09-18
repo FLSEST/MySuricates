@@ -2,6 +2,8 @@ package com.automation.service.dashboard;
 
 import com.automation.service.dashboard.DashboardWidgetMarker.Scan;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -200,6 +202,56 @@ class DashboardWidgetMarkerTest {
     void a_marker_followed_by_neither_brace_nor_bracket_is_still_not_found() {
         assertThat(DashboardWidgetMarker.scan("dashboard_widget: status=GREEN")).isEqualTo(Scan.NONE);
         assertThat(DashboardWidgetMarker.scan("dashboard_widget:\nstatus: GREEN")).isEqualTo(Scan.NONE);
+    }
+
+    // --- C1 (fix round 3): the unanchored and anchored patterns share one keyword sub-expression ---
+
+    @Test
+    void a_decorated_unanchored_marker_counts_toward_ambiguity_the_same_as_a_plain_one() {
+        Scan scan = DashboardWidgetMarker.scan(
+                "**dashboard_widget**: {\"status\":\"GREEN\"}\ndashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"`dashboard_widget`", "*dashboard_widget*", "***dashboard_widget***", "dashboard-widget"})
+    void every_decoration_style_counts_toward_ambiguity(String decoratedKeyword) {
+        Scan scan = DashboardWidgetMarker.scan(
+                "dashboard_widget: {\"status\":\"GREEN\"}\n" + decoratedKeyword + ": {\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    @Test
+    void a_single_decorated_marker_is_still_found_and_not_ambiguous() {
+        Scan scan = DashboardWidgetMarker.scan("**dashboard_widget**: {\"status\":\"GREEN\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isFalse();
+        assertThat(scan.json()).isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
+    // --- C2 (fix round 3): the ambiguity counter stops at a blank line ---
+
+    @Test
+    void a_prose_mention_across_a_blank_line_from_an_unrelated_object_is_not_a_real_occurrence() {
+        Scan scan = DashboardWidgetMarker.scan(
+                "Siehe dashboard_widget:\n\n{\"foo\":1}\n\ndashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isFalse();
+        assertThat(scan.json()).isEqualTo("{\"status\":\"RED\"}");
+    }
+
+    @Test
+    void an_object_on_the_very_next_line_still_counts_toward_ambiguity() {
+        // No blank line between the two markers here (unlike the case above) - both are real.
+        Scan scan = DashboardWidgetMarker.scan(
+                "dashboard_widget:\n{\"status\":\"GREEN\"}\ndashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
     }
 
     // --- B5 (fix round 2): more markdown shapes ---

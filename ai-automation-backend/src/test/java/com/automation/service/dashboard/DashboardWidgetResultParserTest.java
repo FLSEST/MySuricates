@@ -5,6 +5,7 @@ import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
 import com.automation.service.dashboard.DashboardWidgetResultParser.ParseResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
@@ -243,6 +244,11 @@ class DashboardWidgetResultParserTest {
                 .isEqualTo(ResultState.VALID);
         assertThat(state("{\"status\":\"GREEN\",\"title\":" + quote("§5 Abs. 1") + "}"))
                 .isEqualTo(ResultState.VALID);
+        // C3 (fix round 3): the brief's exact original payload has the non-breaking space
+        // between "§" and "5" (not between "5" and "Abs." as the case above does) -- pinned as
+        // its own case so the precise reported payload is covered, not just an equivalent one.
+        assertThat(state("{\"status\":\"GREEN\",\"title\":" + quote("§ 5 Abs. 1") + "}"))
+                .isEqualTo(ResultState.VALID);
     }
 
     /**
@@ -320,6 +326,77 @@ class DashboardWidgetResultParserTest {
                 "dashboard_widget: {\"status\":\"GREEN\"}\n"
                         + "Ergebnis: " + prefix + "dashboard_widget: {\"status\":\"RED\"}").state())
                 .isEqualTo(ResultState.INVALID);
+    }
+
+    /**
+     * C1 (fix round 3, regression from round 2): the ambiguity counter used {@code UNANCHORED_MARKER},
+     * which lacked the {@code [*`]*} decoration group the anchored pattern has -- so a decorated
+     * marker (bold, backtick, hyphenated spelling) counted as zero occurrences for ambiguity purposes
+     * while still being a valid winner for the anchored search, reopening the A2/B3 hijack: a quoted,
+     * decorated marker could win over the report's own plain one. Both patterns are now built from one
+     * shared keyword sub-expression so they cannot drift apart again.
+     */
+    @Test
+    void a_decorated_quoted_marker_before_the_reports_own_plain_marker_is_still_ambiguous() {
+        assertThat(DashboardWidgetResultParser.parse(
+                "Auszug aus dem gelesenen TODO des Nutzers:\n"
+                        + "**dashboard_widget**: {\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n\n"
+                        + "Mein eigener Bericht:\n"
+                        + "dashboard_widget: {\"status\":\"RED\",\"title\":\"12 Blocklist-Treffer\"}").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void the_mirror_case_plain_quoted_marker_before_the_reports_own_decorated_marker_is_still_ambiguous() {
+        assertThat(DashboardWidgetResultParser.parse(
+                "Auszug aus dem gelesenen TODO des Nutzers:\n"
+                        + "dashboard_widget: {\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n\n"
+                        + "Mein eigener Bericht:\n"
+                        + "**dashboard_widget**: {\"status\":\"RED\",\"title\":\"12 Blocklist-Treffer\"}").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @ParameterizedTest
+    @MethodSource("decoratedAndPrefixedSecondMarkers")
+    void a_decorated_or_prefixed_second_marker_still_makes_the_output_ambiguous(String secondMarkerLine) {
+        assertThat(DashboardWidgetResultParser.parse(
+                "dashboard_widget: {\"status\":\"GREEN\"}\n" + secondMarkerLine + " {\"status\":\"RED\"}").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    /** Every combination of a decoration style and a line prefix from the brief's C1 test list. */
+    private static java.util.stream.Stream<String> decoratedAndPrefixedSecondMarkers() {
+        String[] decorations = {"`dashboard_widget`", "*dashboard_widget*", "***dashboard_widget***", "dashboard-widget"};
+        String[] prefixes = {"## ", "- ", "> ", "1. "};
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (String prefix : prefixes) {
+            for (String decoration : decorations) {
+                lines.add(prefix + decoration + ":");
+            }
+        }
+        return lines.stream();
+    }
+
+    @Test
+    void a_single_decorated_marker_alone_still_stays_valid() {
+        assertThat(DashboardWidgetResultParser.parse("**dashboard_widget**: {\"status\":\"GREEN\"}").state())
+                .isEqualTo(ResultState.VALID);
+    }
+
+    /**
+     * C2 (fix round 3): the ambiguity counter must stop at a blank line when deciding whether a
+     * marker occurrence is "real" -- otherwise a prose mention of the feature followed, several
+     * paragraphs later, by an unrelated example object gets miscounted as a real occurrence, which
+     * can turn a report's own single real marker into a false ambiguity alarm. The winner search is
+     * unaffected and keeps its existing (more tolerant) behaviour.
+     */
+    @Test
+    void a_prose_mention_followed_by_an_unrelated_block_across_a_blank_line_does_not_count() {
+        ParseResult parsed = DashboardWidgetResultParser.parse(
+                "Siehe dashboard_widget:\n\n{\"foo\":1}\n\ndashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(parsed.state()).isEqualTo(ResultState.VALID);
+        assertThat(parsed.result().status()).isEqualTo(Result.Status.RED);
     }
 
     /**

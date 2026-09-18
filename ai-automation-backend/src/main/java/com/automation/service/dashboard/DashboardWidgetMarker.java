@@ -38,24 +38,49 @@ import java.util.regex.Pattern;
  *       run the ambiguity rule does not apply at all: several markers on different steps are a normal
  *       sequence, and {@link DashboardWidgetResultParser#parseRun} lets the last one win.</li>
  * </ol>
+ *
+ * <p><b>Fix round 3, C1 (regression from round 2):</b> the anchored and unanchored patterns are built
+ * from one shared {@link #MARKER_KEYWORD} sub-expression so they can never drift apart on what counts
+ * as "the keyword" again — round 2's unanchored pattern lacked the anchored one's {@code [*`]*}
+ * decoration group, so a marker written as {@code **dashboard_widget**:} counted as zero occurrences
+ * for ambiguity while still winning the anchored search, reopening the hijack this class exists to
+ * close.
+ *
+ * <p><b>Fix round 3, C2:</b> the ambiguity counter (unlike the winner search) stops at a blank line
+ * while deciding whether an occurrence is real — a prose mention of the feature, followed several
+ * paragraphs later by an unrelated example object, must not be miscounted as a real occurrence just
+ * because {@code skipDecoration} would otherwise happily walk across any number of blank lines to
+ * reach it.
  */
 final class DashboardWidgetMarker {
 
     /** A valid payload is a few hundred bytes (every contract field is capped); nothing longer is read. */
     static final int MAX_JSON_CHARS = 8192;
 
+    /**
+     * The marker keyword itself: tolerant of bold/backtick decoration touching the word on either
+     * side and the hyphenated spelling, any case. The single source of truth for "what is the
+     * keyword" — {@link #ANCHORED_MARKER} and {@link #UNANCHORED_MARKER} are both built from this one
+     * sub-expression (fix round 3, C1) so they cannot silently drift apart on what counts as a marker.
+     */
+    private static final String MARKER_KEYWORD = "[*`]*dashboard[_-]widget[*`]*:";
+
     // Anchored to the start of a line, after optional indentation and an optional list/blockquote/
-    // numbered prefix, and tolerant of markdown decoration around the word itself: headings, bold,
-    // backticks, "dashboard-widget" with a hyphen, any case. Used to pick the winner (see class
-    // javadoc) once the unanchored count below has confirmed there is exactly one real occurrence.
+    // numbered prefix, and a heading. Used to pick the winner (see class javadoc) once the unanchored
+    // count below has confirmed there is exactly one real occurrence.
     private static final Pattern ANCHORED_MARKER = Pattern.compile(
-            "^[ \\t]*(?:[-*>+]\\s+|\\d{1,2}[.)]\\s+)?(?:#{1,6}\\s+)?[*`]*dashboard[_-]widget[*`]*:",
+            "^[ \\t]*(?:[-*>+]\\s+|\\d{1,2}[.)]\\s+)?(?:#{1,6}\\s+)?" + MARKER_KEYWORD,
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     // Unanchored (fix round 2, B3): used only to count how many real marker occurrences exist
     // anywhere in the output, regardless of line position — see the class javadoc.
     private static final Pattern UNANCHORED_MARKER = Pattern.compile(
-            "dashboard[_-]widget\\s*:", Pattern.CASE_INSENSITIVE);
+            MARKER_KEYWORD, Pattern.CASE_INSENSITIVE);
+
+    // A blank line: a line break, optional horizontal whitespace, another line break (fix round 3,
+    // C2) — used only by the ambiguity counter to stop crediting a marker with a value that is
+    // actually several paragraphs away.
+    private static final Pattern BLANK_LINE = Pattern.compile("\\r?\\n[ \\t]*\\r?\\n");
 
     /**
      * What one output holds. {@code found} without {@code json} means: there is a real marker
@@ -105,13 +130,21 @@ final class DashboardWidgetMarker {
      * How many real marker occurrences (a marker counts once it is followed, after decoration, by
      * {@code {} or {@code [}) exist anywhere in the output — not only at a line's start (fix round 2,
      * B3+B4). Short-circuits once a second one is found; the exact count above 1 is never needed.
+     *
+     * <p>Fix round 3, C2: unlike the winner search, a candidate here is only real if nothing between
+     * the marker and its value crosses a blank line — otherwise a bare prose mention of the feature,
+     * followed several paragraphs later by an unrelated example object, would count as a real
+     * occurrence merely because {@link #skipDecoration} tolerates walking across blank lines (needed
+     * for the winner search, e.g. a marker line followed by a fenced JSON block).
      */
     private static int countRealOccurrences(String output) {
         Matcher matcher = UNANCHORED_MARKER.matcher(output);
         int count = 0;
         while (matcher.find()) {
-            int pos = skipDecoration(output, matcher.end());
-            if (pos < output.length() && (output.charAt(pos) == '{' || output.charAt(pos) == '[')) {
+            int start = matcher.end();
+            int pos = skipDecoration(output, start);
+            if (pos < output.length() && (output.charAt(pos) == '{' || output.charAt(pos) == '[')
+                    && !BLANK_LINE.matcher(output).region(start, pos).find()) {
                 count++;
                 if (count > 1) {
                     return count;
