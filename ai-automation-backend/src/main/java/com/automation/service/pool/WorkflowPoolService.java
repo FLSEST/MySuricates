@@ -107,7 +107,7 @@ public class WorkflowPoolService {
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
                         entry.instructions(), entry.model(), null, entry.metadata(),
-                        mergedContext, "Pool install: " + poolId
+                        mergedContext, "Pool install: " + poolId, null, null, entry.effort()
                 );
                 Workflow updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.POOL_INSTALL);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());
@@ -128,7 +128,8 @@ public class WorkflowPoolService {
                 null,
                 entry.metadata(),
                 mergedContext,
-                entry.version()
+                entry.version(),
+                entry.effort()
         );
 
         Workflow workflow = workflowService.create(createRequest, ChangeSource.POOL_INSTALL);
@@ -189,6 +190,7 @@ public class WorkflowPoolService {
 
         String instructions = (String) raw.get("instructions");
         String model = (String) raw.get("model");
+        String effort = (String) raw.get("effort");
         String version = (String) raw.getOrDefault("version", "1.0.0");
         String author = (String) raw.get("author");
 
@@ -204,7 +206,7 @@ public class WorkflowPoolService {
 
         return new PoolWorkflowEntry(
                 id, name, description, icon, category, scope, tags,
-                blocks, instructions, model, version, author,
+                blocks, instructions, model, effort, version, author,
                 defaultContext, metadata, filename
         );
     }

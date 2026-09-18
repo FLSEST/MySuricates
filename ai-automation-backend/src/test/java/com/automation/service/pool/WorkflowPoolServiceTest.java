@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -369,6 +370,73 @@ class WorkflowPoolServiceTest {
                 .containsEntry("instructions", "Be brief")
                 .containsEntry("model", "sonnet")
                 .containsEntry("tags", List.of("ci"));
+    }
+
+    /**
+     * TODO 96640e6f: getrackte Pool-Dateien nutzen {@code effort} — ohne das Feld im Export ginge
+     * die Einstellung beim Roundtrip Export → Install verloren.
+     */
+    @Test
+    void exportToPool_writesEffort() throws Exception {
+        stubWorkflow(Workflow.builder().id("wf-1").name("Build Gate").effort("high").build());
+
+        poolService.exportToPool("wf-1", null, "repo");
+
+        assertThat(exported("build-gate.json")).containsEntry("effort", "high");
+    }
+
+    @Test
+    void exportToPool_withoutEffort_omitsTheField() throws Exception {
+        stubWorkflow(Workflow.builder().id("wf-1").name("Build Gate").build());
+
+        poolService.exportToPool("wf-1", null, "repo");
+
+        assertThat(exported("build-gate.json")).doesNotContainKey("effort");
+    }
+
+    @Test
+    void listAll_readsEffortFromFile() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}], "effort": "xhigh"}
+                """);
+
+        assertThat(poolService.listAll().get(0).effort()).isEqualTo("xhigh");
+    }
+
+    @Test
+    void install_passesEffortToTheCreatedWorkflow() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}], "effort": "high"}
+                """);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL)))
+                .thenReturn(Workflow.builder().id("wf-1").name("Test").build());
+
+        poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        verify(workflowService).create(argThat(req -> "high".equals(req.effort())), eq(ChangeSource.POOL_INSTALL));
+    }
+
+    /**
+     * TODO 96640e6f: {@code UpdateWorkflowRequest} nimmt 13 Positionsargumente, {@code category} und
+     * {@code effort} stehen nebeneinander und sind beide String — eine Umsortierung des Records
+     * wuerde effort sonst still als category einsetzen, ohne dass ein Test es merkt.
+     */
+    @Test
+    void install_onAnExistingWorkflow_passesEffortToTheUpdate() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}], "effort": "high"}
+                """);
+        Workflow existing = Workflow.builder().id("wf-9").name("Test").build();
+        when(workflowService.findByNameAndProjectId("Test", "proj-1")).thenReturn(Optional.of(existing));
+        when(workflowService.update(eq("wf-9"), any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(existing);
+
+        WorkflowPoolService.InstallResult result =
+                poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        assertThat(result.created()).isFalse();
+        verify(workflowService).update(eq("wf-9"),
+                argThat(req -> "high".equals(req.effort()) && req.category() == null),
+                eq(ChangeSource.POOL_INSTALL));
     }
 
     private void stubWorkflow(Workflow workflow) {

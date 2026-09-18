@@ -524,15 +524,11 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void validateAndApply_everyKnownKey_hasRuntimeApplier() {
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                service.validateAndApply(key, String.valueOf(bounds[0])));
-        ExecutionSettingKeys.DECIMAL_BOUNDS.forEach((key, bounds) ->
-                service.validateAndApply(key, String.valueOf(bounds[0])));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                service.validateAndApply(key, bound.format(bound.min())));
 
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                verify(appSettingsRepository).set(key, String.valueOf(bounds[0])));
-        ExecutionSettingKeys.DECIMAL_BOUNDS.forEach((key, bounds) ->
-                verify(appSettingsRepository).set(key, String.valueOf(bounds[0])));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                verify(appSettingsRepository).set(key, bound.format(bound.min())));
     }
 
     @Test

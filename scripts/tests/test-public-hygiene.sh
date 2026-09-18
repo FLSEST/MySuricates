@@ -158,6 +158,15 @@ write_pool ctx-projectid <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
 JSON
 
+# Schreibweise, die in der generierten Schluesselliste NICHT wortwoertlich steht: der Export
+# (PoolExportSanitizer) normalisiert vor dem Vergleich, das Gate muss dasselbe tun (TODO 96640e6f).
+write_pool ctx-kebab-projectid <<'JSON'
+{"name": {"de": "Kebab", "en": "Kebab"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project-id": "e1b2c3d4"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
 write_pool ctx-placeholder <<'JSON'
 {"name": {"de": "Platzhalter", "en": "Placeholder"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
@@ -293,6 +302,7 @@ check "fehlendes scope erkannt"                'grep -q "missing-scope.*SCOPE" <
 check "ungueltiges scope erkannt"              'grep -q "bad-scope.*SCOPE" <<<"$OUT"'
 check "projectId im Eintrag erkannt"           'grep -q "has-projectid.*PROJECT-ID" <<<"$OUT"'
 check "project_id im defaultContext erkannt"   'grep -q "ctx-projectid.*PROJECT-ID" <<<"$OUT"'
+check "project-id (kebab) ebenso erkannt"      'grep -q "ctx-kebab-projectid.*PROJECT-ID" <<<"$OUT"'
 check "Platzhalter-project_id bleibt erlaubt"  '! grep -q "ctx-placeholder" <<<"$OUT"'
 check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$OUT"'
 check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'
@@ -402,6 +412,24 @@ check "Befund schlaegt das Gate (exit 1)"           '[ "$RC" -eq 1 ]'
 check "Gate nennt die Definition"                   'grep -q "workflow-pool/x.json" <<<"$OUT"'
 check "Gate nennt Tag und Beschreibung"             'grep -q "PATH-ABS.*absoluter Pfad im Prompt" <<<"$OUT"'
 check "kein zusaetzlicher Abbruch-Fehler"           '! grep -q "Pool-Neutralitaet abgebrochen" <<<"$OUT"'
+
+echo "24) Die Instanz-Schluesselliste des Gates stammt aus dem PoolExportSanitizer (TODO 96640e6f)"
+SANITIZER="$REPO/ai-automation-backend/src/main/java/com/automation/service/pool/PoolExportSanitizer.java"
+# Die camelCase-Liste aus INSTANCE_REFERENCE_KEYS, plus die snake_case-Schreibweise jedes Schluessels
+JAVA_KEYS="$(sed -n '/INSTANCE_REFERENCE_KEYS = List.of(/,/);/p' "$SANITIZER" \
+  | grep -oE '"[a-zA-Z]+"' | tr -d '"' \
+  | sed -E 'p; s/([a-z0-9])([A-Z])/\1_\2/g' | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ')"
+GATE_KEYS="$(printf '%s\n' "${HYGIENE_POOL_INSTANCE_KEYS[@]:-}" | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ')"
+check "Sanitizer-Liste nicht leer"             '[ -n "$JAVA_KEYS" ]'
+check "Gate-Liste deckt sich mit dem Sanitizer" '[ "$JAVA_KEYS" = "$GATE_KEYS" ]'
+check "generierte Datei ist getrackt"          '[ -n "$(cd "$REPO" && git ls-files scripts/lib/pool-sanitizer.generated.sh)" ]'
+
+echo "25) Ohne die generierte Schluesselliste bricht die Regeldatei ab, statt leer weiterzulaufen"
+make_repo "$TMP/no-keys"
+rm -f "$TMP/no-keys/scripts/lib/pool-sanitizer.generated.sh"
+OUT=$(cd "$TMP/no-keys" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Gate meldet einen Fehler (exit != 0)"   '[ "$RC" -ne 0 ]'
+check "Meldung nennt die generierte Datei"     'grep -q "pool-sanitizer.generated.sh" <<<"$OUT"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

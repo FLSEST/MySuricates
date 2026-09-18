@@ -1,5 +1,6 @@
 package com.automation.executor;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,11 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * carrying external untrusted input: block outputs and derived variables (foreach items,
  * {@code step_N_output}) are escaped too, so platform bytes cannot re-enter a command line raw.
  *
- * <p>Known limit: the "platform data was used in a shell path" flag itself is not exported. It does
- * not need to be — the first {@link ExecutionContext#recordOutput} or
- * {@link ExecutionContext#setDerivedVariable} after the substitution turns it into exported taint
- * ({@link #export()}), and a segment that is resumed before either happened re-resolves the same
- * template and re-raises the flag.
+ * <p>The flag itself is exported as {@link ExecutionContext#PLATFORM_IN_SHELL_VARIABLE} (TODO
+ * cadfc423), so a segment resumed before any output was recorded starts tainted instead of clean —
+ * {@code ExecutionContextFactory} re-raises it via {@link ExecutionContext#markPlatformUsedInShell()}.
  */
 final class ExecutionContextTaint {
 
@@ -77,7 +76,16 @@ final class ExecutionContextTaint {
 
     /** Taint as reserved input-context keys for persistence and hand-over; empty for a clean run. */
     Map<String, Object> export() {
-        return outputs.export(variables.externalNames());
+        Map<String, Object> exported = outputs.export(variables.externalNames());
+        if (!platformUsedInShell.get()) return exported;
+        Map<String, Object> withPlatformFlag = new HashMap<>(exported);
+        withPlatformFlag.put(ExecutionContext.PLATFORM_IN_SHELL_VARIABLE, true);
+        return withPlatformFlag;
+    }
+
+    /** Re-applies an exported {@link ExecutionContext#PLATFORM_IN_SHELL_VARIABLE} flag (resume, sub-workflow hand-over). */
+    void markPlatformUsedInShell() {
+        platformUsedInShell.set(true);
     }
 
     /**

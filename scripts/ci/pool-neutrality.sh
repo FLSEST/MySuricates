@@ -270,7 +270,16 @@ def env_list(name):
 SCOPES = env_list('POOL_SCOPES')
 BLOCK_TYPES = set(env_list('POOL_BLOCK_TYPES'))
 REPO_MARKERS = env_list('POOL_REPO_MARKERS')
-INSTANCE_KEYS = set(env_list('POOL_INSTANCE_KEYS'))
+def normalize_key(key):
+    """Wie PoolExportSanitizer.normalize: klein, ohne '_' und '-'.
+
+    Der Export vergleicht normalisiert und faengt damit auch Schreibweisen, die in der
+    generierten Liste nicht wortwoertlich stehen (project-id). Das Gate muss dieselbe
+    Semantik haben, sonst beanstandet es weniger, als der Export entfernt (TODO 96640e6f).
+    """
+    return key.lower().replace('_', '').replace('-', '')
+
+INSTANCE_KEYS = {normalize_key(k) for k in env_list('POOL_INSTANCE_KEYS')}
 
 findings = []
 
@@ -294,7 +303,7 @@ def walk_keys(node, path, out):
     if isinstance(node, dict):
         for key, value in node.items():
             here = f"{path}.{key}" if path else key
-            if key in INSTANCE_KEYS and instance_bound(value):
+            if normalize_key(key) in INSTANCE_KEYS and instance_bound(value):
                 out.append((here, key))
             walk_keys(value, here, out)
     elif isinstance(node, list):
@@ -359,7 +368,7 @@ for path in sys.argv[1:]:
     bound = []
     walk_keys(data, "", bound)
     for where, key in bound:
-        tag = "PROJECT-ID" if key in ("projectId", "project_id") else "INSTANCE-REF"
+        tag = "PROJECT-ID" if normalize_key(key) == "projectid" else "INSTANCE-REF"
         report(path, tag, f"Instanz-Bindung unter '{where}' — der Export schreibt sie nicht mehr mit")
 
     types = []

@@ -779,6 +779,31 @@ class ExecutionContextTest {
                         java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
     }
 
+    /**
+     * TODO cadfc423: das Flag „Plattform-Daten sind in einer Shell-Kommandozeile gelandet" gehoert
+     * in den Export — sonst beginnt ein Resume ohne verbuchte Ausgabe wieder ungefaerbt.
+     */
+    @Test
+    void exportTaint_platformDataUsedInShell_isExportedWithoutAnyRecordedOutput() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.resolveShellTemplate("echo {{ previous_report }}", false);
+
+        assertThat(context.exportTaint())
+                .containsEntry(ExecutionContext.PLATFORM_IN_SHELL_VARIABLE, true)
+                .doesNotContainKey(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE);
+    }
+
+    @Test
+    void markPlatformUsedInShell_taintsTheResumedRun_withoutAnyRecordedOutput() {
+        ExecutionContext resumed = ExecutionContext.builder().workflowRunId("run-2").build();
+
+        resumed.markPlatformUsedInShell();
+
+        assertThat(resumed.hasUntrustedInput()).isTrue();
+        assertThat(resumed.exportTaint())
+                .containsEntry(ExecutionContext.PLATFORM_IN_SHELL_VARIABLE, true);
+    }
+
     @Test
     void providerFor_blockConfigOverridesWorkflowProvider() {
         context.setProvider("CODEX");
