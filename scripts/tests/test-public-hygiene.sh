@@ -269,6 +269,37 @@ OUT=$(cd "$REPO" && bash scripts/ci/pool-neutrality.sh 2>&1); RC=$?
 check "Pool-Neutralitaet im Bestand OK (exit 0)" '[ "$RC" -eq 0 ]'
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
 
+echo "15) docs/analysis.md (DE/EN) ist im echten Repository untrackt und ignoriert (TODO 72900609)"
+TRACKED_ANALYSIS="$(cd "$REPO" && git ls-files docs/analysis.md docs/en/analysis.md)"
+check "keine getrackten analysis.md-Dateien"      '[ -z "$TRACKED_ANALYSIS" ]'
+check ".gitignore ignoriert docs/analysis.md"     'grep -qxF "docs/analysis.md" "$REPO/.gitignore"'
+check ".gitignore ignoriert docs/en/analysis.md"  'grep -qxF "docs/en/analysis.md" "$REPO/.gitignore"'
+
+echo "16) docs/specs ist im echten Repository untrackt und ignoriert (TODO 089473cd)"
+TRACKED_SPECS="$(cd "$REPO" && git ls-files docs/specs)"
+check "keine getrackten Dateien unter docs/specs" '[ -z "$TRACKED_SPECS" ]'
+check ".gitignore ignoriert docs/specs/"          'grep -qxF "docs/specs/" "$REPO/.gitignore"'
+
+echo "17) Der [auto-generated]-Stempel ist aus dem getrackten Doku-Bestand entfernt (TODO 994af971)"
+STAMPED="$(cd "$REPO" && git grep -l -F "[auto-generated]" -- '*.md' 2>/dev/null || true)"
+check "kein getracktes .md mit [auto-generated]-Stempel" '[ -z "$STAMPED" ]'
+
+echo "18) Hygiene-Gate lehnt einen neu hinzugefuegten [auto-generated]-Stempel in .md ab (TODO 994af971)"
+make_repo "$TMP/stamp"
+( cd "$TMP/stamp" && mkdir -p docs && printf '> *Zuletzt aktualisiert: [auto-generated]*\n\n# Test\n' > docs/sample.md && $GIT add docs/sample.md )
+OUT=$(cd "$TMP/stamp" && $GIT commit -q -m stamp 2>&1); RC=$?
+check "commit mit [auto-generated]-Stempel abgelehnt" '[ "$RC" -ne 0 ]'
+check "Gate nennt den Stempel"                        'grep -qi "auto-generated" <<<"$OUT"'
+( cd "$TMP/stamp" && git reset -q )
+OUT=$(cd "$TMP/stamp" && printf '# Anderer Text ohne Stempel\n' > docs/sample.md && $GIT add docs/sample.md && $GIT commit -q -m ok 2>&1); RC=$?
+check "commit ohne Stempel bleibt erlaubt (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "19) ai-automation-frontend/cypress/TODO-TESTS.md ist untrackt und ignoriert (TODO af7e5d22)"
+TRACKED_CYPRESS_NOTE="$(cd "$REPO" && git ls-files ai-automation-frontend/cypress/TODO-TESTS.md)"
+check "TODO-TESTS.md nicht getrackt" '[ -z "$TRACKED_CYPRESS_NOTE" ]'
+check ".gitignore ignoriert TODO-TESTS.md" \
+  'grep -qxF "ai-automation-frontend/cypress/TODO-TESTS.md" "$REPO/.gitignore"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

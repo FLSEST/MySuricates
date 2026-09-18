@@ -70,6 +70,12 @@ screenshots/raw/
 # Entscheidung Flo 2026-09-16 (TODO 6e9e00e9): nicht veroeffentlichen, lokal behalten.
 docs/plans/
 
+# Interne Doku-Gap-Analyse von Maerz 2026 (v0.6.2), veraltete "Actual"-Werte,
+# nicht in der Doku-Tabelle verlinkt. Entscheidung Flo 2026-09-18 (TODO 72900609):
+# untracken statt aktualisieren.
+docs/analysis.md
+docs/en/analysis.md
+
 # Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
 # *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und
 # bei einem pauschalen 'git add' mitgegangen waere.
