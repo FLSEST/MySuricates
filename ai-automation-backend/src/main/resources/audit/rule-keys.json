@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "Erlaubte ruleKeys je auditKey — erhoben aus den Audit-Prompts in workflow-pool/mysuricates-*.json.",
+    "Ein auditKey ohne Eintrag wird nicht geprueft; ein unbekannter ruleKey wird normalisiert und",
+    "sonst trotzdem ingestiert (WARN im Activity-Log). AuditRuleKeyCatalogTest haelt den Katalog",
+    "mit den Pool-Prompts synchron: jeder dort woertlich vergebene ruleKey muss hier stehen.",
+    "Schluessel, die mit _ beginnen, sind Kommentare."
+  ],
+  "mysuricates.test-coverage": [
+    "test-coverage.untested-class",
+    "test-coverage.thin-test"
+  ]
+}

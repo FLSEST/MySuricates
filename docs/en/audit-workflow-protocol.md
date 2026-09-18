@@ -53,6 +53,15 @@ JSON envelope:
 Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
+### ruleKey catalogue
+
+When a prompt fixes the `ruleKey`s its model must use, they are listed in
+`ai-automation-backend/src/main/resources/audit/rule-keys.json` under their `auditKey`. Ingestion
+then normalizes spelling drift (lower case, `_` → `-`, plural before `-count`:
+`god-classes-count` → `god-class-count`). A key that still does not match is ingested anyway — with
+a warning in the activity log, once per run and key. An `auditKey` without a catalogue entry is not
+checked; its prompt assigns keys freely.
+
 ## Fact Sheet Pattern: the shell measures, the AI interprets
 
 An audit workflow does **not** let the AI count for itself. A shell block in front of the
