@@ -63,16 +63,35 @@ final class DashboardWidgetOccurrences {
      * The marker keyword: bold/backtick decoration touching the word on either side, the hyphenated
      * spelling, any case, colon directly after the word. The single source of truth for "what is the
      * keyword" — both patterns below are built from it so they cannot drift apart on that question.
+     *
+     * <p>Both decoration classes are <b>possessive</b> ({@code *+}, final fix wave, E1): what may
+     * follow them here is {@code d} (the keyword) or {@code :}, never another asterisk or backtick,
+     * so no legitimate marker shape needs backtracking inside them. That alone does not make the
+     * scan linear, though — see {@link #ANY_MARKER}.
      */
-    private static final String MARKER_KEYWORD = "[*`]*dashboard[_-]widget[*`]*:";
+    private static final String MARKER_KEYWORD = "[*`]*+dashboard[_-]widget[*`]*+:";
 
     /** Line-anchored, after optional indentation, a list/blockquote/numbered prefix and a heading. */
     private static final Pattern ANCHORED_MARKER = Pattern.compile(
             "^[ \\t]*(?:[-*>+]\\s+|\\d{1,2}[.)]\\s+)?(?:#{1,6}\\s+)?" + MARKER_KEYWORD,
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
-    /** The same keyword anywhere, line-anchored or not. */
-    private static final Pattern ANY_MARKER = Pattern.compile(MARKER_KEYWORD, Pattern.CASE_INSENSITIVE);
+    /**
+     * The same keyword anywhere, line-anchored or not — the pattern that decides ambiguity, so it
+     * runs at every position of every step output.
+     *
+     * <p>The lookbehind is what actually makes that linear (final fix wave, E1). A leading unbounded
+     * decoration class costs O(run length) at <em>every</em> start position inside a contiguous run
+     * of asterisks or backticks, whether or not it backtracks — measured at 13.7 s for a 64 000
+     * character run in one output (31.4 s on the reviewer's machine), and possessive quantifiers
+     * alone did not change that number. Refusing to start a match inside such a run does: the first
+     * character of the run is the only start position left, and it yields the same match end,
+     * because the decoration class consumes the whole run either way and the keyword follows it.
+     * Since {@link #in} matches the two patterns into one union, an end this pattern did not reach
+     * would still be contributed by {@link #ANCHORED_MARKER}.
+     */
+    private static final Pattern ANY_MARKER = Pattern.compile(
+            "(?<![*`])" + MARKER_KEYWORD, Pattern.CASE_INSENSITIVE);
 
     /**
      * One keyword occurrence. {@code valueStart} is where its JSON value begins after the decoration

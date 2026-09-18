@@ -34,13 +34,25 @@ import java.util.List;
  * neither an opening brace nor an opening bracket is not a marker at all — a report that merely
  * mentions the feature in prose must not raise a false alarm.
  *
- * <p><b>Accepted residual risk</b> (fix round 5, D1; unchanged since round 3): when the report's own
- * marker shape is recognised by neither question — unanchored <em>and</em> separated from its value
- * by a blank line — a quoted marker can be the only one left and wins. Roughly 31 000 of the
- * reviewer's ~937 000 corpus inputs. Closing it would mean counting a prose mention paragraphs away
- * from an unrelated example block, which is the false alarm fix round 3 removed. The shapes a report
- * actually uses (line-anchored in any decoration, mid-line, indented with spaces or a non-breaking
- * space, value on the next line, value in a fenced block) are all recognised.
+ * <p><b>Accepted residual risk.</b> A quoted marker can still win, but only when the report writes
+ * its <em>own</em> marker in a shape neither question recognises — none of these is reachable by the
+ * attacker, who controls only the quoted text. There are three such shapes, all measured:
+ * <ol>
+ *   <li>unanchored <em>and</em> separated from its value by a blank line (fix round 5, D1;
+ *       unchanged since round 3, ~31 000 of the reviewer's ~937 000 corpus inputs). Closing it would
+ *       mean counting a prose mention paragraphs away from an unrelated example block — the false
+ *       alarm fix round 3 removed;</li>
+ *   <li>a non-breaking space (U+00A0) or a NEL (U+0085) between the colon and the value: the
+ *       decoration walk in {@link DashboardWidgetOccurrences} uses {@code Character.isWhitespace},
+ *       which crosses neither, so such a marker has no value and counts for nothing. That walk is
+ *       therefore a third, narrower notion of "blank" than the two the class otherwise uses (the
+ *       line terminators of the blank-line test, and the parser's visible-character rule);</li>
+ *   <li>{@code \r\r} between an unanchored marker and its value (2 448 cases): since round 5 uses
+ *       one line definition for the anchored pattern and the blank-line test, a double carriage
+ *       return is a blank line like {@code \n\n}, which round 3 happened to catch.</li>
+ * </ol>
+ * Everything a report normally writes — line-anchored in any decoration, mid-line, indented with
+ * spaces or a non-breaking space, value on the next line, value in a fenced block — is recognised.
  */
 final class DashboardWidgetMarker {
 

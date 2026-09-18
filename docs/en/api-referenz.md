@@ -2406,10 +2406,12 @@ Contract (validated at run end and written to run metadata, re-validated on read
 | `summary` | no | text, ≤ 500 characters |
 
 - **Unknown fields ⇒ the whole contract is rejected** (including in KPI objects).
-- Text is single-line: empty, too long, or with control, zero-width, bidi, separator or private-use characters ⇒ rejected.
+- Text is single-line: empty, too long, or with control, zero-width, bidi, separator, private-use characters or lone UTF-16 surrogates ⇒ rejected.
 - KPI values are strings; a number in a string position is a contract violation.
 - The JSON is read to a maximum of 8192 characters; if the closing bracket does not come by then, the marker is invalid.
 - If multiple blocks report a marker, the **last** one wins; outputs from compression blocks (`derivedOutput`) are skipped.
+- **Inside a *single* block output the opposite applies: two markers reject that output entirely** (`resultState: INVALID`, no widget result). Block outputs frequently quote foreign text, and a quoted marker must never out-vote the report's own result — better no result than a wrong one. Emitting the marker twice in one block therefore shows "no valid result".
+- So write your own marker **at the start of a line**, with the JSON directly after it (a fenced code block on the next line is fine too). A marker that sits mid-line *and* is separated from its JSON by a blank line, a non-breaking space (U+00A0) or a NEL (U+0085) is not recognised — a marker quoted from foreign text can then be the only recognised one.
 - Content appears in the dashboard **as text only** — no Markdown, no HTML, no links, no images. The contract deliberately contains no id and no URL field.
 
 ### WebSocket `/topic/dashboard/runs`

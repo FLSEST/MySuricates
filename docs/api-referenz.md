@@ -2414,10 +2414,12 @@ Vertrag (beim Run-Ende geprüft und in die Run-Metadaten geschrieben, beim Lesen
 | `summary` | nein | Text, ≤ 500 Zeichen |
 
 - **Unbekannte Felder ⇒ der ganze Vertrag wird abgelehnt** (auch in einem KPI-Objekt).
-- Texte sind einzeilig: leer, zu lang oder mit Steuer-, Zero-Width-, Bidi-, Separator- oder Private-Use-Zeichen ⇒ abgelehnt.
+- Texte sind einzeilig: leer, zu lang oder mit Steuer-, Zero-Width-, Bidi-, Separator-, Private-Use-Zeichen oder einzelnen UTF-16-Surrogaten ⇒ abgelehnt.
 - KPI-Werte sind Strings; eine Zahl an einer String-Stelle ist ein Vertragsbruch.
 - Das JSON wird höchstens 8192 Zeichen weit gelesen; schließt die Klammer bis dahin nicht, gilt der Marker als ungültig.
 - Melden mehrere Blöcke einen Marker, gewinnt der **letzte**; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) werden übersprungen.
+- **Innerhalb *einer* Blockausgabe gilt das Gegenteil: zwei Marker lehnen diese Ausgabe komplett ab** (`resultState: INVALID`, kein Widget-Ergebnis). Blockausgaben zitieren häufig fremden Text, und ein zitierter Marker darf das eigene Ergebnis des Berichts nie überstimmen — im Zweifel lieber kein Ergebnis als ein falsches. Wer den Marker in einem Block zweimal ausgibt, sieht deshalb „kein gültiges Ergebnis".
+- Den eigenen Marker deshalb **am Zeilenanfang** schreiben, mit dem JSON direkt dahinter (ein Codeblock in der nächsten Zeile ist ebenfalls in Ordnung). Steht er mitten in einer Zeile *und* trennt ihn eine Leerzeile, ein geschütztes Leerzeichen (U+00A0) oder ein NEL (U+0085) von seinem JSON, wird er nicht erkannt — dann kann ein aus fremdem Text zitierter Marker der einzige erkannte sein.
 - Der Inhalt erscheint im Dashboard **ausschließlich als Text** — kein Markdown, kein HTML, keine Links, keine Bilder. Der Vertrag enthält bewusst kein ID- und kein URL-Feld.
 
 ### WebSocket `/topic/dashboard/runs`

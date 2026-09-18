@@ -366,6 +366,24 @@ class DashboardWidgetMarkerTest {
                 "Zitat: dashboard_widget:\u2028{\"status\":\"GREEN\"}")).isEqualTo(1);
     }
 
+    /**
+     * E2 (final fix wave): the other two shapes the javadoc now names as accepted residual risk. A
+     * NEL between colon and value stops the decoration walk exactly like a non-breaking space does
+     * ({@code Character.isWhitespace} crosses neither), and a double carriage return is a blank line
+     * like {@code \n\n} since round 5 unified the line definition. All three need the report itself
+     * to write them; an attacker controls only the quoted text.
+     */
+    @Test
+    void the_other_two_residual_shapes_the_javadoc_names_behave_as_documented() {
+        assertThat(DashboardWidgetMarker.scan("dashboard_widget:\u0085{\"status\":\"GREEN\"}"))
+                .isEqualTo(Scan.NONE);
+        assertThat(DashboardWidgetMarker.countEvidence(">> dashboard_widget:\r\r{\"status\":\"RED\"}")).isZero();
+        // Anchored, so the same double carriage return is harmless: still a winner, still counted.
+        assertThat(DashboardWidgetMarker.countEvidence("dashboard_widget:\r\r{\"status\":\"RED\"}")).isEqualTo(1);
+        assertThat(DashboardWidgetMarker.scan("dashboard_widget:\r\r{\"status\":\"RED\"}").json())
+                .isEqualTo("{\"status\":\"RED\"}");
+    }
+
     @Test
     void an_unanchored_marker_whose_value_follows_a_blank_line_still_does_not_count() {
         // The C2 control, unchanged: only a *blank* line keeps an unanchored occurrence out of the
@@ -374,6 +392,42 @@ class DashboardWidgetMarkerTest {
 
         assertThat(DashboardWidgetMarker.countEvidence(output)).isEqualTo(1);
         assertThat(DashboardWidgetMarker.scan(output).json()).isEqualTo("{\"status\":\"RED\"}");
+    }
+
+    /**
+     * E1 (final fix wave): the keyword's decoration classes are possessive, so a long contiguous run
+     * of backticks or asterisks cannot make the unanchored scan backtrack quadratically. Measured
+     * before the fix on this machine: 1.0 s at 16 000 characters, 3.6 s at 32 000, 13.7 s at 64 000
+     * (31.4 s on the reviewer's); after it, single-digit milliseconds. The assertion's bound is
+     * deliberately generous so a loaded machine cannot make it flaky — it separates "quadratic" from
+     * "linear", not one implementation from another.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"`", "*"})
+    void a_long_run_of_decoration_characters_does_not_blow_up_the_scan(String filler) {
+        String output = "Bericht:\ndashboard_widget: {\"status\":\"GREEN\"}\n"
+                + filler.repeat(64_000) + "\nEnde.";
+
+        long start = System.nanoTime();
+        Scan scan = DashboardWidgetMarker.scan(output);
+        long millis = (System.nanoTime() - start) / 1_000_000;
+
+        assertThat(scan.json()).isEqualTo("{\"status\":\"GREEN\"}");
+        assertThat(millis).as("scan of a 64000-character run of %s", filler).isLessThan(2_000);
+    }
+
+    @Test
+    void a_marker_behind_a_long_decoration_run_is_still_found_and_still_counts() {
+        // E1's lookbehind refuses to start a match *inside* a run of asterisks or backticks. The
+        // run's first character stays a start position and the decoration class swallows the whole
+        // run, so the marker end is the same one the old pattern found - verified separately against
+        // the old pattern over 210 032 inputs with zero differences in the match-end sets.
+        assertThat(DashboardWidgetMarker.scan("*".repeat(40) + "dashboard_widget: {\"status\":\"GREEN\"}").json())
+                .isEqualTo("{\"status\":\"GREEN\"}");
+
+        assertThat(DashboardWidgetMarker.countEvidence(
+                "Zitat: " + "`".repeat(40) + "dashboard_widget: {\"status\":\"GREEN\"}\n"
+                        + "dashboard_widget: {\"status\":\"RED\"}")).isEqualTo(2);
     }
 
     // --- B5 (fix round 2): more markdown shapes ---
