@@ -22,6 +22,8 @@ const FORBIDDEN: [string, RegExp][] = [
   ['href attribute', /\bhref\s*=/],
   ['src attribute', /\bsrc\s*=/],
   ['xlinkHref attribute', /\bxlink(Href|:href)\s*=/i],
+  ['srcSet attribute', /\bsrc[Ss]et\s*=/],
+  ['setAttribute for a URL', /\.setAttribute\s*\(\s*['"](href|src|srcset|xlink:href)/i],
 ];
 
 describe('dashboard markup guard', () => {

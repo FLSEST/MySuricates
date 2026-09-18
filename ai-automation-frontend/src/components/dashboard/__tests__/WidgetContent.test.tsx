@@ -19,8 +19,8 @@ const def = (extra: Partial<DashboardWidgetDef> & Pick<DashboardWidgetDef, 'comp
 });
 
 /**
- * WidgetFrame (error boundary) must wrap Suspense, not the other way round: only then does a
- * failed chunk end in the widget's error card instead of taking down the whole grid.
+ * WidgetContent must keep an error boundary between the grid and the lazily loaded widget: a
+ * chunk that fails to load ends in the widget's own error card instead of escaping into the grid.
  */
 describe('WidgetContent', () => {
   it('shows the error card for a widget whose chunk fails to load, and stays isolated', async () => {
