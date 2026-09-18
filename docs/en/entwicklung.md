@@ -166,6 +166,18 @@ mvn test jacoco:report
 
 The tests use `spring-boot-starter-test` (JUnit 5, MockMvc) and `spring-security-test`. Each controller has its own test class in `src/test/java/com/automation/controller/`.
 
+**Targeted test selection and architecture ratchets:** A topic-scoped `-Dtest` selection (e.g.
+`*Todo*,ControllerModuleGateTest`) does not automatically cover `PackageCycleRatchetTest`,
+`LayerRuleTest` and `SourceSizeRatchetTest` — these three measure the compiled classes via jdeps or
+file sizes and only catch anything when they actually run. Whoever creates a new class, moves a
+class between packages, or renames a package runs them additionally — either targeted
+(`mvn test -Dtest='PackageCycleRatchetTest,LayerRuleTest,SourceSizeRatchetTest'`) or via
+`bash scripts/tests/arch-guard.sh` (runs exactly these three and reports the runtime). Without this
+extra run, a new package cycle or layer violation only surfaces at the full integration checkpoint,
+not already on the feature branch (seen on 2026-09-18: a new cycle between `com.automation.event`
+and `com.automation.modules` had to be fixed after the fact on main because the implementer's
+targeted test selection did not include the three classes).
+
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
 **No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.

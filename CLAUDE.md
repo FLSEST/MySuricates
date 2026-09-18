@@ -85,6 +85,12 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
 1. **Vor der Änderung** — Bestehende Tests im betroffenen Bereich laufen lassen, um den Ist-Zustand zu kennen
 2. **Nach der Änderung** — ALLE betroffenen Tests laufen lassen (nicht nur neue):
    - Backend: `mvn test` (oder gezielt `mvn test -Dtest="BetroffeneTests"`)
+   - **Neue Klasse angelegt, Klasse zwischen Paketen verschoben oder ein Paket umbenannt?**
+     Zusätzlich `mvn test -Dtest='PackageCycleRatchetTest,LayerRuleTest,SourceSizeRatchetTest'`
+     laufen lassen (oder `bash scripts/tests/arch-guard.sh`) — diese drei messen über jdeps bzw.
+     Dateigrößen die kompilierten Klassen und gehören in keine themenbezogene `-Dtest`-Auswahl
+     hinein. Ein am 2026-09-18 auf main aufgefallener Paketzyklus wurde deshalb erst beim
+     Integrations-Checkpoint sichtbar, nicht schon im Feature-Branch.
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
 3. **Wenn Tests brechen** — Sofort fixen. NICHT committen mit kaputten Tests. Ursache untersuchen, nicht einfach Tests anpassen oder löschen.
