@@ -26,7 +26,7 @@ Dieses Dokument beschreibt die Systemarchitektur, den Datenfluss und die zentral
 ### Kommunikationswege
 
 1. **Frontend → Backend:** REST API (`/api/v1/*`) fuer CRUD, WebSocket (`/ws`) fuer Echtzeit-Updates
-2. **Backend → SQLite:** JPA/Hibernate ueber JDBC (WAL-Modus, max. 3 Connections)
+2. **Backend → SQLite:** JPA/Hibernate ueber JDBC (WAL-Modus, HikariCP `maximum-pool-size: 1` -- SQLite hat nur einen Schreiber)
 3. **Backend → Docker:** Docker Java Client ueber Unix Socket (`/var/run/docker.sock`)
 4. **Backend → Claude CLI:** `ProcessBuilder` startet `claude` als Host-Prozess (stdin fuer Prompts)
 
@@ -54,7 +54,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `dto/response/` | Ausgehende Response-Objekte (Projektion) |
 | `mapper/` | MapStruct-Mapper: Entity ↔ DTO Konvertierung |
 | `repository/` | Spring Data JPA Interfaces |
-| `service/` | Business-Logik (41 Dateien in 12 Sub-Packages) |
+| `service/` | Business-Logik (Stand 2026-09-18: 325 Dateien in 35 Sub-Packages) |
 | `executor/` | Workflow-Ausfuehrungsengine + Block-Executors |
 | `config/` | Spring-Beans, Seeders, Built-in-Definitionen |
 | `security/` | API-Key-Auth, Rate-Limiting, Tailscale-Integration |
@@ -63,7 +63,9 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `exception/` | Custom Exceptions + globaler Error-Handler |
 | `util/` | JSON-Converter, Hilfsfunktionen |
 
-### Controller-Uebersicht (13 REST-Controller)
+### Controller-Uebersicht (Auswahl aus 43 REST-Controllern)
+
+Die folgende Tabelle zeigt die zentralen Controller. Die vollstaendige Liste steht in [../api-referenz.md](../api-referenz.md); die Zahl frisch erheben mit `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
 | Controller | Pfad | Funktion |
 |---|---|---|
@@ -78,7 +80,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `ActivityLogController` | `/api/v1/activity-log` | Audit-Log abfragen |
 | `ConversionController` | `/api/v1/conversions` | Agentisch → Deterministisch |
 | `LearningController` | `/api/v1/learning` | Lern-Insights |
-| `WorkflowMemoryController` | `/api/v1/workflow-memory` | Workflow-Konversationshistorie |
+| `WorkflowMemoryController` | `/api/v1/workflows/{workflowId}/memory` | Workflow-Konversationshistorie |
 | `SystemController` | `/api/v1/system` | Health, Version, Metriken |
 
 ---
@@ -88,7 +90,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 ### Komponentenhierarchie
 
 ```
-App.tsx (Router)
+App.tsx (Router) -- Auszug, vollstaendig in src/App.tsx
   └── Layout (Sidebar + Header)
        ├── Dashboard         → QuickStats, RecentRuns, ExecutionInsights, Schedules, Todos
        ├── Projects          → Projektliste mit Container-Status
@@ -123,7 +125,9 @@ App.tsx (Router)
 - `sidebarStore` — Sidebar offen/geschlossen
 - `toastStore` — Benachrichtigungs-Queue
 
-### Routing (React Router v6)
+### Routing (React Router v7, Auswahl)
+
+Die Anwendung hat 39 Seiten unter `src/pages/`; ein Teil davon haengt an optionalen Modulen und wird in `App.tsx` von `ModuleRoute` umschlossen. Auszug:
 
 | Pfad | Seite |
 |---|---|
@@ -141,7 +145,7 @@ App.tsx (Router)
 | `/activity` | Aktivitaetslog |
 | `/settings` | Einstellungen |
 
-Alle Seiten werden per `lazy()` geladen (Code-Splitting).
+Alle Seiten werden per `lazy()` geladen (Code-Splitting). Die vollstaendige Routen-Liste steht in `src/App.tsx`.
 
 ---
 
@@ -169,7 +173,9 @@ Todo (unabhaengig)
 ActivityLog (unabhaengig)
 ```
 
-### Datenbank-Migrationen (Flyway, V1-V19)
+### Datenbank-Migrationen (Flyway, aktuell V1-V73)
+
+Die folgende Tabelle beschreibt das Grundschema (V1-V19). Spaetere Migrationen bis V73 ergaenzen Spalten, Indizes und Tabellen; die Liste steht unter `src/main/resources/db/migration/`.
 
 | Migration | Tabelle | Beschreibung |
 |---|---|---|
@@ -221,16 +227,27 @@ ActivityLog (unabhaengig)
 
 | Typ | Executor | Beschreibung |
 |---|---|---|
-| `simple` | `SimpleBlockExecutor` | Claude CLI Aufruf mit Prompt |
-| `shell` | `ShellBlockExecutor` | Shell-Befehl ausfuehren |
-| `agentic` | `AgenticBlockExecutor` | Goal→Reason→Act Schleife (KI) |
-| `conditional` | `ConditionalBlockExecutor` | If/Else Verzweigung |
-| `foreach` | `ForEachBlockExecutor` | Iteration ueber Liste |
-| `while` | `WhileBlockExecutor` | Bedingte Schleife |
-| `retry` | `RetryBlockExecutor` | Wiederholung mit Backoff |
-| `approval` | `ApprovalBlockExecutor` | Manueller Freigabe-Schritt |
-| `sub-workflow` | `SubWorkflowBlockExecutor` | Verschachtelte Workflows |
-| `skill-capability` | `SkillCapabilityBlockExecutor` | Skill-Faehigkeit aufrufen |
+| `simple` | `SimpleBlockExecutor` | Ein KI-Aufruf mit Prompt, nutzt das Workflow-Modell |
+| `shell` | `ShellBlockExecutor` | Shell-Befehl ausfuehren (kein API-, kein DB-Zugriff) |
+| `agentic` | `AgenticBlockExecutor` | Mehrschrittiger Agent mit REASON+ACT, Token-Budget |
+| `conditional` | `ConditionalBlockExecutor` | Verzweigung: `branch_true` / `branch_false` |
+| `foreach` | `ForEachBlockExecutor` | Iteration ueber eine Liste, Sub-Bloecke je Element |
+| `while` | `WhileBlockExecutor` | Schleife mit Abbruchbedingung und `max_iterations` |
+| `switch` | `SwitchBlockExecutor` | Mehrfachverzweigung anhand eines Vergleichswerts |
+| `retry` | `RetryBlockExecutor` | Wiederholt einen Sub-Block mit Backoff |
+| `approval` | `ApprovalBlockExecutor` | Pausiert bis zur Freigabe (optional mit Auswahl) |
+| `sub-workflow` | `SubWorkflowBlockExecutor` | Ruft einen anderen Workflow auf |
+| `skill-capability` | `SkillCapabilityBlockExecutor` | Fuehrt eine Capability eines Skills aus |
+| `human-input` | `HumanInputBlockExecutor` | Fragt Werte beim Benutzer ab, pausiert bis zur Antwort |
+| `integration` | `IntegrationBlockExecutor` | Aktion eines Integrations-Providers (z.B. `github:create_issue`) |
+| `document` | `DocumentBlockExecutor` | OCR / Dokumentverarbeitung (PDF, Bilder) |
+| `todo-create` | `TodoCreateBlockExecutor` | Legt ein TODO an und merkt sich die ID in einer Variablen |
+| `todo-update` | `TodoUpdateBlockExecutor` | Aendert Felder eines TODOs anhand seiner ID |
+| `todo-close` | `TodoCloseBlockExecutor` | Setzt ein TODO anhand seiner ID auf DONE |
+| `compress` | `CompressBlockExecutor` | Deterministische Komprimierung einer frueheren Block-Ausgabe (ohne KI) |
+| `compress-ai` | `CompressAiBlockExecutor` | KI-Komprimierung einer frueheren Block-Ausgabe (ein Aufruf, gedeckelt) |
+
+Die Liste ist an die registrierten Executoren gebunden: `BlockTypeListsGuardTest` (Backend) und `types/__tests__/blockTypes.test.ts` (Frontend) erzwingen den Gleichstand mit `BLOCK_TYPES`. Konfigurationsdetails je Typ: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md).
 
 ### Agentischer Block (Goal→Reason→Act)
 
@@ -291,7 +308,7 @@ Backend → ProcessBuilder → claude (Host-Prozess)
 **Wichtige Details:**
 - Prompts werden ueber **stdin** geschrieben (nicht als CLI-Argument), um `E2BIG`-Fehler zu vermeiden
 - `CLAUDE_CODE` und `CLAUDECODE` Umgebungsvariablen werden entfernt (verhindert Nested-Session-Erkennung)
-- `--model` Flag fuer Modellauswahl (`claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`)
+- `--model` Flag fuer Modellauswahl -- immer die CLI-Aliase `opus`, `sonnet`, `haiku`, `fable` verwenden, nie datierte Modell-IDs
 - `--max-tokens` Flag fuer optionales Token-Limit pro Aufruf
 - Konfigurierbarer Timeout (Standard: 300 Sekunden)
 
