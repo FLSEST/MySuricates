@@ -360,6 +360,16 @@ Workflow als BPMN 2.0 XML exportieren (Camunda-Modeler-kompatibel).
 
 **Response:** Datei-Download (`.bpmn`, `Content-Disposition: attachment`)
 
+### `POST /api/v1/workflows/import/bpmn`
+
+Workflow aus zuvor per `GET /api/v1/workflows/{id}/export/bpmn` exportiertem BPMN 2.0 XML als **neuen** Workflow importieren (Roundtrip). Akzeptiert nur MySuricates-eigene Exporte (BPMN-Extension `mysuricates:blockConfig`); fremdes BPMN, kaputtes XML oder zu große Eingaben liefern `400` — dann wird nichts angelegt.
+
+**Query-Parameter:** `projectId` (Pflicht) — Zielprojekt
+
+**Request:** `Content-Type: application/xml` oder `text/xml`, Body = BPMN-XML
+
+**Response:** `201` mit `WorkflowResponse`
+
 ### `POST /api/v1/workflows/import`
 
 Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
@@ -839,6 +849,12 @@ Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `avai
 
 `kind`: `line` (Rohzeile), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: Blocknamen der Steps mit gepufferten Zeilen (Schlüssel = `stepIndex`).
 
+### `DELETE /api/v1/executions/{id}`
+
+Lauf samt Schritten und den losen Verweisen darauf löschen. `409`, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm hängt. TODOs und Audit-Daten werden nie mitgelöscht.
+
+**Response:** `204 No Content`
+
 ### `POST /api/v1/executions/{id}/todos/approve`
 
 Auto-generierte TODOs eines Runs genehmigen oder ablehnen.
@@ -1151,6 +1167,12 @@ Schedule deaktivieren.
 Schedule löschen.
 
 **Response:** `204 No Content`
+
+### `GET /api/v1/schedules/catch-up`
+
+Sequenzielle Catch-up-Warteschlange abfragen: der gerade laufende nachgeholte Termin (nach Kaltstart/Resume) und die noch wartenden. Nicht persistiert — nach einem Neustart werden fällige Termine neu eingereiht.
+
+**Response:** `CatchUpQueue.Snapshot` (`active`, `pending[]`)
 
 ### `GET /api/v1/schedules/maintenance`
 
@@ -1703,6 +1725,81 @@ Fix-Workflows die durch einen TodoTrigger gestartet werden, setzen `todoTriggerR
 
 ---
 
+## Audit Center
+
+Read-Only-Auswertung von Audit-Workflow-Ergebnissen (Gate-Status je Audit-Lauf) und der daraus abgeleiteten Findings, plus Promotion einzelner Findings zu TODOs. Modul `audit` (`automation.modules.audit`) — ist es deaktiviert, antworten alle folgenden Endpunkte mit `404 MODULE_DISABLED`.
+
+### `GET /api/v1/audits`
+
+Alle Audits (gruppiert nach Projekt + `auditKey`) mit dem jeweils neuesten gültigen Report auflisten. Optionale Filter: `projectId`, `category`, `gateStatus`.
+
+**Response:** `AuditSummary[]`
+
+### `GET /api/v1/audits/{auditKey}`
+
+Details eines Audits (Zusammenfassung + neuester Report). Pflicht-Parameter: `projectId`.
+
+**Response:** `AuditDetail`
+
+### `GET /api/v1/audits/{auditKey}/reports`
+
+Alle Reports eines Audits, paginiert (`page`, `size`). Pflicht-Parameter: `projectId`.
+
+**Response:** `PageResponse<AuditReportResponse>`
+
+### `GET /api/v1/audit-reports/{id}`
+
+Einzelnen Audit-Report abrufen.
+
+**Response:** `AuditReportResponse`
+
+### `GET /api/v1/audit-findings`
+
+Findings über alle Audits auflisten, paginiert (`page`, `size`). Optionale Filter: `projectId`, `auditKey`, `status`, `severity`.
+
+**Response:** `PageResponse<AuditFindingResponse>`
+
+### `GET /api/v1/audit-findings/{id}`
+
+Einzelnes Finding abrufen.
+
+**Response:** `AuditFindingResponse`
+
+### `PATCH /api/v1/audit-findings/{id}`
+
+Status oder Dispositions-Notiz eines Findings ändern.
+
+**Request:**
+
+| Feld | Typ | Pflicht |
+|---|---|---|
+| `status` | Enum (`AuditFindingStatus`) | Nein |
+| `dispositionNote` | String | Nein |
+
+**Response:** `AuditFindingResponse`
+
+### `POST /api/v1/audit-findings/{id}/todos`
+
+Ein von MySuricates verwaltetes TODO aus dem Finding erzeugen ("Managed TODO").
+
+**Response:** `AuditFindingResponse`
+
+### `POST /api/v1/audit-findings/{id}/todo-links`
+
+Ein bereits bestehendes TODO manuell mit dem Finding verknüpfen.
+
+**Request:** `{ "todoId": "uuid" }`
+
+**Response:** `AuditFindingResponse`
+
+### `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}`
+
+Verknüpfung zwischen Finding und TODO wieder lösen.
+
+**Response:** `204 No Content`
+
+---
+
 ## Notifications
 
 Benachrichtigungen bei Workflow-Abschluss (Webhook oder Desktop).
@@ -1876,6 +1973,18 @@ Schalter aus den Settings entfernen: Das Modul folgt wieder der Startkonfigurati
 Modell-Katalog des Pi-Providers abrufen.
 
 **Response:** `PiCatalog`
+
+### `GET /api/v1/system/ai-providers/{id}/models`
+
+Modelle, die dieser Provider auf diesem Host anbietet (Host-Discovery via CLI bzw. lokalem Cache, TTL-gecacht). Schlägt nie wegen fehlender CLI fehl — dann `available: false` mit `reason`.
+
+**Response:** `ModelCatalog` (`providerId`, `available`, `source`, `fetchedAt`, `reason`, `models[]`)
+
+### `POST /api/v1/system/ai-providers/{id}/models/refresh`
+
+Cache umgehen und den Host jetzt neu abfragen.
+
+**Response:** `ModelCatalog`
 
 ### `POST /api/v1/system/client-errors`
 
