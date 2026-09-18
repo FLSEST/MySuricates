@@ -174,16 +174,33 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > unabhängig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
 > eines früheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthält
 > Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
-> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts ändert
-> sich nichts (dort wird nie escaped). Die beiden Variablen lösen **keine** Taint-Propagation aus:
-> Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
+> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts wird der
+> Wert weiterhin roh eingesetzt (dort wird nie escaped).
 >
-> **Folge für weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
-> oder in ein `items_command` schreibt (z. B. `items_command: "echo {{ previous_report }}"`),
-> verliert das Quoting für die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
-> entstehenden `{{ previous_output }}`, `{{ block.<name>.output }}` und `foreach`-Items gelten in
-> einem sonst sauberen Run als vertrauenswürdig und werden roh eingesetzt. In solchen
-> Folge-Blöcken deshalb explizit `"shell_escape_variables": true` setzen.
+> **Beide Platzhalter lösen Taint-Propagation aus — auf zwei Wegen:**
+>
+> 1. **Substitution in ein Shell-Feld färbt den ganzen Lauf.** Sobald `{{ previous_report }}` oder
+>    `{{ open_todos }}` wirklich in `command`, `items_command`, `condition`, … eines Shell-Blocks
+>    eingesetzt wird, werden **ab diesem Punkt** auch alle Block-Ausgaben des Laufs
+>    (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items)
+>    single-quoted — genau wie in einem webhook-getriggerten Lauf.
+> 2. **Ein KI-Prompt färbt die Ausgabe dieses einen Blocks.** Standen Plattform-Daten im Prompt
+>    eines KI-Blocks (`simple`, `agentic`, `skill-capability` sowie die Nicht-Shell-Zweige von
+>    `foreach`/`while`/`conditional`/`retry`/`switch`), gilt dessen Ausgabe als nicht
+>    vertrauenswürdig: Ein folgender Shell-Block bekommt sie single-quoted. Der Lauf als Ganzes
+>    bleibt dabei sauber, solange nichts anderes ihn färbt.
+>
+> Ein Lauf, der die beiden Platzhalter überhaupt nicht verwendet, bleibt unverändert: Block-Ausgaben
+> werden roh eingesetzt wie bisher.
+>
+> **Sichere Form für Folge-Blöcke:** `"shell_escape_variables": true` setzen und den Platzhalter
+> **unquoted** über `set --` in eine Variable holen —
+> `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"`. Das funktioniert in gefärbten wie in
+> sauberen Läufen gleich und ist die Form, die die ausgelieferten Definitionen verwenden (das
+> Gate `PlatformPromptQuotingGateTest` erzwingt sie dort).
+>
+> Vollständiges Trust-Modell (drei Vertrauensklassen, reservierte Kontextschlüssel, bekannte
+> Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md).
 
 ```json
 {

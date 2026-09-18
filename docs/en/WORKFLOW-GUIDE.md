@@ -173,14 +173,31 @@ Executes a shell command on the host or inside a Docker container.
 > `shell_escape_variables`. The reason: `previous_report` is the output of an earlier run (which may
 > have processed a webhook payload), and `open_todos` contains titles from imported issues. So write
 > these placeholders **unquoted** (`REPORT={{ previous_report }}`, not `REPORT="{{ previous_report }}"`).
-> Nothing changes in AI prompts (they are never escaped). The two variables do **not** trigger taint
-> propagation: block outputs of an otherwise clean run stay raw as before.
+> In AI prompts the value is still substituted raw (prompts are never escaped).
 >
-> **Consequence for forwarded values:** writing `previous_report`/`open_todos` into a block output or
-> into an `items_command` (e.g. `items_command: "echo {{ previous_report }}"`) loses the quoting for
-> the follow-up placeholders: the call itself is quoted, but the resulting `{{ previous_output }}`,
-> `{{ block.<name>.output }}` and `foreach` items count as trusted in an otherwise clean run and are
-> substituted raw. Set `"shell_escape_variables": true` explicitly on such follow-up blocks.
+> **Both placeholders do trigger taint propagation — on two paths:**
+>
+> 1. **Substitution into a shell field colours the whole run.** As soon as `{{ previous_report }}` or
+>    `{{ open_todos }}` really lands in `command`, `items_command`, `condition`, … of a shell block,
+>    **from that point on** every block output of the run (`{{ previous_output }}`,
+>    `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) is single-quoted too —
+>    exactly as in a webhook-triggered run.
+> 2. **An AI prompt colours the output of that one block.** If platform data was in the prompt of an
+>    AI block (`simple`, `agentic`, `skill-capability` plus the non-shell branches of
+>    `foreach`/`while`/`conditional`/`retry`/`switch`), its output counts as untrusted: a following
+>    shell block receives it single-quoted. The run as a whole stays clean unless something else
+>    colours it.
+>
+> A run that does not use the two placeholders at all is unchanged: block outputs are substituted raw
+> as before.
+>
+> **The safe form for follow-up blocks:** set `"shell_escape_variables": true` and pull the
+> **unquoted** placeholder into a variable via `set --` — `set -- {{ previous_output }}`, then
+> `ANSWER="${1:-}"`. This behaves identically in coloured and in clean runs and is the form the
+> shipped definitions use (the `PlatformPromptQuotingGateTest` gate enforces it there).
+>
+> Full trust model (three trust classes, reserved context keys, known limits):
+> [architektur.md → trust classes for context values](architektur.md).
 
 ```json
 {

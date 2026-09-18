@@ -396,6 +396,28 @@ gequotetes Argument**.
   - In den ausgelieferten Definitionen ist ein Built-in betroffen (`saas-continuous-improve.json`);
     der Folgeblock dort ist ein KI-Prompt, für den sich am Verhalten nichts ändert.
 
+**Seit 2026-09-18 (TODO 22e6bec8): Die Ausgabe eines KI-Blocks mit Plattform-Daten im Prompt wird
+gefärbt.** Wer `{{ previous_report }}` oder `{{ open_todos }}` im Prompt eines KI-Blocks verwendet
+(`simple`, `agentic`, `skill-capability` sowie die Nicht-Shell-Zweige von `foreach`, `while`,
+`conditional`, `retry`, `switch`), bekommt die Ausgabe **genau dieses Blocks** in späteren
+Shell-Feldern als **ein einzelnes gequotetes Argument** statt roh. Der Lauf als Ganzes wird davon
+nicht gefärbt — das bleibt der Regel „erst bei Substitution in ein Shell-Feld" vorbehalten.
+
+- **Woran erkennbar:** Ein Shell-Block, der `{{ previous_output }}`/`{{ block.<name>.output }}` eines
+  solchen KI-Blocks bisher wortweise gelesen hat (`$1`, `$2`, `for wort in …`), sieht nach dem Update
+  genau ein Argument.
+- **Warum:** Der Weg Plattform-Daten → KI-Prompt → Shell-Block umging das Quoting bisher vollständig;
+  eine KI-Antwort, die Plattform-Bytes enthält, landete roh in einer Kommandozeile.
+- **Sichere Form (empfohlen, wirkt in beiden Welten):** Im Folgeblock
+  `"shell_escape_variables": true` setzen und den Platzhalter unquoted über `set --` in eine Variable
+  holen: `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"`. Damit ist der Block
+  unabhängig davon, ob der Lauf gefärbt ist.
+- **Altes Verhalten wiederherstellen:** Die Plattform-Daten nicht im Prompt verwenden, sondern vorher
+  in eine eigene, selbst gesetzte Variable schreiben — oder den Folgebefehl so bauen, dass ein
+  einzelnes Argument reicht.
+- In den ausgelieferten Definitionen tragen alle betroffenen Shell-Blöcke das Opt-in bereits;
+  `PlatformPromptQuotingGateTest` hält das fest.
+
 Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 [deployment.md → Vertrauensmodell und Netzwerk-Exposition](deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
