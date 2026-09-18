@@ -67,6 +67,19 @@ class BpmnRoundtripTest {
         assertThat(restored.getName()).isNull(); // NICHT der abgeleitete "Shell: ls"-Text
     }
 
+    /** Datenobjekte sind reine Darstellung — der Import überliest sie, die Config bleibt Quelle der Wahrheit. */
+    @Test
+    void datenobjekteWerdenBeimImportIgnoriert() {
+        Workflow wf = WorkflowFixtures.dataFlow();
+        String xml = exporter.export(wf);
+        assertThat(xml).contains("dataObjectReference");
+        assertThat(xml).contains("dataInputAssociation");
+
+        ImportedWorkflow imported = importer.importFrom(xml);
+        assertThat(imported.blocks()).hasSize(3);
+        assertBlocksEqual(imported.blocks(), wf.getBlocks());
+    }
+
     @Test
     void switchCaseInhalteWerdenNichtDoppeltGezaehlt() {
         Workflow wf = WorkflowFixtures.workflow("S", List.of(

@@ -4,6 +4,8 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +29,11 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
 
     private final BpmnNodeFactory f;
     private final BpmnGatewayBuilder gateways;
+    /**
+     * Id-Basis → Aktivitäts-Knoten. Nur Blöcke, die zu genau einem Task/Sub-Prozess werden, tragen
+     * sich ein; conditional/switch (Gateways) bleiben leer. Grundlage der Datenassoziationen.
+     */
+    private final Map<String, String> activityIdByBase = new HashMap<>();
 
     BpmnModelBuilder(ObjectMapper objectMapper) {
         this.f = new BpmnNodeFactory(objectMapper);
@@ -64,7 +71,21 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         BpmnEdgeRouter router = new BpmnEdgeRouter(f.nodeIndex());
         model.edges.forEach(router::route);
         router.routeChildEdges(model.nodes);
+        // Datenfluss zuletzt: er braucht die endgültigen Koordinaten der Task-Reihe.
+        BpmnDataFlowBuilder.apply(model, blocks, topLevelActivityIds(blocks.size()));
         return model;
+    }
+
+    /** Blockindex → Aktivitäts-Knoten-Id, für alle Top-Level-Blöcke die einen haben. */
+    private Map<Integer, String> topLevelActivityIds(int blockCount) {
+        Map<Integer, String> ids = new LinkedHashMap<>();
+        for (int i = 0; i < blockCount; i++) {
+            String id = activityIdByBase.get("b_" + i);
+            if (id != null) {
+                ids.put(i, id);
+            }
+        }
+        return ids;
     }
 
     /** Horizontale Kette aus Blöcken; Koordinaten relativ (Zeilenmitte y=0, Beginn x=0). */
@@ -140,6 +161,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
             n.warning = "Unbekannter Block-Typ: " + type;
         }
         f.place(n, 0, 0);
+        activityIdByBase.put(idBase, n.id);
 
         BpmnSegment seg = new BpmnSegment();
         seg.nodes.add(n);
@@ -169,6 +191,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         sub.blockType = block.getType();
         sub.blockName = block.getName();
         f.place(sub, 0, 0);
+        activityIdByBase.put(idBase, sub.id);
 
         BpmnModel.Node innerStart = f.node(idBase + "_start", BpmnModel.Kind.START_EVENT, null, EVT, EVT);
         BpmnModel.Node body = f.commandTask(idBase + "_body", BpmnBlockText.str(c, "command"), shellMode);

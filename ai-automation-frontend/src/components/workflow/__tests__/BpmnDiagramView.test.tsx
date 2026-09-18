@@ -33,6 +33,96 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
+/** Ausschnitt eines echten Exports: „report" verarbeitet {{ block.tests.output }}. */
+const DATA_FLOW_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <process id="p1" name="Datenfluss" isExecutable="false">
+    <scriptTask id="b_0_tests" name="tests">
+      <dataOutputAssociation id="dataflow_out_0"><targetRef>dataref_tests</targetRef></dataOutputAssociation>
+    </scriptTask>
+    <serviceTask id="b_1_report" name="report">
+      <property id="b_1_report_data_input" name="__targetRef_placeholder"/>
+      <dataInputAssociation id="dataflow_in_0">
+        <sourceRef>dataref_tests</sourceRef>
+        <targetRef>b_1_report_data_input</targetRef>
+      </dataInputAssociation>
+    </serviceTask>
+    <sequenceFlow id="f1" sourceRef="b_0_tests" targetRef="b_1_report" />
+    <dataObject id="data_tests"/>
+    <dataObjectReference id="dataref_tests" dataObjectRef="data_tests" name="Ausgabe: tests"/>
+  </process>
+  <bpmndi:BPMNDiagram id="d1">
+    <bpmndi:BPMNPlane id="pl1" bpmnElement="p1">
+      <bpmndi:BPMNShape id="sh1" bpmnElement="b_0_tests"><dc:Bounds x="286" y="160" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh2" bpmnElement="b_1_report"><dc:Bounds x="536" y="160" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh3" bpmnElement="dataref_tests"><dc:Bounds x="318" y="300" width="36" height="50"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="ed1" bpmnElement="f1"><di:waypoint x="386" y="200"/><di:waypoint x="536" y="200"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ed2" bpmnElement="dataflow_out_0"><di:waypoint x="336" y="240"/><di:waypoint x="336" y="300"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ed3" bpmnElement="dataflow_in_0"><di:waypoint x="354" y="325"/><di:waypoint x="586" y="240"/></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+describe('BpmnDiagramView Datenfluss', () => {
+  it('zeichnet das Datenobjekt und zwei gestrichelte Assoziationen', () => {
+    useI18nStore.setState({ locale: 'de' });
+    const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} />);
+    // Datenobjekt: Rechteck mit umgeknickter Ecke
+    expect(container.querySelectorAll('path[data-bpmn="data-object"]')).toHaveLength(1);
+    expect(screen.getByText('Ausgabe: tests')).toBeInTheDocument();
+    // Assoziationen gestrichelt, Kontrollfluss durchgezogen
+    const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
+      p.hasAttribute('stroke-dasharray'),
+    );
+    expect(dashed).toHaveLength(2);
+    expect(container.querySelectorAll('polyline')).toHaveLength(3);
+  });
+
+  it('lokalisiert die Datenobjekt-Beschriftung (EN)', () => {
+    useI18nStore.setState({ locale: 'en' });
+    render(<BpmnDiagramView xml={DATA_FLOW_XML} />);
+    expect(screen.getByText('Output: tests')).toBeInTheDocument();
+  });
+
+  it('bricht lange Datenobjekt-Namen um und kürzt sie wie Task-Labels', () => {
+    useI18nStore.setState({ locale: 'de' });
+    const langer = DATA_FLOW_XML.replace(
+      'name="Ausgabe: tests"',
+      'name="Ausgabe: Vollstaendiger Integrationstestlauf inklusive Abdeckungsbericht und Fehleranalyse"',
+    );
+    const { container } = render(<BpmnDiagramView xml={langer} />);
+    const gruppe = container.querySelector('path[data-bpmn="data-object"]')!.parentElement!;
+    const tspans = Array.from(gruppe.querySelectorAll('tspan'));
+    expect(tspans.length).toBeGreaterThan(1);
+    expect(tspans.length).toBeLessThanOrEqual(3);
+    expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
+    // voller Name bleibt im Tooltip der Gruppe
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles.some((t) => t?.includes('Abdeckungsbericht und Fehleranalyse'))).toBe(true);
+  });
+
+  it('macht das Datenobjekt nicht anklickbar', () => {
+    const onSelectBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} onSelectBlock={onSelectBlock} />);
+    // nur die beiden Tasks tragen eine Block-ID (b_<i>_…), das Datenobjekt nicht
+    expect(container.querySelectorAll('g[role="button"]')).toHaveLength(2);
+  });
+
+  it('routet die Assoziationen auch im vertikalen Layout an die beteiligten Kästen', () => {
+    const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
+    const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
+      p.hasAttribute('stroke-dasharray'),
+    );
+    expect(dashed).toHaveLength(2);
+    // Neu-Routing statt gespiegelter Alt-Punkte: keine Kante behält die Original-Koordinaten
+    expect(dashed.some((p) => (p.getAttribute('points') || '').includes('336,240'))).toBe(false);
+  });
+});
+
 describe('BpmnDiagramView', () => {
   it('rendert alle Shapes und Kanten aus dem BPMN-DI', () => {
     const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);

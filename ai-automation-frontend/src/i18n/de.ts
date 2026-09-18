@@ -520,11 +520,13 @@ export const de: TranslationKeys = {
       prefix: {
         'KI': 'KI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
         'Dokument': 'Dokument', 'Freigabe': 'Freigabe', 'Eingabe': 'Eingabe', 'Sub-Workflow': 'Sub-Workflow', 'Retry': 'Retry',
+        'Ausgabe': 'Ausgabe',
       },
       // Tooltips je BPMN-Element-Typ
       tip: {
         scriptTask: 'Shell-Kommando', serviceTask: 'KI / Service', userTask: 'Benutzer-Interaktion',
         callActivity: 'Sub-Workflow', task: 'Unbekannter Block-Typ', subProcess: 'Schleife (Sub-Prozess)',
+        dataObjectReference: 'Datenobjekt (Block-Ausgabe)',
       },
       // Start-/End-Event-Namen
       event: { 'Start': 'Start', 'Ende': 'Ende' },
