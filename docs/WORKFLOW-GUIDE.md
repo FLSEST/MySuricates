@@ -1,6 +1,6 @@
 # Workflow Building Guide
 
-Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst alle Block-Typen, bewaehrte Patterns, Timeout-Konfiguration und haeufige Fallstricke.
+Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst alle Block-Typen, bewährte Patterns, Timeout-Konfiguration und häufige Fallstricke.
 
 **Zielgruppe**: KI-Agenten (Claude, Codex) und Entwickler, die Workflows erstellen oder debuggen.
 
@@ -8,7 +8,7 @@ Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst
 
 ## 1. Schnellstart
 
-Ein Workflow ist eine Sequenz von **Bloecken**, die nacheinander ausgefuehrt werden. Jeder Block hat einen `type` und eine `config`-Map. Die Ausgabe jedes Blocks steht dem naechsten via `{{ previous_output }}` zur Verfuegung.
+Ein Workflow ist eine Sequenz von **Blöcken**, die nacheinander ausgeführt werden. Jeder Block hat einen `type` und eine `config`-Map. Die Ausgabe jedes Blocks steht dem nächsten via `{{ previous_output }}` zur Verfügung.
 
 ### Minimales Beispiel: Zwei-Block-Workflow
 
@@ -39,11 +39,11 @@ Ein Workflow ist eine Sequenz von **Bloecken**, die nacheinander ausgefuehrt wer
 POST /api/v1/workflows
 ```
 
-Alle Workflow-CRUD- und Ausfuehrungsoperationen liegen unter `/api/v1/workflows`. Ein Run wird gestartet mit `POST /api/v1/workflows/{id}/execute`.
+Alle Workflow-CRUD- und Ausführungsoperationen liegen unter `/api/v1/workflows`. Ein Run wird gestartet mit `POST /api/v1/workflows/{id}/execute`.
 
 ### Kontext-Variablen
 
-Variablen beim Start uebergeben:
+Variablen beim Start übergeben:
 
 ```
 POST /api/v1/workflows/{id}/execute
@@ -61,37 +61,37 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstuetzt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstützt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
-**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprueft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Bloecken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zaehlt dabei als unbekannt. Das gilt fuer jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
+**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprüft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Blöcken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zählt dabei als unbekannt. Das gilt für jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
 
-Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Pruefung: enthaelt die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausfuehrbare Definition kommt nicht zurueck.
+Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Prüfung: enthält die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausführbare Definition kommt nicht zurück.
 
 ### Allgemeine Block-Eigenschaften
 
-Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:
+Jeder Block unterstützt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit naechstem Block fortfahren) |
-| `provider` | string | null | **Nur KI-faehige Bloecke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur fuer diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Praezedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
-| `model` | string | null | **Nur KI-faehige Bloecke** (inkl. `compress-ai`): Modell nur fuer diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Praezedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
-| `effort` | string | null | **Nur KI-faehige Bloecke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur fuer diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
+| `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit nächstem Block fortfahren) |
+| `provider` | string | null | **Nur KI-fähige Blöcke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur für diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Präzedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
+| `model` | string | null | **Nur KI-fähige Blöcke** (inkl. `compress-ai`): Modell nur für diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Präzedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
+| `effort` | string | null | **Nur KI-fähige Blöcke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur für diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
 
-Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
+Zusätzlich unterstützt jeder Block ein optionales Top-Level-Feld (nicht in `config`):
 
 | Feld | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `skillIds` | string[] | `[]` | Skill-IDs die **zusaetzlich** zu den Workflow-Skills fuer diesen Block aktiviert werden |
+| `skillIds` | string[] | `[]` | Skill-IDs die **zusätzlich** zu den Workflow-Skills für diesen Block aktiviert werden |
 
-**Standard-Verhalten**: Wenn ein Block fehlschlaegt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` faehrt der Workflow mit dem naechsten Block fort.
+**Standard-Verhalten**: Wenn ein Block fehlschlägt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` fährt der Workflow mit dem nächsten Block fort.
 
-**Per-Block Skills**: Bloecke koennen ueber `skillIds` eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten. Der `WorkflowExecutor` merged beide Listen vor der Ausfuehrung und stellt den Baseline-Zustand nach dem Block wieder her. Beispiel:
+**Per-Block Skills**: Blöcke können über `skillIds` eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten. Der `WorkflowExecutor` merged beide Listen vor der Ausführung und stellt den Baseline-Zustand nach dem Block wieder her. Beispiel:
 
 ```json
 {
   "type": "simple",
-  "config": { "command": "Analysiere den Code auf Sicherheitsluecken" },
+  "config": { "command": "Analysiere den Code auf Sicherheitslücken" },
   "skillIds": ["builtin-code-review", "builtin-security-analyzer"]
 }
 ```
@@ -100,9 +100,9 @@ Zusaetzlich unterstuetzt jeder Block ein optionales Top-Level-Feld (nicht in `co
 
 ### `simple` — KI-Textverarbeitung
 
-Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausfuehrung.
+Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausführung.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `command` | string | **erforderlich** | Der Prompt, der an Claude gesendet wird |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout (wenn null, gilt der globale `automation.host-claude.timeout-seconds`-Wert) |
@@ -111,27 +111,27 @@ Sendet den Prompt an die Claude CLI auf dem Host. Keine Shell-Ausfuehrung.
 {
   "type": "simple",
   "config": {
-    "command": "Analysiere den folgenden Code und liste Verbesserungsvorschlaege auf:\n\n{{ previous_output }}"
+    "command": "Analysiere den folgenden Code und liste Verbesserungsvorschläge auf:\n\n{{ previous_output }}"
   }
 }
 ```
 
-**Wann verwenden**: Textanalyse, Zusammenfassung, Code-Review, Content-Generierung — jede Aufgabe, die KI-Reasoning ohne Shell-Zugriff benoetigt.
+**Wann verwenden**: Textanalyse, Zusammenfassung, Code-Review, Content-Generierung — jede Aufgabe, die KI-Reasoning ohne Shell-Zugriff benötigt.
 
 ---
 
-### `shell` — Shell-Befehl-Ausfuehrung
+### `shell` — Shell-Befehl-Ausführung
 
-Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers aus.
+Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers aus.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
-| `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung; Server kann per Allowlist einschraenken) |
-| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
-| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhaengig von dieser Option |
+| `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausführung |
+| `container_image` | string | null | Docker-Image (siehe Ausführungsumgebung; Server kann per Allowlist einschränken) |
+| `timeout_seconds` | int | 300 | Ausführungs-Timeout |
+| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhängig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
-| `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
+| `mounts` | list | `[]` | Zusätzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
 > **Platzhalter in Heredocs:** `{{ var }}` innerhalb eines quoted Heredocs (`<<'PY'`) landet als
 > Quelltext im Interpreter — bei `PID = '{{ project_id }}'` wird jeder Wert mit `'` zu Python-Code.
@@ -139,49 +139,49 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, Block-Option
 > `"shell_escape_variables": true`. Shell-Blöcke erhalten sonst keine Umgebungsvariablen.
 
-> **Nicht vertrauenswuerdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
+> **Nicht vertrauenswürdige Variablen:** Alles, was ein Webhook-Aufrufer liefert (Payload-Felder und
 > die daraus abgeleiteten `git_*`-Felder), landet in Shell-Befehlen (`shell`, `foreach`, `while`, `retry`,
-> `conditional` und in `switch` verschachtelte Bloecke, jeweils im Shell-Modus) grundsaetzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
+> `conditional` und in `switch` verschachtelte Blöcke, jeweils im Shell-Modus) grundsätzlich in Single-Quotes — auch ohne `shell_escape_variables`. Solche
 > Platzhalter deshalb **unquoted** schreiben (`git checkout {{ git_branch }}`, nicht `"{{ git_branch }}"`),
 > sonst stehen die Quotes doppelt. **Und das ist nicht nur Kosmetik: in eigenen Quotes ist das
 > Escaping wirkungslos.** Beim Wert `x; id` wird `PREV='{{ previous_output }}'` zu
-> `PREV=''x; id''` — die Shell fuehrt das als `PREV=x` **und danach** `id` aus. Einen untrusted
+> `PREV=''x; id''` — die Shell führt das als `PREV=x` **und danach** `id` aus. Einen untrusted
 > oder getainteten Platzhalter deshalb nie in Quotes setzen, sondern immer ohne Quotes schreiben
 > (`PREV={{ previous_output }}`) **und den Block mit `"shell_escape_variables": true` versehen** —
 > ohne Taint kommt der Wert sonst roh, und ein mehrzeiliger Output zerlegt den Befehl. Unquoted plus
-> Escape-Option ist die einzige Form, die in beiden Faellen stimmt; der Test `TemplateHygieneGateTest`
-> erzwingt sie fuer Built-in-Templates und den Pool. Werte aus `defaultContext` und System-Variablen
+> Escape-Option ist die einzige Form, die in beiden Fällen stimmt; der Test `TemplateHygieneGateTest`
+> erzwingt sie für Built-in-Templates und den Pool. Werte aus `defaultContext` und System-Variablen
 > bleiben ohne die Option roh.
 >
-> **Unbelegte Workflow-Variablen:** Bleibt eine Variable unbelegt, steht ihr Platzhalter woertlich im
-> Befehl; unquoted waere `SOURCE_DIR={{ source_dir }}` dann ein Shell-Fehler. Idiom:
+> **Unbelegte Workflow-Variablen:** Bleibt eine Variable unbelegt, steht ihr Platzhalter wörtlich im
+> Befehl; unquoted wäre `SOURCE_DIR={{ source_dir }}` dann ein Shell-Fehler. Idiom:
 > `set -- {{ source_dir }}; SOURCE_DIR="$*"` — belegt liefert es den escapten Wert, unbelegt den
-> woertlichen Platzhalter, den man wie bisher mit `[ "$SOURCE_DIR" = "{{ source_dir }}" ]` erkennt.
+> wörtlichen Platzhalter, den man wie bisher mit `[ "$SOURCE_DIR" = "{{ source_dir }}" ]` erkennt.
 
 > **Taint-Propagation auf Block-Ausgaben:** In einem webhook-getriggerten Run — und in jedem daraus
 > gestarteten Sub-Workflow sowie nach einem Resume — werden auch `{{ previous_output }}`,
 > `{{ block.<name>.output }}`, `{{ step_N_output }}` und die Items eines `items_command`
 > single-quoted. Grund: ein Block kann die Payload in seine Ausgabe tragen, ohne den Platzhalter
-> ueberhaupt zu nennen (Datei lesen, API aufrufen). Der Taint entsteht, sobald der Run irgendeinen
-> untrusted Input traegt, und bleibt bis zum Ende des Runs bestehen. Diese Platzhalter also ebenfalls
+> überhaupt zu nennen (Datei lesen, API aufrufen). Der Taint entsteht, sobald der Run irgendeinen
+> untrusted Input trägt, und bleibt bis zum Ende des Runs bestehen. Diese Platzhalter also ebenfalls
 > **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
-> Chain) bleiben alle Block-Ausgaben unveraendert roh.
+> Chain) bleiben alle Block-Ausgaben unverändert roh.
 
 > **`{{ previous_report }}` / `{{ open_todos }}`:** Beide werden **immer** als nicht
-> vertrauenswuerdig behandelt und in Shell-Bloecken deshalb **stets single-quoted** — in jedem Run,
-> unabhaengig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
-> eines frueheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthaelt
+> vertrauenswürdig behandelt und in Shell-Blöcken deshalb **stets single-quoted** — in jedem Run,
+> unabhängig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
+> eines früheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthält
 > Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
-> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts aendert
-> sich nichts (dort wird nie escaped). Die beiden Variablen loesen **keine** Taint-Propagation aus:
+> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts ändert
+> sich nichts (dort wird nie escaped). Die beiden Variablen lösen **keine** Taint-Propagation aus:
 > Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
 >
-> **Folge fuer weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
+> **Folge für weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
 > oder in ein `items_command` schreibt (z. B. `items_command: "echo {{ previous_report }}"`),
-> verliert das Quoting fuer die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
+> verliert das Quoting für die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
 > entstehenden `{{ previous_output }}`, `{{ block.<name>.output }}` und `foreach`-Items gelten in
-> einem sonst sauberen Run als vertrauenswuerdig und werden roh eingesetzt. In solchen
-> Folge-Bloecken deshalb explizit `"shell_escape_variables": true` setzen.
+> einem sonst sauberen Run als vertrauenswürdig und werden roh eingesetzt. In solchen
+> Folge-Blöcken deshalb explizit `"shell_escape_variables": true` setzen.
 
 ```json
 {
@@ -192,22 +192,22 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 }
 ```
 
-**Wann verwenden**: Skripte ausfuehren, Daten sammeln, Build-Befehle, Dateioperationen — alles was deterministische Shell-Ausfuehrung benoetigt.
+**Wann verwenden**: Skripte ausführen, Daten sammeln, Build-Befehle, Dateioperationen — alles was deterministische Shell-Ausführung benötigt.
 
 ---
 
 ### `agentic` — Zielgesteuerter KI-Agent
 
-Fuehrt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der maechtigste, aber auch teuerste Block-Typ.
+Führt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der mächtigste, aber auch teuerste Block-Typ.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `goal` | string | **erforderlich** | Was der Agent erreichen soll |
 | `success_criteria` | string | `""` | Woran Erfolg gemessen wird |
 | `max_iterations` | int | 10 | Harte Iterationsobergrenze |
 | `iteration_timeout_seconds` | int | 300 | Wall-Clock-Timeout pro Iteration |
 | `total_timeout_seconds` | int | 1800 | Gesamt-Block-Timeout (30 Min) |
-| `max_total_tokens` | int | 200000 | Token-Budget (Input+Output ueber alle Iterationen) |
+| `max_total_tokens` | int | 200000 | Token-Budget (Input+Output über alle Iterationen) |
 | `max_repeated_actions` | int | 3 | Abbruch nach N identischen Aktionen |
 | `require_approval` | bool | false | Freigabe-Gate vor jeder Aktion |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout pro Aufruf (REASON + ACT) |
@@ -217,7 +217,7 @@ Fuehrt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der maechtigste, aber
   "type": "agentic",
   "config": {
     "goal": "Erstelle eine Portfolio-Webseite in portfolio/ basierend auf {{ filepath }}.",
-    "success_criteria": "index.html existiert und enthaelt alle Sektionen.",
+    "success_criteria": "index.html existiert und enthält alle Sektionen.",
     "max_iterations": 8,
     "timeout_seconds": 600,
     "max_total_tokens": 300000
@@ -225,7 +225,7 @@ Fuehrt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der maechtigste, aber
 }
 ```
 
-**Wann verwenden**: Komplexe mehrstufige Aufgaben, die Urteilsvermoegen erfordern — Dateien erstellen, Code reparieren, Projekte bauen. Siehe [Agentic Block Deep Dive](#8-agentic-block-deep-dive) fuer Details.
+**Wann verwenden**: Komplexe mehrstufige Aufgaben, die Urteilsvermögen erfordern — Dateien erstellen, Code reparieren, Projekte bauen. Siehe [Agentic Block Deep Dive](#8-agentic-block-deep-dive) für Details.
 
 ---
 
@@ -233,14 +233,14 @@ Fuehrt eine autonome Goal-Reason-Act-Observe-Schleife aus. Der maechtigste, aber
 
 Wiederholt einen Befehl bis zu N Mal mit einer Pause zwischen den Versuchen.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `command` | string | **erforderlich** | Auszufuehrender Befehl |
+| `command` | string | **erforderlich** | Auszuführender Befehl |
 | `max_retries` | int | 3 | Maximale Wiederholungsversuche |
 | `delay` | int | 5 | Pause zwischen Versuchen (Sekunden) |
 | `exponential_backoff` | bool | false | Pause bei jedem Versuch verdoppeln |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Versuch |
+| `timeout_seconds` | int | 300 | Ausführungs-Timeout pro Versuch |
 
 ```json
 {
@@ -256,21 +256,21 @@ Wiederholt einen Befehl bis zu N Mal mit einer Pause zwischen den Versuchen.
 
 **Exponential Backoff**: Wenn `exponential_backoff: true`, wird die Wartezeit bei jedem Versuch verdoppelt: 1. Versuch = `delay` Sekunden, 2. Versuch = `delay * 2`, 3. Versuch = `delay * 4`, usw.
 
-**Wann verwenden**: Instabile Tests, netzwerkabhaengige Operationen, API-Aufrufe die voruebergehend fehlschlagen koennen.
+**Wann verwenden**: Instabile Tests, netzwerkabhängige Operationen, API-Aufrufe die vorübergehend fehlschlagen können.
 
 ---
 
 ### `conditional` — If/Then/Else
 
-Wertet eine Bedingung aus und fuehrt einen von zwei Zweigen aus.
+Wertet eine Bedingung aus und führt einen von zwei Zweigen aus.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `condition` | string | **erforderlich** | Auszuwertende Bedingung |
-| `then_command` | string | null | Befehl wenn Bedingung wahr (wenn null, wird nichts ausgefuehrt) |
+| `then_command` | string | null | Befehl wenn Bedingung wahr (wenn null, wird nichts ausgeführt) |
 | `else_command` | string | null | Befehl wenn Bedingung falsch |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
+| `timeout_seconds` | int | 300 | Ausführungs-Timeout |
 
 ```json
 {
@@ -286,33 +286,33 @@ Wertet eine Bedingung aus und fuehrt einen von zwei Zweigen aus.
 
 **Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = wahr, ungleich 0 = falsch. Im `claude`-Modus beantwortet die KI die Bedingung mit "TRUE" oder "FALSE".
 
-**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Ausfuehrung von `then_command`/`else_command`. `timeout_seconds` gilt fuer beide.
+**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Ausführung von `then_command`/`else_command`. `timeout_seconds` gilt für beide.
 
-**Wann verwenden**: Verzweigungslogik basierend auf Dateiexistenz, vorheriger Ausgabe, Umgebungspruefungen.
+**Wann verwenden**: Verzweigungslogik basierend auf Dateiexistenz, vorheriger Ausgabe, Umgebungsprüfungen.
 
 ---
 
 ### `switch` — Mehrweg-Verzweigung
 
-Wertet einen Ausdruck aus und leitet die Ausfuehrung zum passenden Case weiter. Wie eine switch/case-Anweisung.
+Wertet einen Ausdruck aus und leitet die Ausführung zum passenden Case weiter. Wie eine switch/case-Anweisung.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `expression` | string | **erforderlich** | Auszuwertender Ausdruck (unterstuetzt `${var}` und `{{ var }}`) |
+| `expression` | string | **erforderlich** | Auszuwertender Ausdruck (unterstützt `${var}` und `{{ var }}`) |
 | `cases` | list | **erforderlich** | Liste von Case-Objekten mit `value` und `blocks` |
-| `default` | list | null | Bloecke bei keinem Treffer |
+| `default` | list | null | Blöcke bei keinem Treffer |
 
 Jeder Case hat:
 - `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
 - `blocks`: Liste von Block-Definitionen bei Treffer
 
-Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
+Verschachtelte Blöcke in `cases` und `default` sind auf `shell` und `simple` beschränkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
-Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfuegbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgefuehrten Case-Bloecke.
+Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfügbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgeführten Case-Blöcke.
 
-Die Bloecke eines Case laufen nacheinander und schieben dabei `{{ previous_output }}` weiter — wie die Iterationen einer `while`-Schleife. Der zweite Block eines Case sieht also die Ausgabe des ersten, nicht mehr die des Schritts vor dem switch (auch bei unbenannten Bloecken). Wer den Stand von vor dem switch braucht, benennt den betreffenden Block und referenziert `{{ block.<name>.output }}`.
+Die Blöcke eines Case laufen nacheinander und schieben dabei `{{ previous_output }}` weiter — wie die Iterationen einer `while`-Schleife. Der zweite Block eines Case sieht also die Ausgabe des ersten, nicht mehr die des Schritts vor dem switch (auch bei unbenannten Blöcken). Wer den Stand von vor dem switch braucht, benennt den betreffenden Block und referenziert `{{ block.<name>.output }}`.
 
-Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind ueberschreibt also einen gleichnamigen frueheren Block, und nach dem switch ueberschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
+Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind überschreibt also einen gleichnamigen früheren Block, und nach dem switch überschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
 
 ```json
 {
@@ -336,15 +336,15 @@ Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der
 }
 ```
 
-**Wann verwenden**: Mehrweg-Verzweigung wenn `conditional` (binaeres if/else) nicht ausreicht. Routing basierend auf Status-Codes, Umgebungsnamen oder Gate-Ergebnissen.
+**Wann verwenden**: Mehrweg-Verzweigung wenn `conditional` (binäres if/else) nicht ausreicht. Routing basierend auf Status-Codes, Umgebungsnamen oder Gate-Ergebnissen.
 
 ---
 
 ### `foreach` — Ueber Items iterieren
 
-Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
+Führt einen Befehl für jedes Item in einer Liste aus.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `variable_name` | string | `"item"` | Name der Schleifenvariable |
 | `items_source` | string | `"list"` | `"command"` (Shell-Ausgabe) oder `"list"` (inline) |
@@ -353,7 +353,7 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 | `command` | string | **erforderlich** | Befehl pro Item |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
-| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Bloecke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
+| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
 
 ```json
 {
@@ -369,9 +369,9 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 }
 ```
 
-**Hinweis**: `items_command` wird immer als Shell-Befehl ausgefuehrt (unabhaengig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
+**Hinweis**: `items_command` wird immer als Shell-Befehl ausgeführt (unabhängig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
 
-**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Bloecke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` laesst dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
+**Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Blöcke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` lässt dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 
@@ -379,22 +379,22 @@ Fuehrt einen Befehl fuer jedes Item in einer Liste aus.
 
 ### `while` — Schleife bis Bedingung
 
-Wiederholt einen Befehl bis eine Bedingung erfuellt ist oder die maximale Iterationszahl erreicht wird.
+Wiederholt einen Befehl bis eine Bedingung erfüllt ist oder die maximale Iterationszahl erreicht wird.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `condition_command` | string | null | Bedingung, die jede Iteration ausgewertet wird. Ohne `condition_command` laeuft die Schleife bis `max_iterations` oder Kommando-Fehler |
+| `condition_command` | string | null | Bedingung, die jede Iteration ausgewertet wird. Ohne `condition_command` läuft die Schleife bis `max_iterations` oder Kommando-Fehler |
 | `command` | string | **erforderlich** | Befehl pro Iteration |
-| `max_iterations` | int | 100 | Maximale Schleifendurchlaeufe |
+| `max_iterations` | int | 100 | Maximale Schleifendurchläufe |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
-| `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout pro Iteration |
+| `timeout_seconds` | int | 300 | Ausführungs-Timeout pro Iteration |
 
 ```json
 {
   "type": "while",
   "config": {
-    "condition_command": "Bewerte die Qualitaet auf einer Skala von 1-10. Antworte NUR mit 'true' wenn unter 8, oder 'false' wenn 8 oder hoeher.",
-    "command": "Verbessere den Text. Gib die vollstaendig ueberarbeitete Version aus.",
+    "condition_command": "Bewerte die Qualität auf einer Skala von 1-10. Antworte NUR mit 'true' wenn unter 8, oder 'false' wenn 8 oder höher.",
+    "command": "Verbessere den Text. Gib die vollständig überarbeitete Version aus.",
     "max_iterations": 3
   }
 }
@@ -402,21 +402,21 @@ Wiederholt einen Befehl bis eine Bedingung erfuellt ist oder die maximale Iterat
 
 **Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = weitermachen, ungleich 0 = stopp. Im `claude`-Modus gilt "false", "0" oder leere Antwort = stopp, alles andere = weitermachen.
 
-**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Befehlsausfuehrung. `timeout_seconds` gilt fuer beide.
+**Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Befehlsausführung. `timeout_seconds` gilt für beide.
 
-**Wann verwenden**: Iterative Verfeinerung, Polling bis eine Bedingung erfuellt ist.
+**Wann verwenden**: Iterative Verfeinerung, Polling bis eine Bedingung erfüllt ist.
 
 ---
 
 ### `approval` — Menschliche Freigabe
 
-Pausiert die Ausfuehrung und wartet auf menschliche Freigabe via WebSocket.
+Pausiert die Ausführung und wartet auf menschliche Freigabe via WebSocket.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `question` | string | `"Approval required"` | Freigabe-Frage fuer den Benutzer |
-| `options` | list | `["Yes", "Yes always", "No"]` | Verfuegbare Antwortmoeglichkeiten |
-| `variable_name` | string | `"approval_answer"` | Kontext-Variable fuer die Antwort |
+| `question` | string | `"Approval required"` | Freigabe-Frage für den Benutzer |
+| `options` | list | `["Yes", "Yes always", "No"]` | Verfügbare Antwortmöglichkeiten |
+| `variable_name` | string | `"approval_answer"` | Kontext-Variable für die Antwort |
 | `timeout_minutes` | int | 30 | Wartezeit |
 | `mode` | string | `"ask"` | `"ask"` (interaktiv) oder `"auto"` (nutzt `auto_answer`) |
 | `auto_answer` | string | — | Automatische Antwort wenn `mode` = `"auto"` |
@@ -435,24 +435,24 @@ Pausiert die Ausfuehrung und wartet auf menschliche Freigabe via WebSocket.
 }
 ```
 
-**"Yes always"**: Wenn der Benutzer "Yes always" waehlt, wird die Antwort fuer diese Frage fuer den Rest des Runs gemerkt — nachfolgende Approval-Bloecke mit derselben Frage werden automatisch beantwortet.
+**"Yes always"**: Wenn der Benutzer "Yes always" wählt, wird die Antwort für diese Frage für den Rest des Runs gemerkt — nachfolgende Approval-Blöcke mit derselben Frage werden automatisch beantwortet.
 
-**Auto-Modus**: Mit `"mode": "auto"` und `"auto_answer": "Yes"` wird der Block sofort ohne Benutzerinteraktion beantwortet. Nuetzlich fuer CI/CD-Pipelines.
+**Auto-Modus**: Mit `"mode": "auto"` und `"auto_answer": "Yes"` wird der Block sofort ohne Benutzerinteraktion beantwortet. Nützlich für CI/CD-Pipelines.
 
-**Wann verwenden**: Vor destruktiven Operationen (Push, Deploy, Loeschen), Quality Gates.
+**Wann verwenden**: Vor destruktiven Operationen (Push, Deploy, Löschen), Quality Gates.
 
 ---
 
 ### `human-input` — Benutzereingabe sammeln
 
-Pausiert die Ausfuehrung um Freitext-Eingaben vom Benutzer zu sammeln.
+Pausiert die Ausführung um Freitext-Eingaben vom Benutzer zu sammeln.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `prompt` | string | `"Please provide input:"` | Frage an den Benutzer |
 | `input_type` | string | `"text"` | `"text"` oder `"select"` |
-| `variable_name` | string | `"user_input"` | Kontext-Variable fuer die Eingabe |
-| `options` | list | `[]` | Auswahlmoeglichkeiten (fuer `select`-Typ) |
+| `variable_name` | string | `"user_input"` | Kontext-Variable für die Eingabe |
+| `options` | list | `[]` | Auswahlmöglichkeiten (für `select`-Typ) |
 | `default_value` | string | `""` | Standardwert bei Timeout |
 | `required` | bool | true | Ob Eingabe erforderlich ist |
 | `validation_pattern` | string | — | Regex-Pattern zur Validierung |
@@ -483,15 +483,15 @@ Pausiert die Ausfuehrung um Freitext-Eingaben vom Benutzer zu sammeln.
 
 ### `sub-workflow` — Verschachtelter Workflow
 
-Fuehrt einen anderen Workflow als verschachtelten Schritt aus.
+Führt einen anderen Workflow als verschachtelten Schritt aus.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `workflow_id` | string | **erforderlich** | ID des auszufuehrenden Workflows |
+| `workflow_id` | string | **erforderlich** | ID des auszuführenden Workflows |
 
-**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkulaere Referenzen werden erkannt. 30-Minuten-Timeout.
+**Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout.
 
-**Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run uebernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
+**Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run übernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
 
 **Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
 
@@ -499,15 +499,15 @@ Fuehrt einen anderen Workflow als verschachtelten Schritt aus.
 
 ### `skill-capability` — Skill aufrufen
 
-Ruft die Faehigkeit eines registrierten Skills auf.
+Ruft die Fähigkeit eines registrierten Skills auf.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `capability` | string | **erforderlich** | Faehigkeitsname (z.B. `"web_search"`, `"analyze"`) |
+| `capability` | string | **erforderlich** | Fähigkeitsname (z.B. `"web_search"`, `"analyze"`) |
 | `input` | string | `""` | Eingabedaten (optional, Default: leerer String) |
-| `params` | map | `{}` | Zusaetzliche Parameter |
+| `params` | map | `{}` | Zusätzliche Parameter |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout |
-| `allow_writes` | bool | `false` | Erlaubt der Capability Schreibzugriff aufs Repo. Erforderlich fuer `writes:true`-Capabilities (test-generator, feature-implementer). Ohne `allow_writes` laeuft der Block read-only (Tool-Whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
+| `allow_writes` | bool | `false` | Erlaubt der Capability Schreibzugriff aufs Repo. Erforderlich für `writes:true`-Capabilities (test-generator, feature-implementer). Ohne `allow_writes` läuft der Block read-only (Tool-Whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
 
 ```json
 {
@@ -522,7 +522,7 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 
 **Wann verwenden**: Spezialisierte Skills nutzen (OCR, Web-Suche, Analyse).
 
-**Sicherheit**: Capabilities deklarieren ueber `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, faellt sofort fehl mit klarer Meldung. Fuer alle anderen Faelle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
+**Sicherheit**: Capabilities deklarieren über `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, fällt sofort fehl mit klarer Meldung. Für alle anderen Fälle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
 
 ---
 
@@ -530,9 +530,9 @@ Ruft die Faehigkeit eines registrierten Skills auf.
 
 Liest eine Datei (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, …) und extrahiert den Plain-Text via Apache Tika. Pure Java, keine nativen Abhängigkeiten. Ausgabe ist der extrahierte Text als `previous_output` (und optional als benannte Variable). Kosten: 0 Tokens.
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `file_path` | string | **erforderlich** | Pfad zur Datei. Absolut oder relativ zum Projekt-Pfad. Unterstuetzt Templates (`{{ variable }}`). |
+| `file_path` | string | **erforderlich** | Pfad zur Datei. Absolut oder relativ zum Projekt-Pfad. Unterstützt Templates (`{{ variable }}`). |
 | `variable_name` | string | null | Wenn gesetzt, wird der extrahierte Text zusätzlich in diese Kontext-Variable geschrieben. |
 | `fail_on_empty` | bool | `false` | Wenn true, FAILT der Block wenn der extrahierte Text leer/unter Schwelle ist. |
 | `min_characters` | int | `1` | Schwelle für `fail_on_empty`: weniger Zeichen gelten als leer. |
@@ -575,7 +575,7 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 
 **`todo-create`**:
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `title` | string | **erforderlich** | Titel (Template-fähig) |
 | `description` | string | null | Markdown-Beschreibung (Template-fähig) |
@@ -619,7 +619,7 @@ Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Log
 
 **`compress`** (Regeln, 0 Tokens):
 
-| Config-Schluessel | Typ | Default | Beschreibung |
+| Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `source` | string | **erforderlich** | Blockname eines früheren Top-Level-Blocks oder `"previous"` |
 | `stages` | Liste | **erforderlich** | Stufen `{ "op": …, … }`, laufen der Reihe nach |
@@ -671,14 +671,14 @@ Variablen verwenden doppelte Klammern: `{{ variable_name }}` (Leerzeichen option
 | Variable | Quelle | Beschreibung |
 |---|---|---|
 | `{{ previous_output }}` | Auto | Ausgabe des vorherigen Blocks (Step N-1) |
-| `{{ step_N_output }}` | Auto | Ausgabe von Step N (z.B. `{{ step_0_output }}` fuer den ersten Block) |
+| `{{ step_N_output }}` | Auto | Ausgabe von Step N (z.B. `{{ step_0_output }}` für den ersten Block) |
 | `{{ block.<name>.output }}` | Auto | Ausgabe eines benannten Blocks (Block muss ein `name`-Feld haben) |
 | `{{ previous_chain_output }}` | Auto | Ausgabe des vorherigen Chain-Eintrags (nur Chains) |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Aktuelles Schleifen-Item |
 
 ### System-injizierte Variablen
 
-Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run gesetzt und stehen in allen Bloecken zur Verfuegung:
+Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run gesetzt und stehen in allen Blöcken zur Verfügung:
 
 | Variable | Beschreibung |
 |---|---|
@@ -691,19 +691,19 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ provider }}` | Konfigurierter AI-Provider (oder leer) |
 | `{{ effort }}` | Konfigurierter Reasoning-Effort (oder leer) |
 | `{{ started_at }}` | Startzeitpunkt des Runs (ISO-8601, z.B. `2026-04-22T21:30:45.123Z`) |
-| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal fuer Output-Verzeichnisse pro Run |
+| `{{ run_timestamp }}` | Pfadsicherer Timestamp (UTC, Format `yyyyMMdd-HHmmss`, z.B. `20260422-213045`) — ideal für Output-Verzeichnisse pro Run |
 | `{{ home_dir }}` | Home-Verzeichnis des JVM-Benutzers |
 | `{{ user }}` | Betriebssystem-Benutzername |
 | `{{ workflow_version }}` | Aktuelle Versionsnummer des Workflows |
-| `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geaendert hat (Hash-Vergleich; ohne Hash ueber Zeitstempel) |
-| `{{ workflow_definition_hash }}` | SHA-256 der ausgefuehrten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
-| `{{ trigger_source }}` | Ausloeser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
-| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
+| `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geändert hat (Hash-Vergleich; ohne Hash über Zeitstempel) |
+| `{{ workflow_definition_hash }}` | SHA-256 der ausgeführten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
+| `{{ trigger_source }}` | Auslöser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
+| `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
+| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 
 ### Kontext-Variablen
 
-Eigene Variablen ueber den Ausfuehrungskontext uebergeben:
+Eigene Variablen über den Ausführungskontext übergeben:
 
 ```json
 {
@@ -717,22 +717,22 @@ Eigene Variablen ueber den Ausfuehrungskontext uebergeben:
 
 Zugriff in jeder Block-Config: `{{ filepath }}`, `{{ language }}`, `{{ batch_size }}`.
 
-### Aufloesung
+### Auflösung
 
-Variablen werden zur Laufzeit durch `ExecutionContext.resolveTemplate()` aufgeloest. Nicht aufgeloeste Variablen bleiben als Literaltext stehen (z.B. `{{ undefined_var }}` bleibt unveraendert).
+Variablen werden zur Laufzeit durch `ExecutionContext.resolveTemplate()` aufgelöst. Nicht aufgelöste Variablen bleiben als Literaltext stehen (z.B. `{{ undefined_var }}` bleibt unverändert).
 
 ### Approval/Human-Input-Variablen
 
-Antworten aus `approval`- und `human-input`-Bloecken werden als Kontext-Variablen gespeichert und stehen in nachfolgenden Bloecken zur Verfuegung:
+Antworten aus `approval`- und `human-input`-Blöcken werden als Kontext-Variablen gespeichert und stehen in nachfolgenden Blöcken zur Verfügung:
 
 ```json
 // approval-Block speichert Antwort in {{ pr_decision }}
-// naechster Block kann verwenden: {{ pr_decision }}
+// nächster Block kann verwenden: {{ pr_decision }}
 ```
 
 ---
 
-## 4. Bewaehrte Workflow-Patterns
+## 4. Bewährte Workflow-Patterns
 
 Diese Patterns sind aus den 65+ eingebauten Templates destilliert. Jedes Pattern hat eine klare Struktur und einen Anwendungsfall.
 
@@ -742,18 +742,18 @@ Beim Workflow-Bau gilt dieselbe YAGNI-Logik wie beim Code — die erste zutreffe
 
 1. **Geht es deterministisch?** → `shell`-Block (0 Tokens, schnell, reproduzierbar)
 2. **Reicht ein einzelner KI-Call?** → `simple` (1 Call) statt `agentic` (N Calls: REASON + ACT pro Iteration)
-3. **`agentic` nur**, wenn die noetigen Schritte vorab unbekannt sind und das Ergebnis verifizierbar ist
-4. **Existierender Block-Typ vor neuem Plattform-Feature** — erst die Referenz in Abschnitt 2 pruefen
-5. **Wenige Bloecke vor vielen** — jeder Block kostet Tokens, Laufzeit und ist ein eigenes Timeout-Risiko
+3. **`agentic` nur**, wenn die nötigen Schritte vorab unbekannt sind und das Ergebnis verifizierbar ist
+4. **Existierender Block-Typ vor neuem Plattform-Feature** — erst die Referenz in Abschnitt 2 prüfen
+5. **Wenige Blöcke vor vielen** — jeder Block kostet Tokens, Laufzeit und ist ein eigenes Timeout-Risiko
 
-Keine Bloecke „auf Vorrat" (Zusammenfassungen, Reports, Formatierungen, die niemand liest).
-Token-Budget ist knapp: Jeder vermiedene KI-Call verlaengert die Laufzeit des Kontingents.
+Keine Blöcke „auf Vorrat" (Zusammenfassungen, Reports, Formatierungen, die niemand liest).
+Token-Budget ist knapp: Jeder vermiedene KI-Call verlängert die Laufzeit des Kontingents.
 
 ### Pattern 1: Sequentielle Simple-Kette
 
 **Struktur**: `simple` -> `simple` -> `simple` -> `simple`
 
-Alle Bloecke sind rein KI-basiert (kein Shell). Jeder Block verfeinert die Ausgabe des vorherigen.
+Alle Blöcke sind rein KI-basiert (kein Shell). Jeder Block verfeinert die Ausgabe des vorherigen.
 
 **Anwendungsfall**: Textanalyse, Content-Erstellung, Uebersetzung, Code-Review.
 
@@ -774,7 +774,7 @@ Block 4: Zusammenfassen/ausgeben
 
 Shell-Block sammelt Rohdaten, KI-Block analysiert sie.
 
-**Anwendungsfall**: Log-Analyse, Git-Historie, System-Metriken, Abhaengigkeitspruefungen.
+**Anwendungsfall**: Log-Analyse, Git-Historie, System-Metriken, Abhängigkeitsprüfungen.
 
 **Templates**: `git-to-changelog`, `log-triage`, `git-statistics-report`
 
@@ -800,8 +800,8 @@ KI analysiert Eingabe, Agentic-Block erstellt komplexe Ausgabe (Dateien, Code), 
 
 ```
 Block 1 (simple): Eingabe analysieren, Plan erstellen
-Block 2 (agentic): Plan ausfuehren — Dateien erstellen, Deps installieren, bauen
-Block 3 (simple): Ausgabe verifizieren, Qualitaetspruefung
+Block 2 (agentic): Plan ausführen — Dateien erstellen, Deps installieren, bauen
+Block 3 (simple): Ausgabe verifizieren, Qualitätsprüfung
 ```
 
 ---
@@ -817,9 +817,9 @@ Shell-Block generiert Daten, Conditional-Block verzweigt basierend auf Ergebnis.
 **Templates**: `deploy-pipeline`, `git-to-changelog` (bedingte Migrationshilfe)
 
 ```
-Block 1 (shell): Vorbedingungen pruefen
+Block 1 (shell): Vorbedingungen prüfen
 Block 2 (conditional): Basierend auf Ergebnis verzweigen
-Block 3: Entsprechende Aktion ausfuehren
+Block 3: Entsprechende Aktion ausführen
 ```
 
 ---
@@ -846,16 +846,16 @@ Block 3 (simple): Ergebnisse aggregieren und zusammenfassen
 
 **Struktur**: `shell` -> `simple` -> `simple` -> `simple` (+ optional `conditional` + TODO-Block)
 
-Shell sammelt Code-/Config-Daten, mehrere Simple-Bloecke analysieren verschiedene Aspekte, letzter Block erstellt strukturierten Bericht.
+Shell sammelt Code-/Config-Daten, mehrere Simple-Blöcke analysieren verschiedene Aspekte, letzter Block erstellt strukturierten Bericht.
 
-**Anwendungsfall**: Code-Audits, Security-Scans, Dokumentationspruefungen, Gesundheitsbewertungen.
+**Anwendungsfall**: Code-Audits, Security-Scans, Dokumentationsprüfungen, Gesundheitsbewertungen.
 
 **Templates**: `api-consistency-audit`, `dead-code-detector`, `doc-accuracy-check`, `codebase-health-scorecard`, `architecture-debt-radar`, `test-coverage-gaps`
 
 ```
 Block 1 (shell): Rohdaten sammeln (grep, find, wc etc.)
 Block 2 (simple): Tiefenanalyse mit spezifischen Kriterien
-Block 3 (conditional): Optionale Schweregrad-Pruefung
+Block 3 (conditional): Optionale Schweregrad-Prüfung
 Block 4 (simple): Strukturierter Bericht mit Findings-Tabelle + Aktionsplan
 Block 5 (agentic): Optional: TODOs aus Findings erstellen
 ```
@@ -873,7 +873,7 @@ Das komplexeste Pattern. Safety-First mit Verifikation und menschlicher Freigabe
 **Templates**: `audit-fix-pr-pipeline`
 
 ```
-Block 1 (shell): Git-Safety-Setup (sauberen Tree pruefen, Branch erstellen)
+Block 1 (shell): Git-Safety-Setup (sauberen Tree prüfen, Branch erstellen)
 Block 2 (simple): Findings parsen, Fix-Plan erstellen
 Block 3 (agentic): Fixes anwenden, ein Commit pro Fix
 Block 4 (shell): Verifikation (Build + Test + Lint)
@@ -886,7 +886,7 @@ Block 7 (shell): Push + PR erstellen (oder abbrechen)
 
 ### Quality-Gate-Marker
 
-Jeder Block kann Gate-Status-Marker in seiner Ausgabe emittieren um Qualitaetsergebnisse zu signalisieren. Der `WorkflowExecutor` scannt **alle** Block-Ausgaben und verwendet den hoechsten Schweregrad.
+Jeder Block kann Gate-Status-Marker in seiner Ausgabe emittieren um Qualitätsergebnisse zu signalisieren. Der `WorkflowExecutor` scannt **alle** Block-Ausgaben und verwendet den höchsten Schweregrad.
 
 ```
 gate_status: GREEN|YELLOW|RED
@@ -894,9 +894,9 @@ gate_category: lint-errors
 gate_description: 3 Probleme gefunden
 ```
 
-| Gate | Run-Status | Auto-Todo-Prioritaet | Bedeutung |
+| Gate | Run-Status | Auto-Todo-Priorität | Bedeutung |
 |------|-----------|-------------------|---------|
-| GREEN | `COMPLETED` | — | Alle Pruefungen bestanden |
+| GREEN | `COMPLETED` | — | Alle Prüfungen bestanden |
 | YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnungen, nicht-blockierende Probleme |
 | RED | `COMPLETED` | HIGH | Kritische Probleme (via AutoTodoService behandelt) |
 
@@ -917,11 +917,11 @@ else
 fi
 ```
 
-Wenn mehrere Bloecke Gates emittieren, gewinnt der hoechste Schweregrad (RED > YELLOW > GREEN).
+Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN).
 
-**Gate-Verdict nach KI-Bloecken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum gruenen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) duerfen weiter `else → GREEN` nutzen.
+**Gate-Verdict nach KI-Blöcken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum grünen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollständig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) dürfen weiter `else → GREEN` nutzen.
 
-**`run.metadata.gate_summary`** aggregiert zusaetzlich alle geparsten Gates des Runs:
+**`run.metadata.gate_summary`** aggregiert zusätzlich alle geparsten Gates des Runs:
 
 ```json
 {
@@ -936,7 +936,7 @@ Wenn mehrere Bloecke Gates emittieren, gewinnt der hoechste Schweregrad (RED > Y
 }
 ```
 
-Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. fuer Public-Readiness-Trends):
+Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. für Public-Readiness-Trends):
 
 ```bash
 curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summary' > a.json
@@ -964,10 +964,10 @@ Quelle: `ExecutionDefaults.java`
 
 ### Die Dual-Timeout-Falle
 
-Agentic-Bloecke haben **zwei unabhaengige Timeouts**, die aufeinander abgestimmt sein muessen:
+Agentic-Blöcke haben **zwei unabhängige Timeouts**, die aufeinander abgestimmt sein müssen:
 
-1. **`timeout_seconds`**: Claude-CLI-Timeout pro Aufruf (gilt fuer REASON- und ACT-Phase)
-2. **`iteration_timeout_seconds`**: Wall-Clock-Timeout fuer die gesamte Iteration (REASON + ACT)
+1. **`timeout_seconds`**: Claude-CLI-Timeout pro Aufruf (gilt für REASON- und ACT-Phase)
+2. **`iteration_timeout_seconds`**: Wall-Clock-Timeout für die gesamte Iteration (REASON + ACT)
 
 **Die Falle**: Wenn `timeout_seconds=900` aber `iteration_timeout_seconds=300`, kann der CLI-Aufruf in 900s erfolgreich sein, aber die Iteration wird bei 300s als TIMEOUT markiert und der Block SCHEITERT.
 
@@ -979,7 +979,7 @@ Agentic-Bloecke haben **zwei unabhaengige Timeouts**, die aufeinander abgestimmt
 iteration_timeout_seconds = max(aktuell, timeout_seconds * 2 + 60)
 ```
 
-Die Formel: `timeout_seconds * 2` (Raum fuer REASON + ACT) `+ 60` (Overhead).
+Die Formel: `timeout_seconds * 2` (Raum für REASON + ACT) `+ 60` (Overhead).
 
 Wenn `total_timeout_seconds` nicht einmal eine Iteration fassen kann, wird auch das auto-aligned.
 
@@ -993,9 +993,9 @@ Wenn `total_timeout_seconds` nicht einmal eine Iteration fassen kann, wird auch 
 
 ### Simple-/Shell-Block-Timeouts
 
-Fuer Simple- und Shell-Bloecke gilt nur `timeout_seconds`:
+Für Simple- und Shell-Blöcke gilt nur `timeout_seconds`:
 
-| Aufgabenkomplexitaet | Empfohlenes `timeout_seconds` |
+| Aufgabenkomplexität | Empfohlenes `timeout_seconds` |
 |---|---|
 | Schnelle Befehle (git, find) | 60-120 |
 | Build/Test (npm, mvn) | 300-600 |
@@ -1005,16 +1005,16 @@ Fuer Simple- und Shell-Bloecke gilt nur `timeout_seconds`:
 
 ## 6. Modellauswahl
 
-Das Modell wird auf Workflow-Ebene gesetzt (`workflow.model`-Feld) oder auf null fuer den System-Standard belassen.
+Das Modell wird auf Workflow-Ebene gesetzt (`workflow.model`-Feld) oder auf null für den System-Standard belassen.
 
 ### Welches Modell wann verwenden
 
-| Modell | Anwendungsfall | Staerken | Schwaechen |
+| Modell | Anwendungsfall | Stärken | Schwächen |
 |---|---|---|---|
-| `opus` | Analyse, Audits, Security-Reviews | Praezision, weniger Halluzinationen, tiefes Reasoning | Langsamer, teurer |
-| `sonnet` | Code-Generierung, Routine-Aufgaben | Schnell, gut genug fuer die meisten Aufgaben | Kann Findings in Analysen halluzinieren |
-| `haiku` | Einfache Klassifikation, Extraktion | Sehr schnell, guenstig | Begrenzte Reasoning-Tiefe |
-| `fable` | Schwerste Reasoning-/Agentic-Aufgaben | Staerkstes Modell | Teuerste Stufe |
+| `opus` | Analyse, Audits, Security-Reviews | Präzision, weniger Halluzinationen, tiefes Reasoning | Langsamer, teurer |
+| `sonnet` | Code-Generierung, Routine-Aufgaben | Schnell, gut genug für die meisten Aufgaben | Kann Findings in Analysen halluzinieren |
+| `haiku` | Einfache Klassifikation, Extraktion | Sehr schnell, günstig | Begrenzte Reasoning-Tiefe |
+| `fable` | Schwerste Reasoning-/Agentic-Aufgaben | Stärkstes Modell | Teuerste Stufe |
 
 Die Werte sind **CLI-Aliase** der Claude CLI und zeigen immer auf das neueste Modell ihrer Familie — sie
 veralten nicht. Eine konkrete ID (z. B. `claude-opus-5`) kann im Modell-Feld frei eingetippt werden, wenn
@@ -1023,16 +1023,16 @@ ein Workflow auf eine Version gepinnt werden soll. Die Vorschlagsliste im UI kom
 
 ### Kritische Regel
 
-**Immer Opus fuer Analyse-Workflows verwenden.** Sonnet halluziniert Findings (z.B. falsche SQL-Injection-Schwachstellen melden). Fuer Code-Analyse, Security-Audits und Architektur-Reviews ist Praezision wichtiger als Geschwindigkeit.
+**Immer Opus für Analyse-Workflows verwenden.** Sonnet halluziniert Findings (z.B. falsche SQL-Injection-Schwachstellen melden). Für Code-Analyse, Security-Audits und Architektur-Reviews ist Präzision wichtiger als Geschwindigkeit.
 
 ### Provider-Regel: Codex ist read-only
 
-`"provider": "CODEX"` ruft `codex exec` immer mit `--sandbox read-only` auf (`HostCodexService`). Bloecke, die
+`"provider": "CODEX"` ruft `codex exec` immer mit `--sandbox read-only` auf (`HostCodexService`). Blöcke, die
 Dateien schreiben sollen (simple/agentic/foreach mit Datei-Output), melden trotzdem COMPLETED — die Dateien
 fehlen aber (stiller Fehlschlag). Deshalb:
 
-- **CODEX nur fuer Analyse/Extraktion ohne Datei-Writes** (Reports in `previous_output`, Klassifikation).
-- **Schreibende Codex-Workflows ueber Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — der
+- **CODEX nur für Analyse/Extraktion ohne Datei-Writes** (Reports in `previous_output`, Klassifikation).
+- **Schreibende Codex-Workflows über Pi:** `"provider": "PI"`, `"model": "openai-codex/gpt-5.5"` — der
   ACT-Pfad von Pi hat read/write/edit/bash-Tools und kann schreiben (Beispiel: `pi-smoke-test`).
 
 ### Modell setzen
@@ -1044,21 +1044,21 @@ Via API:
 }
 ```
 
-Im Workflow-Entity wird das `model`-Feld via `--model`-Flag an die Claude CLI uebergeben.
+Im Workflow-Entity wird das `model`-Feld via `--model`-Flag an die Claude CLI übergeben.
 
-**Wichtig**: Ein null-Model-Feld nutzt den System-Standard (der Sonnet sein kann). Wenn Opus benoetigt wird, explizit setzen.
+**Wichtig**: Ein null-Model-Feld nutzt den System-Standard (der Sonnet sein kann). Wenn Opus benötigt wird, explizit setzen.
 
 ### Reasoning-Effort (Denkaufwand)
 
-Zusaetzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt werden (`workflow.effort`-Feld, UI: Sidebar → „Denkaufwand"). Gueltige Werte: `low`, `medium`, `high`, `xhigh`. Unset (null) = Provider-Default, es wird **kein** Flag emittiert.
+Zusätzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt werden (`workflow.effort`-Feld, UI: Sidebar → „Denkaufwand"). Gültige Werte: `low`, `medium`, `high`, `xhigh`. Unset (null) = Provider-Default, es wird **kein** Flag emittiert.
 
 | Provider | CLI-Mapping | Hinweise |
 |---|---|---|
 | Claude | `--effort <level>` | REASON- und ACT-Aufrufe |
-| Pi | `--thinking <level>` | Explizites Effort gewinnt ueber die maxTurns-Heuristik; ohne Effort verhaelt sich der ACT-Pfad wie bisher (kein Flag) |
+| Pi | `--thinking <level>` | Explizites Effort gewinnt über die maxTurns-Heuristik; ohne Effort verhält sich der ACT-Pfad wie bisher (kein Flag) |
 | Codex | — | Wird ignoriert (`supportsEffort=false`), UI blendet den Regler aus |
 
-**Pro Block ueberschreiben**: Block-Config-Key `"effort"` uebersteuert das Workflow-Level (Praezedenz: Block > Workflow > Provider-Default). Ungueltige Block-Werte werden mit Warnung ignoriert.
+**Pro Block überschreiben**: Block-Config-Key `"effort"` übersteuert das Workflow-Level (Präzedenz: Block > Workflow > Provider-Default). Ungültige Block-Werte werden mit Warnung ignoriert.
 
 ```json
 {
@@ -1070,11 +1070,11 @@ Zusaetzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt 
 }
 ```
 
-Faustregel: `high`/`xhigh` fuer Analyse-/Audit-Bloecke, `low` fuer mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
+Faustregel: `high`/`xhigh` für Analyse-/Audit-Blöcke, `low` für mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
 
 ### Provider und Modell pro Block
 
-Nach demselben Muster wie `effort` koennen KI-faehige Bloecke (`simple`, `agentic`, `skill-capability` und der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`) den Anbieter und das Modell nur fuer sich selbst festlegen — Config-Schluessel `"provider"` und `"model"`. Aufloesung: **Block > Workflow > System-Default** (`AiProviderRegistry.resolve()` bzw. Provider-Default-Modell). Ohne Block-Schluessel verhalten sich bestehende Workflows unveraendert.
+Nach demselben Muster wie `effort` können KI-fähige Blöcke (`simple`, `agentic`, `skill-capability` und der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`) den Anbieter und das Modell nur für sich selbst festlegen — Config-Schlüssel `"provider"` und `"model"`. Auflösung: **Block > Workflow > System-Default** (`AiProviderRegistry.resolve()` bzw. Provider-Default-Modell). Ohne Block-Schlüssel verhalten sich bestehende Workflows unverändert.
 
 ```json
 [
@@ -1085,40 +1085,40 @@ Nach demselben Muster wie `effort` koennen KI-faehige Bloecke (`simple`, `agenti
 ```
 
 Regeln:
-- Ein Block, der nur `provider` setzt, uebernimmt das Workflow-Modell **nicht**, wenn der Anbieter vom Workflow-Anbieter abweicht — Modell-IDs sind anbieterspezifisch (`opus` vs. `anthropic/opus`). Bei gleichem Anbieter (oder ohne `provider`) gilt das Workflow-Modell weiter.
-- Verschachtelte Bloecke (z. B. `blocks` in `switch`) tragen ihre eigenen Schluessel; der Wrapper-Block vererbt seine Werte nicht an Kind-Bloecke.
-- Der `integration`-Block nutzt `provider` fuer den Integrations-Provider und ist kein KI-Block — dort wirkt kein Override.
-- Im Block-Editor der UI erscheinen die Felder „KI-Anbieter und Modell fuer diesen Block" nur bei KI-faehigen Block-Typen; die Modell-Vorschlaege kommen vom Host-Katalog des gewaehlten Anbieters (`GET /api/v1/system/ai-providers/{id}/models`), Freitext bleibt erlaubt.
-- Die tatsaechlich verwendeten Werte stehen im Step-Metadata der Run-Details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (fuer `agentic` zusaetzlich top-level `provider`/`model`).
-- Wrapper-Bloecke (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) uebernehmen `aiRequest`, `provider` und `requestedModel` ihres **ersten inneren KI-Aufrufs** in ihren Sammel-Step (Anbieter und Modell sind pro Block konstant); die Run-Seite zeigt sie als Pills. Zusaetzliche Schluessel: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, Item-Label auf 120 Zeichen gekuerzt), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Reine Shell-Iterationen tragen kein `aiRequest`.
+- Ein Block, der nur `provider` setzt, übernimmt das Workflow-Modell **nicht**, wenn der Anbieter vom Workflow-Anbieter abweicht — Modell-IDs sind anbieterspezifisch (`opus` vs. `anthropic/opus`). Bei gleichem Anbieter (oder ohne `provider`) gilt das Workflow-Modell weiter.
+- Verschachtelte Blöcke (z. B. `blocks` in `switch`) tragen ihre eigenen Schlüssel; der Wrapper-Block vererbt seine Werte nicht an Kind-Blöcke.
+- Der `integration`-Block nutzt `provider` für den Integrations-Provider und ist kein KI-Block — dort wirkt kein Override.
+- Im Block-Editor der UI erscheinen die Felder „KI-Anbieter und Modell für diesen Block" nur bei KI-fähigen Block-Typen; die Modell-Vorschläge kommen vom Host-Katalog des gewählten Anbieters (`GET /api/v1/system/ai-providers/{id}/models`), Freitext bleibt erlaubt.
+- Die tatsächlich verwendeten Werte stehen im Step-Metadata der Run-Details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (für `agentic` zusätzlich top-level `provider`/`model`).
+- Wrapper-Blöcke (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) übernehmen `aiRequest`, `provider` und `requestedModel` ihres **ersten inneren KI-Aufrufs** in ihren Sammel-Step (Anbieter und Modell sind pro Block konstant); die Run-Seite zeigt sie als Pills. Zusätzliche Schlüssel: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, Item-Label auf 120 Zeichen gekürzt), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Reine Shell-Iterationen tragen kein `aiRequest`.
 
 ---
 
-## 7. Ausfuehrungsumgebung
+## 7. Ausführungsumgebung
 
 ### Host-Umgebung (Standard)
 
-Shell-Bloecke ohne `container_image` laufen auf dem Host. Verfuegbare Tools:
+Shell-Blöcke ohne `container_image` laufen auf dem Host. Verfügbare Tools:
 
 - `curl`, `git`, `python3`, `jq`, `nodejs`, `npm`, `wget`, `unzip`, `bash`
 
-Alles andere (pip-Pakete, go, docker-cli, gh, trivy, spezialisierte Tools) ist **NICHT** verfuegbar.
+Alles andere (pip-Pakete, go, docker-cli, gh, trivy, spezialisierte Tools) ist **NICHT** verfügbar.
 
 ### Live-Output beim Beobachten eines Runs
 
-Waehrend ein Block laeuft, erscheinen seine Ausgaben zeilenweise in den Live-Logs der Ausfuehrungsseite: Shell- und
-Container-Bloecke mit stdout/stderr (zusammengefuehrt), Claude-Bloecke als Tool-Aufrufe, gekuerzter Text und
-Abschluss-Zeile, Pi/Codex als Rohzeilen — auch fuer Bloecke innerhalb von `foreach`/`while`/`retry` (unter dem Index des
-aeusseren Steps). Hinweise:
+Während ein Block läuft, erscheinen seine Ausgaben zeilenweise in den Live-Logs der Ausführungsseite: Shell- und
+Container-Blöcke mit stdout/stderr (zusammengeführt), Claude-Blöcke als Tool-Aufrufe, gekürzter Text und
+Abschluss-Zeile, Pi/Codex als Rohzeilen — auch für Blöcke innerhalb von `foreach`/`while`/`retry` (unter dem Index des
+äußeren Steps). Hinweise:
 
-- Fortschrittsbalken mit `\r` zeigen nur den jeweils letzten Stand; sehr lange Zeilen werden gekuerzt.
-- Programme, die ihre Ausgabe puffern (z. B. `python3` ohne `-u`), erscheinen erst beim Flush — fuer Live-Ausgabe
+- Fortschrittsbalken mit `\r` zeigen nur den jeweils letzten Stand; sehr lange Zeilen werden gekürzt.
+- Programme, die ihre Ausgabe puffern (z. B. `python3` ohne `-u`), erscheinen erst beim Flush — für Live-Ausgabe
   `python3 -u` oder `PYTHONUNBUFFERED=1` verwenden.
-- Der Step-Output (`{{ block.<name>.output }}`, Step-Karte) ist davon unberuehrt und enthaelt wie bisher die komplette Ausgabe.
+- Der Step-Output (`{{ block.<name>.output }}`, Step-Karte) ist davon unberührt und enthält wie bisher die komplette Ausgabe.
 
 ### Container-Images
 
-Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
+Für Shell-Blöcke die mehr Tools benötigen, `container_image` setzen:
 
 | Image | Basis | Enthalten |
 |---|---|---|
@@ -1129,14 +1129,14 @@ Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
 
 ### Regeln
 
-- Shell-Bloecke OHNE `container_image` koennen NUR Host-Tools verwenden
+- Shell-Blöcke OHNE `container_image` können NUR Host-Tools verwenden
 - Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools -> `container_image` setzen
 - Container mounten das Projektverzeichnis nach `/workspace`
-- Claude CLI laeuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
-- Der Server kann `container_image` per Allowlist einschraenken (`automation.execution.allowed-container-images` /
+- Claude CLI läuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
+- Der Server kann `container_image` per Allowlist einschränken (`automation.execution.allowed-container-images` /
   `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Leer (Default) erlaubt jedes Image. Ist ein Image nicht gelistet,
   scheitert der Block sichtbar mit Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt still
-  auszufuehren.
+  auszuführen.
 
 ### Beispiel: Shell-Block mit Container
 
@@ -1170,33 +1170,33 @@ Fuer Shell-Bloecke die mehr Tools benoetigen, `container_image` setzen:
 ### Die Goal-Reason-Act-Observe-Schleife
 
 Jede Iteration:
-1. **REASON**: Claude analysiert den aktuellen Stand, Gespraechsverlauf und entscheidet die naechste ACTION (nutzt `--system-prompt`, `--max-turns 3`)
-2. **ACT**: Ein **separater** Claude-CLI-Aufruf fuehrt die ACTION aus (nutzt `--append-system-prompt`, `--model`, Projektverzeichnis)
-3. **OBSERVE**: Das Ergebnis wird aufgezeichnet und in die naechste REASON-Phase zurueckgefuehrt
+1. **REASON**: Claude analysiert den aktuellen Stand, Gesprächsverlauf und entscheidet die nächste ACTION (nutzt `--system-prompt`, `--max-turns 3`)
+2. **ACT**: Ein **separater** Claude-CLI-Aufruf führt die ACTION aus (nutzt `--append-system-prompt`, `--model`, Projektverzeichnis)
+3. **OBSERVE**: Das Ergebnis wird aufgezeichnet und in die nächste REASON-Phase zurückgeführt
 
 ### Kritisch: ACT hat keinen Kontext aus REASON
 
-Die ACT-Phase ist ein **frischer Claude-CLI-Aufruf**. Sie teilt keinen Gespraechskontext mit REASON. Das bedeutet:
+Die ACT-Phase ist ein **frischer Claude-CLI-Aufruf**. Sie teilt keinen Gesprächskontext mit REASON. Das bedeutet:
 
-**Jede ACTION muss eigenstaendig sein:**
+**Jede ACTION muss eigenständig sein:**
 - **Absolute Pfade** verwenden (nicht relativ, nicht "die Datei von vorhin")
 - **Spezifische Namen** angeben (nicht "die Funktion die wir besprochen haben")
-- **Exakte Anweisungen** geben (nicht "den Bug fixen" sondern "in `/pfad/zur/Datei.java` Zeile 42, `foo` zu `bar` aendern")
+- **Exakte Anweisungen** geben (nicht "den Bug fixen" sondern "in `/pfad/zur/Datei.java` Zeile 42, `foo` zu `bar` ändern")
 
 ```
 FALSCH: "Den Bug in der Service-Klasse fixen"
 RICHTIG: "In /home/user/project/src/main/java/com/example/UserService.java
          die Methode getUserById() anpassen, um null-Eingaben zu behandeln
-         indem am Anfang der Methode eine Null-Pruefung eingefuegt wird."
+         indem am Anfang der Methode eine Null-Prüfung eingefügt wird."
 ```
 
 ### History-Komprimierung
 
-Wenn die History mehr als 7 Eintraege hat, werden mittlere Turns zusammengefasst — der erste Turn (initialer Prompt) und die letzten 4 Turns bleiben vollstaendig erhalten. Das bedeutet, fruehere Beobachtungen koennen komprimiert werden. Ziele und Erfolgskriterien so gestalten, dass sie aus dem juengsten Kontext auswertbar sind.
+Wenn die History mehr als 7 Einträge hat, werden mittlere Turns zusammengefasst — der erste Turn (initialer Prompt) und die letzten 4 Turns bleiben vollständig erhalten. Das bedeutet, frühere Beobachtungen können komprimiert werden. Ziele und Erfolgskriterien so gestalten, dass sie aus dem jüngsten Kontext auswertbar sind.
 
 ### Verschmutzung durch veraltete Dateien
 
-Alte Dateien aus vorherigen Runs koennen den Kontext des Agentic-Blocks verschmutzen (z.B. Glob-Patterns die veraltete Reports aufgreifen). Einen Aufraeum-Schritt vor Agentic-Bloecken einfuegen:
+Alte Dateien aus vorherigen Runs können den Kontext des Agentic-Blocks verschmutzen (z.B. Glob-Patterns die veraltete Reports aufgreifen). Einen Aufräum-Schritt vor Agentic-Blöcken einfügen:
 
 ```json
 {
@@ -1209,7 +1209,7 @@ Alte Dateien aus vorherigen Runs koennen den Kontext des Agentic-Blocks verschmu
 
 ### Sicherheitslimits
 
-| Config-Schluessel | Default | Zweck |
+| Config-Schlüssel | Default | Zweck |
 |---|---|---|
 | `max_iterations` | 10 | Harter Stopp nach N Iterationen |
 | `iteration_timeout_seconds` | 300 | Wall-Clock-Timeout pro Iteration |
@@ -1220,11 +1220,11 @@ Alte Dateien aus vorherigen Runs koennen den Kontext des Agentic-Blocks verschmu
 
 ### Action-Komprimierung
 
-Wenn eine ACTION 100.000 Zeichen ueberschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird.
+Wenn eine ACTION 100.000 Zeichen überschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird.
 
 ### Token-Tracking
 
-Token-Nutzung (Input + Output) wird ueber alle Iterationen getrackt. Wenn das Budget erschoepft ist, stoppt der Block. Wenn REASON oder ACT keine Nutzungsdaten liefern, wird ein WARN geloggt — das Budget wird nicht durchgesetzt.
+Token-Nutzung (Input + Output) wird über alle Iterationen getrackt. Wenn das Budget erschöpft ist, stoppt der Block. Wenn REASON oder ACT keine Nutzungsdaten liefern, wird ein WARN geloggt — das Budget wird nicht durchgesetzt.
 
 ---
 
@@ -1232,30 +1232,30 @@ Token-Nutzung (Input + Output) wird ueber alle Iterationen getrackt. Wenn das Bu
 
 ### Zweistufiges Instruktionssystem
 
-1. **Basis-Instruktionen** (`src/main/resources/agent-instructions.md`): Beim Start geladen, gelten fuer ALLE Workflows. Umfassen Arbeitsverzeichnis, Dateiausgabe, Fehlerbehandlung, Qualitaetsstandards.
+1. **Basis-Instruktionen** (`src/main/resources/agent-instructions.md`): Beim Start geladen, gelten für ALLE Workflows. Umfassen Arbeitsverzeichnis, Dateiausgabe, Fehlerbehandlung, Qualitätsstandards.
 
 2. **Workflow-spezifische Instruktionen** (`workflow.instructions`-Feld): Pro Workflow, editierbar in der UI (Monaco-Editor). Erscheinen als Teil des System-Prompts.
 
 ### Wie Instruktionen injiziert werden
 
-- **Block-Ausfuehrung** (alle Block-Typen): Via `--append-system-prompt`-Flag an der Claude CLI
+- **Block-Ausführung** (alle Block-Typen): Via `--append-system-prompt`-Flag an der Claude CLI
 - **Agentic REASON-Phase**: Via `--system-prompt`-Flag, beinhaltet Workflow-Instruktionen im Abschnitt `## Workflow Instructions`
 
 ### Workflow Memory
 
-Workflows koennen ueber Runs hinweg Wissen ansammeln. Memory kann **manuell** oder **automatisch** extrahiert werden.
+Workflows können über Runs hinweg Wissen ansammeln. Memory kann **manuell** oder **automatisch** extrahiert werden.
 
 #### Wie es funktioniert
 
-1. **Extrahieren** (manuell oder automatisch): Nach einem oder mehreren Runs, Extraktion ueber UI ("Memory"-Tab auf der Workflow-Detailseite) oder API ausloesen. Runs auswaehlen und Provider waehlen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
+1. **Extrahieren** (manuell oder automatisch): Nach einem oder mehreren Runs, Extraktion über UI ("Memory"-Tab auf der Workflow-Detailseite) oder API auslösen. Runs auswählen und Provider wählen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
 2. **Aktivieren** (manuell oder automatisch): Bei manueller Extraktion startet Memory als `active=false`. Bei automatischer Extraktion wird es direkt aktiviert. Nur eine Version kann gleichzeitig aktiv sein.
-3. **Beim naechsten Run verwendet**: Vor jeder Workflow-Ausfuehrung wird das aktive Memory nach `.claude/rules/project-memory.md` im Projektverzeichnis geschrieben. Die Claude CLI greift auf diese Datei automatisch via Rules-System zu; pi und Codex lesen `.claude/rules/` nicht und bekommen Memory, Skills und Projekt-Kontext deshalb als Anhang an den System-Prompt (`RunContextFiles`).
-4. **Versionierung**: Mehrere Memory-Versionen pro Workflow werden aufbewahrt. Aeltere Versionen koennen durch Aktivierung wiederhergestellt werden.
-5. **Bearbeiten**: Titel und Inhalt koennen in der UI (Monaco-Editor) manuell verfeinert werden.
+3. **Beim nächsten Run verwendet**: Vor jeder Workflow-Ausführung wird das aktive Memory nach `.claude/rules/project-memory.md` im Projektverzeichnis geschrieben. Die Claude CLI greift auf diese Datei automatisch via Rules-System zu; pi und Codex lesen `.claude/rules/` nicht und bekommen Memory, Skills und Projekt-Kontext deshalb als Anhang an den System-Prompt (`RunContextFiles`).
+4. **Versionierung**: Mehrere Memory-Versionen pro Workflow werden aufbewahrt. Aeltere Versionen können durch Aktivierung wiederhergestellt werden.
+5. **Bearbeiten**: Titel und Inhalt können in der UI (Monaco-Editor) manuell verfeinert werden.
 
 #### Automatische Extraktion (Auto-Memory)
 
-Konfigurierbar pro Workflow ueber `metadata.autoMemoryExtraction`:
+Konfigurierbar pro Workflow über `metadata.autoMemoryExtraction`:
 
 ```json
 {
@@ -1271,13 +1271,13 @@ Konfigurierbar pro Workflow ueber `metadata.autoMemoryExtraction`:
 - **`enabled`**: Automatische Extraktion ein/aus
 - **`interval`**: Nach wie vielen erfolgreichen Runs extrahiert wird (Default: 5)
 - Nur bei **COMPLETED**-Runs (nicht FAILED, CANCELLED etc.)
-- Zaehlt erfolgreiche Runs seit letzter Extraktion
+- Zählt erfolgreiche Runs seit letzter Extraktion
 - Neues Memory wird automatisch aktiviert (ersetzt das bisherige aktive Memory)
-- Konfiguration auch ueber den Toggle "Auto-Memory" auf der Workflow-Detailseite
+- Konfiguration auch über den Toggle "Auto-Memory" auf der Workflow-Detailseite
 
 #### Wann verwenden
 
-Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen produziert hat — Patterns, Fallstricke, Domain-Wissen — die zukuenftige Runs leiten sollen. Besonders nuetzlich fuer Agentic-Workflows die projektspezifische Konventionen ueber die Zeit lernen. **Auto-Memory empfohlen** fuer Workflows die regelmaessig laufen und deren Erkenntnisse sich akkumulieren.
+Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen produziert hat — Patterns, Fallstricke, Domain-Wissen — die zukünftige Runs leiten sollen. Besonders nützlich für Agentic-Workflows die projektspezifische Konventionen über die Zeit lernen. **Auto-Memory empfohlen** für Workflows die regelmäßig laufen und deren Erkenntnisse sich akkumulieren.
 
 #### API
 
@@ -1287,12 +1287,12 @@ Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen p
 | POST | `/api/v1/workflows/{id}/memory/extract` | Aus Runs extrahieren (`runIds`, `provider`) |
 | PUT | `/api/v1/workflows/{id}/memory/{mid}` | Titel/Inhalt aktualisieren |
 | PUT | `/api/v1/workflows/{id}/memory/{mid}/activate` | Version aktivieren |
-| DELETE | `/api/v1/workflows/{id}/memory/{mid}` | Version loeschen |
+| DELETE | `/api/v1/workflows/{id}/memory/{mid}` | Version löschen |
 
 ```json
 // POST /api/v1/workflows/{id}/memory/extract
 {
-  "runIds": ["run-id-1", "run-id-2"],  // optional — weglassen fuer letzte 10 Runs
+  "runIds": ["run-id-1", "run-id-2"],  // optional — weglassen für letzte 10 Runs
   "provider": "CLAUDE"                  // oder "CODEX"
 }
 ```
@@ -1301,20 +1301,20 @@ Memory extrahieren nachdem ein Workflow einen Run mit wertvollen Erkenntnissen p
 
 ## 10. Chains
 
-Chains gruppieren mehrere Workflows zur **sequentiellen Ausfuehrung**.
+Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
 
 ### Kerneigenschaften
 
-- **Projektuebergreifend**: Eine Chain kann Workflows aus beliebigen Projekten referenzieren
+- **Projektübergreifend**: Eine Chain kann Workflows aus beliebigen Projekten referenzieren
 - **Sequentiell**: Workflows laufen nacheinander (nicht parallel)
 - **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
-- **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level muessen `true` sein)
+- **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level müssen `true` sein)
 
 ### Chain-Struktur
 
 ```json
 {
-  "name": "Vollstaendige Audit + Fix Pipeline",
+  "name": "Vollständige Audit + Fix Pipeline",
   "entries": [
     {
       "workflowId": "<audit-workflow-id>",
@@ -1339,8 +1339,8 @@ GET    /api/v1/chains                      # Alle Chains auflisten
 POST   /api/v1/chains                      # Chain erstellen
 GET    /api/v1/chains/{id}                 # Chain abrufen
 PUT    /api/v1/chains/{id}                 # Chain aktualisieren
-DELETE /api/v1/chains/{id}                 # Chain loeschen
-POST   /api/v1/chains/{id}/execute         # Ausfuehrung starten
+DELETE /api/v1/chains/{id}                 # Chain löschen
+POST   /api/v1/chains/{id}/execute         # Ausführung starten
 GET    /api/v1/chains/runs                 # Alle Chain-Runs auflisten
 GET    /api/v1/chains/{id}/runs            # Runs einer Chain auflisten
 GET    /api/v1/chains/{id}/runs/{runId}    # Einzelnen Run abrufen
@@ -1349,14 +1349,14 @@ POST   /api/v1/chains/runs/{runId}/cancel  # Run abbrechen
 
 ### Limits
 
-- Polling-basierte Fertigstellungspruefung (2s Intervall)
+- Polling-basierte Fertigstellungsprüfung (2s Intervall)
 - 180-Minuten-Timeout pro Workflow in der Chain (3 Stunden, konfigurierbar via `automation.chain.workflow-timeout-minutes`)
 
 ---
 
 ## Integration Block (Plugin-System)
 
-Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc.). Teil des Plugin-Systems — jeder `IntegrationProvider` stellt Actions bereit, die in Workflows als `integration`-Block genutzt werden koennen.
+Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc.). Teil des Plugin-Systems — jeder `IntegrationProvider` stellt Actions bereit, die in Workflows als `integration`-Block genutzt werden können.
 
 **Voraussetzung:** Der Provider muss auf der Integrationen-Seite (`/integrations`) verbunden sein.
 
@@ -1366,9 +1366,9 @@ Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc
 |------|---------|--------------|
 | `provider` | Ja | Provider-ID: `google-calendar`, `trello`, etc. |
 | `action` | Ja | Action-Name, z.B. `list_events`, `create_card` |
-| `params` | Nein | Parameter als Key-Value, unterstuetzt `{{ template_vars }}` |
+| `params` | Nein | Parameter als Key-Value, unterstützt `{{ template_vars }}` |
 
-### Beispiel: Naechste Google Calendar Events abrufen
+### Beispiel: Nächste Google Calendar Events abrufen
 
 ```json
 {
@@ -1401,19 +1401,19 @@ Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc
 }
 ```
 
-### Verfuegbare Actions
+### Verfügbare Actions
 
 Alle Actions eines Providers sind auf der Integrationen-Seite sichtbar (Provider-Karte → "Test"-Button). Action-Namen und Parameter-Schemas werden dort angezeigt.
 
 ### Fehlerbehandlung
 
-Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block als `FAILED` markiert mit der Fehlermeldung im Output. Token-Refresh passiert automatisch.
+Wenn der Provider nicht verbunden ist oder die API fehlschlägt, wird der Block als `FAILED` markiert mit der Fehlermeldung im Output. Token-Refresh passiert automatisch.
 
 ### Neuen Provider als Workflow-Block nutzen
 
 1. Provider auf der Integrationen-Seite verbinden (OAuth-Flow)
-2. Integration-Block im Workflow-Editor hinzufuegen
-3. Provider und Action waehlen, Parameter konfigurieren
+2. Integration-Block im Workflow-Editor hinzufügen
+3. Provider und Action wählen, Parameter konfigurieren
 4. Template-Variablen (`{{ previous_output }}`, `{{ started_at }}`) funktionieren in Params
 
 ---
@@ -1422,45 +1422,45 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block 
 
 ### DO
 
-- **`timeout_seconds` explizit setzen** fuer komplexe Bloecke — nicht auf Defaults verlassen
-- **Opus fuer Analyse-/Audit-Workflows verwenden** — Sonnet halluziniert Findings
+- **`timeout_seconds` explizit setzen** für komplexe Blöcke — nicht auf Defaults verlassen
+- **Opus für Analyse-/Audit-Workflows verwenden** — Sonnet halluziniert Findings
 - **`set -euo pipefail`** am Anfang mehrzeiliger Shell-Befehle verwenden
 - **Absolute Pfade** in Agentic-Block-Zielen und -Aktionen verwenden
-- **Aufraeum-Schritte** vor Agentic-Bloecken einfuegen um Verschmutzung durch veraltete Dateien zu vermeiden
+- **Aufräum-Schritte** vor Agentic-Blöcken einfügen um Verschmutzung durch veraltete Dateien zu vermeiden
 - **Agentic-Block-Ziele spezifisch halten** — "Erstelle index.html in output/" statt "Baue eine Webseite"
-- **`{{ previous_output }}`** verwenden um Block-Ausgaben zu verketten — Daten fliessen vorwaerts durch die Pipeline
-- **Sowohl `timeout_seconds` als auch `iteration_timeout_seconds`** fuer Agentic-Bloecke setzen — das Auto-Alignment hilft, aber explizit ist besser
-- **Verifikations-Block** nach Agentic-Bloecken einfuegen (Dateien pruefen, Tests ausfuehren, Ausgabe validieren)
+- **`{{ previous_output }}`** verwenden um Block-Ausgaben zu verketten — Daten fliessen vorwärts durch die Pipeline
+- **Sowohl `timeout_seconds` als auch `iteration_timeout_seconds`** für Agentic-Blöcke setzen — das Auto-Alignment hilft, aber explizit ist besser
+- **Verifikations-Block** nach Agentic-Blöcken einfügen (Dateien prüfen, Tests ausführen, Ausgabe validieren)
 
 ### DON'T
 
-- **Sonnet nicht fuer Code-Analyse verwenden** — halluziniert falsche Positives (gefaelschte SQL-Injection, gefaelschte Security-Issues)
+- **Sonnet nicht für Code-Analyse verwenden** — halluziniert falsche Positives (gefälschte SQL-Injection, gefälschte Security-Issues)
 - **`iteration_timeout_seconds` nicht niedriger als `timeout_seconds` setzen** — die CLI wird erfolgreich sein, aber die Iteration wird als TIMEOUT markiert
 - **Nicht annehmen, dass ACT Kontext aus REASON hat** — jede Aktion ist ein frischer CLI-Aufruf
-- **Keine relativen Pfade in Agentic-Aktionen** — die ACT-Phase teilt moeglicherweise nicht denselben Working-Directory-Kontext
-- **Opus-Workflows nicht parallel ausfuehren** wenn `max-concurrent-calls` niedrig ist (z.B. 3) — Workflows blockieren sich gegenseitig
-- **`container_image` nicht fuer Simple-Bloecke verwenden** — Simple-Bloecke nutzen immer die Host-Claude-CLI
-- **Nicht vergessen, `model` explizit zu setzen** — null nutzt den System-Standard der moeglicherweise nicht gewuenscht ist
-- **Shell-Bloecke nicht fuer KI-Reasoning verwenden** — stattdessen Simple-Bloecke nutzen (Shell-Bloecke fuehren nur Befehle aus)
-- **Nicht mehr als 5-7 Bloecke** ohne guten Grund verketten — jeder Block fuegt Latenz und Kosten hinzu
-- **Den Verifikationsschritt** nach Agentic-Bloecken nicht ueberspringen — Vertrauen ist gut, Kontrolle ist besser
+- **Keine relativen Pfade in Agentic-Aktionen** — die ACT-Phase teilt möglicherweise nicht denselben Working-Directory-Kontext
+- **Opus-Workflows nicht parallel ausführen** wenn `max-concurrent-calls` niedrig ist (z.B. 3) — Workflows blockieren sich gegenseitig
+- **`container_image` nicht für Simple-Blöcke verwenden** — Simple-Blöcke nutzen immer die Host-Claude-CLI
+- **Nicht vergessen, `model` explizit zu setzen** — null nutzt den System-Standard der möglicherweise nicht gewünscht ist
+- **Shell-Blöcke nicht für KI-Reasoning verwenden** — stattdessen Simple-Blöcke nutzen (Shell-Blöcke führen nur Befehle aus)
+- **Nicht mehr als 5-7 Blöcke** ohne guten Grund verketten — jeder Block fügt Latenz und Kosten hinzu
+- **Den Verifikationsschritt** nach Agentic-Blöcken nicht überspringen — Vertrauen ist gut, Kontrolle ist besser
 
 ### Anti-Patterns
 
-| Anti-Pattern | Problem | Loesung |
+| Anti-Pattern | Problem | Lösung |
 |---|---|---|
 | Agentic-Block mit vagem Ziel | Agent dreht sich ohne Fortschritt | Ziel konkret mit Dateipfaden und Erfolgskriterien formulieren |
-| 100+ Woerter pro Agentic-Aktion | ACT-Phase laeuft in Timeout oder wird verwirrt | In kleinere, spezifische Aktionen aufteilen |
-| Kein Aufraeum vor Agentic-Block | Veraltete Dateien aus vorherigen Runs verschmutzen Kontext | `rm -rf output/`-Shell-Block davor einfuegen |
-| `timeout_seconds: 900` mit Standard-`iteration_timeout_seconds` | Iteration laeuft bei 300s in Timeout obwohl CLI erfolgreich | Beide Timeouts setzen oder Auto-Alignment nutzen |
+| 100+ Wörter pro Agentic-Aktion | ACT-Phase läuft in Timeout oder wird verwirrt | In kleinere, spezifische Aktionen aufteilen |
+| Kein Aufräum vor Agentic-Block | Veraltete Dateien aus vorherigen Runs verschmutzen Kontext | `rm -rf output/`-Shell-Block davor einfügen |
+| `timeout_seconds: 900` mit Standard-`iteration_timeout_seconds` | Iteration läuft bei 300s in Timeout obwohl CLI erfolgreich | Beide Timeouts setzen oder Auto-Alignment nutzen |
 
 ---
 
 ## Anhang: Template-Kurzreferenz
 
-Was in den oeffentlichen Workflow-Pool gehoert, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
+Was in den öffentlichen Workflow-Pool gehört, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
-Alle 65+ eingebauten Templates mit ihrem primaeren Pattern:
+Alle 65+ eingebauten Templates mit ihrem primären Pattern:
 
 | Template | Pattern | Kategorie |
 |---|---|---|
@@ -1633,7 +1633,7 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
 }
 ```
 
-**Tag-Matching**: Komma-separiert mit AND-Semantik. Alle Tags im Pattern muessen im TODO vorhanden sein. Beispiel: `"backend,bug"` matcht ein TODO mit Tags `["backend", "bug", "security"]`, aber nicht `["backend", "feature"]`.
+**Tag-Matching**: Komma-separiert mit AND-Semantik. Alle Tags im Pattern müssen im TODO vorhanden sein. Beispiel: `"backend,bug"` matcht ein TODO mit Tags `["backend", "bug", "security"]`, aber nicht `["backend", "feature"]`.
 
 **Weitere Felder**:
 
@@ -1641,7 +1641,7 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
 |------|---------|-------------|
 | `enabled` | `true` | Trigger aktiv/inaktiv |
 | `processBacklog` | `true` | Bestehende offene TODOs nachträglich verarbeiten (Polling alle 5 Min, max 1 pro Tick) |
-| `contextTemplate` | `{}` | Statische Key-Value-Paare, die zusaetzlich zum TODO-Kontext an den Fix-Workflow uebergeben werden |
+| `contextTemplate` | `{}` | Statische Key-Value-Paare, die zusätzlich zum TODO-Kontext an den Fix-Workflow übergeben werden |
 
 ### Optionale Filter
 
@@ -1649,7 +1649,7 @@ Audit-Workflow → AutoTodoService → TODO (OPEN)
 |------|-------------|----------|
 | `projectId` | Nur TODOs aus diesem Projekt | `"ebf4f50c-..."` |
 | `sourceFilter` | Nur TODOs aus dieser Quelle | `"WORKFLOW"` |
-| `minPriority` | Mindest-Prioritaet (HIGH, MEDIUM, LOW) | `"HIGH"` |
+| `minPriority` | Mindest-Priorität (HIGH, MEDIUM, LOW) | `"HIGH"` |
 
 ### Kontext-Variablen im Fix-Workflow
 
@@ -1668,7 +1668,7 @@ Der Fix-Workflow erhält automatisch diese Variablen:
 | `todo_reference_id` | Run-UUID |
 | `todo_trigger_id` | Trigger-UUID |
 
-Zusaetzlich werden alle Eintraege aus `contextTemplate` des Triggers als weitere Variablen uebergeben.
+Zusätzlich werden alle Einträge aus `contextTemplate` des Triggers als weitere Variablen übergeben.
 
 ### API
 
@@ -1680,7 +1680,7 @@ Zusaetzlich werden alle Eintraege aus `contextTemplate` des Triggers als weitere
 | POST | `/api/v1/todo-triggers` | Trigger erstellen |
 | POST | `/api/v1/todo-triggers/{id}/enable` | Trigger aktivieren |
 | POST | `/api/v1/todo-triggers/{id}/disable` | Trigger deaktivieren |
-| DELETE | `/api/v1/todo-triggers/{id}` | Trigger loeschen |
+| DELETE | `/api/v1/todo-triggers/{id}` | Trigger löschen |
 
 ### Loop-Prevention (3 Schichten)
 

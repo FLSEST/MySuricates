@@ -188,13 +188,13 @@ npm run lint
 
 ### E2E-Tests (Cypress)
 
-Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt ueber die API angelegt und geloescht.
+Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt über die API angelegt und gelöscht.
 
 Es gibt zwei Zielmodi:
 - **Dev**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:9090`
 - **Test**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:8090`
 
-**Wichtig:** Frontend und Cypress muessen immer mit demselben `CYPRESS_TARGET` gestartet werden, sonst erzeugt das UI Daten auf einer anderen Instanz als das Setup/Cleanup.
+**Wichtig:** Frontend und Cypress müssen immer mit demselben `CYPRESS_TARGET` gestartet werden, sonst erzeugt das UI Daten auf einer anderen Instanz als das Setup/Cleanup.
 
 ### Dev-Target (Standard)
 
@@ -206,10 +206,10 @@ cd ai-automation-frontend
 # Frontend startet mit Proxy auf Dev (:9090)
 npm run dev
 
-# Cypress interaktiv oeffnen (Browser-UI)
+# Cypress interaktiv öffnen (Browser-UI)
 npm run cy:open
 
-# Cypress headless ausfuehren (CI-Modus)
+# Cypress headless ausführen (CI-Modus)
 npm run cy:run
 
 # Alias
@@ -220,7 +220,7 @@ Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` 
 
 ### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
 
-**Voraussetzung:** Test-Instanz auf Port `8090` laeuft.
+**Voraussetzung:** Test-Instanz auf Port `8090` läuft.
 
 ```bash
 # Beispiel: Test-Instanz mit festem API-Key starten
@@ -242,7 +242,7 @@ CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
 CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
-Optional koennen die Ziele auch direkt ueberschrieben werden:
+Optional können die Ziele auch direkt überschrieben werden:
 
 ```bash
 CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
@@ -253,8 +253,8 @@ CYPRESS_WS_BASE_URL=ws://localhost:8090
 
 - **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev
 - **Test-Target:** dieselben Daten landen auf der Test-Instanz
-- `cy.apiCleanup()` raeumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
-- Fuer die Test-Instanz kann zusaetzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewuenscht ist
+- `cy.apiCleanup()` räumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
+- Für die Test-Instanz kann zusätzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewünscht ist
 
 **Teststruktur:**
 
@@ -444,72 +444,72 @@ sind) ändert sich dadurch nicht. Details zum Katalog selbst: [architektur.md](a
 
 ## Hygiene-Gate
 
-`scripts/ci/public-hygiene.sh` prueft, was in ein oeffentliches Repository geriete. Die Regeln —
+`scripts/ci/public-hygiene.sh` prüft, was in ein öffentliches Repository geriete. Die Regeln —
 verbotene Literale, Sicherungsdatei-Muster, Allowlist-Pfad, Schwellwerte — stehen in
 `scripts/lib/hygiene-rules.sh` und werden von der CI und vom pre-commit-Hook gemeinsam gelesen.
 
-| Modus | Wer | Prueft | Verhalten |
+| Modus | Wer | Prüft | Verhalten |
 |---|---|---|---|
 | `--tracked` (Default) | CI | getrackter Bestand | Fehler |
-| `--worktree` | lokal | zusaetzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
+| `--worktree` | lokal | zusätzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
 | `--staged` | pre-commit-Hook | nur gestagte Aenderungen | Fehler |
 
-Geprueft wird:
+Geprüft wird:
 
-1. **Getrackt, aber ignoriert.** Frueher eine handgepflegte Liste von zehn Verzeichnisnamen, jetzt
-   `git ls-files --cached --ignored --exclude-standard`. Damit ist jede kuenftige Ignore-Regel
-   automatisch abgedeckt. Bewusste Ausnahmen stehen mit Begruendung in
+1. **Getrackt, aber ignoriert.** Früher eine handgepflegte Liste von zehn Verzeichnisnamen, jetzt
+   `git ls-files --cached --ignored --exclude-standard`. Damit ist jede künftige Ignore-Regel
+   automatisch abgedeckt. Bewusste Ausnahmen stehen mit Begründung in
    `scripts/ci/hygiene-allowlist.txt` — nur Pfade, nie Musterliterale, damit die Allowlist selbst
    nichts preisgibt.
-2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefuegten Zeilen.
-3. **Pool-Neutralitaet** ueber `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
+2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefügten Zeilen.
+3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
    Built-in-Template `pool-neutrality-audit` (dort mit `--all`, weil es den Pool einer laufenden
-   Instanz prueft und nicht nur den getrackten Release-Bestand).
-4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Pruefsumme ab 256 KiB sind ein
-   Fehler, eine einzelne getrackte Datei ueber 5 MiB eine Warnung.
+   Instanz prüft und nicht nur den getrackten Release-Bestand).
+4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Prüfsumme ab 256 KiB sind ein
+   Fehler, eine einzelne getrackte Datei über 5 MiB eine Warnung.
 5. **Streunende Sicherungsdateien** (nur `--worktree`): weder getrackt noch ignoriert. Beim Stagen
    ist derselbe Fund ein Fehler.
-6. **`.gitignore` verraet keine privaten Dateinamen.** Die Datei ist getrackt und geht mit der
-   Veroeffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
-   steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort faellt die Pruefung
+6. **`.gitignore` verrät keine privaten Dateinamen.** Die Datei ist getrackt und geht mit der
+   Veröffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
+   steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort fällt die Prüfung
    still aus.
-7. **Symlinks, die aus dem Repository hinausfuehren.** Getrackte (bzw. gestagte) Links mit absolutem
+7. **Symlinks, die aus dem Repository hinausführen.** Getrackte (bzw. gestagte) Links mit absolutem
    Ziel oder mit einem relativen Ziel oberhalb der Repo-Wurzel sind ein Fehler. `git grep` liest keine
-   Symlink-Blobs, deshalb faengt Check 2 einen Entwickler-Pfad im Linkziel nicht; ausserdem zeigt so ein
+   Symlink-Blobs, deshalb fängt Check 2 einen Entwickler-Pfad im Linkziel nicht; ausserdem zeigt so ein
    Link in jedem Clone, Worktree und Run-Snapshot auf den Original-Checkout statt in den eigenen Baum.
    Beispiel: `ai-automation-backend/workflow-pool` muss auf `../workflow-pool` zeigen, weil das Backend
-   mit cwd `ai-automation-backend/` laeuft und den Pool relativ aufloest.
+   mit cwd `ai-automation-backend/` läuft und den Pool relativ auflöst.
 
-Den Hook installiert `scripts/install-hooks.sh` ueber `core.hooksPath` (laeuft in `setup.sh` mit).
+Den Hook installiert `scripts/install-hooks.sh` über `core.hooksPath` (läuft in `setup.sh` mit).
 
-### Wenn das Gate anschlaegt
+### Wenn das Gate anschlägt
 
 Kein Bypass per Reflex. `git commit --no-verify` existiert, aber ein Treffer ist fast immer echt:
-ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehoert. Erst schauen,
+ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehört. Erst schauen,
 was gestaged ist.
 
-## Abhaengigkeits-Meldungen (Frontend)
+## Abhängigkeits-Meldungen (Frontend)
 
 `npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.
 Nach einer ersten Reduktion von zwanzig auf sieben wurden auch die beiden notwendigen
-Major-Upgrades durchgefuehrt.
+Major-Upgrades durchgeführt.
 
-**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam ueber
+**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam über
 `@monaco-editor/react` → `monaco-editor` und stand auf 3.4.12, dem oberen Rand des
-verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS ueber einen abgehaengten Teilbaum). Ein blankes
+verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS über einen abgehängten Teilbaum). Ein blankes
 Update bewegt es nicht, weil ein `overrides`-Eintrag die Version pinnt — der Eintrag steht jetzt
-auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` fuer alles Weitere
+auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` für alles Weitere
 in Range.
 
 **Weitere Updates:**
 
 | Paket | Aktualisierung |
 |---|---|
-| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhaengigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
+| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhängigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
 | `react-router-dom` / `react-router` | Version 7.18.3 behebt die gemeldeten Router-Befunde. Der bestehende Schutz `isInternalAppPath()` gegen protokollrelative und Backslash-Pfade bleibt bestehen. |
 
-Nachpruefen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Pruefung).
-Fuer Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
+Nachprüfen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Prüfung).
+Für Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
 siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
 
 ## Bekannte Einschränkungen

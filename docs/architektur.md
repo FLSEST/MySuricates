@@ -66,7 +66,7 @@ automation:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
 
-Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` waehlt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Praefix, sonst `en`) — das Ergebnis (welche Module aktiv sind) aendert sich dadurch nicht.
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`) — das Ergebnis (welche Module aktiv sind) ändert sich dadurch nicht.
 
 **Katalog** (einzige Quelle: `modules/ModuleCatalog`, 18 Feature-Module + 4 Härtungsschalter = 22 Schlüssel):
 

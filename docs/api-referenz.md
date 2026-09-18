@@ -294,7 +294,7 @@ Neuen Workflow erstellen.
 | `name` | String | Nein | Menschenlesbarer Name für `{{ block.<name>.output }}`-Referenzen |
 | `config` | Object | Ja | Typ-spezifische Konfiguration |
 | `requiredCapabilities` | String[] | Nein | Benoetigte Capabilities |
-| `skillIds` | String[] | Nein | Skill-IDs die zusaetzlich zu Workflow-Skills fuer diesen Block aktiviert werden (additiv) |
+| `skillIds` | String[] | Nein | Skill-IDs die zusätzlich zu Workflow-Skills für diesen Block aktiviert werden (additiv) |
 
 **Response:** `201` mit `WorkflowResponse`
 
