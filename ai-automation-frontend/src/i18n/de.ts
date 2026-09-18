@@ -1423,6 +1423,7 @@ export const de: TranslationKeys = {
   },
   errors: {
     rateLimited: 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.',
+    rateLimitedUntil: 'Zu viele Anfragen — Pause bis {time}',
   },
   runs: {
     title: 'Ausführungs-Verlauf',
