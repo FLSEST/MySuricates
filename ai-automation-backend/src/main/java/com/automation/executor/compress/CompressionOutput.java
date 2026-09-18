@@ -38,10 +38,14 @@ public final class CompressionOutput {
         return new Assembled(header(src, in, cut.length()) + "\n" + finalDetail + "\n\n" + cut, in, cut.length(), true);
     }
 
-    /** Content of an earlier compression output (everything after the first blank line). */
+    /**
+     * Content of an earlier compression output (everything after the first blank line). The {@link #EMPTY_BODY}
+     * marker counts as empty content — chaining a compression over it must not compress the marker text.
+     */
     public static String bodyOf(String derivedOutput) {
         int split = derivedOutput.indexOf("\n\n");
-        return split < 0 ? "" : derivedOutput.substring(split + 2);
+        String body = split < 0 ? "" : derivedOutput.substring(split + 2);
+        return EMPTY_BODY.equals(body) ? "" : body;
     }
 
     public static Map<String, Object> metadata(CompressionSources.Resolved src, Assembled out, int maxChars,

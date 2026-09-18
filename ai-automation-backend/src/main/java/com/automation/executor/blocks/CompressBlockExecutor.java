@@ -55,7 +55,9 @@ public class CompressBlockExecutor implements BlockExecutor {
         } catch (CompressionException e) {
             fail(result, config, e.getMessage());
         } catch (RuntimeException e) {
-            fail(result, config, e.getClass().getSimpleName() + ": " + e.getMessage());
+            fail(result, config, e.getMessage() == null || e.getMessage().isBlank()
+                    ? e.getClass().getSimpleName()
+                    : e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         result.setCompletedAt(Instant.now());
         result.setDurationMs(Duration.between(result.getStartedAt(), result.getCompletedAt()).toMillis());
@@ -67,10 +69,15 @@ public class CompressBlockExecutor implements BlockExecutor {
         return Set.of("compress");
     }
 
+    /** {@code error} may be null (an exception without a message) — the step must still say something readable. */
     private static void fail(StepResult result, Map<String, Object> config, String error) {
+        String message = error == null || error.isBlank() ? "unbekannter Fehler" : error;
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("derivedOutput", true);
+        metadata.put("error", message);
         result.setInput("compress: " + config.get("source"));
-        result.setOutput("Komprimierung fehlgeschlagen: " + error);
+        result.setOutput("Komprimierung fehlgeschlagen: " + message);
         result.setStatus(StepStatus.FAILED);
-        result.setMetadata(new HashMap<>(Map.of("derivedOutput", true, "error", error)));
+        result.setMetadata(metadata);
     }
 }

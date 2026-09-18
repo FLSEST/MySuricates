@@ -43,7 +43,17 @@ class StageChainTest {
 
         assertThatThrownBy(() -> StageChain.run(steps, "a", RegexGuard.startingNow(Duration.ofSeconds(5))))
                 .isInstanceOf(CompressionException.class)
-                .hasMessageStartingWith("Stufe 2 (lines.replace): Stufe lines.replace: ungültige Ersetzung '$9'");
+                .hasMessageStartingWith("Stufe 2 (lines.replace): ungültige Ersetzung '$9'")
+                .satisfies(e -> assertThat(e.getMessage().split("Stufe", -1)).as("genau eine Stufen-Angabe").hasSize(2));
+    }
+
+    @Test
+    void run_stageErrorFromAHelper_isNamedOnce() {
+        var steps = StageChain.parse(List.of(Map.of("op", "json.limit", "path", "meta", "count", 1)));
+
+        assertThatThrownBy(() -> StageChain.run(steps, "{\"meta\":{}}", RegexGuard.startingNow(Duration.ofSeconds(5))))
+                .isInstanceOf(CompressionException.class)
+                .hasMessage("Stufe 1 (json.limit): 'meta' ist kein Array");
     }
 
     @Test

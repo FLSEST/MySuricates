@@ -52,6 +52,20 @@ class RegexGuardTest {
     }
 
     @Test
+    void manyShortLines_stopAtTheDeadline_notOnlyBetweenStages() {
+        Duration budget = Duration.ofMillis(200);
+        RegexGuard guard = RegexGuard.startingNow(budget);
+        Pattern harmless = RegexGuard.compile("^\\w+: \\d+$", 0, "Stufe test");
+        long start = System.nanoTime();
+
+        assertThatThrownBy(() -> {
+            for (int i = 0; i < 5_000_000; i++) guard.find(harmless, "warn: 12345");
+        }).isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(budget.multipliedBy(2));
+    }
+
+    @Test
     void stackOverflow_becomesCompressionException() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofSeconds(30));
         Pattern deep = RegexGuard.compile("^(a|b)*$", 0, "Stufe test");

@@ -183,6 +183,44 @@ class CompressBlockExecutorTest {
     }
 
     @Test
+    void failureWithoutMessage_staysAReadableFailure() {
+        ExecutionContext nullMessage = mock(ExecutionContext.class);
+        when(nullMessage.getSourceSteps()).thenThrow(new com.automation.executor.compress.CompressionException(null));
+        ExecutionContext runtimeWithoutMessage = mock(ExecutionContext.class);
+        when(runtimeWithoutMessage.getSourceSteps()).thenThrow(new IllegalStateException());
+        Map<String, Object> config = Map.of("source", "backend_tests", "stages", List.of(Map.of("op", "text.normalize")));
+
+        StepResult blank = executor.execute(block(config), nullMessage);
+        StepResult runtime = executor.execute(block(config), runtimeWithoutMessage);
+
+        assertThat(blank.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(blank.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: unbekannter Fehler");
+        assertThat(blank.getMetadata()).containsEntry("derivedOutput", true).containsEntry("error", "unbekannter Fehler");
+        assertThat(runtime.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException");
+    }
+
+    @Test
+    void chainOverAnEmptyCompression_doesNotCompressTheLeerMarker() {
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.COMPLETED, 0, "a\nb");
+        StepResult first = executor.execute(block(Map.of("source", "backend_tests",
+                "stages", List.of(Map.of("op", "lines.filter", "include", List.of("ERROR"))))), ctx);
+        assertThat(first.getOutput()).endsWith("\n\n(leer)");
+        Map<String, Object> md = new HashMap<>(first.getMetadata());
+        md.put("blockType", "compress");
+        ctx.recordOutput("backend_kompakt", first.getOutput());
+        ctx.getSourceSteps().record("backend_kompakt", StepResult.builder().stepIndex(1).status(first.getStatus())
+                .output(first.getOutput()).metadata(md).build());
+
+        StepResult second = executor.execute(BlockDefinition.builder().type("compress").name("noch_kompakter")
+                .config(Map.of("source", "backend_kompakt", "stages", List.of(Map.of("op", "text.normalize")))).build(), ctx);
+
+        assertThat(second.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(second.getOutput()).startsWith("## backend_tests (über backend_kompakt) — COMPLETED · exit 0 · 312 s · 0 → 0 Zeichen");
+        assertThat(second.getOutput()).endsWith("\n\n(leer)");
+        assertThat(((Map<?, ?>) second.getMetadata().get("compression")).get("inChars")).isEqualTo(0);
+    }
+
+    @Test
     void previous_resolvesLastRecordedStep() {
         ExecutionContext ctx = contextWithShellSource("a", StepStatus.COMPLETED, 0, "erste");
         record(ctx, null, 1, "simple", StepStatus.COMPLETED, null, "zweite");

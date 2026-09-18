@@ -65,14 +65,22 @@ public final class StageChain {
         return new Outcome(text, metadata, notes);
     }
 
-    /** Runs one stage; its errors name the stage position and op ("Stufe 2 (lines.filter): …"). */
+    /**
+     * Runs one stage; its errors name the stage position and op exactly once ("Stufe 2 (lines.filter): …").
+     * A message the stage already prefixed with its own "Stufe &lt;op&gt;: " loses that prefix — the position
+     * form contains the op already.
+     */
     private static StageResult apply(Step step, int position, String text, RegexGuard guard) {
         try {
             return step.stage().apply(text, step.config(), guard);
         } catch (CompressionException e) {
+            String op = step.stage().op();
             String prefix = "Stufe " + position;
-            if (e.getMessage() != null && e.getMessage().startsWith(prefix)) throw e;
-            throw new CompressionException(prefix + " (" + step.stage().op() + "): " + e.getMessage());
+            String message = e.getMessage() == null ? "" : e.getMessage();
+            if (message.startsWith(prefix)) throw e;
+            String ownPrefix = StageConfig.where(op) + ": ";
+            if (message.startsWith(ownPrefix)) message = message.substring(ownPrefix.length());
+            throw new CompressionException(prefix + " (" + op + "): " + message);
         }
     }
 }
