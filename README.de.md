@@ -148,6 +148,7 @@ erwartet einen selbst gesetzten API-Schluessel.
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
 | [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
 | [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
+| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
 | [Vision](docs/vision.md) | Produktvision und Roadmap |
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
