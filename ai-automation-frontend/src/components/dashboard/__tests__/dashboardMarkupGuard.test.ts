@@ -14,11 +14,14 @@ const SOURCES = import.meta.glob<string>(
 const FORBIDDEN: [string, RegExp][] = [
   ['dangerouslySetInnerHTML', /dangerouslySetInnerHTML/],
   ['innerHTML', /\.innerHTML\b/],
-  ['Markdown renderer', /from ['"][^'"]*markdown/i],
+  ['outerHTML', /\.outerHTML\b/],
+  ['insertAdjacentHTML', /\.insertAdjacentHTML\b/],
+  ['Markdown renderer', /from ['"][^'"]*(markdown|marked|snarkdown)/i],
   ['img element', /<img\b/],
   ['iframe element', /<iframe\b/],
-  ['href attribute', /\bhref=/],
-  ['src attribute', /\bsrc=/],
+  ['href attribute', /\bhref\s*=/],
+  ['src attribute', /\bsrc\s*=/],
+  ['xlinkHref attribute', /\bxlink(Href|:href)\s*=/i],
 ];
 
 describe('dashboard markup guard', () => {
@@ -27,6 +30,17 @@ describe('dashboard markup guard', () => {
     expect(files.some((file) => file.endsWith('/WidgetContent.tsx'))).toBe(true);
     expect(files.some((file) => file.endsWith('/insights/GateStatusChart.tsx'))).toBe(true);
     expect(files.some((file) => file.includes('__tests__'))).toBe(false);
+  });
+
+  it('is not vacuous: every source is non-empty and a known file has known content', () => {
+    const entries = Object.entries(SOURCES);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [file, source] of entries) {
+      expect(typeof source, file).toBe('string');
+      expect(source.length, file).toBeGreaterThan(0);
+    }
+    const widgets = SOURCES[Object.keys(SOURCES).find((file) => file.endsWith('/InsightsWidgets.tsx'))!];
+    expect(widgets).toContain('WidgetSkeleton');
   });
 
   it.each(FORBIDDEN)('uses no %s', (_name, pattern) => {
