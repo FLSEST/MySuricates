@@ -52,11 +52,16 @@ final class TemplateResolver {
     }
 
     /**
-     * Substitution for shell command lines with mixed trust: trusted values are inserted raw
-     * (byte-identical to {@link #resolve}), untrusted ones single-quoted. Untrusted values are
+     * Substitution for shell command lines with mixed trust: every trusted placeholder resolves
+     * exactly as in {@link #resolve}, untrusted ones are single-quoted. Untrusted values are
      * substituted last, in a single pass that never re-scans what it inserted, so an
      * attacker-controlled value can neither break out of its quotes nor pull other values' raw
      * content into the command line.
+     *
+     * <p>The {@link Taint#NONE} shortcut below only skips the bookkeeping, not a behaviour
+     * difference. A real workflow run never takes it: {@code previous_report} and {@code open_todos}
+     * are always escaped ({@link ExecutionContext#setUntrustedPlatformVariable}), so the taint set
+     * is never empty there.
      */
     static String resolveShell(String template, String previousOutput, Map<String, String> blockOutputs,
                                Map<String, Object> vars, Taint taint) {
