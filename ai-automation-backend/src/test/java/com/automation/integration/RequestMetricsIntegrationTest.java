@@ -123,8 +123,24 @@ class RequestMetricsIntegrationTest {
                 .isBetween(0.0d, 1.0d);
     }
 
+    /**
+     * On by default, because the header is the fastest diagnosis path while developing and the dev
+     * instance runs with no profile set. The profiles that face outwards switch it off explicitly
+     * (application-stable/prod/test.yml).
+     */
     @Test
-    void serverTimingHeaderIsOffByDefault() throws Exception {
+    void serverTimingHeaderIsOnByDefault() throws Exception {
+        config.setServerTimingEnabled(new RequestMetricsConfig().isServerTimingEnabled());
+
+        MvcResult result = mockMvc.perform(get("/api/v1/todos")).andReturn();
+
+        assertThat(result.getResponse().getHeader("Server-Timing")).isNotNull();
+    }
+
+    @Test
+    void serverTimingHeaderCanBeSwitchedOff() throws Exception {
+        config.setServerTimingEnabled(false);
+
         MvcResult result = mockMvc.perform(get("/api/v1/todos")).andReturn();
 
         assertThat(result.getResponse().getHeader("Server-Timing")).isNull();

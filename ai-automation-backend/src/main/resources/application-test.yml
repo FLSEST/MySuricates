@@ -19,3 +19,8 @@ automation:
   serve-frontend: true
   frontend-path: /app/frontend
   environment: Test
+
+automation:
+  request-metrics:
+    # Wie stable/prod: der Header bleibt auf die Entwicklungsinstanz beschraenkt.
+    server-timing-enabled: false

@@ -3,6 +3,8 @@
  * stay prop-based (Insights passes its own time range); these wrappers read the one query that
  * DashboardDataProvider runs for the view's filter — one subscription, however many widgets.
  */
+import { ApiLatencyCard } from './ApiLatencyCard';
+import { useRequestMetrics } from '../../hooks/useRequestMetrics';
 import { RunsChart } from './RunsChart';
 import { SuccessRateChart } from './SuccessRateChart';
 import { FailingWorkflowsCard } from './FailingWorkflowsCard';
@@ -22,6 +24,12 @@ export function SuccessRateChartWidget() {
   const { data, isLoading } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="chart" />;
   return <SuccessRateChart data={data?.timeSeries} />;
+}
+
+export function ApiLatencyWidget() {
+  const { data, isLoading } = useRequestMetrics();
+  if (isLoading) return <WidgetSkeleton size="chart" />;
+  return <ApiLatencyCard data={data} />;
 }
 
 export function FailingWorkflowsWidget() {

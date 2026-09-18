@@ -1447,6 +1447,29 @@ export interface SystemModules {
   modules: ModuleInfo[];
 }
 
+// ── Request Metrics ──────────────────────────────────────
+
+/**
+ * What one API route cost over the current window. Percentiles, not averages: an average hides
+ * the one slow request in fifty, which is the one people notice.
+ */
+export interface RequestMetricRoute {
+  /** Route template with method, e.g. "GET /api/v1/todos" — never the URL with ids in it. */
+  route: string;
+  calls: number;
+  p50Ms: number;
+  p95Ms: number;
+  maxMs: number;
+  /** 95th percentile of the time spent queuing for the single pooled DB connection. */
+  p95WaitMs: number;
+  /** Share of total time spent waiting rather than working, 0..1. */
+  waitShare: number;
+  maxSqlStatements: number;
+  avgSqlStatements: number;
+  maxResponseBytes: number;
+  avgResponseBytes: number;
+}
+
 // ── API Error ────────────────────────────────────────────
 
 export interface ApiError {

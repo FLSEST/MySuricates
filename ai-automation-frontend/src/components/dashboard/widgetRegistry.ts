@@ -7,7 +7,7 @@ import {
   PlannedTodayStat, PlannedThisWeekStat, BuildInfoStat,
 } from './StatWidgets';
 import {
-  RunsChartWidget, SuccessRateChartWidget, FailingWorkflowsWidget,
+  RunsChartWidget, SuccessRateChartWidget, FailingWorkflowsWidget, ApiLatencyWidget,
   ProviderStatsWidget, IntegrationStatsWidget, ModelStatsWidget,
 } from './DashboardDataWidgets';
 import { TodosDonutChart } from './TodosDonutChart';
@@ -71,6 +71,10 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDef[] = [
   {
     id: 'failing-workflows', category: 'quality', size: 'chart', component: FailingWorkflowsWidget,
     label: (t) => t.dashboard.failingWorkflows, description: describedBy('failingWorkflows'),
+  },
+  {
+    id: 'api-latency', category: 'quality', size: 'chart', component: ApiLatencyWidget,
+    label: (t) => t.dashboard.apiLatency, description: describedBy('apiLatency'),
   },
   {
     id: 'provider-stats', category: 'costs', size: 'third', component: ProviderStatsWidget,
