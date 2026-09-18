@@ -17,9 +17,21 @@ public record PoolWorkflowEntry(
         List<BlockDefinition> blocks,
         String instructions,
         String model,
+        /** Reasoning-Effort (low/medium/high/xhigh); {@code null}, wenn der Eintrag keinen nennt. */
+        String effort,
         String version,
         String author,
         Map<String, Object> defaultContext,
         Map<String, Object> metadata,
         String filename
-) {}
+) {
+    /** Backwards-compat constructor for call-sites written before {@code effort} existed (96640e6f). */
+    public PoolWorkflowEntry(String id, Map<String, String> name, Map<String, String> description,
+                             String icon, String category, String scope, List<String> tags,
+                             List<BlockDefinition> blocks, String instructions, String model,
+                             String version, String author, Map<String, Object> defaultContext,
+                             Map<String, Object> metadata, String filename) {
+        this(id, name, description, icon, category, scope, tags, blocks, instructions, model,
+                null, version, author, defaultContext, metadata, filename);
+    }
+}
