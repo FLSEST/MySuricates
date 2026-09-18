@@ -107,6 +107,9 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 | `CONTEXT-PII` | kein personenbezogener Schlüssel im `defaultContext` (Kinder, Adresse, IBAN, Lebenslauf …) | Token-Vergleich, der Schlüssel ist das Signal — auch mit Platzhalter als Wert |
 | `BLOCK-TYPE` | jeder Blocktyp steht in der Registry, auch die im `switch` verschachtelten (`cases[].blocks` und `default` — die einzigen Stellen, an denen ein Block einen Block enthält; die übrigen Wrapper führen Strings aus) | Listenvergleich |
 | `REPO-DEP` | ein Eintrag mit `scope: portable` nennt keines der Repo-Kennzeichen (`ai-automation-backend`, `ai-automation-frontend`, `scripts/`, `mvnw`, `workflow-pool/`) | Substring-Suche |
+| `SELF-API` | die Definition ruft die eigene REST-API nicht auf | ein `/api/v1/<endpunkt>` zusammen mit einem Aufruf (`curl`, `wget`, `requests.`, `urllib`, `fetch(`, `http.client`) oder einem HTTP-Verb davor; die auth-freien `/api/v1/system/{health,info,auth-status}` sind als Lebenszeichen-Sonde erlaubt |
+| `CREDENTIAL` | die Definition liest oder setzt keine Zugangsdaten | Substring `X-API-Key` oder `app_settings` — ohne Ausnahme |
+| `DB-DIRECT` | die Definition liest die Datenbank nicht direkt | `sqlite3` irgendwo, oder `automation.db` zusammen mit einem Lesezugriff (`SELECT`, `INSERT INTO`, `.tables`, …); die Dateigröße anzusehen (`stat`, `du`) bleibt erlaubt |
 | `PARSE` | die Datei ist gültiges JSON und ein Objekt | `json.load` |
 
 ### Die Blocktyp-Registry
@@ -121,22 +124,41 @@ Registry verglichen — driftet eine der beiden, fällt es dort auf.
 `human-input`, `integration`, `retry`, `shell`, `simple`, `skill-capability`,
 `sub-workflow`, `switch`, `todo-close`, `todo-create`, `todo-update`, `while`
 
+### Eigene REST-API, Zugangsdaten, Datenbank — und warum die Muster zweistufig sind
+
+Die Hausregel steht in `CLAUDE.md`: Workflow-Blöcke rufen weder die eigene REST-API noch die
+Datenbank auf. Alles, was ein Workflow an Plattformdaten braucht, injiziert der
+`WorkflowExecutor` als Kontextvariable (`{{ open_todos }}`, `{{ previous_report }}`,
+`{{ workflow_run_id }}`, …). In einer **mitveröffentlichten** Definition kommt ein zweites
+Problem dazu: ein Prompt, der erklärt, wie man sich den API-Key aus `app_settings` holt, ist
+eine Anleitung zum Auslesen von Zugangsdaten — jeder Leser installiert sie mit.
+
+Zwei der drei Muster wären einstufig unbrauchbar, deshalb verlangen sie ein zweites Kennzeichen:
+
+- `/api/v1/` allein ist kein Aufruf. `mocking-gap-audit` führt die Zeichenkette als **Suchmuster**
+  in einer Liste von Netzwerk-Kennzeichen, direkt neben `fetch(` und `axios.`. Gemeldet wird
+  deshalb erst ein konkreter Endpunkt (`/api/v1/todos`, nicht das nackte Präfix) zusammen mit
+  einem Aufruf in der Umgebung.
+- `automation.db` allein ist kein Datenbankzugriff. `mysuricates-performance-audit` sieht sich
+  mit `stat -c %s` nur die **Dateigröße** an und schreibt das auch dazu. Verboten ist das Lesen
+  des Inhalts, das an Hibernate und der einzigen Connection (pool-size 1) vorbeigeht.
+
+Wer TODOs schreiben will, nimmt die Blocktypen `todo-create`, `todo-update` und `todo-close`.
+Wer nur auf einen Befund reagieren will, gibt am Ende `gate_status:` aus und setzt
+`metadata.autoTodo.enabled` — dann legt die Plattform das TODO an, hält es über die Läufe
+hinweg aktuell und schließt es bei GREEN wieder. Genau so wurde `system-performance-analysis`
+umgestellt (TODO 1ccdc6d5): der agentische Block, der per curl `POST /api/v1/todos` aufrief
+und sich den Key aus `app_settings` holen sollte, ist entfallen.
+
 ### Was das Gate nicht prüfen kann
 
-Drei Kriterien bleiben eine Lesefrage und gehören in die Freigabe (Abschnitt 4):
+Zwei Kriterien bleiben eine Lesefrage und gehören in die Freigabe (Abschnitt 4):
 
 - **Kein auf eine Person zugeschnittener Prompt.** `CONTEXT-PII` erwischt den Schlüssel im
   `defaultContext`, nicht eine Formulierung im Prompt selbst.
 - **Keine Abhängigkeit auf Skripte außerhalb des Repositories.** `PATH-ABS` und `PATH-HOME`
   erwischen den offensichtlichen Fall; ein Werkzeug, das nur auf einem bestimmten Rechner
   im `PATH` liegt, sieht das Gate nicht.
-- **Kein Aufruf der eigenen REST-API aus der Definition heraus.** Ein Prompt, der die KI
-  anweist, `POST /api/v1/todos` per curl mit `X-API-Key` aufzurufen (womöglich mit dem
-  Hinweis, den Key aus `app_settings` zu holen), verstößt gegen die Hausregel „Workflow-Blöcke
-  rufen weder REST-API noch DB auf“ und ist in einer mitveröffentlichten Definition zusätzlich
-  eine Anleitung zum Auslesen von Zugangsdaten. Dafür gibt es die Blocktypen `todo-create`,
-  `todo-update` und `todo-close`. Das Gate sieht den Unterschied zwischen einem Beispiel-Body
-  und einer Handlungsanweisung nicht.
 
 ## 4. Wie Einträge entstehen und gepflegt werden
 

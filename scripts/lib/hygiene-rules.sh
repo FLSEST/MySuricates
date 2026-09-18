@@ -110,6 +110,38 @@ HYGIENE_POOL_INSTANCE_KEYS=(
 )
 
 # ---------------------------------------------------------------------------
+# Kriterium „Definition ruft die eigene REST-API oder liest Zugangsdaten"
+# (TODO 1ccdc6d5)
+#
+# Die Hausregel lautet: Workflow-Blöcke rufen weder die eigene REST-API noch die
+# Datenbank auf — alles, was sie brauchen, injiziert der WorkflowExecutor als
+# Kontextvariable ({{ open_todos }}, {{ previous_report }}, …). In einer
+# mitveröffentlichten Definition kommt ein zweites Problem dazu: ein Prompt, der
+# erklärt, wie man sich den API-Key aus app_settings holt, ist eine Anleitung
+# zum Auslesen von Zugangsdaten — jeder Leser installiert sie mit.
+# ---------------------------------------------------------------------------
+
+# Zugangsdaten: keine Ausnahme, das Vorkommen allein ist der Befund.
+HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings")
+
+# Eigene REST-API. Das Präfix allein genügt nicht als Befund: mocking-gap-audit
+# führt "/api/v1/" als Suchmuster in einer Liste von Netzwerk-Kennzeichen, und
+# das ist kein Aufruf. Gemeldet wird erst die Kombination aus Pfad und Aufruf.
+HYGIENE_POOL_API_PREFIX="/api/v1/"
+HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.client")
+
+# Ohne API-Key erreichbar (ApiKeyAuthFilter) und deshalb als Lebenszeichen-Sonde
+# erlaubt — mysuricates-performance-audit misst damit die Antwortzeit.
+HYGIENE_POOL_API_ALLOWED=(
+  "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
+)
+
+# Direkter Datenbankzugriff. Die Datei anzusehen (stat, du) bleibt erlaubt —
+# gemeint ist das Lesen des Inhalts, das an Hibernate und pool-size=1 vorbeigeht.
+HYGIENE_POOL_DB_FILES=("automation.db")
+HYGIENE_POOL_DB_ACCESS=("sqlite3" "SELECT " "INSERT INTO" "UPDATE " "DELETE FROM" ".tables" ".schema")
+
+# ---------------------------------------------------------------------------
 # Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung
 #
 # Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.

@@ -233,6 +233,58 @@ write_pool dot-home-path <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "ls ~/.mysuricates/quarantine"}}]}
 JSON
 
+# --- Kriterium "ruft die eigene REST-API oder liest Zugangsdaten" (TODO 1ccdc6d5) ---
+write_pool self-api-curl <<'JSON'
+{"name": {"de": "Self-Call", "en": "Self call"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/todos"}}]}
+JSON
+
+write_pool self-api-prompt <<'JSON'
+{"name": {"de": "Prompt-Call", "en": "Prompt call"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "agentic", "config": {"goal": "Lege ein TODO an: POST /api/v1/todos mit dem Report."}}]}
+JSON
+
+write_pool api-key-header <<'JSON'
+{"name": {"de": "Key", "en": "Key"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "simple", "config": {"command": "Setze den X-API-Key Header bei allen Aufrufen."}}]}
+JSON
+
+write_pool app-settings-key <<'JSON'
+{"name": {"de": "Store", "en": "Store"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "simple", "config": {"command": "Den API-Key aus app_settings holen."}}]}
+JSON
+
+write_pool db-sqlite <<'JSON'
+{"name": {"de": "DB", "en": "DB"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "sqlite3 data/automation.db 'SELECT count(*) FROM todos'"}}]}
+JSON
+
+# Erlaubt: Dateigroesse ansehen ist kein Datenbankzugriff (mysuricates-performance-audit).
+write_pool db-filesize-ok <<'JSON'
+{"name": {"de": "Groesse", "en": "Size"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "stat -c %s ai-automation-backend/data/automation.db"}}]}
+JSON
+
+# Erlaubt: die auth-freie Health-Sonde.
+write_pool api-health-ok <<'JSON'
+{"name": {"de": "Sonde", "en": "Probe"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s -o /dev/null -w '%{time_total}' http://localhost:9090/api/v1/system/health"}}]}
+JSON
+
+# Erlaubt: das Praefix als Suchmuster in einer Liste, ohne Aufruf (mocking-gap-audit).
+write_pool api-prefix-as-marker-ok <<'JSON'
+{"name": {"de": "Marker", "en": "Marker"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "python3 -c \"MARKERS = ['resttemplate', 'webclient', '/api/v1/', 'wiremock']\""}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
@@ -254,6 +306,14 @@ check "unbekannter Blocktyp ohne config"       'grep -q "blocktype-ohne-config.*
 check "portable mit scripts/-Pfad erkannt"     'grep -q "portable-repo-dep.*REPO-DEP" <<<"$OUT"'
 check "UUID in Grossbuchstaben erkannt"        'grep -q "uppercase-uuid.*UUID" <<<"$OUT"'
 check "Tilde-Pfad auf Punktverzeichnis erkannt" 'grep -q "dot-home-path.*PATH-HOME" <<<"$OUT"'
+check "curl auf die eigene API erkannt"        'grep -q "self-api-curl.*SELF-API" <<<"$OUT"'
+check "API-Aufruf im Prompt erkannt"           'grep -q "self-api-prompt.*SELF-API" <<<"$OUT"'
+check "X-API-Key erkannt"                      'grep -q "api-key-header.*CREDENTIAL" <<<"$OUT"'
+check "app_settings erkannt"                   'grep -q "app-settings-key.*CREDENTIAL" <<<"$OUT"'
+check "sqlite3 auf die DB erkannt"             'grep -q "db-sqlite.*DB-DIRECT" <<<"$OUT"'
+check "Dateigroesse der DB bleibt erlaubt"     '! grep -q "db-filesize-ok" <<<"$OUT"'
+check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$OUT"'
+check "API-Praefix als Suchmuster erlaubt"     '! grep -q "api-prefix-as-marker-ok" <<<"$OUT"'
 
 echo "13) Die Blocktyp-Liste des Gates deckt sich mit der Registry im Backend"
 REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"

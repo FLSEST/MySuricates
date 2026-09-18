@@ -145,6 +145,107 @@ PY
 }
 
 # ---------------------------------------------------------------------------
+# Eigene REST-API, Zugangsdaten, direkter Datenbankzugriff (TODO 1ccdc6d5)
+#
+# Die Hausregel steht in CLAUDE.md: Workflow-Bloecke rufen weder die eigene
+# REST-API noch die Datenbank auf. In einer mitveroeffentlichten Definition ist
+# ein Prompt, der den API-Key aus app_settings holen laesst, zusaetzlich eine
+# Anleitung zum Auslesen von Zugangsdaten.
+#
+# Die Muster sind absichtlich zweistufig: "/api/v1/" allein ist kein Befund
+# (mocking-gap-audit fuehrt es als Suchmuster in einer Liste), "automation.db"
+# allein auch nicht (mysuricates-performance-audit sieht nur die Dateigroesse an).
+# Gemeldet wird erst die Kombination mit einem Aufruf bzw. einem Lesezugriff.
+# ---------------------------------------------------------------------------
+scan_api_and_credentials() {
+  POOL_CREDENTIAL_MARKERS="$(printf '%s\n' "${HYGIENE_POOL_CREDENTIAL_MARKERS[@]}")" \
+  POOL_API_PREFIX="$HYGIENE_POOL_API_PREFIX" \
+  POOL_API_CALLERS="$(printf '%s\n' "${HYGIENE_POOL_API_CALLERS[@]}")" \
+  POOL_API_ALLOWED="$(printf '%s\n' "${HYGIENE_POOL_API_ALLOWED[@]}")" \
+  POOL_DB_FILES="$(printf '%s\n' "${HYGIENE_POOL_DB_FILES[@]}")" \
+  POOL_DB_ACCESS="$(printf '%s\n' "${HYGIENE_POOL_DB_ACCESS[@]}")" \
+  python3 - "$@" <<'PY'
+import os, re, sys
+
+def env_list(name):
+    return [v for v in os.environ.get(name, '').splitlines() if v]
+
+CREDENTIALS = env_list('POOL_CREDENTIAL_MARKERS')
+API_PREFIX = os.environ.get('POOL_API_PREFIX', '/api/v1/')
+API_CALLERS = env_list('POOL_API_CALLERS')
+API_ALLOWED = env_list('POOL_API_ALLOWED')
+DB_FILES = env_list('POOL_DB_FILES')
+DB_ACCESS = env_list('POOL_DB_ACCESS')
+
+# Wie weit um eine Fundstelle herum nach dem zweiten Kennzeichen gesucht wird.
+# 200 Zeichen sind gut eine Befehlszeile — weit genug fuer "curl ... $URL",
+# eng genug, dass zwei unabhaengige Stellen nicht zusammengezogen werden.
+WINDOW = 200
+
+VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + re.escape(API_PREFIX))
+# Konkreter Endpunkt: nach dem Praefix muss ein Pfadsegment folgen. Das nackte
+# Praefix ist ein Suchmuster, kein Aufruf — mocking-gap-audit fuehrt '/api/v1/'
+# in einer Liste von Netzwerk-Kennzeichen, direkt neben 'fetch(' und 'axios.'.
+PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
+
+
+def windows(text, needle):
+    start = 0
+    while True:
+        i = text.find(needle, start)
+        if i < 0:
+            return
+        yield i, text[max(0, i - WINDOW):i + WINDOW]
+        start = i + 1
+
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding='utf-8') as fh:
+            raw = fh.read()
+    except OSError:
+        continue
+
+    for marker in CREDENTIALS:
+        if marker in raw:
+            print(f"{path}\tCREDENTIAL\tliest oder setzt Zugangsdaten: '{marker}' "
+                  f"— eine mitveroeffentlichte Definition darf das nicht erklaeren")
+            break
+
+    for i, window in windows(raw, API_PREFIX):
+        endpoint = PATH_AT.match(raw, i)
+        if endpoint is None:
+            continue
+        hit = endpoint.group(0)
+        if any(hit.startswith(allowed) for allowed in API_ALLOWED):
+            continue
+        caller = next((c for c in API_CALLERS if c in window), None)
+        if caller is None and VERB_CALL.search(window):
+            caller = 'HTTP-Verb'
+        if caller is None:
+            continue
+        print(f"{path}\tSELF-API\truft die eigene REST-API auf: '{hit}' (via {caller}) "
+              f"— Plattformdaten kommen als Kontextvariable, "
+              f"TODOs ueber die Bloecke todo-create/todo-update/todo-close")
+        break
+
+    # sqlite3 ist fuer sich schon der Zugriff, egal welche Datei gemeint ist.
+    if 'sqlite3' in raw:
+        print(f"{path}\tDB-DIRECT\truft sqlite3 auf — das umgeht Hibernate und die "
+              f"einzige Connection (pool-size=1)")
+    else:
+        for db in DB_FILES:
+            access = next((a for _, w in windows(raw, db)
+                           for a in DB_ACCESS if a in w), None)
+            if access:
+                print(f"{path}\tDB-DIRECT\tliest die Datenbank direkt "
+                      f"('{db}' zusammen mit '{access.strip()}') — erlaubt ist nur, "
+                      f"die Dateigroesse anzusehen (stat, du)")
+                break
+PY
+}
+
+# ---------------------------------------------------------------------------
 # Kuratierungsregeln (docs/workflow-pool-kuratierung.md, Abschnitt 3)
 #
 # Die Muster oben fragen "steht hier etwas Privates drin?". Hier geht es um die
@@ -307,6 +408,12 @@ RULES=$(scan_definition_rules "${FILES[@]}")
 if [ -n "$RULES" ]; then
   echo "$RULES"
   FINDINGS=$((FINDINGS + $(printf '%s\n' "$RULES" | grep -c .)))
+fi
+
+API=$(scan_api_and_credentials "${FILES[@]}")
+if [ -n "$API" ]; then
+  echo "$API"
+  FINDINGS=$((FINDINGS + $(printf '%s\n' "$API" | grep -c .)))
 fi
 
 if [ "$FINDINGS" -ne 0 ]; then
