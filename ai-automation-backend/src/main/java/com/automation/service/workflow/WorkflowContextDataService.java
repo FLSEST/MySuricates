@@ -54,9 +54,36 @@ public class WorkflowContextDataService {
             context.setUntrustedPlatformVariable("open_todos", loadOpenTodos(projectId));
             // Measured request costs in the audit fact format — the only sanctioned way for a
             // shell block to see them, since it must not call the REST API (CLAUDE.md).
-            context.setUntrustedPlatformVariable("request_metrics", requestMetricsFactSheet.render());
+            context.setUntrustedPlatformVariable("request_metrics", renderRequestMetrics());
         } catch (Exception e) {
             log.warn("Failed to inject platform data: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Never returns an empty string: a missing measurement has to be stated, not left blank.
+     *
+     * <p>The audit fact format has no room for silence — a fact sheet either carries
+     * {@code FAKT request_metrics_*} lines or names the gap as {@code NICHT GEMESSEN}
+     * ({@code docs/audit-workflow-protocol.md}). An empty value would reach the gate block as an
+     * empty measurement and pass as GREEN, which is the failure mode the format exists to prevent.
+     *
+     * <p>Its own try/catch, not the outer one: there, a failure of this measurement would be
+     * indistinguishable from a failure of the two loaders before it, and the variable would be
+     * absent instead of explicitly empty — the shell block would then see the raw placeholder.
+     * TODO 843be7a5.
+     */
+    private String renderRequestMetrics() {
+        try {
+            String rendered = requestMetricsFactSheet.render();
+            if (rendered == null || rendered.isBlank()) {
+                return "NICHT GEMESSEN: request_metrics (Faktenblatt leer)";
+            }
+            return rendered;
+        } catch (Exception e) {
+            log.warn("Failed to render request metrics fact sheet: {}", e.getMessage());
+            return "NICHT GEMESSEN: request_metrics (Messung nicht verfügbar: %s)"
+                    .formatted(e.getClass().getSimpleName());
         }
     }
 

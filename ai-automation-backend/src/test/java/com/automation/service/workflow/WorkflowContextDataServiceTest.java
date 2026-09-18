@@ -9,6 +9,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.metrics.RequestMetricsFactSheet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,6 +29,7 @@ class WorkflowContextDataServiceTest {
     @Mock private WorkflowRunRepository runRepository;
     @Mock private StepResultRepository stepResultRepository;
     @Mock private TodoRepository todoRepository;
+    @Mock private RequestMetricsFactSheet requestMetricsFactSheet;
 
     @InjectMocks private WorkflowContextDataService service;
 
@@ -259,5 +261,80 @@ class WorkflowContextDataServiceTest {
 
         String resolved = ctx.resolveShellTemplate("echo {{ open_todos }}", false);
         assertThat(resolved).startsWith("echo '<open_todos>").endsWith("</open_todos>'").contains("Fix $(id) it");
+    }
+
+    // --- injectPlatformData: request_metrics (TODO 843be7a5) ----------------------------
+    //
+    // Geprueft wurde die Kontextvariable bisher nur ueber die Vorlage: test-audit-facts.sh
+    // rendert den Shell-Block mit einem Fixture-Wert. Das belegt die Vorlage, nicht die
+    // Injektion -- und in genau dieser Luecke blieb am 2026-09-18 unbemerkt, dass der
+    // Live-Workflow die Aenderung nie bekommen hatte (Run cd335b5c).
+
+    /** Kontext ohne Vorgeschichte: die beiden anderen Lader liefern ihre Platzhalter. */
+    private ExecutionContext injectWithoutHistory() {
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+        return ctx;
+    }
+
+    @Test
+    void injectPlatformData_setsRequestMetricsFromTheFactSheet() {
+        when(requestMetricsFactSheet.render()).thenReturn(
+                "FAKT request_metrics_routes_measured: 12\nFAKT request_metrics_slowest_p95_ms: 154");
+
+        ExecutionContext ctx = injectWithoutHistory();
+
+        assertThat(ctx.getVariable("request_metrics"))
+                .as("die gemessenen Request-Kosten muessen im Kontext stehen, nicht nur in der Vorlage")
+                .isEqualTo("FAKT request_metrics_routes_measured: 12\nFAKT request_metrics_slowest_p95_ms: 154");
+    }
+
+    @Test
+    void injectPlatformData_passesTheExplicitGapThrough() {
+        when(requestMetricsFactSheet.render()).thenReturn(
+                "NICHT GEMESSEN: request_metrics (keine Messwerte seit dem letzten Tagesabschluss)");
+
+        assertThat(injectWithoutHistory().getVariable("request_metrics"))
+                .isEqualTo("NICHT GEMESSEN: request_metrics (keine Messwerte seit dem letzten Tagesabschluss)");
+    }
+
+    @Test
+    void injectPlatformData_requestMetrics_isNeverBlank() {
+        when(requestMetricsFactSheet.render()).thenReturn("   ");
+
+        assertThat((String) injectWithoutHistory().getVariable("request_metrics"))
+                .as("ein leerer Wert erreicht den Gate-Block als leere Messung und wuerde GREEN ergeben")
+                .isNotBlank()
+                .startsWith("NICHT GEMESSEN: request_metrics");
+    }
+
+    @Test
+    void injectPlatformData_factSheetThrows_statesTheGapInsteadOfDroppingTheVariable() {
+        when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
+
+        assertThat((String) injectWithoutHistory().getVariable("request_metrics"))
+                .as("faellt die Messung aus, muss die Luecke dastehen — sonst sieht der Shell-Block"
+                        + " den rohen Platzhalter")
+                .startsWith("NICHT GEMESSEN: request_metrics")
+                .contains("IllegalStateException");
+    }
+
+    @Test
+    void injectPlatformData_factSheetFailure_doesNotCostTheOtherTwoVariables() {
+        when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
+
+        ExecutionContext ctx = injectWithoutHistory();
+
+        assertThat(ctx.getVariable("previous_report")).isEqualTo("(kein vorheriger Report vorhanden)");
+        assertThat(ctx.getVariable("open_todos")).isEqualTo("(keine offenen TODOs)");
+    }
+
+    @Test
+    void requestMetrics_isASystemVariable_soItStaysOutOfEveryStepDelta() {
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS)
+                .as("sonst landet das Faktenblatt im Context-Delta jedes Steps")
+                .contains("request_metrics");
     }
 }
