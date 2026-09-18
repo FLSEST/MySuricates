@@ -71,6 +71,11 @@ check "--tracked meldet Verstoss (exit 1)"     '[ "$RC" -eq 1 ]'
 check "Gate nennt escape-link"                 'grep -q "escape-link" <<<"$OUT"'
 check "sub/ok-link bleibt unbeanstandet"       '! grep -q "ok-link" <<<"$OUT"'
 
+echo "8) docs/plans ist im echten Repository untrackt und ignoriert (TODO 6e9e00e9)"
+TRACKED_PLANS="$(cd "$REPO" && git ls-files docs/plans)"
+check "keine getrackten Dateien unter docs/plans" '[ -z "$TRACKED_PLANS" ]'
+check ".gitignore ignoriert docs/plans/"          'grep -qxF "docs/plans/" "$REPO/.gitignore"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

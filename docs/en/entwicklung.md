@@ -117,8 +117,7 @@ JAR. The JVM lazily loads classes from disk for its entire lifetime.
 
 A second Maven run in the same checkout rewrites `target/classes` and pulls the classes out from
 under the running JVM → `NoClassDefFoundError`. The failure is **sticky** (the classloader caches
-the load failure); only a restart heals it. On 2026-07-27 eleven workflow runs died this way (see
-`docs/plans/2026-07-27-ghost-run-root-cause-fixes.md`).
+the load failure); only a restart heals it. On 2026-07-27 eleven workflow runs died this way.
 
 **Rule:** No `mvn` and no `npm run build` in the main checkout while the dev backend is running.
 Instead:
