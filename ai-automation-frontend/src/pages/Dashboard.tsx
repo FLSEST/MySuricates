@@ -6,6 +6,7 @@ import { DashboardEditBar } from '../components/dashboard/DashboardEditBar';
 import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog';
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
+import { WorkflowWidgetProvider } from '../components/dashboard/WorkflowWidgetProvider';
 import { useDashboardData } from '../components/dashboard/dashboardDataContext';
 import { DASHBOARD_VIEW_PANEL_ID, viewTabId } from '../components/dashboard/viewTabA11y';
 import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFilterBar';
@@ -155,15 +156,18 @@ function DashboardPage() {
         aria-busy={isPlaceholderData || undefined}
         className={`transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}
       >
-        <DashboardGrid
-          widgets={layout.visible}
-          editMode={editMode}
-          disabled={locked}
-          onMove={layout.move}
-          onHide={(instanceId) => layout.setHidden(instanceId, true)}
-          onResize={layout.setSize}
-          onRemove={layout.remove}
-        />
+        {/* Workflow widgets of this view share one request and one run-completed subscription. */}
+        <WorkflowWidgetProvider widgets={layout.visible}>
+          <DashboardGrid
+            widgets={layout.visible}
+            editMode={editMode}
+            disabled={locked}
+            onMove={layout.move}
+            onHide={(instanceId) => layout.setHidden(instanceId, true)}
+            onResize={layout.setSize}
+            onRemove={layout.remove}
+          />
+        </WorkflowWidgetProvider>
       </div>
 
       <WidgetCatalogDialog
