@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -102,6 +104,59 @@ class TodoSpecificationsIntegrationTest {
     @Test
     void blankFilters_areIgnored() {
         assertThat(titles(List.of(), "  ", "", "", " "))
+                .containsExactly("Done thing", "Fix login bug", "Write docs");
+    }
+
+    // --- list order (aa434aee) ---
+
+    /**
+     * {@code priority} is persisted as STRING, so a plain {@code Sort.by("priority")} reads
+     * alphabetically (CRITICAL, HIGH, LOW, MEDIUM) and buries MEDIUM behind LOW.
+     */
+    @Test
+    void listSpec_ordersByBusinessPriority_notAlphabetically() {
+        save("Server down", "prod outage", Todo.Status.OPEN, Todo.Priority.CRITICAL, Todo.Source.AI, "[]");
+
+        List<Todo.Priority> order = todoRepository
+                .findAll(TodoSpecifications.listSpec(project, null, null, null, null, null))
+                .stream().map(Todo::getPriority).toList();
+
+        assertThat(order).containsExactly(
+                Todo.Priority.CRITICAL, Todo.Priority.HIGH, Todo.Priority.MEDIUM, Todo.Priority.LOW);
+    }
+
+    /** The order must survive paging — and the count query must not choke on the CASE order-by. */
+    @Test
+    void listSpec_orderSurvivesPaging() {
+        save("Server down", "prod outage", Todo.Status.OPEN, Todo.Priority.CRITICAL, Todo.Source.AI, "[]");
+
+        Page<Todo> firstPage = todoRepository.findAll(
+                TodoSpecifications.listSpec(project, null, null, null, null, null), PageRequest.of(0, 2));
+
+        assertThat(firstPage.getContent()).extracting(Todo::getPriority)
+                .containsExactly(Todo.Priority.CRITICAL, Todo.Priority.HIGH);
+        assertThat(firstPage.getTotalElements()).isEqualTo(4);
+    }
+
+    /** Equal priority falls back to newest first. */
+    @Test
+    void listSpec_samePriority_newestFirst() throws InterruptedException {
+        save("Older medium", "first", Todo.Status.OPEN, Todo.Priority.MEDIUM, Todo.Source.USER, "[]");
+        Thread.sleep(10);   // @CreatedDate may be stored at millisecond precision — keep the two apart
+        save("Newer medium", "second", Todo.Status.OPEN, Todo.Priority.MEDIUM, Todo.Source.USER, "[]");
+
+        List<String> mediums = todoRepository
+                .findAll(TodoSpecifications.listSpec(project, List.of("OPEN"), "MEDIUM", null, null, null))
+                .stream().map(Todo::getTitle).toList();
+
+        assertThat(mediums).containsExactly("Newer medium", "Older medium");
+    }
+
+    /** Filters keep working through the ordered spec. */
+    @Test
+    void listSpec_keepsTheFilters() {
+        assertThat(todoRepository.findAll(TodoSpecifications.listSpec(project, null, null, null, null, null))
+                .stream().map(Todo::getTitle).sorted().toList())
                 .containsExactly("Done thing", "Fix login bug", "Write docs");
     }
 }

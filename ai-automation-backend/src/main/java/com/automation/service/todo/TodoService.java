@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,8 +45,10 @@ public class TodoService {
 
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {
-        Specification<Todo> spec = TodoSpecifications.buildSpec(projectId, status, priority, source, tag, q);
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Order.asc("priority"), Sort.Order.desc("createdAt")));
+        // The order (priority rank, then newest) sits in the specification — an unsorted
+        // PageRequest is required, a Sort would overwrite that order-by (aa434aee).
+        Specification<Todo> spec = TodoSpecifications.listSpec(projectId, status, priority, source, tag, q);
+        PageRequest pageRequest = PageRequest.of(page, size);
         Page<Todo> result = todoRepository.findAll(spec, pageRequest);
 
         List<TodoResponse> content = responseAssembler.toResponses(result.getContent());
