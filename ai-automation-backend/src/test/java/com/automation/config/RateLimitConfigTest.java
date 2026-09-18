@@ -50,6 +50,18 @@ class RateLimitConfigTest {
         assertThat(config.getRequestsPerMinute()).isEqualTo(120);
     }
 
+    @Test
+    void should_return2_when_clientGlobalBackoffDefaultIsQueried() {
+        // Die heutigen Client-Konstanten sind der Default — ohne Konfiguration bleibt das
+        // Verhalten des Frontends unverändert (b6feccbc).
+        assertThat(config.getClientGlobalBackoffSeconds()).isEqualTo(2);
+    }
+
+    @Test
+    void should_return10_when_clientDefaultRetryAfterIsQueried() {
+        assertThat(config.getClientDefaultRetryAfterSeconds()).isEqualTo(10);
+    }
+
     // --- Setter/Override tests (simulating @ConfigurationProperties injection) ---
 
     @Test
