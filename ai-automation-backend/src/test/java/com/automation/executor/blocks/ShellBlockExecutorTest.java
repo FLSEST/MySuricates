@@ -415,6 +415,69 @@ class ShellBlockExecutorTest {
         assertThat(result.getInput()).isEqualTo("echo 'x; id'");
     }
 
+    private StepResult runCheckedCommand(String scriptOutput, int exitCode) {
+        when(shellService.execute(any(), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult(scriptOutput, exitCode, 10));
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of(
+                        "command", "run-the-checks.sh", "checked_command", true,
+                        "check_category", "build-check")))
+                .build();
+        return executor.execute(block, context);
+    }
+
+    @Test
+    void execute_checkedCommandWithoutOwnGate_prependsTheSyntheticGate() {
+        StepResult green = runCheckedCommand("all good", 0);
+        assertThat(green.getOutput()).startsWith("gate_status: GREEN\ngate_category: build-check");
+
+        setUp();
+        StepResult red = runCheckedCommand("boom", 3);
+        assertThat(red.getOutput()).startsWith("gate_status: RED\ngate_category: build-check");
+    }
+
+    /**
+     * 52826011: {@code GateStatusOutputParser} takes the first marker in the output, so a synthetic
+     * GREEN header used to shadow the script's own worse verdict — the documented pattern of a
+     * script that reports {@code gate_status: RED} and still exits 0 was silently downgraded.
+     */
+    @Test
+    void execute_checkedCommandExitZero_doesNotShadowTheScriptsOwnWorseGate() {
+        String script = "gate_status: RED\ngate_category: public-claims\n"
+                + "gate_description: Arbeitsverzeichnis fehlt\n";
+
+        StepResult result = runCheckedCommand(script, 0);
+
+        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
+        assertThat(gate.category()).isEqualTo("public-claims");
+        assertThat(result.getOutput()).doesNotContain("gate_status: GREEN");
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("checkedCommand", true);
+    }
+
+    @Test
+    void execute_checkedCommandFailing_stillEscalatesAMilderScriptGate() {
+        StepResult result = runCheckedCommand("gate_status: YELLOW\ngate_category: lint\n", 2);
+
+        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
+        assertThat(result.getOutput()).startsWith("gate_status: RED");
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+    }
+
+    @Test
+    void execute_checkedCommandFailingWithItsOwnRed_keepsTheScriptsCategoryAndDescription() {
+        StepResult result = runCheckedCommand(
+                "gate_status: RED\ngate_category: tests\ngate_description: 3 Tests rot\n", 1);
+
+        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
+        assertThat(gate.category()).isEqualTo("tests");
+        assertThat(gate.description()).isEqualTo("3 Tests rot");
+    }
+
     @Test
     void execute_cleanRun_blockOutputStaysRaw() {
         context.recordOutput("scan", "a | b");
