@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # API-Referenz
 
 > **Scope:** Vollständige interne REST-API-Referenz für MySuricates. Die kuratierte Kurzreferenz für externe Agents ist [AGENTS.md](../AGENTS.md).

@@ -36,6 +36,20 @@ HYGIENE_SELF_EXCLUDE=(
 )
 
 # ---------------------------------------------------------------------------
+# Verbotene Literale in getrackten Markdown-Dateien (TODO 994af971)
+#
+# Eigene Liste statt HYGIENE_PATTERNS: die generische Literal-Pruefung deckt
+# den gesamten getrackten Bestand ab, und Test-Fixtures (wie in
+# scripts/tests/test-public-hygiene.sh) duerfen den Stempel als Beispieltext
+# verwenden, ohne das Gate ueber sich selbst auszuloesen. Die Suche hier bleibt
+# auf *.md beschraenkt (git grep -- '*.md'), deshalb reicht das ohne
+# Self-Exclude. Format wie HYGIENE_PATTERNS: "muster|beschreibung".
+# ---------------------------------------------------------------------------
+HYGIENE_MD_PATTERNS=(
+  "[auto-generated]|nie ersetzter Stempel-Platzhalter, ersatzlos streichen (siehe TODO 994af971)"
+)
+
+# ---------------------------------------------------------------------------
 # Sicherungsdateien, die weder getrackt noch ignoriert sein dürfen
 #
 # Eine solche Datei ist lokal nur eine Warnung, beim Stagen ein Fehler: genau so

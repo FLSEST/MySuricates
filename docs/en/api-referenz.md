@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # API Reference
 
 ## General
