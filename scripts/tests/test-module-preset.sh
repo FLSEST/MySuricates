@@ -82,6 +82,23 @@ check "no flag + LANG=fr_FR speaks English"           '[[ "$MENU_FALLBACK" == *"
 check "every feature module is offered exactly once"  '[ "$(printf "%s\n" "$MENU_DE" | grep -c "^ \{9\}[^ ].* — ")" -eq "${#MODULE_CATALOG_FEATURE_KEYS[@]}" ]'
 check "the language never changes the result"         '[ "$(LANG=fr_FR module_preset_prompt research <<<"" 2>/dev/null)" = research ]'
 
+echo "10) the comment header of the written config follows --lang (TODO 7c90b447)"
+CFG_EN="$TMP/backend-en/config/application.yml"
+module_preset_write "$CFG_EN" core en; RC=$?
+check "writes with rc=0"                              '[ "$RC" -eq 0 ]'
+check "header text is English"                        'grep -q "^# Local override config" "$CFG_EN"'
+check "still explains how to override single modules" 'grep -q "automation.modules.webhooks: true" "$CFG_EN"'
+check "no German header text leaks in"                '! grep -q "Lokale Override-Config" "$CFG_EN"'
+
+CFG_DE="$TMP/backend-de/config/application.yml"
+module_preset_write "$CFG_DE" core de; RC=$?
+check "writes with rc=0"                              '[ "$RC" -eq 0 ]'
+check "header text is German"                         'grep -q "^# Lokale Override-Config" "$CFG_DE"'
+
+CFG_DEFAULT="$TMP/backend-default/config/application.yml"
+module_preset_write "$CFG_DEFAULT" core; RC=$?
+check "no lang argument keeps the German default"     'grep -q "^# Lokale Override-Config" "$CFG_DEFAULT"'
+
 echo
 echo "passed: $PASS, failed: $FAIL"
 [ "$FAIL" -eq 0 ]
