@@ -314,6 +314,69 @@ networks:
     driver: bridge
 ```
 
+## Reverse Proxy
+
+Since the switch to one-time tickets for the WebSocket handshake (TODO 05b759f6), the frontend
+enforces `transports: ['websocket']` and deliberately disables the SockJS fallback (HTTP polling):
+a one-time ticket is only valid for the first connection attempt and does not survive a transport
+switch. A reverse proxy in front of MySuricates therefore **must** pass WebSocket connections
+through via an HTTP upgrade — without upgrade support, the app stops connecting.
+
+On `localhost`, over Tailscale, and in the Stable/Test containers this holds (direct access, no
+proxy in between); the break only shows up with custom reverse-proxy deployments.
+
+### nginx
+
+```nginx
+location /ws/ {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+}
+
+location / {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_set_header Host $host;
+}
+```
+
+### Caddy
+
+Caddy detects WebSocket upgrades automatically — no extra configuration is needed:
+
+```caddyfile
+example.com {
+    reverse_proxy 127.0.0.1:9090
+}
+```
+
+### Failure Pattern
+
+If the upgrade is not passed through, the `ticket` query parameter still reaches the backend (it
+lives in the URL, not a header) — `WebSocketAuthInterceptor.beforeHandshake` runs before Spring's
+own upgrade check, so it consumes an otherwise valid ticket even when the protocol switch itself
+fails right after due to the missing headers. Tickets are deliberately short-lived and single-use
+(TTL 30s, `WebSocketTicketService`): reproducing the problem (`curl`, repeated reloads, a ticket
+copied from the browser devtools) shows one of two lines from `WebSocketAuthInterceptor` in the
+backend log:
+
+```
+WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}
+```
+
+— a presented ticket is expired, already used, or forged; or
+
+```
+WebSocket handshake rejected: no ticket presented by {}
+```
+
+— no `ticket` parameter arrived at all (e.g. because a test tool or a proxy drops the query
+string). This is not a ticket bug. Check whether the proxy responds to the `/ws/**` path with
+status 101 (Switching Protocols).
+
 ## Trust Model and Network Exposure
 
 MySuricates is built for **local operation by a single trusted person**. It is not a hardened
