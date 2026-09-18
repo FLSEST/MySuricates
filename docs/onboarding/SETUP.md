@@ -10,8 +10,8 @@ Schritt-fuer-Schritt Anleitung zur Einrichtung der lokalen Entwicklungsumgebung.
 |---|---|---|
 | **JDK** | 21+ | `java -version` |
 | **Maven** | 3.9+ | `mvn -version` |
-| **Node.js** | 18+ | `node -v` |
-| **npm** | 9+ | `npm -v` |
+| **Node.js** | 20.19+ / 22.12+ / 24+ (`engines` in `package.json`) | `node -v` |
+| **npm** | 10+ | `npm -v` |
 | **Docker** | 24+ | `docker --version` |
 | **Docker Compose** | 2.x | `docker compose version` |
 | **Claude CLI** | aktuell | `claude --version` |
@@ -78,11 +78,14 @@ export AUTOMATION_WORKSPACE_ROOT=/pfad/zu/projekten
 ### 2.3 Starten
 
 ```bash
-mvn spring-boot:run
+# aus dem Repo-Root -- baut das JAR, kopiert es und startet `java -jar`
+./scripts/start-autotrigger-dev.sh start   # bzw. restart | stop
 ```
 
+> **Nicht** `mvn spring-boot:run` verwenden: der `RuntimeClasspathGuard` beendet einen Start aus `target/classes` mit Exit-Code 2 (Escape-Hatch: `automation.runtime.allow-classes-dir`).
+
 Das Backend startet auf **http://localhost:9090**. Beim ersten Start:
-- Flyway fuehrt alle 68 Migrationen aus
+- Flyway fuehrt alle 73 Migrationen aus (V1-V73)
 - SQLite-Datenbank wird unter `data/automation.db` erstellt
 - 19 Built-in Skills werden geseedet
 - 66 Workflow-Templates werden geseedet
@@ -106,7 +109,13 @@ npm install
 
 ### 3.2 Konfiguration
 
-Die `.env`-Datei enthaelt die Backend-URLs:
+Im Repository liegt nur `.env.example`. Fuer eine eigene Konfiguration kopieren:
+
+```bash
+cp .env.example .env
+```
+
+Darin stehen die Backend-URLs:
 
 ```env
 VITE_API_BASE_URL=http://localhost:9090
@@ -131,6 +140,8 @@ Das Frontend startet auf **http://localhost:3000**.
 | `npm run build` | TypeScript-Check + Production Build |
 | `npm run preview` | Production Build lokal testen |
 | `npm run lint` | ESLint ausfuehren |
+| `npm test` | Vitest-Unit-Tests (einmalig) |
+| `npm run test:watch` | Vitest im Watch-Modus |
 | `npm run cy:open` | Cypress interaktiv oeffnen |
 | `npm run cy:run` | Cypress headless ausfuehren |
 | `npm run test:e2e` | Alias fuer `cy:run` |
@@ -176,18 +187,24 @@ cd ai-automation-backend
 mvn test
 ```
 
-Es gibt 49 Testdateien in folgenden Kategorien:
-- **Controller-Tests** (6): Integration-Tests fuer REST-Endpunkte
-- **Service-Tests** (20+): Unit-Tests fuer Business-Logik
-- **Executor-Tests** (7): Tests fuer Block-Ausfuehrungslogik
-- **Integration-Tests**: End-to-End Tests
+Stand 2026-09-18 enthaelt `src/test/java` 715 Testklassen (`find src/test/java \( -name '*Test.java' -o -name '*Tests.java' \) | wc -l`), verteilt auf:
+- **Service-Tests** (299): Unit-Tests fuer Business-Logik
+- **Integrationstests** (77): Spring-Kontext gegen eine dateibasierte SQLite-DB
+- **Executor-Tests** (44): Tests fuer Block-Ausfuehrungslogik
+- **Controller-Tests** (43): Tests fuer REST-Endpunkte
+- **Security-Tests** (8): API-Key, Rate-Limiting
 
-### Frontend (Cypress E2E)
+Die Zahlen altern -- im Zweifel neu erheben statt zitieren.
+
+### Frontend (Vitest + Cypress E2E)
 
 ```bash
 cd ai-automation-frontend
 
-# Voraussetzung: Backend muss laufen!
+# Unit-Tests (kein laufendes Backend noetig)
+npm test
+
+# E2E -- Voraussetzung: Backend muss laufen!
 npm run test:e2e    # Headless
 npm run cy:open     # Interaktiv
 ```
