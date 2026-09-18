@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Client } from '@stomp/stompjs';
+import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
-import { useSettingsStore } from '../stores/settingsStore';
 import type { AgenticState, PendingHumanInput } from '../types';
 import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot } from '../types/websocket';
 import {
@@ -75,12 +74,27 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       appendEntries(entries);
     };
 
-    const apiKey = useSettingsStore.getState().apiKey;
-    const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
+    // Der API-Key darf nicht in die Handshake-URL (Browser-History, Proxy-Logs): stompjs wartet
+    // vor JEDEM Verbindungsversuch — auch vor jedem Reconnect — auf beforeConnect, dort holen wir
+    // ein frisches Einmal-Ticket. Schlägt das fehl, geht der Handshake ohne Ticket raus, wird
+    // abgelehnt und stompjs plant den nächsten Versuch (statt einer offenen Promise-Ablehnung).
+    let wsTicket = '';
 
     const client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
+      beforeConnect: async () => {
+        wsTicket = await api.fetchWsTicket().catch(() => '');
+      },
+      // Nur der WebSocket-Transport: SockJS legt für jeden Fallback-Versuch (xhr-streaming …) eine
+      // neue Session an und bräuchte dafür ein zweites Ticket — das erste ist da schon verbraucht.
+      // Die Instanz muss also einen WebSocket-fähigen Pfad haben; es gibt keinen SockJS-Fallback.
+      webSocketFactory: () =>
+        new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
+          transports: ['websocket'],
+        }),
       reconnectDelay: 5000,
+      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
+      maxReconnectDelay: 60_000,
       onConnect: () => {
         setConnected(true);
         // Live batches arriving while the replay request is pending wait for it, so lines stay ordered.

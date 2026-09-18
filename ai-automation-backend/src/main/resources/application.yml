@@ -110,6 +110,10 @@ automation:
     rate-limit:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
+  websocket:
+    # Lifetime of a single-use WebSocket handshake ticket (POST /api/v1/ws-ticket). Long enough for
+    # the browser to open the socket, short enough that a leaked URL is worthless.
+    ticket-ttl-seconds: ${AUTOMATION_WS_TICKET_TTL_SECONDS:30}
   activity-log:
     max-request-bytes: ${AUTOMATION_ACTIVITY_LOG_MAX_BYTES:65536}
   ai:

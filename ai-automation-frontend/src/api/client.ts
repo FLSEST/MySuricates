@@ -145,6 +145,16 @@ class ApiClient {
   delete<T>(path: string): Promise<T> {
     return this.request<T>(path, { method: 'DELETE' });
   }
+
+  /**
+   * Holt ein kurzlebiges Einmal-Ticket für den WebSocket-Handshake. Der API-Key reist dabei im
+   * Header (wie überall); nur das Ticket landet in der Handshake-URL — weder SockJS noch ein rohes
+   * Browser-WebSocket können beim Handshake eigene Header setzen.
+   */
+  async fetchWsTicket(): Promise<string> {
+    const response = await this.post<{ ticket: string; expiresInSeconds: number }>('/ws-ticket');
+    return response.ticket;
+  }
 }
 
 export const api = new ApiClient();

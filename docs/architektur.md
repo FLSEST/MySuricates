@@ -198,7 +198,7 @@ com.automation
 │   └── blocks/          19 Block-Executors + Agentic-Hilfsklassen (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Konfigurationsklassen, Seeder (Skill, Template, OnboardingProfile)
-├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
+├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor, WebSocketTicketService
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message-DTOs
@@ -792,7 +792,7 @@ Response (DTO) → React Query Cache → UI-Update
 ## WebSocket (Live-Logs + Status)
 
 - **Protokoll:** STOMP über SockJS
-- **Endpunkt:** `/ws` (SockJS Handshake)
+- **Endpunkt:** `/ws` (SockJS Handshake, Authentifizierung per Ticket — siehe [WebSocket-Authentifizierung](#websocket-authentifizierung))
 - **Broker:** Simple Message Broker auf `/topic`
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow-Ausführungs-Logs
@@ -863,7 +863,18 @@ Response (DTO) → React Query Cache → UI-Update
 
 ### WebSocket-Authentifizierung
 
-- **Interceptor:** `WebSocketAuthInterceptor` — validiert API-Key bei WebSocket-Handshake
+Weder SockJS noch ein rohes Browser-WebSocket kann beim Handshake eigene Header senden — die Authentifizierung muss also über die URL laufen. Der API-Key darf dort nicht stehen (Browser-History, Proxy-Logs), deshalb geht ein **kurzlebiges Einmal-Ticket** voraus:
+
+1. Client ruft `POST /api/v1/ws-ticket` auf — **mit dem API-Key im Header**, wie jeder andere Endpunkt (unterliegt dem normalen API-Rate-Limit). Antwort: `{ "ticket": "<43 Zeichen>", "expiresInSeconds": 30 }`
+2. Client hängt das Ticket als `?ticket=…` an die Handshake-URL (`/ws` und `/ws/terminal/{runId}`)
+3. `WebSocketAuthInterceptor` löst das Ticket ein und lässt den Handshake durch — **genau einmal und nur vor Ablauf**. Ein `?apiKey=` wird abgelehnt (401, Handshake abgebrochen) und mit eigenem Hinweis protokolliert.
+
+- **Ticket-Speicher:** `WebSocketTicketService` — rein in-memory (`ConcurrentHashMap`, kein DB-Zugriff im Handshake), 32 zufällige Bytes URL-safe Base64, abgelaufene Einträge werden bei jedem `issue()`/`consume()` weggeräumt (kein Scheduler). Zusätzlich ist der Speicher hart auf **1000 offene Tickets** gedeckelt; darüber fällt das älteste heraus (der betroffene Client holt beim nächsten Versuch einfach ein neues). Tickets überleben keinen Neustart — genau ihre gedachte Lebensdauer.
+- **Laufzeit:** `automation.websocket.ticket-ttl-seconds` (Default 30, Env `AUTOMATION_WS_TICKET_TTL_SECONDS`)
+- **Frontend:** `api.fetchWsTicket()`; `useWebSocket`/`useAssistantWebSocket` holen das Ticket in stompjs' `beforeConnect` (läuft vor jedem Verbindungsversuch inkl. Reconnect), das Run-Terminal vor `new WebSocket(...)`. Ein Wächter-Test verbietet `apiKey=` in `src/`.
+- **Kein SockJS-Fallback:** Die Clients laufen mit `transports: ['websocket']`. SockJS legt für jeden Fallback-Transport (xhr-streaming, xhr-polling) eine eigene Session an und bräuchte dafür ein zweites Ticket — das erste ist nach dem WebSocket-Versuch verbraucht. **Die Instanz braucht also einen WebSocket-fähigen Pfad** (Proxy/Reverse-Proxy muss Upgrades durchlassen); einen HTTP-Fallback gibt es nicht mehr.
+- **Reconnect:** `reconnectDelay: 5000` mit `ReconnectionTimeMode.EXPONENTIAL` und `maxReconnectDelay: 60000` — jeder Versuch kostet einen `POST /ws-ticket` und soll bei totem Backend nicht gegen das API-Rate-Limit laufen.
+- **Deaktiviert:** Bei `automation.security.enabled=false` oder ohne konfigurierten Key lässt der Interceptor jeden Handshake durch (wie der `ApiKeyAuthFilter`).
 
 ### CORS
 
