@@ -318,7 +318,7 @@ networks:
 
 ## Reverse-Proxy
 
-Seit dem Umstieg auf Einmal-Tickets für den WebSocket-Handshake (Commit 05b759f6) erzwingt das
+Seit dem Umstieg auf Einmal-Tickets für den WebSocket-Handshake (TODO 05b759f6) erzwingt das
 Frontend `transports: ['websocket']` und schaltet den SockJS-Fallback (HTTP-Polling) bewusst ab: Ein
 Einmal-Ticket ist nur für den ersten Verbindungsversuch gültig und überlebt keinen
 Transport-Wechsel. Ein Reverse-Proxy vor MySuricates **muss** WebSocket-Verbindungen also per
@@ -357,15 +357,27 @@ example.com {
 
 ### Fehlerbild
 
-Fehlt die Upgrade-Weiterleitung, bricht der Handshake ab und das Backend-Log zeigt:
+Fehlt die Upgrade-Weiterleitung, kommt der `ticket`-Query-Parameter trotzdem noch beim Backend an (er
+steckt in der URL, nicht in einem Header) — `WebSocketAuthInterceptor.beforeHandshake` läuft vor
+Springs eigener Upgrade-Prüfung und verbraucht ein an sich gültiges Ticket also selbst dann, wenn der
+Protokollwechsel gleich danach an den fehlenden Headern scheitert. Tickets sind bewusst kurzlebig und
+Einmalgebrauch (TTL 30 s, `WebSocketTicketService`): Beim Nachstellen des Problems (`curl`,
+wiederholtes Neuladen, ein aus den Browser-DevTools kopiertes Ticket) zeigt das Backend-Log eine von
+zwei Zeilen aus `WebSocketAuthInterceptor`:
 
 ```
-missing, expired or already used ticket
+WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}
 ```
 
-Das ist kein Ticket-Bug — der Browser fällt (mangels Upgrade) auf einen zweiten Verbindungsversuch
-zurück und verbraucht das Einmal-Ticket dabei ein zweites Mal. Prüfen: Antwortet der Proxy auf den
-`/ws/**`-Pfad mit Status 101 (Switching Protocols)?
+— ein vorgelegtes Ticket ist abgelaufen, schon verbraucht oder erraten; oder
+
+```
+WebSocket handshake rejected: no ticket presented by {}
+```
+
+— es kam gar kein `ticket`-Parameter an (z. B. weil ein Test-Werkzeug oder ein Proxy die Query
+verwirft). Das ist kein Ticket-Bug. Prüfen: Antwortet der Proxy auf den `/ws/**`-Pfad mit Status 101
+(Switching Protocols)?
 
 ## Vertrauensmodell und Netzwerk-Exposition
 

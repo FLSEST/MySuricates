@@ -316,7 +316,7 @@ networks:
 
 ## Reverse Proxy
 
-Since the switch to one-time tickets for the WebSocket handshake (commit 05b759f6), the frontend
+Since the switch to one-time tickets for the WebSocket handshake (TODO 05b759f6), the frontend
 enforces `transports: ['websocket']` and deliberately disables the SockJS fallback (HTTP polling):
 a one-time ticket is only valid for the first connection attempt and does not survive a transport
 switch. A reverse proxy in front of MySuricates therefore **must** pass WebSocket connections
@@ -355,15 +355,27 @@ example.com {
 
 ### Failure Pattern
 
-If the upgrade is not passed through, the handshake fails and the backend log shows:
+If the upgrade is not passed through, the `ticket` query parameter still reaches the backend (it
+lives in the URL, not a header) — `WebSocketAuthInterceptor.beforeHandshake` runs before Spring's
+own upgrade check, so it consumes an otherwise valid ticket even when the protocol switch itself
+fails right after due to the missing headers. Tickets are deliberately short-lived and single-use
+(TTL 30s, `WebSocketTicketService`): reproducing the problem (`curl`, repeated reloads, a ticket
+copied from the browser devtools) shows one of two lines from `WebSocketAuthInterceptor` in the
+backend log:
 
 ```
-missing, expired or already used ticket
+WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}
 ```
 
-This is not a ticket bug — without the upgrade, the browser falls back to a second connection
-attempt and consumes the one-time ticket a second time in the process. Check whether the proxy
-responds to the `/ws/**` path with status 101 (Switching Protocols).
+— a presented ticket is expired, already used, or forged; or
+
+```
+WebSocket handshake rejected: no ticket presented by {}
+```
+
+— no `ticket` parameter arrived at all (e.g. because a test tool or a proxy drops the query
+string). This is not a ticket bug. Check whether the proxy responds to the `/ws/**` path with
+status 101 (Switching Protocols).
 
 ## Trust Model and Network Exposure
 

@@ -387,7 +387,7 @@ Das Backend umfasst **38 REST-Controller** und **19 Block-Typen**:
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`
 
-**Flyway-Migrationen:** V1–V69 (SQLite)
+**Flyway-Migrationen:** V1–V73 (SQLite)
 
 ### Gate Status System
 
