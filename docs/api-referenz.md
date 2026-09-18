@@ -3365,7 +3365,22 @@ Weitere Typen: `status`, `approval_required`/`approval_resolved`, `human_input_r
 ### Terminal-WebSocket
 
 ```
-Endpunkt: ws://localhost:9090/ws/terminal/{runId}?apiKey=...
+Endpunkt: ws://localhost:9090/ws/terminal/{runId}?ticket=...
 ```
 
-Für Echtzeit-Container-Zugriff (interaktive Shell). Raw WebSocket (kein SockJS/STOMP). Max. 3 Sessions pro Container. Authentifizierung über `apiKey`-Query-Parameter.
+Für Echtzeit-Container-Zugriff (interaktive Shell). Raw WebSocket (kein SockJS/STOMP). Max. 3 Sessions pro Container. Authentifizierung über ein kurzlebiges Einmal-Ticket aus `POST /api/v1/ws-ticket` (API-Key im Header) — ein `apiKey`-Query-Parameter wird abgelehnt. Gleiches gilt für den STOMP/SockJS-Handshake auf `/ws`.
+
+### Handshake-Ticket
+
+```
+POST /api/v1/ws-ticket
+Header: X-API-Key: <key>
+```
+
+Antwort:
+
+```json
+{ "ticket": "kxJ9…", "expiresInSeconds": 30 }
+```
+
+Genau einmal einlösbar, danach ungültig; nach Ablauf ebenso. Für jeden Verbindungsversuch (auch jeden Reconnect) ein frisches Ticket holen.

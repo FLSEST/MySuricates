@@ -379,7 +379,7 @@ Persistence-Key: `'assistant-sessions'` (localStorage)
 
 ### WebSocket-Integration (`hooks/useAssistantWebSocket.ts`)
 
-- **Protokoll**: STOMP über SockJS, URL `{origin}/ws?apiKey={key}`
+- **Protokoll**: STOMP über SockJS, URL `{origin}/ws?ticket={ticket}` — das Einmal-Ticket holt `beforeConnect` per `api.fetchWsTicket()` vor jedem Verbindungsversuch (auch vor jedem Reconnect); der API-Key bleibt im Header
 - **Reconnect-Delay**: 5000ms
 
 Zwei STOMP-Subscriptions:
