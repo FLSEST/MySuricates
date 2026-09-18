@@ -51,8 +51,11 @@ automation:
     require-sealed-for-unattended: false
     webhook-signatures: false
   scheduler:
-    # The dev config parks these on a future instant to pause the triggers; tests must not inherit it.
+    # The dev config parks skip-until on a future instant to pause the triggers and turns
+    # catch-up-on-resume off along with it; tests must not inherit either. Values = the defaults
+    # from SchedulerConfig / TodoTriggerConfig.
     skip-until: ""
+    catch-up-on-resume: true
   todo-trigger:
     skip-until: ""
   security:

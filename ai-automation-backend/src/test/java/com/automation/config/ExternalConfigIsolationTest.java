@@ -1,5 +1,8 @@
 package com.automation.config;
 
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleKind;
+import com.automation.modules.ModuleRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -7,7 +10,9 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.PropertySource;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,28 +30,35 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The fix pins {@code spring.config.location} to the classpath in the Surefire configuration
  * ({@code pom.xml}); {@code application-integration.yml} additionally spells out the keys that
- * leaked. This test pins both halves so the leak cannot come back silently.
+ * leaked. All three tests below are needed to pin it: the first one is the only one that fails on
+ * a machine (or CI) that has no {@code config/} directory at all, i.e. it is what keeps the
+ * Surefire entry from being dropped unnoticed.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
 class ExternalConfigIsolationTest {
 
-    /**
-     * Keys the developer config sets, with the value the test environment must see — the catalog
-     * defaults ({@code ModuleCatalog}: provenance on, the other hardening flags off) resp. the
-     * documented default of the trigger pauses (empty = no pause).
-     */
-    private static final List<String[]> EXPECTED_DEFAULTS = List.of(
-            new String[]{"automation.modules.ui-editable", "false"},
-            new String[]{"automation.hardening.provenance", "true"},
-            new String[]{"automation.hardening.sealing", "false"},
-            new String[]{"automation.hardening.require-sealed-for-unattended", "false"},
-            new String[]{"automation.hardening.webhook-signatures", "false"},
-            new String[]{"automation.scheduler.skip-until", ""},
-            new String[]{"automation.todo-trigger.skip-until", ""});
-
     @Autowired
     private ConfigurableEnvironment environment;
+
+    /**
+     * The deterministic half of the guard: independent of whether this machine happens to have a
+     * {@code config/application.yml}, the Surefire pin itself must be in place.
+     */
+    @Test
+    void surefirePinsSpringConfigLocationToTheClasspath() {
+        String location = environment.getProperty("spring.config.location");
+
+        assertThat(location)
+                .as("Surefire must pin spring.config.location to the classpath so that no external "
+                        + "config/application.yml can join a test run — see the "
+                        + "systemPropertyVariables block of maven-surefire-plugin in pom.xml "
+                        + "(TODO 39e55535). When running from an IDE, set the same system property "
+                        + "in the run configuration: "
+                        + "-Dspring.config.location=optional:classpath:/,optional:classpath:/config/")
+                .isNotNull()
+                .doesNotContain("file:");
+    }
 
     @Test
     void noConfigurationIsLoadedFromAFileOutsideTheClasspath() {
@@ -64,17 +76,40 @@ class ExternalConfigIsolationTest {
                         + "untracked dev config ai-automation-backend/config/application.yml) and "
                         + "make local runs measure a different configuration than CI. Fix: keep "
                         + "spring.config.location pinned to the classpath in the surefire "
-                        + "configuration of pom.xml.")
+                        + "configuration of pom.xml; for IDE runs set the same property in the "
+                        + "run configuration.")
                 .isEmpty();
     }
 
     @Test
     void theKeysTheDevConfigOverridesKeepTheirDefaults() {
-        for (String[] expected : EXPECTED_DEFAULTS) {
-            assertThat(environment.getProperty(expected[0], ""))
-                    .as("Property '%s' must keep its default in tests — an external "
-                            + "config/application.yml must not reach the test environment", expected[0])
-                    .isEqualTo(expected[1]);
+        expectedDefaults().forEach((key, expected) ->
+                assertThat(environment.getProperty(key, ""))
+                        .as("Property '%s' must keep its default in tests — an external "
+                                + "config/application.yml must not reach the test environment", key)
+                        .isEqualTo(expected));
+    }
+
+    /**
+     * The keys the developer config sets, mapped to the value a clean checkout has. Derived from
+     * the code that owns each default ({@link ModuleCatalog}, {@link SchedulerConfig},
+     * {@link TodoTriggerConfig}) instead of repeating literals, so this test and
+     * {@code application-integration.yml} cannot drift away from the catalog together.
+     */
+    private static Map<String, String> expectedDefaults() {
+        Map<String, String> expected = new LinkedHashMap<>();
+        expected.put(ModuleRegistry.UI_EDITABLE_PROPERTY, "false");
+        for (ModuleCatalog module : ModuleCatalog.values()) {
+            if (module.kind() == ModuleKind.HARDENING) {
+                expected.put(ModuleKind.HARDENING.propertyPrefix() + "." + module.key(),
+                        String.valueOf(module.defaultEnabled()));
+            }
         }
+        SchedulerConfig schedulerDefaults = new SchedulerConfig();
+        expected.put("automation.scheduler.skip-until", schedulerDefaults.getSkipUntil());
+        expected.put("automation.scheduler.catch-up-on-resume",
+                String.valueOf(schedulerDefaults.isCatchUpOnResume()));
+        expected.put("automation.todo-trigger.skip-until", new TodoTriggerConfig().getSkipUntil());
+        return expected;
     }
 }
