@@ -117,7 +117,7 @@ final class ExecutionContextTaint {
 
     /**
      * Reads and clears the prompt flag: the block that is recording its result now is the one whose
-     * prompt carried platform data, so its output is verbucht as untrusted. Clearing keeps the flag
+     * prompt carried platform data, so its output is recorded as untrusted. Clearing keeps the flag
      * scoped to that block — a later block with a clean prompt records a clean output again (unless
      * the run is tainted by then, which is sticky by design).
      */
