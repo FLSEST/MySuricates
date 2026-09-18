@@ -2,6 +2,7 @@ package com.automation.service.system;
 
 import com.automation.concurrency.DynamicSemaphore;
 import com.automation.config.ChainConfig;
+import com.automation.config.DashboardReportAssistConfig;
 import com.automation.config.CompressionConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
@@ -61,6 +62,7 @@ class ExecutionSettingsServiceTest {
     private CompressionConfig compressionConfig;
     private TodoSimilarityConfig todoSimilarityConfig;
     private RequestMetricsConfig requestMetricsConfig;
+    private final DashboardReportAssistConfig dashboardReportAssistConfig = new DashboardReportAssistConfig();
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -89,7 +91,7 @@ class ExecutionSettingsServiceTest {
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                compressionConfig, todoSimilarityConfig, requestMetricsConfig
+                compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig
         );
     }
 
@@ -622,5 +624,25 @@ class ExecutionSettingsServiceTest {
 
         // Should keep default because 999 > 50
         assertThat(executionSemaphore.getMaxPermits()).isEqualTo(10);
+    }
+
+    @Test
+    void dashboardReportAssist_isOnByDefault_andCanBeSwitchedOff() {
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
+
+        assertThat(service.getCurrentSettings()).containsEntry("dashboardReportAssistEnabled", 1);
+
+        service.validateAndApply("dashboardReportAssistEnabled", "0");
+
+        verify(appSettingsRepository).set("dashboard-report-assist-enabled", "0");
+        assertThat(dashboardReportAssistConfig.isEnabled()).isFalse();
+        assertThat(service.getCurrentSettings()).containsEntry("dashboardReportAssistEnabled", 0);
+    }
+
+    @Test
+    void dashboardReportAssist_rejectsAnythingButZeroAndOne() {
+        assertThatThrownBy(() -> service.validateAndApply("dashboard-report-assist-enabled", "2"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard-report-assist-enabled");
     }
 }

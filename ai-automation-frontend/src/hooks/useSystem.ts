@@ -248,6 +248,8 @@ export interface ExecutionConfig {
   todoHygieneMaxPerRun?: number;
   /** keyword pre-filter of the todo similarity check — a fraction between 0.05 and 0.9 */
   todoSimilarityKeywordThreshold?: number;
+  /** editor AI proposal for dashboard-report blocks: 1 = on */
+  dashboardReportAssistEnabled?: number;
   /** running + queued (a queued run already holds or is about to hold a permit) */
   activeRuns: number;
   /** subset of activeRuns still waiting for a permit or container */

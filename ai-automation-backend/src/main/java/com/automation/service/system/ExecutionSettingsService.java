@@ -5,6 +5,7 @@ import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.ChainConfig;
 import com.automation.config.CompressionConfig;
 import com.automation.config.DashboardLayoutConfig;
+import com.automation.config.DashboardReportAssistConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
@@ -62,6 +63,7 @@ public class ExecutionSettingsService {
     private final CompressionConfig compressionConfig;
     private final TodoSimilarityConfig todoSimilarityConfig;
     private final RequestMetricsConfig requestMetricsConfig;
+    private final DashboardReportAssistConfig dashboardReportAssistConfig;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -88,7 +90,8 @@ public class ExecutionSettingsService {
             ModelCatalogService modelCatalogService,
             CompressionConfig compressionConfig,
             TodoSimilarityConfig todoSimilarityConfig,
-            RequestMetricsConfig requestMetricsConfig) {
+            RequestMetricsConfig requestMetricsConfig,
+            DashboardReportAssistConfig dashboardReportAssistConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -111,6 +114,7 @@ public class ExecutionSettingsService {
         this.compressionConfig = compressionConfig;
         this.todoSimilarityConfig = todoSimilarityConfig;
         this.requestMetricsConfig = requestMetricsConfig;
+        this.dashboardReportAssistConfig = dashboardReportAssistConfig;
         this.appliers = buildAppliers();
     }
 
@@ -157,6 +161,7 @@ public class ExecutionSettingsService {
         m.put("request-metrics-drift-factor", v -> requestMetricsConfig.setDriftFactor(Double.parseDouble(v)));
         m.put("request-metrics-drift-min-calls", v -> requestMetricsConfig.setDriftMinCalls(Integer.parseInt(v)));
         m.put("request-metrics-baseline-days", v -> requestMetricsConfig.setBaselineDays(Integer.parseInt(v)));
+        m.put("dashboard-report-assist-enabled", v -> dashboardReportAssistConfig.setEnabled(Integer.parseInt(v) == 1));
         return m;
     }
 
@@ -221,6 +226,7 @@ public class ExecutionSettingsService {
         result.put("modelCatalogTtlSeconds", modelCatalogService.getTtlSeconds());
         result.put("compressAiMaxInputChars", compressionConfig.getMaxAiInputChars());
         result.put("todoSimilarityKeywordThreshold", todoSimilarityConfig.getKeywordThreshold());
+        result.put("dashboardReportAssistEnabled", dashboardReportAssistConfig.isEnabled() ? 1 : 0);
         result.put("activeRuns", executionRegistry.getActiveRunCount());   // running + queued
         result.put("queuedRuns", executionRegistry.getQueuedRunCount());
         return result;

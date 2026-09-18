@@ -1301,6 +1301,8 @@ export const de: TranslationKeys = {
     runRetentionMaxPerNightHint: 'Obergrenze gelöschter Runs pro nächtlichem Lauf, älteste zuerst (10–5000). Default: 200.',
     dashboardLayoutRetentionCount: 'Aufbewahrte Dashboard-Versionen',
     dashboardLayoutRetentionCountHint: 'Unbenannte Versionen im Dashboard-Verlauf; ältere werden beim Speichern gelöscht. Benannte Versionen bleiben immer (1–1000). Default: 100.',
+    dashboardReportAssist: 'KI-Vorschlag für Dashboard-Berichte',
+    dashboardReportAssistHint: 'Erlaubt im Block-Editor den Knopf „Vorschlag aus dem letzten Run". Ein KI-Aufruf pro Klick; der Block selbst braucht keine KI.',
     wishSettings: 'Wünsche-Einstellungen',
     wishSettingsSubtitle: 'Timeouts für die automatische Wunscherfüllung.',
     wishTotalTimeoutMinutes: 'Wünsche: Gesamt-Timeout (min)',

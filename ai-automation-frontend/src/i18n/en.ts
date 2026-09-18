@@ -1299,6 +1299,8 @@ export const en = {
     runRetentionMaxPerNightHint: 'Upper bound of runs deleted per nightly pass, oldest first (10–5000). Default: 200.',
     dashboardLayoutRetentionCount: 'Dashboard layout versions kept',
     dashboardLayoutRetentionCountHint: 'Unnamed versions kept in the dashboard history; older ones are deleted on save. Named versions are always kept (1–1000). Default: 100.',
+    dashboardReportAssist: 'AI proposal for dashboard reports',
+    dashboardReportAssistHint: 'Enables the block editor\'s "Propose from the last run" button. One AI call per click; the block itself needs no AI.',
     wishSettings: 'Wish Settings',
     wishSettingsSubtitle: 'Timeouts for automatic wish fulfillment.',
     wishTotalTimeoutMinutes: 'Wishes: total timeout (min)',

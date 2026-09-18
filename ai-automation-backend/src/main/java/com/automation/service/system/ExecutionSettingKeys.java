@@ -88,7 +88,8 @@ final class ExecutionSettingKeys {
             Map.entry("wish-default-agentic-total-timeout-seconds",     Bound.whole(60, 86400)),
             Map.entry("model-catalog-ttl-seconds",         Bound.whole(30, 86400)),
             Map.entry("compress-ai-max-input-chars",       Bound.whole(1000, 400000)),
-            Map.entry("todo-similarity-keyword-threshold", Bound.fraction(0.05, 0.9))
+            Map.entry("todo-similarity-keyword-threshold", Bound.fraction(0.05, 0.9)),
+            Map.entry("dashboard-report-assist-enabled", Bound.whole(0, 1))
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -123,7 +124,8 @@ final class ExecutionSettingKeys {
             Map.entry("wishDefaultAgenticTotalTimeoutSeconds",      "wish-default-agentic-total-timeout-seconds"),
             Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds"),
             Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars"),
-            Map.entry("todoSimilarityKeywordThreshold",  "todo-similarity-keyword-threshold")
+            Map.entry("todoSimilarityKeywordThreshold",  "todo-similarity-keyword-threshold"),
+            Map.entry("dashboardReportAssistEnabled",    "dashboard-report-assist-enabled")
     );
 
     /**

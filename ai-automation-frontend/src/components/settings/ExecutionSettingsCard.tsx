@@ -5,7 +5,7 @@ import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSys
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
 
-type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume'>;
+type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'dashboardReportAssistEnabled'>;
 
 interface FieldConfig {
   key: string;
@@ -33,6 +33,7 @@ interface FormState {
   runRetentionDays: number;
   runRetentionMaxPerNight: number;
   dashboardLayoutRetentionCount: number;
+  dashboardReportAssistEnabled: boolean;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -52,6 +53,7 @@ const DEFAULT_FORM: FormState = {
   runRetentionDays: 90,
   runRetentionMaxPerNight: 200,
   dashboardLayoutRetentionCount: 100,
+  dashboardReportAssistEnabled: true,
 };
 
 function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['data']>): FormState {
@@ -72,6 +74,7 @@ function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['
     runRetentionDays: config.runRetentionDays ?? 90,
     runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
     dashboardLayoutRetentionCount: config.dashboardLayoutRetentionCount ?? 100,
+    dashboardReportAssistEnabled: (config.dashboardReportAssistEnabled ?? 1) === 1,
   };
 }
 
@@ -101,7 +104,8 @@ export function ExecutionSettingsCard() {
     form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
     form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
     form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200) ||
-    form.dashboardLayoutRetentionCount !== (config.dashboardLayoutRetentionCount ?? 100)
+    form.dashboardLayoutRetentionCount !== (config.dashboardLayoutRetentionCount ?? 100) ||
+    form.dashboardReportAssistEnabled !== ((config.dashboardReportAssistEnabled ?? 1) === 1)
   );
 
   const fields: FieldConfig[] = [
@@ -139,6 +143,7 @@ export function ExecutionSettingsCard() {
       runRetentionDays: form.runRetentionDays,
       runRetentionMaxPerNight: form.runRetentionMaxPerNight,
       dashboardLayoutRetentionCount: form.dashboardLayoutRetentionCount,
+      dashboardReportAssistEnabled: form.dashboardReportAssistEnabled ? 1 : 0,
     });
   };
 
@@ -204,6 +209,18 @@ export function ExecutionSettingsCard() {
           <Toggle
             enabled={form.schedulerCatchUpOnResume}
             onChange={(v) => setForm(prev => ({ ...prev, schedulerCatchUpOnResume: v }))}
+          />
+        </div>
+
+        {/* Editor AI proposal for dashboard-report blocks */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="block text-sm font-medium text-text">{t.settings.dashboardReportAssist}</label>
+            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.dashboardReportAssistHint}</p>
+          </div>
+          <Toggle
+            enabled={form.dashboardReportAssistEnabled}
+            onChange={(v) => setForm(prev => ({ ...prev, dashboardReportAssistEnabled: v }))}
           />
         </div>
 
