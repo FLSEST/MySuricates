@@ -3,22 +3,23 @@ import { persist } from 'zustand/middleware';
 import {
   LAYOUT_FORMAT_VERSION,
   LAYOUT_LIMITS,
-  addLayoutView,
   createDefaultLayout,
   createViewId,
-  duplicateLayoutView,
-  migrateLayout,
-  moveLayoutView,
-  removeLayoutView,
-  renameLayoutView,
-  sanitizeLayout,
-  selectLayoutView,
-  setLayoutViewFilter,
   type DashboardLayout,
   type DashboardView,
   type DashboardViewFilter,
   type WidgetInstance,
 } from '../components/dashboard/dashboardLayout';
+import {
+  addLayoutView,
+  duplicateLayoutView,
+  moveLayoutView,
+  removeLayoutView,
+  renameLayoutView,
+  selectLayoutView,
+  setLayoutViewFilter,
+} from '../components/dashboard/dashboardViews';
+import { migrateLayout, sanitizeLayout } from '../components/dashboard/dashboardLayoutSanitize';
 import { useDashboardSyncStore } from './dashboardSyncStore';
 
 interface DashboardLayoutState extends DashboardLayout {

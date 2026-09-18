@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { useSystemModules } from './useModules';
 import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
-import {
-  moveWidget, normalizeWidgets, setWidgetHidden, type WidgetInstance,
-} from '../components/dashboard/dashboardLayout';
+import type { WidgetInstance } from '../components/dashboard/dashboardLayout';
+import { moveWidget, normalizeWidgets, setWidgetHidden } from '../components/dashboard/dashboardWidgets';
 import { DASHBOARD_WIDGETS, type DashboardWidgetDef } from '../components/dashboard/widgetRegistry';
 
 export interface ResolvedWidget {

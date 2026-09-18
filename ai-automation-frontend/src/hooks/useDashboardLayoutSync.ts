@@ -10,10 +10,9 @@ import {
   LAYOUT_LIMITS,
   isCustomizedLayout,
   layoutContentKey,
-  migrateLayout,
-  sanitizeLayout,
   type DashboardLayout,
 } from '../components/dashboard/dashboardLayout';
+import { migrateLayout, sanitizeLayout } from '../components/dashboard/dashboardLayoutSanitize';
 import {
   DASHBOARD_LAYOUT_VERSIONS_KEY,
   exceedsLayoutRequestLimit,
