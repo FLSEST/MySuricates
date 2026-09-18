@@ -140,7 +140,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 34 Controller)
+Controller (REST API, 43 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -1009,7 +1009,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 68 Flyway-Migrationen (V1–V68)
+│           └── db/migration/          ← 73 Flyway-Migrationen (V1–V73)
 │
 └── ai-automation-frontend/
     ├── package.json

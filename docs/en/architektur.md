@@ -139,7 +139,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 33 Controllers)
+Controller (REST API, 43 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -967,7 +967,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 66 Flyway migrations (V1–V66)
+│           └── db/migration/          ← 73 Flyway migrations (V1–V73)
 │
 └── ai-automation-frontend/
     ├── package.json
