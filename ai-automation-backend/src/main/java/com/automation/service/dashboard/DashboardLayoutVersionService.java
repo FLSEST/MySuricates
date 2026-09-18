@@ -1,9 +1,9 @@
 package com.automation.service.dashboard;
 
 import com.automation.config.DashboardLayoutConfig;
+import com.automation.dto.response.DashboardLayoutVersionListItem;
 import com.automation.entity.DashboardLayoutVersion;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.repository.DashboardLayoutVersionListItem;
 import com.automation.repository.DashboardLayoutVersionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;

@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.response.DashboardLayoutVersionListItem;
 import com.automation.entity.DashboardLayoutVersion;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
