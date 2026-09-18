@@ -153,6 +153,22 @@ check "Grundschema-Zeile EN ohne Befund" '! grep -qE "^DRIFT docs/grundschema.md
 check "echte Standangabe weiter gemeldet" 'grep -qE "^DRIFT docs/grundschema.md:4 migration-max sagt 2, Code 5" <<<"$OUT"'
 rm "$FAKE/docs/grundschema.md"
 
+echo "4g) Die Ausnahme gilt der Spanne, nicht der ganzen Zeile"
+# Eine Teilspanne ist nur dann belegt, wenn die Zeile auch sagt, wie es weitergeht
+# (Fortsetzungsspanne bis zur Hoechstnummer). Eine blosse Standangabe im Nebensatz
+# reicht nicht — sonst deckt jedes "aktuell V5" jede falsche Spanne derselben Zeile.
+cat > "$FAKE/docs/teilspanne.md" <<'MD_EOF'
+# Migrationen
+Das Grundschema (V1-V3). Aktueller Stand ist V5 in der Produktion.
+Die Tabelle zeigt das Grundschema (V1-V2). V3-V5 ergaenzen Spalten.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "falsche Teilspanne neben blosser Standangabe gemeldet" \
+  'grep -qE "^DRIFT docs/teilspanne.md:2 migration-max sagt 3, Code 5" <<<"$OUT"'
+check "belegte Teilspanne mit Fortsetzung bleibt frei" \
+  '! grep -qE "^DRIFT docs/teilspanne.md:3" <<<"$OUT"'
+rm "$FAKE/docs/teilspanne.md"
+
 echo "4c) Deutscher Dativ-Plural wird erfasst"
 cat > "$FAKE/docs/dativ.md" <<'MD_EOF'
 # Dativ

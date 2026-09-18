@@ -33,6 +33,9 @@ EXCLUDED_PREFIXES = ("docs/plans/", "docs/specs/")
 # Zeilen mit diesem Marker werden uebersprungen (bewusst alte Zahl im Fliesstext).
 IGNORE_MARKER = "doc-facts-check: ignore"
 
+# Bindestrich und die Gedankenstriche, die in der Doku als Spannen-Trenner vorkommen.
+DASH = r"[-‐-―]"
+
 # ---------------------------------------------------------------------------
 # Muster je Groesse
 #
@@ -57,7 +60,7 @@ PATTERNS = {
     # Hoechste Migrationsnummer: nur die Spanne ab V1 ist eine Standangabe.
     # Tabellenzeilen sind ausgenommen, dort stehen echte Teilspannen (| V1-V9 |).
     "migration-max": [
-        r"\bV1\s*[-‐-―]\s*V(\d+)\b",
+        r"\bV1\s*" + DASH + r"\s*V(\d+)\b",
     ],
     # Anzahl der Migrationsdateien.
     "migrations": [
@@ -96,20 +99,38 @@ def is_excluded(rel):
     return rel in EXCLUDED_FILES or rel.startswith(EXCLUDED_PREFIXES)
 
 
-_CURRENT_V = {}
+# Kennzeichnungen, mit denen sich eine Spanne selbst als Auszug ausweist.
+EXCERPT_MARKERS = re.compile(
+    r"Grundschema|Basisschema|Teilspanne|Auszug|base schema|core schema|excerpt|subset",
+    re.IGNORECASE)
+
+_CONTINUATION = {}
 
 
-def names_current_migration(line, expected):
-    """Nennt die Zeile die hoechste Migration bereits selbst?
+def span_is_declared_excerpt(line, start, expected):
+    """Weist sich GENAU DIESE Spanne als Auszug aus?
 
-    Dann ist ein zusaetzliches "V1-Vn" darin eine Teilspanne und keine
-    Standangabe. docs/onboarding/ARCHITECTURE.md schreibt genau so:
-    "Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73
-    ergaenzen ueberwiegend Spalten und Indizes." — V1-V19 ist dort richtig.
+    Die Ausnahme deckt eine Formulierung ab, die es in der Doku wirklich gibt
+    (docs/onboarding/ARCHITECTURE.md):
+
+        "Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73
+         ergaenzen ueberwiegend Spalten und Indizes."
+
+    Zwei Belege muessen zusammenkommen: eine Auszugs-Kennzeichnung unmittelbar
+    vor der Spanne (im selben Satzteil) und eine Fortsetzungsspanne, die bis zur
+    aktuellen Hoechstnummer laeuft. Eine blosse Standangabe im Nebensatz reicht
+    nicht — frueher schaltete jedes "V73" irgendwo in der Zeile die ganze Zeile
+    ab, sodass "Das Grundschema (V1-V50). Aktueller Stand ist V73." unbemerkt
+    blieb. Geprueft wird jede Spanne fuer sich; andere Zahlen derselben Zeile
+    laufen weiter durch die Pruefung.
     """
-    regex = _CURRENT_V.get(expected)
+    segment = re.split(r"[.;:|]", line[:start])[-1]
+    if not EXCERPT_MARKERS.search(segment):
+        return False
+    regex = _CONTINUATION.get(expected)
     if regex is None:
-        regex = _CURRENT_V[expected] = re.compile(rf"\bV{expected}\b")
+        regex = _CONTINUATION[expected] = re.compile(
+            r"\bV\d+\s*" + DASH + rf"\s*V{expected}\b")
     return bool(regex.search(line))
 
 
@@ -133,11 +154,12 @@ def scan(root, rel, facts, findings):
                 continue
             if is_table and name in TABLE_EXEMPT:
                 continue
-            if name == "migration-max" and names_current_migration(line, expected):
-                continue
             for regex in regexes:
                 for match in regex.finditer(line):
                     said = int(match.group(1))
+                    if name == "migration-max" and span_is_declared_excerpt(
+                            line, match.start(), expected):
+                        continue
                     if said != expected:
                         findings.append(
                             f"DRIFT {rel}:{no} {name} sagt {said}, Code {expected}"
