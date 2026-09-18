@@ -1,16 +1,22 @@
 package com.automation.service.todo;
 
+import com.automation.config.TodoSimilarityConfig;
+import com.automation.entity.Todo;
 import com.automation.repository.TodoRepository;
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TodoSimilarityServiceTest {
@@ -21,8 +27,14 @@ class TodoSimilarityServiceTest {
     @Mock
     private AiProviderRegistry aiProviderRegistry;
 
-    @InjectMocks
-    private TodoSimilarityService service;
+    private final TodoSimilarityConfig config = new TodoSimilarityConfig();
+
+    private TodoSimilarityService service() {
+        return new TodoSimilarityService(todoRepository, aiProviderRegistry, config);
+    }
+
+    private final TodoSimilarityService service = new TodoSimilarityService(
+            mock(TodoRepository.class), mock(AiProviderRegistry.class), new TodoSimilarityConfig());
 
     @Test
     void extractKeywords_normalTitle() {
@@ -87,6 +99,29 @@ class TodoSimilarityServiceTest {
     @Test
     void jaccardSimilarity_emptyBoth() {
         assertThat(service.jaccardSimilarity(Set.of(), Set.of())).isEqualTo(0.0);
+    }
+
+    /**
+     * Die Schwelle steht in den Einstellungen und wird pro Aufruf gelesen: eine Aenderung wirkt
+     * ohne Neustart (TODO 380818b1). Kandidat und Titel ueberlappen zu 0,2.
+     */
+    @Test
+    void findSimilar_readsTheKeywordThresholdPerCall() throws Exception {
+        Todo candidate = Todo.builder().id("t-1")
+                .title("WishService in Teilservices aufbrechen").build();
+        when(todoRepository.findByProjectIdAndStatusIn(any(), any())).thenReturn(List.of(candidate));
+        AiProvider provider = mock(AiProvider.class);
+        when(aiProviderRegistry.getDefault()).thenReturn(provider);
+        when(provider.reason(any())).thenReturn(new AiProvider.ReasoningResult("SAME", null));
+        TodoSimilarityService service = service();
+        String title = "WishService in WishPromptBuilder aufteilen";
+
+        config.setKeywordThreshold(0.2);
+        assertThat(service.findSimilar("p-1", title, null)).hasSize(1);
+
+        config.setKeywordThreshold(0.9);
+        assertThat(service.findSimilar("p-1", title, null))
+                .as("hoehere Schwelle: derselbe Kandidat faellt raus, ohne Neustart").isEmpty();
     }
 
     @Test

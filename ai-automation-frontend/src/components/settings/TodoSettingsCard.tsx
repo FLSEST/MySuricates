@@ -12,15 +12,20 @@ const STALE_DAYS_MIN = 7;
 const STALE_DAYS_MAX = 365;
 const MAX_PER_RUN_MIN = 10;
 const MAX_PER_RUN_MAX = 2000;
+const SIMILARITY_MIN = 0.05;
+const SIMILARITY_MAX = 0.9;
+const SIMILARITY_STEP = 0.05;
 
 interface HygieneForm {
   enabled: boolean;
   staleDays: number;
   maxPerRun: number;
+  /** Jaccard threshold of the keyword pre-filter — a fraction, not a count */
+  similarityThreshold: number;
 }
 
 /** Defaults of TodoHygieneConfig — only used until the server config has arrived. */
-const HYGIENE_DEFAULTS: HygieneForm = { enabled: false, staleDays: 30, maxPerRun: 200 };
+const HYGIENE_DEFAULTS: HygieneForm = { enabled: false, staleDays: 30, maxPerRun: 200, similarityThreshold: 0.2 };
 
 type Config = ReturnType<typeof useExecutionConfig>['data'];
 
@@ -29,12 +34,14 @@ function toHygieneForm(config: NonNullable<Config>): HygieneForm {
     enabled: (config.todoHygieneEnabled ?? 0) === 1,
     staleDays: config.todoStaleDays ?? HYGIENE_DEFAULTS.staleDays,
     maxPerRun: config.todoHygieneMaxPerRun ?? HYGIENE_DEFAULTS.maxPerRun,
+    similarityThreshold: config.todoSimilarityKeywordThreshold ?? HYGIENE_DEFAULTS.similarityThreshold,
   };
 }
 
 /**
- * Everything that steers the todo views in one place: the page sizes (a local preference) and
- * the hygiene thresholds of the nightly auto-archival (a runtime setting on the server).
+ * Everything that steers the todo views in one place: the page sizes (a local preference), the
+ * hygiene thresholds of the nightly auto-archival and the similarity threshold of the merge check
+ * (runtime settings on the server).
  */
 export function TodoSettingsCard() {
   const t = useT();
@@ -55,7 +62,8 @@ export function TodoSettingsCard() {
   const hasChanges = !!saved && (
     hygiene.enabled !== saved.enabled ||
     hygiene.staleDays !== saved.staleDays ||
-    hygiene.maxPerRun !== saved.maxPerRun
+    hygiene.maxPerRun !== saved.maxPerRun ||
+    hygiene.similarityThreshold !== saved.similarityThreshold
   );
 
   const handleSave = () => {
@@ -63,6 +71,7 @@ export function TodoSettingsCard() {
       todoHygieneEnabled: hygiene.enabled ? 1 : 0,
       todoStaleDays: hygiene.staleDays,
       todoHygieneMaxPerRun: hygiene.maxPerRun,
+      todoSimilarityKeywordThreshold: hygiene.similarityThreshold,
     });
   };
 
@@ -167,6 +176,32 @@ export function TodoSettingsCard() {
                   }}
                   className={inputClass}
                 />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border">
+              <p className="text-sm font-medium text-text">{t.settings.todoSimilarity}</p>
+              <p className="text-xs text-text-tertiary mb-3">{t.settings.todoSimilarityHint}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="todo-similarity-threshold" className="text-sm font-medium text-text">
+                    {t.settings.todoSimilarityKeywordThreshold}
+                  </label>
+                  <p className="text-xs text-text-tertiary mb-1">{t.settings.todoSimilarityKeywordThresholdHint}</p>
+                  <input
+                    id="todo-similarity-threshold"
+                    type="number"
+                    min={SIMILARITY_MIN}
+                    max={SIMILARITY_MAX}
+                    step={SIMILARITY_STEP}
+                    value={hygiene.similarityThreshold}
+                    onChange={(e) => {
+                      const threshold = parseFloat(e.target.value);
+                      if (!isNaN(threshold)) setHygiene((prev) => ({ ...prev, similarityThreshold: threshold }));
+                    }}
+                    className={inputClass}
+                  />
+                </div>
               </div>
             </div>
 

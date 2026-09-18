@@ -1,5 +1,6 @@
 package com.automation.service.todo;
 
+import com.automation.config.TodoSimilarityConfig;
 import com.automation.entity.Todo;
 import com.automation.repository.TodoRepository;
 import com.automation.service.ai.AiProvider;
@@ -25,6 +26,7 @@ public class TodoSimilarityService {
 
     private final TodoRepository todoRepository;
     private final AiProviderRegistry aiProviderRegistry;
+    private final TodoSimilarityConfig config;
 
     public enum Similarity { SAME, RELATED, DIFFERENT }
 
@@ -35,11 +37,9 @@ public class TodoSimilarityService {
             "ein", "eine", "the", "a", "an", "is", "to", "for", "and", "or", "of", "on", "at", "by", "not",
             "[incident]", "[follow-up]", "—", "-", "todo", "fix", "add", "update");
 
-    private static final double KEYWORD_CANDIDATE_THRESHOLD = 0.2;
-
     /**
      * Finds similar open TODOs in the same project.
-     * Stage 1: Keyword filter (Jaccard > 0.2)
+     * Stage 1: Keyword filter (Jaccard above the configured threshold)
      * Stage 2: AI classification (SAME/RELATED/DIFFERENT) for candidates
      *
      * @param projectId project to search in
@@ -50,6 +50,8 @@ public class TodoSimilarityService {
     public List<SimilarTodo> findSimilar(String projectId, String title, String excludeId) {
         Set<String> titleKeywords = extractKeywords(title);
         if (titleKeywords.isEmpty()) return List.of();
+        // Pro Aufruf gelesen: die Schwelle ist zur Laufzeit in den Einstellungen aenderbar.
+        double threshold = config.getKeywordThreshold();
 
         // Stage 1: Keyword filter against all open TODOs in the project
         List<Todo> openTodos = todoRepository.findByProjectIdAndStatusIn(
@@ -62,7 +64,7 @@ public class TodoSimilarityService {
                     double score = jaccardSimilarity(titleKeywords, otherKeywords);
                     return new SimilarTodo(t, score, null);
                 })
-                .filter(st -> st.keywordScore() >= KEYWORD_CANDIDATE_THRESHOLD)
+                .filter(st -> st.keywordScore() >= threshold)
                 .sorted((a, b) -> Double.compare(b.keywordScore(), a.keywordScore()))
                 .limit(5) // Max 5 candidates for AI check
                 .toList();

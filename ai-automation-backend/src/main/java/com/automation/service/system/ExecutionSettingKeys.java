@@ -48,6 +48,14 @@ final class ExecutionSettingKeys {
             Map.entry("compress-ai-max-input-chars",       new long[]{1000, 400000})
     );
 
+    /**
+     * Schluessel, deren Wert ein Bruch ist statt einer ganzen Zahl. Getrennt von {@link #BOUNDS},
+     * damit die ganzzahligen Schluessel ihre Grenzen unveraendert als {@code long} behalten.
+     */
+    static final Map<String, double[]> DECIMAL_BOUNDS = Map.ofEntries(
+            Map.entry("todo-similarity-keyword-threshold", new double[]{0.05, 0.9})
+    );
+
     // Frontend sends camelCase keys, backend uses kebab-case internally
     static final Map<String, String> KEY_ALIASES = Map.ofEntries(
             Map.entry("executionMaxConcurrent",          "execution-max-concurrent"),
@@ -79,7 +87,8 @@ final class ExecutionSettingKeys {
             Map.entry("wishDefaultShellTimeoutSeconds",             "wish-default-shell-timeout-seconds"),
             Map.entry("wishDefaultAgenticTotalTimeoutSeconds",      "wish-default-agentic-total-timeout-seconds"),
             Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds"),
-            Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars")
+            Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars"),
+            Map.entry("todoSimilarityKeywordThreshold",  "todo-similarity-keyword-threshold")
     );
 
     /**
@@ -89,10 +98,33 @@ final class ExecutionSettingKeys {
      */
     static String resolve(String key) {
         String resolvedKey = KEY_ALIASES.getOrDefault(key, key);
-        if (!BOUNDS.containsKey(resolvedKey)) {
+        if (!BOUNDS.containsKey(resolvedKey) && !DECIMAL_BOUNDS.containsKey(resolvedKey)) {
             throw new IllegalArgumentException("Unknown execution setting: " + key);
         }
         return resolvedKey;
+    }
+
+    /**
+     * Prueft einen Wert gegen die Grenzen seines Schluessels — ganzzahlig oder als Bruch.
+     *
+     * @throws IllegalArgumentException wenn der Wert keine Zahl ist oder ausserhalb der Grenzen liegt
+     */
+    static void validate(String key, String value) {
+        double[] decimal = DECIMAL_BOUNDS.get(key);
+        if (decimal == null) {
+            parseWithinBounds(key, value);
+            return;
+        }
+        double parsed;
+        try {
+            parsed = Double.parseDouble(value);
+        } catch (NumberFormatException | NullPointerException e) {
+            throw new IllegalArgumentException("Value must be a number: " + value);
+        }
+        if (parsed < decimal[0] || parsed > decimal[1]) {
+            throw new IllegalArgumentException(
+                    key + " must be between " + decimal[0] + " and " + decimal[1] + ", got " + parsed);
+        }
     }
 
     /**
