@@ -31,14 +31,9 @@ final class TemplateResolver {
 
     /**
      * Shell-safe substitution: each value is wrapped in POSIX single quotes with internal
-     * single quotes escaped as '\'' to prevent shell injection.
+     * single quotes escaped as '\'' to prevent shell injection. {@code onSubstitution} is told the
+     * key of every placeholder that really resolved (see {@link #resolveShell}).
      */
-    static String resolveShellSafe(String template, String previousOutput,
-                                   Map<String, String> blockOutputs, Map<String, Object> vars) {
-        return resolveShellSafe(template, previousOutput, blockOutputs, vars, IGNORE);
-    }
-
-    /** As {@link #resolveShellSafe(String, String, Map, Map)}, reporting every substituted placeholder key. */
     static String resolveShellSafe(String template, String previousOutput, Map<String, String> blockOutputs,
                                    Map<String, Object> vars, Consumer<String> onSubstitution) {
         return substitute(template, previousOutput, blockOutputs, vars, true, onSubstitution);

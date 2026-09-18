@@ -488,7 +488,7 @@ class ExecutionContextTest {
         assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
     }
 
-    // ── Platform data variables: always escaped, never a run-level taint source ──
+    // ── Platform data variables: always escaped, a run-level taint source on use ──
 
     @Test
     void setUntrustedPlatformVariable_isSingleQuotedInShellCommands() {
