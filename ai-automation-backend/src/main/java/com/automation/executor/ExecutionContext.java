@@ -104,9 +104,7 @@ public class ExecutionContext {
         stepIndices.startAt(firstIndex);
     }
 
-    public void setRunMetadata(String key, Object value) {
-        runMetadata.put(key, value);
-    }
+    public void setRunMetadata(String key, Object value) { runMetadata.put(key, value); }
 
     /** Sets a trusted variable (workflow defaults, system values, block-internal values). Clears any taint. */
     public void setVariable(String name, Object value) {
@@ -202,6 +200,9 @@ public class ExecutionContext {
     public String resolveTemplate(String template) {
         return TemplateResolver.resolve(template, previousOutput, blockOutputs, variables);
     }
+
+    /** Whether a {{ key }} placeholder would resolve to a value (possibly blank) rather than stay literal — the same lookup {@link #resolveTemplate} performs, for a caller that must decide before substituting. */
+    public boolean resolvesPlaceholder(String key) { return TemplateResolver.resolves(key, previousOutput, blockOutputs, variables); }
 
     /** Prompt path: like {@link #resolveTemplate}, but platform data here marks this block's output untrusted (TODO 22e6bec8). */
     public String resolvePromptTemplate(String template) {

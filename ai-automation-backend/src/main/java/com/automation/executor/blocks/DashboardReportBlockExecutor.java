@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -55,9 +56,13 @@ public class DashboardReportBlockExecutor implements BlockExecutor {
         result.setStepIndex(context.nextStepIndex());
         result.setStartedAt(Instant.now());
         result.setInput("dashboard-report");
+        // Populated once the candidate is built; stays empty if DashboardReportCandidate itself threw
+        // (its own messages already name the author's own config position — nothing to renumber).
+        Map<String, List<Integer>> positions = Map.of();
         try {
-            Map<String, Object> candidate = DashboardReportCandidate.build(context, block.getConfig());
-            Result report = DashboardWidgetResultParser.validateOrThrow(candidate);
+            DashboardReportCandidate.Built built = DashboardReportCandidate.buildTracked(context, block.getConfig());
+            positions = built.positions();
+            Result report = DashboardWidgetResultParser.validateOrThrow(built.candidate());
             context.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
                     DashboardWidgetResultParser.toMetadata(report));
             result.setOutput(summary(report));
@@ -65,9 +70,10 @@ public class DashboardReportBlockExecutor implements BlockExecutor {
         } catch (IllegalArgumentException e) {
             // The only exception DashboardReportCandidate/validateOrThrow ever throw; their messages
             // are built from field names and constants only (never a config key, never a candidate
-            // value) — see DashboardReportCandidate's javadoc. Safe to put into step output as-is.
-            String message = e.getMessage() == null || e.getMessage().isBlank()
-                    ? "invalid configuration" : e.getMessage();
+            // value) — see DashboardReportCandidate's javadoc. Safe to put into step output as-is,
+            // once renumbered from the parser's post-drop position back to the author's own.
+            String message = DashboardReportCandidate.renumber(e.getMessage(), positions);
+            message = message == null || message.isBlank() ? "invalid configuration" : message;
             log.info("dashboard-report block rejected its config: {}", message);
             result.setOutput("dashboard-report fehlgeschlagen: " + message);
             result.setStatus(StepStatus.FAILED);

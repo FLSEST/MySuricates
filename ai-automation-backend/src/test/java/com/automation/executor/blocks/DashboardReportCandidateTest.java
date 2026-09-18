@@ -255,4 +255,121 @@ class DashboardReportCandidateTest {
 
         assertThat(candidate.get("kpis")).isEqualTo(List.of(kpi("a", 7, null)));
     }
+
+    // ---- Fix round 2 --------------------------------------------------------------------------
+
+    /**
+     * I1: the old hand copy of {@code TemplateResolver.lookup} treated a <em>defined</em> variable
+     * holding {@code null} as unresolved — real (e.g. a workspace SHA that a {@code Map.get} may
+     * legitimately return {@code null} for) and different from what plain substitution does
+     * ({@code String.valueOf(null)} → the literal text {@code "null"}). Asking
+     * {@link ExecutionContext#resolvesPlaceholder} instead of re-deriving the answer keeps the two in
+     * sync by construction.
+     */
+    @Test
+    void a_defined_variable_holding_null_still_resolves() {
+        ExecutionContext ctx = context();
+        ctx.setVariable("workspace_source_sha", null);
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("title", "Build {{ workspace_source_sha }}");
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(ctx, config);
+
+        assertThat(candidate).containsEntry("title", "Build null");
+    }
+
+    /**
+     * I1: {@code TemplateResolver.lookup} falls back to a variable literally named like the
+     * placeholder ({@code "block.x.output"}) when no block named {@code x} recorded output — the old
+     * hand copy stopped after the block-output check and never took this fallback.
+     */
+    @Test
+    void a_variable_named_like_a_block_output_placeholder_still_resolves() {
+        ExecutionContext ctx = context();
+        ctx.setVariable("block.x.output", "fallback value");
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("title", "{{ block.x.output }}");
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(ctx, config);
+
+        assertThat(candidate).containsEntry("title", "fallback value");
+    }
+
+    /**
+     * I2 (regression): a bare {@code null} kpi entry must reach the validator unchanged, exactly like
+     * any other non-object entry — dropping it silently would accept an input the marker path
+     * rejects (see {@link DashboardReportBlockExecutorTest#a_null_kpi_entry_fails_via_the_shared_validator}
+     * for the end-to-end failure).
+     */
+    @Test
+    void a_null_kpi_entry_is_passed_through_unchanged_not_dropped() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        List<Object> kpis = new ArrayList<>();
+        kpis.add(null);
+        config.put("kpis", kpis);
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(context(), config);
+
+        assertThat(candidate.get("kpis")).isEqualTo(java.util.Collections.singletonList(null));
+    }
+
+    /**
+     * I3 (regression): dropping a blank row shifts every later survivor's position in the list the
+     * validator sees. {@link DashboardReportCandidate#buildTracked} records each survivor's original,
+     * author-facing config position so a validator message can be translated back — see
+     * {@link #renumber_maps_the_validators_post_drop_index_back_to_the_authors_config_position} for
+     * the translation itself and
+     * {@link DashboardReportBlockExecutorTest#a_blank_kpi_row_before_an_invalid_one_does_not_shift_the_authors_numbering}
+     * for the end-to-end result.
+     */
+    @Test
+    void buildTracked_records_each_survivors_original_config_position() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("kpis", List.of(
+                kpi("{{ empty }}", "{{ empty }}", null), // 1: dropped (blank row)
+                kpi("a", "b", null),                      // 2: kept
+                kpi("{{ empty }}", "{{ empty }}", null), // 3: dropped (blank row)
+                "plain"));                                 // 4: kept (passthrough, not an object)
+
+        DashboardReportCandidate.Built built = DashboardReportCandidate.buildTracked(context(), config);
+
+        assertThat(built.positions().get("kpis")).containsExactly(2, 4);
+    }
+
+    @Test
+    void renumber_maps_the_validators_post_drop_index_back_to_the_authors_config_position() {
+        Map<String, List<Integer>> positions = Map.of("kpis", List.of(2, 4));
+
+        assertThat(DashboardReportCandidate.renumber("kpis[1] must be an object", positions))
+                .isEqualTo("kpis[2] must be an object");
+        assertThat(DashboardReportCandidate.renumber("kpis[2].label is required", positions))
+                .isEqualTo("kpis[4].label is required");
+    }
+
+    @Test
+    void renumber_leaves_an_index_it_has_no_record_of_unchanged() {
+        assertThat(DashboardReportCandidate.renumber("items[1] must be a string", Map.of()))
+                .isEqualTo("items[1] must be a string");
+    }
+
+    /**
+     * I4 (was already fixed at the top level in fix round 1, G4 — items entries still forced every
+     * value through {@code toString()}): a non-string item passes through unchanged so the validator
+     * can say "items[n] must be a string" itself, instead of accepting a stringified map or number the
+     * marker path would reject.
+     */
+    @Test
+    void non_string_item_values_survive_so_the_validator_can_reject_them() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("items", List.of(Map.of("a", "b"), 42));
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(context(), config);
+
+        assertThat(candidate.get("items")).isEqualTo(List.of(Map.of("a", "b"), 42));
+    }
 }

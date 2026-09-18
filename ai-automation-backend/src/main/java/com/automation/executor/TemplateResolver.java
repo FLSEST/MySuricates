@@ -174,6 +174,11 @@ final class TemplateResolver {
         return null;
     }
 
+    /** Whether {@code key} would resolve to a value (possibly blank) rather than stay a literal placeholder — the exact question {@link #lookup} answers, reused rather than duplicated. */
+    static boolean resolves(String key, String previousOutput, Map<String, String> blockOutputs, Map<String, Object> vars) {
+        return lookup(key, previousOutput, blockOutputs, vars) != null;
+    }
+
     private static String value(String raw, boolean escape) {
         return escape ? shellEscape(raw) : raw;
     }

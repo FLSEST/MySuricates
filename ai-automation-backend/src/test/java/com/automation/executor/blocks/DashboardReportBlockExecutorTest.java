@@ -11,6 +11,7 @@ import com.automation.modules.ModuleRegistry;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -276,5 +277,55 @@ class DashboardReportBlockExecutorTest {
         assertThat(second.getStatus()).isEqualTo(StepStatus.FAILED);
         Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("first success");
+    }
+
+    // ---- Fix round 2 --------------------------------------------------------------------------
+
+    /** I2 (regression): the marker path rejects a bare null kpi entry — the block must still fail too. */
+    @Test
+    void a_null_kpi_entry_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        List<Object> kpis = new ArrayList<>();
+        kpis.add(null);
+        config.put("kpis", kpis);
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("kpis[1]");
+    }
+
+    /**
+     * I3 (regression): a blank kpi row (dropped before validation) must not shift the position an
+     * invalid later row is reported at — the author wrote the invalid one second, so the failure must
+     * say {@code kpis[2]}, not the validator's own post-drop {@code kpis[1]}.
+     */
+    @Test
+    void a_blank_kpi_row_before_an_invalid_one_does_not_shift_the_authors_numbering() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("kpis", List.of(Map.of(), "plain")); // author's kpis[1]: blank row, dropped; kpis[2]: invalid
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("kpis[2]").doesNotContain("kpis[1]");
+    }
+
+    /** I4: the marker path rejects a non-string item — the block must still fail too, naming the field. */
+    @Test
+    void non_string_item_values_fail_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("items", List.of(42));
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("items[1]");
     }
 }
