@@ -73,7 +73,9 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDef[] = [
     label: (t) => t.dashboard.failingWorkflows, description: describedBy('failingWorkflows'),
   },
   {
-    id: 'api-latency', category: 'quality', size: 'chart', component: ApiLatencyWidget,
+    // catalogOnly per the rule pinned in widgetRegistry.test: a widget added later must not
+    // appear in everyone's dashboard unasked. Diagnostics are fetched when wanted, not by default.
+    id: 'api-latency', category: 'quality', size: 'chart', component: ApiLatencyWidget, catalogOnly: true,
     label: (t) => t.dashboard.apiLatency, description: describedBy('apiLatency'),
   },
   {
