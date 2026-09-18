@@ -18,6 +18,7 @@ public class AgentInstructionsService {
     private static final int MAX_INSTRUCTION_LENGTH = 10_000;
 
     private final SystemIdentityService systemIdentity;
+    private final UserPreferencesService userPreferences;
 
     private String baseInstructions = "";
 
@@ -32,7 +33,18 @@ public class AgentInstructionsService {
         }
     }
 
+    /** Ohne Arbeitspräferenzen — der Weg für alles, was sie nicht anfordert. */
     public String buildInstructionPrefix(String workflowInstructions) {
+        return buildInstructionPrefix(workflowInstructions, false);
+    }
+
+    /**
+     * @param includeUserPreferences Arbeitspräferenzen mitschicken? Opt-in pro Workflow über
+     *     {@code metadata.userPreferences} (TODO d49fbde0). Bei {@code false} ist das Ergebnis
+     *     byte-identisch zum Stand vor der Einführung — ein Workflow, der nichts anfordert, sieht
+     *     keinen geänderten Prompt.
+     */
+    public String buildInstructionPrefix(String workflowInstructions, boolean includeUserPreferences) {
         StringBuilder sb = new StringBuilder();
 
         // Prepend system identity block (name + version + git trailer instruction)
@@ -40,6 +52,16 @@ public class AgentInstructionsService {
 
         if (!baseInstructions.isEmpty()) {
             sb.append(baseInstructions);
+        }
+
+        if (includeUserPreferences) {
+            String preferences = userPreferences.block();
+            if (!preferences.isBlank()) {
+                if (!sb.isEmpty()) {
+                    sb.append("\n\n");
+                }
+                sb.append(preferences.strip());
+            }
         }
 
         String validated = validateInstructions(workflowInstructions);

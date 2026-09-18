@@ -22,7 +22,14 @@ class AgentInstructionsServiceTest {
     void setUp() {
         when(systemIdentity.getAgentIdentityBlock()).thenReturn(
                 "## System Identity\nDu bist ein Agent von MySuricates v0.2.3.\n\n");
-        service = new AgentInstructionsService(systemIdentity);
+        // Arbeitspraeferenzen ohne gesetzte Settings: der Block bleibt leer, der Prompt
+        // damit unveraendert (TODO d49fbde0) -- diese Tests pruefen die uebrigen Teile.
+        com.automation.service.system.SystemSettingsService noSettings =
+                org.mockito.Mockito.mock(com.automation.service.system.SystemSettingsService.class);
+        org.mockito.Mockito.lenient()
+                .when(noSettings.getSetting(org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(java.util.Optional.empty());
+        service = new AgentInstructionsService(systemIdentity, new UserPreferencesService(noSettings));
         // Call init to load base instructions from classpath
         service.init();
     }

@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -50,7 +51,8 @@ class ExecutionContextFactoryTest {
     @BeforeEach
     void setUp() {
         project = Project.builder().id("proj-1").path("/p").aiContext("ctx").build();
-        lenient().when(agentInstructionsService.buildInstructionPrefix(any())).thenReturn("");
+        lenient().when(agentInstructionsService.buildInstructionPrefix(any(), anyBoolean()))
+                .thenReturn("");
         lenient().when(systemIdentity.getName()).thenReturn("MySuricates");
         lenient().when(systemIdentity.getVersion()).thenReturn("0.7.4");
         lenient().when(workflowVersionService.getVersionCount("wf-1")).thenReturn(0);
@@ -202,7 +204,7 @@ class ExecutionContextFactoryTest {
 
     @Test
     void create_nonBlankInstructionsModelProviderEffort_areApplied() {
-        when(agentInstructionsService.buildInstructionPrefix("be brief")).thenReturn("PREFIX");
+        when(agentInstructionsService.buildInstructionPrefix("be brief", false)).thenReturn("PREFIX");
 
         ExecutionContext ctx = factory.create(seed(Map.of(), "be brief", "claude-opus-4-6", "CLAUDE", "high", null));
 

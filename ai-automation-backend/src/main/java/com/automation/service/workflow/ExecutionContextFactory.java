@@ -47,7 +47,20 @@ public class ExecutionContextFactory {
     public record ContextSeed(String runId, String workflowId, String workflowName, Project project,
                               String containerId, Map<String, Object> inputContext, String instructions,
                               String model, String provider, String effort, String resumePreviousOutput,
-                              String definitionHash, TriggerSource triggerSource) {}
+                              String definitionHash, TriggerSource triggerSource,
+                              /** metadata.userPreferences des Workflows (TODO d49fbde0). */
+                              boolean userPreferences) {
+
+        /** Kurzform ohne Arbeitspräferenzen — der Weg fuer alles, was sie nicht anfordert. */
+        public ContextSeed(String runId, String workflowId, String workflowName, Project project,
+                           String containerId, Map<String, Object> inputContext, String instructions,
+                           String model, String provider, String effort, String resumePreviousOutput,
+                           String definitionHash, TriggerSource triggerSource) {
+            this(runId, workflowId, workflowName, project, containerId, inputContext, instructions,
+                    model, provider, effort, resumePreviousOutput, definitionHash, triggerSource,
+                    false);
+        }
+    }
 
     public ExecutionContext create(ContextSeed seed) {
         String runId = seed.runId();
@@ -152,7 +165,8 @@ public class ExecutionContextFactory {
         contextDataService.injectPlatformData(context, workflowId, project.getId());
 
         // Set instruction prefix and model from workflow
-        String instructionPrefix = agentInstructionsService.buildInstructionPrefix(instructions);
+        String instructionPrefix = agentInstructionsService.buildInstructionPrefix(
+                instructions, seed.userPreferences());
         if (!instructionPrefix.isBlank()) {
             context.setInstructionPrefix(instructionPrefix);
         }

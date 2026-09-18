@@ -504,6 +504,16 @@ Two-level instruction injection via Claude CLI `--append-system-prompt` / `--sys
 1. **Base instructions** (`src/main/resources/agent-instructions.md`) — loaded at startup by `AgentInstructionsService`, apply to all workflows
 2. **Workflow-specific instructions** (`workflow.instructions`) — per workflow, editable in the UI (Monaco editor)
 
+3. **Working preferences** (opt-in) — only when a workflow requests them via
+   `metadata.userPreferences: true`. `UserPreferencesService` then renders exactly three runtime
+   settings into a `## Arbeitspräferenzen` section: `user-pref-language`, `user-pref-style`,
+   `user-pref-stack` (answer language, answer style, tech stack). Nothing else is possible: the key
+   list lives in the code, an additional key is a deliberate change. **No names, contact details,
+   CVs or professional profiles** — decision of 2026-09-15. With nothing set, or without the flag,
+   the prompt is byte-identical to the state before the feature; a checking or measuring workflow
+   should depend on the facts alone. Values are maintained via
+   `PUT /api/v1/system/settings/{key}`.
+
 Injection paths:
 - **Block execution:** Instructions via `--append-system-prompt` on host Claude CLI (`HostClaudeService.executeAction()`)
 - **Agentic REASON:** System prompt via `--system-prompt` to `HostClaudeService.reasonStructured()`, including workflow instructions in `## Workflow Instructions`
