@@ -158,6 +158,15 @@ write_pool ctx-projectid <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
 JSON
 
+# Schreibweise, die in der generierten Schluesselliste NICHT wortwoertlich steht: der Export
+# (PoolExportSanitizer) normalisiert vor dem Vergleich, das Gate muss dasselbe tun (TODO 96640e6f).
+write_pool ctx-kebab-projectid <<'JSON'
+{"name": {"de": "Kebab", "en": "Kebab"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project-id": "e1b2c3d4"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
 write_pool ctx-placeholder <<'JSON'
 {"name": {"de": "Platzhalter", "en": "Placeholder"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
@@ -293,6 +302,7 @@ check "fehlendes scope erkannt"                'grep -q "missing-scope.*SCOPE" <
 check "ungueltiges scope erkannt"              'grep -q "bad-scope.*SCOPE" <<<"$OUT"'
 check "projectId im Eintrag erkannt"           'grep -q "has-projectid.*PROJECT-ID" <<<"$OUT"'
 check "project_id im defaultContext erkannt"   'grep -q "ctx-projectid.*PROJECT-ID" <<<"$OUT"'
+check "project-id (kebab) ebenso erkannt"      'grep -q "ctx-kebab-projectid.*PROJECT-ID" <<<"$OUT"'
 check "Platzhalter-project_id bleibt erlaubt"  '! grep -q "ctx-placeholder" <<<"$OUT"'
 check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$OUT"'
 check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'

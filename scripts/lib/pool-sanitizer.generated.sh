@@ -8,6 +8,10 @@
 # Was der Export entfernt, beanstandet das Gate im Bestand: eine Quelle, zwei Seiten.
 # Eingelesen von scripts/lib/hygiene-rules.sh; reine Daten, keine Funktionen.
 #
+# Verglichen wird auf beiden Seiten normalisiert (klein, ohne '_' und '-'), siehe
+# PoolExportSanitizer.normalize und normalize_key in scripts/ci/pool-neutrality.sh.
+# Auch eine Schreibweise, die hier nicht wortwoertlich steht (project-id), zaehlt.
+#
 # shellcheck shell=bash
 
 HYGIENE_POOL_INSTANCE_KEYS=(
