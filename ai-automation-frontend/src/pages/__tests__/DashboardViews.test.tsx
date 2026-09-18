@@ -37,4 +37,21 @@ describe('Dashboard views', { timeout: 20_000 }, () => {
     release();
     await waitFor(() => expect(screen.getByTestId('dashboard-widgets')).not.toHaveAttribute('aria-busy'));
   });
+
+  it('marks the widget area as the panel of the shown view’s tab, but not in edit mode', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'week',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'week', name: 'Week', widgets: [] }],
+    });
+    renderWithProviders(<Dashboard />);
+    expect(await screen.findByText('Recent Runs')).toBeInTheDocument();
+
+    const panel = screen.getByRole('tabpanel', { name: 'Week' });
+    expect(panel).toHaveAttribute('id', 'dashboard-view-panel');
+    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-controls', panel.id);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
 });

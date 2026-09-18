@@ -5,6 +5,7 @@ import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/Dashboa
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
 import { useDashboardData } from '../components/dashboard/dashboardDataContext';
+import { DASHBOARD_VIEW_PANEL_ID, viewTabId } from '../components/dashboard/viewTabA11y';
 import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFilterBar';
 import { DashboardViewTabs } from '../components/dashboard/DashboardViewTabs';
 import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
@@ -55,9 +56,13 @@ function DashboardPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const sync = useDashboardLayoutSync();
   const { isPlaceholderData } = useDashboardData();
+  const activeViewId = useDashboardLayoutStore((s) => selectActiveView(s)?.id);
+  const viewCount = useDashboardLayoutStore((s) => s.views.length);
   useDashboardViewParam();
   // While a version is restored, adopted or saved (`busy`), the layout can change underneath: no edits.
   const locked = sync.busy;
+  // Outside edit mode with several views the tabs switch views, and the widget area is their panel.
+  const tabPanel = !editMode && viewCount > 1 && activeViewId !== undefined;
 
   const toggleEditMode = () => {
     // Leaving edit mode is the save point of the version history (spec E1).
@@ -144,6 +149,9 @@ function DashboardPage() {
       {/* Dimmed while the widgets still show the previous view's or filter's data. */}
       <div
         data-testid="dashboard-widgets"
+        id={tabPanel ? DASHBOARD_VIEW_PANEL_ID : undefined}
+        role={tabPanel ? 'tabpanel' : undefined}
+        aria-labelledby={tabPanel ? viewTabId(activeViewId) : undefined}
         aria-busy={isPlaceholderData || undefined}
         className={`transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}
       >

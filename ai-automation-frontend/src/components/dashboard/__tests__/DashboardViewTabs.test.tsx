@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useI18nStore } from '../../../i18n';
 import { useDashboardLayoutStore } from '../../../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../../../stores/dashboardSyncStore';
@@ -9,6 +9,8 @@ import { DashboardViewTabs } from '../DashboardViewTabs';
 const view = (id: string, name = ''): DashboardView => ({ id, name, widgets: [] });
 const layout = () => useDashboardLayoutStore.getState();
 const tabNames = () => screen.getAllByRole('tab').map((tab) => tab.textContent);
+// In edit mode the views are a list; each entry has a drag handle and a select button with the view id.
+const editNames = () => Array.from(document.querySelectorAll('[role="listitem"] [data-view-id]')).map((el) => el.textContent);
 const nameField = () => screen.getByRole('textbox', { name: 'View name' }) as HTMLInputElement;
 
 beforeEach(() => {
@@ -51,12 +53,12 @@ describe('DashboardViewTabs', () => {
     render(<DashboardViewTabs editMode disabled={false} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate view' }));
-    expect(tabNames()).toEqual(['Overview', 'Overview (copy)']);
-    expect(screen.getByRole('tab', { name: 'Overview (copy)' })).toHaveAttribute('aria-selected', 'true');
+    expect(editNames()).toEqual(['Overview', 'Overview (copy)']);
+    expect(screen.getByRole('button', { name: 'Overview (copy)' })).toHaveAttribute('aria-current', 'true');
     expect(useDashboardSyncStore.getState().dirty).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add view' }));
-    expect(tabNames()).toEqual(['Overview', 'Overview (copy)']);
+    expect(editNames()).toEqual(['Overview', 'Overview (copy)']);
     expect(layout().activeViewId).toBe(layout().views[2]?.id);
     const field = nameField();
     expect(field).toHaveFocus();
@@ -64,7 +66,7 @@ describe('DashboardViewTabs', () => {
 
     fireEvent.change(field, { target: { value: 'Third' } });
     fireEvent.keyDown(field, { key: 'Enter' });
-    expect(tabNames()).toEqual(['Overview', 'Overview (copy)', 'Third']);
+    expect(editNames()).toEqual(['Overview', 'Overview (copy)', 'Third']);
     expect(layout().views[0]?.name).toBe('');
   });
 
@@ -121,7 +123,7 @@ describe('DashboardViewTabs', () => {
     for (const name of ['Add view', 'Rename view', 'Duplicate view', 'Delete view', 'Move view: Ops']) {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }
-    fireEvent.click(screen.getByRole('tab', { name: 'Ops' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ops' }));
     expect(layout().activeViewId).toBe('ops');
   });
 
@@ -134,5 +136,60 @@ describe('DashboardViewTabs', () => {
 
     expect(screen.getByRole('button', { name: 'Add view' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Duplicate view' })).toBeDisabled();
+  });
+
+  it('is a tab list outside edit mode: tabs control the widget panel, one tab stop, arrow keys switch', () => {
+    useDashboardLayoutStore.setState({ activeViewId: 'ops', views: [view('default'), view('ops', 'Ops'), view('plan', 'Plan')] });
+    render(<DashboardViewTabs editMode={false} disabled={false} />);
+
+    const ops = screen.getByRole('tab', { name: 'Ops' });
+    expect(ops).toHaveAttribute('aria-controls', 'dashboard-view-panel');
+    expect(ops).toHaveAttribute('id', 'dashboard-view-tab-ops');
+    expect(screen.getAllByRole('tab').map((tab) => tab.tabIndex)).toEqual([-1, 0, -1]);
+
+    fireEvent.keyDown(ops, { key: 'ArrowRight' });
+    expect(layout().activeViewId).toBe('plan');
+    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Plan' }), { key: 'ArrowRight' });
+    expect(layout().activeViewId).toBe('default');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'ArrowLeft' });
+    expect(layout().activeViewId).toBe('plan');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Plan' }), { key: 'Home' });
+    expect(layout().activeViewId).toBe('default');
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Overview' }), { key: 'End' });
+    expect(layout().activeViewId).toBe('plan');
+    expect(useDashboardSyncStore.getState().dirty).toBe(false);
+  });
+
+  it('is no tab list in edit mode, where every view carries a drag handle', () => {
+    useDashboardLayoutStore.setState({ activeViewId: 'ops', views: [view('default'), view('ops', 'Ops')] });
+    render(<DashboardViewTabs editMode disabled={false} />);
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Dashboard views' })).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Ops' })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveAttribute('aria-current');
+  });
+
+  it.each([false, true])('scrolls the shown view into the visible part of the strip (editMode=%s)', (editMode) => {
+    const scrolled: (string | null)[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this.getAttribute('data-view-id'));
+    };
+    try {
+      const views = Array.from({ length: 8 }, (_, i) => view(`v${i}`, `View ${i}`));
+      useDashboardLayoutStore.setState({ activeViewId: 'v7', views });
+      render(<DashboardViewTabs editMode={editMode} disabled={false} />);
+      expect(scrolled).toEqual(['v7']);
+
+      act(() => layout().setActiveView('v2'));
+      expect(scrolled).toEqual(['v7', 'v2']);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
   });
 });
