@@ -331,11 +331,13 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Check 9 — getrackte Pool-Dateien gegen die private Ausschlussliste
+# Check 9 — Pool-Dateien im Index gegen die private Ausschlussliste
 #
 # Die persoenlichen Definitionen haelt .git/info/exclude aus dem Bestand. Das
 # gilt aber nur lokal: exclude wird nicht geklont, und in einem frischen Clone
-# holt ein pauschales "git add -A" die Dateien zurueck. Hier faellt das auf.
+# holt ein pauschales "git add -A" die Dateien zurueck. Hier faellt das auf —
+# in allen drei Modi, denn git ls-files liest den Index und sieht damit auch
+# gestagte Dateien vor dem Commit.
 #
 # Die Liste selbst liegt nicht im Repository — sie waere sonst genau die
 # Klartext-Namensliste, die exclude vermeiden soll. Fehlt sie, ist das kein
@@ -350,19 +352,35 @@ check_private_pool_list() {
          "die private Liste geprueft (uebersprungen; Vorlage: ${HYGIENE_PRIVATE_LIST_FILE}.example)"
     return 0
   fi
-  local pattern f
-  while IFS= read -r pattern; do
+  local pattern f out rc lineno=0
+  # "|| [ -n "$pattern" ]" nimmt die letzte Zeile mit, wenn die Datei ohne
+  # Zeilenumbruch endet — sonst ist eine einzeilige Liste ein lautloser No-op.
+  while IFS= read -r pattern || [ -n "$pattern" ]; do
+    lineno=$((lineno + 1))
     pattern="${pattern%%#*}"
     pattern="${pattern#"${pattern%%[![:space:]]*}"}"
     pattern="${pattern%"${pattern##*[![:space:]]}"}"
     [ -z "$pattern" ] && continue
+    # Die Muster stammen aus .git/info/exclude und sind dort oft mit fuehrendem
+    # "/" auf die Repo-Wurzel verankert. Als Pathspec bricht git daran ab
+    # ("Invalid path '/workflow-pool'"), deshalb hier abstreifen.
+    pattern="${pattern#/}"
+    out="$(git ls-files -- "$pattern" 2>&1)"
+    rc=$?
+    # Ein Muster, das git nicht aufloesen kann, ist ein Fehler und kein Grund,
+    # stillschweigend nichts zu pruefen: frueher verschluckte "|| true" den Fall.
+    if [ "$rc" -ne 0 ]; then
+      annotate "$HYGIENE_PRIVATE_LIST_FILE" "$lineno" \
+        "Muster '${pattern}' ist keine gueltige Pfadangabe (git ls-files exit ${rc}): $(printf '%s' "$out" | tr '\n' ' ')"
+      continue
+    fi
     while IFS= read -r f; do
       case "$f" in
         workflow-pool/*) ;;
         *) continue ;;
       esac
-      annotate "$f" 1 "getrackte Pool-Definition passt auf ein Muster aus ${HYGIENE_PRIVATE_LIST_FILE} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
-    done < <(git ls-files -- "$pattern" 2>/dev/null || true)
+      annotate "$f" 1 "Pool-Definition im Index passt auf ein Muster aus ${HYGIENE_PRIVATE_LIST_FILE} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
+    done <<<"$out"
   done < "$list"
 }
 
@@ -383,6 +401,10 @@ echo "Public-Hygiene-Gate (${MODE})"
 if [ "$MODE" = "staged" ]; then
   check_staged_files
   check_patterns_staged
+  # Der Pre-Commit-Moment ist genau das Szenario: ein pauschales "git add -A" hat
+  # die privaten Definitionen gerade in den Index geholt. git ls-files liest den
+  # Index, die Pruefung sieht sie also schon vor dem Commit.
+  check_private_pool_list
   report_symlinks
 else
   check_tracked_but_ignored

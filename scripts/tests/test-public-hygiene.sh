@@ -469,6 +469,45 @@ check "hygiene-private.txt nicht getrackt" \
 check "hygiene-private.txt.example getrackt" \
   '[ -n "$(cd "$REPO" && git ls-files scripts/ci/hygiene-private.txt.example)" ]'
 
+echo "28) Letzte Zeile ohne Zeilenumbruch zaehlt mit"
+# Eine einzeilige Liste ohne abschliessendes \n war frueher ein lautloser No-op:
+# read gibt bei EOF ohne Umbruch false zurueck, die Schleife lief kein einziges Mal.
+printf 'workflow-pool/persoenlich-*.json' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Treffer trotz fehlendem Zeilenumbruch (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                           'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+
+echo "29) Muster in der Schreibweise von .git/info/exclude (fuehrender /)"
+printf '/workflow-pool/persoenlich-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fuehrender / wird abgestreift, Treffer erkannt" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                           'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+check "kein git-Fehler in der Ausgabe"                 '! grep -qi "Invalid path\|ungueltiger Pfad" <<<"$OUT"'
+
+echo "30) Ein Muster, das git nicht aufloesen kann, ist ein Gate-Fehler"
+printf ':(bogus)workflow-pool/x.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "unaufloesbares Muster schlaegt das Gate (exit 1)" '[ "$RC" -eq 1 ]'
+check "Meldung nennt das Muster"                         'grep -q "bogus" <<<"$OUT"'
+check "Meldung nennt die Liste"                          'grep -q "hygiene-private.txt" <<<"$OUT"'
+check "Gate meldet kein OK"                              '! grep -q "Public-Hygiene-Gate OK" <<<"$OUT"'
+
+echo "31) Auch der Pre-Commit-Moment (--staged) prueft die Privatliste"
+( cd "$TMP/priv" && cat > workflow-pool/neu-privat.json <<'JSON'
+{"name": {"de": "Neu", "en": "New"},
+ "description": {"de": "Prueft ein Projekt.", "en": "Checks a project."},
+ "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+  $GIT add workflow-pool/neu-privat.json )
+printf 'workflow-pool/neu-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged meldet die gestagte Pool-Datei (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die gestagte Datei"                    'grep -q "workflow-pool/neu-privat.json" <<<"$OUT"'
+printf 'workflow-pool/etwas-anderes-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged ohne Treffer bleibt gruen (exit 0)"      '[ "$RC" -eq 0 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

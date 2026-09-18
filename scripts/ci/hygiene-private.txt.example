@@ -10,9 +10,13 @@
 # "git add -A" in einem frischen Clone committet sie sonst wieder zurueck,
 # ohne dass ein Gate anschlaegt. Diese Liste ist die durchsetzbare Haelfte.
 #
-# Format: ein Glob je Zeile, repo-relativ, Kommentare mit #. Gewertet werden
-# nur Treffer unter workflow-pool/. Die Muster gehoeren zu denselben Dateien,
-# die in .git/info/exclude stehen — beide Stellen zusammen pflegen.
+# Format: ein Glob je Zeile, repo-relativ, Kommentare mit #. Ein fuehrender "/"
+# (die Schreibweise aus .git/info/exclude) wird abgestreift, die Zeilen lassen
+# sich also von dort uebernehmen. Gewertet werden nur Treffer unter
+# workflow-pool/. Ein Muster, das git nicht als Pfadangabe lesen kann, meldet
+# das Gate als Fehler — es wird nicht stillschweigend verworfen.
+# Die Muster gehoeren zu denselben Dateien, die in .git/info/exclude stehen —
+# beide Stellen zusammen pflegen.
 
 # Beispielmuster (erfunden, trifft nichts):
 workflow-pool/mein-privater-workflow-*.json
