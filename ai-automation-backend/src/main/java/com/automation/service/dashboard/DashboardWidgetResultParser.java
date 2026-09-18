@@ -2,6 +2,10 @@ package com.automation.service.dashboard;
 
 import com.automation.dto.response.DashboardWorkflowResultResponse.Result;
 import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
@@ -21,13 +25,21 @@ import java.util.Set;
  * contract; it is harmless because the frontend renders contract values only as React text nodes.
  * What the parser does reject is structure it does not know (unknown fields, wrong types), anything
  * over its limits, and characters that make text read differently than it looks (control, format,
- * separator, surrogate and private-use code points — zero width and bidi overrides included).
+ * separator, surrogate and private-use code points — zero width and bidi overrides included; fix
+ * round 1, A1: also every space-like separator except the ordinary U+0020, and the known invisible
+ * filler letters/symbols U+2800, U+3164, U+115F, U+1160, U+FFA0). Combining-mark floods ("Zalgo") and
+ * strong-RTL letters reordering neutral neighbours remain possible within the length caps — both are
+ * accepted, bounded by the caps, because real i18n text needs them.
  *
  * <p>No numbers exist in the contract: a KPI value is a string, so {@code NaN}, {@code Infinity} or
  * {@code 1e400} can never reach a widget — a number where a string belongs is simply a violation.
  *
  * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own JsonMapper
- * so Spring's Jackson customisation can never change what counts as valid.
+ * so Spring's Jackson customisation can never change what counts as valid. The mapper (fix round 1,
+ * A3) is pinned explicitly rather than relying on Jackson defaults: duplicate keys and trailing
+ * tokens are rejected, and stream-read constraints (nesting depth, string length) are capped so a
+ * pathological payload throws a normal, caught exception instead of risking a {@link StackOverflowError}
+ * that {@code catch (Exception e)} would not stop.
  */
 public final class DashboardWidgetResultParser {
 
@@ -47,9 +59,28 @@ public final class DashboardWidgetResultParser {
     static final int MAX_ITEM = 200;
     static final int MAX_SUMMARY = 500;
 
-    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    /** Deep enough for any legitimate contract (2 levels); far short of any real recursion risk. */
+    private static final int MAX_NESTING_DEPTH = 32;
+
+    private static final JsonMapper MAPPER = JsonMapper.builder(JsonFactory.builder()
+                    .streamReadConstraints(StreamReadConstraints.builder()
+                            .maxNestingDepth(MAX_NESTING_DEPTH)
+                            .maxStringLength(DashboardWidgetMarker.MAX_JSON_CHARS)
+                            .build())
+                    .build())
+            .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
+
     private static final Set<String> RESULT_FIELDS = Set.of("title", "status", "kpis", "items", "summary");
     private static final Set<String> KPI_FIELDS = Set.of("label", "value", "trend");
+
+    /**
+     * Filler code points that are individually legal Unicode (not control/format/separator) but
+     * render as blank: HANGUL FILLER and its choseong/jungseong siblings, HALFWIDTH HANGUL FILLER,
+     * and BRAILLE PATTERN BLANK. See the class javadoc, A1.
+     */
+    private static final Set<Integer> INVISIBLE_FILLERS = Set.of(0x2800, 0x3164, 0x115F, 0x1160, 0xFFA0);
 
     /** VALID carries the result, MISSING means "no marker", INVALID means "marker, but not the contract". */
     public record ParseResult(ResultState state, Result result) {
@@ -62,9 +93,13 @@ public final class DashboardWidgetResultParser {
 
     /**
      * The contract of a whole run: the last output carrying a marker decides, because a report block
-     * usually runs last. Callers pass the outputs in step order and leave out derived ones.
+     * usually runs last. Callers pass the outputs in step order and leave out derived ones. A null
+     * list (no outputs to look at) is simply MISSING, not a crash.
      */
     public static ParseResult parseRun(List<String> outputs) {
+        if (outputs == null) {
+            return ParseResult.MISSING;
+        }
         ParseResult result = ParseResult.MISSING;
         for (String output : outputs) {
             ParseResult parsed = parse(output);
@@ -75,12 +110,16 @@ public final class DashboardWidgetResultParser {
         return result;
     }
 
+    /**
+     * One output's contract. A marker occurring more than once in this single output is rejected
+     * outright as ambiguous (fix round 1, A2) — see {@link DashboardWidgetMarker}.
+     */
     public static ParseResult parse(String output) {
         DashboardWidgetMarker.Scan scan = DashboardWidgetMarker.scan(output);
         if (!scan.found()) {
             return ParseResult.MISSING;
         }
-        if (scan.json() == null) {
+        if (scan.ambiguous() || scan.json() == null) {
             return ParseResult.INVALID;
         }
         try {
@@ -104,6 +143,9 @@ public final class DashboardWidgetResultParser {
 
     /** The plain map that goes into the run metadata (stored as JSON by JsonMapConverter). */
     public static Map<String, Object> toMetadata(Result result) {
+        if (result == null) {
+            return Map.of();
+        }
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("status", result.status().name());
         if (result.title() != null) {
@@ -203,7 +245,7 @@ public final class DashboardWidgetResultParser {
         }
     }
 
-    /** A contract string: trimmed, non-empty, within its cap and free of invisible characters. */
+    /** A contract string: trimmed, non-empty, within its cap and free of invisible/blank characters. */
     private static String text(JsonNode node, int max, boolean required) {
         if (node == null || node.isNull()) {
             if (required) {
@@ -219,7 +261,7 @@ public final class DashboardWidgetResultParser {
             throw new IllegalArgumentException("a text is empty or longer than " + max + " characters");
         }
         if (value.codePoints().anyMatch(DashboardWidgetResultParser::isInvisible)) {
-            throw new IllegalArgumentException("a text holds control or invisible characters");
+            throw new IllegalArgumentException("a text holds control, invisible or blank-filler characters");
         }
         return value;
     }
@@ -228,14 +270,23 @@ public final class DashboardWidgetResultParser {
      * Control characters, invisible format characters (zero width, BOM, bidi overrides), line and
      * paragraph separators, lone surrogates and private-use code points. Contract values are single
      * lines that must read exactly as they look.
+     *
+     * <p>Fix round 1, A1: also every {@code SPACE_SEPARATOR} except the ordinary U+0020 (so a
+     * non-breaking, figure or narrow no-break space can no longer masquerade as real content), and a
+     * denylist of known invisible filler letters/symbols that are not classified as separators at all
+     * (HANGUL FILLER and its choseong/jungseong siblings, HALFWIDTH HANGUL FILLER, BRAILLE PATTERN
+     * BLANK) — without this, a field made only of these renders as an empty heading or row.
      */
     private static boolean isInvisible(int codePoint) {
-        if (Character.isISOControl(codePoint)) {
+        if (codePoint == ' ') {
+            return false;
+        }
+        if (Character.isISOControl(codePoint) || INVISIBLE_FILLERS.contains(codePoint)) {
             return true;
         }
         int type = Character.getType(codePoint);
         return type == Character.CONTROL || type == Character.FORMAT || type == Character.LINE_SEPARATOR
                 || type == Character.PARAGRAPH_SEPARATOR || type == Character.SURROGATE
-                || type == Character.PRIVATE_USE;
+                || type == Character.PRIVATE_USE || type == Character.SPACE_SEPARATOR;
     }
 }

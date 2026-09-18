@@ -5,6 +5,7 @@ import com.automation.entity.RunStatus;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * What one dashboard workflow widget shows (spec E3): the latest run of a workflow and — for the
@@ -36,14 +37,30 @@ public record DashboardWorkflowResultResponse(
     /**
      * The closed contract of the {@code dashboard_widget:} marker. It holds no ids and no URLs on
      * purpose: nothing inside it can ever become a link or a navigation target.
+     *
+     * <p>The type carries its own guarantees (fix round 1, A4), so a caller building one by hand
+     * (not through {@code DashboardWidgetResultParser}) cannot leak a null onto a read path: a
+     * status is required, and {@code kpis}/{@code items} are never null — a null argument becomes an
+     * empty, immutable list.
      */
     public record Result(String title, Status status, List<Kpi> kpis, List<String> items, String summary) {
+
+        public Result {
+            Objects.requireNonNull(status, "Result.status must not be null");
+            kpis = kpis == null ? List.of() : List.copyOf(kpis);
+            items = items == null ? List.of() : List.copyOf(items);
+        }
 
         public enum Status { GREEN, YELLOW, RED }
 
         public enum Trend { UP, DOWN, FLAT }
 
         public record Kpi(String label, String value, Trend trend) {
+
+            public Kpi {
+                Objects.requireNonNull(label, "Kpi.label must not be null");
+                Objects.requireNonNull(value, "Kpi.value must not be null");
+            }
         }
     }
 }
