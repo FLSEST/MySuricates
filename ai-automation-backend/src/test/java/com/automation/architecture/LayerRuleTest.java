@@ -38,7 +38,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ul>
  *
  * <p>Both views run against the same {@link #FORBIDDEN} rules but keep their own allowlist, so a
- * pinned violation in one view never silently covers the other.
+ * pinned violation in one view never silently covers the other. They are complementary, not a
+ * complete net: a fully qualified name inside a generic type argument
+ * ({@code Page<com.automation.repository.Foo>} without an import) is erased in the bytecode and has
+ * no import line – neither view sees it.
  */
 class LayerRuleTest {
 
@@ -108,6 +111,11 @@ class LayerRuleTest {
         assertThat(scan.classes()).as("import scan read %d source files – below %d that is a broken "
                 + "measurement, not a clean architecture", scan.classes(), MIN_SCANNED_CLASSES)
                 .isGreaterThan(MIN_SCANNED_CLASSES);
+        if (scan.indentedImports() > 0) {
+            System.out.println("[LayerRuleTest] " + scan.indentedImports() + " indented import line(s) "
+                    + "were skipped by the column-0 rule of SourceImportEdges – if those are real "
+                    + "imports, this view no longer sees them.");
+        }
 
         List<String> added = violations(scan.edges()).stream()
                 .filter(edge -> !ALLOWED_SOURCE_VIOLATIONS.contains(edge)).toList();
@@ -138,12 +146,16 @@ class LayerRuleTest {
                 "import org.springframework.data.domain.Page;",
                 "",
                 "class C {",
-                "    // import com.automation.repository.NotAnImport; (indented, so not counted)",
+                "    // import com.automation.repository.NotAnImport; (a comment, never counted)",
+                "    import com.automation.repository.Indented;",
                 "    Page<SomeProjection> list() { return null; }",
                 "}");
 
         assertThat(violations(SourceImportEdges.edgesOf(source)))
                 .containsExactly("com.automation.controller -> com.automation.repository");
+        assertThat(SourceImportEdges.countIndentedImports(source))
+                .as("an indented import is skipped by the column-0 rule – but counted, so the gap is visible")
+                .isEqualTo(1);
     }
 
     @Test

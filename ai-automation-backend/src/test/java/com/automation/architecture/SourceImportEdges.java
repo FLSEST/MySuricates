@@ -23,9 +23,16 @@ import java.util.stream.Stream;
  * reflection, and generated code. Neither view subsumes the other, so {@link LayerRuleTest} runs
  * the same rules against both.
  *
+ * <p>What still escapes both: a fully qualified name <em>inside</em> a generic type argument
+ * ({@code Page<com.automation.repository.Foo>} written without an import). The bytecode erases it
+ * and there is no import line to find. That is a real hole, not a covered case – the two views are
+ * complementary, not a complete net.
+ *
  * <p>Parsing is deliberately literal, not a Java parser: a line counts as an import when it starts
  * with {@code "import "} in column 0, which is where every import in this code base sits. Text in
- * comments or string literals is indented and therefore never mistaken for one.
+ * comments or string literals is indented and therefore never mistaken for one. The price is that
+ * an indented real import would be missed, so {@link Scan#indentedImports()} counts those lines and
+ * {@link LayerRuleTest} prints them – a silently growing blind spot is worse than a noisy one.
  *
  * <p>The package of an imported type is its longest prefix of lower-case segments
  * ({@code com.automation.repository.Foo} and the static {@code com.automation.service.Foo.bar} both
@@ -47,9 +54,11 @@ final class SourceImportEdges {
     /**
      * Result of a scan. {@code classes} is the number of scanned {@code com.automation} source
      * files – a scan that found nothing is a broken measurement, not a clean architecture, so the
-     * callers assert on it.
+     * callers assert on it. {@code indentedImports} counts lines that read like an import but do
+     * not start in column 0: this parser skips them on purpose (see class comment), so a non-zero
+     * count means the blind spot has grown and the caller should say so out loud.
      */
-    record Scan(Set<Edge> edges, int classes) {
+    record Scan(Set<Edge> edges, int classes, int indentedImports) {
     }
 
     /** Scans the production sources of this module. */
@@ -61,6 +70,7 @@ final class SourceImportEdges {
     static Scan scan(Path root) throws IOException {
         Set<Edge> edges = new TreeSet<>();
         int classes = 0;
+        int indented = 0;
         try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".java")).sorted().toList()) {
                 List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -69,9 +79,22 @@ final class SourceImportEdges {
                 }
                 classes++;
                 edges.addAll(edgesOf(lines));
+                indented += countIndentedImports(lines);
             }
         }
-        return new Scan(edges, classes);
+        return new Scan(edges, classes, indented);
+    }
+
+    /** Lines this parser ignores although they look like an import of a {@code com.automation} type. */
+    static int countIndentedImports(List<String> lines) {
+        int found = 0;
+        for (String line : lines) {
+            if (!line.startsWith("import ") && line.stripLeading().startsWith("import ")
+                    && line.contains(PREFIX)) {
+                found++;
+            }
+        }
+        return found;
     }
 
     /** Edges of a single source file: its own package to every {@code com.automation} package it imports. */
