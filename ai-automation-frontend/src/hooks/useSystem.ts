@@ -233,6 +233,10 @@ export interface ExecutionConfig {
   wishDefaultShellTimeoutSeconds?: number;
   wishDefaultAgenticTotalTimeoutSeconds?: number;
   modelCatalogTtlSeconds?: number;
+  /** nightly todo hygiene job: on/off, staleness threshold, per-run cap */
+  todoHygieneEnabled?: number;
+  todoStaleDays?: number;
+  todoHygieneMaxPerRun?: number;
   /** running + queued (a queued run already holds or is about to hold a permit) */
   activeRuns: number;
   /** subset of activeRuns still waiting for a permit or container */
