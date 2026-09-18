@@ -22,9 +22,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiKeyGuard } from '../ApiKeyGuard';
 import { SecurityBanner } from '../SecurityBanner';
-import { useSystemModules, isModuleDisabledError } from '../../../hooks/useModules';
+import { useSystemModules } from '../../../hooks/useModules';
 import { useAssistantSuggestions } from '../../../hooks/useAssistant';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../../../api/client';
+import { appQueryDefaults } from '../../../api/queryDefaults';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useI18nStore } from '../../../i18n';
 
@@ -68,21 +69,9 @@ function stubFetch(authStatus: 'rate-limited' | 'security-off') {
   }));
 }
 
-/** Query-Client mit denselben Defaults wie main.tsx (429 wird nicht wiederholt). */
+/** Query-Client mit genau den Defaults aus main.tsx (429 wird nicht wiederholt). */
 function createAppQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 30_000,
-        retry: (failureCount, error) => {
-          if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 429) return false;
-          if (isModuleDisabledError(error)) return false;
-          return failureCount < 1;
-        },
-        refetchOnWindowFocus: false,
-      },
-    },
-  });
+  return new QueryClient({ defaultOptions: appQueryDefaults });
 }
 
 function Page() {

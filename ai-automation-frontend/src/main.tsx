@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
-import { isModuleDisabledError } from './hooks/useModules';
+import { appQueryDefaults } from './api/queryDefaults';
 import { useThemeStore } from './stores/themeStore';
 import { installGlobalErrorHandlers } from './utils/errorReporter';
 import './index.css';
@@ -11,22 +11,8 @@ import './index.css';
 // Install global error handlers before anything else
 installGlobalErrorHandlers();
 
-// Initialize TanStack Query client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: (failureCount, error) => {
-        // Never retry rate limit errors — retries make the problem worse
-        if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 429) return false;
-        // A disabled module stays disabled until the backend restarts
-        if (isModuleDisabledError(error)) return false;
-        return failureCount < 1;
-      },
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+// Initialize TanStack Query client (defaults incl. 429-Backoff-Ableitung: api/queryDefaults)
+const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
 
 // Apply persisted theme on load
 useThemeStore.getState().apply();
