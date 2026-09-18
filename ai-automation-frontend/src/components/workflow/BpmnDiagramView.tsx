@@ -39,6 +39,8 @@ interface EdgeLine {
   sourceRef: string;
   targetRef: string;
   points: [number, number][];
+  /** Datenassoziation statt Kontrollfluss — wird gestrichelt gezeichnet. */
+  dashed: boolean;
 }
 
 interface Diagram {
@@ -138,11 +140,22 @@ function parseBpmn(xml: string): Diagram | null {
   });
   const edges: EdgeLine[] = Array.from(doc.getElementsByTagNameNS(NS_DI, 'BPMNEdge')).map((e) => {
     const flow = byId.get(e.getAttribute('bpmnElement') ?? '');
+    const kind = flow?.localName ?? '';
+    const dashed = kind === 'dataInputAssociation' || kind === 'dataOutputAssociation';
+    // sequenceFlow trägt die Enden als Attribute, Datenassoziationen als Kind-Elemente; deren
+    // zweites Ende ist die Aktivität, in der sie steht (bei dataInputAssociation zeigt targetRef
+    // nur auf den property-Platzhalter).
+    const endpoint = (name: string): string =>
+      flow?.getAttribute(name) ??
+      Array.from(flow?.children ?? []).find((c) => c.localName === name)?.textContent?.trim() ??
+      '';
+    const owner = dashed ? ((flow?.parentNode as Element | null)?.getAttribute?.('id') ?? '') : '';
     return {
       id: e.getAttribute('id') ?? '',
       name: flow?.getAttribute('name') ?? '',
-      sourceRef: flow?.getAttribute('sourceRef') ?? '',
-      targetRef: flow?.getAttribute('targetRef') ?? '',
+      sourceRef: kind === 'dataOutputAssociation' ? owner : endpoint('sourceRef'),
+      targetRef: kind === 'dataInputAssociation' ? owner : endpoint('targetRef'),
+      dashed,
       points: Array.from(e.getElementsByTagNameNS(NS_DDI, 'waypoint')).map(
         (w) => [Number(w.getAttribute('x')), Number(w.getAttribute('y'))] as [number, number],
       ),
@@ -297,6 +310,25 @@ function ShapeSvg({ s, status, maps }: { s: Shape; status?: RunStatus; maps: Bpm
           {s.name && <text x={cx} y={s.y - 8} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>}
         </g>
       );
+    case 'dataObjectReference': {
+      // BPMN-Datenobjekt: Rechteck mit umgeknickter Ecke, Beschriftung darunter
+      const fold = 10;
+      const right = s.x + s.w;
+      return (
+        <g>
+          <title>{maps.tip.dataObjectReference ?? s.kind}</title>
+          <path
+            data-bpmn="data-object"
+            d={`M ${s.x} ${s.y} H ${right - fold} L ${right} ${s.y + fold} V ${s.y + s.h} H ${s.x} Z`}
+            className="fill-surface stroke-border-strong" strokeWidth={1.4} strokeLinejoin="round" />
+          <path d={`M ${right - fold} ${s.y} V ${s.y + fold} H ${right}`}
+            fill="none" className="stroke-border-strong" strokeWidth={1.4} strokeLinejoin="round" />
+          {s.name && (
+            <text x={cx} y={s.y + s.h + 14} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>
+          )}
+        </g>
+      );
+    }
     case 'subProcess':
       return (
         <g>
@@ -422,12 +454,20 @@ export default function BpmnDiagramView({
           <marker id="bpmn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" className="fill-text" />
           </marker>
+          {/* Datenassoziation: offene Pfeilspitze (BPMN-Notation) */}
+          <marker id="bpmn-arrow-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10" fill="none" className="stroke-text-secondary" strokeWidth={1.4} />
+          </marker>
         </defs>
         {diagram.edges.map((e) => (
           <g key={e.id}>
             <polyline
               points={e.points.map((p) => p.join(',')).join(' ')}
-              fill="none" className="stroke-text" strokeWidth={1.6} markerEnd="url(#bpmn-arrow)" />
+              fill="none"
+              className={e.dashed ? 'stroke-text-secondary' : 'stroke-text'}
+              strokeWidth={e.dashed ? 1.3 : 1.6}
+              {...(e.dashed ? { strokeDasharray: '5 4' } : {})}
+              markerEnd={e.dashed ? 'url(#bpmn-arrow-open)' : 'url(#bpmn-arrow)'} />
             {e.name && e.points.length >= 2 && (
               <text
                 x={(e.points[0]![0] + e.points[e.points.length - 1]![0]) / 2}

@@ -518,11 +518,13 @@ export const en = {
       prefix: {
         'KI': 'AI', 'Shell': 'Shell', 'Agent': 'Agent', 'Skill': 'Skill', 'Integration': 'Integration',
         'Dokument': 'Document', 'Freigabe': 'Approval', 'Eingabe': 'Input', 'Sub-Workflow': 'Sub-workflow', 'Retry': 'Retry',
+        'Ausgabe': 'Output',
       },
       // Tooltips per BPMN element type
       tip: {
         scriptTask: 'Shell command', serviceTask: 'AI / Service', userTask: 'User interaction',
         callActivity: 'Sub-workflow', task: 'Unknown block type', subProcess: 'Loop (sub-process)',
+        dataObjectReference: 'Data object (block output)',
       },
       // Start/end event names
       event: { 'Start': 'Start', 'Ende': 'End' },
