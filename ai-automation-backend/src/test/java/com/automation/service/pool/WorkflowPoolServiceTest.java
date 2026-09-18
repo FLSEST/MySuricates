@@ -53,7 +53,8 @@ class WorkflowPoolServiceTest {
         config = new WorkflowPoolConfig();
         objectMapper = new ObjectMapper();
         config.setDirectory(tempDir.toString());
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository,
+                new PoolExportWriter(objectMapper));
     }
 
     @Test
@@ -65,7 +66,8 @@ class WorkflowPoolServiceTest {
     @Test
     void listAll_nonExistentDirectory_returnsEmptyList() {
         config.setDirectory(tempDir.resolve("nonexistent").toString());
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository,
+                new PoolExportWriter(objectMapper));
 
         List<PoolWorkflowEntry> result = poolService.listAll();
         assertThat(result).isEmpty();
@@ -77,7 +79,8 @@ class WorkflowPoolServiceTest {
                 {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {"command": "test"}}]}
                 """);
         config.setEnabled(false);
-        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository);
+        poolService = new WorkflowPoolService(config, objectMapper, workflowService, projectRepository,
+                new PoolExportWriter(objectMapper));
 
         List<PoolWorkflowEntry> result = poolService.listAll();
         assertThat(result).isEmpty();

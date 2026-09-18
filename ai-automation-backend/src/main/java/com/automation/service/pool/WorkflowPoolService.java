@@ -36,6 +36,7 @@ public class WorkflowPoolService {
     private final ObjectMapper objectMapper;
     private final WorkflowService workflowService;
     private final ProjectRepository projectRepository;
+    private final PoolExportWriter exportWriter;
 
     public List<PoolWorkflowEntry> listAll() {
         if (!config.isEnabled()) {
@@ -147,104 +148,7 @@ public class WorkflowPoolService {
             throws IOException {
         PoolScope poolScope = PoolScope.fromParam(scope);
         Workflow workflow = workflowService.findById(workflowId);
-        if (request == null) {
-            request = new ExportToPoolRequest(null, null, null, null, null, null, null);
-        }
-
-        String nameEn = request.nameEn() != null ? request.nameEn() : workflow.getName();
-        String nameDe = request.nameDe() != null ? request.nameDe() : workflow.getName();
-        String descEn = request.descriptionEn() != null ? request.descriptionEn() : workflow.getDescription();
-        String descDe = request.descriptionDe() != null ? request.descriptionDe() : workflow.getDescription();
-
-        // Resolve category from request, then metadata, then fallback
-        String category = request.category();
-        if (category == null && workflow.getMetadata() != null) {
-            Object factoryCat = workflow.getMetadata().get("factoryCategory");
-            if (factoryCat instanceof String s) category = s;
-        }
-        if (category == null) category = "CUSTOM";
-
-        List<String> tags = request.tags() != null ? request.tags() : List.of();
-        String author = request.author() != null ? request.author() : "MySuricates";
-
-        // Build pool JSON in canonical order
-        LinkedHashMap<String, Object> poolJson = new LinkedHashMap<>();
-        poolJson.put("name", Map.of("de", nameDe, "en", nameEn));
-        if (descEn != null || descDe != null) {
-            poolJson.put("description", Map.of(
-                    "de", descDe != null ? descDe : "",
-                    "en", descEn != null ? descEn : ""));
-        }
-        poolJson.put("icon", workflow.getIcon() != null ? workflow.getIcon() : "\uD83D\uDD27");
-        poolJson.put("category", category);
-        poolJson.put("scope", poolScope.jsonValue());
-        if (!tags.isEmpty()) {
-            poolJson.put("tags", tags);
-        }
-        poolJson.put("blocks", workflow.getBlocks());
-
-        if (workflow.getInstructions() != null && !workflow.getInstructions().isBlank()) {
-            poolJson.put("instructions", workflow.getInstructions());
-        }
-        if (workflow.getModel() != null) {
-            poolJson.put("model", workflow.getModel());
-        }
-        poolJson.put("version", workflow.getVersion() != null ? workflow.getVersion() : "1.0.0");
-        poolJson.put("author", author);
-
-        if (workflow.getDefaultContext() != null && !workflow.getDefaultContext().isEmpty()) {
-            poolJson.put("defaultContext", workflow.getDefaultContext());
-        }
-
-        // Filter out factory-internal metadata keys
-        if (workflow.getMetadata() != null && !workflow.getMetadata().isEmpty()) {
-            Map<String, Object> filtered = new LinkedHashMap<>(workflow.getMetadata());
-            Set.of("factoryGenerated", "factoryTopic", "factoryCategory").forEach(filtered::remove);
-            if (!filtered.isEmpty()) {
-                poolJson.put("metadata", filtered);
-            }
-        }
-
-        // Instanz-Bindungen (projectId, Instanz-UUIDs) entfernen, bevor etwas auf Platte landet.
-        // Erst in eine generische Struktur wandeln: die Blöcke sind sonst POJOs, in die der
-        // Sanitizer nicht hineinsieht.
-        Map<String, Object> generic = objectMapper.convertValue(poolJson, new TypeReference<>() {});
-        PoolExportSanitizer sanitizer = new PoolExportSanitizer();
-        @SuppressWarnings("unchecked")
-        Map<String, Object> sanitized = (Map<String, Object>) sanitizer.scrub(generic);
-        if (!sanitizer.removedPaths().isEmpty()) {
-            log.warn("Pool-Export von '{}' ({}): Instanz-Bindungen entfernt: {}",
-                    workflow.getName(), workflowId, sanitizer.removedPaths());
-        }
-
-        // Resolve filename with collision avoidance
-        Path poolDir = resolvePoolDirectory();
-        Files.createDirectories(poolDir);
-
-        String slug = slugify(nameEn);
-        String filename = slug + ".json";
-        Path target = poolDir.resolve(filename);
-        int suffix = 2;
-        while (Files.exists(target)) {
-            filename = slug + "-" + suffix + ".json";
-            target = poolDir.resolve(filename);
-            suffix++;
-        }
-
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(target.toFile(), sanitized);
-        String poolId = filename.replace(".json", "");
-        log.info("Exported workflow '{}' ({}) to pool: {}", workflow.getName(), workflowId, filename);
-        return new ExportToPoolResponse(poolId, filename);
-    }
-
-    private String slugify(String name) {
-        String slug = name.toLowerCase()
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-|-$", "");
-        if (slug.isEmpty()) {
-            slug = "workflow-" + UUID.randomUUID().toString().substring(0, 8);
-        }
-        return slug;
+        return exportWriter.write(workflow, request, poolScope, resolvePoolDirectory());
     }
 
     private PoolWorkflowEntry parsePoolFile(Path file) throws IOException {
