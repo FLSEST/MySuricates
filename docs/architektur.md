@@ -864,9 +864,11 @@ Weder SockJS noch ein rohes Browser-WebSocket kann beim Handshake eigene Header 
 2. Client hängt das Ticket als `?ticket=…` an die Handshake-URL (`/ws` und `/ws/terminal/{runId}`)
 3. `WebSocketAuthInterceptor` löst das Ticket ein und lässt den Handshake durch — **genau einmal und nur vor Ablauf**. Ein `?apiKey=` wird abgelehnt (401, Handshake abgebrochen) und mit eigenem Hinweis protokolliert.
 
-- **Ticket-Speicher:** `WebSocketTicketService` — rein in-memory (`ConcurrentHashMap`, kein DB-Zugriff im Handshake), 32 zufällige Bytes URL-safe Base64, abgelaufene Einträge werden bei jedem `issue()`/`consume()` weggeräumt (kein Scheduler). Tickets überleben keinen Neustart — genau ihre gedachte Lebensdauer.
+- **Ticket-Speicher:** `WebSocketTicketService` — rein in-memory (`ConcurrentHashMap`, kein DB-Zugriff im Handshake), 32 zufällige Bytes URL-safe Base64, abgelaufene Einträge werden bei jedem `issue()`/`consume()` weggeräumt (kein Scheduler). Zusätzlich ist der Speicher hart auf **1000 offene Tickets** gedeckelt; darüber fällt das älteste heraus (der betroffene Client holt beim nächsten Versuch einfach ein neues). Tickets überleben keinen Neustart — genau ihre gedachte Lebensdauer.
 - **Laufzeit:** `automation.websocket.ticket-ttl-seconds` (Default 30, Env `AUTOMATION_WS_TICKET_TTL_SECONDS`)
 - **Frontend:** `api.fetchWsTicket()`; `useWebSocket`/`useAssistantWebSocket` holen das Ticket in stompjs' `beforeConnect` (läuft vor jedem Verbindungsversuch inkl. Reconnect), das Run-Terminal vor `new WebSocket(...)`. Ein Wächter-Test verbietet `apiKey=` in `src/`.
+- **Kein SockJS-Fallback:** Die Clients laufen mit `transports: ['websocket']`. SockJS legt für jeden Fallback-Transport (xhr-streaming, xhr-polling) eine eigene Session an und bräuchte dafür ein zweites Ticket — das erste ist nach dem WebSocket-Versuch verbraucht. **Die Instanz braucht also einen WebSocket-fähigen Pfad** (Proxy/Reverse-Proxy muss Upgrades durchlassen); einen HTTP-Fallback gibt es nicht mehr.
+- **Reconnect:** `reconnectDelay: 5000` mit `ReconnectionTimeMode.EXPONENTIAL` und `maxReconnectDelay: 60000` — jeder Versuch kostet einen `POST /ws-ticket` und soll bei totem Backend nicht gegen das API-Rate-Limit laufen.
 - **Deaktiviert:** Bei `automation.security.enabled=false` oder ohne konfigurierten Key lässt der Interceptor jeden Handshake durch (wie der `ApiKeyAuthFilter`).
 
 ### CORS

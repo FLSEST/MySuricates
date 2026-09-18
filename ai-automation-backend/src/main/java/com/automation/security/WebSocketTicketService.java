@@ -9,8 +9,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Short-lived, single-use tickets for the WebSocket handshake.
@@ -22,7 +22,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Purely in memory (no DB — the single SQLite connection must not be touched on a handshake) and
  * therefore instance-local: tickets do not survive a restart, which is exactly the intended
  * lifetime. Expired entries are swept on every {@link #issue()} and {@link #consume(String)}, so no
- * scheduler is needed and the map stays bounded by the issue rate within one TTL window.
+ * scheduler is needed.
+ *
+ * <p>On top of the TTL sweep the store is hard-capped at {@link #MAX_OPEN_TICKETS} entries: issuing
+ * requires a valid API key and is rate-limited, but a caller that holds the key must not be able to
+ * grow the map without bound. Past the cap the <em>oldest</em> ticket is dropped (insertion-ordered
+ * {@link LinkedHashMap} instead of a {@code ConcurrentHashMap}, because a FIFO cap needs the order);
+ * a client whose ticket was evicted simply gets a fresh one on its next attempt. Access is
+ * serialised with a plain monitor — every operation is a handful of map calls with no I/O.
  */
 @Service
 public class WebSocketTicketService {
@@ -30,28 +37,46 @@ public class WebSocketTicketService {
     /** 32 random bytes — a ticket must be unguessable within its (short) lifetime. */
     private static final int TICKET_BYTES = 32;
 
+    /** Single source of truth for the lifetime: {@code @Value} default and constructor fallback. */
+    static final long DEFAULT_TTL_SECONDS = 30;
+
+    /**
+     * Upper bound on outstanding tickets. Far above any real usage (one ticket per connect attempt,
+     * alive for seconds), low enough that the map cannot become a memory problem.
+     */
+    static final int MAX_OPEN_TICKETS = 1000;
+
     private final SecureRandom random = new SecureRandom();
-    private final Map<String, Instant> tickets = new ConcurrentHashMap<>();
+
+    /** Insertion-ordered so the cap can evict the oldest entry; guarded by {@code this}. */
+    private final Map<String, Instant> tickets = new LinkedHashMap<>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Instant> eldest) {
+            return size() > MAX_OPEN_TICKETS;
+        }
+    };
+
     private final Clock clock;
     private final Duration ttl;
 
     @Autowired
     public WebSocketTicketService(
-            @Value("${automation.websocket.ticket-ttl-seconds:30}") long ttlSeconds) {
+            @Value("${automation.websocket.ticket-ttl-seconds:" + DEFAULT_TTL_SECONDS + "}") long ttlSeconds) {
         this(Clock.systemUTC(), ttlSeconds);
     }
 
     WebSocketTicketService(Clock clock, long ttlSeconds) {
         this.clock = clock;
-        this.ttl = Duration.ofSeconds(ttlSeconds > 0 ? ttlSeconds : 30);
+        this.ttl = Duration.ofSeconds(ttlSeconds > 0 ? ttlSeconds : DEFAULT_TTL_SECONDS);
     }
 
     /** Issues a fresh ticket. The caller must already be authenticated by the API key header. */
-    public String issue() {
+    public synchronized String issue() {
         purgeExpired();
         byte[] bytes = new byte[TICKET_BYTES];
         random.nextBytes(bytes);
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        // Past MAX_OPEN_TICKETS the map drops its eldest entry itself (removeEldestEntry)
         tickets.put(ticket, clock.instant().plus(ttl));
         return ticket;
     }
@@ -60,7 +85,7 @@ public class WebSocketTicketService {
      * Redeems a ticket. Returns true exactly once per issued ticket, and only before it expires —
      * a replayed or forged ticket is indistinguishable from an unknown one.
      */
-    public boolean consume(String ticket) {
+    public synchronized boolean consume(String ticket) {
         purgeExpired();
         if (ticket == null || ticket.isBlank()) {
             return false;
@@ -75,7 +100,7 @@ public class WebSocketTicketService {
     }
 
     /** Visible for tests: how many tickets are still stored (deliberately without sweeping first). */
-    int activeTicketCount() {
+    synchronized int activeTicketCount() {
         return tickets.size();
     }
 

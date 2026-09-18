@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Client } from '@stomp/stompjs';
+import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
 import type { AgenticState, PendingHumanInput } from '../types';
@@ -84,8 +84,17 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       beforeConnect: async () => {
         wsTicket = await api.fetchWsTicket().catch(() => '');
       },
-      webSocketFactory: () => new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`),
+      // Nur der WebSocket-Transport: SockJS legt für jeden Fallback-Versuch (xhr-streaming …) eine
+      // neue Session an und bräuchte dafür ein zweites Ticket — das erste ist da schon verbraucht.
+      // Die Instanz muss also einen WebSocket-fähigen Pfad haben; es gibt keinen SockJS-Fallback.
+      webSocketFactory: () =>
+        new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
+          transports: ['websocket'],
+        }),
       reconnectDelay: 5000,
+      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
+      maxReconnectDelay: 60_000,
       onConnect: () => {
         setConnected(true);
         // Live batches arriving while the replay request is pending wait for it, so lines stay ordered.

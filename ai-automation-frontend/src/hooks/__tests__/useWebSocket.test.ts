@@ -10,12 +10,15 @@ let subscribeCb: ((msg: { body: string }) => void) | null = null;
 let beforeConnectCb: (() => Promise<void>) | null = null;
 let webSocketFactoryCb: (() => unknown) | null = null;
 let lastWsUrl: string | null = null;
+let lastSockJsOptions: Record<string, unknown> | undefined;
+let lastClientConfig: Record<string, unknown> | null = null;
 const mockDeactivate = vi.fn();
 const mockActivate = vi.fn();
 
 vi.mock('@stomp/stompjs', () => {
   class MockClient {
     constructor(config: Record<string, unknown>) {
+      lastClientConfig = config;
       onConnectCb = config.onConnect as () => void;
       beforeConnectCb = config.beforeConnect as (() => Promise<void>) | null;
       webSocketFactoryCb = config.webSocketFactory as (() => unknown) | null;
@@ -29,14 +32,15 @@ vi.mock('@stomp/stompjs', () => {
       return { id: 'sub-1', unsubscribe: vi.fn() };
     });
   }
-  return { Client: MockClient };
+  return { Client: MockClient, ReconnectionTimeMode: { LINEAR: 0, EXPONENTIAL: 1 } };
 });
 
-// Class (not arrow fn) so `new SockJS(url)` works and the URL is captured
+// Class (not arrow fn) so `new SockJS(url)` works and URL + options are captured
 vi.mock('sockjs-client', () => ({
   default: class MockSockJS {
-    constructor(url: string) {
+    constructor(url: string, _protocols?: unknown, options?: Record<string, unknown>) {
       lastWsUrl = url;
+      lastSockJsOptions = options;
     }
   },
 }));
@@ -88,6 +92,8 @@ describe('useExecutionWebSocket', () => {
     beforeConnectCb = null;
     webSocketFactoryCb = null;
     lastWsUrl = null;
+    lastSockJsOptions = undefined;
+    lastClientConfig = null;
     mockActivate.mockClear();
     mockDeactivate.mockClear();
     mockApiGet.mockReset();
@@ -131,6 +137,25 @@ describe('useExecutionWebSocket', () => {
     await act(async () => { await openSocket(); });
 
     expect(lastWsUrl).toBe(`${window.location.origin}/ws?ticket=`);
+  });
+
+  it('uses the websocket transport only — a SockJS fallback would reuse the spent ticket', async () => {
+    renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(beforeConnectCb).not.toBeNull());
+
+    await act(async () => { await openSocket(); });
+
+    expect(lastSockJsOptions).toEqual({ transports: ['websocket'] });
+  });
+
+  it('backs off exponentially between reconnect attempts', async () => {
+    renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(lastClientConfig).not.toBeNull());
+
+    // Every attempt costs a ticket call (POST /ws-ticket), so a dead backend must not be polled
+    // at a fixed 5s forever — it would run into the API rate limit.
+    expect(lastClientConfig?.reconnectTimeMode).toBe(1 /* ReconnectionTimeMode.EXPONENTIAL */);
+    expect(lastClientConfig?.maxReconnectDelay).toBe(60_000);
   });
 
   // --- Connection lifecycle ---

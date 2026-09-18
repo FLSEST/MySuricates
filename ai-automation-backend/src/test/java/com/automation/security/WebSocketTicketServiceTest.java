@@ -114,4 +114,28 @@ class WebSocketTicketServiceTest {
     void ttlIsReportedForTheClient() {
         assertThat(service.getTtlSeconds()).isEqualTo(30);
     }
+
+    @Test
+    void ttlFallsBackToTheDefaultWhenConfiguredNonPositive() {
+        assertThat(new WebSocketTicketService(clock, 0).getTtlSeconds())
+                .isEqualTo(WebSocketTicketService.DEFAULT_TTL_SECONDS);
+        assertThat(new WebSocketTicketService(clock, -5).getTtlSeconds())
+                .isEqualTo(WebSocketTicketService.DEFAULT_TTL_SECONDS);
+    }
+
+    @Test
+    void theStoreIsCappedAndDropsTheOldestTicketsFirst() {
+        String oldest = service.issue();
+        for (int i = 1; i < WebSocketTicketService.MAX_OPEN_TICKETS; i++) {
+            service.issue();
+        }
+        assertThat(service.activeTicketCount()).isEqualTo(WebSocketTicketService.MAX_OPEN_TICKETS);
+
+        // One more within the same TTL window: nothing has expired, so the cap has to bite
+        String newest = service.issue();
+
+        assertThat(service.activeTicketCount()).isEqualTo(WebSocketTicketService.MAX_OPEN_TICKETS);
+        assertThat(service.consume(oldest)).as("oldest ticket was evicted").isFalse();
+        assertThat(service.consume(newest)).as("the ticket just handed out still works").isTrue();
+    }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Client } from '@stomp/stompjs';
+import { Client, ReconnectionTimeMode } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
 
@@ -49,8 +49,16 @@ export function useAssistantWebSocket(
       beforeConnect: async () => {
         wsTicket = await api.fetchWsTicket().catch(() => '');
       },
-      webSocketFactory: () => new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`),
+      // Nur der WebSocket-Transport: ein SockJS-Fallback (xhr-streaming …) eröffnet eine neue
+      // Session und bräuchte ein zweites Ticket — das erste ist dann schon verbraucht.
+      webSocketFactory: () =>
+        new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
+          transports: ['websocket'],
+        }),
       reconnectDelay: 5000,
+      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
+      maxReconnectDelay: 60_000,
       onConnect: () => setConnected(true),
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
