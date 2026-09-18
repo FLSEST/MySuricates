@@ -18,12 +18,12 @@ MySuricates is an **AI-driven workflow automation platform** with a visual inter
 
 | Feature | Description |
 |---|---|
-| **Visual Workflow Editor** | Drag-and-drop block editor with 11 block types (Simple, Shell, Retry, Conditional, ForEach, While, Agentic, Approval, Sub-Workflow, Skill-Capability) |
+| **Visual Workflow Editor** | Drag-and-drop block editor with 19 block types (full list and configuration: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md)) |
 | **AI Integration** | Claude CLI is executed directly on the host for intelligent decisions and code generation |
 | **Docker-based Execution** | Isolated containers (Python, Node.js, Go) for secure skill execution |
-| **Skill System** | 16 built-in skills + custom skills for reusable automation building blocks |
+| **Skill System** | 19 built-in skills + custom skills for reusable automation building blocks |
 | **Scheduling & Webhooks** | Time-based (cron) and HTTP-triggered workflow executions |
-| **Workflow Templates** | 28 pre-built templates as starting points for new workflows |
+| **Workflow Templates** | 66 pre-built templates as starting points for new workflows |
 | **Real-time Updates** | WebSocket-based live updates during execution |
 | **Approval Gates** | Manual approval mechanism for critical steps |
 | **Workflow Conversion** | Successful agentic runs can be converted into deterministic workflows |
@@ -37,29 +37,29 @@ MySuricates is an **AI-driven workflow automation platform** with a visual inter
 | Technology | Version | Purpose |
 |---|---|---|
 | **Java** | 21 (LTS) | Programming language with virtual threads |
-| **Spring Boot** | 3.2.2 | Web framework & dependency injection |
-| **Spring Data JPA** | 3.2.x | Database abstraction (ORM) |
-| **SQLite** | 3.44.1 | Embedded database (WAL mode) |
-| **Flyway** | 9.x | Database migration management |
+| **Spring Boot** | 3.4.13 | Web framework & dependency injection |
+| **Spring Data JPA** | 3.4.x (via Spring Boot BOM) | Database abstraction (ORM) |
+| **SQLite** | sqlite-jdbc 3.50.3.0 | Embedded database (WAL mode, HikariCP pool size 1) |
+| **Flyway** | 10.20.1 (via Spring Boot BOM) | Database migration management |
 | **MapStruct** | 1.5.5 | Entity-DTO mapping (code generation) |
 | **Lombok** | 1.18.x | Boilerplate reduction (getters, setters, builders) |
-| **Docker Java Client** | 3.3.4 | Container management via Docker API |
+| **Docker Java Client** | 3.4.1 | Container management via Docker API |
 | **Maven** | 3.9+ | Build tool & dependency management |
 
 ### Frontend
 
 | Technology | Version | Purpose |
 |---|---|---|
-| **React** | 18.3.1 | UI framework (SPA) |
+| **React** | 19.2 | UI framework (SPA) |
 | **TypeScript** | 5.3.3 | Type-safe JavaScript development |
-| **Vite** | 5.0.12 | Build tool & dev server |
+| **Vite** | 7.3 | Build tool & dev server |
 | **TanStack Query** | 5.17.0 | Server-state management & caching |
 | **Zustand** | 4.4.7 | Client-state management |
-| **TailwindCSS** | 3.4.1 | Utility-first CSS framework |
+| **TailwindCSS** | 4.2 | Utility-first CSS framework (CSS-first configuration in `src/index.css`, no `tailwind.config.*`) |
 | **Monaco Editor** | 4.6.0 | Code editor (VS Code engine) |
 | **xterm.js** | 6.0.0 | Terminal emulator for WebSocket terminal |
-| **Cypress** | 13.17.0 | End-to-end testing |
-| **Vite PWA** | 0.17.4 | Progressive Web App support |
+| **Cypress** | 15.21 | End-to-end testing |
+| **Vite PWA** | 1.2 | Progressive Web App support |
 
 ### Infrastructure
 
@@ -81,6 +81,7 @@ autotrigger/
 │   ├── src/main/resources/      # Configuration & migrations
 │   ├── src/test/                # Unit & integration tests
 │   ├── docker/                  # Dockerfiles for agent containers
+│   ├── docker-compose.yml       # Development environment (+ .stable.yml, .test.yml)
 │   └── pom.xml                  # Maven build configuration
 │
 ├── ai-automation-frontend/      # React SPA (Port 3000)
@@ -89,10 +90,10 @@ autotrigger/
 │   ├── public/                  # Static assets
 │   └── package.json             # npm configuration
 │
-├── docs/                        # Documentation
+├── docs/                        # Documentation (DE) -- docs/en/ mirrors it in English
 │   └── onboarding/              # This onboarding package
 │
-├── docker-compose.yml           # Development environment
+├── scripts/                     # Start, staging and CI scripts
 └── CLAUDE.md                    # AI agent context
 ```
 
@@ -103,14 +104,15 @@ autotrigger/
 For the full setup guide see [SETUP.md](SETUP.md). Here is the short version:
 
 ```bash
-# Start the backend
-cd ai-automation-backend
-mvn spring-boot:run
+# Start the backend (builds the JAR and starts it from a copy)
+./scripts/start-autotrigger-dev.sh start
 
 # Start the frontend (new terminal)
 cd ai-automation-frontend
 npm install && npm run dev
 ```
+
+> Do **not** use `mvn spring-boot:run`: the `RuntimeClasspathGuard` aborts a start from `target/classes` with exit code 2.
 
 The application is then available at **http://localhost:3000**.
 

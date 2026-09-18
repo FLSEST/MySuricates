@@ -30,7 +30,7 @@ Interface das jeder Block-Typ implementieren muss. Definiert `execute(BlockDefin
 19 vordefinierte Skills die beim Start automatisch geseedet werden (z.B. `builtin-code-review`, `builtin-test-generator`). Definiert als Ressourcen unter `src/main/resources/skills/builtin/<id>.json` (Metadaten inkl. `sortOrder`) + `<id>.md` (Prompt), geladen von `BuiltInSkillLoader`.
 
 **Built-in Templates**
-28 vordefinierte Workflow-Vorlagen die beim Start geseedet werden. Definiert in `BuiltInTemplates.java`. Koennen nicht geloescht werden.
+66 vordefinierte Workflow-Vorlagen die beim Start geseedet werden. Definiert als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`), geseedet von `WorkflowTemplateSeeder`. Koennen nicht geloescht werden.
 
 ## C
 
@@ -56,12 +56,14 @@ Laufzeit-Kontext der durch alle Block-Executors einer Workflow-Ausfuehrung gerei
 ## F
 
 **Flyway**
-Datenbank-Migrations-Tool. Migrationen liegen unter `src/main/resources/db/migration/` mit dem Schema `V{N}__beschreibung.sql`. Aktuell 68 Migrationen (V1-V68).
+Datenbank-Migrations-Tool. Migrationen liegen unter `src/main/resources/db/migration/` mit dem Schema `V{N}__beschreibung.sql`. Aktuell 73 Migrationen (V1-V73).
 
 ## G
 
-**Gate (GateStatus)**
-Status eines Approval Gates: `PENDING`, `APPROVED`, `REJECTED`. Wird vom `GateStatusResolver` aufgeloest.
+**Gate (Quality Gate, `GateStatus`)**
+Ergebnis einer Qualitaetspruefung am Ende eines Workflow-Laufs: `GREEN`, `YELLOW`, `RED` (`entity/GateStatus.java`). Der `GateStatusResolver` liest den Wert aus dem Run-Metadatum `gate_status` oder leitet ihn aus dem Run-Status ab. `AutoTodoService` erzeugt daraus TODOs: RED mit Prioritaet HIGH, YELLOW mit MEDIUM, GREEN schliesst offene TODOs.
+
+Nicht zu verwechseln mit dem → **Approval Gate**: das ist der manuelle Freigabe-Schritt im Workflow und hat mit `GateStatus` nichts zu tun.
 
 ## H
 
@@ -111,7 +113,7 @@ Eine einzelne Ausfuehrung eines Workflows. Status: PENDING → RUNNING → COMPL
 Spring-Komponenten die beim Anwendungsstart automatisch Daten einfuegen. `SkillSeeder` fuer Skills, `WorkflowTemplateSeeder` fuer Templates.
 
 **Skill**
-Wiederverwendbarer Automatisierungsbaustein mit Name, Kategorie, AI-Kontext und Capabilities. 16 Built-in + benutzerdefinierte Skills.
+Wiederverwendbarer Automatisierungsbaustein mit Name, Kategorie, AI-Kontext und Capabilities. 19 Built-in + benutzerdefinierte Skills.
 
 **SkillRegistry**
 In-Memory `ConcurrentHashMap` die alle registrierten Skills haelt. Wird beim Start vom Seeder befuellt. Bietet schnellen Zugriff und aggregierten AI-Kontext.

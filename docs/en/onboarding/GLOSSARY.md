@@ -29,10 +29,10 @@ JSON object describing a single step in a workflow. Consists of `type` (block ty
 Interface that every block type must implement. Defines `execute(BlockDefinition, ExecutionContext)` and `supports(String type)`.
 
 **Built-in Skills**
-16 predefined skills that are seeded automatically at startup (e.g. `builtin-code-review`, `builtin-test-generator`). Defined in `BuiltInSkills.java` (order) and `BuiltIn<Category>Skills.java` (contents).
+19 predefined skills that are seeded automatically at startup (e.g. `builtin-code-review`, `builtin-test-generator`). Defined as resources under `src/main/resources/skills/builtin/<id>.json` (metadata incl. `sortOrder`) + `<id>.md` (prompt), loaded by `BuiltInSkillLoader`.
 
 **Built-in Templates**
-28 predefined workflow templates that are seeded at startup. Defined in `BuiltInTemplates.java`. Cannot be deleted.
+66 predefined workflow templates that are seeded at startup. Defined as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`), seeded by `WorkflowTemplateSeeder`. Cannot be deleted.
 
 ## C
 
@@ -58,12 +58,14 @@ Runtime context passed through all block executors of a workflow execution. Cont
 ## F
 
 **Flyway**
-Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 68 migrations (V1–V68).
+Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 73 migrations (V1-V73).
 
 ## G
 
-**Gate (GateStatus)**
-Status of an approval gate: `PENDING`, `APPROVED`, `REJECTED`. Resolved by the `GateStatusResolver`.
+**Gate (quality gate, `GateStatus`)**
+Result of a quality check at the end of a workflow run: `GREEN`, `YELLOW`, `RED` (`entity/GateStatus.java`). The `GateStatusResolver` reads the value from the run metadata key `gate_status` or derives it from the run status. `AutoTodoService` turns it into TODOs: RED with priority HIGH, YELLOW with MEDIUM, GREEN closes open TODOs.
+
+Not to be confused with the → **Approval Gate**, which is the manual approval step inside a workflow and has nothing to do with `GateStatus`.
 
 ## H
 
@@ -113,7 +115,7 @@ A single execution of a workflow. Status: PENDING → RUNNING → COMPLETED/FAIL
 Spring components that automatically insert data at application startup. `SkillSeeder` for skills, `WorkflowTemplateSeeder` for templates.
 
 **Skill**
-Reusable automation building block with a name, category, AI context, and capabilities. 16 built-in + user-defined skills.
+Reusable automation building block with a name, category, AI context, and capabilities. 19 built-in + user-defined skills.
 
 **SkillRegistry**
 In-memory `ConcurrentHashMap` holding all registered skills. Populated by the seeder at startup. Provides fast access and aggregated AI context.
