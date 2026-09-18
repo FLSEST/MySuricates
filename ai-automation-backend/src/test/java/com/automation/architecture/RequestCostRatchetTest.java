@@ -242,6 +242,16 @@ class RequestCostRatchetTest {
                 .as("%s must answer 200 for the measurement to mean anything", route)
                 .isEqualTo(200);
 
+        // A ceiling only guards while something is actually being counted. Zero statements on a
+        // route that reads from the database means the counter is not wired up any more — and
+        // zero passes every ceiling, so without this the gate would go green while blind.
+        // That happened: RequestCostFilter reset and removed the ThreadLocal mid-request, and
+        // every route silently measured 0 (2026-09-18).
+        assertThat(statements)
+                .as("%s measured 0 SQL statements — the counter is not reaching this request, "
+                        + "so the ceilings below are meaningless", route)
+                .isPositive();
+
         return new Cost(statements, result.getResponse().getContentAsByteArray().length);
     }
 }

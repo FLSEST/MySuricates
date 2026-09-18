@@ -1,5 +1,8 @@
 package com.automation.metrics;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 /**
  * Counts the SQL statements one thread issues while a measurement is active.
  *
@@ -9,46 +12,63 @@ package com.automation.metrics;
  * so it can be asserted in a test. An N+1 turns 3 statements into 33 no matter how fast the
  * machine is — that is what {@code RequestCostRatchetTest} pins.
  *
- * <p>Measurements are per thread and never nested: {@link #start()} resets, {@link #stop()}
- * removes the ThreadLocal. Requests run on virtual threads, so the ThreadLocal dies with the
- * thread anyway; {@link #stop()} matters for the pooled threads that outlive a measurement.
+ * <p><b>Measurements nest, and every level counts.</b> One thread can be measured twice at once:
+ * {@code RequestCostRatchetTest} measures around a MockMvc call while {@code RequestCostFilter}
+ * measures the request from the inside. A single-slot ThreadLocal made the inner measurement
+ * silently destroy the outer one — the ratchet then read 0 statements for every route and stayed
+ * green, because zero is below every ceiling (found 2026-09-18, introduced with the filter).
+ * {@link #record()} therefore increments every open measurement, and {@link #stop()} ends only
+ * the innermost.
  *
  * <p>When no measurement is active {@link #record()} does nothing and allocates nothing — it
  * runs on every statement in production.
  */
 public final class SqlStatementCounter {
 
-    private static final ThreadLocal<int[]> COUNT = new ThreadLocal<>();
+    private static final ThreadLocal<Deque<int[]>> COUNTS = new ThreadLocal<>();
 
     private SqlStatementCounter() {
     }
 
-    /** Begins a measurement on this thread, discarding any previous one. */
+    /** Begins a measurement on this thread, nested inside any measurement already running. */
     public static void start() {
-        COUNT.set(new int[1]);
+        Deque<int[]> stack = COUNTS.get();
+        if (stack == null) {
+            stack = new ArrayDeque<>();
+            COUNTS.set(stack);
+        }
+        stack.push(new int[1]);
     }
 
-    /** Records one statement, or does nothing when no measurement is active. */
+    /** Records one statement against every open measurement, or does nothing when none is active. */
     public static void record() {
-        int[] counter = COUNT.get();
-        if (counter != null) {
+        Deque<int[]> stack = COUNTS.get();
+        if (stack == null) return;
+        for (int[] counter : stack) {
             counter[0]++;
         }
     }
 
-    /** Statements recorded since {@link #start()}, or {@code 0} when no measurement is active. */
+    /** Statements recorded by the innermost measurement, or {@code 0} when none is active. */
     public static int count() {
-        int[] counter = COUNT.get();
-        return counter == null ? 0 : counter[0];
+        Deque<int[]> stack = COUNTS.get();
+        int[] innermost = stack == null ? null : stack.peek();
+        return innermost == null ? 0 : innermost[0];
     }
 
     /** Whether this thread is currently measuring. */
     public static boolean isActive() {
-        return COUNT.get() != null;
+        Deque<int[]> stack = COUNTS.get();
+        return stack != null && !stack.isEmpty();
     }
 
-    /** Ends the measurement and frees the ThreadLocal. Safe to call without a prior start. */
+    /** Ends the innermost measurement, freeing the ThreadLocal with the last one. */
     public static void stop() {
-        COUNT.remove();
+        Deque<int[]> stack = COUNTS.get();
+        if (stack == null) return;
+        stack.poll();
+        if (stack.isEmpty()) {
+            COUNTS.remove();
+        }
     }
 }

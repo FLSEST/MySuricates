@@ -13,7 +13,9 @@ class SqlStatementCounterTest {
 
     @AfterEach
     void tearDown() {
-        SqlStatementCounter.stop();
+        while (SqlStatementCounter.isActive()) {
+            SqlStatementCounter.stop();
+        }
     }
 
     @Test
@@ -44,15 +46,34 @@ class SqlStatementCounterTest {
         assertThat(SqlStatementCounter.isActive()).isFalse();
     }
 
+    /**
+     * One thread can be measured twice at once — the ratchet measures around a request while the
+     * filter measures inside it. The inner measurement must not swallow the outer one; that bug
+     * made the ratchet read 0 statements for every route and stay green (2026-09-18).
+     */
     @Test
-    void startResetsAPreviousMeasurement() {
+    void nestedMeasurementsBothCount() {
         SqlStatementCounter.start();
         SqlStatementCounter.record();
 
         SqlStatementCounter.start();
         SqlStatementCounter.record();
+        assertThat(SqlStatementCounter.count()).as("inner sees only its own").isEqualTo(1);
+        SqlStatementCounter.stop();
 
-        assertThat(SqlStatementCounter.count()).isEqualTo(1);
+        assertThat(SqlStatementCounter.count()).as("outer saw both").isEqualTo(2);
+    }
+
+    @Test
+    void stopEndsOnlyTheInnermostMeasurement() {
+        SqlStatementCounter.start();
+        SqlStatementCounter.start();
+
+        SqlStatementCounter.stop();
+
+        assertThat(SqlStatementCounter.isActive()).isTrue();
+        SqlStatementCounter.stop();
+        assertThat(SqlStatementCounter.isActive()).isFalse();
     }
 
     @Test
