@@ -14,12 +14,8 @@ import java.util.regex.Pattern;
 final class TemplateResolver {
 
     private static final Pattern SENTINEL = Pattern.compile("\\x00untrusted-\\d+\\x00");
-    /**
-     * {@code {{x}}} or {@code {{ x }}} — exactly the two spellings the resolver has always supported. Keys may
-     * contain spaces (block names like "Build Report"); an asymmetric spelling yields a key with a leading or
-     * trailing space that matches nothing and stays literal.
-     */
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{( ?)([^{}]+?)\\1\\}\\}");
+    /** Shared with static analyses (BPMN data-flow export) — see {@link PlaceholderSyntax#PLACEHOLDER}. */
+    private static final Pattern PLACEHOLDER = PlaceholderSyntax.PLACEHOLDER;
 
     private TemplateResolver() {}
 

@@ -32,6 +32,17 @@ final class WorkflowFixtures {
     }
 
     /**
+     * Datenfluss-Fixture: {@code tests} erzeugt, {@code compress} konsumiert (Config {@code source})
+     * und erzeugt, {@code report} konsumiert über {@code block.compress.output}.
+     */
+    static Workflow dataFlow() {
+        return workflow("Datenfluss", List.of(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("compress", "compress", Map.of("source", "tests", "max_chars", 5000)),
+                block("simple", "report", Map.of("command", "Bericht schreiben:\n{{ block.compress.output }}"))));
+    }
+
+    /**
      * Katalog aller Export-Fixtures für den Roundtrip-Beweis: jeder Block-Typ (WORKFLOW-GUIDE),
      * unbekannter Typ, benannte/namenlose Blöcke, verschachtelte Switch-Cases (conditional,
      * foreach, weiterer switch), Sonderzeichen und der leere Prozess.
@@ -40,6 +51,7 @@ final class WorkflowFixtures {
         return List.of(
                 workflow("Leer", List.of()),
                 linear(),
+                dataFlow(),
                 workflow("Cond", List.of(block("conditional", null, Map.of(
                         "condition", "Fehler?", "then_command", "Analysiere", "else_command", "Weiter",
                         "execution_mode", "shell")))),

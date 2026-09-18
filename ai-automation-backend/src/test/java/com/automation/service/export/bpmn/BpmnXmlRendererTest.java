@@ -36,6 +36,7 @@ class BpmnXmlRendererTest {
     private List<com.automation.entity.Workflow> alleFixtures() {
         return List.of(
                 WorkflowFixtures.linear(),
+                WorkflowFixtures.dataFlow(),
                 WorkflowFixtures.workflow("Leer", List.of()),
                 WorkflowFixtures.workflow("Cond", List.of(WorkflowFixtures.block("conditional", null, Map.of(
                         "condition", "Fehler?", "then_command", "Analysiere", "else_command", "Weiter",
@@ -111,8 +112,11 @@ class BpmnXmlRendererTest {
             assertThat(nodeIds).as("Fixture '%s': Knoten ohne BPMNShape", wf.getName()).isSubsetOf(shapeRefs);
 
             NodeList edges = doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_DI, "BPMNEdge");
-            NodeList flows = doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "sequenceFlow");
-            assertThat(edges.getLength()).isEqualTo(flows.getLength());
+            // Kanten im Diagramm = Kontrollfluss + Datenassoziationen
+            int flows = doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "sequenceFlow").getLength()
+                    + doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "dataInputAssociation").getLength()
+                    + doc.getElementsByTagNameNS(BpmnXmlRenderer.NS_MODEL, "dataOutputAssociation").getLength();
+            assertThat(edges.getLength()).isEqualTo(flows);
             for (int i = 0; i < edges.getLength(); i++) {
                 NodeList wps = ((Element) edges.item(i))
                         .getElementsByTagNameNS(BpmnXmlRenderer.NS_DDI, "waypoint");

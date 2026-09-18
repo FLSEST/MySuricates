@@ -7,6 +7,9 @@
       <extensionElements>
         <mysuricates:blockConfig name="Daten sammeln" type="shell">{"command":"git log --oneline -20"}</mysuricates:blockConfig>
       </extensionElements>
+      <dataOutputAssociation id="dataflow_out_0">
+        <targetRef>dataref_daten_sammeln</targetRef>
+      </dataOutputAssociation>
       <script>git log --oneline -20</script>
     </scriptTask>
     <serviceTask id="b_1_ki_fasse_die_historie_zusammen" name="KI: Fasse die Historie zusammen:">
@@ -14,6 +17,11 @@
       <extensionElements>
         <mysuricates:blockConfig type="simple">{"command":"Fasse die Historie zusammen:\n{{ previous_output }}"}</mysuricates:blockConfig>
       </extensionElements>
+      <property id="b_1_ki_fasse_die_historie_zusammen_data_input" name="__targetRef_placeholder"/>
+      <dataInputAssociation id="dataflow_in_0">
+        <sourceRef>dataref_daten_sammeln</sourceRef>
+        <targetRef>b_1_ki_fasse_die_historie_zusammen_data_input</targetRef>
+      </dataInputAssociation>
     </serviceTask>
     <userTask id="b_2_freigabe_bericht_freigeben" name="Freigabe: Bericht freigeben?">
       <documentation>Freigabefrage: Bericht freigeben?</documentation>
@@ -26,6 +34,8 @@
     <sequenceFlow id="flow_1" sourceRef="b_1_ki_fasse_die_historie_zusammen" targetRef="b_2_freigabe_bericht_freigeben"/>
     <sequenceFlow id="flow_2" sourceRef="start_event" targetRef="b_0_daten_sammeln"/>
     <sequenceFlow id="flow_3" sourceRef="b_2_freigabe_bericht_freigeben" targetRef="end_event"/>
+    <dataObject id="data_daten_sammeln"/>
+    <dataObjectReference dataObjectRef="data_daten_sammeln" id="dataref_daten_sammeln" name="Ausgabe: Daten sammeln"/>
   </process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane bpmnElement="process_linear_demo" id="BPMNPlane_1">
@@ -44,6 +54,9 @@
       <bpmndi:BPMNShape bpmnElement="end_event" id="shape_end_event">
         <dc:Bounds height="36" width="36" x="1036" y="182"/>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="dataref_daten_sammeln" id="shape_dataref_daten_sammeln">
+        <dc:Bounds height="50" width="36" x="318" y="300"/>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge bpmnElement="flow_0" id="edge_flow_0">
         <di:waypoint x="386" y="200"/>
         <di:waypoint x="536" y="200"/>
@@ -59,6 +72,14 @@
       <bpmndi:BPMNEdge bpmnElement="flow_3" id="edge_flow_3">
         <di:waypoint x="886" y="200"/>
         <di:waypoint x="1036" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_out_0" id="edge_dataflow_out_0">
+        <di:waypoint x="336" y="240"/>
+        <di:waypoint x="336" y="300"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_in_0" id="edge_dataflow_in_0">
+        <di:waypoint x="354" y="325"/>
+        <di:waypoint x="586" y="240"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
