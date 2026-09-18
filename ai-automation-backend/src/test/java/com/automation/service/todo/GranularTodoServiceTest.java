@@ -261,6 +261,61 @@ class GranularTodoServiceTest {
                 && "related-1".equals(t.getRelatedTodoId()));
     }
 
+    /**
+     * Wrapper-Bloecke (Komprimierung, Weiterreichen einer Ausgabe) kuerzen oder verstellen Titel:
+     * ein gekuerzter Titel ist eine Dublette derselben Zeile, kein zweites TODO (TODO 8d02ed3f).
+     */
+    @Test
+    void granularTodos_truncatedTitleInSameRun_createsOnlyTheLongerTodo() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Timeout im Workflow-Executor behebt sich nicht von selbst",
+                        "priority", "HIGH", "tags", List.of("backend")),
+                Map.of("title", "Timeout im Workflow-Executor behebt…", "priority", "HIGH", "tags", List.of("backend")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactly("Timeout im Workflow-Executor behebt sich nicht von selbst");
+    }
+
+    @Test
+    void granularTodos_titleDifferingOnlyInCaseAndWhitespace_createsOneTodo() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Fix SQL injection", "priority", "HIGH", "tags", List.of("security")),
+                Map.of("title", "  fix   SQL   INJECTION ", "priority", "HIGH", "tags", List.of("security")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactly("Fix SQL injection");
+    }
+
+    /** Gegenprobe: ein gemeinsamer kurzer Anfang macht aus zwei Befunden keinen einzigen. */
+    @Test
+    void granularTodos_differentTitles_stayTwoTodos() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Hunt rebuild: hornberg", "priority", "HIGH", "tags", List.of("hunt")),
+                Map.of("title", "Hunt rebuild: wesel", "priority", "HIGH", "tags", List.of("hunt")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactlyInAnyOrder("Hunt rebuild: hornberg", "Hunt rebuild: wesel");
+    }
+
+    /** @return die Titel der in diesem Lauf neu angelegten granularen TODOs */
+    private List<String> createdTitles(List<Map<String, Object>> items) {
+        when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(similarityService.findSimilar(anyString(), anyString(), any())).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(
+                anyString(), any(), anyString(), anyString(), any())).thenReturn(List.of());
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.syncItems("p-1", event(items), new GateResult(GateStatus.RED, "quality", "Issues"));
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues().stream().map(Todo::getTitle).filter(java.util.Objects::nonNull).toList();
+    }
+
     @Test
     void granularTodos_resolvedItem_closedTodo() {
         // Item was in previous run but not in current → should be closed
