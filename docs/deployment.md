@@ -316,6 +316,57 @@ networks:
     driver: bridge
 ```
 
+## Reverse-Proxy
+
+Seit dem Umstieg auf Einmal-Tickets für den WebSocket-Handshake (Commit 05b759f6) erzwingt das
+Frontend `transports: ['websocket']` und schaltet den SockJS-Fallback (HTTP-Polling) bewusst ab: Ein
+Einmal-Ticket ist nur für den ersten Verbindungsversuch gültig und überlebt keinen
+Transport-Wechsel. Ein Reverse-Proxy vor MySuricates **muss** WebSocket-Verbindungen also per
+HTTP-Upgrade durchreichen — ohne Upgrade-Unterstützung verbindet sich die App nicht mehr.
+
+Auf `localhost`, über Tailscale und in den Stable-/Test-Containern ist das der Fall (direkter
+Zugriff, kein Proxy dazwischen); der Bruch entsteht erst bei eigenen Reverse-Proxy-Deployments.
+
+### nginx
+
+```nginx
+location /ws/ {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+}
+
+location / {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_set_header Host $host;
+}
+```
+
+### Caddy
+
+Caddy erkennt WebSocket-Upgrades automatisch — es braucht keine gesonderte Konfiguration:
+
+```caddyfile
+example.com {
+    reverse_proxy 127.0.0.1:9090
+}
+```
+
+### Fehlerbild
+
+Fehlt die Upgrade-Weiterleitung, bricht der Handshake ab und das Backend-Log zeigt:
+
+```
+missing, expired or already used ticket
+```
+
+Das ist kein Ticket-Bug — der Browser fällt (mangels Upgrade) auf einen zweiten Verbindungsversuch
+zurück und verbraucht das Einmal-Ticket dabei ein zweites Mal. Prüfen: Antwortet der Proxy auf den
+`/ws/**`-Pfad mit Status 101 (Switching Protocols)?
+
 ## Vertrauensmodell und Netzwerk-Exposition
 
 MySuricates ist fuer den **lokalen Betrieb durch eine vertrauenswuerdige Person** gebaut. Es ist kein
