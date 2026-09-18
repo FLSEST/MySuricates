@@ -42,6 +42,16 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Workflow> findAllWithActiveProject();
 
     /**
+     * Workflow- und Projektbezeichner für eine Menge von Workflows in EINER Query — für Run-Listen,
+     * die sonst je Zeile die Lazy-Assoziation {@code WorkflowRun.workflow} auflösen (N+1, TODO
+     * 9db34f3b). Soft-gelöschte Workflows fehlen im Ergebnis (`@SQLRestriction`); der Mapper fällt
+     * dann auf den Namens-Schnappschuss des Runs bzw. "(deleted)" zurück — dasselbe Verhalten wie
+     * beim Einzel-Mapping.
+     */
+    @Query("SELECT w.id, w.name, w.project.name, w.project.path FROM Workflow w WHERE w.id IN :ids")
+    List<Object[]> findRunOwnerData(@Param("ids") Collection<String> ids);
+
+    /**
      * Finds a workflow by ID with eagerly fetched activatedSkills and project.
      */
     @EntityGraph(attributePaths = {"activatedSkills", "project"})

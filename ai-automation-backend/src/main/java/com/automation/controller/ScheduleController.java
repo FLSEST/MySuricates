@@ -61,7 +61,7 @@ public class ScheduleController {
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)
     public Map<String, Object> getScheduleRuns(@PathVariable String id) {
-        List<WorkflowRunResponse> workflowRuns = workflowMapper.toRunResponseList(
+        List<WorkflowRunResponse> workflowRuns = workflowMapper.toRunResponseListWithOwners(
                 schedulerService.findWorkflowRunsByScheduleId(id));
         List<ChainRunResponse> chainRuns = chainMapper.toRunResponseList(
                 schedulerService.findChainRunsByScheduleId(id));
@@ -84,7 +84,7 @@ public class ScheduleController {
             @RequestParam Instant from,
             @RequestParam Instant to) {
         var upcoming = scheduleMapper.toResponseList(schedulerService.findSchedulesInRange(from, to));
-        var pastRuns = workflowMapper.toRunResponseList(schedulerService.findWorkflowRunsBetween(from, to));
+        var pastRuns = workflowMapper.toRunResponseListWithOwners(schedulerService.findWorkflowRunsBetween(from, to));
         return new CalendarDataResponse(upcoming, pastRuns);
     }
 

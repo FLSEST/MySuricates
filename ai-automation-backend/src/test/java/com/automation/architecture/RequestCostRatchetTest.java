@@ -82,18 +82,17 @@ class RequestCostRatchetTest {
     /**
      * Route -> ceiling, measured on 2026-09-18 against the seed above.
      *
-     * <p><b>Several of these ceilings pin a known defect, not a target.</b> The first run of this
-     * test found three N+1 patterns and one unbounded response; they are pinned so that the gate
-     * is green and nothing gets <em>worse</em> while they are fixed, each with its ticket. When a
-     * fix lands, drop the ceiling in the same commit — {@code ceilingsThatDriftedTooHighAreReportedAsAHint}
-     * prints the new number.
+     * <p><b>Some of these ceilings pin a known defect, not a target.</b> The first run of this test
+     * found three N+1 patterns and one unbounded response; the ones still open are pinned so that
+     * the gate is green and nothing gets <em>worse</em> while they are fixed, each with its ticket.
+     * When a fix lands, drop the ceiling in the same commit —
+     * {@code ceilingsThatDriftedTooHighAreReportedAsAHint} prints the new number (that is how
+     * {@code /executions} went from 29 statements to 5 when TODO 9db34f3b was fixed).
      *
      * <ul>
      *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: one
      *       {@code select containers} per workflow — the project's container association is
      *       resolved row by row (TODO 13d1e2a2).</li>
-     *   <li>{@code /executions}: one {@code select workflows} per run, from
-     *       {@code safeWorkflowName(run)} in WorkflowMapper (TODO 9db34f3b).</li>
      *   <li>{@code /executions}: the list response carries every step's full {@code output} TEXT,
      *       so its size grows with step output, unbounded (TODO a05c9504).</li>
      *   <li>{@code /search}: also one {@code select workflow_runs} per hit — the batched run-count
@@ -104,7 +103,7 @@ class RequestCostRatchetTest {
             "/api/v1/todos", new Cost(2, 32_000),
             "/api/v1/projects", new Cost(4, 1_200),
             "/api/v1/workflows", new Cost(32, 26_000),
-            "/api/v1/executions", new Cost(29, 3_200_000),
+            "/api/v1/executions", new Cost(5, 3_200_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
             "/api/v1/search?q=Workflow", new Cost(51, 18_000)));
 

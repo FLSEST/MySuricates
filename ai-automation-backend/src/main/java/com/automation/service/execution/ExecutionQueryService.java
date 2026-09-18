@@ -81,7 +81,7 @@ public class ExecutionQueryService {
 
     private PageResponse<WorkflowRunResponse> toPageResponse(Page<WorkflowRun> result) {
         return new PageResponse<>(
-                workflowMapper.toRunResponseList(result.getContent()),
+                workflowMapper.toRunResponseListWithOwners(result.getContent()),
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
