@@ -40,6 +40,7 @@ class AuditFingerprintMigrationJobResilienceTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private AuditFindingOccurrenceRepository occurrenceRepository;
     @Mock private TodoRepository todoRepository;
+    @Mock private com.automation.repository.AppSettingsRepository appSettings;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private ModuleRegistry modules;
 
@@ -48,9 +49,10 @@ class AuditFingerprintMigrationJobResilienceTest {
     @BeforeEach
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        job = new AuditFingerprintMigrationJob(findingRepository, findingTodoRepository, occurrenceRepository,
-                todoRepository, new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
-                new TransactionTemplate(transactionManager), modules);
+        job = new AuditFingerprintMigrationJob(findingRepository,
+                new AuditFindingMerger(findingTodoRepository, occurrenceRepository, todoRepository),
+                new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
+                appSettings, new TransactionTemplate(transactionManager), modules);
         when(modules.isEnabled(ModuleCatalog.AUDIT)).thenReturn(true);
     }
 

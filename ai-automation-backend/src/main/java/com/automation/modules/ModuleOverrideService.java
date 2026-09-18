@@ -1,9 +1,11 @@
 package com.automation.modules;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.event.ModuleStateChangedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumMap;
@@ -21,6 +23,7 @@ public class ModuleOverrideService {
     private final ModuleRegistry registry;
     private final ModuleOverrideStore store;
     private final ActivityLogService activityLog;
+    private final ApplicationEventPublisher eventPublisher;
 
     public synchronized ModuleRegistry.ModuleStatus setEnabled(String name, boolean enabled) {
         ModuleCatalog module = resolve(name);
@@ -49,6 +52,11 @@ public class ModuleOverrideService {
         activityLog.warn(LogCategory.SECURITY, message + " (" + (before ? "on" : "off") + " → "
                 + (status.enabled() ? "on" : "off") + ", startup configuration: " + (status.configured() ? "on" : "off")
                 + ")", "ModuleOverrideService");
+        // Nur bei echtem Wechsel: Hintergrundpfade des Moduls (Jobs, Listener) holen daran ihren
+        // sonst nur beim Start laufenden Teil nach.
+        if (before != status.enabled()) {
+            eventPublisher.publishEvent(new ModuleStateChangedEvent(this, module, status.enabled()));
+        }
         return status;
     }
 

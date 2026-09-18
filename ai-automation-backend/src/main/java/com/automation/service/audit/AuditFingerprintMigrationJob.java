@@ -1,15 +1,11 @@
 package com.automation.service.audit;
 
 import com.automation.entity.AuditFinding;
-import com.automation.entity.AuditFindingOccurrence;
-import com.automation.entity.AuditFindingStatus;
-import com.automation.entity.AuditFindingTodo;
+import com.automation.event.ModuleStateChangedEvent;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
-import com.automation.repository.AuditFindingOccurrenceRepository;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.AuditFindingRepository;
-import com.automation.repository.AuditFindingTodoRepository;
-import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -17,13 +13,11 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Einmaliger Aufraeumlauf beim Start: rechnet die Fingerprints aller Audit-Findings auf das
@@ -34,11 +28,21 @@ import java.util.Optional;
  * juengsten Anzeigeattribute, TODO-Verknuepfungen und Vorkommen, die Dubletten werden geloescht.
  * Reine DB-Arbeit in kurzen Transaktionen je (Projekt, Audit) — passend zu pool-size 1, ohne
  * langsame Operationen. Der Lauf ist idempotent: ist nichts mehr zu tun, schreibt er nichts.
+ *
+ * <p>Er laeuft trotzdem nur einmal: nach einem vollstaendigen Lauf haelt der Marker
+ * {@link #MARKER_KEY} in {@code app_settings} die Job-Version fest, sonst scannte jeder
+ * Backend-Start alle Findings (Audit-TODO 763ff931). War das AUDIT-Modul beim Start aus, holt
+ * {@link #onModuleStateChanged} den Lauf beim Einschalten nach.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuditFingerprintMigrationJob {
+
+    /** Marker in {@code app_settings}: bis zu welcher Job-Version wurde schon aufgeraeumt? */
+    static final String MARKER_KEY = "audit-fingerprint-migration.version";
+    /** Erhoehen, wenn ein neuer Aufraeumschritt dazukommt — dann laeuft der Job noch einmal. */
+    static final int VERSION = 1;
 
     private static final Comparator<AuditFinding> OLDEST_FIRST = Comparator
             .comparing(AuditFinding::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -46,17 +50,47 @@ public class AuditFingerprintMigrationJob {
             .thenComparing(AuditFinding::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
     private final AuditFindingRepository findingRepository;
-    private final AuditFindingTodoRepository findingTodoRepository;
-    private final AuditFindingOccurrenceRepository occurrenceRepository;
-    private final TodoRepository todoRepository;
+    private final AuditFindingMerger merger;
     private final ManagedTodoReconciler managedTodoReconciler;
+    private final AppSettingsRepository appSettings;
     private final TransactionTemplate transactionTemplate;
     private final ModuleRegistry modules;
 
     @EventListener(ApplicationReadyEvent.class)
-    public void migrate() {
-        if (!modules.isEnabled(ModuleCatalog.AUDIT)) {
+    public void migrateOnStartup() {
+        migrateIfNeeded();
+    }
+
+    /**
+     * War das AUDIT-Modul beim Start aus, holt der Lauf hier nach — sonst liefe er erst beim
+     * naechsten Neustart.
+     */
+    @EventListener
+    public void onModuleStateChanged(ModuleStateChangedEvent event) {
+        if (event.getModule() == ModuleCatalog.AUDIT && event.isEnabled()) {
+            migrateIfNeeded();
+        }
+    }
+
+    /** Laeuft nur, solange der Marker fehlt: ein erfolgreicher Lauf schreibt ihn. */
+    private void migrateIfNeeded() {
+        if (!modules.isEnabled(ModuleCatalog.AUDIT) || isMigrated()) {
             return;
+        }
+        if (migrate()) {
+            markMigrated();
+        }
+    }
+
+    /**
+     * Fuehrt den Aufraeumlauf ueber alle Scopes aus — ohne Marker-Pruefung, damit er auch nach
+     * einer Datenkorrektur wiederholbar bleibt (er ist idempotent).
+     *
+     * @return {@code true}, wenn jeder Scope durchgelaufen ist (nur dann darf der Marker fallen)
+     */
+    public boolean migrate() {
+        if (!modules.isEnabled(ModuleCatalog.AUDIT)) {
+            return false;
         }
         List<Scope> scopes;
         try {
@@ -64,11 +98,12 @@ public class AuditFingerprintMigrationJob {
                     .map(row -> new Scope((String) row[0], (String) row[1])).toList());
         } catch (Exception e) {
             log.error("Audit fingerprint migration could not read its scopes, skipping the run: {}", e.toString(), e);
-            return;
+            return false;
         }
         if (scopes == null || scopes.isEmpty()) {
-            return;
+            return true;
         }
+        boolean complete = true;
         int merged = 0;
         int rehashed = 0;
         for (Scope scope : scopes) {
@@ -81,6 +116,7 @@ public class AuditFingerprintMigrationJob {
                     rehashed += counts[1];
                 }
             } catch (Exception e) {
+                complete = false;
                 log.error("Audit fingerprint migration failed for project {} / audit {}, left unchanged: {}",
                         scope.projectId(), scope.auditKey(), e.toString(), e);
             }
@@ -88,6 +124,35 @@ public class AuditFingerprintMigrationJob {
         if (merged > 0 || rehashed > 0) {
             log.info("Audit fingerprints migrated: {} duplicate findings merged, {} findings re-hashed",
                     merged, rehashed);
+        }
+        return complete;
+    }
+
+    /** @return true, wenn der Marker den Lauf dieser Version (oder eine neuere) schon belegt */
+    private boolean isMigrated() {
+        try {
+            return appSettings.get(MARKER_KEY).map(String::trim).filter(v -> !v.isEmpty())
+                    .map(v -> parseVersion(v) >= VERSION).orElse(false);
+        } catch (Exception e) {
+            // Lieber einmal zu viel scannen als den Marker raten: der Lauf ist idempotent.
+            log.warn("Audit fingerprint migration could not read its marker, running anyway: {}", e.toString());
+            return false;
+        }
+    }
+
+    private void markMigrated() {
+        try {
+            appSettings.set(MARKER_KEY, String.valueOf(VERSION));
+        } catch (Exception e) {
+            log.warn("Audit fingerprint migration ran but its marker could not be stored: {}", e.toString());
+        }
+    }
+
+    private static int parseVersion(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return -1;
         }
     }
 
@@ -114,9 +179,7 @@ public class AuditFingerprintMigrationJob {
                                 + "ruleKey {}, project {}, audit {}",
                         duplicate.getId(), duplicate.getSubject(), target.getId(), targetSubject,
                         target.getRuleKey(), target.getProjectId(), target.getAuditKey());
-                mergeInto(target, duplicate);
-                relinkTodos(target, duplicate);
-                relinkOccurrences(target, duplicate);
+                merger.merge(target, duplicate);
                 findingRepository.delete(duplicate);
                 merged++;
             }
@@ -151,107 +214,9 @@ public class AuditFingerprintMigrationJob {
         }
     }
 
-    private void mergeInto(AuditFinding target, AuditFinding duplicate) {
-        target.setOccurrenceCount(target.getOccurrenceCount() + duplicate.getOccurrenceCount());
-        target.setRegressionCount(target.getRegressionCount() + duplicate.getRegressionCount());
-        if (isBefore(duplicate.getFirstSeenAt(), target.getFirstSeenAt())) {
-            target.setFirstSeenAt(duplicate.getFirstSeenAt());
-            target.setFirstSeenReportId(duplicate.getFirstSeenReportId());
-            target.setFirstSeenRunId(duplicate.getFirstSeenRunId());
-        }
-        if (isBefore(target.getLastSeenAt(), duplicate.getLastSeenAt())) {
-            target.setLastSeenAt(duplicate.getLastSeenAt());
-            target.setLastSeenReportId(duplicate.getLastSeenReportId());
-            target.setLastSeenRunId(duplicate.getLastSeenRunId());
-            target.setSubject(duplicate.getSubject());
-            target.setSeverity(duplicate.getSeverity());
-            target.setTitle(duplicate.getTitle());
-            target.setDescription(duplicate.getDescription());
-            target.setEvidence(duplicate.getEvidence());
-            target.setTags(duplicate.getTags());
-        }
-        applyStatusAndDisposition(target, duplicate);
-    }
-
-    /**
-     * Status und Disposition wandern immer <em>zusammen</em>: eine menschliche Disposition
-     * ({@code ACCEPTED_RISK}, {@code DISMISSED}) schlaegt, egal auf welcher Seite sie steht — beim
-     * wahrscheinlichsten Drift-Verlauf ist das aeltere Finding auto-resolved und der juengere
-     * Wiedergaenger der akzeptierte. Genau diese Wiedergaenger haben die Akzeptanzen bisher
-     * unterlaufen; wiedereroeffnet wird ein akzeptiertes Risiko allein ueber
-     * {@link AuditAcceptancePolicy} (belegte Verschlechterung). Ohne Disposition im Spiel zieht ein
-     * offener oder wiedervorgelegter Wiedergaenger das Ziel aus {@code RESOLVED} heraus.
-     */
-    private static void applyStatusAndDisposition(AuditFinding target, AuditFinding duplicate) {
-        if (isDisposed(target.getStatus())) {
-            return;
-        }
-        if (isDisposed(duplicate.getStatus())) {
-            target.setStatus(duplicate.getStatus());
-            target.setDispositionNote(duplicate.getDispositionNote());
-            target.setDispositionEvidence(duplicate.getDispositionEvidence());
-            target.setDispositionAt(duplicate.getDispositionAt());
-            target.setResolvedAt(duplicate.getResolvedAt());
-            return;
-        }
-        if (target.getStatus() == AuditFindingStatus.OPEN || duplicate.getStatus() == AuditFindingStatus.OPEN) {
-            target.setStatus(AuditFindingStatus.OPEN);
-            target.setResolvedAt(null);
-        } else if (duplicate.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
-            // Wieder offen heisst: kein Behebungsdatum — sonst zeigt das Audit Center ein
-            // wartendes Finding mit resolvedAt an.
-            target.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
-            target.setResolvedAt(null);
-        }
-    }
-
-    private static boolean isDisposed(AuditFindingStatus status) {
-        return status == AuditFindingStatus.ACCEPTED_RISK || status == AuditFindingStatus.DISMISSED;
-    }
-
-    private void relinkTodos(AuditFinding target, AuditFinding duplicate) {
-        for (AuditFindingTodo link : findingTodoRepository.findByFindingId(duplicate.getId())) {
-            repointTodoReference(target, duplicate, link.getTodoId());
-            Optional<AuditFindingTodo> existing =
-                    findingTodoRepository.findByFindingIdAndTodoId(target.getId(), link.getTodoId());
-            if (existing.isPresent()) {
-                if (link.isManaged()) {
-                    existing.get().setManaged(true);
-                }
-                findingTodoRepository.delete(link);
-            } else {
-                link.setFindingId(target.getId());
-            }
-        }
-    }
-
-    /** Sonst zeigen der Deep-Link {@code /reports?finding=…} und {@code todo_reference_id} ins Leere. */
-    private void repointTodoReference(AuditFinding target, AuditFinding duplicate, String todoId) {
-        todoRepository.findById(todoId).ifPresent(todo -> {
-            if (AuditIngestionService.REFERENCE_TYPE.equals(todo.getReferenceType())
-                    && duplicate.getId().equals(todo.getReferenceId())) {
-                todo.setReferenceId(target.getId());
-            }
-        });
-    }
-
-    private void relinkOccurrences(AuditFinding target, AuditFinding duplicate) {
-        for (AuditFindingOccurrence occurrence : occurrenceRepository.findByFindingId(duplicate.getId())) {
-            if (occurrenceRepository.existsByFindingIdAndReportId(target.getId(), occurrence.getReportId())) {
-                occurrenceRepository.delete(occurrence);
-            } else {
-                occurrence.setFindingId(target.getId());
-            }
-        }
-    }
-
     private static String newFingerprint(AuditFinding finding) {
         return AuditIngestionService.fingerprint(finding.getProjectId(), finding.getAuditKey(),
                 finding.getRuleKey(), finding.getSubject());
-    }
-
-    private static boolean isBefore(Instant candidate, Instant reference) {
-        return candidate != null && (reference == null || candidate.isBefore(reference));
     }
 
     private record Scope(String projectId, String auditKey) {
