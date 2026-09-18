@@ -4,3 +4,9 @@ spring:
 
   jpa:
     show-sql: false
+
+automation:
+  request-metrics:
+    # Der Header verraet interne Zeiten und die SQL-Zahl — in den nach aussen zeigenden
+    # Umgebungen aus. Startup-only, damit ein geleakter API-Key ihn nicht einschalten kann.
+    server-timing-enabled: false

@@ -69,6 +69,9 @@ class WorkflowExecutorTest {
     private com.automation.repository.TodoRepository todoRepository;
 
     @Mock
+    private com.automation.service.metrics.RequestMetricsFactSheet requestMetricsFactSheet;
+
+    @Mock
     private WorkflowVersionService workflowVersionService;
 
     @Mock
@@ -180,7 +183,8 @@ class WorkflowExecutorTest {
                 virtualThreadExecutor,
                 new DynamicSemaphore(10),
                 new ExecutionContextFactory(workflowVersionService, runRepository, systemIdentity,
-                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
+                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository,
+                                requestMetricsFactSheet),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
@@ -1260,7 +1264,8 @@ class WorkflowExecutorTest {
                 threads,
                 semaphore,
                 new ExecutionContextFactory(workflowVersionService, runRepository, systemIdentity,
-                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
+                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository,
+                                requestMetricsFactSheet),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
                 new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),

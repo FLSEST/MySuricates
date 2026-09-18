@@ -8,6 +8,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.metrics.RequestMetricsFactSheet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +18,7 @@ import java.util.regex.Pattern;
 
 /**
  * Loads platform data that is injected into the {@link ExecutionContext} as template
- * variables ({@code previous_report}, {@code open_todos}) so workflows never need direct
+ * variables ({@code previous_report}, {@code open_todos}, {@code request_metrics}) so workflows never need direct
  * DB or API access. Extracted from {@code WorkflowExecutor} (pure data queries).
  */
 @Service
@@ -28,6 +29,7 @@ public class WorkflowContextDataService {
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
     private final TodoRepository todoRepository;
+    private final RequestMetricsFactSheet requestMetricsFactSheet;
 
     /**
      * Injects platform data into the execution context so workflows don't need
@@ -50,6 +52,9 @@ public class WorkflowContextDataService {
             // in prompts nothing changes. See ExecutionContext#setUntrustedPlatformVariable.
             context.setUntrustedPlatformVariable("previous_report", loadPreviousReport(workflowId));
             context.setUntrustedPlatformVariable("open_todos", loadOpenTodos(projectId));
+            // Measured request costs in the audit fact format — the only sanctioned way for a
+            // shell block to see them, since it must not call the REST API (CLAUDE.md).
+            context.setUntrustedPlatformVariable("request_metrics", requestMetricsFactSheet.render());
         } catch (Exception e) {
             log.warn("Failed to inject platform data: {}", e.getMessage());
         }

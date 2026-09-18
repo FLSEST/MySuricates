@@ -227,7 +227,7 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(0, 10), 1);
         when(runRepository.findFiltered(isNull(), isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(page);
-        when(workflowMapper.toRunResponseList(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+        when(workflowMapper.toRunResponseListWithOwners(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
 
         PageResponse<WorkflowRunResponse> result = service.listExecutionResponses(0, 10, null, null, null, null);
 
@@ -269,7 +269,7 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(1, 20), 21);
         when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20))).thenReturn(page);
-        when(workflowMapper.toRunResponseList(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+        when(workflowMapper.toRunResponseListWithOwners(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
 
         PageResponse<WorkflowRunResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);
 

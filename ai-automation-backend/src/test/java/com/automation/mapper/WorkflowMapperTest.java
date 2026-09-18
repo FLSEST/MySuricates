@@ -26,6 +26,8 @@ class WorkflowMapperTest extends WorkflowMapper {
     @Override public StepResultResponse toStepResponse(StepResult step) { return null; }
     @Override public WorkflowResponse toResponse(Workflow workflow, Map<String, Long> runCounts) { return null; }
     @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows, Map<String, Long> runCounts) { return null; }
+    @Override public WorkflowRunResponse toRunResponse(WorkflowRun run, Map<String, RunOwner> owners) { return null; }
+    @Override public List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs, Map<String, RunOwner> owners) { return null; }
 
     @Nested
     class SafeWorkflowId {
@@ -139,6 +141,70 @@ class WorkflowMapperTest extends WorkflowMapper {
             WorkflowRun run = WorkflowRun.builder().id("r-1").build();
 
             assertThat(safeProjectPath(run)).isNull();
+        }
+    }
+
+    /**
+     * The batched list path must produce exactly what the single path produces — it only takes the
+     * labels from a map instead of from the lazy association (TODO 9db34f3b).
+     */
+    @Nested
+    class BatchedOwners {
+
+        private final RunOwner owner = new RunOwner("My Workflow", "My Project", "/home/user/project");
+
+        @Test
+        void knownWorkflow_returnsItsLabels() {
+            Workflow wf = Workflow.builder().id("wf-1").name("My Workflow").build();
+            WorkflowRun run = WorkflowRun.builder().id("r-1").workflow(wf).build();
+
+            RunOwner resolved = ownerOf(run, Map.of("wf-1", owner));
+
+            assertThat(resolved.projectName()).isEqualTo("My Project");
+            assertThat(resolved.projectPath()).isEqualTo("/home/user/project");
+        }
+
+        @Test
+        void unknownWorkflow_returnsEmptyLabels() {
+            Workflow wf = Workflow.builder().id("wf-gone").name("WF").build();
+            WorkflowRun run = WorkflowRun.builder().id("r-1").workflow(wf).build();
+
+            RunOwner resolved = ownerOf(run, Map.of("wf-1", owner));
+
+            assertThat(resolved.projectName()).isNull();
+            assertThat(resolved.projectPath()).isNull();
+        }
+
+        @Test
+        void nullWorkflow_returnsEmptyLabels() {
+            WorkflowRun run = WorkflowRun.builder().id("r-1").build();
+
+            assertThat(ownerOf(run, Map.of("wf-1", owner)).projectName()).isNull();
+        }
+
+        @Test
+        void snapshotWins_likeInTheSinglePath() {
+            Workflow wf = Workflow.builder().id("wf-1").name("My Workflow").build();
+            WorkflowRun run = WorkflowRun.builder().id("r-1").workflow(wf).workflowName("Snapshot").build();
+
+            assertThat(batchedWorkflowName(run, Map.of("wf-1", owner))).isEqualTo("Snapshot");
+        }
+
+        @Test
+        void blankSnapshot_fallsBackToTheBatchedName() {
+            Workflow wf = Workflow.builder().id("wf-1").name("My Workflow").build();
+            WorkflowRun run = WorkflowRun.builder().id("r-1").workflow(wf).workflowName("  ").build();
+
+            assertThat(batchedWorkflowName(run, Map.of("wf-1", owner))).isEqualTo("My Workflow");
+        }
+
+        /** Soft-deleted workflows are missing from the batch query — same wording as the single path. */
+        @Test
+        void missingWorkflowAndNoSnapshot_readsAsDeleted() {
+            Workflow wf = Workflow.builder().id("wf-gone").name("WF").build();
+            WorkflowRun run = WorkflowRun.builder().id("r-1").workflow(wf).build();
+
+            assertThat(batchedWorkflowName(run, Map.of())).isEqualTo("(deleted)");
         }
     }
 }

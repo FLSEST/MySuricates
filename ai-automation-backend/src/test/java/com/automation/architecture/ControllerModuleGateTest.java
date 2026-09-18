@@ -43,6 +43,8 @@ class ControllerModuleGateTest {
             "SystemController",
             "SystemMaintenanceController",
             "SystemModulesController",
+            // How a slow platform gets diagnosed — must not switch off with a feature module.
+            "SystemRequestMetricsController",
             "SystemSettingsController",
             "TodoController",
             "TodoTriggerController",

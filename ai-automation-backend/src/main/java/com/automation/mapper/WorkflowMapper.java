@@ -8,6 +8,7 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowDefinitionHasher;
 import org.mapstruct.Context;
@@ -19,6 +20,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring")
@@ -26,6 +29,9 @@ public abstract class WorkflowMapper {
 
     @Autowired
     protected WorkflowRunRepository workflowRunRepository;
+
+    @Autowired
+    protected WorkflowRepository workflowRepository;
 
     // Optional: controller slices that import the mapper without the module system still work
     @Autowired(required = false)
@@ -85,9 +91,60 @@ public abstract class WorkflowMapper {
     @Mapping(target = "workflowName", expression = "java(safeWorkflowName(run))")
     @Mapping(target = "projectName", expression = "java(safeProjectName(run))")
     @Mapping(target = "projectPath", expression = "java(safeProjectPath(run))")
+    @Named("runSingle")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
+    @IterableMapping(qualifiedByName = "runSingle")
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
+
+    // --- Batch variant: workflow/project labels injected via @Context (avoids the per-run
+    // lazy-load of WorkflowRun.workflow, TODO 9db34f3b) ---
+
+    /** Die Bezeichner, die eine Run-Zeile vom zugehörigen Workflow braucht. */
+    public record RunOwner(String workflowName, String projectName, String projectPath) {}
+
+    private static final RunOwner UNKNOWN_OWNER = new RunOwner(null, null, null);
+
+    @Mapping(target = "workflowId", expression = "java(safeWorkflowId(run))")
+    @Mapping(target = "workflowName", expression = "java(batchedWorkflowName(run, owners))")
+    @Mapping(target = "projectName", expression = "java(ownerOf(run, owners).projectName())")
+    @Mapping(target = "projectPath", expression = "java(ownerOf(run, owners).projectPath())")
+    @Named("runWithOwners")
+    public abstract WorkflowRunResponse toRunResponse(WorkflowRun run, @Context Map<String, RunOwner> owners);
+
+    @IterableMapping(qualifiedByName = "runWithOwners")
+    public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs,
+                                                                @Context Map<String, RunOwner> owners);
+
+    /**
+     * Run-Liste, deren Workflow- und Projektnamen aus EINER Query stammen (statt je Run die
+     * Lazy-Assoziation aufzulösen). Werte identisch zum Einzelpfad: Vorrang hat der Namens-
+     * Schnappschuss des Runs, dann der Workflow, sonst "(deleted)".
+     */
+    public List<WorkflowRunResponse> toRunResponseListWithOwners(List<WorkflowRun> runs) {
+        Set<String> workflowIds = runs.stream()
+                .map(this::safeWorkflowId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<String, RunOwner> owners = workflowIds.isEmpty()
+                ? Map.of()
+                : workflowRepository.findRunOwnerData(workflowIds).stream().collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> new RunOwner((String) row[1], (String) row[2], (String) row[3])));
+        return toRunResponseList(runs, owners);
+    }
+
+    protected RunOwner ownerOf(WorkflowRun run, Map<String, RunOwner> owners) {
+        String workflowId = safeWorkflowId(run);
+        return workflowId == null ? UNKNOWN_OWNER : owners.getOrDefault(workflowId, UNKNOWN_OWNER);
+    }
+
+    protected String batchedWorkflowName(WorkflowRun run, Map<String, RunOwner> owners) {
+        String snapshot = run.getWorkflowName();
+        if (snapshot != null && !snapshot.isBlank()) return snapshot;
+        String name = ownerOf(run, owners).workflowName();
+        return name != null ? name : "(deleted)";
+    }
 
     @Mapping(target = "blockType", expression = "java(metadataString(step, \"blockType\"))")
     @Mapping(target = "blockName", expression = "java(metadataString(step, \"blockName\"))")

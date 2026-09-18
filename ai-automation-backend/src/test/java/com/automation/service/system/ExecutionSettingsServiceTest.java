@@ -6,6 +6,7 @@ import com.automation.config.CompressionConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.RequestMetricsConfig;
 import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
@@ -59,6 +60,7 @@ class ExecutionSettingsServiceTest {
     private DashboardLayoutConfig dashboardLayoutConfig;
     private CompressionConfig compressionConfig;
     private TodoSimilarityConfig todoSimilarityConfig;
+    private RequestMetricsConfig requestMetricsConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -79,6 +81,7 @@ class ExecutionSettingsServiceTest {
         dashboardLayoutConfig = new DashboardLayoutConfig();
         compressionConfig = new CompressionConfig();
         todoSimilarityConfig = new TodoSimilarityConfig();
+        requestMetricsConfig = new RequestMetricsConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
@@ -86,7 +89,7 @@ class ExecutionSettingsServiceTest {
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                compressionConfig, todoSimilarityConfig
+                compressionConfig, todoSimilarityConfig, requestMetricsConfig
         );
     }
 
