@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -413,6 +414,29 @@ class WorkflowPoolServiceTest {
         poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
 
         verify(workflowService).create(argThat(req -> "high".equals(req.effort())), eq(ChangeSource.POOL_INSTALL));
+    }
+
+    /**
+     * TODO 96640e6f: {@code UpdateWorkflowRequest} nimmt 13 Positionsargumente, {@code category} und
+     * {@code effort} stehen nebeneinander und sind beide String — eine Umsortierung des Records
+     * wuerde effort sonst still als category einsetzen, ohne dass ein Test es merkt.
+     */
+    @Test
+    void install_onAnExistingWorkflow_passesEffortToTheUpdate() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}], "effort": "high"}
+                """);
+        Workflow existing = Workflow.builder().id("wf-9").name("Test").build();
+        when(workflowService.findByNameAndProjectId("Test", "proj-1")).thenReturn(Optional.of(existing));
+        when(workflowService.update(eq("wf-9"), any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(existing);
+
+        WorkflowPoolService.InstallResult result =
+                poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        assertThat(result.created()).isFalse();
+        verify(workflowService).update(eq("wf-9"),
+                argThat(req -> "high".equals(req.effort()) && req.category() == null),
+                eq(ChangeSource.POOL_INSTALL));
     }
 
     private void stubWorkflow(Workflow workflow) {
