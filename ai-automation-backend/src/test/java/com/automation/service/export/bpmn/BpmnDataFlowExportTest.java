@@ -145,6 +145,25 @@ class BpmnDataFlowExportTest {
                 .doesNotThrowAnyException();
     }
 
+    /** Datenassoziationen dürfen an keinem Block-Typ das Schema brechen (auch Schleifen/Sub-Prozesse). */
+    @Test
+    void ganzerFixtureKatalogBleibtSchemaValide() throws Exception {
+        Validator validator = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(new File("src/test/resources/bpmn/xsd/BPMN20.xsd"))
+                .newValidator();
+        List<Workflow> katalog = new ArrayList<>(WorkflowFixtures.roundtripCatalog());
+        katalog.add(WorkflowFixtures.workflow("SchleifeAlsVerbraucher", List.of(
+                WorkflowFixtures.block("shell", "tests", Map.of("command", "mvn test")),
+                WorkflowFixtures.block("foreach", "je Fehler", Map.of(
+                        "variable_name", "f", "command", "Analysiere {{ block.tests.output }} für {{ f }}")))));
+        for (Workflow wf : katalog) {
+            String xml = adapter.export(wf);
+            assertThatCode(() -> validator.validate(new StreamSource(new StringReader(xml))))
+                    .as("XSD-Validierung für Fixture '%s':\n%s", wf.getName(), xml)
+                    .doesNotThrowAnyException();
+        }
+    }
+
     @Test
     void exportIstDeterministisch() {
         assertThat(adapter.export(WorkflowFixtures.dataFlow()))
