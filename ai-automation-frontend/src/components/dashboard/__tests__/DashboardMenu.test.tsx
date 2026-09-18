@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { DashboardMenu } from '../DashboardMenu';
 
 const items = [
@@ -80,5 +80,19 @@ describe('DashboardMenu', () => {
     const { trigger } = renderMenu({ items: [{ id: 'ops', label: 'Operations' }] });
     fireEvent.click(trigger);
     expect(screen.getByRole('menuitem', { name: 'Operations' })).not.toHaveAttribute('aria-checked');
+  });
+
+  it('wraps radio items in a labelled group', () => {
+    const { trigger } = renderMenu();
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Size: Chart' });
+    const group = within(menu).getByRole('group', { name: 'Size: Chart' });
+    expect(within(group).getAllByRole('menuitemradio')).toHaveLength(3);
+  });
+
+  it('has no group around plain action items', () => {
+    const { trigger } = renderMenu({ items: [{ id: 'ops', label: 'Operations' }] });
+    fireEvent.click(trigger);
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
   });
 });

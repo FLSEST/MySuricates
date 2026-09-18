@@ -72,6 +72,28 @@ export function DashboardMenu({ label, icon, items, disabled = false, onSelect, 
     buttons[(target + buttons.length) % buttons.length]?.focus();
   };
 
+  // Radio items (a value to choose, e.g. widget size) form one group; plain action items don't.
+  const isRadioGroup = items.length > 0 && items.every((item) => item.checked !== undefined);
+  const renderItem = (item: DashboardMenuItem) => (
+    <button
+      key={item.id}
+      type="button"
+      role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+      aria-checked={item.checked}
+      tabIndex={-1}
+      onClick={() => {
+        close();
+        onSelect(item.id);
+      }}
+      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text focus:bg-surface-hover focus:text-text focus:outline-none"
+    >
+      {item.checked !== undefined && (
+        <span className="flex w-3.5 shrink-0 justify-center">{item.checked && <Check className="h-3.5 w-3.5 text-accent" />}</span>
+      )}
+      <span className="min-w-0 truncate">{item.label}</span>
+    </button>
+  );
+
   return (
     <div className="relative">
       <button
@@ -97,25 +119,13 @@ export function DashboardMenu({ label, icon, items, disabled = false, onSelect, 
           onKeyDown={handleKeyDown}
           className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border border-border bg-surface-overlay p-1 shadow-lg"
         >
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
-              aria-checked={item.checked}
-              tabIndex={-1}
-              onClick={() => {
-                close();
-                onSelect(item.id);
-              }}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text focus:bg-surface-hover focus:text-text focus:outline-none"
-            >
-              {item.checked !== undefined && (
-                <span className="flex w-3.5 shrink-0 justify-center">{item.checked && <Check className="h-3.5 w-3.5 text-accent" />}</span>
-              )}
-              <span className="min-w-0 truncate">{item.label}</span>
-            </button>
-          ))}
+          {isRadioGroup ? (
+            <div role="group" aria-label={label}>
+              {items.map((item) => renderItem(item))}
+            </div>
+          ) : (
+            items.map((item) => renderItem(item))
+          )}
         </div>
       )}
     </div>
