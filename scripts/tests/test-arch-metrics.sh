@@ -230,7 +230,7 @@ EOF
 
 # Werkzeugkasten: nur die Programme, die das Skript wirklich braucht. So laesst sich
 # "jdeps fehlt" testen, ohne am System-PATH zu drehen.
-TOOLS="bash sh mkdir rm cp mv cat mktemp dirname find xargs awk sort uniq cut grep sed head wc tr git python3 javac jdeps"
+TOOLS="bash sh mkdir rm cp mv touch cat mktemp dirname find xargs awk sort uniq cut grep sed head wc tr git python3 javac jdeps"
 make_toolbox() {  # $1 = Zielverzeichnis, $2 = optional auszulassendes Werkzeug
   local dir="$1" skip="${2:-}" t p
   mkdir -p "$dir"
@@ -264,6 +264,15 @@ check "gemessener Teil trotzdem byte-identisch"      'diff -q "$TMP/fix1.measure
 if ! diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null 2>&1; then
   diff -u "$TMP/fix1.measured" "$TMP/fix2.measured" | head -20
 fi
+
+# Der Aufruf im Pool-Workflow lautet `bash scripts/public-readiness/arch-metrics.sh "$BASE"`.
+# Wird SCRIPT_DIR erst nach dem cd in die gemessene Wurzel aufgeloest, zeigt der relative Pfad
+# ins Leere und die Zyklen gelten still als nicht gemessen.
+( cd "$REPO" && PATH="$TMP/bin" bash scripts/public-readiness/arch-metrics.sh "$TMP/fixture" ) \
+  > "$TMP/relpath.txt" 2>/dev/null
+check "relativer Skriptpfad: cycles_state=ok" 'grep -qx "cycles_state=ok" "$TMP/relpath.txt"'
+check "relativer Skriptpfad: Zyklus gefunden" \
+  "grep -qx 'pair${TAB}com.automation.a${TAB}com.automation.b' '$TMP/relpath.txt'"
 
 echo "7) Fehlschlaege werden gemeldet, nicht als Sauberkeit ausgegeben"
 mkdir -p "$TMP/stub-python"
@@ -326,12 +335,42 @@ AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "
 check "unkommittierte Aenderung umgeht den Cache" 'grep -qx "compile=compiled" "$TMP/cache3.txt"'
 rm -f "$TMP/fixture/dirty.txt"
 
+# Ein Treffer wird benutzt, also frisch gestempelt: jdeps liest sekundenlang daraus, und der
+# Keep-3-Rang geht nach mtime. Ohne den Stempel raeumt ein paralleler Lauf den Eintrag genau
+# waehrend der Messung weg — exit 0, kein error=, halber Klassenbaum gemessen.
+rm -rf "$BE/target"
+touch -d '2020-01-01 00:00:00' "$CACHE/$FIX_SHA"
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache-touch.txt" 2>/dev/null
+check "Treffer stempelt den Eintrag frisch" \
+  '[ -n "$(find "$CACHE" -mindepth 1 -maxdepth 1 -name "$FIX_SHA" -newermt "2021-01-01" 2>/dev/null)" ]'
+check "Treffer bleibt ein Treffer (compile=cached)" 'grep -qx "compile=cached" "$TMP/cache-touch.txt"'
+
+# Derselbe Eintrag, aber drei juengere Fremdeintraege: ohne den Stempel waere er Rang 4 und
+# fiele dem Aufraeumen zum Opfer, obwohl gerade aus ihm gemessen wird.
+rm -rf "$BE/target"
+touch -d '2020-01-01 00:00:00' "$CACHE/$FIX_SHA"
+for fresh in eee fff ggg; do mkdir -p "$CACHE/$fresh"; : > "$CACHE/$fresh/marker"; done
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > /dev/null 2>&1
+check "benutzter Eintrag ueberlebt juengere Fremdeintraege" '[ -d "$CACHE/$FIX_SHA" ]'
+rm -rf "$CACHE/eee" "$CACHE/fff" "$CACHE/ggg"
+
+# Ein gueltiger Eintrag wird nie ersetzt — sonst zieht ein Schreiber dem Leser die Klassen
+# unter der laufenden Messung weg.
+: > "$CACHE/$FIX_SHA/nicht-ueberschreiben"
+rm -rf "$BE/target"
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > /dev/null 2>&1
+check "gueltiger Cache-Eintrag wird nicht neu geschrieben" '[ -f "$CACHE/$FIX_SHA/nicht-ueberschreiben" ]'
+
+# Ein liegengebliebenes Staging-Verzeichnis eines abgestuerzten Laufs darf beim Aufraeumen
+# nicht als Eintrag mitzaehlen und echte Kompilate verdraengen.
+mkdir -p "$CACHE/.staging.999"
 rm -rf "$BE/target" "$CACHE/$FIX_SHA"
 for stale in aaa bbb ccc ddd; do mkdir -p "$CACHE/$stale"; : > "$CACHE/$stale/marker"; done
 AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache4.txt" 2>/dev/null
 check "Cache behaelt hoechstens 3 Eintraege" \
-  '[ "$(find "$CACHE" -mindepth 1 -maxdepth 1 -type d | wc -l)" -le 3 ]'
+  '[ "$(find "$CACHE" -mindepth 1 -maxdepth 1 -type d ! -name ".*" | wc -l)" -le 3 ]'
 check "der frische Eintrag ueberlebt das Aufraeumen" '[ -d "$CACHE/$FIX_SHA" ]'
+check "fremdes Staging-Verzeichnis bleibt unangetastet" '[ -d "$CACHE/.staging.999" ]'
 
 # Ein unbrauchbares Cache-Verzeichnis darf das Faktenblatt nicht roetlich faerben.
 rm -rf "$BE/target"

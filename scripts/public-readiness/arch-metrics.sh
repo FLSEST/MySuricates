@@ -45,11 +45,21 @@
 # eine falsche Messung. Es bleiben die juengsten drei Eintraege liegen. Jeder Fehlschlag am
 # Cache ist still: gemessen wird dann eben frisch.
 #
+# Parallele Laeufe: ein benutzter Eintrag wird beim Treffer frisch gestempelt (mtime), damit
+# das Aufraeumen ihn nicht mitten in der jdeps-Messung wegzieht, und ein bereits gueltiger
+# Eintrag wird nie ersetzt. Zwei Laeufe desselben Commits kommen sich damit nicht in die
+# Quere; schlimmstenfalls verwirft einer sein frisch kopiertes Staging.
+#
 # Bewusst ohne common.sh: dessen run_limited/MAX_LINES wuerde das Faktenblatt kuerzen und
 # cd_root die uebergebene Wurzel ignorieren.
 #
 set -uo pipefail
 export LC_ALL=C
+
+# Vor dem cd aufloesen: wurde das Skript ueber einen relativen Pfad aufgerufen, zeigt
+# dirname "$0" nach dem Wechsel in die gemessene Wurzel ins Leere — arch_cycles.py waere
+# dann nicht auffindbar und die Zyklen still "nicht gemessen".
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ROOT_ARG="${1:-.}"
 if [ ! -d "$ROOT_ARG" ]; then
@@ -61,7 +71,6 @@ ROOT="$(pwd -P)"
 BACKEND="$ROOT/ai-automation-backend"
 SRC="$BACKEND/src/main/java"
 CLASSES="$BACKEND/target/classes"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 ERRORS=""
@@ -93,9 +102,10 @@ cache_key() {
 has_classes() { [ -n "$(find "$1" -name '*.class' -print -quit 2>/dev/null)" ]; }
 
 # Nur die juengsten CACHE_KEEP Eintraege bleiben liegen; ein Kompilat je Commit waechst sonst
-# ueber die Monate zu einem stillen Gigabyte im Home-Verzeichnis heran.
+# ueber die Monate zu einem stillen Gigabyte im Home-Verzeichnis heran. Punkt-Verzeichnisse
+# (Staging eines parallelen Laufs) zaehlen nicht mit und werden nicht angetastet.
 prune_cache() {
-  find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@\t%p\n' 2>/dev/null \
+  find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@\t%p\n' 2>/dev/null \
     | sort -rn \
     | awk -v keep="$CACHE_KEEP" -F'\t' 'NR > keep { print $2 }' \
     | while IFS= read -r stale; do
@@ -103,17 +113,30 @@ prune_cache() {
       done
 }
 
+# Ein Treffer wird benutzt, also frisch gestempelt: jdeps liest 10-20 s daraus, und der
+# Keep-3-Rang geht nach mtime — ohne das koennte ein paralleler Lauf den Eintrag genau
+# waehrend der Messung wegraeumen und wir wuerden einen halben Klassenbaum messen.
+touch_cache() { touch "$1" 2>/dev/null || true; }
+
 # Ablegen ist Kuer: jeder Fehlschlag (Rechte, volle Platte, unbrauchbarer Pfad) bleibt still,
 # das Faktenblatt ist davon unberuehrt.
 store_cache() {  # $1 = Schluessel, $2 = Quellverzeichnis
   [ -n "$1" ] || return 0
   has_classes "$2" || return 0
+  local entry="$CACHE_ROOT/$1"
+  # Ein gueltiger Eintrag wird nie ersetzt — ein Treffer ist ein Treffer, und ein paralleler
+  # Lauf koennte gerade daraus messen. Nur ein halb geschriebener Rest wird aufgeraeumt.
+  if has_classes "$entry"; then
+    touch_cache "$entry"
+    prune_cache
+    return 0
+  fi
   local staging="$CACHE_ROOT/.staging.$$"
   mkdir -p "$CACHE_ROOT" 2>/dev/null || return 0
   rm -rf "$staging"
   cp -r "$2" "$staging" 2>/dev/null || { rm -rf "$staging"; return 0; }
   rm -rf "${CACHE_ROOT:?}/$1"
-  mv "$staging" "$CACHE_ROOT/$1" 2>/dev/null || { rm -rf "$staging"; return 0; }
+  mv "$staging" "$entry" 2>/dev/null || { rm -rf "$staging"; return 0; }
   prune_cache
 }
 
@@ -122,8 +145,10 @@ if [ ! -d "$CLASSES" ]; then
   CACHE_KEY="$(cache_key)" || CACHE_KEY=""
   if [ -n "$CACHE_KEY" ] && [ -d "$CACHE_ROOT/$CACHE_KEY" ] && has_classes "$CACHE_ROOT/$CACHE_KEY"; then
     # Direkt aus dem Cache messen statt zurueckzukopieren: jdeps liest nur, und target/classes
-    # bleibt so das, was ein echter Build dort hinterlaesst.
+    # bleibt so das, was ein echter Build dort hinterlaesst. Vorher stempeln, damit der
+    # Eintrag waehrend der Messung nicht von einem parallelen Lauf weggeraeumt wird.
     CLASSES="$CACHE_ROOT/$CACHE_KEY"
+    touch_cache "$CLASSES"
     COMPILE_STATE="cached"
   elif [ "${ARCH_METRICS_COMPILE:-1}" != "1" ]; then
     COMPILE_STATE="skipped"
