@@ -24,9 +24,10 @@ scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build
 scripts/start-autotrigger-dev.sh stop
 ```
 
-`mvn spring-boot:run` is **deliberately blocked**: the backend aborts at startup from `target/classes`
-with a message (`RuntimeClasspathGuard`), see [Builds next to the running dev backend](#builds-next-to-the-running-dev-backend).
-Escape hatch for special cases: `-Dautomation.runtime.allow-classes-dir=true`.
+> Do **not** use `mvn spring-boot:run` — the command is **deliberately blocked**: the backend aborts
+> at startup from `target/classes` with a message (`RuntimeClasspathGuard`), see
+> [Builds next to the running dev backend](#builds-next-to-the-running-dev-backend).
+> Escape hatch for special cases: `-Dautomation.runtime.allow-classes-dir=true`.
 
 The backend automatically creates `data/automation.db` on first start and runs Flyway migrations.
 

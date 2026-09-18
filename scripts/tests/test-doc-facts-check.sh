@@ -385,6 +385,47 @@ check "nennt die fehlende Quelle"  'grep -qi "package.json" <<<"$OUT"'
 check "meldet kein OK"             '! grep -q "Doku-Zahlen OK" <<<"$OUT"'
 mv "$TMP/package.bak" "$FAKE/ai-automation-frontend/package.json"
 
+echo "14) Verbotene Muster, fehlende Dateien und Testzahl-Datierung gelten in ganz docs/ (TODO c9c9f3eb)"
+# Bewusst KEINE Onboarding-Datei: vor c9c9f3eb galten diese drei Regeln nur unter
+# docs/onboarding, hier wird die Ausweitung selbst geprueft.
+cat > "$FAKE/docs/regeln.md" <<'MD_EOF'
+# Regeln
+Starte das Backend mit `mvn spring-boot:run`.
+> **Nicht** `mvn spring-boot:run` verwenden: der RuntimeClasspathGuard bricht ab.
+Der Workflow laeuft mit `--model claude-opus-4-6`.
+Eine konkrete ID wie `claude-opus-5` ist erlaubt, sie veraltet nicht.
+Die Themes stehen in `tailwind.config.ts`.
+Unter `src/test/java` liegen 715 Testklassen.
+Es gibt 42 Testklassen im Repo (Stand
+2026-09-18, per grep gezaehlt).
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "mvn spring-boot:run auch ausserhalb des Onboardings gemeldet" \
+  'grep -qE "^DRIFT docs/regeln.md:2 verbotenes-muster" <<<"$OUT"'
+check "Warn-Blockquote bleibt auch hier erlaubt"      '! grep -q "regeln.md:3" <<<"$OUT"'
+check "datierte Modell-ID auch ausserhalb gemeldet" \
+  'grep -qE "^DRIFT docs/regeln.md:4 verbotenes-muster.*[Mm]odell" <<<"$OUT"'
+check "einsegmentige Modell-ID (claude-opus-5) bleibt frei" '! grep -q "regeln.md:5" <<<"$OUT"'
+check "fehlende Datei auch ausserhalb gemeldet" \
+  'grep -qE "^DRIFT docs/regeln.md:6 fehlende-datei.*tailwind.config.ts" <<<"$OUT"'
+check "undatierte Testzahl auch ausserhalb gemeldet" \
+  'grep -qE "^DRIFT docs/regeln.md:7 testzahl-ohne-datum" <<<"$OUT"'
+check "Datierung hinter dem Zeilenumbruch zaehlt"    '! grep -q "regeln.md:8" <<<"$OUT"'
+rm "$FAKE/docs/regeln.md"
+
+# Gegenprobe zur Umbruch-Toleranz: ein Datum in der Folgezeile darf eine
+# abgeschlossene Aussage NICHT stumm stellen (sonst deckt jede datierte
+# Nachbarzeile eine undatierte Testzahl).
+cat > "$FAKE/docs/regeln.md" <<'MD_EOF'
+# Regeln
+Unter `src/test/java` liegen 715 Testklassen.
+Stand 2026-09-18: die Messung lief auf main.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "abgeschlossener Satz wird von datierter Nachbarzeile nicht gedeckt" \
+  'grep -qE "^DRIFT docs/regeln.md:2 testzahl-ohne-datum" <<<"$OUT"'
+rm "$FAKE/docs/regeln.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
