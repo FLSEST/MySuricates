@@ -293,6 +293,7 @@ export function WorkflowDetailModals({
             configJson={newBlock.config}
             onConfigChange={(config) => setNewBlock({ ...newBlock, config })}
             idSuffix="-new-block"
+            workflowId={workflowId}
           />
           <BlockAiOverrideFields
             blockType={newBlock.type}
@@ -403,6 +404,7 @@ export function WorkflowDetailModals({
             configJson={editBlock.config}
             onConfigChange={(config) => setEditBlock({ ...editBlock, config })}
             idSuffix="-edit-block"
+            workflowId={workflowId}
           />
           <BlockAiOverrideFields
             blockType={editBlock.type}

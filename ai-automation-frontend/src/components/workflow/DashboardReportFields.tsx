@@ -5,6 +5,7 @@ import {
   configJsonWithReport, formFromConfig, hasPlaceholder,
   reportWarnings, REPORT_STATUSES, type ReportForm, type ReportKpiForm, type ReportTrend,
 } from './dashboardReport';
+import { DashboardReportAssist } from './DashboardReportAssist';
 import { WORKFLOW_RESULT_CAPS } from '../dashboard/workflowWidgetContract';
 import type { BlockType } from '../../types';
 
@@ -15,6 +16,8 @@ interface DashboardReportFieldsProps {
   onConfigChange: (configJson: string) => void;
   /** Keeps element ids unique when both the add and the edit modal are mounted. */
   idSuffix?: string;
+  /** Only a saved workflow can be the source of a proposal. */
+  workflowId?: string;
 }
 
 const CUSTOM_STATUS = '__custom__';
@@ -28,7 +31,7 @@ const CUSTOM_STATUS = '__custom__';
  * a placeholder cannot be judged before the run.
  */
 export function DashboardReportFields({
-  blockType, configJson, onConfigChange, idSuffix = '',
+  blockType, configJson, onConfigChange, idSuffix = '', workflowId,
 }: DashboardReportFieldsProps) {
   const t = useT().workflows.dashboardReport;
   if (blockType !== 'dashboard-report') return null;
@@ -57,6 +60,10 @@ export function DashboardReportFields({
         </p>
         <p className="text-xs text-text-tertiary mt-0.5">{t.hint}</p>
       </div>
+
+      {workflowId && form && (
+        <DashboardReportAssist workflowId={workflowId} onApply={(proposed) => write(proposed)} />
+      )}
 
       {!form ? (
         <p data-testid="dashboard-report-invalid-json" className="text-xs text-warning">{t.invalidJson}</p>
