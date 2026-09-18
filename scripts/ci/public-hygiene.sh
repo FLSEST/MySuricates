@@ -99,49 +99,6 @@ check_patterns_tracked() {
   done
 }
 
-# ---------------------------------------------------------------------------
-# Check 2b — verbotene Literale, aber nur in *.md (TODO 994af971)
-#
-# Eigene Funktion statt Wiederverwendung von check_patterns_tracked/_staged:
-# die Suche bleibt auf *.md beschraenkt, damit Test-Fixtures fuer dieses Gate
-# (z. B. in scripts/tests/test-public-hygiene.sh, keine .md-Datei) den
-# Stempel als Beispieltext verwenden duerfen, ohne selbst anzuschlagen.
-# ---------------------------------------------------------------------------
-check_md_patterns_tracked() {
-  local entry pat desc file line
-  for entry in "${HYGIENE_MD_PATTERNS[@]}"; do
-    pat="$(hygiene_pattern_of "$entry")"
-    desc="$(hygiene_desc_of "$entry")"
-    while IFS=: read -r file line _; do
-      [ -z "$file" ] && continue
-      annotate "$file" "$line" "${desc}: '${pat}'"
-    done < <(git grep -nI -F -- "$pat" -- '*.md' 2>/dev/null || true)
-  done
-}
-
-check_md_patterns_staged() {
-  local current_file="" line content entry pat desc
-  while IFS= read -r line; do
-    case "$line" in
-      "+++ b/"*) current_file="${line#+++ b/}"; continue ;;
-      "+++"*)    continue ;;
-    esac
-    case "$current_file" in *.md) ;; *) continue ;; esac
-    case "$line" in
-      +*)
-        content="${line:1}"
-        for entry in "${HYGIENE_MD_PATTERNS[@]}"; do
-          pat="$(hygiene_pattern_of "$entry")"
-          desc="$(hygiene_desc_of "$entry")"
-          case "$content" in
-            *"$pat"*) annotate "$current_file" 1 "neue Zeile enthaelt '${pat}' (${desc})" ;;
-          esac
-        done
-        ;;
-    esac
-  done < <(git diff --cached --no-color -U0 --diff-filter=AM 2>/dev/null || true)
-}
-
 check_patterns_staged() {
   local current_file="" line content entry pat desc
   while IFS= read -r line; do
@@ -380,12 +337,10 @@ echo "Public-Hygiene-Gate (${MODE})"
 if [ "$MODE" = "staged" ]; then
   check_staged_files
   check_patterns_staged
-  check_md_patterns_staged
   report_symlinks
 else
   check_tracked_but_ignored
   check_patterns_tracked
-  check_md_patterns_tracked
   check_pool
   while IFS=$'\t' read -r kind path size desc; do
     [ -z "${kind:-}" ] && continue

@@ -23,6 +23,7 @@ HYGIENE_PATTERNS=(
   "test-e2e-key|hardcoded test API key string"
   "ebf4f50c-20c2-4c35-a84a-a0b350124523|internal project UUID"
   "changeme|known default credential"
+  "[auto-generated]|nie ersetzter Stempel-Platzhalter, ersatzlos streichen (siehe TODO 994af971)"
 )
 
 # ---------------------------------------------------------------------------
@@ -33,20 +34,7 @@ HYGIENE_SELF_EXCLUDE=(
   "scripts/ci/public-hygiene.sh"
   "scripts/ci/pool-neutrality.sh"
   "scripts/git-hooks/pre-commit"
-)
-
-# ---------------------------------------------------------------------------
-# Verbotene Literale in getrackten Markdown-Dateien (TODO 994af971)
-#
-# Eigene Liste statt HYGIENE_PATTERNS: die generische Literal-Pruefung deckt
-# den gesamten getrackten Bestand ab, und Test-Fixtures (wie in
-# scripts/tests/test-public-hygiene.sh) duerfen den Stempel als Beispieltext
-# verwenden, ohne das Gate ueber sich selbst auszuloesen. Die Suche hier bleibt
-# auf *.md beschraenkt (git grep -- '*.md'), deshalb reicht das ohne
-# Self-Exclude. Format wie HYGIENE_PATTERNS: "muster|beschreibung".
-# ---------------------------------------------------------------------------
-HYGIENE_MD_PATTERNS=(
-  "[auto-generated]|nie ersetzter Stempel-Platzhalter, ersatzlos streichen (siehe TODO 994af971)"
+  "scripts/tests/test-public-hygiene.sh"
 )
 
 # ---------------------------------------------------------------------------
