@@ -25,7 +25,7 @@ Es heisst nicht, dass die Frage beantwortet ist.
 | Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → Gate-Bewertung → automatisch erzeugtes TODO → `TodoTrigger` startet einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft. |
 | Was muss ein Agent ueber ein Projekt wissen, und woher kommt dieses Wissen, wenn niemand es aufschreibt? | **Workflow-Memory**: aus abgeschlossenen Runs wird Wissen extrahiert und vor dem naechsten Lauf als Kontext eingespielt. |
 | Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
-| Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO, YELLOW faerbt den Run. Die Bewertung steckt im Workflow, nicht in der Plattform. |
+| Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO mit hoher, YELLOW eines mit mittlerer Prioritaet. Die Bewertung steckt im Workflow, nicht in der Plattform. |
 
 Die ehrlichste Antwort nach sieben Monaten: die Mechanismen tragen, aber sie brauchen Leitplanken,
 und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmodell fragt, ob etwas
@@ -34,28 +34,30 @@ die wiederkehrende Lehre.
 
 ## Was da steht
 
-Stand 2026-09-12. Commit-Zaehler und Zeilen aus dem Arbeitsbaum, Testzahlen aus einem Lauf
-an diesem Tag in einem isolierten Worktree:
+Stand 2026-09-18, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
+`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-12 in einem
+isolierten Worktree:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, 1 014 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 52 000 Zeilen, 38 REST-Controller, 68 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 48 000 Zeilen |
-| Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 |
+| Entstanden seit | 2026-02-15, rund 1 240 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.4, rund 62 000 Zeilen, 42 REST-Controller, 73 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 56 000 Zeilen |
+| Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 — Lauf vom 2026-09-12 |
 | Bausteine | 19 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
-sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein externer
-CI-Lauf steht noch aus, weil das Repository bisher nicht gepusht wurde.
+sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein CI-Lauf
+auf einem externen Git-Host steht noch aus.
 
 ## Reifegrad und bekannte Schulden
 
-Experimentell. Das System laeuft taeglich auf einem Rechner und hat dabei rund 2 400 Runs
-hinter sich — es ist nie unter Last, nie mit mehreren Benutzern und nie ausserhalb eines
+Experimentell. Das System laeuft taeglich auf einem Rechner und hatte am 2026-09-12 rund 2 400
+Runs hinter sich — es ist nie unter Last, nie mit mehreren Benutzern und nie ausserhalb eines
 vertrauenswuerdigen Netzes betrieben worden.
 
-Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center fuehrt aktuell **89 Befunde**:
+Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center fuehrte am 2026-09-12
+**89 Befunde**:
 26 offen (davon 1 kritisch, 4 hoch), 25 warten auf Verifikation, 38 sind erledigt. Inhaltlich fast
 durchgehend Struktur: zu grosse und zu stark gekoppelte Services und UI-Komponenten, unscharfe
 Controller-Repository-Grenzen, Speicher- und Retention-Themen. Wie diese Befunde entstehen und was
@@ -137,7 +139,7 @@ erwartet einen selbst gesetzten API-Schluessel.
 |---|---|
 | [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
 | [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
-| [API-Referenz](docs/api-referenz.md) | Alle REST-Endpunkte mit Request/Response |
+| [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
 | [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
 | [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
 | [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
@@ -167,4 +169,4 @@ Abgrenzung:
 
 ---
 
-> 🌍 Die englische `README.md` wird vom Workflow **„README DE↔EN Sync"** aus dieser Datei generiert. Bei inhaltlichen Änderungen diese deutsche Quelle bearbeiten und den Workflow laufen lassen.
+> 🌍 Die englische `README.md` wird vom Workflow **„README DE↔EN Sync"** aus dieser Datei generiert. Bei inhaltlichen Änderungen diese deutsche Quelle bearbeiten und den Workflow laufen lassen. Der Workflow selbst gehört zur lokalen MySuricates-Instanz und ist nicht Teil dieses Repositories.
