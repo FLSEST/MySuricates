@@ -375,6 +375,34 @@ check "generischer Name node_modules bleibt unbeanstandet" '! grep -q "node_modu
 check "workflow-pool-Eintrag weiterhin als Leck erkannt"    'grep -q "privat.json" <<<"$OUT"'
 check "Gate meldet weiterhin einen Verstoss (exit 1)"       '[ "$RC" -eq 1 ]'
 
+echo "22) Abbruch der Pool-Neutralitaet schlaegt das Gate (kein stilles OK)"
+make_repo "$TMP/pool-crash"
+( cd "$TMP/pool-crash" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md \
+    && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/pool-crash" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Ausgangslage ohne Pool-Definitionen ist sauber (exit 0)" '[ "$RC" -eq 0 ]'
+
+# Das echte Unterskript, aber ohne ../lib daneben: es bricht mit exit 2 ab ("Regeldatei fehlt")
+# und gibt keine einzige Befundzeile aus. Genau dieser Fall fiel frueher lautlos weg.
+mkdir -p "$TMP/pool-orphan"
+cp "$REPO/scripts/ci/pool-neutrality.sh" "$TMP/pool-orphan/"
+printf '#!/usr/bin/env bash\nexec bash "%s/pool-neutrality.sh" "$@"\n' "$TMP/pool-orphan" \
+  > "$TMP/pool-crash/scripts/ci/pool-neutrality.sh"
+OUT=$(cd "$TMP/pool-crash" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Abbruch schlaegt das Gate (exit 1)"          '[ "$RC" -eq 1 ]'
+check "Gate meldet kein OK"                         '! grep -q "Public-Hygiene-Gate OK" <<<"$OUT"'
+check "Meldung nennt die Roh-Ausgabe"               'grep -q "Regeldatei fehlt" <<<"$OUT"'
+check "Meldung nennt den Exit-Code"                 'grep -q "exit 2" <<<"$OUT"'
+
+echo "23) Verwertbare Befundzeilen werden weiterhin je Definition annotiert"
+printf '#!/usr/bin/env bash\nprintf "workflow-pool/x.json\\tPATH-ABS\\tabsoluter Pfad im Prompt\\n"\nexit 1\n' \
+  > "$TMP/pool-crash/scripts/ci/pool-neutrality.sh"
+OUT=$(cd "$TMP/pool-crash" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Befund schlaegt das Gate (exit 1)"           '[ "$RC" -eq 1 ]'
+check "Gate nennt die Definition"                   'grep -q "workflow-pool/x.json" <<<"$OUT"'
+check "Gate nennt Tag und Beschreibung"             'grep -q "PATH-ABS.*absoluter Pfad im Prompt" <<<"$OUT"'
+check "kein zusaetzlicher Abbruch-Fehler"           '! grep -q "Pool-Neutralitaet abgebrochen" <<<"$OUT"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

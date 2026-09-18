@@ -143,14 +143,23 @@ check_staged_files() {
 # Check 3 — Pool-Neutralität (eigenes Skript, auch vom Built-in-Template genutzt)
 # ---------------------------------------------------------------------------
 check_pool() {
-  local out
-  if out="$(bash "$REPO_ROOT/scripts/ci/pool-neutrality.sh" 2>&1)"; then
-    return 0
-  fi
+  local out rc reported=0
+  out="$(bash "$REPO_ROOT/scripts/ci/pool-neutrality.sh" 2>&1)"
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
   while IFS=$'\t' read -r file tag desc; do
     [ -z "${file:-}" ] && continue
-    case "$file" in *.json) annotate "$file" 1 "[$tag] $desc" ;; esac
+    case "$file" in
+      *.json) annotate "$file" 1 "[$tag] $desc"; reported=1 ;;
+    esac
   done < <(printf '%s\n' "$out")
+  # Ein Abbruch des Unterskripts (exit 2 "Regeldatei fehlt", Python-Traceback, fehlendes
+  # python3) liefert keine TAB-Zeilen mit .json — frueher fiel er hier lautlos weg und das
+  # Gate meldete "OK". Ein Lauf ohne verwertbare Befundzeilen ist deshalb selbst ein Fehler.
+  if [ "$reported" -eq 0 ]; then
+    annotate "scripts/ci/pool-neutrality.sh" 1 \
+      "Pool-Neutralitaet abgebrochen (exit ${rc}) ohne verwertbare Befundzeilen: $(printf '%s' "$out" | tr '\n' ' ')"
+  fi
 }
 
 # ---------------------------------------------------------------------------

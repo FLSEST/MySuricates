@@ -35,15 +35,15 @@ die wiederkehrende Lehre.
 ## Was da steht
 
 Stand 2026-09-18, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
-`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-12 in einem
+`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-18 in einem
 isolierten Worktree:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, rund 1 320 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 62 000 Zeilen, 43 REST-Controller, 73 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 56 000 Zeilen |
-| Tests | Backend 7 633 (0 Fehler, 1 uebersprungen), Frontend 496 — Lauf vom 2026-09-12 |
+| Entstanden seit | 2026-02-15, rund 1 420 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.4, rund 64 000 Zeilen, 43 REST-Controller, 73 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 61 000 Zeilen |
+| Tests | Backend 8 767 (0 Fehler, 1 uebersprungen), Frontend 1 013 — Lauf vom 2026-09-18 |
 | Bausteine | 19 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:

@@ -146,7 +146,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 - **Bewusst trusted:** Antworten aus `approval`- und `human-input`-Blöcken kommen über die API-Key-geschützte REST-Schnittstelle von der Person, der die Instanz gehört — sie werden nicht escaped. Ebenso überschreibt `setVariable` (etwa eine Workflow-Variable, die einen Webhook-Wert gleichen Namens überdeckt) die Untrusted-Markierung absichtlich: Der Wert kommt dann aus der Definition, nicht vom Aufrufer. `replaceValue` (Workspace-Pfad-Remapping) tauscht dagegen nur den Wert und lässt die Klasse stehen.
 - **Bekannte Grenzen:**
   1. In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab.
-  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
+  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form sechsmal vor (sechs Pool-Workflows, kein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
   3. Das Nutzungs-Flag der Plattform-Daten selbst wird nicht exportiert; es braucht das nicht, weil die erste Ausgabe nach der Substitution den Taint in `__untrusted_outputs` schreibt.
   4. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
 
@@ -913,7 +913,12 @@ globale Sperre nimmt dem Sturm die Spitze, ohne die beiden Auswege zu verschlie�
 ohne Reload: Ein Timer auf der letzten Frist (`scheduleExpiry`) meldet das Ablaufen, und
 `installRateLimitRecovery` invalidiert beim Übergang aktiv → inaktiv **einmal alle Queries im
 Fehlerzustand** — `retry` ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft
-montierte Queries (Sidebar, Layout, Dashboard) blieben sonst bis zum Reload rot.
+montierte Queries blieben sonst bis zum Reload rot. Erfasst wird dabei genau das, was wirklich auf
+`error` steht. Queries mit `initialData` (`useSystemModules`, `useBlockTypes`) stehen auch nach
+einem 429 weiter auf `success` und werden von der Erholung deshalb nie angefasst — gewollt: der
+zuletzt bekannte Modul- bzw. Blocktyp-Stand soll stehen bleiben, statt Navigation und Widgets
+flackern zu lassen (b13509f3). Ihren Serverstand holen sie beim nächsten Mount nach, weil
+`initialDataUpdatedAt: 0` den geseedeten Stand sofort stale macht.
 
 **Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
 (oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake
@@ -1011,9 +1016,13 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V64 | Writes-Flag auf Capabilities |
 | V65 | Catch-Up-On-Resume auf Schedules |
 | V66 | Todo-Export-Link |
-| V67 | Aufwandsschätzung auf Workflows |
+| V67 | Reasoning-Effort auf Workflows |
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 | V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
+| V70 | Run-Provenienz: Definitions-Hash auf Versionen und Runs, Versions-Bezug und `trigger_source` |
+| V71 | Workflow-Versiegelung: `sealed`, `sealed_hash`, `sealed_at` auf Workflows |
+| V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
+| V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
 
 ## Architektur-Gates
 
