@@ -355,10 +355,21 @@ through the API-key-protected interface from the person who owns the instance. A
 sets a variable itself (`setVariable`), it counts as trusted again — the value then comes from the
 definition, not from the caller.
 
-Limits worth knowing: **nothing is escaped in AI prompts.** A prompt is not a command line; the model
-does not defend against prompt injection. And a shell block that writes a tainted value into a file
-itself and later executes that file is outside what quoting can see. Technical version with class
-names and reserved context keys: [Workflow Hardening](architektur.md#workflow-hardening-optional).
+Limits worth knowing:
+
+- **Nothing is escaped in AI prompts.** A prompt is not a command line; the model does not defend
+  against prompt injection.
+- **Going through an AI block washes the taint off.** Platform data inside a `simple` or `agentic`
+  prompt does not taint the run; the AI's answer counts as untainted; a following shell block then
+  substitutes `{{ previous_output }}` **raw**. This shape occurs eight times in the bundled
+  definitions (seven pool workflows, one built-in template) and only stays harmless there because
+  every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **In your own workflows, set `"shell_escape_variables": true` in
+  every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+- **Quoting cannot see files you write yourself.** A shell block that writes a tainted value into a
+  file and later executes it is outside what quoting can reach.
+
+Technical version with class names and reserved context keys:
+[Workflow Hardening](architektur.md#workflow-hardening-optional).
 
 ### Where it listens
 

@@ -130,10 +130,14 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 | **untrusted extern** | Webhook-Payload, wiederhergestellte `__untrusted_keys` (Resume, Sub-Workflow), aus getainteten Ausgaben abgeleitete Variablen (`step_N_output`, foreach-Items, `document`-Extrakte) | immer single-quoted | roh | ja, ab dem Setzen |
 | **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | erst wenn der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde |
 
-- **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Der Taint ist klebrig — auch wenn die auslösende Variable später überschrieben wird —, weil ein Block Fremdbytes auch ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Persistiert wird er in den reservierten Kontextschlüsseln `__untrusted_keys` und `__untrusted_outputs`, damit er Resume und Sub-Workflow-Übergabe überlebt. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
+- **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den reservierten Kontextschlüsseln `__untrusted_keys` und `__untrusted_outputs`, damit er Resume und Sub-Workflow-Übergabe überlebt. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
 - **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` nur im KI-Prompt verwendet (`resolveTemplate`) oder gar nicht, bleibt untainted.
 - **Bewusst trusted:** Antworten aus `approval`- und `human-input`-Blöcken kommen über die API-Key-geschützte REST-Schnittstelle von der Person, der die Instanz gehört — sie werden nicht escaped. Ebenso überschreibt `setVariable` (etwa eine Workflow-Variable, die einen Webhook-Wert gleichen Namens überdeckt) die Untrusted-Markierung absichtlich: Der Wert kommt dann aus der Definition, nicht vom Aufrufer. `replaceValue` (Workspace-Pfad-Remapping) tauscht dagegen nur den Wert und lässt die Klasse stehen.
-- **Bekannte Grenzen:** In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab. Das Nutzungs-Flag der Plattform-Daten selbst wird nicht exportiert; es braucht das nicht, weil die erste Ausgabe nach der Substitution den Taint in `__untrusted_outputs` schreibt. Und ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
+- **Bekannte Grenzen:**
+  1. In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab.
+  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
+  3. Das Nutzungs-Flag der Plattform-Daten selbst wird nicht exportiert; es braucht das nicht, weil die erste Ausgabe nach der Substitution den Taint in `__untrusted_outputs` schreibt.
+  4. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
 
 **Webhook-Signaturen** — `POST /api/v1/webhooks/{id}/secret` erzeugt ein Secret (32 Zufallsbytes, hex), zeigt es genau einmal und speichert es AES-GCM-verschlüsselt (`IntegrationEncryptionService`, Schlüssel außerhalb der Datenbank) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` entfernt es. Hat ein Webhook ein Secret, prüft `WebhookSignatureVerifier` vor dem JSON-Parsen den Header `X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`, das Format von GitHub und Gitea) als HMAC-SHA256 über die rohen Request-Bytes, Vergleich in konstanter Zeit — sonst **401 `WEBHOOK_SIGNATURE_INVALID`**. Wie beim Siegel bleibt ein gespeichertes Secret wirksam, wenn der Schalter später aus ist. Responses verraten nur `signatureRequired`.
 
@@ -879,15 +883,25 @@ Response (DTO) → React Query Cache → UI-Update
 **Server-Eimer global, Client-Sperre pro Pfad — die Asymmetrie ist Absicht.** Der Server zählt in
 *einem* Eimer pro Client-IP über alle Endpunkte hinweg; ein 429 bedeutet also „du insgesamt bist zu
 schnell". Der Client (`api/client.ts`) merkt sich die Sperre dagegen **pro Endpunkt-Muster** (der
-Pfad ohne Query und mit ersetzten IDs, damit `/executions/{id}` nicht pro Run einen eigenen
-Schlüssel bekommt) und legt zusätzlich eine **kurze globale Sperre (2 s)** über alle Pfade.
+Pfad ohne Query und mit durch `{id}` ersetzten UUIDs, damit `/executions/{id}` nicht pro Run einen
+eigenen Schlüssel bekommt).
 
-Daraus folgt: Nach einem 429-Sturm lässt der Client nach den 2 s wieder einzelne Muster los, und
-jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Das ist bewusst so
-gewählt — eine dauerhafte globale Sperre würde genau die Aufrufe mitsperren, die aus dem Zustand
-herausführen: `POST /ws-ticket` (jeder Reconnect braucht eins) und `GET /system/auth-status` (die
-Guards zeigen sonst dauerhaft „nicht authentifiziert"). Die kurze globale Sperre nimmt dem Sturm die
-Spitze, ohne diese Pfade zu verschließen.
+Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s (`GLOBAL_BACKOFF_SECONDS`),
+gedeckelt durch `Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale
+Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
+blockierte Ticket-Anfrage kostet den WebSocket einen Reconnect-Versuch und verdoppelt seinen
+exponentiellen Abstand, aus 2 s wird also ein viel längerer Ausfall) und `GET /system/auth-status`
+(der `ApiKeyGuard` rendert nichts, bevor der antwortet — die App bliebe leer statt den
+Rate-Limit-Hinweis zu zeigen). Ihre eigene Pfad-Sperre gilt für sie weiterhin; ausgenommen sind sie
+nur von *fremden* 429ern.
+
+Daraus folgt: Nach einem 429-Sturm lässt der Client nach spätestens 2 s wieder einzelne Muster los,
+und jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Die kurze
+globale Sperre nimmt dem Sturm die Spitze, ohne die beiden Auswege zu verschließen. Erholung läuft
+ohne Reload: Ein Timer auf der letzten Frist (`scheduleExpiry`) meldet das Ablaufen, und
+`installRateLimitRecovery` invalidiert beim Übergang aktiv → inaktiv **einmal alle Queries im
+Fehlerzustand** — `retry` ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft
+montierte Queries (Sidebar, Layout, Dashboard) blieben sonst bis zum Reload rot.
 
 **Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
 (oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake

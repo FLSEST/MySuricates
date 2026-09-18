@@ -357,10 +357,21 @@ ueber die API-Key-geschuetzte Schnittstelle von der Person, der die Instanz geho
 Workflow eine Variable selbst (`setVariable`), gilt sie wieder als vertrauenswuerdig — der Wert
 stammt dann aus der Definition, nicht vom Aufrufer.
 
-Grenzen, die man kennen sollte: **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine
-Kommandozeile; gegen Prompt-Injection hilft das Modell nicht. Und ein Shell-Block, der einen
-gefaerbten Wert selbst in eine Datei schreibt und diese spaeter ausfuehrt, liegt ausserhalb dessen,
-was das Quoting sehen kann. Technische Fassung mit Klassennamen und reservierten Kontextschluesseln:
+Grenzen, die man kennen sollte:
+
+- **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
+  hilft das Modell nicht.
+- **Der Weg ueber einen KI-Block waescht die Faerbung ab.** Stehen Plattform-Daten in einem
+  `simple`- oder `agentic`-Prompt, faerbt das den Run nicht; die KI-Antwort gilt als ungefaerbt; ein
+  folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. In den mitgelieferten
+  Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und ist nur
+  deshalb unauffaellig, weil dort alle Folge-Shell-Bloecke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
+  jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
+  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschuetzt.
+- **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefaerbten Wert
+  in eine Datei schreibt und diese spaeter ausfuehrt, liegt ausserhalb dessen, was sich quoten laesst.
+
+Technische Fassung mit Klassennamen und reservierten Kontextschluesseln:
 [Workflow-Haertung](architektur.md#workflow-härtung-optional).
 
 ### Wo gelauscht wird
