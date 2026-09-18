@@ -4,7 +4,7 @@ export function isCompressionBlock(type: string): boolean {
   return type === 'compress' || type === 'compress-ai';
 }
 
-export type CompressPresetId = 'java-log' | 'npm-build' | 'feed-json' | 'ai-report';
+export type CompressPresetId = 'java-log' | 'maven-summary' | 'npm-build' | 'feed-json' | 'ai-report';
 
 /** Ready-made stage chains for the compress block (spec § 7.1). Regexes are Java syntax. */
 export const COMPRESS_PRESETS: Record<CompressPresetId, Array<Record<string, unknown>>> = {
@@ -17,6 +17,19 @@ export const COMPRESS_PRESETS: Record<CompressPresetId, Array<Record<string, unk
     { op: 'lines.replace', pattern: '^(?:\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+Z?|\\d{2}:\\d{2}:\\d{2}[.,]\\d+)\\s*', replacement: '' },
     { op: 'lines.dedupe', count: true },
     { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' },
+  ],
+  // java-log removes noise and keeps the rest; this one keeps the verdict and nothing else —
+  // what a health report needs from a Maven run (TODO 643d0ebd, pilot self-care-platform-health).
+  'maven-summary': [
+    { op: 'text.normalize' },
+    {
+      op: 'lines.filter',
+      // exclude wins over include: the [ERROR]-prefixed stack frames are noise, not a finding
+      exclude: ['^\\[ERROR\\]\\s+at ', '^\\[ERROR\\]\\s+\\.\\.\\. \\d+ more'],
+      // surefire per-class and total lines, failure details, the results header and the build verdict
+      include: ['Tests run:', 'FAIL', '^\\[ERROR\\]', '^\\[INFO\\] Results:', 'BUILD (?:SUCCESS|FAILURE)'],
+    },
+    { op: 'text.truncate', max_chars: 8000, keep: 'head_tail' },
   ],
   'npm-build': [
     { op: 'text.normalize' },

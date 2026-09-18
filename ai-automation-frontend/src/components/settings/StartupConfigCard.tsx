@@ -1,4 +1,4 @@
-import { ShieldAlert } from 'lucide-react';
+import { Info, ShieldAlert } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { ConfigSnippet } from './ConfigSnippet';
 import { useSystemModules } from '../../hooks/useModules';
@@ -52,8 +52,13 @@ export function StartupConfigCard() {
           </p>
         )}
 
-        <div className="max-w-md">
+        <div className="max-w-md space-y-1.5">
           <ConfigSnippet label={t.startupConfig.setupCommand} text={SETUP_COMMAND} />
+          {/* module_preset_write refuses to overwrite an existing config — say so, or the command reads as a no-op */}
+          <p className="flex items-start gap-2 text-xs text-text-tertiary" data-testid="startup-config-setup-hint">
+            <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            {t.startupConfig.setupCommandHint}
+          </p>
         </div>
       </div>
     </Card>
@@ -68,20 +73,25 @@ function ModuleStateList({ title, modules }: { title: string; modules: ModuleInf
     <div>
       <h4 className="text-sm font-semibold text-text mb-2">{title}</h4>
       <ul className="space-y-1.5">
-        {modules.map((m) => (
-          <li
-            key={m.name}
-            data-testid={`startup-config-module-${m.name}`}
-            className="flex items-center gap-2 text-sm"
-          >
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${m.enabled ? 'bg-success' : 'bg-text-tertiary'}`}
-              aria-hidden="true"
-            />
-            <span className="text-text">{moduleName(m.name)}</span>
-            <span className="text-xs text-text-tertiary">{m.enabled ? t.modules.enabled : t.modules.disabled}</span>
-          </li>
-        ))}
+        {modules.map((m) => {
+          // This card shows what the instance STARTED with: `configured` ignores a settings-UI
+          // switch (ModulesCard shows the runtime state). Older backends send no `configured`.
+          const configured = m.configured ?? m.enabled;
+          return (
+            <li
+              key={m.name}
+              data-testid={`startup-config-module-${m.name}`}
+              className="flex items-center gap-2 text-sm"
+            >
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${configured ? 'bg-success' : 'bg-text-tertiary'}`}
+                aria-hidden="true"
+              />
+              <span className="text-text">{moduleName(m.name)}</span>
+              <span className="text-xs text-text-tertiary">{configured ? t.modules.enabled : t.modules.disabled}</span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -5,7 +5,7 @@ import type { BadgeVariant } from '../ui/Badge';
 import { ConfigSnippet } from './ConfigSnippet';
 import { useResetModule, useSetModuleEnabled, useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
-import { useModuleName } from '../../i18n/modules';
+import { useModuleName, useModuleText } from '../../i18n/modules';
 import { envSnippet, yamlSnippet } from '../../utils/moduleSnippets';
 import type { ModuleInfo, ModuleMaturity } from '../../types';
 
@@ -91,6 +91,7 @@ function ModuleGroup({ title, modules, editable, note }: {
 function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: boolean }) {
   const t = useT();
   const moduleName = useModuleName();
+  const moduleTextOf = useModuleText();
   const [open, setOpen] = useState(false);
   const setEnabled = useSetModuleEnabled();
   const reset = useResetModule();
@@ -132,7 +133,8 @@ function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: bool
       </div>
       {open && (
         <div className="space-y-3 px-9 pb-3">
-          <p className="text-xs text-text-secondary">{m.description}</p>
+          {/* Localized text; the backend's English description covers a module this build does not know yet */}
+          <p className="text-xs text-text-secondary">{moduleTextOf(m.name).description || m.description}</p>
           {m.requires.length > 0 && (
             <p className="text-xs text-text-secondary">
               {t.modules.requires}: {m.requires.map((r) => moduleName(r)).join(', ')}

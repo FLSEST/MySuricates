@@ -5,7 +5,7 @@ import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import type { BlockDraft } from './blockEdit';
 import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
 import { useT } from '../../i18n';
-import { BLOCK_TYPES } from '../../types';
+import { useBlockTypes } from '../../hooks/useBlockTypes';
 import type {
   BlockType, Workflow, OptimizeResult, Project,
 } from '../../types';
@@ -163,6 +163,13 @@ export function WorkflowDetailModals({
   onApplyOptimize,
 }: WorkflowDetailModalsProps) {
   const t = useT();
+  // What THIS backend can execute (BlockTypeRegistry); the static list is only the fallback
+  const blockTypes = useBlockTypes();
+  // A type only the server knows has no icon and no label in this build — offer its raw name
+  const blockTypeOptions = blockTypes.map((type) => ({
+    value: type,
+    label: t.workflows.blockTypes[type as BlockType] ?? type,
+  }));
 
   return (
     <>
@@ -242,12 +249,10 @@ export function WorkflowDetailModals({
                 compress: { source: '', stages: [{ op: 'text.normalize' }, { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' }], max_chars: 20000 },
                 'compress-ai': { source: '', instruction: '', max_chars: 4000, provider: 'CLAUDE' },
               };
-              setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type], null, 2) });
+              // A type only the server knows has no default config here — start from an empty one
+              setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type] ?? {}, null, 2) });
             }}
-            options={BLOCK_TYPES.map((type) => ({
-              value: type,
-              label: t.workflows.blockTypes[type],
-            }))}
+            options={blockTypeOptions}
           />
           <Input
             label={t.workflows.blockName}
@@ -351,10 +356,7 @@ export function WorkflowDetailModals({
               const type = e.target.value as BlockType;
               setEditBlock({ ...editBlock, type });
             }}
-            options={BLOCK_TYPES.map((type) => ({
-              value: type,
-              label: t.workflows.blockTypes[type],
-            }))}
+            options={blockTypeOptions}
           />
           <Input
             label={t.workflows.blockName}
