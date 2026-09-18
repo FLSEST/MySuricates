@@ -196,4 +196,23 @@ class RunCompletionHandlerTest {
         assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(1);
         assertThat((List<?>) ctx.getRunMetadata().get("todo_items")).hasSize(1);
     }
+
+    /** A sub-workflow step hands the child's last output up; its markers belong to the child run only (6e5d6e2c). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void complete_derivedSubWorkflowOutput_keepsOnlyTheOwnStepsMarkers() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "gate_status: RED\ngate_category: tests\ntodo_item: Parent finding | HIGH | bug | own desc",
+                "gate_status: RED\ngate_category: child\ntodo_item: Child finding | HIGH | bug | child desc");
+        run.getSteps().get(1).setMetadata(Map.of("derivedOutput", true, "subRunId", "child-run-1"));
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
+        assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(1);
+        assertThat((Map<String, Integer>) summary.get("counts_by_status")).containsExactly(Map.entry("RED", 1));
+        assertThat((List<Map<String, Object>>) ctx.getRunMetadata().get("todo_items"))
+                .extracting(item -> item.get("title"))
+                .containsExactly("Parent finding");
+    }
 }

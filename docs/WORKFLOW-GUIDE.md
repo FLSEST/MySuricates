@@ -473,6 +473,8 @@ Fuehrt einen anderen Workflow als verschachtelten Schritt aus.
 
 **Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkulaere Referenzen werden erkannt. 30-Minuten-Timeout.
 
+**Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run uebernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
+
 **Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
 
 ---

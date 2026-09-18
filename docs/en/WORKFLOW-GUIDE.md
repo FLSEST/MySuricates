@@ -467,6 +467,8 @@ Executes another workflow as a nested step.
 
 **Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
 
+**Markers**: The step merely passes the child run's last output through (step metadata `derivedOutput: true`). Any `gate_status:` and `todo_item:` markers inside it are evaluated in the child run only — the parent run deliberately leaves them out of its gate summary and TODO list.
+
 **When to use**: Composing complex workflows from smaller, reusable ones.
 
 ---
