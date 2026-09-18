@@ -248,6 +248,7 @@ export function WorkflowDetailModals({
                 'todo-close': { id: '{{ todo_id }}' },
                 compress: { source: '', stages: [{ op: 'text.normalize' }, { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' }], max_chars: 20000 },
                 'compress-ai': { source: '', instruction: '', max_chars: 4000, provider: 'CLAUDE' },
+                'dashboard-report': { status: 'GREEN', title: '', summary: '', kpis: [], items: [] },
               };
               // A type only the server knows has no default config here — start from an empty one
               setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type] ?? {}, null, 2) });

@@ -490,6 +490,7 @@ export const en = {
       'todo-close': 'Close TODO',
       compress: 'Compression (rules)',
       'compress-ai': 'Compression (AI)',
+      'dashboard-report': 'Dashboard report',
     },
     compression: {
       preset: 'Preset',

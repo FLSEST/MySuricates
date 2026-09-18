@@ -28,6 +28,7 @@ const blockTypeVariant: Record<BlockType, BadgeVariant> = {
   'todo-close': 'default',
   compress: 'accent',
   'compress-ai': 'success',
+  'dashboard-report': 'default',
 };
 
 interface SortableBlockProps {

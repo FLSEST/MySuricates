@@ -492,6 +492,7 @@ export const de: TranslationKeys = {
       'todo-close': 'TODO schließen',
       compress: 'Komprimierung (Regeln)',
       'compress-ai': 'Komprimierung (KI)',
+      'dashboard-report': 'Dashboard-Bericht',
     },
     compression: {
       preset: 'Vorlage',

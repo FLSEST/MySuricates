@@ -245,7 +245,7 @@ export const BLOCK_TYPES = [
   'simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch',
   'skill-capability', 'approval', 'agentic', 'sub-workflow', 'human-input',
   'integration', 'document', 'todo-create', 'todo-update', 'todo-close',
-  'compress', 'compress-ai',
+  'compress', 'compress-ai', 'dashboard-report',
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
