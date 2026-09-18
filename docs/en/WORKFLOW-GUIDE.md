@@ -182,11 +182,14 @@ Executes a shell command on the host or inside a Docker container.
 >    **from that point on** every block output of the run (`{{ previous_output }}`,
 >    `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) is single-quoted too —
 >    exactly as in a webhook-triggered run.
-> 2. **An AI prompt colours the output of that one block.** If platform data was in the prompt of an
->    AI block (`simple`, `agentic`, `skill-capability` plus the non-shell branches of
+> 2. **An AI prompt colours that block's output — and from it, the run.** If platform data was in the
+>    prompt of an AI block (`simple`, `agentic`, `skill-capability` plus the non-shell branches of
 >    `foreach`/`while`/`conditional`/`retry`/`switch`), its output counts as untrusted: a following
->    shell block receives it single-quoted. The run as a whole stays clean unless something else
->    colours it.
+>    shell block receives it single-quoted. Once that output is recorded the run is coloured, sticky
+>    just as in case 1 — every **further** block output and the variables derived from it
+>    (`{{ step_N_output }}`, `foreach` items, `document` extracts) are quoted from then on too, and
+>    the taint is passed to sub-workflows and to a resume via `exportTaint()`. The prompt alone
+>    colours nothing: if no output is recorded, the run stays clean.
 >
 > A run that does not use the two placeholders at all is unchanged: block outputs are substituted raw
 > as before.
@@ -197,7 +200,7 @@ Executes a shell command on the host or inside a Docker container.
 > shipped definitions use (the `PlatformPromptQuotingGateTest` gate enforces it there).
 >
 > Full trust model (three trust classes, reserved context keys, known limits):
-> [architektur.md → trust classes for context values](architektur.md).
+> [architektur.md → trust classes for context values](architektur.md#workflow-hardening-optional).
 
 ```json
 {

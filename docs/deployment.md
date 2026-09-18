@@ -429,9 +429,13 @@ Grenzen, die man kennen sollte:
 - **Eine KI-Antwort nach einem Prompt mit Plattform-Daten ist selbst gefärbt.** Stehen
   Plattform-Daten im Prompt eines `simple`-, `agentic`- oder `skill-capability`-Blocks (auch in der
   verschachtelten Form), gilt die Ausgabe genau dieses Blocks als nicht vertrauenswürdig: Ein
-  folgender Shell-Block bekommt `{{ previous_output }}` **single-quoted**. Der Lauf selbst wird davon
-  nicht gefärbt — das bleibt der Regel „erst bei Substitution in ein Shell-Feld" vorbehalten.
-  **Setze in eigenen Workflows in jedem Shell-Block, der die Ausgabe eines KI-Blocks
+  folgender Shell-Block bekommt `{{ previous_output }}` **single-quoted**. Sobald diese gefärbte
+  Ausgabe verbucht ist, ist der Lauf gefärbt — und die Färbung ist klebrig wie immer: Auch alle
+  **weiteren** Blockausgaben und die daraus abgeleiteten Variablen (`step_N_output`,
+  `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und `exportTaint()` gibt das an
+  Sub-Workflows und an ein Resume weiter. In der Praxis heisst das: Praktisch jeder Audit- oder
+  Report-Workflow, der `previous_report` in einem Prompt liest, läuft ab diesem Block im gequoteten
+  Modus. **Setze in eigenen Workflows in jedem Shell-Block, der die Ausgabe eines KI-Blocks
   weiterverarbeitet, `"shell_escape_variables": true`** — dann verhält sich der Block in gefärbten
   wie in ungefärbten Läufen gleich.
 - **Was das Quoting nicht abwehrt:** Gequotet wird der Text der KI-Antwort, nicht ihr Zustandekommen.

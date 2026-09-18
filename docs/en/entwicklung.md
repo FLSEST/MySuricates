@@ -394,12 +394,15 @@ splitting (`some_cmd {{ previous_output }}` became several arguments, one per wo
 coloured.** If you use `{{ previous_report }}` or `{{ open_todos }}` in the prompt of an AI block
 (`simple`, `agentic`, `skill-capability`, plus the non-shell branches of `foreach`, `while`,
 `conditional`, `retry`, `switch`), the output of **exactly that block** arrives in later shell fields
-as **a single quoted argument** instead of raw. The run as a whole is not coloured by this — that
-stays reserved for the rule "only on substitution into a shell field".
+as **a single quoted argument** instead of raw. Once that output is recorded, the run counts as
+coloured, and the colouring is sticky: every **further** block output and the variables derived from
+it (`step_N_output`, `foreach` items, `document` extracts) are quoted from then on too, and
+`exportTaint()` passes that on to sub-workflows and to a resume. In practice: nearly every audit or
+report workflow that reads `previous_report` in a prompt runs in quoted mode from that block on.
 
 - **How to recognize it:** a shell block that used to read `{{ previous_output }}` /
-  `{{ block.<name>.output }}` of such an AI block word by word (`$1`, `$2`, `for word in …`) now
-  sees exactly one argument.
+  `{{ block.<name>.output }}` of such an AI block — or any later block output of the same run — word
+  by word (`$1`, `$2`, `for word in …`) now sees exactly one argument.
 - **Why:** the path platform data → AI prompt → shell block bypassed the quoting entirely; an AI
   answer carrying platform bytes ended up raw on a command line.
 - **The safe form (recommended, works either way):** set `"shell_escape_variables": true` in the

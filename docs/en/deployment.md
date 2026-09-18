@@ -427,10 +427,14 @@ Limits worth knowing:
 - **An AI answer that followed a prompt with platform data is coloured itself.** If platform data is
   in the prompt of a `simple`, `agentic` or `skill-capability` block (nested forms included), the
   output of exactly that block counts as untrusted: a following shell block receives
-  `{{ previous_output }}` **single-quoted**. The run itself is not coloured by this — that stays
-  reserved for the rule "only on substitution into a shell field". **In your own workflows, set
-  `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — the
-  block then behaves the same in coloured and in uncoloured runs.
+  `{{ previous_output }}` **single-quoted**. Once that coloured output is recorded, the run is
+  coloured — and the colouring is sticky as always: every **further** block output and the variables
+  derived from it (`step_N_output`, `foreach` items, `document` extracts) are quoted from then on
+  too, and `exportTaint()` passes that on to sub-workflows and to a resume. In practice: nearly every
+  audit or report workflow that reads `previous_report` in a prompt runs in quoted mode from that
+  block on. **In your own workflows, set `"shell_escape_variables": true` in every shell block that
+  consumes an AI block's output** — the block then behaves the same in coloured and in uncoloured
+  runs.
 - **What quoting does not defend against:** what is quoted is the text of the AI answer, not how it
   came about. The trust model does not help against manipulation of the content (prompt injection).
 - **Quoting cannot see files you write yourself.** A shell block that writes a tainted value into a

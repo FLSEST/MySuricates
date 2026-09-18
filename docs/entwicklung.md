@@ -400,12 +400,16 @@ gequotetes Argument**.
 gefärbt.** Wer `{{ previous_report }}` oder `{{ open_todos }}` im Prompt eines KI-Blocks verwendet
 (`simple`, `agentic`, `skill-capability` sowie die Nicht-Shell-Zweige von `foreach`, `while`,
 `conditional`, `retry`, `switch`), bekommt die Ausgabe **genau dieses Blocks** in späteren
-Shell-Feldern als **ein einzelnes gequotetes Argument** statt roh. Der Lauf als Ganzes wird davon
-nicht gefärbt — das bleibt der Regel „erst bei Substitution in ein Shell-Feld" vorbehalten.
+Shell-Feldern als **ein einzelnes gequotetes Argument** statt roh. Sobald diese Ausgabe verbucht ist,
+gilt der Lauf als gefärbt, und die Färbung ist klebrig: Auch alle **weiteren** Blockausgaben und die
+daraus abgeleiteten Variablen (`step_N_output`, `foreach`-Items, `document`-Extrakte) werden ab da
+gequotet, und `exportTaint()` reicht das an Sub-Workflows und an ein Resume weiter. Praktisch heisst
+das: Fast jeder Audit- oder Report-Workflow, der `previous_report` in einem Prompt liest, läuft ab
+diesem Block im gequoteten Modus.
 
 - **Woran erkennbar:** Ein Shell-Block, der `{{ previous_output }}`/`{{ block.<name>.output }}` eines
-  solchen KI-Blocks bisher wortweise gelesen hat (`$1`, `$2`, `for wort in …`), sieht nach dem Update
-  genau ein Argument.
+  solchen KI-Blocks — oder irgendeine spätere Blockausgabe desselben Laufs — bisher wortweise gelesen
+  hat (`$1`, `$2`, `for wort in …`), sieht nach dem Update genau ein Argument.
 - **Warum:** Der Weg Plattform-Daten → KI-Prompt → Shell-Block umging das Quoting bisher vollständig;
   eine KI-Antwort, die Plattform-Bytes enthält, landete roh in einer Kommandozeile.
 - **Sichere Form (empfohlen, wirkt in beiden Welten):** Im Folgeblock

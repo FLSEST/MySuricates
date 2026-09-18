@@ -120,6 +120,13 @@ final class ExecutionContextTaint {
      * prompt carried platform data, so its output is recorded as untrusted. Clearing keeps the flag
      * scoped to that block — a later block with a clean prompt records a clean output again (unless
      * the run is tainted by then, which is sticky by design).
+     *
+     * <p>Deliberately <em>not</em> exported, unlike {@link ExecutionContext#PLATFORM_IN_SHELL_VARIABLE}:
+     * {@link com.automation.service.workflow.ResumePlan} resumes after the last COMPLETED step, so a
+     * block whose prompt set this flag but whose output was never recorded is executed again from the
+     * top — it resolves its prompt once more and raises the flag again. Should the resume semantics
+     * ever change (picking up <em>inside</em> a block, replaying a recorded output), this is where
+     * under-colouring would appear, and the flag needs an export like the shell one.
      */
     boolean consumePlatformPrompt() {
         return platformInPrompt.getAndSet(false);

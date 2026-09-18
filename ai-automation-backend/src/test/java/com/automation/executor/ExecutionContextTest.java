@@ -682,6 +682,33 @@ class ExecutionContextTest {
                         java.util.List.of("analyse", ExecutionContext.PREVIOUS_OUTPUT_NAME));
     }
 
+    /**
+     * Die gefärbte Ausgabe färbt den Lauf: Ab ihr ist der Taint klebrig wie bei externem Input —
+     * auch ein Folgeblock mit sauberem Prompt liefert eine gequotete Ausgabe, und der Export ist
+     * nicht mehr leer. Das ist die Aussage, die in der Doku stand und die hier festgenagelt wird.
+     */
+    @Test
+    void platformPrompt_recordedOutput_taintsTheRestOfTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        context.resolvePromptTemplate("Bewerte: {{ previous_report }}");
+        context.recordOutput("analyse", "a | b");
+
+        // zweiter Block, Prompt ohne Plattform-Daten
+        context.resolvePromptTemplate("Fasse den Stand zusammen");
+        context.recordOutput("zusammenfassung", "c | d");
+        context.setDerivedVariable("step_1_output", "e | f");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ block.zusammenfassung.output }}", false))
+                .isEqualTo("echo 'c | d'");
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false)).isEqualTo("echo 'c | d'");
+        assertThat(context.resolveShellTemplate("echo {{ step_1_output }}", false)).isEqualTo("echo 'e | f'");
+        assertThat(context.exportTaint())
+                .isNotEmpty()
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        java.util.List.of("analyse", ExecutionContext.PREVIOUS_OUTPUT_NAME, "zusammenfassung"));
+    }
+
     @Test
     void resolvePromptTemplate_neverEscapes_andReportsOnlyPlatformData() {
         context.setUntrustedPlatformVariable("previous_report", "a'b");

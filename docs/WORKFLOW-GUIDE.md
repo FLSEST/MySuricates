@@ -184,11 +184,15 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 >    eingesetzt wird, werden **ab diesem Punkt** auch alle Block-Ausgaben des Laufs
 >    (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items)
 >    single-quoted — genau wie in einem webhook-getriggerten Lauf.
-> 2. **Ein KI-Prompt färbt die Ausgabe dieses einen Blocks.** Standen Plattform-Daten im Prompt
->    eines KI-Blocks (`simple`, `agentic`, `skill-capability` sowie die Nicht-Shell-Zweige von
->    `foreach`/`while`/`conditional`/`retry`/`switch`), gilt dessen Ausgabe als nicht
->    vertrauenswürdig: Ein folgender Shell-Block bekommt sie single-quoted. Der Lauf als Ganzes
->    bleibt dabei sauber, solange nichts anderes ihn färbt.
+> 2. **Ein KI-Prompt färbt die Ausgabe dieses Blocks — und ab ihr den Lauf.** Standen
+>    Plattform-Daten im Prompt eines KI-Blocks (`simple`, `agentic`, `skill-capability` sowie die
+>    Nicht-Shell-Zweige von `foreach`/`while`/`conditional`/`retry`/`switch`), gilt dessen Ausgabe
+>    als nicht vertrauenswürdig: Ein folgender Shell-Block bekommt sie single-quoted. Sobald diese
+>    Ausgabe verbucht ist, ist der Lauf gefärbt, und zwar klebrig wie in Fall 1 — auch alle
+>    **weiteren** Block-Ausgaben und die daraus abgeleiteten Variablen (`{{ step_N_output }}`,
+>    `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und der Taint wird über
+>    `exportTaint()` an Sub-Workflows und an ein Resume weitergereicht. Der Prompt allein färbt
+>    nichts: Wird keine Ausgabe verbucht, bleibt der Lauf sauber.
 >
 > Ein Lauf, der die beiden Platzhalter überhaupt nicht verwendet, bleibt unverändert: Block-Ausgaben
 > werden roh eingesetzt wie bisher.
@@ -200,7 +204,7 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > Gate `PlatformPromptQuotingGateTest` erzwingt sie dort).
 >
 > Vollständiges Trust-Modell (drei Vertrauensklassen, reservierte Kontextschlüssel, bekannte
-> Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md).
+> Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md#workflow-härtung-optional).
 
 ```json
 {
