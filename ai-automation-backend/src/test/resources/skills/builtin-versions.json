@@ -1,0 +1,78 @@
+{
+  "builtin-blog-writer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:93d33c69438368744454b87b738955b70db463abfa1c6fd6590d463d0c1c4eee"
+  },
+  "builtin-code-review" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:29e364a27bcdf912d8149f19153fba8a480ce3a45f10a40b406260a280d22356"
+  },
+  "builtin-data-analyzer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:d716284d227d294ea9f99995e63001d3dec90163fdfb7c7d5fbacb11186374b0"
+  },
+  "builtin-document-analyzer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:54c9cfaf9093fc94cde53d40987ab75d078c2080d6856cf9f03aff041661f798"
+  },
+  "builtin-document-translator" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:87d191a59e07b2b92c84aef9ce8bb23ec2da3786dd51cb95eea1e7ab18dbe143"
+  },
+  "builtin-email-drafter" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:8202febb202ec8825cf425012651e60fafb3f84800e22490d88992d83d9e56f3"
+  },
+  "builtin-fact-checker" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:4c840e0b916742925acb7bbc7cedb3c26432bd7881dbfb23b6cba24327ea7d70"
+  },
+  "builtin-feature-implementer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:adae0628f50b52e8e4e6ac0ea8237220b48b4600bb5ff28f11ad5da2ee4c4f86"
+  },
+  "builtin-grammar-style" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:27f85311ff90e4cb8c22d751f6528c0cbfc2553f7304331a0041fc8279aedcc0"
+  },
+  "builtin-marketing-copywriter" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:8b635d178f18abdbe3537bb52bc1419ed18c660841701f2b1d7c4214c5d7dca0"
+  },
+  "builtin-meeting-notes" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:b281435d7ab102323bce1b1c7016b11ea0523f9737cc3f9a2d09b0de4f215158"
+  },
+  "builtin-report-generator" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:0e63475765cd8c56019c33dafb692fd9332d86e60a9edc6cb47647a452064b76"
+  },
+  "builtin-research-assistant" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:b78d1118fd87548af2dd9a5b4570d7486353cfb5521c6f56ecab216a9fb24ad2"
+  },
+  "builtin-risk-assessor" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:d00482aa79680aca781e831c6ad254ccf374780b5d91fa1c138ec6851b58aa11"
+  },
+  "builtin-security-analyzer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:38af660ee23d9968470da98e64792c80908f73c3134148d6de3cdfd7832d1d7e"
+  },
+  "builtin-smart-summarizer" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:6238a06b0e97e8bfbed547558f409b792f2c086613d02740fb0c967734418636"
+  },
+  "builtin-social-media" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:5125a627ed3e8871801e69f4ae541fa3a0a3ec63e91999cab7c466c94716a64e"
+  },
+  "builtin-spec-architect" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:6debaf08a97143445f92bc2955686cbb968f99bad744bceb364b85fb850286e3"
+  },
+  "builtin-test-generator" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:5f99eaba589e5253f625bda277b4c54bd53cdc26327ec47bc57459d76b07c5fc"
+  }
+}
