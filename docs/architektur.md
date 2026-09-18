@@ -159,7 +159,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 43 Controller)
+Controller (REST API, 45 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -178,7 +178,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          43 REST-Controller
+├── controller/          45 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -236,7 +236,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 43 REST-Controller
+### Alle 45 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -281,6 +281,8 @@ com.automation
 | `SystemAccessController` | `/api/v1/system` | Zugriffs-Oberfläche: Remote Access (Tailscale) Enable/Disable/Status, lokales Dateisystem (Browse, Open-Path, Integration-Snippet) |
 | `SystemMaintenanceController` | `/api/v1/system` | Wartung: Auto-Repair, VACUUM, Datenbank-Backups (Liste, Erstellen, Download) |
 | `DashboardLayoutController` | `/api/v1/dashboard/layouts` | Versionsverlauf des Dashboard-Layouts (Core-Feature, kein Modul-Gate) |
+| `DashboardWorkflowController` | `/api/v1/dashboard/workflow-results` | Liefert die Ergebnisse aller Workflow-Widgets einer Ansicht in **einer** Anfrage (Marker `dashboard_widget`), damit das Dashboard nicht je Widget lädt |
+| `SystemRequestMetricsController` | `/api/v1/system/request-metrics` | Gemessene Kosten je Route: laufende Momentaufnahme (`GET`) und Tageswerte (`GET /daily`, optional je Route) |
 | `WorkflowSealController` | `/api/v1/workflows/{id}` | Siegeln/Entsiegeln eines Workflows (nur bei `automation.hardening.sealing=true`; bestehende Siegel bleiben auch bei ausgeschaltetem Schalter wirksam) |
 | `WebSocketTicketController` | `/api/v1/ws-ticket` | Vergibt kurzlebige Einmal-Tickets für den WebSocket-Handshake (kein Modul-Gate, gewöhnliches API-Rate-Limit gilt) |
 
@@ -1049,6 +1051,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V71 | Workflow-Versiegelung: `sealed`, `sealed_hash`, `sealed_at` auf Workflows |
 | V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
 | V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
+| V74 | Tagesaggregat der gemessenen Request-Kosten je Route (`request_metrics_daily`) |
 
 ## Architektur-Gates
 
@@ -1093,7 +1096,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 73 Flyway-Migrationen (V1–V73)
+│           └── db/migration/          ← 74 Flyway-Migrationen (V1–V74)
 │
 └── ai-automation-frontend/
     ├── package.json

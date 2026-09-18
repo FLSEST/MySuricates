@@ -504,13 +504,13 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 
 ### Backend-Struktur
 
-Das Backend umfasst **43 REST-Controller** und **19 Block-Typen**:
+Das Backend umfasst **45 REST-Controller** und **19 Block-Typen**:
 
 **Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`
 
-**Flyway-Migrationen:** V1–V73 (SQLite)
+**Flyway-Migrationen:** V1–V74 (SQLite)
 
 ### Gate Status System
 

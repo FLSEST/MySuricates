@@ -1247,6 +1247,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V71 | `V71__workflow_sealing.sql` | `sealed`, `sealed_hash`, `sealed_at` in workflows (Workflow-Versiegelung) |
 | V72 | `V72__webhook_signing_secret.sql` | `signing_secret_enc` in webhook_triggers (verschlüsseltes HMAC-Signatur-Secret) |
 | V73 | `V73__dashboard_layout_versions.sql` | dashboard_layout_versions-Tabelle + Index (versionierte Dashboard-Layout-Snapshots) |
+| V74 | `V74__request_metrics_daily.sql` | request_metrics_daily-Tabelle (Tagesabschluss der Request-Kosten je Route: Aufrufe, p50/p95, Wartezeit-Anteil, SQL-Statements, Antwort-Bytes) |
 
 ## SQLite-Besonderheiten
 

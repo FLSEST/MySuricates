@@ -158,7 +158,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 43 Controllers)
+Controller (REST API, 45 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -177,7 +177,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          43 REST Controllers
+├── controller/          45 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -234,7 +234,7 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 43 REST Controllers
+### All 45 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
@@ -1007,6 +1007,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V71 | Workflow sealing: `sealed`, `sealed_hash`, `sealed_at` on workflows |
 | V72 | Encrypted HMAC signing secret on webhook triggers |
 | V73 | Versioned dashboard layout snapshots (`dashboard_layout_versions`) |
+| V74 | Daily aggregate of the measured request cost per route (`request_metrics_daily`) |
 
 ## Architecture Gates
 
@@ -1051,7 +1052,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 73 Flyway migrations (V1–V73)
+│           └── db/migration/          ← 74 Flyway migrations (V1–V74)
 │
 └── ai-automation-frontend/
     ├── package.json
