@@ -4,7 +4,7 @@ import {
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
 import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
-import { fetchWorkflowBpmn } from '../../api/client';
+import { apiErrorMessage, fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
 import { useModuleEnabled } from '../../hooks/useModules';
@@ -57,8 +57,8 @@ export function WorkflowDetailHeader({
       const xml = await fetchWorkflowBpmn(workflow.id);
       const safeName = workflow.name.replace(/[^a-zA-Z0-9_-]/g, '_');
       downloadBlob(new Blob([xml], { type: 'application/xml' }), `${safeName}.bpmn`);
-    } catch {
-      toast.error(t.workflows.bpmnExportFailed);
+    } catch (err) {
+      toast.error(apiErrorMessage(err, t.workflows.bpmnExportFailed));
     }
   };
 
