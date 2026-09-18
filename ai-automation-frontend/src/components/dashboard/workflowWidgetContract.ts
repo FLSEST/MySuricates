@@ -124,6 +124,47 @@ function isVisible(codePoint: number, char: string): boolean {
   return !NOT_VISIBLE_CATEGORY.test(char);
 }
 
+/** TAB, LF, VT, FF, CR and the four Java-specific separator controls (U+001C-U+001F). */
+const JAVA_WHITESPACE_CONTROLS = new Set([0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x1f]);
+/** The three "non-breaking" space separators Java's Character.isWhitespace explicitly excludes. */
+const NON_BREAKING_SPACES = new Set([0xa0, 0x2007, 0x202f]);
+const SEPARATOR_CATEGORY = /[\p{Zs}\p{Zl}\p{Zp}]/u;
+
+/**
+ * Mirrors Character.isWhitespace(codePoint) exactly — deliberately not the same set as "not visible"
+ * above (e.g. NBSP/U+2007/U+202F are not Java whitespace but also not visible; U+001C-U+001F are Java
+ * whitespace but also fatal). A Unicode space/line/paragraph separator counts unless it is one of the
+ * three "non-breaking" spaces Java excludes; TAB/LF/VT/FF/CR and U+001C-U+001F always count.
+ */
+function isJavaWhitespace(codePoint: number, char: string): boolean {
+  if (JAVA_WHITESPACE_CONTROLS.has(codePoint)) return true;
+  if (NON_BREAKING_SPACES.has(codePoint)) return false;
+  return SEPARATOR_CATEGORY.test(char);
+}
+
+/**
+ * Mirrors Java's String#strip() exactly (not JavaScript's own .trim(), which removes a different set
+ * — notably BOM, NBSP, U+2007 and U+202F, none of which Java's strip() touches, while it leaves
+ * U+001C-U+001F in place, which Java's strip() removes). Iterates by code point so it never splits a
+ * surrogate pair while walking in from either end.
+ */
+function stripBoundary(text: string): string {
+  const codePoints = Array.from(text);
+  let start = 0;
+  let end = codePoints.length;
+  while (start < end) {
+    const char = codePoints[start];
+    if (char === undefined || !isJavaWhitespace(char.codePointAt(0) ?? 0, char)) break;
+    start++;
+  }
+  while (end > start) {
+    const char = codePoints[end - 1];
+    if (char === undefined || !isJavaWhitespace(char.codePointAt(0) ?? 0, char)) break;
+    end--;
+  }
+  return codePoints.slice(start, end).join('');
+}
+
 export function isWorkflowId(value: unknown): value is string {
   return typeof value === 'string' && WORKFLOW_ID.test(value);
 }
@@ -140,14 +181,15 @@ export function workflowIdsOf(widgets: readonly ResolvedWidget[]): string[] {
 }
 
 /**
- * A contract string: trimmed, non-empty, within its cap, free of fatal characters, and with at least
- * one visible code point remaining — mirrors DashboardWidgetResultParser#text exactly. Null for
- * anything that fails one of those checks; invisible-but-not-fatal characters elsewhere in an
- * otherwise visible string are kept as-is, not stripped.
+ * A contract string: boundary-stripped (Java's String#strip() semantics, not JavaScript's .trim()),
+ * non-empty, within its cap, free of fatal characters, and with at least one visible code point
+ * remaining — mirrors DashboardWidgetResultParser#text exactly. Null for anything that fails one of
+ * those checks; invisible-but-not-fatal characters elsewhere in an otherwise visible string are kept
+ * as-is, not stripped (only the boundary is stripped, and only of Java whitespace).
  */
 function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
-  const text = value.trim();
+  const text = stripBoundary(value);
   if (text.length === 0 || text.length > max) return null;
   let sawVisible = false;
   for (const char of text) {

@@ -143,6 +143,67 @@ describe('workflow widget contract', () => {
     expect(parseWorkflowResult({ status: 'GREEN', summary: blank })).toBeNull();
   });
 
+  // Fix round 3: cleanText boundary-strips like Java's String#strip(), not JavaScript's own .trim()
+  // — the two remove a different set of code points, which caused three concrete divergences from
+  // the backend (all exercised below): .trim() silently removes a leading/trailing BOM before the
+  // fatal check ever runs, and removes a leading NBSP/U+2007/U+202F before the length check runs
+  // (letting an over-cap value through); conversely .trim() leaves U+001C-U+001F in place, where
+  // Java's strip() (and this fix) removes them, so a value the backend accepts must not be rejected
+  // here as "fatal".
+  it.each([
+    ['leading', '﻿Hello'],
+    ['trailing', 'Hello﻿'],
+  ])('rejects a %s BOM: a boundary strip must not remove a fatal character before the fatal check', (_pos, text) => {
+    expect(parseWorkflowResult({ status: 'GREEN', title: text })).toBeNull();
+  });
+
+  it.each([
+    ['non-breaking space', ' '],
+    ['figure space', ' '],
+    ['narrow no-break space', ' '],
+  ])('rejects a title one character over the cap when a leading %s makes it 81 long — the boundary strip must not shrink it under the cap', (_name, ch) => {
+    expect(parseWorkflowResult({ status: 'GREEN', title: ch + 't'.repeat(80) })).toBeNull();
+  });
+
+  it.each([
+    ['leading', 'Hello', 'Hello'],
+    ['trailing', 'Hello', 'Hello'],
+  ])('accepts a %s U+001C at the boundary, stripped like Java whitespace rather than treated as fatal', (_pos, text, expected) => {
+    expect(parseWorkflowResult({ status: 'GREEN', title: text })).toEqual({
+      status: 'GREEN', title: expected, kpis: [], items: [],
+    });
+  });
+
+  it('rejects a lone unpaired surrogate wherever it appears, in a contract field and in workflowName', () => {
+    expect(parseWorkflowResult({ status: 'GREEN', items: ['a\ud800b'] })).toBeNull();
+    expect(parseWorkflowEntry({
+      workflowId: 'wf-a1', workflowName: 'Team\ud800QA', available: true,
+      run: null, resultState: 'MISSING', result: null,
+    })?.workflowName).toBeNull();
+  });
+
+  it('accepts a real astral character unchanged, in a contract field and in workflowName', () => {
+    const partyPopper = '\u{1F389}'; // U+1F389, a full surrogate pair — not a lone one
+    expect(parseWorkflowResult({ status: 'GREEN', items: [`Great ${partyPopper} work`] })).toEqual({
+      status: 'GREEN', kpis: [], items: [`Great ${partyPopper} work`],
+    });
+    expect(parseWorkflowEntry({
+      workflowId: 'wf-a1', workflowName: `Team ${partyPopper} QA`, available: true,
+      run: null, resultState: 'MISSING', result: null,
+    })?.workflowName).toBe(`Team ${partyPopper} QA`);
+  });
+
+  it('accepts an unassigned code point embedded in visible text unchanged, in a contract field and in workflowName', () => {
+    const unassigned = '͸'; // individually legal here: "not visible", but not fatal either
+    expect(parseWorkflowResult({ status: 'GREEN', items: [`code${unassigned}point`] })).toEqual({
+      status: 'GREEN', kpis: [], items: [`code${unassigned}point`],
+    });
+    expect(parseWorkflowEntry({
+      workflowId: 'wf-a1', workflowName: `Team${unassigned}QA`, available: true,
+      run: null, resultState: 'MISSING', result: null,
+    })?.workflowName).toBe(`Team${unassigned}QA`);
+  });
+
   it('parses an entry and downgrades a result that does not match the contract', () => {
     const base = {
       workflowId: 'wf-a1', workflowName: 'Nightly QA', available: true,
