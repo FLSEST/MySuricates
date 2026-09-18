@@ -9,7 +9,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
 import type { WidgetSize } from './dashboardLayout';
-import { staticSortingStrategy, widgetCollisionDetection } from './dashboardDnd';
+import { shouldMove, staticSortingStrategy, widgetCollisionDetection } from './dashboardDnd';
 import { SortableWidgetSlot } from './SortableWidgetSlot';
 import { WidgetContent } from './WidgetContent';
 import { SLOT_CLASSES, widgetSizeClasses } from './widgetSlot';
@@ -50,8 +50,10 @@ export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onH
     );
   }
 
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!disabled && over && active.id !== over.id) onMove(String(active.id), String(over.id));
+  // shouldMove ignores a tiny slip on the handle (see dashboardDnd.ts) — otherwise it would hit a neighbour.
+  const handleDragEnd = ({ active, over, delta }: DragEndEvent) => {
+    if (disabled || !over || !shouldMove(active, over, delta)) return;
+    onMove(String(active.id), String(over.id));
   };
 
   return (

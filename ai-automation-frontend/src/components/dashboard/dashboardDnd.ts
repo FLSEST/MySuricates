@@ -24,3 +24,22 @@ export const widgetCollisionDetection: CollisionDetection = (args) => {
  * the same size — with mixed sizes they overlap and no longer match the drop targets.
  */
 export const staticSortingStrategy: SortingStrategy = () => null;
+
+/** Below this travel (px), a drag end is treated as a slip, not an intentional move. */
+const MOVE_THRESHOLD_PX = 16;
+
+/**
+ * Whether a drag end should reorder the layout. The edit toolbar (and its grip handle) sits at
+ * `-top-3`, partly outside the dragged slot's border box, so pressing its upper part puts the
+ * pointer outside the tile: `pointerWithin` finds nothing and the `closestCenter` fallback can
+ * already pick a neighbouring tile a few pixels past the 5px activation distance. Without this
+ * threshold, a tiny slip on the handle silently reorders the layout and marks it dirty.
+ */
+export function shouldMove(
+  active: { id: string | number },
+  over: { id: string | number } | null | undefined,
+  delta: { x: number; y: number },
+): boolean {
+  if (!over || active.id === over.id) return false;
+  return Math.hypot(delta.x, delta.y) >= MOVE_THRESHOLD_PX;
+}
