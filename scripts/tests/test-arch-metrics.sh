@@ -13,6 +13,8 @@ REPO="$(cd "$HERE/../.." && pwd)"
 SCRIPT="$REPO/scripts/public-readiness/arch-metrics.sh"
 CYCLES="$REPO/scripts/public-readiness/arch_cycles.py"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+# Kein Testlauf schreibt in den echten Kompilat-Cache des Entwicklers.
+export AUTOMATION_ARCH_CACHE="$TMP/arch-cache-default"
 PASS=0; FAIL=0
 TAB="$(printf '\t')"
 
@@ -215,6 +217,7 @@ public class B {
 }
 EOF
   : > "$BE/src/main/java/com/automation/a/Leer.java"
+  printf 'target/\n' > "$TMP/fixture/.gitignore"
   printf '<project/>\n' > "$BE/pom.xml"
   cat > "$BE/mvnw" <<'EOF'
 #!/bin/sh
@@ -227,7 +230,7 @@ EOF
 
 # Werkzeugkasten: nur die Programme, die das Skript wirklich braucht. So laesst sich
 # "jdeps fehlt" testen, ohne am System-PATH zu drehen.
-TOOLS="bash sh mkdir rm cat mktemp dirname find xargs awk sort uniq cut grep sed head wc tr git python3 javac jdeps"
+TOOLS="bash sh mkdir rm cp mv cat mktemp dirname find xargs awk sort uniq cut grep sed head wc tr git python3 javac jdeps"
 make_toolbox() {  # $1 = Zielverzeichnis, $2 = optional auszulassendes Werkzeug
   local dir="$1" skip="${2:-}" t p
   mkdir -p "$dir"
@@ -289,6 +292,54 @@ check "jdeps fehlt: exit 0"                     '[ "$RC" -eq 0 ]'
 check "jdeps fehlt: jdeps=missing in ## run"    'grep -qx "jdeps=missing" "$TMP/no-jdeps.txt"'
 check "jdeps fehlt: error nennt jdeps_missing"  'grep -qE "^error=.*jdeps_missing" "$TMP/no-jdeps.txt"'
 check "jdeps fehlt: sizes trotzdem gemessen"    "grep -qx 'files=3' '$TMP/no-jdeps.txt'"
+
+echo "8) Kompilat-Cache fuer Bytecode-Messungen (TODO bf5872be)"
+CACHE="$TMP/arch-cache"
+make_fixture
+( cd "$TMP/fixture" && git init -q \
+    && git add -A \
+    && git -c user.email=fixture@example.invalid -c user.name=Fixture commit -qm fixture ) >/dev/null 2>&1
+FIX_SHA="$( cd "$TMP/fixture" && git rev-parse HEAD 2>/dev/null )"
+check "Fixture ist ein Git-Repo mit genau einem Commit" '[ -n "$FIX_SHA" ]'
+
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache1.txt" 2> "$TMP/cache1.err"
+check "erster Lauf kompiliert (compile=compiled)" 'grep -qx "compile=compiled" "$TMP/cache1.txt"'
+check "Kompilat liegt danach im Cache unter dem Commit" \
+  '[ -n "$(find "$CACHE/$FIX_SHA" -name "*.class" -print -quit 2>/dev/null)" ]'
+
+rm -rf "$BE/target"
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache2.txt" 2> "$TMP/cache2.err"
+check "zweiter Lauf nutzt den Cache (compile=cached)" 'grep -qx "compile=cached" "$TMP/cache2.txt"'
+check "der Cache-Lauf kompiliert wirklich nicht neu"  '[ ! -d "$BE/target/classes" ]'
+measured "$TMP/cache1.txt" > "$TMP/cache1.measured"; measured "$TMP/cache2.txt" > "$TMP/cache2.measured"
+check "Cache misst dasselbe wie das frische Kompilat" \
+  'diff -q "$TMP/cache1.measured" "$TMP/cache2.measured" >/dev/null'
+if ! diff -q "$TMP/cache1.measured" "$TMP/cache2.measured" >/dev/null 2>&1; then
+  diff -u "$TMP/cache1.measured" "$TMP/cache2.measured" | head -20
+fi
+
+# Ein Cache-Treffer auf den Commit-Stand waere bei geaenderten Dateien eine falsche Messung:
+# gemessen wuerde der Commit, gemeldet der Arbeitsstand.
+rm -rf "$BE/target"
+printf 'unkommittiert\n' > "$TMP/fixture/dirty.txt"
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache3.txt" 2>/dev/null
+check "unkommittierte Aenderung umgeht den Cache" 'grep -qx "compile=compiled" "$TMP/cache3.txt"'
+rm -f "$TMP/fixture/dirty.txt"
+
+rm -rf "$BE/target" "$CACHE/$FIX_SHA"
+for stale in aaa bbb ccc ddd; do mkdir -p "$CACHE/$stale"; : > "$CACHE/$stale/marker"; done
+AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache4.txt" 2>/dev/null
+check "Cache behaelt hoechstens 3 Eintraege" \
+  '[ "$(find "$CACHE" -mindepth 1 -maxdepth 1 -type d | wc -l)" -le 3 ]'
+check "der frische Eintrag ueberlebt das Aufraeumen" '[ -d "$CACHE/$FIX_SHA" ]'
+
+# Ein unbrauchbares Cache-Verzeichnis darf das Faktenblatt nicht roetlich faerben.
+rm -rf "$BE/target"
+: > "$TMP/cache-is-a-file"
+AUTOMATION_ARCH_CACHE="$TMP/cache-is-a-file" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache5.txt" 2>/dev/null
+RC=$?
+check "unbrauchbarer Cache-Pfad: exit 0"            '[ "$RC" -eq 0 ]'
+check "unbrauchbarer Cache-Pfad: trotzdem gemessen" 'grep -qx "cycles=1" "$TMP/cache5.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

@@ -1083,6 +1083,8 @@ Für Simple- und Shell-Blöcke gilt nur `timeout_seconds`:
 | Build/Test (npm, mvn) | 300-600 |
 | Komplexe Analyse (Opus) | 600-900 |
 
+**Bytecode-Messungen kosten Kompilierzeit**: Shell-Blöcke, die über den Bytecode messen (`scripts/public-readiness/arch-metrics.sh` mit `jdeps`), brauchen ein `target/classes` — im Workspace-Klon eines isolierten Runs fehlt das immer und der erste Lauf kompiliert (~1-2 Minuten, deshalb `timeout_seconds: 600`). Ab dem zweiten Run desselben Commits greift der Kompilat-Cache unter `$AUTOMATION_ARCH_CACHE` (Default `~/.cache/mysuricates/arch-classes`) und der Block ist in Sekunden durch; `compile=cached` im Abschnitt `## run` zeigt den Treffer. Bei uncommitteten Änderungen wird bewusst neu kompiliert.
+
 ---
 
 ## 6. Modellauswahl

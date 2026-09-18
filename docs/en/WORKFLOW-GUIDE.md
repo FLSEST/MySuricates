@@ -1071,6 +1071,8 @@ For simple and shell blocks, only `timeout_seconds` applies:
 | Build/test (npm, mvn) | 300-600 |
 | Complex analysis (Opus) | 600-900 |
 
+**Bytecode measurements cost compile time**: shell blocks that measure the bytecode (`scripts/public-readiness/arch-metrics.sh` with `jdeps`) need a `target/classes` — the workspace clone of an isolated run never has one, so the first run compiles (~1-2 minutes, hence `timeout_seconds: 600`). From the second run of the same commit on, the compile cache under `$AUTOMATION_ARCH_CACHE` (default `~/.cache/mysuricates/arch-classes`) takes over and the block finishes in seconds; `compile=cached` in the `## run` section marks the hit. With uncommitted changes it deliberately compiles again.
+
 ---
 
 ## 6. Model Selection
