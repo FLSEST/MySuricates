@@ -60,7 +60,7 @@ Security is enabled by default (`AUTOMATION_SECURITY_ENABLED=true`). Solutions:
 
 The REST controllers live under `ai-automation-backend/src/main/java/com/automation/controller/` (as of 2026-09-18: 43 classes with `@RestController`). Each controller has a `@RequestMapping` with the API path; re-measure with `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
-The complete API reference is at `docs/api-referenz.md`.
+The complete API reference is at `docs/en/api-referenz.md`.
 
 ---
 
