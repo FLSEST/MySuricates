@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Deployment
 
 ## Docker Compose

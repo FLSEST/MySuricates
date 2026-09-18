@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Assistant System
 
 The Assistant is a context-sensitive chat assistant available as a floating panel in the platform. It knows the current page, can create or explain workflows, and suggests context-sensitive actions.

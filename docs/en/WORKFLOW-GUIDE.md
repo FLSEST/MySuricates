@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Workflow Building Guide
 
 Practical guide for creating effective workflows in MySuricates. Covers all block types, proven patterns, timeout configuration, and common pitfalls.

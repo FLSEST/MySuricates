@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Data Model
 
 ## ER Diagram (Core)

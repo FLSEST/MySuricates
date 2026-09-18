@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # MySuricates — Vision
 
 ## Die Idee

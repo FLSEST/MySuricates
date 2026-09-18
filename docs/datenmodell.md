@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Datenmodell
 
 ## ER-Diagramm (Kern)

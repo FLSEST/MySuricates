@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Frontend
 
 ## Routing

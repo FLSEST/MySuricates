@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Workflow Memory — Architektur & Datenfluss
 
 ## Uebersicht

@@ -23,6 +23,7 @@ HYGIENE_PATTERNS=(
   "test-e2e-key|hardcoded test API key string"
   "ebf4f50c-20c2-4c35-a84a-a0b350124523|internal project UUID"
   "changeme|known default credential"
+  "[auto-generated]|nie ersetzter Stempel-Platzhalter, ersatzlos streichen (siehe TODO 994af971)"
 )
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ HYGIENE_SELF_EXCLUDE=(
   "scripts/ci/public-hygiene.sh"
   "scripts/ci/pool-neutrality.sh"
   "scripts/git-hooks/pre-commit"
+  "scripts/tests/test-public-hygiene.sh"
 )
 
 # ---------------------------------------------------------------------------
