@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,4 +75,13 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     @Transactional
     @Query(value = "UPDATE workflows SET stable_synced_at = :syncedAt WHERE id = :id", nativeQuery = true)
     void updateStableSyncedAt(@Param("id") String id, @Param("syncedAt") String syncedAt);
+
+    /**
+     * Nur {@code id} und {@code name} der (nicht soft-gelöschten) Workflows — für die
+     * Workflow-Widgets des Dashboards. Root-Query auf Workflow, also greift
+     * {@code @SQLRestriction("deleted_at IS NULL")}: ein gelöschter Workflow fehlt im Ergebnis und
+     * das Widget zeigt „nicht mehr vorhanden“.
+     */
+    @Query("SELECT w.id, w.name FROM Workflow w WHERE w.id IN :ids")
+    List<Object[]> findIdAndNameByIdIn(@Param("ids") Collection<String> ids);
 }

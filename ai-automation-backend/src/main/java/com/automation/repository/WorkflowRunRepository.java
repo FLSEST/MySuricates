@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -192,4 +193,24 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            "AND NOT EXISTS (SELECT 1 FROM AuditReport ar WHERE ar.workflowRunId = wr.id) ORDER BY wr.completedAt ASC")
     List<String> findTerminalRunIdsOlderThan(@Param("statuses") java.util.Collection<RunStatus> statuses,
                                              @Param("cutoff") Instant cutoff, Pageable pageable);
+
+    /**
+     * Neuester Run je Workflow für die Workflow-Widgets des Dashboards — schlanke Projektion
+     * {@code [workflowId, runId, status, startedAt, completedAt, durationMs, metadata]}.
+     *
+     * <p>Bewusst KEINE Steps: {@code StepResult.input/output/context_delta} sind die großen
+     * TEXT-Spalten (volle CLI-Ausgaben); bei pool-size=1 hält ein solcher Fetch die einzige
+     * SQLite-Connection sekundenlang. Der Vertrag des Ergebnis-Widgets steht deshalb schon beim
+     * Run-Ende in {@code metadata} (RunCompletionHandler), genau wie {@code gate_status}.
+     *
+     * <p>Die Unterabfrage wählt je Workflow den Run mit dem größten {@code startedAt} — dasselbe
+     * Muster wie {@link #findBrokenWorkflows}. Bei gleichem Zeitstempel können zwei Zeilen
+     * zurückkommen; die Sortierung macht die Auswahl deterministisch, der Aufrufer nimmt die erste.
+     */
+    @Query("SELECT wr.workflow.id, wr.id, wr.status, wr.startedAt, wr.completedAt, "
+         + "wr.durationMs, wr.metadata FROM WorkflowRun wr "
+         + "WHERE wr.workflow.id IN :workflowIds "
+         + "AND wr.startedAt = (SELECT MAX(wr2.startedAt) FROM WorkflowRun wr2 WHERE wr2.workflow.id = wr.workflow.id) "
+         + "ORDER BY wr.startedAt DESC, wr.id DESC")
+    List<Object[]> findLatestRunPerWorkflow(@Param("workflowIds") Collection<String> workflowIds);
 }
