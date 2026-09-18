@@ -18,6 +18,9 @@ final class ClaudeToolFlags {
             // SessionStart plugin hooks fire — --strict-mcp-config drops MCP wiring, --setting-sources
             // local keeps only project/local settings (no user/managed hooks). Verified with the real
             // CLI: init event then lists no tools and no mcp servers.
+            // Not --bare (TODO edb38a38): that minimal mode also skips keychain reads ("Anthropic auth
+            // is strictly ANTHROPIC_API_KEY or apiKeyHelper via --settings"), so on an OAuth-signed-in
+            // host the call dies with "Not logged in" — verified on the dev host, see WORKFLOW-GUIDE.
             cmd.add("--tools");
             cmd.add("");
             cmd.add("--strict-mcp-config");

@@ -663,6 +663,16 @@ JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
 
 **`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Wegen `--setting-sources local` gelten Claude-Einstellungen auf Benutzerebene (z. B. `env` oder `apiKeyHelper` in `~/.claude/settings.json`) für diesen Aufruf **nicht**. Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl — läuft der Workflow mit einem anderen Provider, im Block `"provider": "CLAUDE"` setzen. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
 
+> **Grenze — `--bare` ist die stärkere Isolation, aber nicht nutzbar (TODO edb38a38):** Die Claude-CLI
+> kennt mit `--bare` einen Minimalmodus, der zusätzlich Hooks, LSP, Plugin-Sync, Auto-Memory und die
+> `CLAUDE.md`-Erkennung abschaltet. Er kommt hier trotzdem nicht zum Einsatz, weil `--bare` laut
+> `claude --help` auch die **Keychain-Leseoperationen** überspringt: „Anthropic auth is strictly
+> `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth and keychain are never read)". Auf
+> einem Host, der wie üblich per OAuth angemeldet ist, bricht der Aufruf deshalb ab — auf dem
+> Dev-Host geprüft: `claude -p --bare "Antworte mit OK"` → `Not logged in · Please run /login`
+> (Exit-Code 1), während `claude -p --setting-sources local "Antworte mit OK"` → `OK` liefert.
+> `--bare` wäre also nur für Instanzen möglich, die ausschließlich mit `ANTHROPIC_API_KEY` arbeiten.
+
 ```json
 [
   { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },

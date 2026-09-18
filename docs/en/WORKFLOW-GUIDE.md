@@ -657,6 +657,15 @@ JSON stages need JSON as input and must come before text stages.
 
 **`compress-ai`** (one tool-less AI call): `source` (required), `instruction` (plain text, placeholders are **not** resolved), `max_chars` (default 4000, minimum 500), `model`, `effort`, `timeout_seconds`. Runs in a fresh, private working directory per call (no project `CLAUDE.md`, no MCP servers, no plugin hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Because of `--setting-sources local`, user-level Claude settings (e.g. `env` or `apiKeyHelper` in `~/.claude/settings.json`) are **not** applied to this call. Only provider `CLAUDE`; a different `provider` fails — if the workflow runs on another provider, set `"provider": "CLAUDE"` on the block. Inputs above the `compress-ai-max-input-chars` setting (default 60,000) fail without making the call — put a `compress` block before it instead.
 
+> **Limit — `--bare` would isolate more, but is unusable (TODO edb38a38):** the Claude CLI has a
+> minimal mode `--bare` that additionally skips hooks, LSP, plugin sync, auto-memory and `CLAUDE.md`
+> discovery. It is still not used here, because per `claude --help` `--bare` also skips **keychain
+> reads**: "Anthropic auth is strictly `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth
+> and keychain are never read)". On a host signed in via OAuth, as is usual, the call therefore
+> aborts — verified on the dev host: `claude -p --bare "Antworte mit OK"` → `Not logged in · Please
+> run /login` (exit code 1), while `claude -p --setting-sources local "Antworte mit OK"` → `OK`.
+> `--bare` would thus only be possible for instances that run purely on `ANTHROPIC_API_KEY`.
+
 ```json
 [
   { "type": "shell", "name": "backend_tests", "config": { "command": "mvn -q test", "on_failure": "continue", "checked_command": true } },
