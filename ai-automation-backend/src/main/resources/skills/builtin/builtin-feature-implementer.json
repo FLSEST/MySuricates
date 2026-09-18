@@ -1,0 +1,89 @@
+{
+  "id" : "builtin-feature-implementer",
+  "sortOrder" : 18,
+  "version" : "1.0.0",
+  "name" : "Feature Implementer",
+  "icon" : "🛠️",
+  "description" : "Implements a single feature in a generated SaaS app, reuses snippets when available, writes accompanying tests.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "implement_feature",
+      "description" : "Implement a single feature in the target project",
+      "writes" : true,
+      "inputSchema" : {
+        "properties" : {
+          "feature" : {
+            "type" : "object"
+          },
+          "project_path" : {
+            "type" : "string"
+          },
+          "stack" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "files_changed" : {
+            "type" : "array"
+          },
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "write_tests",
+      "description" : "Write unit/integration tests for an implemented feature",
+      "writes" : true,
+      "inputSchema" : {
+        "properties" : {
+          "feature" : {
+            "type" : "object"
+          },
+          "stack" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "test_files" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "apply_routes_glue",
+      "description" : "Wire a feature into the app's router/navigation/layout",
+      "writes" : true,
+      "inputSchema" : {
+        "properties" : {
+          "feature_id" : {
+            "type" : "string"
+          },
+          "project_path" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "files_changed" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "id" : "builtin-test-generator",
+  "sortOrder" : 2,
+  "version" : "1.0.0",
+  "name" : "Test Generator",
+  "icon" : "🧪",
+  "description" : "Automatically generates unit and integration tests for your code.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "generate_unit_tests",
+      "description" : "Generate unit tests for the provided code",
+      "writes" : true,
+      "inputSchema" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "framework" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "tests" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "generate_integration_tests",
+      "description" : "Generate integration tests for component interactions",
+      "writes" : true,
+      "inputSchema" : {
+        "properties" : {
+          "components" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "tests" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

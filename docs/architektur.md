@@ -581,7 +581,10 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 - Skills werden in der `skills`-DB-Tabelle gespeichert, nicht in Frontend oder In-Memory-Beans hardcodiert
 - **19 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
-- Skill-Definitionen liegen in `BuiltInSkills` (Reihenfolge) und `BuiltIn<Kategorie>Skills` (`config/`-Package)
+- **Ablage:** `src/main/resources/skills/builtin/<id>.json` (Metadaten: `sortOrder`, `version`, `name`, `icon`, `description`, `category`, `capabilities` inkl. `writes`/`async`/`handlerClass`/Schemata) plus `<id>.md` mit dem Prompt-Text. Geladen von `BuiltInSkillLoader` (Vorbild `BuiltInTemplateLoader`); die Java-Klassen `BuiltInSkills`/`BuiltIn<Kategorie>Skills` gibt es nicht mehr
+- Die `.md` wird **byte-genau** übernommen (kein Trim, kein angehängter Zeilenumbruch). `BuiltInSkillsSnapshotTest` vergleicht alle Skills kanonisch mit `src/test/resources/skills/builtin-snapshot.json` und schlägt bei jeder unbeabsichtigten Änderung fehl; gewollte Änderungen mit `./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true` neu schreiben
+- **Versionsregel:** `SkillSeeder` seedet versionsbasiert (Semver-Vergleich in `SeedVersions`, wie `WorkflowTemplateSeeder`) — fehlende Skills werden angelegt, vorhandene nur bei höherer Ressourcen-`version` überschrieben (inkl. Capabilities). Eine inhaltliche Änderung an einem Built-in braucht also eine höhere `version` in der JSON, sonst erreicht sie bestehende Instanzen nicht. Nutzer-Skills (`builtin=false`) und in den Ressourcen entfallene Built-ins bleiben unangetastet
+- Loader-Fehler sind hart: fehlende `.md`, Dateiname ≠ `id`, fehlender oder doppelter `sortOrder`, fehlende/unbekannte `category` oder ein leeres Verzeichnis brechen den Start ab, statt ein unvollständiges Skill-Set zu seeden
 - Built-in Skills haben stabile IDs (z.B. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` registriert alle Skills auch im In-Memory `SkillRegistry` für Capability-Lookups
 - `SkillRegistry` hängt nicht mehr von `SkillProvider`-Beans ab — Seeder übernimmt die Registrierung

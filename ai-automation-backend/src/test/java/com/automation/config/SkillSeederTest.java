@@ -1,9 +1,11 @@
 package com.automation.config;
 
+import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
 import com.automation.repository.SkillRepository;
 import com.automation.service.skill.SkillRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,7 +18,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SkillSeederTest {
@@ -27,74 +32,153 @@ class SkillSeederTest {
     @Mock
     private SkillRegistry skillRegistry;
 
+    private BuiltInSkillLoader loader;
     private SkillSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new SkillSeeder(skillRepository, skillRegistry);
+        loader = new BuiltInSkillLoader(new ObjectMapper());
+        seeder = new SkillSeeder(skillRepository, skillRegistry, loader);
+    }
+
+    private Skill firstBuiltIn() {
+        return loader.loadAll().get(0);
+    }
+
+    /** Kopie eines Built-ins, wie sie in der DB laege — mit frei waehlbarer Version. */
+    private Skill dbCopy(Skill source, String version) {
+        Skill copy = Skill.builder()
+                .id(source.getId())
+                .name("Alter Name")
+                .icon("❔")
+                .description("Alte Beschreibung")
+                .category(SkillCategory.DATA)
+                .aiContext("Alter Prompt")
+                .builtin(true)
+                .version(version)
+                .build();
+        copy.setCapabilities(new ArrayList<>());
+        return copy;
     }
 
     @Test
-    void run_emptyDb_seedsAllSkills() throws Exception {
+    void run_emptyDb_seedsAllSkills() {
         when(skillRepository.findByBuiltin(true)).thenReturn(List.of());
         when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
-        int expectedCount = BuiltInSkills.getAll().size();
-        verify(skillRepository, times(expectedCount)).save(any(Skill.class));
-        verify(skillRegistry, times(expectedCount)).register(any(Skill.class));
+        int expected = loader.loadAll().size();
+        verify(skillRepository, times(expected)).save(any(Skill.class));
+        verify(skillRegistry, times(expected)).register(any(Skill.class));
     }
 
     @Test
-    void run_allExist_skipsSeeding() throws Exception {
-        List<Skill> existingSkills = new ArrayList<>();
-        for (int i = 0; i < BuiltInSkills.getAll().size(); i++) {
-            existingSkills.add(Skill.builder()
-                    .id("existing-" + i)
-                    .name("Existing " + i)
-                    .category(SkillCategory.CODE)
-                    .builtin(true)
-                    .build());
-        }
-        when(skillRepository.findByBuiltin(true)).thenReturn(existingSkills);
+    void run_sameVersion_doesNotUpdate() {
+        List<Skill> existing = loader.loadAll().stream()
+                .map(s -> dbCopy(s, "1.0.0"))
+                .toList();
+        when(skillRepository.findByBuiltin(true)).thenReturn(existing);
 
         seeder.run(null);
 
         verify(skillRepository, never()).save(any(Skill.class));
-        // But all existing skills should be registered in the registry
-        verify(skillRegistry, times(existingSkills.size())).register(any(Skill.class));
+        verify(skillRegistry, times(existing.size())).register(any(Skill.class));
     }
 
     @Test
-    void run_partialState_seedsOnlyMissing() throws Exception {
-        // Simulate: first skill already exists, rest are missing
-        Skill existingSkill = BuiltInSkills.getAll().get(0);
-        when(skillRepository.findByBuiltin(true)).thenReturn(List.of(existingSkill));
+    void run_olderVersionInDb_updatesFromResources() {
+        Skill fresh = firstBuiltIn();
+        Skill stale = dbCopy(fresh, "0.9.0");
+        when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(stale)));
         when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
-        int expectedNewSkills = BuiltInSkills.getAll().size() - 1;
-        verify(skillRepository, times(expectedNewSkills)).save(any(Skill.class));
+        ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
+        verify(skillRepository, times(loader.loadAll().size())).save(captor.capture());
 
-        // All skills (existing + new) should be registered
-        int totalRegistered = BuiltInSkills.getAll().size();
-        verify(skillRegistry, times(totalRegistered)).register(any(Skill.class));
+        Skill updated = captor.getAllValues().stream()
+                .filter(s -> s.getId().equals(fresh.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(updated).isSameAs(stale);
+        assertThat(updated.getName()).isEqualTo(fresh.getName());
+        assertThat(updated.getIcon()).isEqualTo(fresh.getIcon());
+        assertThat(updated.getDescription()).isEqualTo(fresh.getDescription());
+        assertThat(updated.getCategory()).isEqualTo(fresh.getCategory());
+        assertThat(updated.getAiContext()).isEqualTo(fresh.getAiContext());
+        assertThat(updated.getVersion()).isEqualTo("1.0.0");
+        assertThat(updated.getCapabilities())
+                .extracting(Capability::getName)
+                .containsExactlyElementsOf(fresh.getCapabilities().stream().map(Capability::getName).toList());
+        assertThat(updated.getCapabilities()).allSatisfy(c -> assertThat(c.getSkill()).isSameAs(stale));
     }
 
     @Test
-    void run_registersSkillsInRegistry() throws Exception {
+    void run_newerVersionInDb_isNotDowngraded() {
+        Skill fresh = firstBuiltIn();
+        Skill newer = dbCopy(fresh, "2.0.0");
+        when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(newer)));
+        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.run(null);
+
+        ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
+        verify(skillRepository, times(loader.loadAll().size() - 1)).save(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Skill::getId).doesNotContain(fresh.getId());
+        assertThat(newer.getName()).isEqualTo("Alter Name");
+        assertThat(newer.getVersion()).isEqualTo("2.0.0");
+    }
+
+    @Test
+    void run_partialState_seedsOnlyMissing() {
+        Skill existing = dbCopy(firstBuiltIn(), "1.0.0");
+        when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(existing)));
+        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.run(null);
+
+        verify(skillRepository, times(loader.loadAll().size() - 1)).save(any(Skill.class));
+        verify(skillRegistry, times(loader.loadAll().size())).register(any(Skill.class));
+    }
+
+    @Test
+    void run_neverTouchesUserSkills() {
+        // Nutzer-Skills sind builtin=false und tauchen in findByBuiltin(true) nicht auf.
         when(skillRepository.findByBuiltin(true)).thenReturn(List.of());
         when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
-        verify(skillRegistry, atLeastOnce()).register(captor.capture());
+        verify(skillRepository, times(loader.loadAll().size())).save(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(s -> {
+            assertThat(s.isBuiltin()).isTrue();
+            assertThat(s.getId()).startsWith("builtin-");
+        });
+        verify(skillRepository, never()).delete(any(Skill.class));
+        verify(skillRepository, never()).deleteAll();
+    }
 
-        List<Skill> registered = captor.getAllValues();
-        assertThat(registered).isNotEmpty();
-        assertThat(registered.get(0).getId()).isNotBlank();
+    @Test
+    void run_registersUnknownBuiltInsFromDbToo() {
+        // Ein Built-in, das es in den Ressourcen nicht mehr gibt, bleibt erhalten und registriert.
+        Skill orphan = Skill.builder()
+                .id("builtin-retired")
+                .name("Retired")
+                .category(SkillCategory.CODE)
+                .builtin(true)
+                .version("1.0.0")
+                .build();
+        when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(orphan)));
+        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        seeder.run(null);
+
+        ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
+        verify(skillRegistry, times(loader.loadAll().size() + 1)).register(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Skill::getId).contains("builtin-retired");
+        verify(skillRepository, never()).delete(any(Skill.class));
     }
 }

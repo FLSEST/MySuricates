@@ -1,0 +1,63 @@
+{
+  "id" : "builtin-document-translator",
+  "sortOrder" : 5,
+  "version" : "1.0.0",
+  "name" : "Document Translator",
+  "icon" : "🌍",
+  "description" : "Translates documents between languages while preserving formatting and context.",
+  "category" : "DOCUMENT",
+  "capabilities" : [
+    {
+      "name" : "translate_text",
+      "description" : "Translate text from one language to another",
+      "inputSchema" : {
+        "properties" : {
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "detectedLanguage" : {
+            "type" : "string"
+          },
+          "translation" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "detect_language",
+      "description" : "Detect the language of the provided text",
+      "inputSchema" : {
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "confidence" : {
+            "type" : "number"
+          },
+          "language" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

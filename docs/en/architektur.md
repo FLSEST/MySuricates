@@ -543,7 +543,10 @@ Claude Code sessions can also serve as templates for workflows:
 
 - Skills are stored in the `skills` DB table, not hardcoded in frontend or in-memory beans
 - **19 built-in skills** are seeded at startup by `SkillSeeder` (idempotent)
-- Skill definitions are in `BuiltInSkills` (order) and `BuiltIn<Category>Skills` (`config/` package)
+- **Location:** `src/main/resources/skills/builtin/<id>.json` (metadata: `sortOrder`, `version`, `name`, `icon`, `description`, `category`, `capabilities` incl. `writes`/`async`/`handlerClass`/schemas) plus `<id>.md` holding the prompt text. Loaded by `BuiltInSkillLoader` (modelled on `BuiltInTemplateLoader`); the Java classes `BuiltInSkills`/`BuiltIn<Category>Skills` are gone
+- The `.md` is taken **byte-for-byte** (no trim, no appended newline). `BuiltInSkillsSnapshotTest` compares all skills canonically against `src/test/resources/skills/builtin-snapshot.json` and fails on any unintended change; rewrite intended changes with `./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true`
+- **Version rule:** `SkillSeeder` seeds version-based (semver comparison in `SeedVersions`, like `WorkflowTemplateSeeder`) — missing skills are inserted, existing ones are only overwritten when the resource `version` is higher (capabilities included). So a content change to a built-in needs a higher `version` in its JSON, otherwise it never reaches existing instances. User skills (`builtin=false`) and built-ins no longer present in the resources are left untouched
+- Loader failures are hard: a missing `.md`, a filename that differs from the `id`, a missing or duplicate `sortOrder`, a missing/unknown `category` or an empty directory abort startup instead of seeding an incomplete skill set
 - Built-in skills have stable IDs (e.g. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` also registers all skills in the in-memory `SkillRegistry` for capability lookups
 - `SkillRegistry` no longer depends on `SkillProvider` beans — the seeder handles registration
