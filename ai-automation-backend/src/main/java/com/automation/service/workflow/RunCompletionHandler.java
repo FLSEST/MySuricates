@@ -1,5 +1,6 @@
 package com.automation.service.workflow;
 
+import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
@@ -7,6 +8,7 @@ import com.automation.entity.StepResult;
 import com.automation.entity.WorkflowRun;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.dashboard.DashboardWidgetResultParser;
 import com.automation.service.dlq.DeadLetterService;
 import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.todo.TodoOutputParser;
@@ -100,6 +102,23 @@ public class RunCompletionHandler {
                     })
                     .toList());
             log.info("Parsed {} todo_item markers from workflow {}", allTodoItems.size(), workflowName);
+        }
+
+        // dashboard_widget marker: what a workflow result widget shows (spec E3). Parsed here, where
+        // the steps are already in memory — the read path must never load step output blobs (pool=1).
+        // Derived outputs are skipped like above: a compression step copies its source's text.
+        DashboardWidgetResultParser.ParseResult widgetResult = DashboardWidgetResultParser.parseRun(
+                run.getSteps().stream()
+                        .filter(step -> step.getOutput() != null && !isDerivedOutput(step))
+                        .map(StepResult::getOutput)
+                        .toList());
+        if (widgetResult.state() == ResultState.VALID) {
+            context.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
+                    DashboardWidgetResultParser.toMetadata(widgetResult.result()));
+        } else if (widgetResult.state() == ResultState.INVALID) {
+            // A fixed token, never anything from the output: the widget says "invalid" instead of nothing.
+            context.setRunMetadata(DashboardWidgetResultParser.ERROR_METADATA_KEY, "INVALID");
+            log.info("Workflow {} reported a dashboard_widget marker that does not match the contract", workflowName);
         }
 
         boolean failedChecks = run.getSteps().stream().anyMatch(step ->

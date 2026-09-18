@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.automation.service.dashboard.DashboardWidgetResultParser;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.contains;
@@ -214,5 +216,45 @@ class RunCompletionHandlerTest {
         assertThat((List<Map<String, Object>>) ctx.getRunMetadata().get("todo_items"))
                 .extracting(item -> item.get("title"))
                 .containsExactly("Parent finding");
+    }
+
+    @Test
+    void storesTheDashboardWidgetContractOfTheLastReportingStep() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "dashboard_widget: {\"status\":\"GREEN\",\"title\":\"early\"}",
+                "dashboard_widget: {\"status\":\"RED\",\"title\":\"final\",\"items\":[\"<b>text</b>\"]}");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.ERROR_METADATA_KEY);
+        assertThat(ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY))
+                .isEqualTo(Map.of("status", "RED", "title", "final", "items", List.of("<b>text</b>")));
+    }
+
+    @Test
+    void marksABrokenMarkerAsInvalidWithoutEchoingTheOutput() {
+        WorkflowRun run = run(RunStatus.RUNNING, "dashboard_widget: {\"status\":\"PINK\",\"secret\":\"key-1\"}");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.METADATA_KEY);
+        assertThat(ctx.getRunMetadata().get(DashboardWidgetResultParser.ERROR_METADATA_KEY)).isEqualTo("INVALID");
+    }
+
+    @Test
+    void ignoresMarkersInDerivedOutputAndRunsWithoutOne() {
+        WorkflowRun compressed = run(RunStatus.RUNNING,
+                "dashboard_widget: {\"status\":\"GREEN\"}", "dashboard_widget: {\"status\":\"RED\"}");
+        compressed.getSteps().get(1).setMetadata(Map.of("derivedOutput", true));
+
+        handler.complete(compressed, ctx, "wf-1", "Demo", null, "proj-1");
+        assertThat(DashboardWidgetResultParser.fromMetadata(
+                ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY)).result().status().name())
+                .isEqualTo("GREEN");
+
+        ExecutionContext plain = ExecutionContext.builder().workflowRunId("run-2").build();
+        handler.complete(run(RunStatus.RUNNING, "nothing to report"), plain, "wf-1", "Demo", null, "proj-1");
+        assertThat(plain.getRunMetadata()).doesNotContainKeys(
+                DashboardWidgetResultParser.METADATA_KEY, DashboardWidgetResultParser.ERROR_METADATA_KEY);
     }
 }
