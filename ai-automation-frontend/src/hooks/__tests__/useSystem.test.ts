@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
+import { parseRetryAfter, resetRateLimitBackoff } from '../../api/client';
 import {
   useSystemHealth,
   useSystemInfo,
@@ -94,6 +95,29 @@ describe('useSystemInfo', () => {
     const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.version).toBe('0.5.0');
+  });
+
+  it('übernimmt die Rate-Limit-Parameter der Instanz für den 429-Backoff (37b98c97)', async () => {
+    server.use(http.get(`${apiBase}/system/info`, () => HttpResponse.json({
+      version: '0.5.0',
+      rateLimit: { enabled: true, requestsPerMinute: 600, globalBackoffSeconds: 7, defaultRetryAfterSeconds: 21 },
+    })));
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // Ohne den Serverwert stünden hier die eingebauten 10 s.
+    expect(parseRetryAfter(null)).toBe(21);
+    resetRateLimitBackoff();
+    expect(parseRetryAfter(null)).toBe(10);
+  });
+
+  it('bleibt bei den eingebauten Werten, wenn die Instanz kein rateLimit meldet', async () => {
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(parseRetryAfter(null)).toBe(10);
   });
 });
 

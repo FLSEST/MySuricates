@@ -15,12 +15,15 @@
 #   ./scripts/setup.sh --start        # nach erfolgreichem Setup direkt starten
 #   ./scripts/setup.sh --show-key     # API-Key voll anzeigen (Default: maskiert)
 #   ./scripts/setup.sh --preset core  # Modul-Preset ohne Rückfrage: core | research | full
+#   ./scripts/setup.sh --preset full --force   # Preset auch in einer vorhandenen Config setzen
 #   ./scripts/setup.sh --lang de      # Sprache der Modultexte: de | en (Default: $LANG, sonst en)
 #   ./scripts/setup.sh --install --start
 #   ./scripts/setup.sh --help
 #
 # Das Modul-Preset landet in ai-automation-backend/config/application.yml — nur wenn die
 # Datei noch nicht existiert. Ohne --preset wird im Terminal gefragt, sonst gilt core.
+# --force (nur zusammen mit --preset) ersetzt in einer vorhandenen Datei ausschließlich die
+# Zeile automation.modules.preset: — alles andere bleibt unverändert; wirksam nach Neustart.
 # --lang ändert nur die Anzeige der Modultexte, nie das Ergebnis; unbekannte Sprache → en.
 #
 # set -e bewusst NICHT: der Checker probiert absichtlich evtl. fehlende Tools.
@@ -37,6 +40,7 @@ DO_INSTALL=0
 DO_START=0
 SHOW_KEY=0
 PRESET=""
+FORCE_PRESET=0
 LANG_OPT=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -45,10 +49,11 @@ while [ "$#" -gt 0 ]; do
     --show-key) SHOW_KEY=1 ;;
     --preset)  PRESET="${2:-}"; shift ;;
     --preset=*) PRESET="${1#--preset=}" ;;
+    --force)   FORCE_PRESET=1 ;;
     --lang)    LANG_OPT="${2:-}"; shift ;;
     --lang=*)  LANG_OPT="${1#--lang=}" ;;
     -h|--help)
-      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "Unbekannte Option: $1 (siehe --help)" >&2; exit 2 ;;
@@ -57,6 +62,10 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -n "$PRESET" ] && ! module_preset_valid "$PRESET"; then
   echo "Unbekanntes Preset: $PRESET (erlaubt: ${MODULE_PRESETS})" >&2
+  exit 2
+fi
+if [ "$FORCE_PRESET" = 1 ] && [ -z "$PRESET" ]; then
+  echo "--force gilt nur zusammen mit --preset <${MODULE_PRESETS// /|}> (siehe --help)" >&2
   exit 2
 fi
 # Anzeigesprache der Modultexte: --lang, sonst $LANG-Präfix, sonst en. Kein Fehlerfall —
@@ -343,8 +352,25 @@ fi
 head2 "Module"
 LOCAL_CONFIG="${BACKEND_DIR}/config/application.yml"
 if [ -e "$LOCAL_CONFIG" ]; then
-  ok "config/application.yml vorhanden — Modul-Konfiguration bleibt unverändert"
-  [ -n "$PRESET" ] && warn "--preset ${PRESET} ignoriert; Preset dort unter automation.modules.preset anpassen"
+  if [ "$FORCE_PRESET" = 1 ]; then
+    # --force fasst nur die Preset-Zeile an; alles andere in der Datei bleibt, wie es ist.
+    module_preset_update "$LOCAL_CONFIG" "$PRESET"; PRESET_RC=$?
+    case "$PRESET_RC" in
+      0)
+        ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} in ai-automation-backend/config/application.yml gesetzt (nur diese Zeile)"
+        echo "      Wirksam nach einem Backend-Neustart (Übersicht: Settings → Module & Härtung)"
+        ;;
+      1)
+        warn "config/application.yml ist nicht schreibbar — Preset dort von Hand anpassen"
+        ;;
+      *)
+        warn "Preset-Zeile konnte nicht eindeutig gesetzt werden (Grund siehe oben) — in config/application.yml von Hand anpassen"
+        ;;
+    esac
+  else
+    ok "config/application.yml vorhanden — Modul-Konfiguration bleibt unverändert"
+    [ -n "$PRESET" ] && warn "--preset ${PRESET} ignoriert; mit ${C_BLD}--force${C_RST} wird dort nur die Zeile automation.modules.preset ersetzt"
+  fi
 else
   if [ -z "$PRESET" ]; then
     if [[ -t 0 && -t 1 ]]; then

@@ -80,19 +80,31 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getRemaining(limit)));
             filterChain.doFilter(request, response);
         } else {
-            log.warn("Rate limit exceeded for client: {}", clientId);
+            // Wartezeit bis zum nächsten freien Slot, nicht pauschal 60 s: der Client richtet
+            // seine Sperre nach Retry-After und würde ohne den Header 10 s raten (b6feccbc).
+            int retryAfterSeconds = bucket.secondsUntilReset(System.currentTimeMillis());
+            log.warn("Rate limit exceeded for client: {} (retry after {}s)", clientId, retryAfterSeconds);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
             response.setContentType("application/json");
-            response.getWriter().write("""
-                    {"error": "Rate limit exceeded", "retryAfterSeconds": 60}
-                    """);
+            response.getWriter().write(
+                    "{\"error\": \"Rate limit exceeded\", \"retryAfterSeconds\": " + retryAfterSeconds + "}\n");
         }
     }
 
-    private static class ClientBucket {
+    /** Package-private, damit {@code RateLimitFilterTest} das Fenster mit festen Zeitpunkten prüfen kann. */
+    static class ClientBucket {
         private final AtomicInteger count = new AtomicInteger(0);
-        private volatile long windowStart = System.currentTimeMillis();
+        private volatile long windowStart;
         private final Object windowLock = new Object();
+
+        ClientBucket() {
+            this(System.currentTimeMillis());
+        }
+
+        ClientBucket(long windowStart) {
+            this.windowStart = windowStart;
+        }
 
         boolean tryConsume(int limit) {
             long now = System.currentTimeMillis();
@@ -103,6 +115,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 }
             }
             return count.incrementAndGet() <= limit;
+        }
+
+        /**
+         * Sekunden bis das Minutenfenster umschlägt — mindestens 1, damit ein Client, der in der
+         * letzten Millisekunde des Fensters abgewiesen wird, nicht "0" (= keine Sperre) liest.
+         */
+        int secondsUntilReset(long now) {
+            long start;
+            synchronized (windowLock) {
+                start = windowStart;
+            }
+            long remainingMs = start + 60_000 - now;
+            if (remainingMs <= 0) {
+                return 1;
+            }
+            return (int) Math.min(60, Math.max(1, (remainingMs + 999) / 1000));
         }
 
         int getRemaining(int limit) {

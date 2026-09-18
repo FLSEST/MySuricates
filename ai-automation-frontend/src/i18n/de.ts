@@ -1997,7 +1997,7 @@ export const de: TranslationKeys = {
     uiEditableLabel: 'Über die Einstellungen schaltbar',
     uiEditableRisk: 'Jeder mit API-Key kann Funktionsmodule hier schalten. Auf öffentlich erreichbaren Instanzen ausgeschaltet lassen.',
     setupCommand: 'Preset ändern',
-    setupCommandHint: 'Der Befehl legt nur eine neue ai-automation-backend/config/application.yml an. Existiert sie bereits — auf jeder laufenden Instanz —, lässt er sie unangetastet: dort die Zeile automation.modules.preset: von Hand ändern und neu starten.',
+    setupCommandHint: 'Ohne --force legt der Befehl nur eine neue ai-automation-backend/config/application.yml an und lässt eine vorhandene unangetastet. Mit --force ersetzt er dort ausschließlich die Zeile automation.modules.preset: — alles andere bleibt, wie es ist. Wirksam nach einem Backend-Neustart.',
   },
   commandPalette: {
     placeholder: 'Was willst du machen?',

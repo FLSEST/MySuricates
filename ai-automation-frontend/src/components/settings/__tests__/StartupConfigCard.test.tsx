@@ -45,10 +45,12 @@ describe('StartupConfigCard', () => {
     expect(within(section).getByTestId('startup-config-ui-editable')).toHaveTextContent('Off');
     expect(within(section).queryByTestId('startup-config-ui-editable-risk')).not.toBeInTheDocument();
 
-    // The setup.sh command is shown, copyable — with the hint that it writes nothing on a running instance
-    expect(within(section).getByText(/scripts\/setup\.sh --preset/)).toBeInTheDocument();
+    // The setup.sh command is shown, copyable — with --force, which is what a running instance
+    // needs: its config/application.yml already exists (729ceb19).
+    expect(within(section).getByText(/scripts\/setup\.sh --preset .*--force/)).toBeInTheDocument();
     expect(within(section).getByTestId('startup-config-setup-hint'))
-      .toHaveTextContent(/config\/application\.yml.*automation\.modules\.preset/);
+      .toHaveTextContent(/--force.*automation\.modules\.preset/);
+    expect(within(section).getByTestId('startup-config-setup-hint')).toHaveTextContent(/config\/application\.yml/);
 
     // Read-only: no button/input anywhere in the section except the copy button
     const buttons = within(section).getAllByRole('button');

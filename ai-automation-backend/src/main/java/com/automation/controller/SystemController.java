@@ -1,5 +1,6 @@
 package com.automation.controller;
 
+import com.automation.config.RateLimitConfig;
 import com.automation.config.RuntimeClasspathGuard;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
@@ -33,6 +34,7 @@ public class SystemController {
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final TailscaleService tailscaleService;
+    private final RateLimitConfig rateLimitConfig;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -115,6 +117,21 @@ public class SystemController {
         result.put("runtimeMode", RuntimeClasspathGuard.mode(System.getProperty("java.class.path")));
         result.put("tailscale", tailscaleService.isConfigEnabled() ? "CONFIGURED" : "DISABLED");
         result.put("environment", environment);
+        result.put("rateLimit", rateLimitInfo());
         return result;
+    }
+
+    /**
+     * Rate-Limit-Kennzahlen dieser Instanz für den Browser-Client: sein 429-Backoff soll die
+     * Zahlen nicht raten, sondern von der Instanz beziehen, gegen die er läuft (37b98c97).
+     * Der Endpunkt ist bewusst öffentlich — hier steht nichts, was ein 429 nicht ohnehin verrät.
+     */
+    private Map<String, Object> rateLimitInfo() {
+        Map<String, Object> rateLimit = new LinkedHashMap<>();
+        rateLimit.put("enabled", rateLimitConfig.isEnabled());
+        rateLimit.put("requestsPerMinute", rateLimitConfig.getRequestsPerMinute());
+        rateLimit.put("globalBackoffSeconds", rateLimitConfig.getClientGlobalBackoffSeconds());
+        rateLimit.put("defaultRetryAfterSeconds", rateLimitConfig.getClientDefaultRetryAfterSeconds());
+        return rateLimit;
     }
 }

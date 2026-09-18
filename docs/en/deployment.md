@@ -150,7 +150,11 @@ Two commented templates for modules and hardening live in `ai-automation-backend
 | [`application-minimal.yml`](../../ai-automation-backend/config-examples/application-minimal.yml) | core only (`core`) | off | all off |
 | [`application-maximal.yml`](../../ai-automation-backend/config-examples/application-maximal.yml) | all (`full`) | on | all on |
 
-The public default sits in between: `core`, settings switches off, only `provenance` on. For Docker/Compose, the same values as environment variables:
+The public default sits in between: `core`, settings switches off, only `provenance` on.
+
+On an instance that is already running, `./scripts/setup.sh --preset <core|research|full> --force` switches the preset: `--force` replaces just the `automation.modules.preset:` line in the existing `config/application.yml` and leaves everything else (comments, order, individual module overrides) untouched — it takes effect after a backend restart. Without `--force`, `setup.sh` writes nothing into an existing file. If the line cannot be placed unambiguously (several `automation:` blocks), the script aborts with a message instead of guessing.
+
+For Docker/Compose, the same values as environment variables:
 
 ```bash
 # Minimal: platform core only, every option off
