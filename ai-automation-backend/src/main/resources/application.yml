@@ -26,6 +26,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # Logs every statement slower than this (ms) with its runtime. Hibernate reads the
+        # threshold once at startup, so it is not runtime-switchable like the request metrics.
+        # 0 would log every statement — keep it at a value that only catches real outliers.
+        log_slow_query: 200
 
   flyway:
     enabled: true

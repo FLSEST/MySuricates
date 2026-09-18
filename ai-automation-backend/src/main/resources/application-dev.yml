@@ -7,3 +7,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+automation:
+  request-metrics:
+    # Server-Timing zeigt Wartezeit, Arbeitszeit und SQL-Zahl jeder Antwort direkt im
+    # DevTools-Network-Tab. Das ist beim Entwickeln der schnellste Weg zur Diagnose, verraet
+    # aber Interna — deshalb nur im Dev-Profil an, in stable/test/prod aus (Default false).
+    server-timing-enabled: true

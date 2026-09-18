@@ -8,6 +8,7 @@ import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RateLimitConfig;
+import com.automation.config.RequestMetricsConfig;
 import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
@@ -60,6 +61,7 @@ public class ExecutionSettingsService {
     private final ModelCatalogService modelCatalogService;
     private final CompressionConfig compressionConfig;
     private final TodoSimilarityConfig todoSimilarityConfig;
+    private final RequestMetricsConfig requestMetricsConfig;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -85,7 +87,8 @@ public class ExecutionSettingsService {
             DashboardLayoutConfig dashboardLayoutConfig,
             ModelCatalogService modelCatalogService,
             CompressionConfig compressionConfig,
-            TodoSimilarityConfig todoSimilarityConfig) {
+            TodoSimilarityConfig todoSimilarityConfig,
+            RequestMetricsConfig requestMetricsConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -107,6 +110,7 @@ public class ExecutionSettingsService {
         this.modelCatalogService = modelCatalogService;
         this.compressionConfig = compressionConfig;
         this.todoSimilarityConfig = todoSimilarityConfig;
+        this.requestMetricsConfig = requestMetricsConfig;
         this.appliers = buildAppliers();
     }
 
@@ -146,6 +150,9 @@ public class ExecutionSettingsService {
         m.put("model-catalog-ttl-seconds", v -> modelCatalogService.setTtlSeconds(Integer.parseInt(v)));
         m.put("compress-ai-max-input-chars", v -> compressionConfig.setMaxAiInputChars(Integer.parseInt(v)));
         m.put("todo-similarity-keyword-threshold", v -> todoSimilarityConfig.setKeywordThreshold(Double.parseDouble(v)));
+        m.put("request-metrics-enabled", v -> requestMetricsConfig.setEnabled(Integer.parseInt(v) == 1));
+        m.put("request-metrics-retention-days", v -> requestMetricsConfig.setRetentionDays(Integer.parseInt(v)));
+        m.put("request-metrics-slow-request-ms", v -> requestMetricsConfig.setSlowRequestMs(Long.parseLong(v)));
         return m;
     }
 
