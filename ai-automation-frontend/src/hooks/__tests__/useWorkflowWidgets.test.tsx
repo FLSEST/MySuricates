@@ -56,4 +56,32 @@ describe('useWorkflowWidgetResults', () => {
 
     await waitFor(() => expect(result.current.data).toEqual([]));
   });
+
+  it('treats different orders of the same ids as one query and refetches nothing', async () => {
+    let calls = 0;
+    server.use(http.get('/api/v1/dashboard/workflow-results', () => {
+      calls += 1;
+      return HttpResponse.json([ENTRY, { ...ENTRY, workflowId: 'wf-b1' }]);
+    }));
+
+    // A QueryClient created inside the wrapper component would be recreated on every rerender
+    // (losing the cache); hoisting it here keeps the same client across the reorder below.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    function stableWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    }
+
+    const { result, rerender } = renderHook(
+      ({ ids }: { ids: string[] }) => useWorkflowWidgetResults(ids, { polling: false }),
+      { wrapper: stableWrapper, initialProps: { ids: ['wf-a1', 'wf-b1'] } },
+    );
+
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    expect(calls).toBe(1);
+
+    rerender({ ids: ['wf-b1', 'wf-a1'] });
+
+    expect(result.current.data?.map((entry) => entry.workflowId)).toEqual(['wf-a1', 'wf-b1']);
+    expect(calls).toBe(1);
+  });
 });

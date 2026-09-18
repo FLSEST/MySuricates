@@ -16,14 +16,19 @@ interface WorkflowWidgetOptions {
  * broadcast; the 60 s interval is the fallback for a missing WebSocket connection.
  *
  * Every entry goes through parseWorkflowEntry: what does not match the contract never reaches a widget.
+ *
+ * The ids are deduplicated and sorted before they become the query key: the backend already dedupes
+ * and caps them, so this is only about a stable key — reordering widgets on the dashboard must not
+ * churn the cache key and trigger a redundant refetch.
  */
 export function useWorkflowWidgetResults(workflowIds: readonly string[], options: WorkflowWidgetOptions) {
+  const ids = [...new Set(workflowIds)].sort();
   return useQuery({
-    queryKey: [...WORKFLOW_RESULTS_QUERY_KEY, workflowIds.join(',')],
-    enabled: workflowIds.length > 0,
+    queryKey: [...WORKFLOW_RESULTS_QUERY_KEY, ids.join(',')],
+    enabled: ids.length > 0,
     queryFn: async () => {
       const params = new URLSearchParams();
-      for (const workflowId of workflowIds) params.append('workflowIds', workflowId);
+      for (const workflowId of ids) params.append('workflowIds', workflowId);
       const raw = await api.get<unknown>(`/dashboard/workflow-results?${params.toString()}`);
       if (!Array.isArray(raw)) return [];
       return raw.map(parseWorkflowEntry).filter((entry): entry is WorkflowWidgetEntry => entry !== null);

@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 
 let onConnectCb: (() => void) | null = null;
 let onDisconnectCb: (() => void) | null = null;
+let onStompErrorCb: (() => void) | null = null;
 let lastWsUrl: string | null = null;
 
 interface SubscribeRecord { destination: string; callback: (msg: { body: string }) => void }
@@ -18,6 +19,7 @@ vi.mock('@stomp/stompjs', () => {
     constructor(config: Record<string, unknown>) {
       onConnectCb = config.onConnect as () => void;
       onDisconnectCb = config.onDisconnect as () => void;
+      onStompErrorCb = config.onStompError as () => void;
       capturedWebSocketFactory = config.webSocketFactory as (() => unknown) | undefined;
       capturedBeforeConnect = config.beforeConnect as (() => Promise<void>) | undefined;
     }
@@ -50,15 +52,35 @@ beforeEach(() => {
 
 describe('useRunCompletedSocket', () => {
   it('connects only when enabled and subscribes to the dashboard topic', () => {
-    const { rerender } = renderHook(({ on }: { on: boolean }) => useRunCompletedSocket(on, vi.fn()), {
+    const { result, rerender } = renderHook(({ on }: { on: boolean }) => useRunCompletedSocket(on, vi.fn()), {
       initialProps: { on: false },
     });
     expect(mockActivate).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
 
     rerender({ on: true });
 
     expect(mockActivate).toHaveBeenCalledTimes(1);
     expect(subscriptions.map((sub) => sub.destination)).toEqual(['/topic/dashboard/runs']);
+    expect(result.current).toBe(true);
+  });
+
+  it('reports connected as false again once the socket disconnects', () => {
+    const { result } = renderHook(() => useRunCompletedSocket(true, vi.fn()));
+    expect(result.current).toBe(true);
+
+    act(() => { onDisconnectCb?.(); });
+
+    expect(result.current).toBe(false);
+  });
+
+  it('reports connected as false again on a STOMP protocol error', () => {
+    const { result } = renderHook(() => useRunCompletedSocket(true, vi.fn()));
+    expect(result.current).toBe(true);
+
+    act(() => { onStompErrorCb?.(); });
+
+    expect(result.current).toBe(false);
   });
 
   it('reports run_completed messages and ignores anything else', () => {
