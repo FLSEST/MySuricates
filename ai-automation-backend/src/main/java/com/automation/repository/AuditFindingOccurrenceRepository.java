@@ -8,4 +8,5 @@ import java.util.List;
 public interface AuditFindingOccurrenceRepository extends JpaRepository<AuditFindingOccurrence, String> {
     boolean existsByFindingIdAndReportId(String findingId, String reportId);
     List<AuditFindingOccurrence> findByReportId(String reportId);
+    List<AuditFindingOccurrence> findByFindingId(String findingId);
 }
