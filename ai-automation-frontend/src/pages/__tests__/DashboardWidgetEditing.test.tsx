@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
-import { setupDashboardPageTests, slot } from '../../test/dashboardPage';
+import { DASHBOARD_FIXTURE, setupDashboardPageTests, slot } from '../../test/dashboardPage';
 import { WIDGET_SIZE_CLASSES } from '../../components/dashboard/widgetRegistry';
 import { Dashboard } from '../Dashboard';
 
@@ -41,5 +41,34 @@ describe('Dashboard widget editing', { timeout: 20_000 }, () => {
     expect(slot('recent-runs')?.className).not.toContain(WIDGET_SIZE_CLASSES.twoThirds);
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(posts[0]?.layout?.views[0]?.widgets).toContainEqual({ instanceId: 'recent-runs', type: 'recent-runs', size: 'full' }));
+  });
+
+  it('adds an Insights chart from the catalog, removes it again and saves both steps', async () => {
+    server.use(
+      http.get('/api/v1/learning/dashboard', () => HttpResponse.json({ ...DASHBOARD_FIXTURE, gateStatusSummary: [{ status: 'GREEN', count: 3 }] })),
+    );
+    const posts = capturePosts();
+    await openEditMode();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add widget' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Quality gate results: green, yellow, red.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add: Quality Gates' }));
+    expect(within(dialog).getByRole('button', { name: 'In view: Quality Gates' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    // Lazy: the chart's code loads on first use, the slot shows it afterwards.
+    await waitFor(() => expect(slot('insights-gate-status')).toHaveTextContent('Quality Gates'), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(posts[0]?.layout?.views[0]?.widgets).toContainEqual({ instanceId: 'insights-gate-status', type: 'insights-gate-status' }));
+
+    // Editing is locked while the save runs.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove: Quality Gates' }));
+    expect(slot('insights-gate-status')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(posts).toHaveLength(2));
+    expect(posts[1]?.layout?.views[0]?.widgets.map((w) => w.instanceId)).not.toContain('insights-gate-status');
   });
 });

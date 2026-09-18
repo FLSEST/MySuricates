@@ -46,9 +46,13 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     expect(JSON.parse(localStorage.getItem('dashboard-layout') ?? '{}').state.views[0].widgets)
       .toContainEqual({ instanceId: 'recent-runs', type: 'recent-runs', hidden: true });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show: Recent Runs' }));
+    // Hidden widgets come back through the catalog.
+    fireEvent.click(screen.getByRole('button', { name: 'Add widget' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Show: Recent Runs' }));
     expect(widgetOrder()).toEqual([...DEFAULT_WIDGET_IDS]);
     expect(screen.queryByRole('button', { name: 'Show: Recent Runs' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'In view: Recent Runs' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     // Leaving edit mode keeps the layout and removes the edit controls.
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
@@ -101,7 +105,9 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     await waitFor(() => expect(slot('integration-stats')).toBeNull(), { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
     expect(slot('integration-stats')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Integrations/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add widget' }));
+    expect(within(screen.getByRole('dialog')).getByText('Runs Over Time')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).queryByText(/Integrations/)).not.toBeInTheDocument();
   });
 
   it('renders independent widgets while the dashboard data is still loading', async () => {

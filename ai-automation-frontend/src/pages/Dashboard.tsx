@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Check, History, Pencil, RotateCcw } from 'lucide-react';
 import { Button } from '../components/ui';
-import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
+import { DashboardGrid } from '../components/dashboard/DashboardGrid';
+import { DashboardEditBar } from '../components/dashboard/DashboardEditBar';
+import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog';
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
 import { useDashboardData } from '../components/dashboard/dashboardDataContext';
@@ -54,6 +56,7 @@ function DashboardPage() {
   const layout = useDashboardLayout();
   const [editMode, setEditMode] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const sync = useDashboardLayoutSync();
   const { isPlaceholderData } = useDashboardData();
   const activeViewId = useDashboardLayoutStore((s) => selectActiveView(s)?.id);
@@ -67,6 +70,7 @@ function DashboardPage() {
   const toggleEditMode = () => {
     // Leaving edit mode is the save point of the version history (spec E1).
     if (editMode && hasLocalLayoutChanges()) void sync.saveSnapshot();
+    setCatalogOpen(false);
     setEditMode((v) => !v);
   };
 
@@ -139,11 +143,7 @@ function DashboardPage() {
       </div>
 
       {editMode && (
-        <HiddenWidgetsBar
-          widgets={layout.hidden}
-          disabled={locked}
-          onShow={(instanceId) => layout.setHidden(instanceId, false)}
-        />
+        <DashboardEditBar hiddenCount={layout.hidden.length} disabled={locked} onOpenCatalog={() => setCatalogOpen(true)} />
       )}
 
       {/* Dimmed while the widgets still show the previous view's or filter's data. */}
@@ -165,6 +165,18 @@ function DashboardPage() {
           onRemove={layout.remove}
         />
       </div>
+
+      <WidgetCatalogDialog
+        open={editMode && catalogOpen}
+        onClose={() => setCatalogOpen(false)}
+        available={layout.available}
+        visible={layout.visible}
+        hidden={layout.hidden}
+        canAppend={layout.canAppend}
+        disabled={locked}
+        onAdd={layout.add}
+        onShow={(instanceId) => layout.setHidden(instanceId, false)}
+      />
 
       <LayoutHistoryDialog
         open={historyOpen}
