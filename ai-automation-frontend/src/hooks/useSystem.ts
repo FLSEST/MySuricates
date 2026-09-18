@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../api/client';
+import { api, apiErrorMessage, applyServerRateLimitConfig } from '../api/client';
 import { useToast } from './useToast';
 import { useT, useI18nStore } from '../i18n';
 import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
@@ -13,10 +13,19 @@ export function useSystemHealth() {
   });
 }
 
+/**
+ * Plattform-Info der Instanz. Nebenbei die einzige Quelle der 429-Backoff-Parameter: der Client
+ * übernimmt `rateLimit` von hier, statt 2 s/10 s zu raten (37b98c97). Der Endpunkt wird ohnehin
+ * beim Start geladen (Sidebar) und braucht keinen API-Key — also kein eigener Request.
+ */
 export function useSystemInfo() {
   return useQuery({
     queryKey: ['system', 'info'],
-    queryFn: () => api.get<SystemInfo>('/system/info'),
+    queryFn: async () => {
+      const info = await api.get<SystemInfo>('/system/info');
+      applyServerRateLimitConfig(info?.rateLimit);
+      return info;
+    },
   });
 }
 

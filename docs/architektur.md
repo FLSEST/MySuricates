@@ -890,9 +890,10 @@ Response (DTO) → React Query Cache → UI-Update
 - **Filter:** `RateLimitFilter` (liest von `RateLimitConfig` Bean)
 - **Algorithmus:** Sliding Window (1 Minute)
 - **Standard:** 120 Requests/Minute pro Client-IP
-- **Response-Header:** `X-RateLimit-Remaining`
+- **Response-Header:** `X-RateLimit-Remaining`; bei 429 zusätzlich `Retry-After` — Sekunden bis das Minutenfenster des Eimers umschlägt (mindestens 1), derselbe Wert wie `retryAfterSeconds` im JSON-Body
 - **Runtime-konfigurierbar:** Settings → Execution → API-Ratenbegrenzung (Toggle + RPM-Wert)
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
+- **Client-Backoff-Budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) und `client-default-retry-after-seconds` (10) — siehe unten
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
@@ -902,14 +903,26 @@ schnell". Der Client (`api/client.ts`) merkt sich die Sperre dagegen **pro Endpu
 Pfad ohne Query und mit durch `{id}` ersetzten UUIDs, damit `/executions/{id}` nicht pro Run einen
 eigenen Schlüssel bekommt).
 
-Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s (`GLOBAL_BACKOFF_SECONDS`),
-gedeckelt durch `Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale
-Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
+Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s, gedeckelt durch
+`Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
 blockierte Ticket-Anfrage kostet den WebSocket einen Reconnect-Versuch und verdoppelt seinen
 exponentiellen Abstand, aus 2 s wird also ein viel längerer Ausfall) und `GET /system/auth-status`
 (der `ApiKeyGuard` rendert nichts, bevor der antwortet — die App bliebe leer statt den
 Rate-Limit-Hinweis zu zeigen). Ihre eigene Pfad-Sperre gilt für sie weiterhin; ausgenommen sind sie
 nur von *fremden* 429ern.
+
+**Woher die zwei Zahlen kommen: von der Instanz, nicht aus dem Bundle.** Die 2 s der globalen
+Kurzsperre und die 10 s, die der Client ohne brauchbaren `Retry-After` annimmt, stehen als
+Konstanten (`GLOBAL_BACKOFF_SECONDS`, `DEFAULT_RETRY_AFTER_SECONDS`) nur noch als *Fallback* im
+Client. Die geltenden Werte liefert `GET /api/v1/system/info` unter `rateLimit`
+(`enabled`, `requestsPerMinute`, `globalBackoffSeconds`, `defaultRetryAfterSeconds`); `useSystemInfo`
+reicht sie über `applyServerRateLimitConfig()` an den Client weiter — der Endpunkt wird beim Start
+ohnehin geladen (Sidebar) und braucht keinen API-Key, also entsteht dafür kein eigener Request.
+Gesetzt werden sie über `automation.security.rate-limit.client-global-backoff-seconds` bzw.
+`client-default-retry-after-seconds`; fehlende oder nicht-positive Werte lässt der Client liegen und
+bleibt bei seinen Konstanten. Hintergrund: Eine Instanz mit anderem `requests-per-minute` macht fest
+verdrahtete Client-Zahlen zu Raterei (37b98c97). Weil der Filter bei jedem 429 ein `Retry-After`
+sendet, greift der 10-s-Default ohnehin nur noch, wenn ein Proxy den Header verschluckt.
 
 Daraus folgt: Nach einem 429-Sturm lässt der Client nach spätestens 2 s wieder einzelne Muster los,
 und jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Die kurze

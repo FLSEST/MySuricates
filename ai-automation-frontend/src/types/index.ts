@@ -731,6 +731,13 @@ export interface SystemInfo {
   java: string;
   tailscale: string;
   environment: string;
+  /** Rate limit of this instance — the client's 429 backoff takes its parameters from here (37b98c97). */
+  rateLimit?: {
+    enabled: boolean;
+    requestsPerMinute: number;
+    globalBackoffSeconds: number;
+    defaultRetryAfterSeconds: number;
+  };
 }
 
 export interface RemoteAccessStatus {

@@ -851,9 +851,10 @@ Response (DTO) → React Query Cache → UI Update
 - **Filter:** `RateLimitFilter` (reads from `RateLimitConfig` bean)
 - **Algorithm:** Sliding window (1 minute)
 - **Default:** 120 requests/minute per client IP
-- **Response header:** `X-RateLimit-Remaining`
+- **Response header:** `X-RateLimit-Remaining`; on a 429 also `Retry-After` — seconds until the bucket's minute window turns over (at least 1), the same value as `retryAfterSeconds` in the JSON body
 - **Runtime-configurable:** Settings → Execution → API rate limit (toggle + RPM value)
 - **Env override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
+- **Client backoff budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) and `client-default-retry-after-seconds` (10) — see below
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
 
@@ -862,13 +863,25 @@ Response (DTO) → React Query Cache → UI Update
 client (`api/client.ts`) in contrast remembers the lock **per endpoint pattern** (the path without
 its query and with UUIDs replaced by `{id}`, so `/executions/{id}` does not get one key per run).
 
-On top of that comes a **short lock over the remaining paths: at most 2 s
-(`GLOBAL_BACKOFF_SECONDS`), capped by `Retry-After`** — with `Retry-After: 0` no global lock is
-created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
+On top of that comes a **short lock over the remaining paths: at most 2 s, capped by
+`Retry-After`** — with `Retry-After: 0` no global lock is created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
 ticket request costs the WebSocket one reconnect attempt and doubles its exponential delay, turning
 2 s into a much longer outage) and `GET /system/auth-status` (the `ApiKeyGuard` renders nothing until
 it answers — the app would stay empty instead of showing the rate-limit hint). Their own path lock
 still applies to them; they are only exempt from *somebody else's* 429.
+
+**Where those two numbers come from: the instance, not the bundle.** The 2 s of the short global
+lock and the 10 s the client assumes without a usable `Retry-After` remain in the client as
+constants (`GLOBAL_BACKOFF_SECONDS`, `DEFAULT_RETRY_AFTER_SECONDS`) only as a *fallback*. The values
+actually in force come from `GET /api/v1/system/info` under `rateLimit` (`enabled`,
+`requestsPerMinute`, `globalBackoffSeconds`, `defaultRetryAfterSeconds`); `useSystemInfo` hands them
+to the client via `applyServerRateLimitConfig()` — the endpoint is loaded at startup anyway
+(sidebar) and needs no API key, so this costs no request of its own. They are set through
+`automation.security.rate-limit.client-global-backoff-seconds` and
+`client-default-retry-after-seconds`; missing or non-positive values are ignored and the client
+keeps its constants. Background: an instance with a different `requests-per-minute` turns
+hard-wired client numbers into guesswork (37b98c97). Since the filter sends a `Retry-After` on every
+429, the 10 s default now only applies when a proxy swallows the header.
 
 The consequence: after a 429 storm the client releases individual patterns again after at most 2 s,
 and each pattern collects its own 429 until its `Retry-After` lock is in place. The short global lock
