@@ -51,11 +51,14 @@ interface Diagram {
 export type DiagramOrientation = 'horizontal' | 'vertical';
 
 const VERTICAL_GAP = 70; // Leerraum zwischen Kästen im vertikalen Fluss
+/** Abstand zwischen Unterkante des Erzeugers und Oberkante seines Datenobjekts. */
+const DATA_OBJECT_GAP = 10;
 
 /**
  * Baut aus dem links→rechts-Layout ein sauberes oben→unten-Layout:
  * 1) Kästen transponieren (Position x↔y, Größe bleibt — horizontaler Text lesbar),
  * 2) Leerräume entlang der Fluss-Achse auf {@link VERTICAL_GAP} stauchen,
+ * 2b) Datenobjekte unter ihren Erzeuger legen (statt auf gleiche Höhe daneben),
  * 3) Kanten aus den Kasten-Positionen NEU routen (unten-Mitte → oben-Mitte, orthogonal).
  *
  * Schritt 3 ist entscheidend: Ein reiner Punkt-Tausch der Waypoints dockt falsch an,
@@ -91,6 +94,26 @@ function verticalLayout(d: Diagram): Diagram {
     return s;
   };
   shapes = shapes.map((s) => ({ ...s, y: s.y - shiftFor(s.y) }));
+
+  // 2b) Datenobjekte unter ihren Erzeuger legen. Das Backend setzt sie im waagerechten Layout
+  //     UNTER die Task-Reihe; transponiert landen sie damit auf gleicher Höhe rechts neben dem
+  //     Erzeuger, und die Ausgabe-Assoziation läuft erst zurück nach oben (sichtbarer Haken).
+  //     Unterhalb des Erzeugers — seitlich versetzt, damit die Fluss-Spalte frei bleibt —
+  //     verläuft sie monoton in Fluss-Richtung. Sie passt in den {@link VERTICAL_GAP}-Zwischenraum.
+  const dataIds = new Set(shapes.filter((s) => s.kind === 'dataObjectReference').map((s) => s.id));
+  const producerOf = new Map<string, string>();
+  for (const e of d.edges) {
+    if (e.dashed && dataIds.has(e.targetRef) && !producerOf.has(e.targetRef)) {
+      producerOf.set(e.targetRef, e.sourceRef); // dataOutputAssociation: Erzeuger → Datenobjekt
+    }
+  }
+  if (producerOf.size > 0) {
+    const placed = new Map(shapes.map((s) => [s.id, s]));
+    shapes = shapes.map((s) => {
+      const producer = placed.get(producerOf.get(s.id) ?? '');
+      return producer ? { ...s, y: producer.y + producer.h + DATA_OBJECT_GAP } : s;
+    });
+  }
 
   // 3) Kanten neu routen — orthogonal von Unterkante-Mitte der Quelle zur Oberkante-Mitte des Ziels
   const byId = new Map(shapes.map((s) => [s.id, s]));

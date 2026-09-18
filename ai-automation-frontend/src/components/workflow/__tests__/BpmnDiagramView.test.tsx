@@ -121,6 +121,34 @@ describe('BpmnDiagramView Datenfluss', () => {
     // Neu-Routing statt gespiegelter Alt-Punkte: keine Kante behält die Original-Koordinaten
     expect(dashed.some((p) => (p.getAttribute('points') || '').includes('336,240'))).toBe(false);
   });
+
+  it('legt das Datenobjekt im vertikalen Layout unter den Erzeuger, nicht daneben', () => {
+    const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
+    // Erzeuger ist der erste Task (b_0_tests), das Datenobjekt das Symbol mit umgeknickter Ecke
+    const erzeuger = container.querySelectorAll('rect')[0]!;
+    const oben = Number(erzeuger.getAttribute('y'));
+    const unten = oben + Number(erzeuger.getAttribute('height'));
+    const d = container.querySelector('path[data-bpmn="data-object"]')!.getAttribute('d')!;
+    const [dataX, dataY] = d.slice(2).split(' ').map(Number) as [number, number];
+    // unterhalb (im Fluss nach unten), nicht auf gleicher Höhe rechts daneben
+    expect(dataY).toBeGreaterThanOrEqual(unten);
+    // seitlich versetzt, damit es die Fluss-Spalte nicht blockiert
+    expect(dataX).toBeGreaterThan(Number(erzeuger.getAttribute('x')));
+  });
+
+  it('routet die Ausgabe-Assoziation im vertikalen Layout ohne Haken', () => {
+    const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} orientation="vertical" />);
+    const dashed = Array.from(container.querySelectorAll('polyline')).filter((p) =>
+      p.hasAttribute('stroke-dasharray'),
+    );
+    // Beide Assoziationen laufen monoton in Fluss-Richtung (y nie rückwärts) — kein Haken
+    for (const kante of dashed) {
+      const ys = (kante.getAttribute('points') || '').trim().split(/\s+/).map((pt) => Number(pt.split(',')[1]));
+      for (let i = 1; i < ys.length; i++) {
+        expect(ys[i]!).toBeGreaterThanOrEqual(ys[i - 1]! - 0.001);
+      }
+    }
+  });
 });
 
 describe('BpmnDiagramView', () => {
