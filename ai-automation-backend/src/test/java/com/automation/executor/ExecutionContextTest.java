@@ -488,7 +488,7 @@ class ExecutionContextTest {
         assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
     }
 
-    // ── Platform data variables: always escaped, never a run-level taint source ──
+    // ── Platform data variables: always escaped, a run-level taint source on use ──
 
     @Test
     void setUntrustedPlatformVariable_isSingleQuotedInShellCommands() {
@@ -535,6 +535,86 @@ class ExecutionContextTest {
         assertThat(context.hasUntrustedInput()).isTrue();
         assertThat(context.getUntrustedVariables()).containsExactly("previous_report");
         assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo 'y; id'");
+    }
+
+    // ── Platform data taints the run once it really lands in a shell command line ──
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_taintsTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo 'x; id'");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+    }
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_escapesLaterDerivedVariables() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+        context.resolveShellTemplate("echo {{ previous_report }}", false);
+
+        context.setDerivedVariable("item", "a.txt; id");
+
+        assertThat(context.isUntrusted("item")).isTrue();
+        assertThat(context.resolveShellTemplate("cat {{ item }}", false)).isEqualTo("cat 'a.txt; id'");
+    }
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_taintsLaterBlockOutputs() {
+        context.setUntrustedPlatformVariable("open_todos", "todos");
+        context.resolveShellTemplate("echo {{open_todos}}", false);
+
+        context.recordOutput("scan", "a | b");
+
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("'a | b' 'a | b'");
+        assertThat(context.exportTaint()).containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
+    }
+
+    @Test
+    void platformVariable_substitutedWithEscapeAll_taintsTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", true))
+                .isEqualTo("echo 'report'");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+    }
+
+    @Test
+    void platformVariable_usedOnlyInAPrompt_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        assertThat(context.resolveTemplate("Bewerte: {{ previous_report }}")).isEqualTo("Bewerte: x; id");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void platformVariable_notMentionedInTheShellCommand_leavesTheRunUntainted() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.setVariable("branch", "main");
+
+        assertThat(context.resolveShellTemplate("git checkout {{ branch }}", false))
+                .isEqualTo("git checkout main");
+
+        context.recordOutput("scan", "a | b");
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }}", false)).isEqualTo("a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void platformVariable_clearedBeforeUse_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.setVariable("previous_report", "clean");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo clean");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
     }
 
     // ── replaceValue: value changes, trust label stays ──────────────────────────

@@ -132,6 +132,23 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 
 Chains and sub-workflows pass their starter's origin on in the reserved context key `__parent_trigger_source`: `ChainExecutor` sets it for every entry itself (inputs cannot preset it), `SubWorkflowBlockExecutor` hands down the parent run's effective origin, and webhook payloads may not contain `__` keys. A missing or unreadable key counts as unattended. Refusals answer **403 `UNATTENDED_REQUIRES_SEAL`**. With this switch, auto-repair and wishes are effectively off: they run unattended and would have to modify sealed workflows.
 
+**Trust classes of context values** — Every context variable of a run carries one of three classes (`executor/VariableTrust`, bookkeeping in `executor/ExecutionContextTaint`). The class decides whether the value is substituted raw into a shell command line or wrapped in POSIX single quotes — and whether it *taints* the run, i.e. whether everything derived from it is escaped too.
+
+| Class | Source | In shell blocks | In AI prompts | Taints the run |
+|---|---|---|---|---|
+| **trusted** | workflow defaults, system values (`project_path`, `workflow_run_id`, `workflow_definition_hash`), block-internal values, answers from `approval`/`human-input`, any `setVariable` | substituted raw | raw | no |
+| **untrusted external** | webhook payload, restored `__untrusted_keys` (resume, sub-workflow), variables derived from tainted output (`step_N_output`, foreach items, `document` extracts) | always single-quoted | raw | yes, from the moment it is set |
+| **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | only once the placeholder was really substituted into a shell command line |
+
+- **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the reserved context keys `__untrusted_keys` and `__untrusted_outputs` so it survives resume and sub-workflow hand-over. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
+- **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that uses `{{ previous_report }}` only in an AI prompt (`resolveTemplate`), or not at all, stays untainted.
+- **Deliberately trusted:** answers from `approval` and `human-input` blocks arrive through the API-key-protected REST interface from the person who owns the instance — they are not escaped. Likewise `setVariable` (e.g. a workflow variable shadowing a webhook field of the same name) clears the untrusted mark on purpose: the value then comes from the definition, not from the caller. `replaceValue` (workspace path remapping) in contrast only swaps the value and leaves the class in place.
+- **Known limits:**
+  1. Nothing is escaped in AI prompts — a prompt is not a command line, and the trust model does not defend against prompt injection.
+  2. **Laundering through an AI block:** platform data in a `simple` or `agentic` prompt does not taint the run (limit 1); the AI's answer is recorded by `recordOutput` as untainted; a following shell block then substitutes `{{ previous_output }}` **raw**. The path platform data → AI prompt → shell block therefore bypasses the quoting entirely. It occurs eight times in the bundled definitions (seven pool workflows, one built-in template) and only stays harmless there because every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **Recommendation for your own workflows: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+  3. The platform-data "used in a shell path" flag itself is not exported; it does not need to be, because the first output after the substitution writes the taint into `__untrusted_outputs`.
+  4. A shell block that writes a tainted value into a file itself and later executes that file is outside what quoting can see.
+
 **Webhook signatures** — `POST /api/v1/webhooks/{id}/secret` generates a secret (32 random bytes, hex), shows it exactly once and stores it AES-GCM-encrypted (`IntegrationEncryptionService`, key outside the database) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` removes it. For a webhook with a secret, `WebhookSignatureVerifier` checks `X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`, the GitHub/Gitea format) as HMAC-SHA256 over the raw request bytes before the JSON is parsed, compared in constant time — otherwise **401 `WEBHOOK_SIGNATURE_INVALID`**. As with seals, a stored secret stays in force if the switch is later turned off. Responses only reveal `signatureRequired`.
 
 ## Backend Architecture
@@ -835,6 +852,34 @@ Response (DTO) → React Query Cache → UI Update
 - **Env override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
+
+**Global server bucket, per-path client lock — the asymmetry is deliberate.** The server counts in
+*one* bucket per client IP across all endpoints, so a 429 means "you as a whole are too fast". The
+client (`api/client.ts`) in contrast remembers the lock **per endpoint pattern** (the path without
+its query and with UUIDs replaced by `{id}`, so `/executions/{id}` does not get one key per run).
+
+On top of that comes a **short lock over the remaining paths: at most 2 s
+(`GLOBAL_BACKOFF_SECONDS`), capped by `Retry-After`** — with `Retry-After: 0` no global lock is
+created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
+ticket request costs the WebSocket one reconnect attempt and doubles its exponential delay, turning
+2 s into a much longer outage) and `GET /system/auth-status` (the `ApiKeyGuard` renders nothing until
+it answers — the app would stay empty instead of showing the rate-limit hint). Their own path lock
+still applies to them; they are only exempt from *somebody else's* 429.
+
+The consequence: after a 429 storm the client releases individual patterns again after at most 2 s,
+and each pattern collects its own 429 until its `Retry-After` lock is in place. The short global lock
+takes the peak off the storm without closing the two ways out. Recovery needs no reload: a timer on
+the last deadline (`scheduleExpiry`) reports the expiry, and `installRateLimitRecovery` invalidates
+**every query in an error state once** on the active → inactive transition — `retry` is off for 429
+and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar, layout,
+dashboard) would otherwise stay red until a reload.
+
+**An empty `?ticket=` in the handshake is the client fallback.** If `POST /ws-ticket` runs into a
+lock (or fails otherwise), `useWebSocket` sets `wsTicket = ''` in `beforeConnect` and the handshake
+goes out with an empty `?ticket=`. The interceptor refuses it, stompjs schedules the next attempt
+with a growing delay — that is the intended path, rather than an unhandled promise rejection that
+would tear the reconnect cycle apart. An empty ticket in the server logs is therefore not an attack
+but a client whose ticket request did not get through.
 
 ### Request Size Limit
 

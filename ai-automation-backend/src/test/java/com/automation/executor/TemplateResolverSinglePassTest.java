@@ -32,7 +32,7 @@ class TemplateResolverSinglePassTest {
         Map<String, String> outputs = Map.of("log", "a {{ v }} b");
         Map<String, Object> vars = new HashMap<>(Map.of("v", "$(rm -rf x)"));
 
-        String out = TemplateResolver.resolveShellSafe("echo {{ block.log.output }}", "", outputs, vars);
+        String out = TemplateResolver.resolveShellSafe("echo {{ block.log.output }}", "", outputs, vars, key -> { });
 
         assertThat(out).isEqualTo("echo 'a {{ v }} b'");
     }

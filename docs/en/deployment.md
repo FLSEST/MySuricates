@@ -393,6 +393,45 @@ The Claude CLI is also invoked with `automation.cli.skip-permissions` = **`true`
 a call carries an explicit tool whitelist, the flag is dropped and the CLI enforces the list — this
 is how `skill-capability` blocks without `allow_writes` stay read-only.
 
+### Three trust classes for context values
+
+Not every value a workflow substitutes into a shell command comes from the definition. Every context
+variable therefore carries one of three classes; the class decides whether the value goes into the
+command line raw or wrapped in POSIX single quotes.
+
+| Class | Where the value comes from | In shell blocks | In AI prompts | Taints the run |
+|---|---|---|---|---|
+| **trusted** | workflow defaults, system values (`project_path`, `workflow_run_id`), block-internal values, answers from `approval`/`human-input` | substituted raw | raw | no |
+| **untrusted external** | webhook payload and everything derived from it (block outputs, `step_N_output`, foreach items) — across resume and sub-workflows too | always single-quoted | raw | yes, from the moment it is set |
+| **platform data** | `previous_report` and `open_todos`, injected into **every** run | always single-quoted | raw | only once the placeholder really appears in a shell command |
+
+"Taints the run" means: from that moment every further output of the run is quoted too, because a
+block can pull foreign bytes into its output without naming any placeholder. The taint is sticky and
+survives resume and sub-workflow hand-over. Platform data deliberately taints only on use: it is
+present in every run, and tainting at injection time would taint every run and change the meaning of
+the output placeholders in the bundled templates.
+
+Deliberately **not** escaped are answers from `approval` and `human-input` blocks: they arrive
+through the API-key-protected interface from the person who owns the instance. And when a workflow
+sets a variable itself (`setVariable`), it counts as trusted again — the value then comes from the
+definition, not from the caller.
+
+Limits worth knowing:
+
+- **Nothing is escaped in AI prompts.** A prompt is not a command line; the model does not defend
+  against prompt injection.
+- **Going through an AI block washes the taint off.** Platform data inside a `simple` or `agentic`
+  prompt does not taint the run; the AI's answer counts as untainted; a following shell block then
+  substitutes `{{ previous_output }}` **raw**. This shape occurs eight times in the bundled
+  definitions (seven pool workflows, one built-in template) and only stays harmless there because
+  every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **In your own workflows, set `"shell_escape_variables": true` in
+  every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+- **Quoting cannot see files you write yourself.** A shell block that writes a tainted value into a
+  file and later executes it is outside what quoting can reach.
+
+Technical version with class names and reserved context keys:
+[Workflow Hardening](architektur.md#workflow-hardening-optional).
+
 ### Where it listens
 
 Neither backend nor frontend binds to loopback. `server.address` is set nowhere, so the backend

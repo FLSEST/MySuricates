@@ -61,11 +61,8 @@ public class ExecutionContext {
     /** Pseudo block name for the run's {@code previous_output} inside {@link #UNTRUSTED_OUTPUTS_VARIABLE}. */
     public static final String PREVIOUS_OUTPUT_NAME = "previous_output";
 
-    /** Trust label per variable — untrusted ones are shell-escaped in commands. See {@link VariableTrust}. */
-    private final VariableTrust variableTrust = new VariableTrust();
-
-    /** Block outputs derived from untrusted input — shell-escaped like untrusted variables. */
-    private final OutputTaint outputTaint = new OutputTaint();
+    /** Trust label per variable plus the run's output taint. See {@link ExecutionContextTaint}. */
+    private final ExecutionContextTaint taint = new ExecutionContextTaint();
 
     /** Named block outputs keyed by block name. Resolved via {{ block.<name>.output }}. */
     @Builder.Default
@@ -118,19 +115,19 @@ public class ExecutionContext {
     /** Sets a trusted variable (workflow defaults, system values, block-internal values). Clears any taint. */
     public void setVariable(String name, Object value) {
         variables.put(name, value);
-        variableTrust.clear(name);
+        taint.markTrusted(name);
     }
 
     /** Sets a variable that came from an untrusted external source (webhook payload etc.). */
     public void setUntrustedVariable(String name, Object value) {
         variables.put(name, value);
-        variableTrust.markUntrusted(name);
+        taint.markUntrusted(name);
     }
 
-    /** Platform data injected into every run ({@code previous_report}, {@code open_todos}): always shell-escaped, never a run-level taint source. See {@link VariableTrust}. */
+    /** Platform data injected into every run ({@code previous_report}, {@code open_todos}): always shell-escaped, and a run-level taint source only once it is really substituted into a shell command line. See {@link ExecutionContextTaint}. */
     public void setUntrustedPlatformVariable(String name, Object value) {
         variables.put(name, value);
-        variableTrust.markPlatform(name);
+        taint.markPlatform(name);
     }
 
     /** Sets a variable derived from block output ({@code step_N_output}, foreach items): untrusted iff tainted. */
@@ -144,11 +141,11 @@ public class ExecutionContext {
         variables.put(name, value);
     }
 
-    public boolean isUntrusted(String name) { return variableTrust.isUntrusted(name); }
+    public boolean isUntrusted(String name) { return taint.isUntrusted(name); }
 
-    /** True as soon as the run carries untrusted <em>external</em> input — a variable or a tainted output. */
+    /** True as soon as the run carries untrusted input — an external variable, a tainted output, or platform data that reached a shell command line. */
     public boolean hasUntrustedInput() {
-        return variableTrust.hasExternalInput() || !outputTaint.isEmpty();
+        return taint.hasUntrustedInput();
     }
 
     /**
@@ -160,19 +157,19 @@ public class ExecutionContext {
         boolean tainted = hasUntrustedInput();
         setPreviousOutput(output);
         setBlockOutput(blockName, output);
-        if (tainted) outputTaint.mark(blockName);
+        if (tainted) taint.markOutput(blockName);
     }
 
     /** Re-applies one exported taint name ({@link #PREVIOUS_OUTPUT_NAME} or a block name). */
     public void markOutputUntrusted(String name) {
-        if (PREVIOUS_OUTPUT_NAME.equals(name)) outputTaint.markPreviousOutput();
-        else outputTaint.markBlockOutput(name);
+        if (PREVIOUS_OUTPUT_NAME.equals(name)) taint.markPreviousOutput();
+        else taint.markBlockOutput(name);
     }
 
     /** Taint as reserved input-context keys for persistence and hand-over; empty for a clean run. */
-    public Map<String, Object> exportTaint() { return outputTaint.export(variableTrust.externalNames()); }
+    public Map<String, Object> exportTaint() { return taint.export(); }
 
-    public Set<String> getUntrustedVariables() { return variableTrust.externalNames(); }
+    public Set<String> getUntrustedVariables() { return taint.untrustedVariables(); }
 
     public Object getVariable(String name) {
         return variables.get(name);
@@ -212,18 +209,20 @@ public class ExecutionContext {
      * single quotes (internal quotes escaped as '\''). See {@link TemplateResolver#resolveShellSafe}.
      */
     public String resolveTemplateShellSafe(String template) {
-        return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables);
+        return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables,
+                taint::substitutedIntoShell);
     }
 
     /**
      * Resolves a template that becomes a shell command line. With {@code escapeAll} every
      * placeholder is single-quoted; otherwise only untrusted variables and tainted block outputs
-     * are, trusted values stay raw. See {@link TemplateResolver#resolveShell}.
+     * are, trusted values stay raw. Substituted platform data taints the run from here on
+     * ({@link ExecutionContextTaint#substitutedIntoShell}). See {@link TemplateResolver#resolveShell}.
      */
     public String resolveShellTemplate(String template, boolean escapeAll) {
         if (escapeAll) return resolveTemplateShellSafe(template);
         return TemplateResolver.resolveShell(template, previousOutput, blockOutputs, variables,
-                outputTaint.snapshot(variableTrust.escapedNames()));
+                taint.snapshot(), taint::substitutedIntoShell);
     }
 
     static String shellEscape(String value) {

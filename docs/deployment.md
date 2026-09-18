@@ -395,6 +395,46 @@ Die Claude CLI wird ausserdem mit `automation.cli.skip-permissions` = **`true`**
 einem Aufruf eine Werkzeug-Whitelist mitgegeben, entfaellt das Flag und die CLI erzwingt die Liste —
 so arbeiten `skill-capability`-Bloecke ohne `allow_writes` nur lesend.
 
+### Drei Vertrauensklassen fuer Kontextwerte
+
+Nicht jeder Wert, den ein Workflow in einen Shell-Befehl einsetzt, kommt aus der Definition. Jede
+Kontextvariable traegt deshalb eine von drei Klassen; sie entscheidet, ob der Wert roh in die
+Kommandozeile geht oder in POSIX-Single-Quotes gepackt wird.
+
+| Klasse | Woher der Wert kommt | In Shell-Bloecken | In KI-Prompts | Faerbt den Run |
+|---|---|---|---|---|
+| **trusted** | Workflow-Defaults, Systemwerte (`project_path`, `workflow_run_id`), blockinterne Werte, Antworten aus `approval`/`human-input` | roh eingesetzt | roh | nein |
+| **untrusted extern** | Webhook-Nutzlast und alles, was daraus abgeleitet ist (Blockausgaben, `step_N_output`, foreach-Items) — auch ueber Resume und Sub-Workflows hinweg | immer single-quoted | roh | ja, ab dem Setzen |
+| **Plattform-Daten** | `previous_report` und `open_todos`, die in **jeden** Run injiziert werden | immer single-quoted | roh | erst, wenn der Platzhalter wirklich in einem Shell-Befehl steht |
+
+„Faerbt den Run" heisst: Ab diesem Moment werden auch alle Folgeausgaben des Runs gequotet, denn ein
+Block kann fremde Bytes in seine Ausgabe holen, ohne einen Platzhalter zu nennen. Die Faerbung ist
+klebrig und ueberlebt Resume und Sub-Workflow-Uebergabe. Plattform-Daten faerben bewusst erst bei
+Nutzung: Sie stecken in jedem Run, eine Faerbung beim Injizieren wuerde jeden Run faerben und die
+Bedeutung der Ausgabe-Platzhalter in den mitgelieferten Templates aendern.
+
+Bewusst **nicht** escaped werden Antworten aus `approval`- und `human-input`-Bloecken: Sie kommen
+ueber die API-Key-geschuetzte Schnittstelle von der Person, der die Instanz gehoert. Und setzt ein
+Workflow eine Variable selbst (`setVariable`), gilt sie wieder als vertrauenswuerdig — der Wert
+stammt dann aus der Definition, nicht vom Aufrufer.
+
+Grenzen, die man kennen sollte:
+
+- **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
+  hilft das Modell nicht.
+- **Der Weg ueber einen KI-Block waescht die Faerbung ab.** Stehen Plattform-Daten in einem
+  `simple`- oder `agentic`-Prompt, faerbt das den Run nicht; die KI-Antwort gilt als ungefaerbt; ein
+  folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. In den mitgelieferten
+  Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und ist nur
+  deshalb unauffaellig, weil dort alle Folge-Shell-Bloecke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
+  jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
+  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschuetzt.
+- **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefaerbten Wert
+  in eine Datei schreibt und diese spaeter ausfuehrt, liegt ausserhalb dessen, was sich quoten laesst.
+
+Technische Fassung mit Klassennamen und reservierten Kontextschluesseln:
+[Workflow-Haertung](architektur.md#workflow-härtung-optional).
+
 ### Wo gelauscht wird
 
 Weder Backend noch Frontend binden auf Loopback. `server.address` ist nirgends gesetzt, das Backend
