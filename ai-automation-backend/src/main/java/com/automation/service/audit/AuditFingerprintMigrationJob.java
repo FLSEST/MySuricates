@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,10 +163,15 @@ public class AuditFingerprintMigrationJob {
 
     /** @return {@code [zusammengefuehrte Dubletten, neu gehashte Findings]} */
     private int[] migrateScope(Scope scope) {
+        // Der normalisierte Key wird zuerst nur berechnet: geschrieben wird er erst am
+        // ueberlebenden Datensatz. Eine Dublette wird gleich danach geloescht — ihr UPDATE
+        // waere verworfen und die Log-Zeile behauptete eine Aenderung, die niemand je sieht.
+        Map<AuditFinding, String> normalizedKeys = new IdentityHashMap<>();
         Map<String, List<AuditFinding>> groups = new LinkedHashMap<>();
         for (AuditFinding finding : findingRepository.findByProjectIdAndAuditKey(scope.projectId(), scope.auditKey())) {
-            normalizeRuleKey(finding);
-            groups.computeIfAbsent(newFingerprint(finding), key -> new ArrayList<>()).add(finding);
+            String normalized = normalizedRuleKey(finding);
+            normalizedKeys.put(finding, normalized);
+            groups.computeIfAbsent(newFingerprint(finding, normalized), key -> new ArrayList<>()).add(finding);
         }
         Map<String, AuditFinding> survivors = new LinkedHashMap<>();
         List<AuditFinding> mergeTargets = new ArrayList<>();
@@ -183,7 +189,7 @@ public class AuditFingerprintMigrationJob {
                 log.info("Audit fingerprint merge: finding {} (subject \"{}\") into {} (subject \"{}\") — "
                                 + "ruleKey {}, project {}, audit {}",
                         duplicate.getId(), duplicate.getSubject(), target.getId(), targetSubject,
-                        target.getRuleKey(), target.getProjectId(), target.getAuditKey());
+                        normalizedKeys.get(target), target.getProjectId(), target.getAuditKey());
                 merger.merge(target, duplicate);
                 findingRepository.delete(duplicate);
                 merged++;
@@ -195,6 +201,7 @@ public class AuditFingerprintMigrationJob {
         findingRepository.flush();
         int rehashed = 0;
         for (Map.Entry<String, AuditFinding> survivor : survivors.entrySet()) {
+            applyRuleKey(survivor.getValue(), normalizedKeys.get(survivor.getValue()));
             if (!survivor.getKey().equals(survivor.getValue().getFingerprint())) {
                 survivor.getValue().setFingerprint(survivor.getKey());
                 rehashed++;
@@ -225,20 +232,28 @@ public class AuditFingerprintMigrationJob {
      * gedriftetes Altfinding nicht wieder: es entstuende ein zweiter Datensatz, waehrend der alte
      * ueber die Abwesenheits-Schleife auf RESOLVED faellt — samt Erstsichtung, Zaehlern und einer
      * eventuellen Akzeptanz.
+     *
+     * @return die zu verwendende Schreibweise (unveraendert, wenn der Katalog nichts dazu sagt)
      */
-    private void normalizeRuleKey(AuditFinding finding) {
+    private String normalizedRuleKey(AuditFinding finding) {
         String normalized = ruleKeyCatalog.resolve(finding.getAuditKey(), finding.getRuleKey()).ruleKey();
-        if (normalized != null && !normalized.equals(finding.getRuleKey())) {
-            log.info("Audit ruleKey normalized: finding {} '{}' → '{}' (project {}, audit {})",
-                    finding.getId(), finding.getRuleKey(), normalized, finding.getProjectId(), finding.getAuditKey());
-            finding.setRuleKey(normalized);
-        }
+        return normalized != null ? normalized : finding.getRuleKey();
     }
 
-    /** Erwartet einen bereits ueber {@link #normalizeRuleKey} gezogenen ruleKey. */
-    private static String newFingerprint(AuditFinding finding) {
+    /** Schreibt die gezogene Schreibweise — nur am ueberlebenden Datensatz, siehe migrateScope. */
+    private void applyRuleKey(AuditFinding finding, String normalized) {
+        if (normalized == null || normalized.equals(finding.getRuleKey())) {
+            return;
+        }
+        log.info("Audit ruleKey normalized: finding {} '{}' → '{}' (project {}, audit {})",
+                finding.getId(), finding.getRuleKey(), normalized, finding.getProjectId(), finding.getAuditKey());
+        finding.setRuleKey(normalized);
+    }
+
+    /** Erwartet den ueber {@link #normalizedRuleKey} gezogenen ruleKey. */
+    private static String newFingerprint(AuditFinding finding, String ruleKey) {
         return AuditIngestionService.fingerprint(finding.getProjectId(), finding.getAuditKey(),
-                finding.getRuleKey(), finding.getSubject());
+                ruleKey, finding.getSubject());
     }
 
     private record Scope(String projectId, String auditKey) {

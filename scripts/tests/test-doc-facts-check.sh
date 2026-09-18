@@ -14,6 +14,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 SCRIPT="$REPO/scripts/public-readiness/doc-facts-check.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
+GIT="git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false"
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
@@ -48,6 +49,38 @@ for n in 1 2 3 4 5 6; do echo '{}' > "$RES/templates/builtin/t$n.json"; done
 for n in 1 2 3; do echo '{}' > "$RES/skills/builtin/s$n.json"; done
 echo 'class OneProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/OneProvider.java"
 echo 'class TwoProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/TwoProvider.java"
+
+# Versionsquellen mit unverwechselbaren Zahlen (nichts davon kommt im echten Repo vor).
+cat > "$FAKE/ai-automation-backend/pom.xml" <<'POM_EOF'
+<project>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>9.9.9</version>
+    </parent>
+    <properties>
+        <docker-java.version>1.2.3</docker-java.version>
+        <sqlite-jdbc.version>4.5.6.7</sqlite-jdbc.version>
+    </properties>
+</project>
+POM_EOF
+mkdir -p "$FAKE/ai-automation-frontend"
+cat > "$FAKE/ai-automation-frontend/package.json" <<'PKG_EOF'
+{
+  "dependencies": {
+    "react": "^8.1.2",
+    "react-dom": "^8.1.2",
+    "@types/react": "^8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^3.2.1",
+    "vite": "^2.3.4",
+    "tailwindcss": "^5.6.7",
+    "cypress": "^7.8.9",
+    "vite-plugin-pwa": "^0.9.8"
+  }
+}
+PKG_EOF
 
 echo "1) Korrekte Zahlen erzeugen keine Drift"
 cat > "$FAKE/docs/ok.md" <<'MD_EOF'
@@ -153,6 +186,28 @@ check "Grundschema-Zeile EN ohne Befund" '! grep -qE "^DRIFT docs/grundschema.md
 check "echte Standangabe weiter gemeldet" 'grep -qE "^DRIFT docs/grundschema.md:4 migration-max sagt 2, Code 5" <<<"$OUT"'
 rm "$FAKE/docs/grundschema.md"
 
+echo "4g) Die Ausnahme gilt der Spanne, nicht der ganzen Zeile"
+# Eine Teilspanne ist nur dann belegt, wenn die Zeile auch sagt, wie es weitergeht
+# (Fortsetzungsspanne bis zur Hoechstnummer). Eine blosse Standangabe im Nebensatz
+# reicht nicht — sonst deckt jedes "aktuell V5" jede falsche Spanne derselben Zeile.
+cat > "$FAKE/docs/teilspanne.md" <<'MD_EOF'
+# Migrationen
+Das Grundschema (V1-V3). Aktueller Stand ist V5 in der Produktion.
+Die Tabelle zeigt das Grundschema (V1-V2). V3-V5 ergaenzen Spalten.
+Das Grundschema (V1-V3). V2-V5 ergaenzen Spalten.
+V1-V5 (Grundschema) ist vollstaendig.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "falsche Teilspanne neben blosser Standangabe gemeldet" \
+  'grep -qE "^DRIFT docs/teilspanne.md:2 migration-max sagt 3, Code 5" <<<"$OUT"'
+check "belegte Teilspanne mit Fortsetzung bleibt frei" \
+  '! grep -qE "^DRIFT docs/teilspanne.md:3" <<<"$OUT"'
+check "Fortsetzung, die nicht anschliesst, belegt nichts" \
+  'grep -qE "^DRIFT docs/teilspanne.md:4 migration-max sagt 3, Code 5" <<<"$OUT"'
+check "vollstaendige Spanne bleibt frei" \
+  '! grep -qE "^DRIFT docs/teilspanne.md:5" <<<"$OUT"'
+rm "$FAKE/docs/teilspanne.md"
+
 echo "4c) Deutscher Dativ-Plural wird erfasst"
 cat > "$FAKE/docs/dativ.md" <<'MD_EOF'
 # Dativ
@@ -219,6 +274,116 @@ echo "9) Das echte Repository ist frei von Zahlen-Drift"
 OUT=$(bash "$SCRIPT" 2>&1); RC=$?
 check "Repo-Lauf ohne Drift (exit 0)" '[ "$RC" -eq 0 ]'
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
+echo "10) Migrationstabellen: die hoechste genannte Vn zaehlt"
+cat > "$FAKE/docs/tabelle-alt.md" <<'MD_EOF'
+# Schema
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V3 | `V3__index.sql` | Indexe |
+MD_EOF
+cat > "$FAKE/docs/tabelle-auszug.md" <<'MD_EOF'
+# Schema (Auszug)
+Die Tabelle beschreibt das Grundschema; der aktuelle Stand ist V5.
+
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V3 | `V3__index.sql` | Indexe |
+MD_EOF
+cat > "$FAKE/docs/tabelle-aktuell.md" <<'MD_EOF'
+# Schema
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V5 | `V5__step.sql` | Letzter Stand |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Migrationstabelle gemeldet" \
+  'grep -qE "^DRIFT docs/tabelle-alt.md:5 migration-table sagt 3, Code 5" <<<"$OUT"'
+check "als Auszug ausgewiesene Tabelle bleibt frei" '! grep -q "tabelle-auszug.md" <<<"$OUT"'
+check "aktuelle Tabelle bleibt frei"                '! grep -q "tabelle-aktuell.md" <<<"$OUT"'
+rm "$FAKE/docs/tabelle-alt.md" "$FAKE/docs/tabelle-auszug.md" "$FAKE/docs/tabelle-aktuell.md"
+
+echo "11) README-Kopfzahlen: Commits mit Toleranz, Testzahlen nur mit Datum"
+( cd "$FAKE" && git init -q . && $GIT add -A && $GIT commit -q -m eins \
+    && $GIT commit -q --allow-empty -m zwei && $GIT commit -q --allow-empty -m drei )
+cat > "$FAKE/README.de.md" <<'MD_EOF'
+# MySuricates
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 40 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Commit-Zahl gemeldet" \
+  'grep -qE "^DRIFT README.de.md:4 commits sagt 40, Code 3" <<<"$OUT"'
+check "Testzahl ohne Datum gemeldet" \
+  'grep -qE "^DRIFT README.de.md:5 testzahl-ohne-datum" <<<"$OUT"'
+cat > "$FAKE/README.de.md" <<'MD_EOF'
+# MySuricates
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 3 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 — Lauf vom 2026-09-18 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "passende Commit-Zahl und datierte Testzahl: exit 0" '[ "$RC" -eq 0 ]'
+check "README.de.md ohne Befund" '! grep -q "README.de.md" <<<"$OUT"'
+rm "$FAKE/README.de.md"
+
+echo "12) Onboarding-Fakten: Versionen, verbotene Muster, nicht existierende Dateien"
+mkdir -p "$FAKE/docs/onboarding"
+cat > "$FAKE/docs/onboarding/README.md" <<'MD_EOF'
+# Onboarding
+| Technologie | Version | Zweck |
+|---|---|---|
+| **Spring Boot** | 9.9.8 | Web-Framework |
+| **React** | 8.1 | UI-Framework |
+| **SQLite** | sqlite-jdbc 4.5.6.7 | Datenbank |
+| **Vite** | 2.4 | Build-Tool |
+| **Java** | 21 (LTS) | Sprache |
+MD_EOF
+cat > "$FAKE/docs/onboarding/SETUP.md" <<'MD_EOF'
+# Setup
+Starte das Backend mit `mvn spring-boot:run`.
+> **Nicht** `mvn spring-boot:run` verwenden: der RuntimeClasspathGuard bricht ab.
+Das Routing nutzt React Router v6.
+Der Workflow laeuft mit `--model claude-opus-4-6`.
+Die Themes stehen in `tailwind.config.ts`.
+Unter `src/test/java` liegen 715 Testklassen.
+Stand 2026-09-18: 114 Vitest-Dateien unter `src/`.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Version gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/README.md:4 version\(Spring Boot\) sagt 9.9.8, Code 9.9.9" <<<"$OUT"'
+check "gekuerzte, passende Version bleibt frei" '! grep -q "README.md:5" <<<"$OUT"'
+check "Version im Fliesstext der Zelle erkannt" '! grep -q "README.md:6" <<<"$OUT"'
+check "falsche Nebenversion gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/README.md:7 version\(Vite\) sagt 2.4, Code 2.3.4" <<<"$OUT"'
+check "Zeile ohne Versionszahl bleibt frei"     '! grep -q "README.md:8" <<<"$OUT"'
+check "mvn spring-boot:run gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:2 verbotenes-muster" <<<"$OUT"'
+check "Warn-Blockquote bleibt erlaubt"          '! grep -q "SETUP.md:3" <<<"$OUT"'
+check "veraltete React-Router-Version gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:4 verbotenes-muster" <<<"$OUT"'
+check "datierte Modell-ID gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:5 verbotenes-muster.*[Mm]odell" <<<"$OUT"'
+check "nicht existierende Datei gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:6 fehlende-datei.*tailwind.config.ts" <<<"$OUT"'
+check "undatierte Testzahl im Onboarding gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:7 testzahl-ohne-datum" <<<"$OUT"'
+check "datierte Testzahl bleibt frei"           '! grep -q "SETUP.md:8" <<<"$OUT"'
+rm -r "$FAKE/docs/onboarding"
+
+echo "13) Fehlende Versionsquelle ist ein harter Fehler"
+mv "$FAKE/ai-automation-frontend/package.json" "$TMP/package.bak"
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "exit 2 ohne package.json"   '[ "$RC" -eq 2 ]'
+check "nennt die fehlende Quelle"  'grep -qi "package.json" <<<"$OUT"'
+check "meldet kein OK"             '! grep -q "Doku-Zahlen OK" <<<"$OUT"'
+mv "$TMP/package.bak" "$FAKE/ai-automation-frontend/package.json"
 
 echo
 echo "passed=$PASS failed=$FAIL"

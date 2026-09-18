@@ -179,6 +179,19 @@ hygiene_gitignore_leak_is_generic() {
 # ---------------------------------------------------------------------------
 HYGIENE_ALLOWLIST_FILE="scripts/ci/hygiene-allowlist.txt"
 
+# ---------------------------------------------------------------------------
+# Private Ausschlussliste für den Workflow-Pool (TODO 0640f29b)
+#
+# Die persönlichen Pool-Definitionen bleiben über .git/info/exclude aus dem
+# Bestand — dort steht keine Klartext-Namensliste im öffentlichen Repository.
+# exclude wird aber nicht geklont und gilt in keinem Worktree: ein pauschales
+# "git add -A" holt die Dateien zurück, ohne dass etwas anschlägt. Diese Liste
+# ist die durchsetzbare Hälfte davon; sie liegt selbst nicht im Repository
+# (auch sie steht in .git/info/exclude). Fehlt sie, wird der Check hörbar
+# übersprungen statt still zu bestehen. Vorlage: die .example-Datei daneben.
+# ---------------------------------------------------------------------------
+HYGIENE_PRIVATE_LIST_FILE="scripts/ci/hygiene-private.txt"
+
 # Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).
 hygiene_allowlist_paths() {
   [ -f "$HYGIENE_ALLOWLIST_FILE" ] || return 0

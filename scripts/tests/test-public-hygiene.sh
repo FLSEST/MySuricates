@@ -21,6 +21,9 @@ make_repo() {  # $1 = pfad
   git init -q "$1"
   mkdir -p "$1/scripts"
   cp -r "$REPO/scripts/ci" "$REPO/scripts/lib" "$REPO/scripts/git-hooks" "$1/scripts/"
+  # Die private Ausschlussliste ist untrackt und liegt nur lokal — sie darf nicht
+  # mit in die Testrepos wandern, sonst haengt das Ergebnis am Rechner.
+  rm -f "$1/scripts/ci/hygiene-private.txt"
   ( cd "$1" && $GIT add . && $GIT commit -q -m init && git config core.hooksPath scripts/git-hooks )
 }
 
@@ -430,6 +433,80 @@ rm -f "$TMP/no-keys/scripts/lib/pool-sanitizer.generated.sh"
 OUT=$(cd "$TMP/no-keys" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "Gate meldet einen Fehler (exit != 0)"   '[ "$RC" -ne 0 ]'
 check "Meldung nennt die generierte Datei"     'grep -q "pool-sanitizer.generated.sh" <<<"$OUT"'
+
+echo "26) Fehlende Pool-Privatliste wird hoerbar uebersprungen (TODO 0640f29b)"
+make_repo "$TMP/priv"
+( cd "$TMP/priv" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md \
+    && mkdir -p workflow-pool && cat > workflow-pool/persoenlich-beispiel.json <<'JSON'
+{"name": {"de": "Portabel", "en": "Portable"},
+ "description": {"de": "Prueft ein Projekt.", "en": "Checks a project."},
+ "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+  $GIT add SECURITY.md workflow-pool && $GIT commit -q -m pool )
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "ohne Liste bleibt das Gate gruen (exit 0)" '[ "$RC" -eq 0 ]'
+check "Gate nennt die fehlende Liste"             'grep -q "hygiene-private.txt" <<<"$OUT"'
+check "Gate sagt, dass es uebersprungen hat"      'grep -qi "uebersprungen\|nicht geprueft" <<<"$OUT"'
+
+echo "27) Getrackte Pool-Datei auf der Privatliste schlaegt das Gate"
+printf '# privat\nworkflow-pool/persoenlich-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Treffer schlaegt das Gate (exit 1)"   '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                 'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+check "Gate meldet kein OK"                  '! grep -q "Public-Hygiene-Gate OK" <<<"$OUT"'
+
+echo "28) Muster ohne Treffer laesst das Gate gruen"
+printf '# privat\nworkflow-pool/etwas-anderes-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "kein Treffer: exit 0"                 '[ "$RC" -eq 0 ]'
+check "Gate nennt keine Pool-Datei"          '! grep -q "persoenlich-beispiel.json" <<<"$OUT"'
+check "kein Skip-Hinweis mehr"               '! grep -qi "hygiene-private.txt fehlt" <<<"$OUT"'
+
+echo "29) Die Privatliste selbst liegt nicht im getrackten Bestand, die Vorlage schon"
+check "hygiene-private.txt nicht getrackt" \
+  '[ -z "$(cd "$REPO" && git ls-files scripts/ci/hygiene-private.txt)" ]'
+check "hygiene-private.txt.example getrackt" \
+  '[ -n "$(cd "$REPO" && git ls-files scripts/ci/hygiene-private.txt.example)" ]'
+
+echo "30) Letzte Zeile ohne Zeilenumbruch zaehlt mit"
+# Eine einzeilige Liste ohne abschliessendes \n war frueher ein lautloser No-op:
+# read gibt bei EOF ohne Umbruch false zurueck, die Schleife lief kein einziges Mal.
+printf 'workflow-pool/persoenlich-*.json' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Treffer trotz fehlendem Zeilenumbruch (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                           'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+
+echo "31) Muster in der Schreibweise von .git/info/exclude (fuehrender /)"
+printf '/workflow-pool/persoenlich-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fuehrender / wird abgestreift, Treffer erkannt" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                           'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+check "kein git-Fehler in der Ausgabe"                 '! grep -qi "Invalid path\|ungueltiger Pfad" <<<"$OUT"'
+
+echo "32) Ein Muster, das git nicht aufloesen kann, ist ein Gate-Fehler"
+printf ':(bogus)workflow-pool/x.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "unaufloesbares Muster schlaegt das Gate (exit 1)" '[ "$RC" -eq 1 ]'
+check "Meldung nennt das Muster"                         'grep -q "bogus" <<<"$OUT"'
+check "Meldung nennt die Liste"                          'grep -q "hygiene-private.txt" <<<"$OUT"'
+check "Gate meldet kein OK"                              '! grep -q "Public-Hygiene-Gate OK" <<<"$OUT"'
+
+echo "33) Auch der Pre-Commit-Moment (--staged) prueft die Privatliste"
+( cd "$TMP/priv" && cat > workflow-pool/neu-privat.json <<'JSON'
+{"name": {"de": "Neu", "en": "New"},
+ "description": {"de": "Prueft ein Projekt.", "en": "Checks a project."},
+ "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+  $GIT add workflow-pool/neu-privat.json )
+printf 'workflow-pool/neu-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged meldet die gestagte Pool-Datei (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die gestagte Datei"                    'grep -q "workflow-pool/neu-privat.json" <<<"$OUT"'
+printf 'workflow-pool/etwas-anderes-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged ohne Treffer bleibt gruen (exit 0)"      '[ "$RC" -eq 0 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"
