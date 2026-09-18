@@ -15,11 +15,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Laedt die Built-in-Skills aus {@code classpath:skills/builtin/*.json} (Metadaten inkl.
@@ -31,15 +33,19 @@ import java.util.Set;
  * abschliessenden Zeilenumbruch; ein Editor, der einen anhaengt, aendert den Prompt.
  * {@code BuiltInSkillsSnapshotTest} schlaegt in dem Fall fehl.
  *
- * <p>Anders als beim Template-Loader sind Fehler hier hart: eine fehlende {@code .md},
- * ein doppelter {@code sortOrder} oder ein leeres Verzeichnis brechen den Start ab, statt
- * ein unvollstaendiges Skill-Set zu seeden.
+ * <p>Anders als beim Template-Loader sind Fehler hier hart: eine fehlende {@code .md}, ein
+ * Dateiname der nicht zur {@code id} passt, fehlender {@code sortOrder}, ein doppelter
+ * {@code sortOrder}, eine fehlende/unbekannte {@code category} oder ein leeres Verzeichnis
+ * brechen den Start ab, statt ein unvollstaendiges Skill-Set zu seeden.
  */
 @Component
 @Slf4j
 public class BuiltInSkillLoader {
 
     private static final String DEFAULT_BASE_PATH = "skills/builtin";
+
+    private static final Set<String> CATEGORIES = Arrays.stream(SkillCategory.values())
+            .map(Enum::name).collect(Collectors.toUnmodifiableSet());
 
     private final ObjectMapper objectMapper;
     private final String basePath;
@@ -87,14 +93,31 @@ public class BuiltInSkillLoader {
     }
 
     private BuiltInSkillDefinition read(Resource resource) {
+        String filename = resource.getFilename();
         BuiltInSkillDefinition def;
         try (InputStream is = resource.getInputStream()) {
             def = objectMapper.readValue(is, BuiltInSkillDefinition.class);
         } catch (IOException e) {
-            throw new IllegalStateException("Built-in-Skill " + resource.getFilename() + " nicht lesbar", e);
+            throw new IllegalStateException("Built-in-Skill " + filename + " nicht lesbar", e);
         }
+
         if (def.id() == null || def.id().isBlank()) {
-            throw new IllegalStateException("Built-in-Skill " + resource.getFilename() + " hat keine id");
+            throw new IllegalStateException("Built-in-Skill " + filename + " hat keine id");
+        }
+        // Die Prompt-Datei wird ueber die id aufgeloest — Dateiname und id muessen deshalb passen.
+        if (!(def.id() + ".json").equals(filename)) {
+            throw new IllegalStateException(
+                    "Built-in-Skill " + filename + " heisst nicht wie seine id: erwartet " + def.id() + ".json");
+        }
+        if (def.sortOrder() == null) {
+            throw new IllegalStateException("Built-in-Skill " + filename + " hat keinen sortOrder");
+        }
+        if (def.category() == null || def.category().isBlank()) {
+            throw new IllegalStateException("Built-in-Skill " + filename + " hat keine category");
+        }
+        if (!CATEGORIES.contains(def.category())) {
+            throw new IllegalStateException(
+                    "Built-in-Skill " + filename + " hat unbekannte category: " + def.category());
         }
         return def;
     }

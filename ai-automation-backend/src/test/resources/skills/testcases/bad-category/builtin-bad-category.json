@@ -1,0 +1,15 @@
+{
+  "id" : "builtin-bad-category",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "name" : "Unbekannte Kategorie",
+  "icon" : "🚫",
+  "description" : "Testfall: category gibt es im Enum SkillCategory nicht.",
+  "category" : "NOT_A_CATEGORY",
+  "capabilities" : [
+    {
+      "name" : "noop",
+      "description" : "Tut nichts."
+    }
+  ]
+}

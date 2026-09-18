@@ -17,7 +17,8 @@ import java.util.Map;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record BuiltInSkillDefinition(
         String id,
-        int sortOrder,
+        /** Pflichtfeld — {@code Integer}, damit ein fehlendes Feld nicht still als 0 durchgeht. */
+        Integer sortOrder,
         String version,
         String name,
         String icon,

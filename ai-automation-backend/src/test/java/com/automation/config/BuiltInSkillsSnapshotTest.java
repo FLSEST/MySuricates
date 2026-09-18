@@ -42,13 +42,14 @@ class BuiltInSkillsSnapshotTest {
     private static final String SNAPSHOT_RELATIVE = "src/test/resources/skills/builtin-snapshot.json";
 
     /** Einzige Quelle der Skills — bei einem Umbau nur hier umstellen. */
-    private static List<Skill> builtInSkills() {
-        return new BuiltInSkillLoader(new ObjectMapper()).loadAll();
+    private static String canonicalJson() {
+        BuiltInSkillLoader loader = new BuiltInSkillLoader(new ObjectMapper());
+        return canonicalJson(loader.loadAll(), loader.loadAllDefinitions());
     }
 
     @Test
     void builtInSkills_matchCanonicalSnapshot() throws IOException {
-        String actual = canonicalJson(builtInSkills());
+        String actual = canonicalJson();
         Path snapshot = snapshotPath();
 
         if (Boolean.getBoolean("skills.snapshot.write")) {
@@ -68,16 +69,31 @@ class BuiltInSkillsSnapshotTest {
 
     @Test
     void canonicalJson_isStableAcrossInvocations() {
-        assertThat(canonicalJson(builtInSkills())).isEqualTo(canonicalJson(builtInSkills()));
+        assertThat(canonicalJson()).isEqualTo(canonicalJson());
     }
 
     // ── Kanonische Serialisierung ─────────────────────────────
 
-    static String canonicalJson(List<Skill> skills) {
+    /**
+     * {@code skills} und {@code definitions} kommen beide nach {@code sortOrder} sortiert aus
+     * demselben Loader-Lauf. Der Snapshot haelt den <em>deklarierten</em> {@code sortOrder} aus
+     * der JSON fest (nicht die Listenposition), damit auch eine Verschiebung aller Werte —
+     * etwa 1..19 → 10..28 — als Abweichung auffaellt.
+     */
+    static String canonicalJson(List<Skill> skills, List<BuiltInSkillDefinition> definitions) {
+        if (skills.size() != definitions.size()) {
+            throw new IllegalStateException("Skills und Definitionen passen nicht zusammen");
+        }
         List<Object> root = new ArrayList<>();
         for (int i = 0; i < skills.size(); i++) {
-            // sortOrder ist heute die Listenposition; nach der Auslagerung die Zahl aus der JSON.
-            root.add(toCanonicalMap(skills.get(i), i + 1));
+            Skill skill = skills.get(i);
+            BuiltInSkillDefinition def = definitions.get(i);
+            if (!skill.getId().equals(def.id())) {
+                throw new IllegalStateException(
+                        "Reihenfolge von Skills und Definitionen weicht ab: "
+                                + skill.getId() + " != " + def.id());
+            }
+            root.add(toCanonicalMap(skill, def.sortOrder()));
         }
         try {
             return writer().writeValueAsString(root);

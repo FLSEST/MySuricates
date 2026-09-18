@@ -121,6 +121,37 @@ class BuiltInSkillLoaderTest {
     }
 
     @Test
+    void loadAll_failsWhenFilenameDoesNotMatchId() {
+        BuiltInSkillLoader loader = new BuiltInSkillLoader(new ObjectMapper(), "skills/testcases/id-mismatch");
+
+        assertThatThrownBy(loader::loadAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("wrong-filename.json")
+                .hasMessageContaining("builtin-bar.json");
+    }
+
+    @Test
+    void loadAll_failsWhenSortOrderIsMissing() {
+        BuiltInSkillLoader loader =
+                new BuiltInSkillLoader(new ObjectMapper(), "skills/testcases/missing-sort-order");
+
+        assertThatThrownBy(loader::loadAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("builtin-no-sort-order.json")
+                .hasMessageContaining("sortOrder");
+    }
+
+    @Test
+    void loadAll_failsOnUnknownCategory() {
+        BuiltInSkillLoader loader = new BuiltInSkillLoader(new ObjectMapper(), "skills/testcases/bad-category");
+
+        assertThatThrownBy(loader::loadAll)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("builtin-bad-category.json")
+                .hasMessageContaining("NOT_A_CATEGORY");
+    }
+
+    @Test
     void loadAll_failsWhenNoResourcesExist() {
         BuiltInSkillLoader loader = new BuiltInSkillLoader(new ObjectMapper(), "skills/testcases/empty");
 
