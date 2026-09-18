@@ -1410,6 +1410,9 @@ export const de: TranslationKeys = {
     connectionError: 'Verbindung zum Server konnte nicht hergestellt werden.',
     connect: 'Verbinden',
   },
+  errors: {
+    rateLimited: 'Zu viele Anfragen — die App pausiert kurz und versucht es von selbst erneut.',
+  },
   runs: {
     title: 'Ausführungs-Verlauf',
     subtitle: 'Workflow- und Ketten-Ausführungen',

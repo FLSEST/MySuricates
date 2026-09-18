@@ -1413,6 +1413,9 @@ export const en = {
     connectionError: 'Could not connect to the server.',
     connect: 'Connect',
   },
+  errors: {
+    rateLimited: 'Too many requests — the app is pausing briefly and will retry on its own.',
+  },
   runs: {
     title: 'Run History',
     subtitle: 'Workflow and chain executions',
