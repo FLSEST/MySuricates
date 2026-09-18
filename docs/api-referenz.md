@@ -2366,6 +2366,66 @@ Body `{ "name": "vor dem Umbau" }` benennt eine Version (1–80 Zeichen), `{ "na
 
 ---
 
+## Dashboard-Workflow-Widgets
+
+Daten der Workflow-Widgets des Dashboards (Status-Widget und Ergebnis-Widget). Kern-Endpunkt, kein Modul-Gate.
+
+### `GET /api/v1/dashboard/workflow-results`
+
+Je angefragtem Workflow der **letzte Run** und das geprüfte Ergebnis — **ohne** Step-Ausgaben.
+
+**Query-Parameter:** `workflowIds` (mehrfach oder kommagetrennt, höchstens 50; jede ID muss `^[a-z0-9][a-z0-9-]{0,79}$` erfüllen, sonst **400**). Ohne Parameter: leere Liste.
+
+**Response:** ein Eintrag je angefragter ID, in Anfragereihenfolge.
+
+```json
+[
+  { "workflowId": "wf-a1", "workflowName": "Nightly QA", "available": true,
+    "run": { "runId": "run-1", "status": "COMPLETED", "startedAt": "2026-09-18T08:00:00Z",
+             "completedAt": "2026-09-18T08:02:00Z", "durationMs": 120000, "gateStatus": "GREEN" },
+    "resultState": "VALID",
+    "result": { "title": "Nightly QA", "status": "YELLOW",
+                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
+                "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde." } }
+]
+```
+
+- `available: false` (soft-gelöschter oder unbekannter Workflow) ⇒ `workflowName`, `run` und `result` sind `null`, `resultState` ist `MISSING`.
+- `resultState`: `VALID` (Vertrag erfüllt), `INVALID` (Marker vorhanden, aber abgelehnt), `MISSING` (kein Marker). Nur bei `VALID` steht `result`.
+
+### Marker `dashboard_widget:` im Workflow
+
+Ein Workflow meldet sein Dashboard-Ergebnis wie `gate_status:` als Markerzeile in der Blockausgabe; das JSON darf über mehrere Zeilen gehen:
+
+```
+dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
+  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
+  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
+```
+
+Vertrag (beim Run-Ende geprüft und in die Run-Metadaten geschrieben, beim Lesen erneut geprüft):
+
+| Feld | Pflicht | Regel |
+|---|---|---|
+| `status` | ja | `GREEN`, `YELLOW` oder `RED` |
+| `title` | nein | Text, ≤ 80 Zeichen |
+| `kpis` | nein | ≤ 6 Objekte mit `label` (≤ 40), `value` (≤ 40, **String**) und optional `trend` (`UP`/`DOWN`/`FLAT`) |
+| `items` | nein | ≤ 10 Texte, je ≤ 200 Zeichen |
+| `summary` | nein | Text, ≤ 500 Zeichen |
+
+- **Unbekannte Felder ⇒ der ganze Vertrag wird abgelehnt** (auch in einem KPI-Objekt).
+- Texte sind einzeilig: leer, zu lang oder mit Steuer-, Zero-Width-, Bidi-, Separator- oder Private-Use-Zeichen ⇒ abgelehnt.
+- KPI-Werte sind Strings; eine Zahl an einer String-Stelle ist ein Vertragsbruch.
+- Das JSON wird höchstens 8192 Zeichen weit gelesen; schließt die Klammer bis dahin nicht, gilt der Marker als ungültig.
+- Melden mehrere Blöcke einen Marker, gewinnt der **letzte**; Ausgaben von Komprimierungs-Blöcken (`derivedOutput`) werden übersprungen.
+- Der Inhalt erscheint im Dashboard **ausschließlich als Text** — kein Markdown, kein HTML, keine Links, keine Bilder. Der Vertrag enthält bewusst kein ID- und kein URL-Feld.
+
+### WebSocket `/topic/dashboard/runs`
+
+Nach dem Speichern eines beendeten Runs: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Nur IDs und Status — das Dashboard lädt daraufhin seine Workflow-Widgets neu.
+
+---
+
 ## Chains
 
 ### `GET /api/v1/chains`

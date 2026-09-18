@@ -2358,6 +2358,66 @@ Body `{ "name": "before the rework" }` names a version (1–80 characters), `{ "
 
 ---
 
+## Dashboard workflow widgets
+
+Data of the dashboard's workflow widgets (status widget and result widget). Core endpoint, no module gate.
+
+### `GET /api/v1/dashboard/workflow-results`
+
+For each queried workflow: the **latest run** and the validated result — **without** step outputs.
+
+**Query parameters:** `workflowIds` (multiple or comma-separated, at most 50; each id must match `^[a-z0-9][a-z0-9-]{0,79}$`, else **400**). Without parameters: empty list.
+
+**Response:** one entry per queried id, in request order.
+
+```json
+[
+  { "workflowId": "wf-a1", "workflowName": "Nightly QA", "available": true,
+    "run": { "runId": "run-1", "status": "COMPLETED", "startedAt": "2026-09-18T08:00:00Z",
+             "completedAt": "2026-09-18T08:02:00Z", "durationMs": 120000, "gateStatus": "GREEN" },
+    "resultState": "VALID",
+    "result": { "title": "Nightly QA", "status": "YELLOW",
+                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
+                "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde." } }
+]
+```
+
+- `available: false` (soft-deleted or unknown workflow) ⇒ `workflowName`, `run` and `result` are `null`, `resultState` is `MISSING`.
+- `resultState`: `VALID` (contract fulfilled), `INVALID` (marker present but rejected), `MISSING` (no marker). Only present when `VALID`.
+
+### The `dashboard_widget:` marker in a workflow
+
+A workflow reports its dashboard result like `gate_status:` as a marker line in the block output; the JSON may span multiple lines:
+
+```
+dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
+  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
+  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
+```
+
+Contract (validated at run end and written to run metadata, re-validated on read):
+
+| Field | Required | Rule |
+|---|---|---|
+| `status` | yes | `GREEN`, `YELLOW` or `RED` |
+| `title` | no | text, ≤ 80 characters |
+| `kpis` | no | ≤ 6 objects with `label` (≤ 40), `value` (≤ 40, **string**) and optional `trend` (`UP`/`DOWN`/`FLAT`) |
+| `items` | no | ≤ 10 texts, each ≤ 200 characters |
+| `summary` | no | text, ≤ 500 characters |
+
+- **Unknown fields ⇒ the whole contract is rejected** (including in KPI objects).
+- Text is single-line: empty, too long, or with control, zero-width, bidi, separator or private-use characters ⇒ rejected.
+- KPI values are strings; a number in a string position is a contract violation.
+- The JSON is read to a maximum of 8192 characters; if the closing bracket does not come by then, the marker is invalid.
+- If multiple blocks report a marker, the **last** one wins; outputs from compression blocks (`derivedOutput`) are skipped.
+- Content appears in the dashboard **as text only** — no Markdown, no HTML, no links, no images. The contract deliberately contains no id and no URL field.
+
+### WebSocket `/topic/dashboard/runs`
+
+After a run ends and is saved: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Only ids and status — the dashboard then reloads its workflow widgets.
+
+---
+
 ## Chains
 
 ### `GET /api/v1/chains`
