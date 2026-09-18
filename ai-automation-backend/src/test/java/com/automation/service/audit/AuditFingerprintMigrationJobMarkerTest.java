@@ -3,7 +3,7 @@ package com.automation.service.audit;
 import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditSeverity;
-import com.automation.event.ModuleStateChangedEvent;
+import com.automation.modules.ModuleStateChangedEvent;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
 import com.automation.repository.AppSettingsRepository;

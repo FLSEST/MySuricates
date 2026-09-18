@@ -1,6 +1,5 @@
-package com.automation.event;
+package com.automation.modules;
 
-import com.automation.modules.ModuleCatalog;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 

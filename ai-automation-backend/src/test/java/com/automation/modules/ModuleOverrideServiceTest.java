@@ -1,7 +1,6 @@
 package com.automation.modules;
 
 import com.automation.entity.ActivityLog.LogCategory;
-import com.automation.event.ModuleStateChangedEvent;
 import com.automation.exception.ModuleChangeException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.activitylog.ActivityLogService;
