@@ -66,7 +66,7 @@ final class DataFlowReferenceScanner {
 
         /** Id-Basis des zugehörigen Knotens; {@code rootPrefix} ist das Präfix der Top-Level-Kette. */
         String idBase(String rootPrefix) {
-            return rootPrefix + "_" + blockIndex + branchPath;
+            return BpmnBranchBlocks.member(rootPrefix, blockIndex) + branchPath;
         }
     }
 

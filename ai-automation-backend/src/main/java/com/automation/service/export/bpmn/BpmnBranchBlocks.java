@@ -7,15 +7,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Die Blöcke in den Zweigen eines {@code switch} samt ihrem Id-Pfad — die einzige Stelle, die
- * weiß, wie Zweig-Ids geschrieben werden ({@code …_c&lt;k&gt;_&lt;j&gt;} je Case-Block,
- * {@code …_default_&lt;j&gt;} je Default-Block, rekursiv bei Switch-in-Switch).
+ * Die Blöcke in den Zweigen eines {@code switch} samt ihrem Id-Pfad — und die Schreibweise der
+ * Block-Ids: {@link #member} je Block einer Kette, {@link #casePrefix}/{@link #defaultPrefix} je
+ * Zweig. Zusammen ergibt das {@code …_c&lt;k&gt;_&lt;j&gt;} bzw. {@code …_default_&lt;j&gt;},
+ * rekursiv bei Switch-in-Switch.
  *
- * <p>{@link BpmnGatewayBuilder} baut die Knoten-Ids über {@link #casePrefix}/{@link #defaultPrefix}
- * (die Kette hängt je Block noch {@code _&lt;j&gt;} an), der {@link DataFlowReferenceScanner} baut
- * denselben Pfad, um Datenassoziationen an den Zweig-Task statt an das Gateway zu hängen (7557b928).
- * BPMN erlaubt an Gateways keine Datenassoziationen — der Zweig-Task ist der nächstgelegene
- * gültige Endpunkt.
+ * <p>Alle drei Erzeuger nutzen dieselben Helfer: {@link BpmnModelBuilder} für die Blöcke einer
+ * Kette (Top-Level wie Zweig), {@link BpmnGatewayBuilder} für die Zweig-Präfixe, und der
+ * {@link DataFlowReferenceScanner} baut denselben Pfad nach, um Datenassoziationen an den Zweig-Task
+ * statt an das Gateway zu hängen (7557b928). BPMN erlaubt an Gateways keine Datenassoziationen —
+ * der Zweig-Task ist der nächstgelegene gültige Endpunkt. Ändert sich die Schreibweise, muss sie
+ * sich nur hier ändern.
  */
 final class BpmnBranchBlocks {
 
@@ -24,6 +26,11 @@ final class BpmnBranchBlocks {
     }
 
     private BpmnBranchBlocks() {
+    }
+
+    /** Id-Basis des {@code index}-ten Blocks einer Kette — für die Top-Level-Kette wie für einen Zweig. */
+    static String member(String chainPrefix, int index) {
+        return chainPrefix + "_" + index;
     }
 
     /** Id-Präfix der Block-Kette eines Case-Zweigs. */
@@ -63,7 +70,7 @@ final class BpmnBranchBlocks {
 
     private static void collectChain(List<BlockDefinition> blocks, String prefix, List<Branch> out, int depth) {
         for (int j = 0; j < blocks.size(); j++) {
-            String path = prefix + "_" + j;
+            String path = member(prefix, j);
             out.add(new Branch(path, blocks.get(j)));
             collect(blocks.get(j), path, out, depth + 1);
         }

@@ -86,7 +86,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         double cursor = 0;
         String prevExit = null;
         for (int i = 0; i < blocks.size(); i++) {
-            BpmnSegment part = buildBlock(blocks.get(i), idPrefix + "_" + i);
+            BpmnSegment part = buildBlock(blocks.get(i), BpmnBranchBlocks.member(idPrefix, i));
             part.translate(cursor, 0);
             seg.nodes.addAll(part.nodes);
             seg.edges.addAll(part.edges);

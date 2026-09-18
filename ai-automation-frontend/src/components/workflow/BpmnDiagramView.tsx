@@ -100,6 +100,8 @@ function verticalLayout(d: Diagram): Diagram {
   //     Erzeuger, und die Ausgabe-Assoziation läuft erst zurück nach oben (sichtbarer Haken).
   //     Unterhalb des Erzeugers — seitlich versetzt, damit die Fluss-Spalte frei bleibt —
   //     verläuft sie monoton in Fluss-Richtung. Sie passt in den {@link VERTICAL_GAP}-Zwischenraum.
+  //     Erst NACH dem Stauchen: die Datenobjekte bleiben dort als belegte Intervalle stehen, wo sie
+  //     transponiert lagen, und würden sonst mitverschoben wieder neben dem Erzeuger landen.
   const dataIds = new Set(shapes.filter((s) => s.kind === 'dataObjectReference').map((s) => s.id));
   const producerOf = new Map<string, string>();
   for (const e of d.edges) {

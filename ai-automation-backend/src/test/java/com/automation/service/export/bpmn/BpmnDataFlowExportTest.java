@@ -219,7 +219,19 @@ class BpmnDataFlowExportTest {
                 .doesNotThrowAnyException();
     }
 
-    /** Gateway-Blöcke (conditional/switch) haben keinen einzelnen Aktivitäts-Knoten — kein Datenobjekt. */
+    /**
+     * Der Gateway-Knoten selbst trägt nie eine Assoziation — BPMN erlaubt das an Gateways nicht.
+     *
+     * <p><b>Bekannte Lücke, kein gewolltes Endziel:</b> Beim {@code conditional} fällt damit heute
+     * auch die Referenz aus {@code then_command}/{@code else_command} weg, obwohl es dafür bereits
+     * Tasks gibt ({@code _then}/{@code _else}) — sie tragen sich nur nicht in
+     * {@code activityIdByBase} ein. Anders als beim {@code switch}, dessen Zweig-Blöcke seit
+     * 7557b928 Endpunkte sind (siehe {@link #zweigTasksSindDieEndpunkteDerAssoziationen()}), steht
+     * die Zuordnung hier noch aus; TODO 7557b928 bleibt mit diesem Restumfang offen. Der Test pinnt
+     * also den Ist-Stand, nicht die Zielsemantik: Wird die Lücke geschlossen, gehören die beiden
+     * Assoziationen an {@code _then}/{@code _else} — und dieser Test wird entsprechend umgestellt,
+     * statt die neue Kante zu verhindern.
+     */
     @Test
     void gatewayBloeckeBekommenKeineAssoziation() throws Exception {
         Workflow wf = WorkflowFixtures.workflow("Gate", List.of(
