@@ -161,6 +161,32 @@ ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 
 README_SOURCE = "README.de.md"
 
+# ---------------------------------------------------------------------------
+# Onboarding-Paket (docs/onboarding, docs/en/onboarding)
+#
+# Das Paket wurde am 2026-09-18 von Hand gegen den Code geprueft (TODO 8c75f1dd);
+# die Regeln von damals stehen hier, damit die Zahlen nicht wieder ungeprueft
+# altern. Absichtlich nur fuer das Onboarding: "mvn spring-boot:run" steht in
+# docs/entwicklung.md als erklaerter Gegen-Hinweis im Fliesstext, und der
+# Verzeichnisbaum in docs/architektur.md nennt Dateinamen in anderem Kontext.
+# ---------------------------------------------------------------------------
+ONBOARDING_PREFIXES = ("docs/onboarding/", "docs/en/onboarding/")
+
+# Technologietabelle: "| **React** | 19.2 | UI-Framework |". Die Doku kuerzt,
+# deshalb gilt die genannte Version als richtig, wenn sie ein komponentenweises
+# Praefix der echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
+VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
+VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
+
+# Verbotene Muster. Blockquote-Zeilen sind ausgenommen: dort steht das Muster
+# als Warnung ("Nicht `mvn spring-boot:run` verwenden"), nicht als Anleitung.
+FORBIDDEN_PATTERNS = [
+    (re.compile(r"mvn\s+spring-boot:run"),
+     "mvn spring-boot:run — der RuntimeClasspathGuard bricht den Start ab"),
+    (re.compile(r"React Router v[1-6]\b"),
+     "veraltete React-Router-Version (package.json fuehrt v7)"),
+]
+
 
 def digits(text):
     """"1 420" / "1.420" -> 1420."""
@@ -200,6 +226,42 @@ def check_readme_head(rel, no, line, facts, findings):
                                 f" | {line.strip()[:120]}")
 
 
+def check_version_row(rel, no, line, versions, findings):
+    """Technologietabelle gegen pom.xml / package.json."""
+    if not versions:
+        return
+    match = VERSION_ROW.match(line.strip())
+    if not match:
+        return
+    expected = versions.get(match.group(1).strip())
+    if not expected:
+        return
+    said = VERSION_NUMBER.search(match.group(2))
+    if not said:
+        return
+    said = said.group(0)
+    parts = said.split(".")
+    if expected.split(".")[:len(parts)] != parts:
+        findings.append(f"DRIFT {rel}:{no} version({match.group(1).strip()}) sagt {said},"
+                        f" Code {expected} | {line.strip()[:120]}")
+
+
+def check_forbidden_patterns(rel, no, line, findings):
+    if line.lstrip().startswith(">"):
+        return
+    for regex, reason in FORBIDDEN_PATTERNS:
+        if regex.search(line):
+            findings.append(f"DRIFT {rel}:{no} verbotenes-muster: {reason}"
+                            f" | {line.strip()[:120]}")
+
+
+def check_absent_files(rel, no, line, absent, findings):
+    for name in absent or ():
+        if name in line:
+            findings.append(f"DRIFT {rel}:{no} fehlende-datei: '{name}' gibt es im"
+                            f" Repository nicht | {line.strip()[:120]}")
+
+
 def check_test_claim_dated(rel, no, line, findings):
     if TEST_CLAIM.search(line.strip()) and not ISO_DATE.search(line):
         findings.append(f"DRIFT {rel}:{no} testzahl-ohne-datum: Testzahlen nur mit Datum"
@@ -213,6 +275,7 @@ def scan(root, rel, facts, findings):
             lines = fh.readlines()
     except OSError:
         return
+    is_onboarding = rel.startswith(ONBOARDING_PREFIXES)
     for no, line in enumerate(lines, 1):
         # Codebloecke werden bewusst MIT geprueft: die Verzeichnisbaeume in
         # docs/architektur.md ("├── controller/   43 REST-Controller") stehen in
@@ -236,8 +299,13 @@ def scan(root, rel, facts, findings):
                         findings.append(
                             f"DRIFT {rel}:{no} {name} sagt {said}, Code {expected}"
                             f" | {line.strip()[:120]}")
+        check_version_row(rel, no, line, facts.get("versions"), findings)
         if rel == README_SOURCE:
             check_readme_head(rel, no, line, facts, findings)
+        if is_onboarding:
+            check_forbidden_patterns(rel, no, line, findings)
+            check_absent_files(rel, no, line, facts.get("absent-files"), findings)
+        if is_onboarding or rel == README_SOURCE:
             check_test_claim_dated(rel, no, line, findings)
     check_migration_table(rel, lines, facts.get("migration-max"), findings)
     return

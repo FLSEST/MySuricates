@@ -50,6 +50,38 @@ for n in 1 2 3; do echo '{}' > "$RES/skills/builtin/s$n.json"; done
 echo 'class OneProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/OneProvider.java"
 echo 'class TwoProvider implements IntegrationProvider {}' > "$JAVA/service/integration/providers/TwoProvider.java"
 
+# Versionsquellen mit unverwechselbaren Zahlen (nichts davon kommt im echten Repo vor).
+cat > "$FAKE/ai-automation-backend/pom.xml" <<'POM_EOF'
+<project>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>9.9.9</version>
+    </parent>
+    <properties>
+        <docker-java.version>1.2.3</docker-java.version>
+        <sqlite-jdbc.version>4.5.6.7</sqlite-jdbc.version>
+    </properties>
+</project>
+POM_EOF
+mkdir -p "$FAKE/ai-automation-frontend"
+cat > "$FAKE/ai-automation-frontend/package.json" <<'PKG_EOF'
+{
+  "dependencies": {
+    "react": "^8.1.2",
+    "react-dom": "^8.1.2",
+    "@types/react": "^8.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^3.2.1",
+    "vite": "^2.3.4",
+    "tailwindcss": "^5.6.7",
+    "cypress": "^7.8.9",
+    "vite-plugin-pwa": "^0.9.8"
+  }
+}
+PKG_EOF
+
 echo "1) Korrekte Zahlen erzeugen keine Drift"
 cat > "$FAKE/docs/ok.md" <<'MD_EOF'
 # Korrekt
@@ -294,6 +326,55 @@ OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "passende Commit-Zahl und datierte Testzahl: exit 0" '[ "$RC" -eq 0 ]'
 check "README.de.md ohne Befund" '! grep -q "README.de.md" <<<"$OUT"'
 rm "$FAKE/README.de.md"
+
+echo "12) Onboarding-Fakten: Versionen, verbotene Muster, nicht existierende Dateien"
+mkdir -p "$FAKE/docs/onboarding"
+cat > "$FAKE/docs/onboarding/README.md" <<'MD_EOF'
+# Onboarding
+| Technologie | Version | Zweck |
+|---|---|---|
+| **Spring Boot** | 9.9.8 | Web-Framework |
+| **React** | 8.1 | UI-Framework |
+| **SQLite** | sqlite-jdbc 4.5.6.7 | Datenbank |
+| **Vite** | 2.4 | Build-Tool |
+| **Java** | 21 (LTS) | Sprache |
+MD_EOF
+cat > "$FAKE/docs/onboarding/SETUP.md" <<'MD_EOF'
+# Setup
+Starte das Backend mit `mvn spring-boot:run`.
+> **Nicht** `mvn spring-boot:run` verwenden: der RuntimeClasspathGuard bricht ab.
+Das Routing nutzt React Router v6.
+Die Themes stehen in `tailwind.config.ts`.
+Unter `src/test/java` liegen 715 Testklassen.
+Stand 2026-09-18: 114 Vitest-Dateien unter `src/`.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Version gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/README.md:4 version\(Spring Boot\) sagt 9.9.8, Code 9.9.9" <<<"$OUT"'
+check "gekuerzte, passende Version bleibt frei" '! grep -q "README.md:5" <<<"$OUT"'
+check "Version im Fliesstext der Zelle erkannt" '! grep -q "README.md:6" <<<"$OUT"'
+check "falsche Nebenversion gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/README.md:7 version\(Vite\) sagt 2.4, Code 2.3.4" <<<"$OUT"'
+check "Zeile ohne Versionszahl bleibt frei"     '! grep -q "README.md:8" <<<"$OUT"'
+check "mvn spring-boot:run gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:2 verbotenes-muster" <<<"$OUT"'
+check "Warn-Blockquote bleibt erlaubt"          '! grep -q "SETUP.md:3" <<<"$OUT"'
+check "veraltete React-Router-Version gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:4 verbotenes-muster" <<<"$OUT"'
+check "nicht existierende Datei gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:5 fehlende-datei.*tailwind.config.ts" <<<"$OUT"'
+check "undatierte Testzahl im Onboarding gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:6 testzahl-ohne-datum" <<<"$OUT"'
+check "datierte Testzahl bleibt frei"           '! grep -q "SETUP.md:7" <<<"$OUT"'
+rm -r "$FAKE/docs/onboarding"
+
+echo "13) Fehlende Versionsquelle ist ein harter Fehler"
+mv "$FAKE/ai-automation-frontend/package.json" "$TMP/package.bak"
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "exit 2 ohne package.json"   '[ "$RC" -eq 2 ]'
+check "nennt die fehlende Quelle"  'grep -qi "package.json" <<<"$OUT"'
+check "meldet kein OK"             '! grep -q "Doku-Zahlen OK" <<<"$OUT"'
+mv "$TMP/package.bak" "$FAKE/ai-automation-frontend/package.json"
 
 echo
 echo "passed=$PASS failed=$FAIL"

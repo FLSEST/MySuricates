@@ -41,6 +41,9 @@ ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || { echo "doc-facts-check: Wurzel nicht
 [ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md)
 
 BACKEND="$ROOT/ai-automation-backend"
+FRONTEND="$ROOT/ai-automation-frontend"
+POM="$BACKEND/pom.xml"
+PKG="$FRONTEND/package.json"
 JAVA_SRC="$BACKEND/src/main/java"
 RES="$BACKEND/src/main/resources"
 REGISTRY="$JAVA_SRC/com/automation/service/assistant/context/BlockTypesIndexSection.java"
@@ -99,6 +102,54 @@ SKILLS="$(fact_skills)"
 PROVIDERS="$(fact_providers)"
 COMMITS="$(fact_commits)"
 
+# ---------------------------------------------------------------------------
+# Versionen der Technologietabellen (docs/onboarding/README.md, DE und EN)
+#
+# Quelle ist pom.xml bzw. package.json. Die Doku kuerzt ("React 19.2" fuer
+# 19.2.4) — geprueft wird deshalb komponentenweise als Praefix, siehe
+# doc_facts_check.py. Fehlt eine Quelle, bricht der Lauf ab: eine leere Version
+# wuerde jede Tabellenzeile stumm durchwinken.
+# ---------------------------------------------------------------------------
+pom_property() {  # $1 = Name des Property-Tags
+  sed -n "s|.*<$1>\([^<]*\)</$1>.*|\1|p" "$POM" 2>/dev/null | head -1
+}
+pom_parent_version() {
+  grep -A4 'spring-boot-starter-parent' "$POM" 2>/dev/null \
+    | sed -n 's|.*<version>\([^<]*\)</version>.*|\1|p' | head -1
+}
+pkg_version() {  # $1 = Paketname
+  sed -n "s|.*\"$1\"[[:space:]]*:[[:space:]]*\"[^0-9]*\([0-9][^\"]*\)\".*|\1|p" "$PKG" 2>/dev/null | head -1
+}
+
+[ -f "$POM" ] || MISSING+=("versions: $POM fehlt")
+[ -f "$PKG" ] || MISSING+=("versions: $PKG fehlt")
+
+VERSION_LABELS=("Spring Boot" "SQLite" "Docker Java Client" \
+                "React" "TypeScript" "Vite" "TailwindCSS" "Cypress" "Vite PWA")
+VERSION_VALUES=("$(pom_parent_version)" "$(pom_property sqlite-jdbc.version)" \
+                "$(pom_property docker-java.version)" \
+                "$(pkg_version react)" "$(pkg_version typescript)" "$(pkg_version vite)" \
+                "$(pkg_version tailwindcss)" "$(pkg_version cypress)" "$(pkg_version vite-plugin-pwa)")
+VERSIONS_JSON=""
+for i in "${!VERSION_LABELS[@]}"; do
+  if [ -z "${VERSION_VALUES[$i]}" ]; then
+    MISSING+=("version '${VERSION_LABELS[$i]}': keine Quelle gefunden (pom.xml/package.json)")
+  fi
+  VERSIONS_JSON="${VERSIONS_JSON}${VERSIONS_JSON:+,}\"${VERSION_LABELS[$i]}\":\"${VERSION_VALUES[$i]}\""
+done
+
+# Dateinamen, die das Onboarding frueher nannte, obwohl es sie nicht gibt. Geprueft
+# wird jedes Mal neu, ob sie wirklich fehlen — taucht die Datei wieder auf, faellt
+# die Regel von selbst weg statt falschen Alarm zu schlagen.
+ABSENT_CANDIDATES=(tailwind.config.ts BlockTypeSelector.tsx BuiltInTemplates.java)
+ABSENT_JSON=""
+for name in "${ABSENT_CANDIDATES[@]}"; do
+  found="$(find "$ROOT" -name "$name" -not -path '*/node_modules/*' -not -path '*/target/*' \
+             -print -quit 2>/dev/null)"
+  [ -n "$found" ] && continue
+  ABSENT_JSON="${ABSENT_JSON}${ABSENT_JSON:+,}\"$name\""
+done
+
 COMMITS_JSON=""
 COMMITS_NOTE=""
 if [ -n "$COMMITS" ] && [ "$COMMITS" != "0" ]; then
@@ -137,6 +188,10 @@ if [ "$FACTS_ONLY" -eq 1 ]; then
     skills "$SKILLS" \
     integration-providers "$PROVIDERS" \
     commits "${COMMITS:-(kein Git-Repository)}"
+  for i in "${!VERSION_LABELS[@]}"; do
+    printf '%-22s %s\n' "version:${VERSION_LABELS[$i]}" "${VERSION_VALUES[$i]}"
+  done
+  printf '%-22s %s\n' absent-files "${ABSENT_JSON:-(keine)}"
   exit 0
 fi
 
@@ -159,9 +214,9 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"templates":%s,"skills":%s,"integration-providers":%s%s}' \
+DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
   "$BLOCK_TYPES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" \
-  "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON")" \
+  "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?
 
