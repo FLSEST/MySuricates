@@ -3032,6 +3032,10 @@ Pool-Workflow in ein Projekt installieren.
 
 Bestehenden Workflow in den Pool exportieren.
 
+**Query-Parameter:** `scope` = `repo` | `portable` (optional, Default `portable`) — Pool-Metadatum, das repo-gebundene von portablen Einträgen trennt. Ein unbekannter Wert ergibt `400`. Regelwerk: [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
+
+Der Export schreibt keine Instanz-Bindungen mit: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` mit konkretem Wert und UUID-Werte fallen weg, eine UUID innerhalb eines Textes wird durch `REDACTED-UUID` ersetzt.
+
 **Request (optional):**
 
 ```json

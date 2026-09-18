@@ -3018,6 +3018,10 @@ Install a pool workflow into a project.
 
 Export an existing workflow to the pool.
 
+**Query parameter:** `scope` = `repo` | `portable` (optional, default `portable`) — pool metadata separating repo-bound from portable entries. An unknown value yields `400`. Rule set: [workflow-pool-curation.md](workflow-pool-curation.md).
+
+The export writes no instance bindings: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` with a concrete value and UUID values are dropped; a UUID inside a text is replaced with `REDACTED-UUID`.
+
 **Request (optional):**
 
 ```json

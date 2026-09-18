@@ -135,7 +135,17 @@ public class WorkflowPoolService {
         return new InstallResult(workflow, true);
     }
 
-    public ExportToPoolResponse exportToPool(String workflowId, ExportToPoolRequest request) throws IOException {
+    /**
+     * Schreibt einen Workflow als Pool-Definition.
+     *
+     * @param scope {@code repo} oder {@code portable}; ohne Angabe gilt {@code portable}
+     *              (siehe {@link PoolScope}). Der Wert ist ein Pool-Metadatum, kein Feld der
+     *              Workflow-Definition.
+     * @throws IllegalArgumentException bei einem unbekannten {@code scope}
+     */
+    public ExportToPoolResponse exportToPool(String workflowId, ExportToPoolRequest request, String scope)
+            throws IOException {
+        PoolScope poolScope = PoolScope.fromParam(scope);
         Workflow workflow = workflowService.findById(workflowId);
         if (request == null) {
             request = new ExportToPoolRequest(null, null, null, null, null, null, null);
@@ -167,6 +177,7 @@ public class WorkflowPoolService {
         }
         poolJson.put("icon", workflow.getIcon() != null ? workflow.getIcon() : "\uD83D\uDD27");
         poolJson.put("category", category);
+        poolJson.put("scope", poolScope.jsonValue());
         if (!tags.isEmpty()) {
             poolJson.put("tags", tags);
         }
@@ -194,6 +205,18 @@ public class WorkflowPoolService {
             }
         }
 
+        // Instanz-Bindungen (projectId, Instanz-UUIDs) entfernen, bevor etwas auf Platte landet.
+        // Erst in eine generische Struktur wandeln: die Blöcke sind sonst POJOs, in die der
+        // Sanitizer nicht hineinsieht.
+        Map<String, Object> generic = objectMapper.convertValue(poolJson, new TypeReference<>() {});
+        PoolExportSanitizer sanitizer = new PoolExportSanitizer();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sanitized = (Map<String, Object>) sanitizer.scrub(generic);
+        if (!sanitizer.removedPaths().isEmpty()) {
+            log.warn("Pool-Export von '{}' ({}): Instanz-Bindungen entfernt: {}",
+                    workflow.getName(), workflowId, sanitizer.removedPaths());
+        }
+
         // Resolve filename with collision avoidance
         Path poolDir = resolvePoolDirectory();
         Files.createDirectories(poolDir);
@@ -208,7 +231,7 @@ public class WorkflowPoolService {
             suffix++;
         }
 
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(target.toFile(), poolJson);
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(target.toFile(), sanitized);
         String poolId = filename.replace(".json", "");
         log.info("Exported workflow '{}' ({}) to pool: {}", workflow.getName(), workflowId, filename);
         return new ExportToPoolResponse(poolId, filename);
@@ -251,6 +274,9 @@ public class WorkflowPoolService {
 
         String icon = (String) raw.getOrDefault("icon", "📋");
         String category = (String) raw.get("category");
+        // Bewusst ohne Default: ein Eintrag ohne 'scope' soll im Pool-Browser als
+        // "nicht deklariert" erkennbar sein, nicht als portabel durchgehen.
+        String scope = raw.get("scope") instanceof String s ? s : null;
 
         @SuppressWarnings("unchecked")
         List<String> tags = raw.containsKey("tags")
@@ -273,7 +299,7 @@ public class WorkflowPoolService {
                 : null;
 
         return new PoolWorkflowEntry(
-                id, name, description, icon, category, tags,
+                id, name, description, icon, category, scope, tags,
                 blocks, instructions, model, version, author,
                 defaultContext, metadata, filename
         );

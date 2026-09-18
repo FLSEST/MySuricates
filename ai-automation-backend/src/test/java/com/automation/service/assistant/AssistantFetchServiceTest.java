@@ -471,6 +471,7 @@ class AssistantFetchServiceTest {
                 Map.of("de", "Fuehrt den Release-Prozess aus."),
                 "icon",
                 "delivery",
+                "repo",
                 List.of("release", "ci"),
                 List.of(com.automation.entity.BlockDefinition.builder()
                         .type("shell")

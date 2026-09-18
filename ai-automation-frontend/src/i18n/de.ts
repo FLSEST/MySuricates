@@ -1282,6 +1282,10 @@ export const de: TranslationKeys = {
     install: 'Installieren',
     searchPlaceholder: 'Pool-Workflows durchsuchen...',
     tags: 'Tags',
+    scopeRepo: 'repo',
+    scopePortable: 'portable',
+    scopeRepoHint: 'Greift auf die Struktur dieses Repositories zu (Backend, Frontend, scripts/) — in einem anderen Projekt läuft der Workflow ins Leere.',
+    scopePortableHint: 'Über project_path parametrisiert — in jedem Projekt lauffähig.',
   },
   testBadge: {
     passed: 'Getestet',

@@ -9,6 +9,7 @@
   },
   "icon": "🗳️",
   "category": "QUALITY",
+  "scope": "portable",
   "tags": [
     "release",
     "public-readiness",

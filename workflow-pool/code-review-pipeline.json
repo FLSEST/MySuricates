@@ -9,6 +9,7 @@
   },
   "icon": "🔍",
   "category": "CODE",
+  "scope": "portable",
   "tags": ["code-review", "quality", "lint"],
   "blocks": [
     {

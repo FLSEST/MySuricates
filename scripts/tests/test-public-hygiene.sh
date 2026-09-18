@@ -111,6 +111,126 @@ check "Gate nennt SECURITY.md als nicht getrackt"                         'grep 
 OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "einmal committete SECURITY.md wird akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
 
+echo "12) Pool-Kuratierungsregeln (TODO 523702f4): scope, projectId, Beschreibung/Tags, Blocktypen"
+POOL="$TMP/pool"
+mkdir -p "$POOL"
+write_pool() { cat > "$POOL/$1.json"; }
+
+write_pool ok-portable <<'JSON'
+{"name": {"de": "Portabel", "en": "Portable"},
+ "description": {"de": "Prueft ein Projekt.", "en": "Checks a project."},
+ "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_path": ""},
+ "blocks": [{"type": "shell", "config": {"command": "cd {{ project_path }} && ls"}},
+            {"type": "simple", "config": {"goal": "Fasse zusammen."}}]}
+JSON
+
+write_pool ok-repo <<'JSON'
+{"name": {"de": "Repo-gebunden", "en": "Repo bound"},
+ "description": {"de": "Prueft dieses Repository.", "en": "Checks this repository."},
+ "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh && ./mvnw -q test"}}]}
+JSON
+
+write_pool missing-scope <<'JSON'
+{"name": {"de": "Ohne", "en": "Without"},
+ "description": {"de": "Text.", "en": "Text."}, "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool bad-scope <<'JSON'
+{"name": {"de": "Falsch", "en": "Wrong"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "private", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool has-projectid <<'JSON'
+{"name": {"de": "Gebunden", "en": "Bound"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "projectId": "proj-42",
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool ctx-projectid <<'JSON'
+{"name": {"de": "Kontext", "en": "Context"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_id": "e1b2c3d4"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool ctx-placeholder <<'JSON'
+{"name": {"de": "Platzhalter", "en": "Placeholder"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_id": "{{ project_id }}"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool empty-tags <<'JSON'
+{"name": {"de": "Ohne Tags", "en": "No tags"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": [],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool empty-desc <<'JSON'
+{"name": {"de": "Ohne Text", "en": "No text"},
+ "description": {"de": "", "en": ""}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool string-desc <<'JSON'
+{"name": "Nur ein String",
+ "description": "Nur ein String statt de/en.", "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool unknown-blocktype <<'JSON'
+{"name": {"de": "Unbekannt", "en": "Unknown"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "magic", "config": {}}]}
+JSON
+
+write_pool nested-blocktype <<'JSON'
+{"name": {"de": "Verschachtelt", "en": "Nested"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "foreach", "config": {"blocks": [{"type": "sorcery", "config": {}}]}}]}
+JSON
+
+write_pool portable-repo-dep <<'JSON'
+{"name": {"de": "Portabel?", "en": "Portable?"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh"}}]}
+JSON
+
+OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
+check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
+check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
+check "ok-repo darf scripts/ und mvnw nutzen"  '! grep -q "ok-repo" <<<"$OUT"'
+check "fehlendes scope erkannt"                'grep -q "missing-scope.*SCOPE" <<<"$OUT"'
+check "ungueltiges scope erkannt"              'grep -q "bad-scope.*SCOPE" <<<"$OUT"'
+check "projectId im Eintrag erkannt"           'grep -q "has-projectid.*PROJECT-ID" <<<"$OUT"'
+check "project_id im defaultContext erkannt"   'grep -q "ctx-projectid.*PROJECT-ID" <<<"$OUT"'
+check "Platzhalter-project_id bleibt erlaubt"  '! grep -q "ctx-placeholder" <<<"$OUT"'
+check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$OUT"'
+check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'
+check "description als String erkannt"         'grep -q "string-desc.*DESCRIPTION" <<<"$OUT"'
+check "unbekannter Blocktyp erkannt"           'grep -q "unknown-blocktype.*BLOCK-TYPE" <<<"$OUT"'
+check "unbekannter Blocktyp verschachtelt"     'grep -q "nested-blocktype.*BLOCK-TYPE" <<<"$OUT"'
+check "portable mit scripts/-Pfad erkannt"     'grep -q "portable-repo-dep.*REPO-DEP" <<<"$OUT"'
+
+echo "13) Die Blocktyp-Liste des Gates deckt sich mit der Registry im Backend"
+REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"
+JAVA_TYPES="$(grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("//;s/"//' | sort | tr '\n' ' ')"
+# shellcheck source=../lib/hygiene-rules.sh
+. "$REPO/scripts/lib/hygiene-rules.sh"
+GATE_TYPES="$(printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]:-}" | sort | tr '\n' ' ')"
+check "Registry-Liste nicht leer"              '[ -n "$JAVA_TYPES" ]'
+check "Gate-Liste deckt sich mit der Registry" '[ "$JAVA_TYPES" = "$GATE_TYPES" ]'
+
+echo "14) Die getrackten Pool-Definitionen erfuellen die Kuratierungsregeln"
+OUT=$(cd "$REPO" && bash scripts/ci/pool-neutrality.sh 2>&1); RC=$?
+check "Pool-Neutralitaet im Bestand OK (exit 0)" '[ "$RC" -eq 0 ]'
+[ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -1,8 +1,10 @@
 package com.automation.service.pool;
 
 import com.automation.config.WorkflowPoolConfig;
+import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.response.PoolWorkflowEntry;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
@@ -18,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -231,6 +235,119 @@ class WorkflowPoolServiceTest {
         InstallPoolWorkflowRequest request = new InstallPoolWorkflowRequest("proj-1", null, null);
         assertThatThrownBy(() -> poolService.install("nonexistent", request))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ── scope (Pool-Metadatum) ──────────────────────────────────────────────
+
+    @Test
+    void listAll_readsScopeFromFile() throws Exception {
+        writePoolFile("repo-bound.json", """
+                {"name": {"en": "Repo bound"}, "scope": "repo",
+                 "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+                """);
+
+        assertThat(poolService.listAll().get(0).scope()).isEqualTo("repo");
+    }
+
+    @Test
+    void listAll_scopeIsNullWhenNotDeclared() throws Exception {
+        writePoolFile("undeclared.json", """
+                {"name": {"en": "Undeclared"}, "blocks": [{"type": "shell", "config": {}}]}
+                """);
+
+        assertThat(poolService.listAll().get(0).scope()).isNull();
+    }
+
+    // ── export ──────────────────────────────────────────────────────────────
+
+    @Test
+    void exportToPool_writesScopeFromParameter() throws Exception {
+        stubWorkflow(Workflow.builder().id("wf-1").name("Build Gate").build());
+
+        poolService.exportToPool("wf-1", null, "repo");
+
+        assertThat(exported("build-gate.json")).containsEntry("scope", "repo");
+    }
+
+    @Test
+    void exportToPool_defaultsScopeToPortable() throws Exception {
+        stubWorkflow(Workflow.builder().id("wf-1").name("Build Gate").build());
+
+        poolService.exportToPool("wf-1", null, null);
+
+        assertThat(exported("build-gate.json")).containsEntry("scope", "portable");
+    }
+
+    @Test
+    void exportToPool_rejectsUnknownScope() {
+        assertThatThrownBy(() -> poolService.exportToPool("wf-1", null, "private"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void exportToPool_omitsProjectIdAndInstanceUuids() throws Exception {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("projectId", "11111111-2222-3333-4444-555555555555");
+        metadata.put("sourceRunId", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        metadata.put("gateCategory", "quality");
+        Map<String, Object> defaultContext = new LinkedHashMap<>();
+        defaultContext.put("project_path", "{{ project_path }}");
+        defaultContext.put("workflowId", "99999999-8888-7777-6666-555555555555");
+        stubWorkflow(Workflow.builder()
+                .id("wf-1").name("Build Gate")
+                .metadata(metadata)
+                .defaultContext(defaultContext)
+                .blocks(List.of(BlockDefinition.builder()
+                        .type("shell")
+                        .config(new LinkedHashMap<>(Map.of(
+                                "command", "echo run 12345678-1234-1234-1234-123456789abc")))
+                        .build()))
+                .build());
+
+        poolService.exportToPool("wf-1", null, "portable");
+
+        String raw = Files.readString(tempDir.resolve("build-gate.json"));
+        assertThat(raw).doesNotContain("projectId");
+        assertThat(raw).doesNotContainPattern("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+        Map<String, Object> json = exported("build-gate.json");
+        assertThat(json).doesNotContainKey("projectId");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> meta = (Map<String, Object>) json.get("metadata");
+        assertThat(meta).containsEntry("gateCategory", "quality").doesNotContainKey("sourceRunId");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ctx = (Map<String, Object>) json.get("defaultContext");
+        assertThat(ctx).containsEntry("project_path", "{{ project_path }}").doesNotContainKey("workflowId");
+    }
+
+    @Test
+    void exportToPool_keepsFunctionalFields() throws Exception {
+        stubWorkflow(Workflow.builder()
+                .id("wf-1").name("Build Gate").description("Runs the build")
+                .icon("🚦").version("2.1.0").instructions("Be brief").model("sonnet")
+                .blocks(List.of(BlockDefinition.builder().type("shell")
+                        .config(new LinkedHashMap<>(Map.of("command", "ls"))).build()))
+                .build());
+
+        poolService.exportToPool("wf-1",
+                new ExportToPoolRequest(null, null, null, null, "QUALITY", List.of("ci"), "MySuricates"),
+                "repo");
+
+        Map<String, Object> json = exported("build-gate.json");
+        assertThat(json).containsEntry("category", "QUALITY")
+                .containsEntry("author", "MySuricates")
+                .containsEntry("version", "2.1.0")
+                .containsEntry("instructions", "Be brief")
+                .containsEntry("model", "sonnet")
+                .containsEntry("tags", List.of("ci"));
+    }
+
+    private void stubWorkflow(Workflow workflow) {
+        when(workflowService.findById(workflow.getId())).thenReturn(workflow);
+    }
+
+    private Map<String, Object> exported(String filename) throws Exception {
+        return objectMapper.readValue(tempDir.resolve(filename).toFile(),
+                new com.fasterxml.jackson.core.type.TypeReference<>() {});
     }
 
     private void writePoolFile(String filename, String content) throws Exception {

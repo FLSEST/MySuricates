@@ -9,6 +9,7 @@
   },
   "icon": "🕵️",
   "category": "CODE",
+  "scope": "portable",
   "tags": ["testing", "mocking", "integration", "audit", "quality", "todo", "bug-hunt"],
   "blocks": [
     {
