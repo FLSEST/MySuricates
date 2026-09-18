@@ -30,6 +30,17 @@ final class TemplateResolver {
     }
 
     /**
+     * Raw substitution for an AI prompt — identical output to {@link #resolve}, but every placeholder
+     * that really resolved is reported. Platform data in a prompt does not taint the run (a prompt is
+     * no command line), it marks the output of the block that used it
+     * ({@link ExecutionContextTaint#substitutedIntoPrompt}, TODO 22e6bec8).
+     */
+    static String resolvePrompt(String template, String previousOutput, Map<String, String> blockOutputs,
+                                Map<String, Object> vars, Consumer<String> onSubstitution) {
+        return substitute(template, previousOutput, blockOutputs, vars, false, onSubstitution);
+    }
+
+    /**
      * Shell-safe substitution: each value is wrapped in POSIX single quotes with internal
      * single quotes escaped as '\'' to prevent shell injection. {@code onSubstitution} is told the
      * key of every placeholder that really resolved (see {@link #resolveShell}).

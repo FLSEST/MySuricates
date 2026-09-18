@@ -139,15 +139,18 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 |---|---|---|---|---|
 | **trusted** | Workflow-Defaults, Systemwerte (`project_path`, `workflow_run_id`, `workflow_definition_hash`), blockinterne Werte, Antworten aus `approval`/`human-input`, jedes `setVariable` | roh eingesetzt | roh | nein |
 | **untrusted extern** | Webhook-Payload, wiederhergestellte `__untrusted_keys` (Resume, Sub-Workflow), aus getainteten Ausgaben abgeleitete Variablen (`step_N_output`, foreach-Items, `document`-Extrakte) | immer single-quoted | roh | ja, ab dem Setzen |
-| **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | erst wenn der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde |
+| **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | auf zwei Wegen: (1) sobald der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde; (2) sobald die Ausgabe eines KI-Blocks verbucht wird, in dessen Prompt der Platzhalter stand — ab dieser gefärbten Ausgabe ist der Lauf klebrig getaintet |
 
 - **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den drei reservierten Kontextschlüsseln `__untrusted_keys`, `__untrusted_outputs` und `__platform_in_shell` (Letzteres das Nutzungs-Flag der Plattform-Daten, `true` sobald es gesetzt ist), damit er Resume und Sub-Workflow-Übergabe überlebt — auch dann, wenn nach der Substitution noch keine Ausgabe verbucht wurde. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
-- **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` nur im KI-Prompt verwendet (`resolveTemplate`) oder gar nicht, bleibt untainted.
+- **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` gar nicht verwendet, bleibt untainted.
+- **KI-Ausgaben nach Plattform-Daten-Prompt sind gefärbt:** Standen Plattform-Daten im Prompt eines KI-Blocks, gilt die Ausgabe genau dieses Blocks als untrusted — ein folgender Shell-Block bekommt `{{ previous_output }}`/`{{ block.<name>.output }}` also single-quoted. Umgesetzt über denselben Rückmeldekanal: `TemplateResolver.resolvePrompt` meldet die aufgelösten Platzhalter, `ExecutionContextTaint.substitutedIntoPrompt` merkt sich Plattform-Daten, und die nächste über `recordOutput` verbuchte Ausgabe konsumiert dieses Flag. Der **Prompt allein** färbt den Run nicht: Solange keine Ausgabe verbucht wurde, ist `hasUntrustedInput()` false und `exportTaint()` leer. Mit der verbuchten Ausgabe ist der Lauf dann aber getaintet, und zwar klebrig wie in jedem anderen Fall — `recordOutput` escapt ab da **jede** weitere Blockausgabe, `setDerivedVariable` markiert jede daraus abgeleitete Variable (`step_N_output`, foreach-Items, `document`-Extrakte) als untrusted, und `exportTaint()` reicht beides an Sub-Workflows und an ein Resume weiter. Ein späterer KI-Block mit sauberem Prompt bekommt also keine saubere Ausgabe zurück — das gilt nur, wenn vorher nichts Gefärbtes verbucht wurde. Auf dem Prompt-Pfad liegen genau die KI-Aufrufe: `simple`, `skill-capability`, `agentic` (`goal`/`success_criteria`) und die Nicht-Shell-Zweige von `foreach`, `while`, `conditional`, `retry` und `switch`; Nicht-Prompt-Auflösungen (Mounts, Dokumentpfade, TODO-Felder, Integrations-Parameter, `switch`-Ausdruck) bleiben auf `resolveTemplate` und melden weiterhin nichts.
 - **Bewusst trusted:** Antworten aus `approval`- und `human-input`-Blöcken kommen über die API-Key-geschützte REST-Schnittstelle von der Person, der die Instanz gehört — sie werden nicht escaped. Ebenso überschreibt `setVariable` (etwa eine Workflow-Variable, die einen Webhook-Wert gleichen Namens überdeckt) die Untrusted-Markierung absichtlich: Der Wert kommt dann aus der Definition, nicht vom Aufrufer. `replaceValue` (Workspace-Pfad-Remapping) tauscht dagegen nur den Wert und lässt die Klasse stehen.
 - **Bekannte Grenzen:**
   1. In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab.
-  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form sechsmal vor (sechs Pool-Workflows, kein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
+  2. Prompt-Injection über die KI-Antwort selbst bleibt möglich: Gequotet wird die Ausgabe, ihr *Inhalt* stammt weiterhin aus einem Modell, das Plattform-Daten gelesen hat. Das Quoting verhindert Shell-Injection, keine inhaltliche Manipulation.
   3. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
+
+  Der Weg Plattform-Daten → KI-Prompt → Shell-Block war bis TODO 22e6bec8 die vierte Grenze; er ist seit der Färbung der KI-Ausgabe geschlossen. **Empfehlung bleibt: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — dann verhält sich der Block in gefärbten wie in sauberen Läufen gleich. Für die ausgelieferten Definitionen erzwingt das `PlatformPromptQuotingGateTest`.
 
 **Webhook-Signaturen** — `POST /api/v1/webhooks/{id}/secret` erzeugt ein Secret (32 Zufallsbytes, hex), zeigt es genau einmal und speichert es AES-GCM-verschlüsselt (`IntegrationEncryptionService`, Schlüssel außerhalb der Datenbank) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` entfernt es. Hat ein Webhook ein Secret, prüft `WebhookSignatureVerifier` vor dem JSON-Parsen den Header `X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`, das Format von GitHub und Gitea) als HMAC-SHA256 über die rohen Request-Bytes, Vergleich in konstanter Zeit — sonst **401 `WEBHOOK_SIGNATURE_INVALID`**. Wie beim Siegel bleibt ein gespeichertes Secret wirksam, wenn der Schalter später aus ist. Responses verraten nur `signatureRequired`.
 
@@ -206,7 +209,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), DataFlowReferenceScanner (Platzhalter-Scan `block.x.output`/`previous_output`/`step_N_output`/compress-`source`) + BpmnDataFlowBuilder (Datenobjekte und -assoziationen unter der Task-Reihe; Import überliest sie), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames; Import (Roundtrip): BpmnImportAdapter (liest `mysuricates:blockConfig` der direkten `<process>`-Kinder zurück, lehnt Fremd-BPMN ab), BpmnDom (XXE-gehärtetes JDK-DOM-Parsen), BpmnImportException → 400; Interfaces `export/ProcessFormatAdapter` (Export) + `export/ProcessFormatImporter` (Import, Ergebnis `ImportedWorkflow`)
+│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), DataFlowReferenceScanner (Platzhalter-Scan `block.x.output`/`previous_output`/`step_N_output`/compress-`source`) + DataFlowConfigStrings (Ebenen-Regel: direkte vs. verschachtelte Config-Werte) + BpmnBranchBlocks (Blöcke und Id-Pfade der switch-Zweige) + BpmnDataFlowBuilder (Datenobjekte und -assoziationen unter der Task-Reihe, Endpunkt ist der Task — bei Referenzen aus einem Zweig der Zweig-Task, nie das Gateway; Import überliest sie), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames; Import (Roundtrip): BpmnImportAdapter (liest `mysuricates:blockConfig` der direkten `<process>`-Kinder zurück, lehnt Fremd-BPMN ab), BpmnDom (XXE-gehärtetes JDK-DOM-Parsen), BpmnImportException → 400; Interfaces `export/ProcessFormatAdapter` (Export) + `export/ProcessFormatImporter` (Import, Ergebnis `ImportedWorkflow`)
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService (+ ThreadDumpCollector)
 │   ├── repair/          AutoRepairService
@@ -890,9 +893,10 @@ Response (DTO) → React Query Cache → UI-Update
 - **Filter:** `RateLimitFilter` (liest von `RateLimitConfig` Bean)
 - **Algorithmus:** Sliding Window (1 Minute)
 - **Standard:** 120 Requests/Minute pro Client-IP
-- **Response-Header:** `X-RateLimit-Remaining`
+- **Response-Header:** `X-RateLimit-Remaining`; bei 429 zusätzlich `Retry-After` — Sekunden bis das Minutenfenster des Eimers umschlägt (mindestens 1), derselbe Wert wie `retryAfterSeconds` im JSON-Body
 - **Runtime-konfigurierbar:** Settings → Execution → API-Ratenbegrenzung (Toggle + RPM-Wert)
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
+- **Client-Backoff-Budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) und `client-default-retry-after-seconds` (10) — siehe unten
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
@@ -902,14 +906,32 @@ schnell". Der Client (`api/client.ts`) merkt sich die Sperre dagegen **pro Endpu
 Pfad ohne Query und mit durch `{id}` ersetzten UUIDs, damit `/executions/{id}` nicht pro Run einen
 eigenen Schlüssel bekommt).
 
-Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s (`GLOBAL_BACKOFF_SECONDS`),
-gedeckelt durch `Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale
-Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
+Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s, gedeckelt durch
+`Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
 blockierte Ticket-Anfrage kostet den WebSocket einen Reconnect-Versuch und verdoppelt seinen
 exponentiellen Abstand, aus 2 s wird also ein viel längerer Ausfall) und `GET /system/auth-status`
 (der `ApiKeyGuard` rendert nichts, bevor der antwortet — die App bliebe leer statt den
 Rate-Limit-Hinweis zu zeigen). Ihre eigene Pfad-Sperre gilt für sie weiterhin; ausgenommen sind sie
 nur von *fremden* 429ern.
+
+**Woher die zwei Zahlen kommen: von der Instanz, nicht aus dem Bundle.** Die 2 s der globalen
+Kurzsperre und die 10 s, die der Client ohne brauchbaren `Retry-After` annimmt, stehen als
+Konstanten (`GLOBAL_BACKOFF_SECONDS`, `DEFAULT_RETRY_AFTER_SECONDS`) nur noch als *Fallback* im
+Client. Die geltenden Werte liefert `GET /api/v1/system/info` unter `rateLimit`
+(`enabled`, `requestsPerMinute`, `globalBackoffSeconds`, `defaultRetryAfterSeconds`); `useSystemInfo`
+reicht sie über `applyServerRateLimitConfig()` an den Client weiter — der Endpunkt wird beim Start
+ohnehin geladen (Sidebar) und braucht keinen API-Key, also entsteht dafür kein eigener Request.
+Gesetzt werden sie über `automation.security.rate-limit.client-global-backoff-seconds` bzw.
+`client-default-retry-after-seconds`; fehlende oder nicht-positive Werte lässt der Client liegen und
+bleibt bei seinen Konstanten. Hintergrund: Eine Instanz mit anderem `requests-per-minute` macht fest
+verdrahtete Client-Zahlen zu Raterei (37b98c97).
+
+Der `Retry-After`-Header kommt **nur vom `RateLimitFilter`**. Die beiden anderen 429-Quellen senden
+ihn nicht: der Webhook-Limiter (`WebhookController` → `WebhookRateLimiter`, leere 429-Antwort) und
+`TOKEN_BUDGET_EXCEEDED` (`ErrorCode`/`GlobalExceptionHandler`, ein Budget- statt Zeitproblem — hier
+hilft Warten gar nicht). Für den Browser-Client heißt das: bei einem 429 auf `/api/v1` greift
+praktisch immer der Header, der `defaultRetryAfterSeconds`-Wert nur bei diesen Sonderfällen oder
+wenn ein Proxy den Header verschluckt.
 
 Daraus folgt: Nach einem 429-Sturm lässt der Client nach spätestens 2 s wieder einzelne Muster los,
 und jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Die kurze
@@ -1030,7 +1052,9 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 
 ## Architektur-Gates
 
-Zwei JUnit-Tests im Paket `com.automation.architecture` halten die gemessene Struktur fest, beide auf denselben jdeps-Paketkanten wie `scripts/public-readiness/arch-metrics.sh` (Abschnitt `## packages`) und ohne neue Abhängigkeit: `PackageCycleRatchetTest` pinnt die 13 heute wechselseitig abhängigen Paketpaare als Allowlist — ein neues Paar bricht den Build, ein aufgelöstes wird nur als Hinweis gemeldet —, und `LayerRuleTest` verbietet die Kantenklassen `service.* → controller.*`, `controller.* → repository.*` und `repository.* → service.*` (Allowlist heute leer). Gemessen wird immer das Build-Verzeichnis, aus dem die Tests selbst geladen wurden (`target/` bzw. `target-ide/` im IDE-Profil), nie ein danebenliegender veralteter Stand; fehlt es oder fehlt jdeps, werden beide Tests mit klarer Meldung übersprungen statt still grün zu laufen; ihr blinder Fleck sind Abhängigkeiten, die nur als generisches Typargument auftauchen und im Bytecode gelöscht sind.
+Zwei JUnit-Tests im Paket `com.automation.architecture` halten die gemessene Struktur fest, ohne neue Abhängigkeit. Ihre Grundmessung sind dieselben jdeps-Paketkanten wie in `scripts/public-readiness/arch-metrics.sh` (Abschnitt `## packages`); `LayerRuleTest` prüft zusätzlich eine zweite Sicht (siehe unten). `PackageCycleRatchetTest` pinnt die 13 heute wechselseitig abhängigen Paketpaare als Allowlist — ein neues Paar bricht den Build, ein aufgelöstes wird nur als Hinweis gemeldet —, und `LayerRuleTest` verbietet die Kantenklassen `service.* → controller.*`, `controller.* → repository.*` und `repository.* → service.*` (Allowlist heute leer). Gemessen wird immer das Build-Verzeichnis, aus dem die Tests selbst geladen wurden (`target/` bzw. `target-ide/` im IDE-Profil), nie ein danebenliegender veralteter Stand; fehlt es oder fehlt jdeps, werden beide Tests mit klarer Meldung übersprungen statt still grün zu laufen.
+
+Der blinde Fleck der Bytecode-Messung sind Abhängigkeiten, die nur als generisches Typargument auftauchen und im Bytecode gelöscht sind. `LayerRuleTest` prüft dieselben drei Regeln deshalb aus einer **zweiten Sicht**: `SourceImportEdges` liest die `import`-Zeilen des Quelltexts unter `src/main/java` (Spalte 0, damit Kommentare und String-Literale nicht mitzählen) und wertet sie gegen dieselben Regeln aus, mit eigener Allowlist (heute ebenfalls leer). Die Sichten decken sich nicht — die Bytecode-Sicht sieht Vererbung, statische Verweise und generierten Code, die Quelltext-Sicht die gelöschten Typargumente —, und der Test belegt zusätzlich, dass der Scan überhaupt Klassen gelesen hat: eine leere Messung meldete sonst jede Regel als eingehalten. Ein **Rest bleibt für beide unsichtbar**: ein voll qualifizierter Name innerhalb eines generischen Typarguments (`Page<com.automation.repository.Foo>` ohne Import) ist im Bytecode gelöscht und hat keine Import-Zeile. Für Projektionen, die vom Repository bis in den Controller reisen, heißt das: sie gehören nach `com.automation.dto.response`, nicht ins Repository-Paket.
 
 ## Verzeichnisstruktur
 
@@ -1074,13 +1098,12 @@ autotrigger/
 └── ai-automation-frontend/
     ├── package.json
     ├── vite.config.ts
-    ├── tailwind.config.ts
     ├── eslint.config.js               ← Flat Config (ESLint 9+)
     ├── index.html
     └── src/
         ├── App.tsx                    ← Router
         ├── main.tsx                   ← Entry Point
-        ├── index.css                  ← Globale Styles
+        ├── index.css                  ← Globale Styles + Tailwind-4-Konfiguration (@theme inline)
         ├── api/client.ts              ← HTTP-Client (Singleton)
         ├── types/index.ts             ← TypeScript-Typen
         ├── pages/                     ← 37 Seiten (inkl. Simple-Mode-Varianten)

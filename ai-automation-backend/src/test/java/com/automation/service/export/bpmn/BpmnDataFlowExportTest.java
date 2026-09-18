@@ -182,7 +182,56 @@ class BpmnDataFlowExportTest {
         assertThat(elements(doc, "dataOutputAssociation")).isEmpty();
     }
 
-    /** Gateway-Blöcke (conditional/switch) haben keinen einzelnen Aktivitäts-Knoten — kein Datenobjekt. */
+    /**
+     * 7557b928: Der Datenfluss endet an den Zweig-Tasks der Verzweigung, nicht am Gateway —
+     * BPMN erlaubt an Gateways keine Datenassoziationen.
+     */
+    @Test
+    void zweigTasksSindDieEndpunkteDerAssoziationen() throws Exception {
+        Document doc = export(WorkflowFixtures.branching());
+
+        // tests → analyse (in den Case hinein), analyse → report (aus dem Case heraus)
+        assertThat(ownerIdsOf(doc, "dataOutputAssociation"))
+                .containsExactlyInAnyOrder("b_0_tests", "b_1_c0_0_analyse");
+        assertThat(ownerIdsOf(doc, "dataInputAssociation"))
+                .containsExactlyInAnyOrder("b_1_c0_0_analyse", "b_2_report");
+        assertThat(elements(doc, "dataObjectReference")).hasSize(2);
+    }
+
+    /** Kein Gateway-Knoten trägt eine Datenassoziation (XSD-Grenze der Notation). */
+    @Test
+    void keinGatewayTraegtEineDatenassoziation() throws Exception {
+        Document doc = export(WorkflowFixtures.branching());
+        for (Element gateway : elements(doc, "exclusiveGateway")) {
+            assertThat(gateway.getElementsByTagNameNS(NS_MODEL, "dataInputAssociation").getLength()).isZero();
+            assertThat(gateway.getElementsByTagNameNS(NS_MODEL, "dataOutputAssociation").getLength()).isZero();
+        }
+    }
+
+    @Test
+    void verzweigterDatenflussIstSchemaValide() throws Exception {
+        Validator validator = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(new File("src/test/resources/bpmn/xsd/BPMN20.xsd"))
+                .newValidator();
+        String xml = adapter.export(WorkflowFixtures.branching());
+        assertThatCode(() -> validator.validate(new StreamSource(new StringReader(xml))))
+                .as("XSD-Validierung verzweigter Datenfluss:\n%s", xml)
+                .doesNotThrowAnyException();
+    }
+
+    /**
+     * Der Gateway-Knoten selbst trägt nie eine Assoziation — BPMN erlaubt das an Gateways nicht.
+     *
+     * <p><b>Bekannte Lücke, kein gewolltes Endziel:</b> Beim {@code conditional} fällt damit heute
+     * auch die Referenz aus {@code then_command}/{@code else_command} weg, obwohl es dafür bereits
+     * Tasks gibt ({@code _then}/{@code _else}) — sie tragen sich nur nicht in
+     * {@code activityIdByBase} ein. Anders als beim {@code switch}, dessen Zweig-Blöcke seit
+     * 7557b928 Endpunkte sind (siehe {@link #zweigTasksSindDieEndpunkteDerAssoziationen()}), steht
+     * die Zuordnung hier noch aus; TODO 7557b928 bleibt mit diesem Restumfang offen. Der Test pinnt
+     * also den Ist-Stand, nicht die Zielsemantik: Wird die Lücke geschlossen, gehören die beiden
+     * Assoziationen an {@code _then}/{@code _else} — und dieser Test wird entsprechend umgestellt,
+     * statt die neue Kante zu verhindern.
+     */
     @Test
     void gatewayBloeckeBekommenKeineAssoziation() throws Exception {
         Workflow wf = WorkflowFixtures.workflow("Gate", List.of(

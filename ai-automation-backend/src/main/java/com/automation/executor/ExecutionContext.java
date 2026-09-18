@@ -146,11 +146,11 @@ public class ExecutionContext {
 
     /**
      * The single write path for a block result: {@code previous_output} plus, for a named block,
-     * {{ block.&lt;name&gt;.output }}. Untrusted iff the run already carries untrusted input — taint
-     * is sticky for the rest of the run.
+     * {{ block.&lt;name&gt;.output }}. Untrusted iff the run already carries untrusted input (taint is
+     * sticky for the rest of the run) or this block's prompt carried platform data (TODO 22e6bec8).
      */
     public void recordOutput(String blockName, String output) {
-        boolean tainted = hasUntrustedInput();
+        boolean tainted = taint.consumePlatformPrompt() | hasUntrustedInput(); // | : always consume the flag
         setPreviousOutput(output);
         setBlockOutput(blockName, output);
         if (tainted) taint.markOutput(blockName);
@@ -203,20 +203,22 @@ public class ExecutionContext {
         return TemplateResolver.resolve(template, previousOutput, blockOutputs, variables);
     }
 
-    /**
-     * Resolves template placeholders with shell-safe escaping: every value is wrapped in POSIX
-     * single quotes (internal quotes escaped as '\''). See {@link TemplateResolver#resolveShellSafe}.
-     */
+    /** Prompt path: like {@link #resolveTemplate}, but platform data here marks this block's output untrusted (TODO 22e6bec8). */
+    public String resolvePromptTemplate(String template) {
+        return TemplateResolver.resolvePrompt(template, previousOutput, blockOutputs, variables,
+                taint::substitutedIntoPrompt);
+    }
+
+    /** Shell-safe: every value wrapped in POSIX single quotes (internal ones as '\''). See {@link TemplateResolver#resolveShellSafe}. */
     public String resolveTemplateShellSafe(String template) {
         return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables,
                 taint::substitutedIntoShell);
     }
 
     /**
-     * Resolves a template that becomes a shell command line. With {@code escapeAll} every
-     * placeholder is single-quoted; otherwise only untrusted variables and tainted block outputs
-     * are, trusted values stay raw. Substituted platform data taints the run from here on
-     * ({@link ExecutionContextTaint#substitutedIntoShell}). See {@link TemplateResolver#resolveShell}.
+     * Shell command line: with {@code escapeAll} every placeholder is single-quoted, otherwise only
+     * untrusted variables and tainted block outputs are. Substituted platform data taints the run from
+     * here on ({@link ExecutionContextTaint#substitutedIntoShell}). See {@link TemplateResolver#resolveShell}.
      */
     public String resolveShellTemplate(String template, boolean escapeAll) {
         if (escapeAll) return resolveTemplateShellSafe(template);

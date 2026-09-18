@@ -879,6 +879,54 @@ class SwitchBlockExecutorTest {
         assertThat(context.resolveTemplate("{{ block.review.output }}")).isEqualTo("reviewed");
     }
 
+    /**
+     * 2718c20e: a name that resolves as {{ block.&lt;name&gt;.output }} must also work as the
+     * {@code source} of a compression block — with the case step's own facts in the header.
+     */
+    @Test
+    void execute_namedCaseBlock_isRegisteredAsCompressionSource() {
+        StepResult caseResult = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)
+                .output("kaputt").durationMs(2_000L).metadata(Map.of("blockType", "shell", "exitCode", 1)).build();
+        when(commandExecutor.executeStepAsShell(any(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(caseResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "shell", "name", "scan", "config", Map.of("command", "pruefe"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        var source = context.getSourceSteps().find("scan").orElseThrow();
+        assertThat(source.blockName()).isEqualTo("scan");
+        assertThat(source.status()).isEqualTo(StepStatus.FAILED);
+        assertThat(source.exitCode()).isEqualTo(1);
+        assertThat(source.blockType()).isEqualTo("shell");
+    }
+
+    /** End-to-end: switch case output → compress with the case name as source (2718c20e). */
+    @Test
+    void execute_namedCaseBlock_canBeCompressedByAFollowingCompressBlock() {
+        StepResult caseResult = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                .output(("Zeile A\n").repeat(5) + "Zeile B\n").durationMs(1_000L).build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(caseResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "befund", "config", Map.of("command", "analysiere"))))));
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        StepResult compressed = new CompressBlockExecutor().execute(
+                BlockDefinition.builder().type("compress").name("befund_kompakt")
+                        .config(Map.of("source", "befund", "stages", List.of(Map.of("op", "lines.dedupe", "count", true))))
+                        .build(),
+                context);
+
+        assertThat(compressed.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(compressed.getOutput()).contains("## befund").contains("5× Zeile A").contains("Zeile B");
+    }
+
     @Test
     void execute_namedBlocksInTheDefaultBranch_areRecordedTooAndKeepTheirOwnOutput() {
         StepResult first = StepResult.builder()
@@ -1006,5 +1054,27 @@ class SwitchBlockExecutorTest {
         ArgumentCaptor<BlockDefinition> captor = ArgumentCaptor.forClass(BlockDefinition.class);
         verify(commandExecutor).executeStepAsShell(any(), captor.capture(), anyInt(), anyInt());
         assertThat(captor.getValue().getName()).isEqualTo("cleanup");
+    }
+
+    /**
+     * TODO 22e6bec8: the nested AI form counts too — platform data in a nested {@code simple}
+     * block's prompt taints the output the switch records for that case.
+     */
+    @Test
+    void execute_platformDataInANestedPrompt_taintsTheRecordedCaseOutput() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(
+                StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("a | b").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks", List.of(Map.of(
+                "type", "simple", "name", "analyse",
+                "config", Map.of("command", "Bewerte: {{ previous_report }}"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.resolveShellTemplate("echo {{ block.analyse.output }}", false))
+                .isEqualTo("echo 'a | b'");
     }
 }

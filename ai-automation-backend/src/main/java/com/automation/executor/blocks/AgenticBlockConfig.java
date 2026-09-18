@@ -28,8 +28,8 @@ public record AgenticBlockConfig(
      * Extracts and validates agentic block config from raw config map + execution context.
      */
     public static AgenticBlockConfig from(Map<String, Object> config, ExecutionContext context) {
-        String goal = context.resolveTemplate(requireString(config, "goal"));
-        String successCriteria = context.resolveTemplate(
+        String goal = context.resolvePromptTemplate(requireString(config, "goal"));
+        String successCriteria = context.resolvePromptTemplate(
                 (String) config.getOrDefault("success_criteria", ""));
         int maxIterations = ((Number) config.getOrDefault("max_iterations", AGENTIC_MAX_ITERATIONS)).intValue();
         int iterationTimeoutSeconds = ((Number) config.getOrDefault(

@@ -173,8 +173,12 @@ class DataFlowReferenceScannerTest {
                 .containsExactly(new DataFlowReferenceScanner.Reference(0, 1));
     }
 
+    /**
+     * 7557b928: ein Platzhalter in einem Switch-Case zeigt auf den Zweig-Block, nicht auf den
+     * Switch selbst — der ist ein Gateway und trägt im BPMN keine Datenassoziation.
+     */
     @Test
-    void platzhalterInVerschachteltenBloeckenZaehlenFuerDenElternBlock() {
+    void platzhalterInVerschachteltenBloeckenZeigenAufDenZweigBlock() {
         assertThat(scan(
                 block("shell", "tests", Map.of("command", "mvn test")),
                 block("switch", "verteiler", Map.of(
@@ -182,7 +186,108 @@ class DataFlowReferenceScannerTest {
                         "cases", List.of(Map.of("value", "RED", "blocks", List.of(
                                 Map.of("type", "simple", "config", Map.of(
                                         "command", "Analysiere {{ block.tests.output }}")))))))))
-                .containsExactly(new DataFlowReferenceScanner.Reference(0, 1));
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        DataFlowReferenceScanner.Endpoint.topLevel(0),
+                        new DataFlowReferenceScanner.Endpoint(1, "_c0_0")));
+    }
+
+    @Test
+    void platzhalterImDefaultZweigZeigtAufDenDefaultBlock() {
+        assertThat(scan(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "RED", "blocks", List.of())),
+                        "default", List.of(Map.of("type", "simple", "config", Map.of(
+                                "command", "Analysiere {{ block.tests.output }}")))))))
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        DataFlowReferenceScanner.Endpoint.topLevel(0),
+                        new DataFlowReferenceScanner.Endpoint(1, "_default_0")));
+    }
+
+    /** Ein benannter Case-Block ist zur Laufzeit als {@code block.<name>.output} ansprechbar (12a3b244). */
+    @Test
+    void benannterCaseBlockIstQuelleFuerSpaetereBloecke() {
+        assertThat(scan(
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "RED", "blocks", List.of(
+                                Map.of("type", "shell", "name", "alarm", "config", Map.of("command", "echo alarm"))))))),
+                block("simple", "report", Map.of("command", "Bericht: {{ block.alarm.output }}"))))
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        new DataFlowReferenceScanner.Endpoint(0, "_c0_0"),
+                        DataFlowReferenceScanner.Endpoint.topLevel(1)));
+    }
+
+    /** Auch tiefer verschachtelt bleibt der Pfad eindeutig (Switch im Switch). */
+    @Test
+    void zweifachVerschachtelterCaseBlockBehaeltSeinenPfad() {
+        assertThat(scan(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("switch", "aussen", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                                Map.of("type", "switch", "config", Map.of(
+                                        "expression", "{{ inner }}",
+                                        "cases", List.of(Map.of("value", "1", "blocks", List.of(
+                                                Map.of("type", "simple", "config", Map.of(
+                                                        "command", "{{ block.tests.output }}"))))))))))))))
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        DataFlowReferenceScanner.Endpoint.topLevel(0),
+                        new DataFlowReferenceScanner.Endpoint(1, "_c0_0_c0_0")));
+    }
+
+    /** Innerhalb desselben Switch-Blocks entsteht keine Kante: zur Laufzeit läuft nur ein Zweig. */
+    @Test
+    void referenzZwischenZweiCaseBloeckenDesselbenSwitchWirdVerworfen() {
+        assertThat(scan(
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(
+                                Map.of("value", "A", "blocks", List.of(
+                                        Map.of("type", "shell", "name", "erst", "config", Map.of("command", "ls")))),
+                                Map.of("value", "B", "blocks", List.of(
+                                        Map.of("type", "simple", "config", Map.of(
+                                                "command", "{{ block.erst.output }}")))))))))
+                .isEmpty();
+    }
+
+    @Test
+    void mehrdeutigerNameZwischenZweigUndTopLevelWirdIgnoriert() {
+        assertThat(scan(
+                block("shell", "doppelt", Map.of("command", "ls")),
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                                Map.of("type", "shell", "name", "doppelt", "config", Map.of("command", "pwd"))))))),
+                block("simple", "report", Map.of("command", "{{ block.doppelt.output }}"))))
+                .isEmpty();
+    }
+
+    /** Die Ebenen-Semantik bleibt: {@code source: "previous"} im Zweig meint die innere Ebene. */
+    @Test
+    void komprimierungsQuellePreviousInEinemZweigWirdVerworfen() {
+        assertThat(scan(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                                Map.of("type", "compress", "config", Map.of("source", "previous")))))))))
+                .isEmpty();
+    }
+
+    /** …aber ein Blockname als {@code source} im Zweig zeigt auf den Zweig-Block. */
+    @Test
+    void komprimierungsQuelleMitBlocknamenInEinemZweigWirdErkannt() {
+        assertThat(scan(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("switch", "verteiler", Map.of(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                                Map.of("type", "compress", "config", Map.of("source", "tests")))))))))
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        DataFlowReferenceScanner.Endpoint.topLevel(0),
+                        new DataFlowReferenceScanner.Endpoint(1, "_c0_0")));
     }
 
     @Test

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   api,
   apiErrorMessage,
+  applyServerRateLimitConfig,
   fetchWorkflowBpmn,
   importWorkflowBpmn,
   isRateLimitBackoffActive,
@@ -270,6 +271,74 @@ describe('Rohe Aufrufe laufen über den Backoff (b6feccbc)', () => {
     await validateApiKey('typed-key');
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)['X-API-Key']).toBe('typed-key');
+  });
+});
+
+describe('Backoff-Parameter vom Server (37b98c97)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetRateLimitBackoff();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    fetchMock = vi.fn(async () => jsonResponse(429, { error: 'Rate limit exceeded', timestamp: 'x' }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    resetRateLimitBackoff(); // stellt auch die eingebauten Fallback-Werte wieder her
+  });
+
+  it('nimmt ohne Serverwerte die eingebauten Konstanten (2 s / 10 s)', async () => {
+    expect(parseRetryAfter(null, NOW)).toBe(10);
+
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 10 });
+    // Die globale Kurzsperre bleibt bei 2 s, obwohl die Pfad-Sperre 10 s steht.
+    vi.setSystemTime(NOW + 2_000);
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(0);
+  });
+
+  it('übernimmt die Werte der Instanz aus /system/info', async () => {
+    applyServerRateLimitConfig({ globalBackoffSeconds: 5, defaultRetryAfterSeconds: 30 });
+
+    expect(parseRetryAfter(null, NOW)).toBe(30);
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 30 });
+    expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(30);
+
+    // Fremder Pfad: jetzt 5 s statt 2 s gesperrt.
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(5);
+    vi.setSystemTime(NOW + 2_000);
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(3);
+    vi.setSystemTime(NOW + 5_000);
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(0);
+  });
+
+  it('ignoriert fehlende, unbrauchbare oder nicht-positive Serverwerte', async () => {
+    applyServerRateLimitConfig(undefined);
+    expect(parseRetryAfter(null, NOW)).toBe(10);
+
+    applyServerRateLimitConfig({ globalBackoffSeconds: 0, defaultRetryAfterSeconds: -5 });
+    expect(parseRetryAfter(null, NOW)).toBe(10);
+
+    applyServerRateLimitConfig({ defaultRetryAfterSeconds: Number.NaN } as never);
+    expect(parseRetryAfter(null, NOW)).toBe(10);
+
+    // Nur der brauchbare Teil wird übernommen.
+    applyServerRateLimitConfig({ globalBackoffSeconds: 4 });
+    expect(parseRetryAfter(null, NOW)).toBe(10);
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 10 });
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(4);
+  });
+
+  it('deckelt die globale Sperre weiterhin durch Retry-After', async () => {
+    applyServerRateLimitConfig({ globalBackoffSeconds: 5, defaultRetryAfterSeconds: 30 });
+    fetchMock.mockImplementation(async () =>
+      jsonResponse(429, { error: 'nope', timestamp: 'x' }, { 'Retry-After': '1' }));
+
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 1 });
+    expect(rateLimitRemainingSeconds('/workflows')).toBe(1);
   });
 });
 

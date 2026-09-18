@@ -4,7 +4,10 @@ import { getTranslations } from '../i18n';
 
 const BASE_URL = '/api/v1';
 
-/** Fallback lock time when the server sends a 429 without a usable `Retry-After`. */
+/**
+ * Fallback lock time when the server sends a 429 without a usable `Retry-After`. Only the
+ * fallback: the instance's own value arrives via {@link applyServerRateLimitConfig}.
+ */
 const DEFAULT_RETRY_AFTER_SECONDS = 10;
 
 /**
@@ -14,6 +17,34 @@ const DEFAULT_RETRY_AFTER_SECONDS = 10;
  * making the app feel frozen (b6feccbc).
  */
 const GLOBAL_BACKOFF_SECONDS = 2;
+
+/** The two numbers actually in use — server values when the instance sent them, else the constants. */
+let defaultRetryAfterSeconds = DEFAULT_RETRY_AFTER_SECONDS;
+let globalBackoffSeconds = GLOBAL_BACKOFF_SECONDS;
+
+/** What `GET /system/info` reports about this instance's rate limit (all fields optional). */
+export interface ServerRateLimitConfig {
+  enabled?: boolean;
+  requestsPerMinute?: number;
+  globalBackoffSeconds?: number;
+  defaultRetryAfterSeconds?: number;
+}
+
+/** A usable server number: finite and positive. Anything else keeps the constant. */
+function usableSeconds(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * Takes the backoff budget from the instance the app runs against (`GET /system/info` →
+ * `rateLimit`). Another instance may run a different `requests-per-minute`, which makes the
+ * built-in constants guesswork; they stay as the fallback for anything the server omits or
+ * sends unusably (37b98c97). Called from `useSystemInfo` — no request of its own.
+ */
+export function applyServerRateLimitConfig(config: ServerRateLimitConfig | null | undefined): void {
+  globalBackoffSeconds = usableSeconds(config?.globalBackoffSeconds) ?? GLOBAL_BACKOFF_SECONDS;
+  defaultRetryAfterSeconds = usableSeconds(config?.defaultRetryAfterSeconds) ?? DEFAULT_RETRY_AFTER_SECONDS;
+}
 
 /**
  * Endpoints the *global* lock must not touch. Their own path lock still applies — this only
@@ -94,7 +125,7 @@ function lockAfterRateLimit(path: string, retryAfterSeconds: number, now: number
   if (retryAfterSeconds > 0) {
     rateLimitedUntil.set(backoffKey(path), now + retryAfterSeconds * 1000);
   }
-  const globalUntil = now + Math.min(GLOBAL_BACKOFF_SECONDS, Math.max(retryAfterSeconds, 0)) * 1000;
+  const globalUntil = now + Math.min(globalBackoffSeconds, Math.max(retryAfterSeconds, 0)) * 1000;
   if (globalUntil > globalRateLimitedUntil) globalRateLimitedUntil = globalUntil;
   scheduleExpiry(now);
   notifyBackoffListeners();
@@ -102,16 +133,16 @@ function lockAfterRateLimit(path: string, retryAfterSeconds: number, now: number
 
 /**
  * Seconds to wait as told by a `Retry-After` header — either a delta in seconds or an
- * HTTP date. Missing or unparsable ⇒ {@link DEFAULT_RETRY_AFTER_SECONDS}; a value in the
- * past ⇒ 0 (no lock).
+ * HTTP date. Missing or unparsable ⇒ the instance's default (server value, else
+ * {@link DEFAULT_RETRY_AFTER_SECONDS}); a value in the past ⇒ 0 (no lock).
  */
 export function parseRetryAfter(header: string | null | undefined, now: number = Date.now()): number {
-  if (header === null || header === undefined) return DEFAULT_RETRY_AFTER_SECONDS;
+  if (header === null || header === undefined) return defaultRetryAfterSeconds;
   const raw = header.trim();
-  if (raw === '') return DEFAULT_RETRY_AFTER_SECONDS;
+  if (raw === '') return defaultRetryAfterSeconds;
   if (/^\d+$/.test(raw)) return Number(raw);
   const at = Date.parse(raw);
-  if (Number.isNaN(at)) return DEFAULT_RETRY_AFTER_SECONDS;
+  if (Number.isNaN(at)) return defaultRetryAfterSeconds;
   return Math.max(0, Math.ceil((at - now) / 1000));
 }
 
@@ -149,10 +180,14 @@ export function subscribeRateLimitBackoff(listener: () => void): () => void {
   return () => { backoffListeners.delete(listener); };
 }
 
-/** Clears every backoff deadline. Test helper — production code lets them expire. */
+/**
+ * Clears every backoff deadline and restores the built-in fallback parameters. Test helper —
+ * production code lets the deadlines expire and keeps the server's parameters.
+ */
 export function resetRateLimitBackoff(): void {
   rateLimitedUntil.clear();
   globalRateLimitedUntil = 0;
+  applyServerRateLimitConfig(null);
   if (expiryTimer !== null) {
     clearTimeout(expiryTimer);
     expiryTimer = null;

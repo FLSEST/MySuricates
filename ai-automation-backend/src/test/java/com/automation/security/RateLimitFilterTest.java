@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -91,6 +92,64 @@ class RateLimitFilterTest {
         writer.flush();
         assertThat(stringWriter.toString()).contains("retryAfterSeconds");
         assertThat(stringWriter.toString()).contains("Rate limit exceeded");
+    }
+
+    @Test
+    void rateLimitEnabled_exceedsLimit_sendsRetryAfterHeaderMatchingBody() throws Exception {
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(1);
+        when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter writer = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(writer);
+
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain);
+
+        // Der Client richtet seine Sperre nach Retry-After; ohne den Header rät er 10 s. Ein
+        // frisches Fenster heißt: knapp 60 s (die exakte Rechnung prüft secondsUntilReset_*).
+        ArgumentCaptor<String> retryAfter = ArgumentCaptor.forClass(String.class);
+        verify(response).setHeader(eq("Retry-After"), retryAfter.capture());
+        int seconds = Integer.parseInt(retryAfter.getValue());
+        assertThat(seconds).isEqualTo(60);
+
+        writer.flush();
+        // Derselbe Wert im Body — Header und JSON dürfen nicht auseinanderlaufen.
+        assertThat(stringWriter.toString()).contains("\"retryAfterSeconds\": " + seconds);
+    }
+
+    @Test
+    void secondsUntilReset_countsDownWithinTheWindow() {
+        long start = 1_700_000_000_000L;
+        RateLimitFilter.ClientBucket bucket = new RateLimitFilter.ClientBucket(start);
+
+        // Fester Zeitpunkt statt einer Spanne: eine hart verdrahtete 60 käme hier sonst durch.
+        assertThat(bucket.secondsUntilReset(start)).isEqualTo(60);
+        assertThat(bucket.secondsUntilReset(start + 30_000)).isEqualTo(30);
+        assertThat(bucket.secondsUntilReset(start + 59_001)).isEqualTo(1);
+        assertThat(bucket.secondsUntilReset(start + 59_999)).isEqualTo(1);
+    }
+
+    @Test
+    void secondsUntilReset_neverReturnsZero() {
+        long start = 1_700_000_000_000L;
+        RateLimitFilter.ClientBucket bucket = new RateLimitFilter.ClientBucket(start);
+
+        // 0 hieße für den Client „keine Sperre" — er würde sofort wieder anfragen.
+        assertThat(bucket.secondsUntilReset(start + 60_000)).isEqualTo(1);
+        assertThat(bucket.secondsUntilReset(start + 120_000)).isEqualTo(1);
+    }
+
+    @Test
+    void rateLimitEnabled_underLimit_sendsNoRetryAfterHeader() throws Exception {
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(10);
+        when(clientIpResolver.resolve(request)).thenReturn("127.0.0.1");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(response, never()).setHeader(eq("Retry-After"), any());
     }
 
     @Test

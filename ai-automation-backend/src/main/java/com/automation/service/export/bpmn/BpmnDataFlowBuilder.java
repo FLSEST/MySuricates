@@ -14,8 +14,9 @@ import java.util.Set;
  *
  * <p>Je erzeugendem Block entsteht ein Datenobjekt unterhalb seines Tasks; der erzeugende Task
  * bekommt eine {@code dataOutputAssociation}, jeder konsumierende eine {@code dataInputAssociation}.
- * Blöcke ohne einzelnen Aktivitäts-Knoten (conditional/switch werden zu Gateways, an denen BPMN
- * keine Datenassoziationen erlaubt) bleiben außen vor.
+ * Endpunkt ist immer ein Aktivitäts-Knoten — für Referenzen aus einem Switch-Zweig der Task des
+ * Zweig-Blocks (7557b928), denn an Gateways erlaubt BPMN keine Datenassoziationen. Blöcke ganz ohne
+ * eigenen Aktivitäts-Knoten (der Switch/Conditional selbst) bleiben außen vor.
  */
 final class BpmnDataFlowBuilder {
 
@@ -28,10 +29,12 @@ final class BpmnDataFlowBuilder {
     }
 
     /**
-     * @param activityIdByBlockIndex Aktivitäts-Knoten je Top-Level-Blockindex (nur Blöcke, die zu
-     *                               genau einem Task/Sub-Prozess werden)
+     * @param activityIdByBase Aktivitäts-Knoten je Id-Basis (Top-Level-Blöcke <em>und</em>
+     *                         Zweig-Blöcke), wie {@code BpmnModelBuilder} sie vergibt
+     * @param rootPrefix       Id-Präfix der Top-Level-Kette (siehe {@code DataFlowReferenceScanner.Endpoint})
      */
-    static void apply(BpmnModel model, List<BlockDefinition> blocks, Map<Integer, String> activityIdByBlockIndex) {
+    static void apply(BpmnModel model, List<BlockDefinition> blocks,
+                      Map<String, String> activityIdByBase, String rootPrefix) {
         List<DataFlowReferenceScanner.Reference> refs = DataFlowReferenceScanner.scan(blocks);
         if (refs.isEmpty()) {
             return;
@@ -41,20 +44,20 @@ final class BpmnDataFlowBuilder {
 
         double rowY = taskRowBottom(model) + DATA_ROW_GAP;
         Set<String> usedIds = new HashSet<>(byId.keySet());
-        Map<Integer, BpmnModel.DataObject> objects = new LinkedHashMap<>();
+        Map<DataFlowReferenceScanner.Endpoint, BpmnModel.DataObject> objects = new LinkedHashMap<>();
         int outputs = 0;
         int inputs = 0;
 
         for (DataFlowReferenceScanner.Reference ref : refs) {
-            BpmnModel.Node producer = byId.get(activityIdByBlockIndex.get(ref.sourceIndex()));
-            BpmnModel.Node consumer = byId.get(activityIdByBlockIndex.get(ref.targetIndex()));
+            BpmnModel.Node producer = byId.get(activityIdByBase.get(ref.source().idBase(rootPrefix)));
+            BpmnModel.Node consumer = byId.get(activityIdByBase.get(ref.target().idBase(rootPrefix)));
             if (producer == null || consumer == null) {
-                continue; // Gateway-Block (conditional/switch) an einem der beiden Enden
+                continue; // Gateway-Knoten (der switch/conditional selbst) an einem der beiden Enden
             }
-            BpmnModel.DataObject data = objects.get(ref.sourceIndex());
+            BpmnModel.DataObject data = objects.get(ref.source());
             if (data == null) {
-                data = createObject(model, usedIds, producer, blocks.get(ref.sourceIndex()), rowY);
-                objects.put(ref.sourceIndex(), data);
+                data = createObject(model, usedIds, producer, blockAt(blocks, ref.source()), rowY);
+                objects.put(ref.source(), data);
                 addAssociation(model, producer, data, false, "dataflow_out_" + outputs++);
             }
             addAssociation(model, consumer, data, true, "dataflow_in_" + inputs++);
@@ -64,9 +67,17 @@ final class BpmnDataFlowBuilder {
         }
     }
 
+    /**
+     * Der Block hinter einem Endpunkt — {@code null} für Zweig-Blöcke: deren Name steckt bereits im
+     * Namen des Zweig-Tasks, und nur benannte Zweig-Blöcke können überhaupt Quelle sein.
+     */
+    private static BlockDefinition blockAt(List<BlockDefinition> blocks, DataFlowReferenceScanner.Endpoint endpoint) {
+        return endpoint.branchPath().isEmpty() ? blocks.get(endpoint.blockIndex()) : null;
+    }
+
     private static BpmnModel.DataObject createObject(BpmnModel model, Set<String> usedIds,
                                                      BpmnModel.Node producer, BlockDefinition block, double rowY) {
-        String label = block.getName() != null && !block.getName().isBlank()
+        String label = block != null && block.getName() != null && !block.getName().isBlank()
                 ? block.getName().strip()
                 : (producer.name == null || producer.name.isBlank() ? producer.id : producer.name);
         String base = BpmnNames.elementId("data", label);

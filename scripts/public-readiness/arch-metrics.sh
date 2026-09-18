@@ -14,31 +14,52 @@
 #   ## churn     geaenderte Dateien der letzten 90 Tage aus git log
 #   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend
 #   ## summary   Kennzahlen als key=value
-#   ## run       Laufzeit-Zustand (compile=, jdeps=) — bewusst NICHT deterministisch
+#   ## run       Laufzeit-Zustand (compile=reused|cached|compiled|…, jdeps=) — bewusst NICHT
+#                deterministisch
 #
 # Die Ausgabe ist ein Faktenblatt fuer einen KI-Block, der nur interpretiert — sie ist
 # stabil sortiert und enthaelt keine Zeitstempel.
 #
 # Determinismus, genau: alles vor `## run` ist zwischen zwei Laeufen byte-identisch,
 # solange (a) HEAD derselbe ist, (b) beide Laeufe im selben 90-Tage-Churn-Fenster liegen
-# (also kein Commit ueber die Grenze rutscht) und (c) target/classes zum selben Quellstand
-# gehoert. Der Laufzeit-Zustand steht deshalb unter `## run`: `compile=` wechselt beim
-# ersten Lauf in einem frischen Arbeitsverzeichnis von `compiled` auf `reused`, das ist
-# kein Messunterschied und darf keinen Determinismus-Vergleich roetlich faerben.
+# (also kein Commit ueber die Grenze rutscht) und (c) das gemessene Kompilat zum selben
+# Quellstand gehoert. Der Laufzeit-Zustand steht deshalb unter `## run`: `compile=` wechselt
+# beim ersten Lauf in einem frischen Arbeitsverzeichnis von `compiled` auf `reused` bzw.
+# `cached`, das ist kein Messunterschied und darf keinen Determinismus-Vergleich roetlich
+# faerben.
 #
 # Usage:  scripts/public-readiness/arch-metrics.sh [repo-root]        (Default: .)
 # Env:    ARCH_METRICS_COMPILE=0   nie kompilieren, nur vorhandenes target/classes nutzen
+#         AUTOMATION_ARCH_CACHE    Kompilat-Cache (Default: ~/.cache/mysuricates/arch-classes)
 # Exit:   0 = Faktenblatt geschrieben (auch mit error=-Markierungen), 2 = Wurzel unbrauchbar
 #
 # Zeitbudget: fehlt ai-automation-backend/target/classes, laeuft einmalig
 # `./mvnw -q -DskipTests compile` (~1-2 Minuten auf dem Dev-Host); jdeps und die Zaehler
 # brauchen danach ~10-20 Sekunden. Im Workflow deshalb timeout_seconds: 600.
 #
+# Kompilat-Cache: ein Workspace-Klon (isolierter Run) hat nie ein target/classes und wuerde
+# jedes Mal neu kompilieren. Liegt unter $AUTOMATION_ARCH_CACHE/<commit-sha>/ schon ein
+# Kompilat des gemessenen Commits, wird direkt daraus gemessen (compile=cached); sonst wird
+# kompiliert und das Ergebnis dort abgelegt (compile=compiled). Schluessel ist `git rev-parse
+# HEAD`, und nur bei sauberem Arbeitsbaum — bei uncommitteten Aenderungen waere ein Treffer
+# eine falsche Messung. Es bleiben die juengsten drei Eintraege liegen. Jeder Fehlschlag am
+# Cache ist still: gemessen wird dann eben frisch.
+#
+# Parallele Laeufe: ein benutzter Eintrag wird beim Treffer frisch gestempelt (mtime), damit
+# das Aufraeumen ihn nicht mitten in der jdeps-Messung wegzieht, und ein bereits gueltiger
+# Eintrag wird nie ersetzt. Zwei Laeufe desselben Commits kommen sich damit nicht in die
+# Quere; schlimmstenfalls verwirft einer sein frisch kopiertes Staging.
+#
 # Bewusst ohne common.sh: dessen run_limited/MAX_LINES wuerde das Faktenblatt kuerzen und
 # cd_root die uebergebene Wurzel ignorieren.
 #
 set -uo pipefail
 export LC_ALL=C
+
+# Vor dem cd aufloesen: wurde das Skript ueber einen relativen Pfad aufgerufen, zeigt
+# dirname "$0" nach dem Wechsel in die gemessene Wurzel ins Leere — arch_cycles.py waere
+# dann nicht auffindbar und die Zyklen still "nicht gemessen".
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ROOT_ARG="${1:-.}"
 if [ ! -d "$ROOT_ARG" ]; then
@@ -50,7 +71,6 @@ ROOT="$(pwd -P)"
 BACKEND="$ROOT/ai-automation-backend"
 SRC="$BACKEND/src/main/java"
 CLASSES="$BACKEND/target/classes"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 ERRORS=""
@@ -64,14 +84,79 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 # ---------------------------------------------------------------------------
 # Klassen bereitstellen (jdeps braucht Bytecode, kein Quelltext)
 # ---------------------------------------------------------------------------
+CACHE_ROOT="${AUTOMATION_ARCH_CACHE:-${HOME:-$TMP}/.cache/mysuricates/arch-classes}"
+CACHE_KEEP=3
+
+# Cache-Schluessel ist der gemessene Commit — und nur, wenn der Arbeitsstand ihm entspricht.
+# Bei uncommitteten Aenderungen waere ein Treffer eine falsche Messung: gemessen wuerde der
+# Commit, gemeldet der Arbeitsstand. Kein Repo, kein HEAD, schmutziger Baum ⇒ kein Cache.
+cache_key() {
+  git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  local sha
+  sha=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null) || return 1
+  [ -n "$sha" ] || return 1
+  [ -z "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ] || return 1
+  printf '%s' "$sha"
+}
+
+has_classes() { [ -n "$(find "$1" -name '*.class' -print -quit 2>/dev/null)" ]; }
+
+# Nur die juengsten CACHE_KEEP Eintraege bleiben liegen; ein Kompilat je Commit waechst sonst
+# ueber die Monate zu einem stillen Gigabyte im Home-Verzeichnis heran. Punkt-Verzeichnisse
+# (Staging eines parallelen Laufs) zaehlen nicht mit und werden nicht angetastet.
+prune_cache() {
+  find "$CACHE_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@\t%p\n' 2>/dev/null \
+    | sort -rn \
+    | awk -v keep="$CACHE_KEEP" -F'\t' 'NR > keep { print $2 }' \
+    | while IFS= read -r stale; do
+        case "$stale" in "$CACHE_ROOT"/?*) rm -rf "$stale" ;; esac
+      done
+}
+
+# Ein Treffer wird benutzt, also frisch gestempelt: jdeps liest 10-20 s daraus, und der
+# Keep-3-Rang geht nach mtime — ohne das koennte ein paralleler Lauf den Eintrag genau
+# waehrend der Messung wegraeumen und wir wuerden einen halben Klassenbaum messen.
+touch_cache() { touch "$1" 2>/dev/null || true; }
+
+# Ablegen ist Kuer: jeder Fehlschlag (Rechte, volle Platte, unbrauchbarer Pfad) bleibt still,
+# das Faktenblatt ist davon unberuehrt.
+store_cache() {  # $1 = Schluessel, $2 = Quellverzeichnis
+  [ -n "$1" ] || return 0
+  has_classes "$2" || return 0
+  local entry="$CACHE_ROOT/$1"
+  # Ein gueltiger Eintrag wird nie ersetzt — ein Treffer ist ein Treffer, und ein paralleler
+  # Lauf koennte gerade daraus messen. Nur ein halb geschriebener Rest wird aufgeraeumt.
+  if has_classes "$entry"; then
+    touch_cache "$entry"
+    prune_cache
+    return 0
+  fi
+  local staging="$CACHE_ROOT/.staging.$$"
+  mkdir -p "$CACHE_ROOT" 2>/dev/null || return 0
+  rm -rf "$staging"
+  cp -r "$2" "$staging" 2>/dev/null || { rm -rf "$staging"; return 0; }
+  rm -rf "${CACHE_ROOT:?}/$1"
+  mv "$staging" "$entry" 2>/dev/null || { rm -rf "$staging"; return 0; }
+  prune_cache
+}
+
 COMPILE_STATE="reused"
 if [ ! -d "$CLASSES" ]; then
-  if [ "${ARCH_METRICS_COMPILE:-1}" != "1" ]; then
+  CACHE_KEY="$(cache_key)" || CACHE_KEY=""
+  if [ -n "$CACHE_KEY" ] && [ -d "$CACHE_ROOT/$CACHE_KEY" ] && has_classes "$CACHE_ROOT/$CACHE_KEY"; then
+    # Direkt aus dem Cache messen statt zurueckzukopieren: jdeps liest nur, und target/classes
+    # bleibt so das, was ein echter Build dort hinterlaesst. Vorher stempeln, damit der
+    # Eintrag waehrend der Messung nicht von einem parallelen Lauf weggeraeumt wird.
+    CLASSES="$CACHE_ROOT/$CACHE_KEY"
+    touch_cache "$CLASSES"
+    COMPILE_STATE="cached"
+  elif [ "${ARCH_METRICS_COMPILE:-1}" != "1" ]; then
     COMPILE_STATE="skipped"
   elif [ -x "$BACKEND/mvnw" ] && [ -f "$BACKEND/pom.xml" ]; then
     echo "arch-metrics: target/classes fehlt — kompiliere (Zeitbudget ca. 1-2 Minuten)" >&2
     if ( cd "$BACKEND" && ./mvnw -q -DskipTests compile ) >&2; then
       COMPILE_STATE="compiled"
+      store_cache "$CACHE_KEY" "$CLASSES"
     else
       COMPILE_STATE="failed"
     fi
@@ -245,7 +330,8 @@ printf 'commit=%s\n' "$COMMIT"
 [ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
 
 # ## run steht bewusst am Ende und ausserhalb des Determinismus-Vergleichs: compile= haengt
-# davon ab, ob das Arbeitsverzeichnis schon ein Kompilat hatte, nicht vom gemessenen Stand.
+# davon ab, ob das Arbeitsverzeichnis (oder der Cache) schon ein Kompilat hatte, nicht vom
+# gemessenen Stand.
 printf '\n## run\n'
 printf '# Laufzeit-Zustand, nicht Teil des Determinismus-Vergleichs\n'
 printf 'compile=%s\n' "$COMPILE_STATE"

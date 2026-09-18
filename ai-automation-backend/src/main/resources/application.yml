@@ -110,6 +110,11 @@ automation:
     rate-limit:
       enabled: ${AUTOMATION_RATE_LIMIT_ENABLED:true}
       requests-per-minute: ${AUTOMATION_RATE_LIMIT_RPM:120}
+      # Backoff-Budget des Browser-Clients. Geht über GET /api/v1/system/info an ihn; ohne diese
+      # Werte nimmt er seine eingebauten Konstanten (2 s / 10 s) — auf einer Instanz mit anderem
+      # Limit wären die geraten (37b98c97).
+      client-global-backoff-seconds: ${AUTOMATION_RATE_LIMIT_CLIENT_GLOBAL_BACKOFF_SECONDS:2}
+      client-default-retry-after-seconds: ${AUTOMATION_RATE_LIMIT_CLIENT_DEFAULT_RETRY_AFTER_SECONDS:10}
   websocket:
     # Lifetime of a single-use WebSocket handshake ticket (POST /api/v1/ws-ticket). Long enough for
     # the browser to open the socket, short enough that a leaked URL is worthless.

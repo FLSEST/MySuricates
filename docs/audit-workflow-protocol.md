@@ -101,6 +101,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Workflow | Messung | Selbsttest |
 |---|---|---|
 | Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, Zeilen, Churn) | `scripts/tests/test-arch-metrics.sh` |
+| Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Groessen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Actuator, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Groesse `ERWARTETE FINDINGS`, Gate zaehlt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |

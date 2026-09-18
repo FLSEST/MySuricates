@@ -2116,7 +2116,7 @@ export const en = {
     uiEditableLabel: 'Switchable via settings UI',
     uiEditableRisk: 'Anyone with the API key can switch feature modules here. Keep this off on publicly reachable instances.',
     setupCommand: 'Change the preset',
-    setupCommandHint: 'The command only creates a new ai-automation-backend/config/application.yml. If that file already exists — as it does on every running instance — it leaves it untouched: change the automation.modules.preset: line there by hand and restart.',
+    setupCommandHint: 'Without --force the command only creates a new ai-automation-backend/config/application.yml and leaves an existing one untouched. With --force it replaces just the automation.modules.preset: line there — everything else stays as it is. Takes effect after a backend restart.',
   },
   commandPalette: {
     placeholder: 'What do you want to do?',

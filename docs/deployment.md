@@ -150,7 +150,11 @@ Zwei kommentierte Vorlagen für Module und Härtung liegen in `ai-automation-bac
 | [`application-minimal.yml`](../ai-automation-backend/config-examples/application-minimal.yml) | nur Kern (`core`) | aus | alles aus |
 | [`application-maximal.yml`](../ai-automation-backend/config-examples/application-maximal.yml) | alle (`full`) | an | alles an |
 
-Der öffentliche Default liegt dazwischen: `core`, Settings-Schalter aus, nur `provenance` an. Für Docker/Compose dieselben Werte als Umgebungsvariablen:
+Der öffentliche Default liegt dazwischen: `core`, Settings-Schalter aus, nur `provenance` an.
+
+Auf einer schon laufenden Instanz setzt `./scripts/setup.sh --preset <core|research|full> --force` das Preset um: `--force` ersetzt in der vorhandenen `config/application.yml` ausschließlich die Zeile `automation.modules.preset:` und lässt alles andere (Kommentare, Reihenfolge, einzelne Modul-Overrides) unverändert — wirksam nach einem Backend-Neustart. Ohne `--force` schreibt `setup.sh` in eine vorhandene Datei nichts. Lässt sich die Zeile nicht eindeutig einordnen (mehrere `automation:`-Blöcke), bricht das Skript mit einer Meldung ab, statt zu raten.
+
+Für Docker/Compose dieselben Werte als Umgebungsvariablen:
 
 ```bash
 # Minimal: platform core only, every option off
@@ -422,13 +426,20 @@ Grenzen, die man kennen sollte:
 
 - **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
   hilft das Modell nicht.
-- **Der Weg über einen KI-Block wäscht die Färbung ab.** Stehen Plattform-Daten in einem
-  `simple`- oder `agentic`-Prompt, färbt das den Run nicht; die KI-Antwort gilt als ungefärbt; ein
-  folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. In den mitgelieferten
-  Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und ist nur
-  deshalb unauffällig, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
-  jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
-  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschützt.
+- **Eine KI-Antwort nach einem Prompt mit Plattform-Daten ist selbst gefärbt.** Stehen
+  Plattform-Daten im Prompt eines `simple`-, `agentic`- oder `skill-capability`-Blocks (auch in der
+  verschachtelten Form), gilt die Ausgabe genau dieses Blocks als nicht vertrauenswürdig: Ein
+  folgender Shell-Block bekommt `{{ previous_output }}` **single-quoted**. Sobald diese gefärbte
+  Ausgabe verbucht ist, ist der Lauf gefärbt — und die Färbung ist klebrig wie immer: Auch alle
+  **weiteren** Blockausgaben und die daraus abgeleiteten Variablen (`step_N_output`,
+  `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und `exportTaint()` gibt das an
+  Sub-Workflows und an ein Resume weiter. In der Praxis heisst das: Praktisch jeder Audit- oder
+  Report-Workflow, der `previous_report` in einem Prompt liest, läuft ab diesem Block im gequoteten
+  Modus. **Setze in eigenen Workflows in jedem Shell-Block, der die Ausgabe eines KI-Blocks
+  weiterverarbeitet, `"shell_escape_variables": true`** — dann verhält sich der Block in gefärbten
+  wie in ungefärbten Läufen gleich.
+- **Was das Quoting nicht abwehrt:** Gequotet wird der Text der KI-Antwort, nicht ihr Zustandekommen.
+  Gegen inhaltliche Manipulation (Prompt-Injection) hilft das Trust-Modell nicht.
 - **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefärbten Wert
   in eine Datei schreibt und diese später ausführt, liegt ausserhalb dessen, was sich quoten lässt.
 

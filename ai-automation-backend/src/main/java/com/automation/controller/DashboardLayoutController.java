@@ -1,11 +1,11 @@
 package com.automation.controller;
 
+import com.automation.dto.response.DashboardLayoutVersionListItem;
 import com.automation.dto.response.DashboardLayoutVersionResponse;
 import com.automation.dto.response.DashboardLayoutVersionSummary;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.DashboardLayoutVersion;
 import com.automation.mapper.DashboardLayoutVersionMapper;
-import com.automation.repository.DashboardLayoutVersionListItem;
 import com.automation.service.dashboard.DashboardLayoutVersionService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;

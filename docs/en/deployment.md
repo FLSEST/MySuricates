@@ -150,7 +150,11 @@ Two commented templates for modules and hardening live in `ai-automation-backend
 | [`application-minimal.yml`](../../ai-automation-backend/config-examples/application-minimal.yml) | core only (`core`) | off | all off |
 | [`application-maximal.yml`](../../ai-automation-backend/config-examples/application-maximal.yml) | all (`full`) | on | all on |
 
-The public default sits in between: `core`, settings switches off, only `provenance` on. For Docker/Compose, the same values as environment variables:
+The public default sits in between: `core`, settings switches off, only `provenance` on.
+
+On an instance that is already running, `./scripts/setup.sh --preset <core|research|full> --force` switches the preset: `--force` replaces just the `automation.modules.preset:` line in the existing `config/application.yml` and leaves everything else (comments, order, individual module overrides) untouched — it takes effect after a backend restart. Without `--force`, `setup.sh` writes nothing into an existing file. If the line cannot be placed unambiguously (several `automation:` blocks), the script aborts with a message instead of guessing.
+
+For Docker/Compose, the same values as environment variables:
 
 ```bash
 # Minimal: platform core only, every option off
@@ -420,12 +424,19 @@ Limits worth knowing:
 
 - **Nothing is escaped in AI prompts.** A prompt is not a command line; the model does not defend
   against prompt injection.
-- **Going through an AI block washes the taint off.** Platform data inside a `simple` or `agentic`
-  prompt does not taint the run; the AI's answer counts as untainted; a following shell block then
-  substitutes `{{ previous_output }}` **raw**. This shape occurs eight times in the bundled
-  definitions (seven pool workflows, one built-in template) and only stays harmless there because
-  every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **In your own workflows, set `"shell_escape_variables": true` in
-  every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+- **An AI answer that followed a prompt with platform data is coloured itself.** If platform data is
+  in the prompt of a `simple`, `agentic` or `skill-capability` block (nested forms included), the
+  output of exactly that block counts as untrusted: a following shell block receives
+  `{{ previous_output }}` **single-quoted**. Once that coloured output is recorded, the run is
+  coloured — and the colouring is sticky as always: every **further** block output and the variables
+  derived from it (`step_N_output`, `foreach` items, `document` extracts) are quoted from then on
+  too, and `exportTaint()` passes that on to sub-workflows and to a resume. In practice: nearly every
+  audit or report workflow that reads `previous_report` in a prompt runs in quoted mode from that
+  block on. **In your own workflows, set `"shell_escape_variables": true` in every shell block that
+  consumes an AI block's output** — the block then behaves the same in coloured and in uncoloured
+  runs.
+- **What quoting does not defend against:** what is quoted is the text of the AI answer, not how it
+  came about. The trust model does not help against manipulation of the content (prompt injection).
 - **Quoting cannot see files you write yourself.** A shell block that writes a tainted value into a
   file and later executes it is outside what quoting can reach.
 

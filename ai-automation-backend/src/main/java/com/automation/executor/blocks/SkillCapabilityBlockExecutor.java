@@ -53,7 +53,7 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
                     "Skill-capability block requires a 'capability' in config");
         }
         Object rawInput = config.get("input");
-        String input = context.resolveTemplate(rawInput != null ? rawInput.toString() : "");
+        String input = context.resolvePromptTemplate(rawInput != null ? rawInput.toString() : "");
         @SuppressWarnings("unchecked")
         Map<String, Object> params = (Map<String, Object>) config.getOrDefault("params", Map.of());
         boolean allowWrites = Boolean.TRUE.equals(config.get("allow_writes"));

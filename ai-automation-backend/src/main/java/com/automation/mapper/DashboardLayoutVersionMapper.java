@@ -1,8 +1,8 @@
 package com.automation.mapper;
 
+import com.automation.dto.response.DashboardLayoutVersionListItem;
 import com.automation.dto.response.DashboardLayoutVersionSummary;
 import com.automation.entity.DashboardLayoutVersion;
-import com.automation.repository.DashboardLayoutVersionListItem;
 import org.mapstruct.Mapper;
 
 import java.util.List;

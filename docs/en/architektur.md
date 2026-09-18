@@ -138,15 +138,18 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 |---|---|---|---|---|
 | **trusted** | workflow defaults, system values (`project_path`, `workflow_run_id`, `workflow_definition_hash`), block-internal values, answers from `approval`/`human-input`, any `setVariable` | substituted raw | raw | no |
 | **untrusted external** | webhook payload, restored `__untrusted_keys` (resume, sub-workflow), variables derived from tainted output (`step_N_output`, foreach items, `document` extracts) | always single-quoted | raw | yes, from the moment it is set |
-| **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | only once the placeholder was really substituted into a shell command line |
+| **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | on two paths: (1) once the placeholder was really substituted into a shell command line; (2) once the output of an AI block whose prompt contained the placeholder is recorded — from that coloured output on, the run is stickily tainted |
 
 - **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the three reserved context keys `__untrusted_keys`, `__untrusted_outputs` and `__platform_in_shell` (the last one the platform-data usage flag, `true` once it is raised) so it survives resume and sub-workflow hand-over — even when no output has been recorded since the substitution. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
-- **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that uses `{{ previous_report }}` only in an AI prompt (`resolveTemplate`), or not at all, stays untainted.
+- **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that does not use `{{ previous_report }}` at all stays untainted.
+- **AI outputs after a platform-data prompt are coloured:** if platform data was in an AI block's prompt, the output of exactly that block counts as untrusted — a following shell block therefore receives `{{ previous_output }}`/`{{ block.<name>.output }}` single-quoted. Built on the same feedback channel: `TemplateResolver.resolvePrompt` reports the placeholders it resolved, `ExecutionContextTaint.substitutedIntoPrompt` remembers platform data, and the next output recorded via `recordOutput` consumes that flag. The **prompt alone** does not colour the run: as long as no output was recorded, `hasUntrustedInput()` is false and `exportTaint()` is empty. Once the output is recorded the run is tainted, though — sticky as in every other case: from then on `recordOutput` escapes **every** further block output, `setDerivedVariable` marks every variable derived from it (`step_N_output`, foreach items, `document` extracts) untrusted, and `exportTaint()` passes both on to sub-workflows and to a resume. So a later AI block with a clean prompt does not get a clean output back — that only holds while nothing coloured has been recorded before it. The prompt path covers exactly the AI calls: `simple`, `skill-capability`, `agentic` (`goal`/`success_criteria`) and the non-shell branches of `foreach`, `while`, `conditional`, `retry` and `switch`; non-prompt resolutions (mounts, document paths, TODO fields, integration parameters, the `switch` expression) stay on `resolveTemplate` and keep reporting nothing.
 - **Deliberately trusted:** answers from `approval` and `human-input` blocks arrive through the API-key-protected REST interface from the person who owns the instance — they are not escaped. Likewise `setVariable` (e.g. a workflow variable shadowing a webhook field of the same name) clears the untrusted mark on purpose: the value then comes from the definition, not from the caller. `replaceValue` (workspace path remapping) in contrast only swaps the value and leaves the class in place.
 - **Known limits:**
   1. Nothing is escaped in AI prompts — a prompt is not a command line, and the trust model does not defend against prompt injection.
-  2. **Laundering through an AI block:** platform data in a `simple` or `agentic` prompt does not taint the run (limit 1); the AI's answer is recorded by `recordOutput` as untainted; a following shell block then substitutes `{{ previous_output }}` **raw**. The path platform data → AI prompt → shell block therefore bypasses the quoting entirely. It occurs six times in the bundled definitions (six pool workflows, no built-in template) and only stays harmless there because every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **Recommendation for your own workflows: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+  2. Prompt injection through the AI's answer itself remains possible: what gets quoted is the output, its *content* still comes from a model that read platform data. Quoting prevents shell injection, not manipulation of the content.
   3. A shell block that writes a tainted value into a file itself and later executes that file is outside what quoting can see.
+
+  The path platform data → AI prompt → shell block was the fourth limit until TODO 22e6bec8; colouring the AI output closed it. **The recommendation still stands: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — the block then behaves the same in coloured and in clean runs. For the bundled definitions `PlatformPromptQuotingGateTest` enforces it.
 
 **Webhook signatures** — `POST /api/v1/webhooks/{id}/secret` generates a secret (32 random bytes, hex), shows it exactly once and stores it AES-GCM-encrypted (`IntegrationEncryptionService`, key outside the database) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` removes it. For a webhook with a secret, `WebhookSignatureVerifier` checks `X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`, the GitHub/Gitea format) as HMAC-SHA256 over the raw request bytes before the JSON is parsed, compared in constant time — otherwise **401 `WEBHOOK_SIGNATURE_INVALID`**. As with seals, a stored secret stays in force if the switch is later turned off. Responses only reveal `signatureRequired`.
 
@@ -204,7 +207,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (chain/single task/loop) + BpmnNodeFactory (ids, placement, edges, command tasks), BpmnGatewayBuilder (conditional/switch: split/rows/merge), BpmnEdgeRouter (right-angle waypoint routing), DataFlowReferenceScanner (placeholder scan for `block.x.output`/`previous_output`/`step_N_output`/compress `source`) + BpmnDataFlowBuilder (data objects and associations below the task row; the import skips them), BpmnBlockText (labels, docs, config helpers), BpmnSegment (sub-graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
+│   ├── export/bpmn/     BpmnModelBuilder (chain/single task/loop) + BpmnNodeFactory (ids, placement, edges, command tasks), BpmnGatewayBuilder (conditional/switch: split/rows/merge), BpmnEdgeRouter (right-angle waypoint routing), DataFlowReferenceScanner (placeholder scan for `block.x.output`/`previous_output`/`step_N_output`/compress `source`) + DataFlowConfigStrings (level rule: direct vs. nested config values) + BpmnBranchBlocks (blocks and id paths of the switch branches) + BpmnDataFlowBuilder (data objects and associations below the task row, the endpoint is always a task — for references from a branch the branch task, never the gateway; the import skips them), BpmnBlockText (labels, docs, config helpers), BpmnSegment (sub-graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
@@ -851,9 +854,10 @@ Response (DTO) → React Query Cache → UI Update
 - **Filter:** `RateLimitFilter` (reads from `RateLimitConfig` bean)
 - **Algorithm:** Sliding window (1 minute)
 - **Default:** 120 requests/minute per client IP
-- **Response header:** `X-RateLimit-Remaining`
+- **Response header:** `X-RateLimit-Remaining`; on a 429 also `Retry-After` — seconds until the bucket's minute window turns over (at least 1), the same value as `retryAfterSeconds` in the JSON body
 - **Runtime-configurable:** Settings → Execution → API rate limit (toggle + RPM value)
 - **Env override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
+- **Client backoff budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) and `client-default-retry-after-seconds` (10) — see below
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
 
@@ -862,13 +866,31 @@ Response (DTO) → React Query Cache → UI Update
 client (`api/client.ts`) in contrast remembers the lock **per endpoint pattern** (the path without
 its query and with UUIDs replaced by `{id}`, so `/executions/{id}` does not get one key per run).
 
-On top of that comes a **short lock over the remaining paths: at most 2 s
-(`GLOBAL_BACKOFF_SECONDS`), capped by `Retry-After`** — with `Retry-After: 0` no global lock is
-created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
+On top of that comes a **short lock over the remaining paths: at most 2 s, capped by
+`Retry-After`** — with `Retry-After: 0` no global lock is created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
 ticket request costs the WebSocket one reconnect attempt and doubles its exponential delay, turning
 2 s into a much longer outage) and `GET /system/auth-status` (the `ApiKeyGuard` renders nothing until
 it answers — the app would stay empty instead of showing the rate-limit hint). Their own path lock
 still applies to them; they are only exempt from *somebody else's* 429.
+
+**Where those two numbers come from: the instance, not the bundle.** The 2 s of the short global
+lock and the 10 s the client assumes without a usable `Retry-After` remain in the client as
+constants (`GLOBAL_BACKOFF_SECONDS`, `DEFAULT_RETRY_AFTER_SECONDS`) only as a *fallback*. The values
+actually in force come from `GET /api/v1/system/info` under `rateLimit` (`enabled`,
+`requestsPerMinute`, `globalBackoffSeconds`, `defaultRetryAfterSeconds`); `useSystemInfo` hands them
+to the client via `applyServerRateLimitConfig()` — the endpoint is loaded at startup anyway
+(sidebar) and needs no API key, so this costs no request of its own. They are set through
+`automation.security.rate-limit.client-global-backoff-seconds` and
+`client-default-retry-after-seconds`; missing or non-positive values are ignored and the client
+keeps its constants. Background: an instance with a different `requests-per-minute` turns
+hard-wired client numbers into guesswork (37b98c97).
+
+The `Retry-After` header comes **from the `RateLimitFilter` only**. The two other sources of a 429
+do not send it: the webhook limiter (`WebhookController` → `WebhookRateLimiter`, an empty 429) and
+`TOKEN_BUDGET_EXCEEDED` (`ErrorCode`/`GlobalExceptionHandler` — a budget problem, not a timing one,
+where waiting does not help at all). For the browser client that means: a 429 on `/api/v1` almost
+always carries the header, and the `defaultRetryAfterSeconds` value only applies in those special
+cases or when a proxy swallows the header.
 
 The consequence: after a 429 storm the client releases individual patterns again after at most 2 s,
 and each pattern collects its own 429 until its `Retry-After` lock is in place. The short global lock
@@ -988,7 +1010,9 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 
 ## Architecture Gates
 
-Two JUnit tests in package `com.automation.architecture` pin the measured structure, both on the same jdeps package edges as `scripts/public-readiness/arch-metrics.sh` (section `## packages`) and without any new dependency: `PackageCycleRatchetTest` pins today's 13 mutually dependent package pairs as an allowlist — a new pair fails the build, a resolved one is only reported as a hint — and `LayerRuleTest` forbids the edge classes `service.* → controller.*`, `controller.* → repository.*` and `repository.* → service.*` (allowlist empty today). What gets measured is always the build directory the tests themselves were loaded from (`target/`, or `target-ide/` under the IDE profile), never a stale one sitting next to it; if it or jdeps is missing, both tests are skipped with a clear message instead of passing silently; their blind spot is a dependency that only appears as a generic type argument and is erased from the bytecode.
+Two JUnit tests in package `com.automation.architecture` pin the measured structure, without any new dependency. Their base measurement is the same jdeps package edges as in `scripts/public-readiness/arch-metrics.sh` (section `## packages`); `LayerRuleTest` additionally checks a second view (see below). `PackageCycleRatchetTest` pins today's 13 mutually dependent package pairs as an allowlist — a new pair fails the build, a resolved one is only reported as a hint — and `LayerRuleTest` forbids the edge classes `service.* → controller.*`, `controller.* → repository.*` and `repository.* → service.*` (allowlist empty today). What gets measured is always the build directory the tests themselves were loaded from (`target/`, or `target-ide/` under the IDE profile), never a stale one sitting next to it; if it or jdeps is missing, both tests are skipped with a clear message instead of passing silently.
+
+The blind spot of the bytecode measurement is a dependency that only appears as a generic type argument and is erased from the bytecode. `LayerRuleTest` therefore checks the same three rules from a **second view**: `SourceImportEdges` reads the `import` lines of the sources under `src/main/java` (column 0, so comments and string literals never count) and evaluates them against the same rules, with its own allowlist (empty today as well). The views do not overlap — the bytecode view sees inheritance, static references and generated code, the source view sees the erased type arguments — and the test additionally asserts that the scan read any classes at all: an empty measurement would otherwise report every rule as kept. **One gap survives both**: a fully qualified name inside a generic type argument (`Page<com.automation.repository.Foo>` written without an import) is erased in the bytecode and has no import line. For projections that travel from the repository up into the controller this means: they belong in `com.automation.dto.response`, not in the repository package.
 
 ## Directory Structure
 
@@ -1032,13 +1056,12 @@ autotrigger/
 └── ai-automation-frontend/
     ├── package.json
     ├── vite.config.ts
-    ├── tailwind.config.ts
     ├── eslint.config.js               ← Flat config (ESLint 9+)
     ├── index.html
     └── src/
         ├── App.tsx                    ← Router
         ├── main.tsx                   ← Entry point
-        ├── index.css                  ← Global styles
+        ├── index.css                  ← Global styles + Tailwind 4 configuration (@theme inline)
         ├── api/client.ts              ← HTTP client (singleton)
         ├── types/index.ts             ← TypeScript types
         ├── pages/                     ← 37 pages (incl. simple mode variants)

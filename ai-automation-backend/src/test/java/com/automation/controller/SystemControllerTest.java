@@ -130,6 +130,38 @@ class SystemControllerTest {
     }
 
     @Test
+    void info_carriesRateLimitParametersForTheClient() throws Exception {
+        when(systemIdentity.getName()).thenReturn("MySuricates");
+        when(rateLimitConfig.isEnabled()).thenReturn(true);
+        when(rateLimitConfig.getRequestsPerMinute()).thenReturn(240);
+        when(rateLimitConfig.getClientGlobalBackoffSeconds()).thenReturn(3);
+        when(rateLimitConfig.getClientDefaultRetryAfterSeconds()).thenReturn(15);
+
+        // Ohne diese Werte rät der Client sein Backoff-Budget (b6feccbc) — eine fremde
+        // Instanz mit anderem Limit bekäme falsch geratene Sperrzeiten.
+        mockMvc.perform(get("/api/v1/system/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateLimit.enabled").value(true))
+                .andExpect(jsonPath("$.rateLimit.requestsPerMinute").value(240))
+                .andExpect(jsonPath("$.rateLimit.globalBackoffSeconds").value(3))
+                .andExpect(jsonPath("$.rateLimit.defaultRetryAfterSeconds").value(15));
+    }
+
+    @Test
+    void info_rateLimitDisabled_stillReportsTheClientParameters() throws Exception {
+        when(systemIdentity.getName()).thenReturn("MySuricates");
+        when(rateLimitConfig.isEnabled()).thenReturn(false);
+        when(rateLimitConfig.getClientGlobalBackoffSeconds()).thenReturn(2);
+        when(rateLimitConfig.getClientDefaultRetryAfterSeconds()).thenReturn(10);
+
+        mockMvc.perform(get("/api/v1/system/info"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateLimit.enabled").value(false))
+                .andExpect(jsonPath("$.rateLimit.globalBackoffSeconds").value(2))
+                .andExpect(jsonPath("$.rateLimit.defaultRetryAfterSeconds").value(10));
+    }
+
+    @Test
     void info_tailscaleEnabled_showsConfigured() throws Exception {
         when(systemIdentity.getName()).thenReturn("MySuricates");
         when(systemIdentity.getVersion()).thenReturn("0.2.3");
