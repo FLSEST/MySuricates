@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<definitions xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:mysuricates="https://mysuricates.dev/schema/bpmn/1.0" exporter="MySuricates" exporterVersion="1.0" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="process_verzweigter_datenfluss" isExecutable="false" name="Verzweigter Datenfluss">
+    <startEvent id="start_event" name="Start"/>
+    <scriptTask id="b_0_tests" name="tests" scriptFormat="bash">
+      <documentation>mvn test</documentation>
+      <extensionElements>
+        <mysuricates:blockConfig name="tests" type="shell">{"command":"mvn test"}</mysuricates:blockConfig>
+      </extensionElements>
+      <dataOutputAssociation id="dataflow_out_0">
+        <targetRef>dataref_tests</targetRef>
+      </dataOutputAssociation>
+      <script>mvn test</script>
+    </scriptTask>
+    <exclusiveGateway default="flow_2" id="b_1_split" name="{{ gate }}">
+      <extensionElements>
+        <mysuricates:blockConfig name="verteiler" type="switch">{"default":[{"type":"shell","name":"notiz","config":{"command":"echo 'alles gruen'"}}],"expression":"{{ gate }}","cases":[{"value":"RED","blocks":[{"type":"simple","name":"analyse","config":{"command":"Analysiere den Fehlschlag:\n{{ block.tests.output }}"}}]}]}</mysuricates:blockConfig>
+      </extensionElements>
+    </exclusiveGateway>
+    <serviceTask id="b_1_c0_0_analyse" name="analyse">
+      <documentation>Analysiere den Fehlschlag:</documentation>
+      <property id="b_1_c0_0_analyse_data_input" name="__targetRef_placeholder"/>
+      <dataInputAssociation id="dataflow_in_0">
+        <sourceRef>dataref_tests</sourceRef>
+        <targetRef>b_1_c0_0_analyse_data_input</targetRef>
+      </dataInputAssociation>
+      <dataOutputAssociation id="dataflow_out_1">
+        <targetRef>dataref_analyse</targetRef>
+      </dataOutputAssociation>
+    </serviceTask>
+    <scriptTask id="b_1_default_0_notiz" name="notiz" scriptFormat="bash">
+      <documentation>echo 'alles gruen'</documentation>
+      <script>echo 'alles gruen'</script>
+    </scriptTask>
+    <exclusiveGateway id="b_1_merge"/>
+    <serviceTask id="b_2_report" name="report">
+      <documentation>Bericht schreiben:</documentation>
+      <extensionElements>
+        <mysuricates:blockConfig name="report" type="simple">{"command":"Bericht schreiben:\n{{ block.analyse.output }}"}</mysuricates:blockConfig>
+      </extensionElements>
+      <property id="b_2_report_data_input" name="__targetRef_placeholder"/>
+      <dataInputAssociation id="dataflow_in_1">
+        <sourceRef>dataref_analyse</sourceRef>
+        <targetRef>b_2_report_data_input</targetRef>
+      </dataInputAssociation>
+    </serviceTask>
+    <endEvent id="end_event" name="Ende"/>
+    <sequenceFlow id="flow_0" name="RED" sourceRef="b_1_split" targetRef="b_1_c0_0_analyse"/>
+    <sequenceFlow id="flow_1" sourceRef="b_1_c0_0_analyse" targetRef="b_1_merge"/>
+    <sequenceFlow id="flow_2" name="default" sourceRef="b_1_split" targetRef="b_1_default_0_notiz"/>
+    <sequenceFlow id="flow_3" sourceRef="b_1_default_0_notiz" targetRef="b_1_merge"/>
+    <sequenceFlow id="flow_4" sourceRef="b_0_tests" targetRef="b_1_split"/>
+    <sequenceFlow id="flow_5" sourceRef="b_1_merge" targetRef="b_2_report"/>
+    <sequenceFlow id="flow_6" sourceRef="start_event" targetRef="b_0_tests"/>
+    <sequenceFlow id="flow_7" sourceRef="b_2_report" targetRef="end_event"/>
+    <dataObject id="data_tests"/>
+    <dataObjectReference dataObjectRef="data_tests" id="dataref_tests" name="Ausgabe: tests"/>
+    <dataObject id="data_analyse"/>
+    <dataObjectReference dataObjectRef="data_analyse" id="dataref_analyse" name="Ausgabe: analyse"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane bpmnElement="process_verzweigter_datenfluss" id="BPMNPlane_1">
+      <bpmndi:BPMNShape bpmnElement="start_event" id="shape_start_event">
+        <dc:Bounds height="36" width="36" x="100" y="182"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_0_tests" id="shape_b_0_tests">
+        <dc:Bounds height="80" width="100" x="286" y="160"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_1_split" id="shape_b_1_split">
+        <dc:Bounds height="50" width="50" x="536" y="175"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_1_c0_0_analyse" id="shape_b_1_c0_0_analyse">
+        <dc:Bounds height="80" width="100" x="736" y="310"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_1_default_0_notiz" id="shape_b_1_default_0_notiz">
+        <dc:Bounds height="80" width="100" x="736" y="460"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_1_merge" id="shape_b_1_merge">
+        <dc:Bounds height="50" width="50" x="986" y="175"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="b_2_report" id="shape_b_2_report">
+        <dc:Bounds height="80" width="100" x="1186" y="160"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="end_event" id="shape_end_event">
+        <dc:Bounds height="36" width="36" x="1436" y="182"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="dataref_tests" id="shape_dataref_tests">
+        <dc:Bounds height="50" width="36" x="318" y="600"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="dataref_analyse" id="shape_dataref_analyse">
+        <dc:Bounds height="50" width="36" x="768" y="600"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="flow_0" id="edge_flow_0">
+        <di:waypoint x="561" y="225"/>
+        <di:waypoint x="561" y="350"/>
+        <di:waypoint x="736" y="350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_1" id="edge_flow_1">
+        <di:waypoint x="836" y="350"/>
+        <di:waypoint x="1011" y="350"/>
+        <di:waypoint x="1011" y="225"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_2" id="edge_flow_2">
+        <di:waypoint x="561" y="225"/>
+        <di:waypoint x="561" y="500"/>
+        <di:waypoint x="736" y="500"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_3" id="edge_flow_3">
+        <di:waypoint x="836" y="500"/>
+        <di:waypoint x="1011" y="500"/>
+        <di:waypoint x="1011" y="225"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_4" id="edge_flow_4">
+        <di:waypoint x="386" y="200"/>
+        <di:waypoint x="536" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_5" id="edge_flow_5">
+        <di:waypoint x="1036" y="200"/>
+        <di:waypoint x="1186" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_6" id="edge_flow_6">
+        <di:waypoint x="136" y="200"/>
+        <di:waypoint x="286" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow_7" id="edge_flow_7">
+        <di:waypoint x="1286" y="200"/>
+        <di:waypoint x="1436" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_out_0" id="edge_dataflow_out_0">
+        <di:waypoint x="336" y="240"/>
+        <di:waypoint x="336" y="600"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_in_0" id="edge_dataflow_in_0">
+        <di:waypoint x="354" y="625"/>
+        <di:waypoint x="786" y="390"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_out_1" id="edge_dataflow_out_1">
+        <di:waypoint x="786" y="390"/>
+        <di:waypoint x="786" y="600"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="dataflow_in_1" id="edge_dataflow_in_1">
+        <di:waypoint x="804" y="625"/>
+        <di:waypoint x="1236" y="240"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

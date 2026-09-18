@@ -182,6 +182,43 @@ class BpmnDataFlowExportTest {
         assertThat(elements(doc, "dataOutputAssociation")).isEmpty();
     }
 
+    /**
+     * 7557b928: Der Datenfluss endet an den Zweig-Tasks der Verzweigung, nicht am Gateway —
+     * BPMN erlaubt an Gateways keine Datenassoziationen.
+     */
+    @Test
+    void zweigTasksSindDieEndpunkteDerAssoziationen() throws Exception {
+        Document doc = export(WorkflowFixtures.branching());
+
+        // tests → analyse (in den Case hinein), analyse → report (aus dem Case heraus)
+        assertThat(ownerIdsOf(doc, "dataOutputAssociation"))
+                .containsExactlyInAnyOrder("b_0_tests", "b_1_c0_0_analyse");
+        assertThat(ownerIdsOf(doc, "dataInputAssociation"))
+                .containsExactlyInAnyOrder("b_1_c0_0_analyse", "b_2_report");
+        assertThat(elements(doc, "dataObjectReference")).hasSize(2);
+    }
+
+    /** Kein Gateway-Knoten trägt eine Datenassoziation (XSD-Grenze der Notation). */
+    @Test
+    void keinGatewayTraegtEineDatenassoziation() throws Exception {
+        Document doc = export(WorkflowFixtures.branching());
+        for (Element gateway : elements(doc, "exclusiveGateway")) {
+            assertThat(gateway.getElementsByTagNameNS(NS_MODEL, "dataInputAssociation").getLength()).isZero();
+            assertThat(gateway.getElementsByTagNameNS(NS_MODEL, "dataOutputAssociation").getLength()).isZero();
+        }
+    }
+
+    @Test
+    void verzweigterDatenflussIstSchemaValide() throws Exception {
+        Validator validator = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(new File("src/test/resources/bpmn/xsd/BPMN20.xsd"))
+                .newValidator();
+        String xml = adapter.export(WorkflowFixtures.branching());
+        assertThatCode(() -> validator.validate(new StreamSource(new StringReader(xml))))
+                .as("XSD-Validierung verzweigter Datenfluss:\n%s", xml)
+                .doesNotThrowAnyException();
+    }
+
     /** Gateway-Blöcke (conditional/switch) haben keinen einzelnen Aktivitäts-Knoten — kein Datenobjekt. */
     @Test
     void gatewayBloeckeBekommenKeineAssoziation() throws Exception {

@@ -5,7 +5,6 @@ import com.automation.entity.Workflow;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,11 +26,15 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
     static final double TASK_W = 100, TASK_H = 80, EVT = 36, GW = 50;
     static final double GAP = 150, MAIN_Y = 200, ROW_STEP = 150, SUB_PAD = 40;
 
+    /** Id-Präfix der Top-Level-Blockkette; Zweig-Blöcke hängen ihren Pfad daran (BpmnBranchBlocks). */
+    static final String ROOT_PREFIX = "b";
+
     private final BpmnNodeFactory f;
     private final BpmnGatewayBuilder gateways;
     /**
-     * Id-Basis → Aktivitäts-Knoten. Nur Blöcke, die zu genau einem Task/Sub-Prozess werden, tragen
-     * sich ein; conditional/switch (Gateways) bleiben leer. Grundlage der Datenassoziationen.
+     * Id-Basis → Aktivitäts-Knoten, für Top-Level- wie Zweig-Blöcke. Nur Blöcke, die zu genau einem
+     * Task/Sub-Prozess werden, tragen sich ein; conditional/switch (Gateways) bleiben leer.
+     * Grundlage der Datenassoziationen.
      */
     private final Map<String, String> activityIdByBase = new HashMap<>();
 
@@ -50,7 +53,7 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         f.place(start, 0, 0);
 
         List<BlockDefinition> blocks = workflow.getBlocks() == null ? List.of() : workflow.getBlocks();
-        BpmnSegment chain = buildChain(blocks, "b");
+        BpmnSegment chain = buildChain(blocks, ROOT_PREFIX);
         chain.translate(EVT + GAP, 0);
 
         double endX = chain.entryId == null ? EVT + GAP : EVT + GAP + chain.width + GAP;
@@ -72,20 +75,8 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         model.edges.forEach(router::route);
         router.routeChildEdges(model.nodes);
         // Datenfluss zuletzt: er braucht die endgültigen Koordinaten der Task-Reihe.
-        BpmnDataFlowBuilder.apply(model, blocks, topLevelActivityIds(blocks.size()));
+        BpmnDataFlowBuilder.apply(model, blocks, activityIdByBase, ROOT_PREFIX);
         return model;
-    }
-
-    /** Blockindex → Aktivitäts-Knoten-Id, für alle Top-Level-Blöcke die einen haben. */
-    private Map<Integer, String> topLevelActivityIds(int blockCount) {
-        Map<Integer, String> ids = new LinkedHashMap<>();
-        for (int i = 0; i < blockCount; i++) {
-            String id = activityIdByBase.get("b_" + i);
-            if (id != null) {
-                ids.put(i, id);
-            }
-        }
-        return ids;
     }
 
     /** Horizontale Kette aus Blöcken; Koordinaten relativ (Zeilenmitte y=0, Beginn x=0). */

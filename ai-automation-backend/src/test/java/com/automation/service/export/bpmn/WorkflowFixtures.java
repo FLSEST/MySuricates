@@ -4,12 +4,26 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 final class WorkflowFixtures {
 
     private WorkflowFixtures() {
+    }
+
+    /**
+     * Map mit fester Reihenfolge. {@code Map.of} iteriert pro JVM zufällig (SALT in
+     * {@code ImmutableCollections}); in einem Golden-File landet diese Reihenfolge als
+     * Config-JSON und macht die Datei zwischen zwei Läufen instabil.
+     */
+    static Map<String, Object> ordered(Object... keyValues) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            map.put((String) keyValues[i], keyValues[i + 1]);
+        }
+        return map;
     }
 
     static BlockDefinition block(String type, String name, Map<String, Object> config) {
@@ -43,6 +57,24 @@ final class WorkflowFixtures {
     }
 
     /**
+     * Datenfluss über eine Verzweigung (7557b928): {@code tests} fließt in den Case-Block
+     * {@code analyse}, dessen Ausgabe der spätere Top-Level-Block {@code report} konsumiert.
+     * Endpunkte der Assoziationen sind die Zweig-Tasks, nicht das Gateway.
+     */
+    static Workflow branching() {
+        return workflow("Verzweigter Datenfluss", List.of(
+                block("shell", "tests", Map.of("command", "mvn test")),
+                block("switch", "verteiler", ordered(
+                        "expression", "{{ gate }}",
+                        "cases", List.of(ordered("value", "RED", "blocks", List.of(
+                                ordered("type", "simple", "name", "analyse", "config", Map.of(
+                                        "command", "Analysiere den Fehlschlag:\n{{ block.tests.output }}"))))),
+                        "default", List.of(ordered("type", "shell", "name", "notiz", "config", Map.of(
+                                "command", "echo 'alles gruen'"))))),
+                block("simple", "report", Map.of("command", "Bericht schreiben:\n{{ block.analyse.output }}"))));
+    }
+
+    /**
      * Katalog aller Export-Fixtures für den Roundtrip-Beweis: jeder Block-Typ (WORKFLOW-GUIDE),
      * unbekannter Typ, benannte/namenlose Blöcke, verschachtelte Switch-Cases (conditional,
      * foreach, weiterer switch), Sonderzeichen und der leere Prozess.
@@ -52,6 +84,7 @@ final class WorkflowFixtures {
                 workflow("Leer", List.of()),
                 linear(),
                 dataFlow(),
+                branching(),
                 // step_N_output: 0-basiert, ohne Wrapper-Block davor ⇒ Kante zum ersten Block
                 workflow("StepIndex", List.of(
                         block("shell", "erst", Map.of("command", "mvn test")),
