@@ -144,6 +144,54 @@ class SubWorkflowBlockExecutorTest {
         assertThat(result.getMetadata()).containsEntry("subRunId", "sub-run-1");
     }
 
+    /** The step only copies the child's output; gate_status/todo_item stay the child run's business (6e5d6e2c). */
+    @Test
+    void execute_success_marksTheStepAsDerivedOutput() {
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+
+        WorkflowRun subRun = WorkflowRun.builder()
+                .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        StepResult subStep = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .output("gate_status: RED\ntodo_item: Child finding | HIGH | bug | desc")
+                .build();
+        subRun.getSteps().add(subStep);
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("sub-run-1")).thenReturn(List.of(subStep));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getOutput()).contains("gate_status: RED");
+        assertThat(result.getMetadata()).containsEntry("derivedOutput", true);
+    }
+
+    @Test
+    void execute_subWorkflowFails_stillMarksTheStepAsDerivedOutput() {
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder()
+                .id("sub-run-1").workflow(subWorkflow).status(RunStatus.FAILED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("derivedOutput", true);
+    }
+
     @Test
     void execute_subWorkflowFails_returnsFailed() {
         Workflow subWorkflow = Workflow.builder()

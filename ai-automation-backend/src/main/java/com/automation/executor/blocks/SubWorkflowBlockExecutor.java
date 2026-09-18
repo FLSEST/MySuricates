@@ -122,7 +122,10 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
                             "subWorkflowId", workflowId,
                             "subWorkflowName", subWorkflow.getName(),
                             "subRunId", completed.getId(),
-                            "subRunStatus", completed.getStatus().name()
+                            "subRunStatus", completed.getStatus().name(),
+                            // The output is a copy of the child's; its gate_status/todo_item markers
+                            // are evaluated in the child run only, never again here (6e5d6e2c).
+                            "derivedOutput", true
                     ))
                     .build();
 
