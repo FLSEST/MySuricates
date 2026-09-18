@@ -9,9 +9,17 @@
 #   ## churn     geaenderte Dateien der letzten 90 Tage aus git log
 #   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend
 #   ## summary   Kennzahlen als key=value
+#   ## run       Laufzeit-Zustand (compile=, jdeps=) — bewusst NICHT deterministisch
 #
 # Die Ausgabe ist ein Faktenblatt fuer einen KI-Block, der nur interpretiert — sie ist
-# stabil sortiert und enthaelt keine Zeitstempel, damit zwei Laeufe identisch sind.
+# stabil sortiert und enthaelt keine Zeitstempel.
+#
+# Determinismus, genau: alles vor `## run` ist zwischen zwei Laeufen byte-identisch,
+# solange (a) HEAD derselbe ist, (b) beide Laeufe im selben 90-Tage-Churn-Fenster liegen
+# (also kein Commit ueber die Grenze rutscht) und (c) target/classes zum selben Quellstand
+# gehoert. Der Laufzeit-Zustand steht deshalb unter `## run`: `compile=` wechselt beim
+# ersten Lauf in einem frischen Arbeitsverzeichnis von `compiled` auf `reused`, das ist
+# kein Messunterschied und darf keinen Determinismus-Vergleich roetlich faerben.
 #
 # Usage:  scripts/public-readiness/arch-metrics.sh [repo-root]        (Default: .)
 # Env:    ARCH_METRICS_COMPILE=0   nie kompilieren, nur vorhandenes target/classes nutzen
@@ -77,33 +85,60 @@ if ! command -v jdeps >/dev/null 2>&1; then
   JDEPS_STATE="missing"
   note_error "jdeps_missing"
 elif [ -d "$CLASSES" ]; then
-  jdeps -verbose:class -filter:none "$CLASSES" 2>/dev/null \
-    | awk 'NF==4 && $2=="->" && $1 ~ /^com\.automation\./ && $3 ~ /^com\.automation\./ {
-             from=$1; to=$3;
-             sub(/\.[^.]*$/, "", from); sub(/\.[^.]*$/, "", to);
-             if (from != to) print from "\t" to
-           }' \
+  # Erst roh einsammeln, dann auswerten: in einer Pipe ginge der Rueckgabewert von jdeps
+  # verloren und ein Fehlschlag saehe aus wie "keine Abhaengigkeiten".
+  jdeps -verbose:class -filter:none "$CLASSES" > "$TMP/jdeps.raw" 2>"$TMP/jdeps.err"
+  JDEPS_RC=$?
+  awk 'NF==4 && $2=="->" && $1 ~ /^com\.automation\./ && $3 ~ /^com\.automation\./ {
+         from=$1; to=$3;
+         sub(/\.[^.]*$/, "", from); sub(/\.[^.]*$/, "", to);
+         if (from != to) print from "\t" to
+       }' "$TMP/jdeps.raw" \
     | sort | uniq -c \
     | awk '{ print $2 "\t" $3 "\t" $1 }' \
     | sort -k1,1 -k2,2 > "$TMP/edges.tsv"
-  [ -s "$TMP/edges.tsv" ] || JDEPS_STATE="empty"
+  if [ "$JDEPS_RC" -ne 0 ]; then
+    if [ -s "$TMP/edges.tsv" ]; then
+      JDEPS_STATE="partial"
+      note_error "jdeps_partial"
+    else
+      JDEPS_STATE="failed"
+      note_error "jdeps_failed"
+      : > "$TMP/edges.tsv"
+    fi
+  elif [ ! -s "$TMP/edges.tsv" ]; then
+    JDEPS_STATE="empty"
+  fi
 else
   JDEPS_STATE="no_classes"
 fi
 
+# Zyklen: ein Fehlschlag der Erkennung darf nicht als "keine Zyklen" durchgehen — das waere
+# falsch-gruen in genau der Dimension, fuer die das Faktenblatt gebaut wurde.
+CYCLES_STATE="no_edges"
 if [ -s "$TMP/edges.tsv" ]; then
-  cut -f1,2 "$TMP/edges.tsv" | python3 "$SCRIPT_DIR/arch_cycles.py" > "$TMP/cycles.tsv" 2>/dev/null
+  if cut -f1,2 "$TMP/edges.tsv" | python3 "$SCRIPT_DIR/arch_cycles.py" > "$TMP/cycles.tsv" 2>"$TMP/cycles.err"; then
+    CYCLES_STATE="ok"
+  else
+    CYCLES_STATE="failed"
+    note_error "cycles_failed"
+    : > "$TMP/cycles.tsv"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
 # Dateigroessen — gleiche Zaehlweise wie SourceSizeRatchetTest
 # (Files.readAllLines(..).size(): awk zaehlt eine letzte Zeile ohne Zeilenumbruch mit).
+# Leere Dateien liefern awk keinen Satz und wuerden fehlen — sie kommen per find -empty
+# mit 0 Zeilen dazu, damit die Zeilenzahl der Liste zu files= passt.
 # ---------------------------------------------------------------------------
 FILES=0
 if [ -d "$SRC" ]; then
-  ( cd "$SRC" && find . -type f -name '*.java' -print0 \
-      | xargs -0 -r awk 'FNR==1 { if (f != "") { sub(/^\.\//, "", f); print n "\t" f } f=FILENAME } { n=FNR }
-                         END { if (f != "") { sub(/^\.\//, "", f); print n "\t" f } }' ) \
+  ( cd "$SRC" \
+      && find . -type f -name '*.java' ! -empty -print0 \
+        | xargs -0 -r awk 'FNR==1 { if (f != "") { sub(/^\.\//, "", f); print n "\t" f } f=FILENAME } { n=FNR }
+                           END { if (f != "") { sub(/^\.\//, "", f); print n "\t" f } }' \
+      && find . -type f -name '*.java' -empty -printf '0\t%P\n' ) \
     | sort -k1,1rn -k2,2 > "$TMP/sizes.tsv"
   FILES=$(find "$SRC" -type f -name '*.java' | wc -l | tr -d ' ')
 else
@@ -137,16 +172,20 @@ printf '# Paketabhaengigkeiten aus jdeps -verbose:class, nur com.automation.*, o
 printf '# von\tnach\tanzahl (aggregierte Klassenkanten)\n'
 if [ -s "$TMP/edges.tsv" ]; then
   cat "$TMP/edges.tsv"
+elif [ "$JDEPS_STATE" = "empty" ]; then
+  printf '# keine com.automation-Kanten gefunden\n'
 else
-  printf '# keine Kanten gemessen (jdeps=%s, compile=%s)\n' "$JDEPS_STATE" "$COMPILE_STATE"
+  printf '# nicht gemessen — siehe error= in ## summary und ## run\n'
 fi
 
 printf '\n## cycles\n'
 printf '# cycle\tgroesse\tpakete   |   pair\ta\tb (wechselseitige Abhaengigkeit)\n'
 if [ -s "$TMP/cycles.tsv" ]; then
   cat "$TMP/cycles.tsv"
-else
+elif [ "$CYCLES_STATE" = "ok" ]; then
   printf '# keine Zyklen zwischen com.automation-Paketen gefunden\n'
+else
+  printf '# nicht gemessen (cycles_state=%s) — kein Beleg fuer Zyklenfreiheit\n' "$CYCLES_STATE"
 fi
 
 printf '\n## sizes\n'
@@ -191,13 +230,19 @@ printf 'packages=%s\n' "$PACKAGES"
 printf 'edges=%s\n' "$EDGES"
 printf 'cycles=%s\n' "$CYCLES"
 printf 'cycle_pairs=%s\n' "$PAIRS"
+printf 'cycles_state=%s\n' "$CYCLES_STATE"
 printf 'files=%s\n' "$FILES"
 printf 'files_over_300=%s\n' "$FILES_OVER_300"
 printf 'files_over_500=%s\n' "$FILES_OVER_500"
 printf 'max_file_lines=%s\n' "${MAX_LINES:-0}"
 printf 'churn_files_90d=%s\n' "$CHURN_FILES"
 printf 'commit=%s\n' "$COMMIT"
+[ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
+
+# ## run steht bewusst am Ende und ausserhalb des Determinismus-Vergleichs: compile= haengt
+# davon ab, ob das Arbeitsverzeichnis schon ein Kompilat hatte, nicht vom gemessenen Stand.
+printf '\n## run\n'
+printf '# Laufzeit-Zustand, nicht Teil des Determinismus-Vergleichs\n'
 printf 'compile=%s\n' "$COMPILE_STATE"
 printf 'jdeps=%s\n' "$JDEPS_STATE"
-[ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
 exit 0
