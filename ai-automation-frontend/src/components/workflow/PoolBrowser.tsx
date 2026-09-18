@@ -105,6 +105,19 @@ export function PoolBrowser({ onSelect }: PoolBrowserProps) {
                     {entry.version && (
                       <span className="text-xs text-text-tertiary">v{entry.version}</span>
                     )}
+                    {entry.scope && (
+                      <span
+                        data-testid={`pool-scope-${entry.id}`}
+                        title={entry.scope === 'repo' ? t.pool.scopeRepoHint : t.pool.scopePortableHint}
+                        className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium ${
+                          entry.scope === 'repo'
+                            ? 'bg-warning-subtle text-warning'
+                            : 'bg-info-subtle text-info'
+                        }`}
+                      >
+                        {entry.scope === 'repo' ? t.pool.scopeRepo : t.pool.scopePortable}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

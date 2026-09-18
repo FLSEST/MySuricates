@@ -283,6 +283,12 @@ export interface PoolWorkflowEntry {
   description: Record<string, string>;
   icon: string;
   category: string | null;
+  /**
+   * Kategorie des Eintrags: `repo` greift auf die Struktur dieses Repositories zu,
+   * `portable` ist über `project_path` parametrisiert. `null` = nicht deklariert.
+   * Regelwerk: docs/workflow-pool-kuratierung.md
+   */
+  scope: PoolScope | null;
   tags: string[];
   blocks: BlockDefinition[];
   instructions: string | null;
@@ -292,6 +298,8 @@ export interface PoolWorkflowEntry {
   defaultContext: Record<string, unknown> | null;
   filename: string;
 }
+
+export type PoolScope = 'repo' | 'portable';
 
 // ── Workflow Run ─────────────────────────────────────────
 
@@ -1327,6 +1335,11 @@ export interface ExportToPoolRequest {
 export interface ExportToPoolResponse {
   poolId: string;
   filename: string;
+  /**
+   * Stellen, die der Export als Instanz-Bindung entfernt hat (z. B. die `workflowId` eines
+   * sub-workflow-Blocks). Leer, wenn nichts zu bereinigen war.
+   */
+  sanitizedPaths: string[];
 }
 
 // ── Chain Templates ──────────────────────────────────────

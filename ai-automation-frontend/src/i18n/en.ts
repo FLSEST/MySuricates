@@ -1287,6 +1287,10 @@ export const en = {
     install: 'Install',
     searchPlaceholder: 'Search pool workflows...',
     tags: 'Tags',
+    scopeRepo: 'repo',
+    scopePortable: 'portable',
+    scopeRepoHint: 'Relies on this repository\'s layout (backend, frontend, scripts/) — in another project the workflow has nothing to work on.',
+    scopePortableHint: 'Parameterised via project_path — runs in any project.',
   },
   testBadge: {
     passed: 'Tested',

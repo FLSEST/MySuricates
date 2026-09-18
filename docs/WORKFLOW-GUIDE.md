@@ -1454,6 +1454,8 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block 
 
 ## Anhang: Template-Kurzreferenz
 
+Was in den oeffentlichen Workflow-Pool gehoert, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
+
 Alle 65+ eingebauten Templates mit ihrem primaeren Pattern:
 
 | Template | Pattern | Kategorie |

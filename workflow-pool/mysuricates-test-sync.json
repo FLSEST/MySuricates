@@ -9,6 +9,7 @@
   },
   "icon": "✍️",
   "category": "CUSTOM",
+  "scope": "repo",
   "tags": [
     "quality",
     "mysuricates",

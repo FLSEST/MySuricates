@@ -11,6 +11,8 @@ public record PoolWorkflowEntry(
         Map<String, String> description,
         String icon,
         String category,
+        /** {@code repo} | {@code portable}; {@code null}, wenn der Eintrag es nicht deklariert. */
+        String scope,
         List<String> tags,
         List<BlockDefinition> blocks,
         String instructions,

@@ -70,6 +70,44 @@ HYGIENE_SECURITY_REQUIRED_TERMS=(
 )
 
 # ---------------------------------------------------------------------------
+# Kuratierungsregeln für den öffentlichen Workflow-Pool (TODO 523702f4)
+#
+# Der Plan steht in docs/workflow-pool-kuratierung.md; die Werte hier sind seine
+# maschinell prüfbare Seite. Gelesen von scripts/ci/pool-neutrality.sh.
+# ---------------------------------------------------------------------------
+
+# Erlaubte Werte des Pflichtfelds "scope".
+#   repo     — greift auf die Struktur dieses Repositories zu
+#   portable — über project_path (o. ä.) parametrisiert, läuft in jedem Projekt
+HYGIENE_POOL_SCOPES=("repo" "portable")
+
+# Registrierte Blocktypen. Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend
+# (dort selbst gegen die BlockExecutor-Klassen gepinnt, BlockTypeListsGuardTest).
+# scripts/tests/test-public-hygiene.sh vergleicht beide Listen — driftet eine,
+# fällt es dort auf.
+HYGIENE_POOL_BLOCK_TYPES=(
+  agentic approval compress compress-ai conditional document foreach
+  human-input integration retry shell simple skill-capability sub-workflow
+  switch todo-close todo-create todo-update while
+)
+
+# Kennzeichen, an denen ein Eintrag an DIESES Repository gebunden ist. In einem
+# Eintrag mit scope: portable sind sie ein Befund — wer ihn in sein eigenes
+# Projekt installiert, läuft sonst ins Leere.
+HYGIENE_POOL_REPO_MARKERS=(
+  "ai-automation-backend" "ai-automation-frontend" "scripts/" "mvnw" "workflow-pool/"
+)
+
+# Schlüssel, die eine laufende Instanz bezeichnen. Als Feld der Definition, im
+# defaultContext oder in den Metadaten sind sie ein Befund — es sei denn, der
+# Wert ist leer oder eine Template-Variable ({{ project_id }}), denn das ist
+# gerade die portable Parametrisierung.
+HYGIENE_POOL_INSTANCE_KEYS=(
+  "projectId" "project_id" "workflowId" "workflow_id" "runId" "run_id"
+  "scheduleId" "schedule_id" "chainId" "chain_id" "executionId" "execution_id"
+)
+
+# ---------------------------------------------------------------------------
 # Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung
 #
 # Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.

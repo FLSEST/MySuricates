@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
+import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
@@ -44,7 +45,7 @@ class WorkflowPoolControllerTest {
     private PoolWorkflowEntry sampleEntry() {
         return new PoolWorkflowEntry(
                 "code-review", Map.of("en", "Code Review", "de", "Code Review"),
-                Map.of("en", "Reviews code"), "magnifying_glass", "development",
+                Map.of("en", "Reviews code"), "magnifying_glass", "development", "portable",
                 List.of("code", "review"), List.of(), "Review the code", "claude-sonnet-4-6",
                 "1.0.0", "system", null, null, "code-review.json"
         );
@@ -115,6 +116,40 @@ class WorkflowPoolControllerTest {
                         .content("""
                                 {"projectId": "", "name": "test"}
                                 """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void exportToPool_passesScopeQueryParamThrough() throws Exception {
+        when(poolService.exportToPool(eq("wf-1"), any(), eq("repo")))
+                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json", List.of()));
+
+        mockMvc.perform(post("/api/v1/pool/export/wf-1?scope=repo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.poolId").value("build-gate"));
+    }
+
+    @Test
+    void exportToPool_withoutScopeParam_passesNull() throws Exception {
+        when(poolService.exportToPool(eq("wf-1"), any(), eq((String) null)))
+                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json", List.of()));
+
+        mockMvc.perform(post("/api/v1/pool/export/wf-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void exportToPool_invalidScope_returns400() throws Exception {
+        when(poolService.exportToPool(eq("wf-1"), any(), eq("private")))
+                .thenThrow(new IllegalArgumentException("Unbekannter scope: private"));
+
+        mockMvc.perform(post("/api/v1/pool/export/wf-1?scope=private")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isBadRequest());
     }
 

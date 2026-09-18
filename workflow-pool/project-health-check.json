@@ -9,6 +9,7 @@
   },
   "icon": "🏥",
   "category": "CODE",
+  "scope": "portable",
   "tags": ["health", "dependencies", "security", "maintenance"],
   "blocks": [
     {

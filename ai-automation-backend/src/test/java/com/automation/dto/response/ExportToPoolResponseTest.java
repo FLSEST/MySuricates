@@ -3,12 +3,14 @@ package com.automation.dto.response;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ExportToPoolResponseTest {
 
     private static ExportToPoolResponse sample() {
-        return new ExportToPoolResponse("pool-123", "workflow-export.json");
+        return new ExportToPoolResponse("pool-123", "workflow-export.json", List.of("blocks[0].config.workflowId"));
     }
 
     @Nested
@@ -20,14 +22,16 @@ class ExportToPoolResponseTest {
 
             assertThat(response.poolId()).isEqualTo("pool-123");
             assertThat(response.filename()).isEqualTo("workflow-export.json");
+            assertThat(response.sanitizedPaths()).containsExactly("blocks[0].config.workflowId");
         }
 
         @Test
         void should_allow_null_fields() {
-            ExportToPoolResponse response = new ExportToPoolResponse(null, null);
+            ExportToPoolResponse response = new ExportToPoolResponse(null, null, List.of());
 
             assertThat(response.poolId()).isNull();
             assertThat(response.filename()).isNull();
+            assertThat(response.sanitizedPaths()).isEmpty();
         }
     }
 
@@ -46,14 +50,14 @@ class ExportToPoolResponseTest {
 
         @Test
         void should_not_be_equal_when_poolId_differs() {
-            ExportToPoolResponse other = new ExportToPoolResponse("pool-999", "workflow-export.json");
+            ExportToPoolResponse other = new ExportToPoolResponse("pool-999", "workflow-export.json", List.of());
 
             assertThat(sample()).isNotEqualTo(other);
         }
 
         @Test
         void should_not_be_equal_when_filename_differs() {
-            ExportToPoolResponse other = new ExportToPoolResponse("pool-123", "other.json");
+            ExportToPoolResponse other = new ExportToPoolResponse("pool-123", "other.json", List.of());
 
             assertThat(sample()).isNotEqualTo(other);
         }

@@ -20,6 +20,17 @@
 #
 set -uo pipefail
 
+# Regelbasis wie in public-hygiene.sh aus dem Skriptpfad, nicht aus git: das Skript
+# wird auch mit fremdem Arbeitsverzeichnis aufgerufen (Built-in-Template).
+POOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+POOL_RULES_FILE="$POOL_SCRIPT_DIR/../lib/hygiene-rules.sh"
+if [ ! -f "$POOL_RULES_FILE" ]; then
+  echo "Pool-Neutralitaet: Regeldatei fehlt: $POOL_RULES_FILE" >&2
+  exit 2
+fi
+# shellcheck source=../lib/hygiene-rules.sh
+. "$POOL_RULES_FILE"
+
 SCAN_ALL=0
 if [ "${1:-}" = "--all" ]; then
   SCAN_ALL=1
@@ -55,7 +66,8 @@ scan_file() {
   m=$(grep -noE '(^|[^A-Za-z0-9])[A-Z]:\\\\[A-Za-z]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-WIN" "Windows-Pfad: ${m#*:}"
 
-  m=$(grep -noE '~/[a-zA-Z]' "$f" | head -1) \
+  # Punkt mit drin: ~/.mysuricates ist genauso ein Home-Pfad wie ~/projekt.
+  m=$(grep -noE '~/[A-Za-z.]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-HOME" "Home-relativer Pfad: ${m#*:}"
 
   m=$(grep -noE '(192\.168\.[0-9]|10\.[0-9]+\.[0-9]+\.[0-9]|172\.(1[6-9]|2[0-9]|3[01])\.[0-9])' "$f" | head -1) \
@@ -64,7 +76,8 @@ scan_file() {
   m=$(grep -noE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "EMAIL" "Mailadresse: ${m#*:}"
 
-  m=$(grep -noE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$f" | head -1) \
+  # Beide Schreibweisen, wie der Sanitizer im Backend (PoolExportSanitizer).
+  m=$(grep -noE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "UUID" "Instanz-UUID: ${m#*:}"
 
   # Fest verdrahtete Werkzeugpfade — /usr/bin/env ist der portable Shebang und zählt nicht.
@@ -132,6 +145,141 @@ PY
 }
 
 # ---------------------------------------------------------------------------
+# Kuratierungsregeln (docs/workflow-pool-kuratierung.md, Abschnitt 3)
+#
+# Die Muster oben fragen "steht hier etwas Privates drin?". Hier geht es um die
+# zweite Frage: "ist das ein brauchbarer Eintrag?" — deklarierter scope, keine
+# Instanz-Bindung, Beschreibung und Tags vorhanden, Blocktypen aus der Registry,
+# und bei scope: portable keine Abhängigkeit auf dieses Repository.
+#
+# Die Listen kommen aus scripts/lib/hygiene-rules.sh und werden als Umgebungs-
+# variablen durchgereicht, damit argv den Dateien gehört.
+# ---------------------------------------------------------------------------
+scan_definition_rules() {
+  POOL_SCOPES="$(printf '%s\n' "${HYGIENE_POOL_SCOPES[@]}")" \
+  POOL_BLOCK_TYPES="$(printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]}")" \
+  POOL_REPO_MARKERS="$(printf '%s\n' "${HYGIENE_POOL_REPO_MARKERS[@]}")" \
+  POOL_INSTANCE_KEYS="$(printf '%s\n' "${HYGIENE_POOL_INSTANCE_KEYS[@]}")" \
+  python3 - "$@" <<'PY'
+import json, os, sys
+
+def env_list(name):
+    return [v for v in os.environ.get(name, '').splitlines() if v]
+
+SCOPES = env_list('POOL_SCOPES')
+BLOCK_TYPES = set(env_list('POOL_BLOCK_TYPES'))
+REPO_MARKERS = env_list('POOL_REPO_MARKERS')
+INSTANCE_KEYS = set(env_list('POOL_INSTANCE_KEYS'))
+
+findings = []
+
+def report(path, tag, desc):
+    findings.append(f"{path}\t{tag}\t{desc}")
+
+def localized_ok(value):
+    """Ein {de, en}-Feld mit mindestens einem nicht-leeren Text."""
+    return isinstance(value, dict) and any(
+        isinstance(v, str) and v.strip() for v in value.values())
+
+def instance_bound(value):
+    """Ein Wert, der eine laufende Instanz bezeichnet — Platzhalter zaehlen nicht."""
+    if value is None:
+        return False
+    if not isinstance(value, str):
+        return True
+    return bool(value.strip()) and '{{' not in value
+
+def walk_keys(node, path, out):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            here = f"{path}.{key}" if path else key
+            if key in INSTANCE_KEYS and instance_bound(value):
+                out.append((here, key))
+            walk_keys(value, here, out)
+    elif isinstance(node, list):
+        for i, item in enumerate(node):
+            walk_keys(item, f"{path}[{i}]", out)
+
+# Config-Schluessel, unter denen wieder Bloecke stehen. Es gibt genau zwei, beide vom
+# switch-Block: cases[].blocks und default (SwitchBlockExecutor.java:37-38,59,67, gespiegelt
+# in ExecutionMode.java:68-76). Die anderen Wrapper verschachteln keine Bloecke, sondern
+# fuehren Strings aus: conditional then_command/else_command, foreach/while/retry command.
+#
+# 'cases' selbst steht bewusst NICHT hier: seine Elemente sind Fall-Objekte ({when, blocks}),
+# keine Bloecke. Die Rekursion erreicht ihr 'blocks' im naechsten Schritt ohnehin — und ein
+# Fall-Objekt mit einem eigenen 'type'-Feld wuerde sonst faelschlich als Block gezaehlt.
+BLOCK_CONTAINER_KEYS = {'blocks', 'default'}
+
+def collect_types(node, out, is_block=False):
+    """Blocktypen einsammeln.
+
+    is_block gilt fuer Werte, die unter einem Blockschluessel stehen — dort ist jedes
+    Objekt ein Block, auch ohne 'config' (das Feld ist optional). Anderswo im Baum zaehlt
+    ein Objekt nur mit 'type' UND 'config' als Block: sonst wuerde ein Konfigurationswert
+    wie {"type": "pdf"} als Blocktyp gezaehlt.
+    """
+    if isinstance(node, dict):
+        if isinstance(node.get('type'), str) and (is_block or 'config' in node):
+            out.append(node['type'])
+        for key, value in node.items():
+            collect_types(value, out, key in BLOCK_CONTAINER_KEYS)
+    elif isinstance(node, list):
+        for item in node:
+            collect_types(item, out, is_block)
+
+for path in sys.argv[1:]:
+    try:
+        with open(path, encoding='utf-8') as fh:
+            raw = fh.read()
+        data = json.loads(raw)
+    except Exception as exc:                                  # noqa: BLE001
+        report(path, "PARSE", f"JSON nicht lesbar: {exc}")
+        continue
+    if not isinstance(data, dict):
+        report(path, "PARSE", "Definition ist kein JSON-Objekt")
+        continue
+
+    scope = data.get('scope')
+    if scope is None:
+        report(path, "SCOPE", "Pflichtfeld 'scope' fehlt (erlaubt: " + ", ".join(SCOPES) + ")")
+    elif scope not in SCOPES:
+        report(path, "SCOPE", f"ungueltiger scope: {scope!r} (erlaubt: " + ", ".join(SCOPES) + ")")
+
+    if not localized_ok(data.get('name')):
+        report(path, "NAME", "'name' fehlt oder ist kein {de, en}-Objekt mit Text "
+                             "— der Eintrag laesst sich nicht laden")
+    if not localized_ok(data.get('description')):
+        report(path, "DESCRIPTION", "'description' fehlt oder ist kein {de, en}-Objekt mit Text")
+
+    tags = data.get('tags')
+    if not isinstance(tags, list) or not [t for t in tags if isinstance(t, str) and t.strip()]:
+        report(path, "TAGS", "'tags' fehlt oder ist leer — ohne Tags ist der Eintrag nicht auffindbar")
+
+    bound = []
+    walk_keys(data, "", bound)
+    for where, key in bound:
+        tag = "PROJECT-ID" if key in ("projectId", "project_id") else "INSTANCE-REF"
+        report(path, tag, f"Instanz-Bindung unter '{where}' — der Export schreibt sie nicht mehr mit")
+
+    types = []
+    collect_types(data.get('blocks') or [], types, is_block=True)
+    for unknown in sorted({t for t in types if t not in BLOCK_TYPES}):
+        report(path, "BLOCK-TYPE", f"Blocktyp '{unknown}' ist in der Registry nicht vorhanden")
+
+    if scope == "portable":
+        for marker in REPO_MARKERS:
+            if marker in raw:
+                report(path, "REPO-DEP",
+                       f"scope: portable, nutzt aber '{marker}' aus diesem Repository "
+                       f"— entweder parametrisieren oder scope: repo")
+                break
+
+for line in findings:
+    print(line)
+PY
+}
+
+# ---------------------------------------------------------------------------
 # Lauf
 # ---------------------------------------------------------------------------
 if [ "$SCAN_ALL" -eq 1 ]; then
@@ -153,6 +301,12 @@ CTX=$(scan_context_keys "${FILES[@]}")
 if [ -n "$CTX" ]; then
   echo "$CTX"
   FINDINGS=$((FINDINGS + $(printf '%s\n' "$CTX" | grep -c .)))
+fi
+
+RULES=$(scan_definition_rules "${FILES[@]}")
+if [ -n "$RULES" ]; then
+  echo "$RULES"
+  FINDINGS=$((FINDINGS + $(printf '%s\n' "$RULES" | grep -c .)))
 fi
 
 if [ "$FINDINGS" -ne 0 ]; then
