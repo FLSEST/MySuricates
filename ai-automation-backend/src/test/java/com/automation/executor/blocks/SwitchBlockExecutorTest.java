@@ -861,6 +861,81 @@ class SwitchBlockExecutorTest {
         assertThat(nested.getConfig()).containsEntry("command", "check");
     }
 
+    /** 12a3b244: a name on a case block must also make its output addressable downstream. */
+    @Test
+    void execute_namedCaseBlock_outputIsAvailableUnderItsName() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("reviewed").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "review", "config", Map.of("command", "Pruefe das"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutput("review")).isEqualTo("reviewed");
+        assertThat(context.resolveTemplate("{{ block.review.output }}")).isEqualTo("reviewed");
+    }
+
+    @Test
+    void execute_namedBlocksInTheDefaultBranch_areRecordedTooAndKeepTheirOwnOutput() {
+        StepResult first = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("collected").build();
+        StepResult second = StepResult.builder()
+                .stepIndex(2).status(StepStatus.COMPLETED).output("summarised").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(first, second);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "nothing-matches");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "config", Map.of("command", "skip"))))));
+        config.put("default", List.of(
+                Map.of("type", "simple", "name", "collect", "config", Map.of("command", "sammle")),
+                Map.of("type", "simple", "name", "summarise", "config", Map.of("command", "fasse zusammen"))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutput("collect")).isEqualTo("collected");
+        assertThat(context.getBlockOutput("summarise")).isEqualTo("summarised");
+    }
+
+    @Test
+    void execute_unnamedCaseBlock_recordsNoNamedOutput() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "config", Map.of("command", "arbeite"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutputs()).isEmpty();
+    }
+
+    /** Taint is sticky: a case output in an untrusted run is shell-escaped downstream like any other. */
+    @Test
+    void execute_namedCaseBlockInUntrustedRun_outputIsRecordedAsTainted() {
+        context.setUntrustedVariable("payload", "harmless");
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("a; id").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "scan", "config", Map.of("command", "scanne"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.resolveShellTemplate("echo {{ block.scan.output }}", false))
+                .isEqualTo("echo 'a; id'");
+    }
+
     @Test
     void execute_nestedNamedShellBlock_passesTheNameToTheStepBlock() {
         StepResult shellResult = StepResult.builder()

@@ -310,6 +310,8 @@ Jeder Case hat:
 
 Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
+Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfuegbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgefuehrten Case-Bloecke.
+
 ```json
 {
   "type": "switch",

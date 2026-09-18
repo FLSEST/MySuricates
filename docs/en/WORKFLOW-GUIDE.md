@@ -307,6 +307,8 @@ Each case has:
 
 Nested blocks in `cases` and `default` are limited to `shell` and `simple` — other types (including `compress`/`compress-ai`) are rejected with an error message.
 
+A `name` on a nested block makes its output available as `{{ block.<name>.output }}` in later steps; without a name only `{{ previous_output }}` carries it. The switch block's own output stays the concatenation of all executed case blocks.
+
 ```json
 {
   "type": "switch",
