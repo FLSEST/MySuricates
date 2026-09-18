@@ -9,14 +9,15 @@
 ### How do I start the development environment?
 
 ```bash
-# Terminal 1: Backend
-cd ai-automation-backend
-mvn spring-boot:run
+# Terminal 1: backend (from the repo root)
+./scripts/start-autotrigger-dev.sh start
 
-# Terminal 2: Frontend
+# Terminal 2: frontend
 cd ai-automation-frontend
 npm run dev
 ```
+
+> `mvn spring-boot:run` does not work: the `RuntimeClasspathGuard` aborts a start from `target/classes` with exit code 2. The script builds the JAR and starts it from a copy.
 
 The backend runs on port 9090, the frontend on port 3000. Vite automatically proxies `/api` and `/ws` to the backend.
 
@@ -57,7 +58,7 @@ Security is enabled by default (`AUTOMATION_SECURITY_ENABLED=true`). Solutions:
 
 ### Where do I find the REST endpoints?
 
-All 13 controllers are located under `ai-automation-backend/src/main/java/com/automation/controller/`. Each controller has a `@RequestMapping` with the API path.
+The REST controllers live under `ai-automation-backend/src/main/java/com/automation/controller/` (as of 2026-09-18: 43 classes with `@RestController`). Each controller has a `@RequestMapping` with the API path; re-measure with `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
 The complete API reference is at `docs/api-referenz.md`.
 
@@ -77,7 +78,7 @@ The complete API reference is at `docs/api-referenz.md`.
        public StepResult execute(BlockDefinition block, ExecutionContext ctx) { ... }
    }
    ```
-3. **Frontend:** Add the block type in `BlockTypeSelector.tsx`
+3. **Keep the lists in sync:** The type must appear in all three lists -- `BLOCK_TYPES` in `ai-automation-frontend/src/types/index.ts`, `BlockTypesIndexSection` (assistant context) and `AssistantToolValidator.KNOWN_BLOCK_TYPES`. `BlockTypeListsGuardTest` (backend) and `types/__tests__/blockTypes.test.ts` (frontend) enforce parity with the executors.
 4. **Optional:** Create a configuration dialog
 
 Spring automatically detects the new executor via component scan.
@@ -98,7 +99,7 @@ All AI calls go through `HostClaudeService`:
 
 ### How does the template system work?
 
-- 28 built-in templates in `BuiltInTemplates.java`
+- 66 built-in templates as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`)
 - Seeded on startup by `WorkflowTemplateSeeder` (idempotent)
 - Name/description are i18n JSON maps: `{"de":"...", "en":"..."}`
 - Frontend resolves language via `resolveTemplateName()` in `utils/templateUtils.ts`
@@ -113,7 +114,7 @@ All AI calls go through `HostClaudeService`:
 3. Create a repository interface under `repository/`
 4. Create a service class under `service/`
 
-**Important:** Keep numbering sequential (currently V19), file format: `V{N}__short_description.sql`
+**Important:** Keep numbering sequential (highest existing migration: V73), file format: `V{N}__short_description.sql`. Always determine the next number freshly: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
 
 ---
 
@@ -161,10 +162,10 @@ export function useMyData() {
 
 ### How do I change the theme/styling?
 
-- **TailwindCSS classes** for all styles (no custom CSS)
-- **Dark mode** via `themeStore` (`stores/themeStore.ts`)
-- **Tailwind configuration** in `tailwind.config.ts`
-- **Global styles** in `src/index.css`
+- **TailwindCSS classes** for all styles -- prefer the colour tokens (`bg-surface`, `text-accent`, `text-danger`, ...) so themes apply
+- **Dark mode / themes** via `themeStore` (`stores/themeStore.ts`), registry in `src/theme/themes.ts`
+- **Tailwind configuration:** Tailwind 4 no longer uses a `tailwind.config.*` -- the configuration lives as `@theme inline` in `src/index.css`
+- **Global styles** also in `src/index.css`
 
 ---
 
@@ -186,7 +187,7 @@ mvn test                    # All tests
 mvn test -Dtest=WorkflowControllerTest  # Single test class
 ```
 
-49 test files in: `controller/`, `service/`, `executor/blocks/`, `integration/`, `security/`
+The tests live under `controller/`, `service/`, `executor/`, `integration/` and `security/` (as of 2026-09-18: 715 test classes). Current number: `find ai-automation-backend/src/test/java \( -name '*Test.java' -o -name '*Tests.java' \) | wc -l`
 
 ---
 

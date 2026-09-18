@@ -7,14 +7,15 @@
 ### Wie starte ich die Entwicklungsumgebung?
 
 ```bash
-# Terminal 1: Backend
-cd ai-automation-backend
-mvn spring-boot:run
+# Terminal 1: Backend (aus dem Repo-Root)
+./scripts/start-autotrigger-dev.sh start
 
 # Terminal 2: Frontend
 cd ai-automation-frontend
 npm run dev
 ```
+
+> `mvn spring-boot:run` funktioniert nicht: der `RuntimeClasspathGuard` beendet einen Start aus `target/classes` mit Exit-Code 2. Das Skript baut das JAR und startet es aus einer Kopie.
 
 Backend laeuft auf Port 9090, Frontend auf Port 3000. Vite proxied `/api` und `/ws` automatisch zum Backend.
 
@@ -55,7 +56,7 @@ Security ist standardmaessig aktiviert (`AUTOMATION_SECURITY_ENABLED=true`). Loe
 
 ### Wo finde ich die REST-Endpunkte?
 
-Alle 13 Controller unter `ai-automation-backend/src/main/java/com/automation/controller/`. Jeder Controller hat ein `@RequestMapping` mit dem API-Pfad.
+Die REST-Controller liegen unter `ai-automation-backend/src/main/java/com/automation/controller/` (Stand 2026-09-18: 43 Klassen mit `@RestController`). Jeder Controller hat ein `@RequestMapping` mit dem API-Pfad; die Zahl frisch erheben mit `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
 Die vollstaendige API-Referenz liegt unter `docs/api-referenz.md`.
 
@@ -75,7 +76,7 @@ Die vollstaendige API-Referenz liegt unter `docs/api-referenz.md`.
        public StepResult execute(BlockDefinition block, ExecutionContext ctx) { ... }
    }
    ```
-3. **Frontend:** Block-Typ in `BlockTypeSelector.tsx` hinzufuegen
+3. **Listen pflegen:** Der Typ muss in allen drei Listen stehen -- `BLOCK_TYPES` in `ai-automation-frontend/src/types/index.ts`, `BlockTypesIndexSection` (Assistent-Kontext) und `AssistantToolValidator.KNOWN_BLOCK_TYPES`. `BlockTypeListsGuardTest` (Backend) und `types/__tests__/blockTypes.test.ts` (Frontend) erzwingen den Gleichstand mit den Executoren.
 4. **Optional:** Konfigurations-Dialog erstellen
 
 Spring erkennt den neuen Executor automatisch (Component Scan).
@@ -96,7 +97,7 @@ Alle KI-Aufrufe laufen ueber `HostClaudeService`:
 
 ### Wie funktioniert das Template-System?
 
-- 28 Built-in Templates in `BuiltInTemplates.java`
+- 66 Built-in Templates als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`)
 - Werden beim Start durch `WorkflowTemplateSeeder` geseedet (idempotent)
 - Name/Description sind i18n JSON-Maps: `{"de":"...", "en":"..."}`
 - Frontend loest Sprache ueber `resolveTemplateName()` in `utils/templateUtils.ts` auf
@@ -111,7 +112,7 @@ Alle KI-Aufrufe laufen ueber `HostClaudeService`:
 3. Repository Interface unter `repository/` erstellen
 4. Service-Klasse unter `service/` erstellen
 
-**Wichtig:** Nummerierung fortlaufend (aktuell V19), Dateiformat: `V{N}__kurze_beschreibung.sql`
+**Wichtig:** Nummerierung fortlaufend (hoechste vorhandene Migration: V73), Dateiformat: `V{N}__kurze_beschreibung.sql`. Naechste Nummer immer frisch ermitteln: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
 
 ---
 
@@ -159,10 +160,10 @@ export function useMeineDaten() {
 
 ### Wie aendere ich das Theme/Styling?
 
-- **TailwindCSS Klassen** fuer alle Styles (kein custom CSS)
-- **Dark Mode** ueber `themeStore` (`stores/themeStore.ts`)
-- **Tailwind-Konfiguration** in `tailwind.config.ts`
-- **Globale Styles** in `src/index.css`
+- **TailwindCSS Klassen** fuer alle Styles -- bevorzugt die Farb-Token (`bg-surface`, `text-accent`, `text-danger`, ...), damit Themes greifen
+- **Dark Mode / Themes** ueber `themeStore` (`stores/themeStore.ts`), Registry in `src/theme/themes.ts`
+- **Tailwind-Konfiguration:** Tailwind 4 hat keine `tailwind.config.*` mehr -- die Konfiguration steht als `@theme inline` in `src/index.css`
+- **Globale Styles** ebenfalls in `src/index.css`
 
 ---
 
@@ -184,7 +185,7 @@ mvn test                    # Alle Tests
 mvn test -Dtest=WorkflowControllerTest  # Einzelne Testklasse
 ```
 
-49 Testdateien in: `controller/`, `service/`, `executor/blocks/`, `integration/`, `security/`
+Die Tests liegen unter `controller/`, `service/`, `executor/`, `integration/` und `security/` (Stand 2026-09-18: 715 Testklassen). Aktuelle Zahl: `find ai-automation-backend/src/test/java \( -name '*Test.java' -o -name '*Tests.java' \) | wc -l`
 
 ---
 
