@@ -300,6 +300,12 @@ check "TODO-TESTS.md nicht getrackt" '[ -z "$TRACKED_CYPRESS_NOTE" ]'
 check ".gitignore ignoriert TODO-TESTS.md" \
   'grep -qxF "ai-automation-frontend/cypress/TODO-TESTS.md" "$REPO/.gitignore"'
 
+echo "20) Die in der Doku genannten Zahlen decken sich mit dem Code (TODO 3df2df73)"
+# Laeuft in ~0,4 s und braucht kein Netz — deshalb hier und nicht nur als eigener Test.
+OUT=$(cd "$REPO" && bash scripts/public-readiness/doc-facts-check.sh 2>&1); RC=$?
+check "keine Zahlen-Drift in docs/ und README.de.md (exit 0)" '[ "$RC" -eq 0 ]'
+[ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
