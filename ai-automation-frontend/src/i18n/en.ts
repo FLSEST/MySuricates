@@ -1983,6 +1983,13 @@ export const en = {
     disabledPageHowTo: 'To enable it, add this to the backend configuration and restart:',
     disabledPageSettingsLink: 'All modules',
   },
+  startupConfig: {
+    title: 'Startup configuration',
+    subtitle: 'Read-only overview of what this instance was started with (GET /api/v1/system/capabilities). Nothing here can be changed from the app — edit the configuration and restart, or use the command below.',
+    uiEditableLabel: 'Switchable via settings UI',
+    uiEditableRisk: 'Anyone with the API key can switch feature modules here. Keep this off on publicly reachable instances.',
+    setupCommand: 'Change the preset',
+  },
   commandPalette: {
     placeholder: 'What do you want to do?',
     workflows: 'Workflows',

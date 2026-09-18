@@ -18,6 +18,7 @@ import { WishSettingsCard } from '../components/settings/WishSettingsCard';
 import { SettingsNav, type NavSection } from '../components/settings/SettingsNav';
 import { SettingsSection } from '../components/settings/SettingsSection';
 import { ModulesCard } from '../components/settings/ModulesCard';
+import { StartupConfigCard } from '../components/settings/StartupConfigCard';
 import { useModuleEnabled } from '../hooks/useModules';
 
 export function Settings() {
@@ -140,6 +141,7 @@ export function Settings() {
           )}
 
           <SettingsSection id="modules" title={t.modules.navTitle}>
+            <StartupConfigCard />
             <ModulesCard />
           </SettingsSection>
 
