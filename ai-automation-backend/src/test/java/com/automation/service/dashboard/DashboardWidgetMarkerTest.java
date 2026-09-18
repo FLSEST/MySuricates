@@ -303,8 +303,77 @@ class DashboardWidgetMarkerTest {
                 + "{\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n\nMein eigener Bericht:\n"
                 + "dashboard_widget: {\"status\":\"RED\",\"title\":\"12 Blocklist-Treffer\"}";
 
-        assertThat(DashboardWidgetMarker.countRealOccurrences(output)).isEqualTo(2);
+        assertThat(DashboardWidgetMarker.countEvidence(output)).isEqualTo(2);
         assertThat(DashboardWidgetMarker.scan(output).ambiguous()).isTrue();
+    }
+
+    // --- D1 (fix round 5, regression from round 4): the counter is permissive again. Round 4 counted
+    // an unanchored occurrence only when its value started on the same line, so a quoted marker became
+    // the sole counted one as soon as the report put its own value on the next line. Anchored now
+    // always counts; unanchored counts unless a BLANK line separates the marker from its value ---
+
+    @Test
+    void a_quoted_marker_does_not_win_when_the_report_puts_its_own_value_on_the_next_line() {
+        String output = "Der Nutzer schrieb:\ndashboard_widget: {\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n"
+                + "Ende des Zitats. Mein Ergebnis: dashboard_widget:\n"
+                + "{\"status\":\"RED\",\"title\":\"12 Blocklist-Treffer\"}";
+
+        assertThat(DashboardWidgetMarker.countEvidence(output)).isEqualTo(2);
+        assertThat(DashboardWidgetMarker.scan(output).found()).isTrue();
+        assertThat(DashboardWidgetMarker.scan(output).ambiguous()).isTrue();
+    }
+
+    /**
+     * Every single line break between the report's own marker and its JSON — including a fenced
+     * block — leaves the occurrence counted. Only a *blank* line does not (the accepted residual,
+     * pinned in {@code DashboardWidgetResultParserTest}), because that is the shape a prose mention
+     * of the feature has.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"\n", "\r\n", "\r", "\n```json\n", "\u2028", "\n```\n"})
+    void an_unanchored_report_marker_counts_across_every_single_line_break_shape(String separator) {
+        Scan scan = DashboardWidgetMarker.scan(
+                "Zitat:\ndashboard_widget: {\"status\":\"GREEN\"}\n"
+                        + "Mein Ergebnis: dashboard_widget:" + separator + "{\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    /** Whatever decorates the report's own marker line, the quoted one must not become the only one. */
+    @ParameterizedTest
+    @ValueSource(strings = {">> ", "\u2022 ", "\u00A0", "Mein Ergebnis: ", "\u00A0\u00A0- "})
+    void an_unanchored_report_marker_counts_whatever_stands_before_it(String prefix) {
+        Scan scan = DashboardWidgetMarker.scan(
+                "Zitat:\ndashboard_widget: {\"status\":\"GREEN\"}\n"
+                        + prefix + "dashboard_widget:\n{\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    /**
+     * D4 (fix round 5): the two claims the class javadoc makes about characters. A non-breaking space
+     * between the colon and the value ends the decoration walk — {@code Character.isWhitespace}
+     * excludes U+00A0 — so that is not a marker at all; and U+2028/U+2029 are line terminators for
+     * the blank-line test exactly as they are for the anchored pattern's {@code ^}.
+     */
+    @Test
+    void the_line_and_whitespace_definitions_the_javadoc_states_hold() {
+        assertThat(DashboardWidgetMarker.scan("dashboard_widget:\u00A0{\"status\":\"GREEN\"}"))
+                .isEqualTo(Scan.NONE);
+        assertThat(DashboardWidgetMarker.countEvidence(
+                "Zitat: dashboard_widget:\u2028\u2029{\"status\":\"GREEN\"}")).isZero();
+        assertThat(DashboardWidgetMarker.countEvidence(
+                "Zitat: dashboard_widget:\u2028{\"status\":\"GREEN\"}")).isEqualTo(1);
+    }
+
+    @Test
+    void an_unanchored_marker_whose_value_follows_a_blank_line_still_does_not_count() {
+        // The C2 control, unchanged: only a *blank* line keeps an unanchored occurrence out of the
+        // count, so a report documenting the feature plus an example block stays usable.
+        String output = "Siehe dashboard_widget:\n\n{\"foo\":1}\n\ndashboard_widget: {\"status\":\"RED\"}";
+
+        assertThat(DashboardWidgetMarker.countEvidence(output)).isEqualTo(1);
+        assertThat(DashboardWidgetMarker.scan(output).json()).isEqualTo("{\"status\":\"RED\"}");
     }
 
     // --- B5 (fix round 2): more markdown shapes ---
