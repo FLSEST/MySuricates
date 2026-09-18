@@ -36,8 +36,8 @@ final class JsonSortStage implements CompressionStage {
     @Override
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
         String where = StageConfig.where(op());
-        JsonNode root = JsonPaths.parse(input, op());
-        ArrayNode array = JsonPaths.arrayAt(root, StageConfig.string(config, "path", "", where), op());
+        JsonPaths.Document doc = JsonPaths.arrayIn(input, StageConfig.string(config, "path", "", where), op());
+        ArrayNode array = doc.array();
         String by = StageConfig.string(config, "by", null, where);
         boolean desc = descending(config);
         List<JsonNode> items = new ArrayList<>();
@@ -45,7 +45,7 @@ final class JsonSortStage implements CompressionStage {
         items.sort((a, b) -> compare(JsonPaths.at(a, by), JsonPaths.at(b, by), desc));
         array.removeAll();
         items.forEach(array::add);
-        return new StageResult(JsonPaths.write(root),
+        return new StageResult(JsonPaths.write(doc.root()),
                 CompressionNumbers.fmt(items.size()) + " Einträge nach " + by + (desc ? " absteigend" : " aufsteigend"));
     }
 

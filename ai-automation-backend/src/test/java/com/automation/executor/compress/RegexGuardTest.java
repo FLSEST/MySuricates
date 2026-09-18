@@ -86,6 +86,17 @@ class RegexGuardTest {
         assertThat(out).startsWith("b").endsWith("a");
     }
 
+    /** validate() and apply() ask for the same pattern — it must be compiled once, not twice. */
+    @Test
+    void compile_reusesTheCompiledPattern() {
+        Pattern first = RegexGuard.compile("^ab+c$", 0, "Stufe test");
+
+        assertThat(RegexGuard.compile("^ab+c$", 0, "Stufe test")).isSameAs(first);
+        assertThat(RegexGuard.compile("^ab+c$", Pattern.CASE_INSENSITIVE, "Stufe test")).isNotSameAs(first);
+        assertThatThrownBy(() -> RegexGuard.compile("(unvollständig", 0, "Stufe test"))
+                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger regulärer Ausdruck");
+    }
+
     @Test
     void safeCut_movesBeforeSurrogatePair() {
         assertThat(RegexGuard.safeCut("x😀", 2)).isEqualTo(1);

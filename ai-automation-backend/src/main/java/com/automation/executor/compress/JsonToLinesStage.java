@@ -40,8 +40,7 @@ final class JsonToLinesStage implements CompressionStage {
 
     @Override
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
-        JsonNode root = JsonPaths.parse(input, op());
-        ArrayNode array = JsonPaths.arrayAt(root, StageConfig.string(config, "path", "", StageConfig.where(op())), op());
+        ArrayNode array = JsonPaths.arrayIn(input, StageConfig.string(config, "path", "", StageConfig.where(op())), op()).array();
         String template = template(config);
         List<String> lines = new ArrayList<>();
         for (JsonNode element : array) {
