@@ -351,7 +351,6 @@ Authentication uses the `X-API-Key` header and covers `/api/**` and `/actuator/*
 | Path | Purpose |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Status checks before login |
-| `/api/v1/system/integration-snippet` | Embeddable snippet |
 | `/actuator/health` | Docker healthcheck |
 | `/ws/**` | WebSocket handshake (the key is checked there as a query parameter) |
 | `/api/v1/webhook/trigger/**` | Public webhook entry point |

@@ -834,7 +834,6 @@ Response (DTO) → React Query Cache → UI-Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
-- `GET /api/v1/system/integration-snippet`
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)

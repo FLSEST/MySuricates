@@ -354,7 +354,6 @@ Ausgenommen sind:
 | Pfad | Zweck |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
-| `/api/v1/system/integration-snippet` | Einbettbares Snippet |
 | `/actuator/health` | Healthcheck fuer Docker |
 | `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprueft) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
