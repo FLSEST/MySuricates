@@ -32,6 +32,7 @@ public class AuditCenterService {
     private final TodoRepository todoRepository;
     private final AuditAcceptancePolicy acceptancePolicy;
     private final ApplicationEventPublisher eventPublisher;
+    private final ManagedTodoReconciler managedTodoReconciler;
 
     @Transactional(readOnly = true)
     public List<AuditSummary> listAudits(String projectId, String category, GateStatus gateStatus) {
@@ -123,7 +124,7 @@ public class AuditCenterService {
         }
         if (dispositionNote != null) finding.setDispositionNote(dispositionNote);
         finding = findingRepository.save(finding);
-        reconcileManagedTodoLinks(findingTodoRepository.findByFindingId(id));
+        managedTodoReconciler.reconcileFinding(id);
         return toFinding(finding, todoLinks(List.of(id)).getOrDefault(id, List.of()));
     }
 
@@ -164,7 +165,20 @@ public class AuditCenterService {
     public AuditFindingResponse unlinkTodo(String findingId, String todoId) {
         AuditFinding finding = requireFinding(findingId);
         findingTodoRepository.findByFindingIdAndTodoId(findingId, todoId).ifPresent(findingTodoRepository::delete);
+        clearAuditReference(findingId, todoId);
         return toFinding(finding, todoLinks(List.of(findingId)).getOrDefault(findingId, List.of()));
+    }
+
+    /** Sonst zeigt {@code todo.referenceId} (Deep-Link {@code /reports?finding=…}) auf ein Finding, das nicht mehr verknuepft ist. */
+    private void clearAuditReference(String findingId, String todoId) {
+        todoRepository.findById(todoId).ifPresent(todo -> {
+            if (AuditIngestionService.REFERENCE_TYPE.equals(todo.getReferenceType())
+                    && findingId.equals(todo.getReferenceId())) {
+                todo.setReferenceType(null);
+                todo.setReferenceId(null);
+                todoRepository.save(todo);
+            }
+        });
     }
 
     @Transactional
@@ -225,19 +239,6 @@ public class AuditCenterService {
 
     private AuditFinding requireFinding(String id) {
         return findingRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("AuditFinding", id));
-    }
-
-    private void reconcileManagedTodoLinks(List<AuditFindingTodo> links) {
-        for (AuditFindingTodo link : links) {
-            if (!link.isManaged()) continue;
-            Todo todo = todoRepository.findById(link.getTodoId()).orElse(null);
-            if (todo == null) continue;
-            boolean allTerminal = findingTodoRepository.findByTodoId(todo.getId()).stream()
-                    .map(l -> findingRepository.findById(l.getFindingId()).orElse(null)).filter(Objects::nonNull)
-                    .allMatch(f -> f.getStatus().isTerminal());
-            todo.setStatus(allTerminal ? Todo.Status.DONE : Todo.Status.OPEN);
-            todoRepository.save(todo);
-        }
     }
 
     private static String managedTodoDescription(AuditFinding finding) {

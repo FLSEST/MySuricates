@@ -5,6 +5,7 @@ import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.*;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.audit.AuditResultParser.ParseResult;
 import com.automation.service.audit.AuditResultParser.ParsedFinding;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,8 @@ public class AuditIngestionService {
     private final TodoRepository todoRepository;
     private final AuditResultParser parser;
     private final AuditAcceptancePolicy acceptancePolicy;
+    private final AuditRuleKeyCatalog ruleKeyCatalog;
+    private final ActivityLogService activityLog;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -87,17 +90,19 @@ public class AuditIngestionService {
     private void ingestSnapshot(WorkflowRunCompletedEvent event, AuditReport report, List<ParsedFinding> parsedFindings) {
         Instant observedAt = report.getGeneratedAt();
         Set<String> seenFingerprints = new HashSet<>();
+        Set<String> reportedRuleKeys = new HashSet<>();
         List<AuditFinding> touched = new ArrayList<>();
 
         for (ParsedFinding item : parsedFindings) {
-            String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), item.ruleKey(), item.subject());
+            String ruleKey = resolveRuleKey(event, report, item, reportedRuleKeys);
+            String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
             if (!seenFingerprints.add(fingerprint)) continue;
 
             AuditFinding finding = findingRepository
                     .findByProjectIdAndAuditKeyAndFingerprint(event.getProjectId(), report.getAuditKey(), fingerprint)
                     .orElseGet(() -> AuditFinding.builder()
                             .projectId(event.getProjectId()).auditKey(report.getAuditKey()).fingerprint(fingerprint)
-                            .ruleKey(item.ruleKey()).subject(item.subject()).status(AuditFindingStatus.OPEN)
+                            .ruleKey(ruleKey).subject(item.subject()).status(AuditFindingStatus.OPEN)
                             .firstSeenReportId(report.getId()).firstSeenRunId(event.getRunId()).firstSeenAt(observedAt)
                             .occurrenceCount(0).build());
 
@@ -154,6 +159,25 @@ public class AuditIngestionService {
             }
         }
         reconcileManagedTodos(touched);
+    }
+
+    /**
+     * Haelt die Regel-Identitaet stabil: ein gedrifteter {@code ruleKey} wird auf den Katalogeintrag
+     * normalisiert, ein unbekannter bleibt stehen (kein Datenverlust) und wird einmal je Run und Key
+     * im Activity-Log gemeldet — sonst faellt die Drift erst an den Wiedergaenger-Findings auf
+     * (Audit-TODO 8fc9a401).
+     */
+    private String resolveRuleKey(WorkflowRunCompletedEvent event, AuditReport report, ParsedFinding item,
+                                  Set<String> reportedRuleKeys) {
+        AuditRuleKeyCatalog.Resolution resolution = ruleKeyCatalog.resolve(report.getAuditKey(), item.ruleKey());
+        if (resolution.unknown() && reportedRuleKeys.add(item.ruleKey())) {
+            String message = "Audit '" + report.getAuditKey() + "': unbekannter ruleKey '" + item.ruleKey()
+                    + "' — erlaubt sind " + ruleKeyCatalog.allowedKeys(report.getAuditKey())
+                    + ". Das Finding wurde uebernommen, bekommt aber eine eigene Identitaet.";
+            log.warn("{} (run {})", message, event.getRunId());
+            activityLog.warn(ActivityLog.LogCategory.EXECUTION, message, "AuditIngestionService", event.getRunId());
+        }
+        return resolution.ruleKey();
     }
 
     private Todo ensureManagedTodo(AuditFinding finding, AuditReport report) {

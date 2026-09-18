@@ -15,6 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,6 +33,9 @@ import static com.automation.service.todo.AutoTodoService.TAG_AUTO_WORKFLOW;
 @RequiredArgsConstructor
 @Slf4j
 public class GranularTodoService {
+
+    /** So lang muss ein abgeschnittener Titel mindestens sein, um als Fragment zu zaehlen. */
+    private static final int PREFIX_MIN_LENGTH = 20;
 
     private final TodoRepository todoRepository;
     private final TodoSimilarityService similarityService;
@@ -83,7 +87,85 @@ public class GranularTodoService {
             items.add(new Item(title, parsePriority(map.get("priority")), TodoMapper.listToJson(tags),
                     textBuilder.buildGranularDescription(description, event)));
         }
-        return items;
+        return deduplicate(items);
+    }
+
+    /**
+     * Ein Befund, zwei Zeilen: Wrapper-Bloecke (Komprimierung, Weiterreichen einer Ausgabe) kuerzen
+     * oder verstellen Titel, wodurch dieselbe Zeile ein zweites TODO erzeugte (TODO 8d02ed3f).
+     * Verglichen wird der normalisierte Titel; von zwei Dubletten gewinnt der laengere, weil der
+     * kuerzere in aller Regel der abgeschnittene ist.
+     */
+    private static List<Item> deduplicate(List<Item> items) {
+        List<Item> kept = new ArrayList<>();
+        for (Item candidate : items) {
+            String normalized = normalizeTitle(candidate.title());
+            int existing = indexOfDuplicate(kept, candidate);
+            if (existing < 0) {
+                kept.add(candidate);
+            } else if (normalizeTitle(kept.get(existing).title()).length() < normalized.length()) {
+                log.info("Auto-todo (granular): '{}' ist die gekuerzte Fassung von '{}' — nur die laengere zaehlt",
+                        kept.get(existing).title(), candidate.title());
+                kept.set(existing, candidate);
+            } else {
+                log.info("Auto-todo (granular): '{}' ist eine Dublette von '{}' — uebersprungen",
+                        candidate.title(), kept.get(existing).title());
+            }
+        }
+        return kept;
+    }
+
+    private static int indexOfDuplicate(List<Item> kept, Item candidate) {
+        for (int i = 0; i < kept.size(); i++) {
+            if (isDuplicate(kept.get(i), candidate)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Gleicher normalisierter Titel — oder der kuerzere ist nachweislich die abgeschnittene Fassung
+     * des laengeren. Nachweislich heisst: er endet auf „…"/„..." <em>und</em> ist mindestens
+     * {@link #PREFIX_MIN_LENGTH} Zeichen lang.
+     *
+     * <p>Beide Bedingungen schuetzen einen eigenstaendigen Befund davor, verworfen zu werden — die
+     * Regel loescht eine ganze Zeile samt Prioritaet, Tags und Beschreibung. „Fehler in Modul A
+     * beheben" ist ein Praefix von „Fehler in Modul A beheben, Teil 2", aber eben kein Fragment,
+     * sondern eine eigene Aufgabe; ohne das Kuerzungszeichen bleiben beide stehen. Und ein Titel,
+     * der schon nach wenigen Zeichen abbricht, taugt auch als Fragment nicht als Beweis.
+     */
+    private static boolean isDuplicate(Item a, Item b) {
+        String normalizedA = normalizeTitle(a.title());
+        String normalizedB = normalizeTitle(b.title());
+        if (normalizedA.equals(normalizedB)) {
+            return true;
+        }
+        boolean aIsShorter = normalizedA.length() <= normalizedB.length();
+        Item shorter = aIsShorter ? a : b;
+        String shorterTitle = aIsShorter ? normalizedA : normalizedB;
+        String longerTitle = aIsShorter ? normalizedB : normalizedA;
+        return wasTruncated(shorter.title())
+                && shorterTitle.length() >= PREFIX_MIN_LENGTH
+                && longerTitle.startsWith(shorterTitle);
+    }
+
+    /** Hat der Titel ein Kuerzungszeichen, ist er ein Fragment und keine eigene Aufgabe. */
+    private static boolean wasTruncated(String title) {
+        String trimmed = title == null ? "" : title.trim();
+        return trimmed.endsWith("…") || trimmed.endsWith("...");
+    }
+
+    /** Trim, Whitespace-Folgen zu einem Leerzeichen, Kleinschreibung, Kuerzungssuffix („…", „...") weg. */
+    static String normalizeTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        String normalized = title.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        while (normalized.endsWith("…") || normalized.endsWith("...")) {
+            normalized = normalized.substring(0, normalized.length() - (normalized.endsWith("…") ? 1 : 3)).trim();
+        }
+        return normalized;
     }
 
     private static Todo.Priority parsePriority(Object raw) {
