@@ -9,7 +9,7 @@ import { DASHBOARD_FIXTURE, setupDashboardPageTests, slot, widgetOrder } from '.
 import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../../stores/dashboardSyncStore';
 import { useToastStore } from '../../stores/toastStore';
-import { DASHBOARD_WIDGET_IDS } from '../../components/dashboard/widgetRegistry';
+import { DEFAULT_WIDGET_IDS } from '../../components/dashboard/widgetRegistry';
 import { Dashboard } from '../Dashboard';
 
 setupDashboardPageTests();
@@ -30,7 +30,7 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
   it('renders all registered widgets in registry order by default', async () => {
     await renderDashboard();
 
-    expect(widgetOrder()).toEqual([...DASHBOARD_WIDGET_IDS]);
+    expect(widgetOrder()).toEqual([...DEFAULT_WIDGET_IDS]);
     // Widgets without data render nothing, their slot collapses via CSS (empty:hidden).
     expect(slot('provider-stats')).toBeEmptyDOMElement();
     expect(slot('model-stats')).toBeEmptyDOMElement();
@@ -47,13 +47,13 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
       .toContainEqual({ instanceId: 'recent-runs', type: 'recent-runs', hidden: true });
 
     fireEvent.click(screen.getByRole('button', { name: 'Show: Recent Runs' }));
-    expect(widgetOrder()).toEqual([...DASHBOARD_WIDGET_IDS]);
+    expect(widgetOrder()).toEqual([...DEFAULT_WIDGET_IDS]);
     expect(screen.queryByRole('button', { name: 'Show: Recent Runs' })).not.toBeInTheDocument();
 
     // Leaving edit mode keeps the layout and removes the edit controls.
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(screen.queryByRole('button', { name: /^Hide:/ })).not.toBeInTheDocument();
-    expect(widgetOrder()).toEqual([...DASHBOARD_WIDGET_IDS]);
+    expect(widgetOrder()).toEqual([...DEFAULT_WIDGET_IDS]);
   });
 
   it('keeps a stored custom order, skips unknown widgets and appends new ones', async () => {
@@ -71,7 +71,7 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
     await renderDashboard();
 
-    const expected = ['quick-actions', ...DASHBOARD_WIDGET_IDS.filter((id) => id !== 'quick-actions' && id !== 'stat-version')];
+    const expected = ['quick-actions', ...DEFAULT_WIDGET_IDS.filter((id) => id !== 'quick-actions' && id !== 'stat-version')];
     expect(widgetOrder()).toEqual(expected);
   });
 
@@ -88,7 +88,7 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
 
-    expect(widgetOrder()).toEqual([...DASHBOARD_WIDGET_IDS]);
+    expect(widgetOrder()).toEqual([...DEFAULT_WIDGET_IDS]);
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
   });
 
@@ -143,7 +143,7 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
 
     await renderDashboard();
 
-    const expected = ['quick-actions', ...DASHBOARD_WIDGET_IDS.filter((id) => id !== 'quick-actions' && id !== 'stat-version')];
+    const expected = ['quick-actions', ...DEFAULT_WIDGET_IDS.filter((id) => id !== 'quick-actions' && id !== 'stat-version')];
     expect(widgetOrder()).toEqual(expected);
   });
 

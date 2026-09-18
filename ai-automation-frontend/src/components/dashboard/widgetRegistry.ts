@@ -1,7 +1,5 @@
-import type { ComponentType } from 'react';
-import type { TranslationKeys } from '../../i18n/en';
-import type { ModuleName } from '../../types';
-import type { WidgetConfig, WidgetSize } from './dashboardLayout';
+import type { WidgetSize } from './dashboardLayout';
+import { describedBy, type DashboardWidgetDef } from './widgetDefinition';
 import {
   ActiveProjectsStat, TotalWorkflowsStat, RunsTodayStat, SuccessRateStat, TotalCostStat,
   PlannedTodayStat, PlannedThisWeekStat, BuildInfoStat,
@@ -16,53 +14,92 @@ import { TodosWidget } from './TodosWidget';
 import { RecentRunsCard } from './RecentRunsCard';
 import { QuickActionsCard } from './QuickActionsCard';
 
-/** Props every widget component receives. Singletons can ignore them. */
-export interface WidgetProps {
-  instanceId: string;
-  /** Validated plain values; the widget checks the keys it needs itself. */
-  config: WidgetConfig;
-}
+export type { DashboardWidgetDef, WidgetProps } from './widgetDefinition';
 
-export interface DashboardWidgetDef {
-  /** Stable id — persisted in users' layouts as instance type, never rename. */
-  id: string;
-  /** Unique label for the edit mode (hidden list, drag handles). */
-  label: (t: TranslationKeys) => string;
-  size: WidgetSize;
-  /** Hidden entirely when the backend reports the module disabled. */
-  module?: ModuleName;
-  /** Can be added several times with its own config; never added automatically, can also be removed (not only hidden). */
-  multiple?: boolean;
-  /**
-   * Loads its own data. May render nothing (e.g. no data yet) — the grid then collapses its slot.
-   */
-  component: ComponentType<WidgetProps>;
-}
-
-/** Registry order is the default layout; new widgets are appended to customized layouts. */
+/** Registry order is the default layout; new standard singletons would be appended to customized layouts. */
 export const DASHBOARD_WIDGETS: readonly DashboardWidgetDef[] = [
-  { id: 'stat-active-projects', label: (t) => t.dashboard.activeProjects, size: 'stat', component: ActiveProjectsStat },
-  { id: 'stat-total-workflows', label: (t) => t.dashboard.totalWorkflows, size: 'stat', component: TotalWorkflowsStat },
-  { id: 'stat-runs-today', label: (t) => t.dashboard.runsToday, size: 'stat', component: RunsTodayStat },
-  { id: 'stat-success-rate', label: (t) => t.dashboard.successRate, size: 'stat', component: SuccessRateStat },
-  { id: 'stat-total-cost', label: (t) => t.dashboard.totalCost, size: 'stat', component: TotalCostStat },
-  { id: 'stat-planned-today', label: (t) => t.dashboard.plannedToday, size: 'stat', component: PlannedTodayStat },
-  { id: 'stat-planned-week', label: (t) => t.dashboard.plannedThisWeek, size: 'stat', component: PlannedThisWeekStat },
-  { id: 'stat-version', label: (t) => t.dashboard.version, size: 'stat', component: BuildInfoStat },
-  { id: 'chart-runs', label: (t) => t.charts.runsOverTime, size: 'chart', component: RunsChartWidget },
-  { id: 'chart-success-rate', label: (t) => t.dashboard.successRateChart, size: 'chart', component: SuccessRateChartWidget },
-  { id: 'chart-todos', label: (t) => t.dashboard.todoStatusChart, size: 'chart', component: TodosDonutChart },
-  { id: 'upcoming-schedules', label: (t) => t.dashboard.upcomingSchedules, size: 'chart', component: UpcomingSchedulesCard },
-  { id: 'failing-workflows', label: (t) => t.dashboard.failingWorkflows, size: 'chart', component: FailingWorkflowsWidget },
-  { id: 'provider-stats', label: (t) => t.charts.providerStats, size: 'third', component: ProviderStatsWidget },
-  { id: 'integration-stats', label: (t) => t.charts.integrationStats, size: 'third', module: 'integrations', component: IntegrationStatsWidget },
-  { id: 'model-stats', label: (t) => t.charts.modelStats, size: 'third', component: ModelStatsWidget },
-  { id: 'todos', label: (t) => t.dashboard.openTodos, size: 'full', component: TodosWidget },
-  { id: 'recent-runs', label: (t) => t.dashboard.recentRuns, size: 'twoThirds', component: RecentRunsCard },
-  { id: 'quick-actions', label: (t) => t.dashboard.quickActions, size: 'third', component: QuickActionsCard },
+  {
+    id: 'stat-active-projects', category: 'overview', size: 'stat', component: ActiveProjectsStat,
+    label: (t) => t.dashboard.activeProjects, description: describedBy('statActiveProjects'),
+  },
+  {
+    id: 'stat-total-workflows', category: 'overview', size: 'stat', component: TotalWorkflowsStat,
+    label: (t) => t.dashboard.totalWorkflows, description: describedBy('statTotalWorkflows'),
+  },
+  {
+    id: 'stat-runs-today', category: 'runs', size: 'stat', component: RunsTodayStat,
+    label: (t) => t.dashboard.runsToday, description: describedBy('statRunsToday'),
+  },
+  {
+    id: 'stat-success-rate', category: 'quality', size: 'stat', component: SuccessRateStat,
+    label: (t) => t.dashboard.successRate, description: describedBy('statSuccessRate'),
+  },
+  {
+    id: 'stat-total-cost', category: 'costs', size: 'stat', component: TotalCostStat,
+    label: (t) => t.dashboard.totalCost, description: describedBy('statTotalCost'),
+  },
+  {
+    id: 'stat-planned-today', category: 'planning', size: 'stat', component: PlannedTodayStat,
+    label: (t) => t.dashboard.plannedToday, description: describedBy('statPlannedToday'),
+  },
+  {
+    id: 'stat-planned-week', category: 'planning', size: 'stat', component: PlannedThisWeekStat,
+    label: (t) => t.dashboard.plannedThisWeek, description: describedBy('statPlannedWeek'),
+  },
+  {
+    id: 'stat-version', category: 'overview', size: 'stat', component: BuildInfoStat,
+    label: (t) => t.dashboard.version, description: describedBy('statVersion'),
+  },
+  {
+    id: 'chart-runs', category: 'runs', size: 'chart', component: RunsChartWidget,
+    label: (t) => t.charts.runsOverTime, description: describedBy('chartRuns'),
+  },
+  {
+    id: 'chart-success-rate', category: 'quality', size: 'chart', component: SuccessRateChartWidget,
+    label: (t) => t.dashboard.successRateChart, description: describedBy('chartSuccessRate'),
+  },
+  {
+    id: 'chart-todos', category: 'planning', size: 'chart', component: TodosDonutChart,
+    label: (t) => t.dashboard.todoStatusChart, description: describedBy('chartTodos'),
+  },
+  {
+    id: 'upcoming-schedules', category: 'planning', size: 'chart', component: UpcomingSchedulesCard,
+    label: (t) => t.dashboard.upcomingSchedules, description: describedBy('upcomingSchedules'),
+  },
+  {
+    id: 'failing-workflows', category: 'quality', size: 'chart', component: FailingWorkflowsWidget,
+    label: (t) => t.dashboard.failingWorkflows, description: describedBy('failingWorkflows'),
+  },
+  {
+    id: 'provider-stats', category: 'costs', size: 'third', component: ProviderStatsWidget,
+    label: (t) => t.charts.providerStats, description: describedBy('providerStats'),
+  },
+  {
+    id: 'integration-stats', category: 'runs', size: 'third', module: 'integrations', component: IntegrationStatsWidget,
+    label: (t) => t.charts.integrationStats, description: describedBy('integrationStats'),
+  },
+  {
+    id: 'model-stats', category: 'costs', size: 'third', component: ModelStatsWidget,
+    label: (t) => t.charts.modelStats, description: describedBy('modelStats'),
+  },
+  {
+    id: 'todos', category: 'planning', size: 'full', component: TodosWidget,
+    label: (t) => t.dashboard.openTodos, description: describedBy('todos'),
+  },
+  {
+    id: 'recent-runs', category: 'runs', size: 'twoThirds', component: RecentRunsCard,
+    label: (t) => t.dashboard.recentRuns, description: describedBy('recentRuns'),
+  },
+  {
+    id: 'quick-actions', category: 'overview', size: 'third', component: QuickActionsCard,
+    label: (t) => t.dashboard.quickActions, description: describedBy('quickActions'),
+  },
 ];
 
 export const DASHBOARD_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.map((w) => w.id);
+
+/** Standard singletons: what an empty view shows, in this order. */
+export const DEFAULT_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.filter((w) => !w.multiple && !w.catalogOnly).map((w) => w.id);
 
 /**
  * Flex-basis per size (minus the 1rem gap, flex-grow fills the rest). Mirrors the former
