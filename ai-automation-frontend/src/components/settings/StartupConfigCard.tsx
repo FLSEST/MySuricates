@@ -6,7 +6,9 @@ import { useT } from '../../i18n';
 import { useModuleName } from '../../i18n/modules';
 import type { ModuleInfo } from '../../types';
 
-const SETUP_COMMAND = './scripts/setup.sh --preset <core|research|full>';
+// --force, weil auf einer laufenden Instanz config/application.yml immer schon existiert: ohne
+// das Flag schreibt setup.sh dort nichts (729ceb19).
+const SETUP_COMMAND = './scripts/setup.sh --preset <core|research|full> --force';
 
 /**
  * Read-only summary of the startup configuration (GET /api/v1/system/capabilities): module

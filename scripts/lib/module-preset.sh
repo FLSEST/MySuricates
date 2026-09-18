@@ -138,6 +138,90 @@ module_preset_write() {
   } > "$file"
 }
 
+# Replaces *only* the `preset:` line of an existing config — setup.sh --preset … --force.
+# Everything else (comments, order, other values, indentation, the trailing comment of the
+# preset line itself) stays byte-identical; nothing is regenerated.
+#
+# $1 = file, $2 = preset. Returns 0 on success, 2 = unknown preset, 4 = file does not exist
+# (that is module_preset_write's job), 5 = the place is not unambiguous — the file is then left
+# untouched and a reason goes to stderr. Deliberately no YAML parser: the awk below tracks the
+# key path by indentation and refuses to guess whenever the file is not plain `key: value` YAML.
+module_preset_update() {
+  local file="$1" preset="$2" tmp rc
+  module_preset_valid "$preset" || return 2
+  [ -f "$file" ] || return 4
+  tmp="$(mktemp)" || return 1
+  awk -v preset="$preset" '
+    function fail(msg) { print "module_preset_update: " msg > "/dev/stderr"; failed = 1; exit 1 }
+    { lines[NR] = $0 }
+    END {
+      if (failed) exit 1
+      n = NR
+      depth = 0
+      targets = 0; target = 0
+      autom = 0; autom_n = 0; autom_ind = -1; autom_child = -1; autom_scalar = 0
+      mods = 0; mods_n = 0; mods_ind = -1; mods_child = -1; mods_scalar = 0
+      for (i = 1; i <= n; i++) {
+        line = lines[i]
+        if (line ~ /^[ \t]*($|#)/) continue
+        if (line ~ /\t/) fail("Tabulatoren in " FILENAME " — Preset-Zeile bitte von Hand aendern")
+        if (line !~ /^ *[A-Za-z0-9_.-]+:([ ]|$)/) continue   # Listen, Blockskalare: ignorieren
+        ind = match(line, /[^ ]/) - 1
+        key = line; sub(/^ */, "", key); sub(/:.*$/, "", key)
+        value = line; sub(/^ *[A-Za-z0-9_.-]+:[ ]*/, "", value); sub(/[ ]*#.*$/, "", value)
+        while (depth > 0 && stack_ind[depth] >= ind) depth--
+        path = ""
+        for (d = 1; d <= depth; d++) path = path stack_key[d] "."
+        parent = path; sub(/\.$/, "", parent)
+        path = path key
+        depth++; stack_ind[depth] = ind; stack_key[depth] = key
+        if (path == "automation") {
+          autom_n++; autom = i; autom_ind = ind; autom_scalar = (value != "")
+        } else if (path == "automation.modules") {
+          mods_n++; mods = i; mods_ind = ind; mods_scalar = (value != "")
+        } else if (path == "automation.modules.preset") {
+          targets++; target = i
+        }
+        if (parent == "automation" && autom_child < 0) autom_child = ind
+        if (parent == "automation.modules" && mods_child < 0) mods_child = ind
+      }
+      if (targets > 1) fail("mehrere automation.modules.preset-Zeilen — bitte von Hand aendern")
+      if (autom_n > 1) fail("mehrere automation:-Bloecke — bitte von Hand aendern")
+      if (mods_n > 1) fail("mehrere automation.modules:-Bloecke — bitte von Hand aendern")
+      if (autom_scalar || mods_scalar) fail("automation(.modules) ist kein Block — bitte von Hand aendern")
+
+      if (targets == 1) {
+        line = lines[target]
+        match(line, /^ *(automation\.modules\.)?preset:[ ]*/)
+        head = substr(line, 1, RLENGTH)
+        rest = substr(line, RLENGTH + 1)
+        sub(/^[^ #]+/, "", rest)            # nur den alten Wert ersetzen, Kommentar bleibt
+        lines[target] = head preset rest
+      } else if (mods_n == 1) {
+        ind = (mods_child >= 0) ? mods_child : mods_ind + 2
+        insert_at = mods; insert_text = sprintf("%*s%s", ind, "", "preset: " preset)
+      } else if (autom_n == 1) {
+        ind = (autom_child >= 0) ? autom_child : autom_ind + 2
+        step = ind - autom_ind
+        insert_at = autom
+        insert_text = sprintf("%*s%s\n%*s%s", ind, "", "modules:", ind + step, "", "preset: " preset)
+      } else {
+        append_text = "automation:\n  modules:\n    preset: " preset
+      }
+
+      for (i = 1; i <= n; i++) {
+        print lines[i]
+        if (i == insert_at && insert_at > 0) print insert_text
+      }
+      if (append_text != "") print append_text
+    }
+  ' "$file" > "$tmp"
+  rc=$?
+  if [ "$rc" -ne 0 ]; then rm -f "$tmp"; return 5; fi
+  cat "$tmp" > "$file" || { rm -f "$tmp"; return 1; }   # cat, nicht mv: Rechte/Inode bleiben
+  rm -f "$tmp"
+}
+
 # The handful of sentences around the module list. The module texts themselves are never
 # hard-coded here — they come from the generated file. $1 = language, $2 = message id.
 module_preset_msg() {

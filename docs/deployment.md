@@ -150,7 +150,11 @@ Zwei kommentierte Vorlagen für Module und Härtung liegen in `ai-automation-bac
 | [`application-minimal.yml`](../ai-automation-backend/config-examples/application-minimal.yml) | nur Kern (`core`) | aus | alles aus |
 | [`application-maximal.yml`](../ai-automation-backend/config-examples/application-maximal.yml) | alle (`full`) | an | alles an |
 
-Der öffentliche Default liegt dazwischen: `core`, Settings-Schalter aus, nur `provenance` an. Für Docker/Compose dieselben Werte als Umgebungsvariablen:
+Der öffentliche Default liegt dazwischen: `core`, Settings-Schalter aus, nur `provenance` an.
+
+Auf einer schon laufenden Instanz setzt `./scripts/setup.sh --preset <core|research|full> --force` das Preset um: `--force` ersetzt in der vorhandenen `config/application.yml` ausschließlich die Zeile `automation.modules.preset:` und lässt alles andere (Kommentare, Reihenfolge, einzelne Modul-Overrides) unverändert — wirksam nach einem Backend-Neustart. Ohne `--force` schreibt `setup.sh` in eine vorhandene Datei nichts. Lässt sich die Zeile nicht eindeutig einordnen (mehrere `automation:`-Blöcke), bricht das Skript mit einer Meldung ab, statt zu raten.
+
+Für Docker/Compose dieselben Werte als Umgebungsvariablen:
 
 ```bash
 # Minimal: platform core only, every option off

@@ -99,6 +99,75 @@ CFG_DEFAULT="$TMP/backend-default/config/application.yml"
 module_preset_write "$CFG_DEFAULT" core; RC=$?
 check "no lang argument keeps the German default"     'grep -q "^# Lokale Override-Config" "$CFG_DEFAULT"'
 
+echo "11) module_preset_update: nur die Preset-Zeile einer vorhandenen Datei (TODO 729ceb19)"
+UPD="$TMP/upd/config/application.yml"
+mkdir -p "$(dirname "$UPD")"
+write_existing() {  # $1 = target file
+  cat > "$1" <<'YAML'
+# Lokale Override-Config (nicht im Git).
+automation:
+  modules:
+    preset: core   # von Hand gesetzt
+    webhooks: true
+  hardening:
+    sealing: true
+logging:
+  level:
+    com.automation: DEBUG
+YAML
+}
+write_existing "$UPD"; cp "$UPD" "$TMP/upd.orig"
+module_preset_update "$UPD" full; RC=$?
+check "updates an existing file (rc=$RC)"             '[ "$RC" -eq 0 ]'
+check "the preset line now names the new preset"      'grep -q "^    preset: full" "$UPD"'
+check "keeps the trailing comment of that line"       'grep -q "^    preset: full   # von Hand gesetzt$" "$UPD"'
+check "everything else is byte-identical"             'diff <(sed "s/^    preset: core   /    preset: full   /" "$TMP/upd.orig") "$UPD" >/dev/null'
+check "no config header is prepended"                 '[ "$(grep -c "^# Lokale Override-Config" "$UPD")" -eq 1 ]'
+
+echo "12) module_preset_update: fehlende Preset-Zeile wird ergaenzt"
+ADD1="$TMP/add1/config/application.yml"; mkdir -p "$(dirname "$ADD1")"
+printf 'automation:\n  modules:\n    webhooks: true\n  hardening:\n    sealing: true\n' > "$ADD1"
+module_preset_update "$ADD1" research; RC=$?
+check "adds the line under automation.modules (rc=$RC)" '[ "$RC" -eq 0 ] && grep -q "^    preset: research$" "$ADD1"'
+check "keeps the other module values"                  'grep -q "^    webhooks: true$" "$ADD1" && grep -q "^    sealing: true$" "$ADD1"'
+
+ADD2="$TMP/add2/config/application.yml"; mkdir -p "$(dirname "$ADD2")"
+printf 'automation:\n  host-claude:\n    timeout-seconds: 600\n' > "$ADD2"
+module_preset_update "$ADD2" core; RC=$?
+check "adds modules: under an existing automation: (rc=$RC)" '[ "$RC" -eq 0 ] && grep -q "^  modules:$" "$ADD2" && grep -q "^    preset: core$" "$ADD2"'
+check "keeps the existing automation values"                 'grep -q "^    timeout-seconds: 600$" "$ADD2"'
+
+ADD3="$TMP/add3/config/application.yml"; mkdir -p "$(dirname "$ADD3")"
+printf 'logging:\n  level:\n    root: INFO\n' > "$ADD3"
+module_preset_update "$ADD3" full; RC=$?
+check "appends a whole automation block (rc=$RC)"      '[ "$RC" -eq 0 ] && grep -q "^automation:$" "$ADD3" && grep -q "^    preset: full$" "$ADD3"'
+check "keeps the unrelated top-level keys"             'grep -q "^logging:$" "$ADD3" && grep -q "^    root: INFO$" "$ADD3"'
+
+echo "13) module_preset_update: Abbruch statt Raten"
+DUP="$TMP/dup.yml"
+printf 'automation:\n  modules:\n    preset: core\nautomation:\n  modules:\n    preset: full\n' > "$DUP"
+cp "$DUP" "$TMP/dup.orig"
+module_preset_update "$DUP" research 2>/dev/null; RC=$?
+check "two preset lines abort (rc=$RC, nothing written)" '[ "$RC" -eq 5 ] && diff "$TMP/dup.orig" "$DUP" >/dev/null'
+SCALAR="$TMP/scalar.yml"
+printf 'automation:\n  modules: core\n' > "$SCALAR"; cp "$SCALAR" "$TMP/scalar.orig"
+module_preset_update "$SCALAR" full 2>/dev/null; RC=$?
+check "a scalar automation.modules aborts (rc=$RC)"     '[ "$RC" -eq 5 ] && diff "$TMP/scalar.orig" "$SCALAR" >/dev/null'
+module_preset_update "$TMP/missing.yml" core 2>/dev/null; RC=$?
+check "a missing file returns 4 and writes nothing"     '[ "$RC" -eq 4 ] && [ ! -e "$TMP/missing.yml" ]'
+BAD="$TMP/bad.yml"; printf 'automation:\n  modules:\n    preset: core\n' > "$BAD"; cp "$BAD" "$TMP/bad.orig"
+module_preset_update "$BAD" nope 2>/dev/null; RC=$?
+check "a bad preset returns 2 and writes nothing"       '[ "$RC" -eq 2 ] && diff "$TMP/bad.orig" "$BAD" >/dev/null'
+
+echo "14) setup.sh --force"
+FORCED="$TMP/forced/config/application.yml"; mkdir -p "$(dirname "$FORCED")"
+write_existing "$FORCED"; cp "$FORCED" "$TMP/forced.orig"
+check "--help documents --force"                       'bash "$SETUP" --help | grep -q -- "--force"'
+check "--force without --preset exits 2 and says why"  'out="$(bash "$SETUP" --force 2>&1 >/dev/null)"; [ $? -eq 2 ] && [[ "$out" == *"--preset"* ]]'
+# Ohne Flag bleibt es beim alten Verhalten: module_preset_write fasst die Datei nicht an.
+module_preset_write "$FORCED" full; RC=$?
+check "without the flag the file is untouched (rc=$RC)" '[ "$RC" -eq 3 ] && diff "$TMP/forced.orig" "$FORCED" >/dev/null'
+
 echo
 echo "passed: $PASS, failed: $FAIL"
 [ "$FAIL" -eq 0 ]
