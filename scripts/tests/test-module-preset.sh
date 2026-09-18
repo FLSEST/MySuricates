@@ -44,7 +44,43 @@ check "garbage → default"   '[ "$(module_preset_prompt core <<<"x" 2>/dev/null
 echo "6) setup.sh argument handling"
 SETUP="$HERE/../setup.sh"
 check "--help documents --preset"                     'bash "$SETUP" --help | grep -q -- "--preset core"'
+check "--help documents --lang"                       'bash "$SETUP" --help | grep -q -- "--lang de"'
 check "unknown preset exits 2 before any check"       'bash "$SETUP" --preset everything >/dev/null 2>&1; [ $? -eq 2 ]'
+
+echo "7) generated module catalog"
+GENERATED="$HERE/../lib/module-catalog.generated.sh"
+check "the generated file exists"                     '[ -f "$GENERATED" ]'
+check "the generated file parses (bash -n)"           'bash -n "$GENERATED"'
+check "says it is generated, not hand-written"        'grep -q "generiert von ModuleCatalogTextsTest" "$GENERATED"'
+check "keys = feature keys + hardening keys"          '[ "${#MODULE_CATALOG_KEYS[@]}" -eq $(( ${#MODULE_CATALOG_FEATURE_KEYS[@]} + ${#MODULE_CATALOG_HARDENING_KEYS[@]} )) ]'
+check "carries tier, risks and requires"              '[ "${MODULE_CATALOG_TIER[remote-access]}" = advanced ] && [ "${MODULE_CATALOG_RISKS[terminal]}" = host-access ] && [ "${MODULE_CATALOG_REQUIRES[sealing]}" = provenance ]'
+check "every key has a name in every language"        'for l in "${MODULE_CATALOG_LANGS[@]}"; do for k in "${MODULE_CATALOG_KEYS[@]}"; do [ -n "${MODULE_TEXT_NAME[$l:$k]:-}" ] && [ -n "${MODULE_TEXT_DESC[$l:$k]:-}" ] || exit 1; done; done'
+
+echo "8) language choice (--lang / \$LANG, fallback en)"
+check "--lang de wins"                                '[ "$(module_text_lang de)" = de ]'
+check "--lang en wins"                                '[ "$(module_text_lang en)" = en ]'
+check "unknown --lang falls back to en"               '[ "$(module_text_lang fr)" = en ]'
+check "no flag: LANG prefix decides"                  '[ "$(LANG=de_DE.UTF-8 module_text_lang)" = de ]'
+check "no flag: LANG=fr_FR falls back to en"          '[ "$(LANG=fr_FR module_text_lang)" = en ]'
+check "no flag and no LANG falls back to en"          '[ "$(LANG= LC_ALL= LC_MESSAGES= module_text_lang)" = en ]'
+check "LC_ALL beats LANG"                             '[ "$(LC_ALL=de_DE.UTF-8 LANG=fr_FR module_text_lang)" = de ]'
+check "unknown module key falls back to the key"      '[ "$(module_text_name nope de)" = nope ] && [ -z "$(module_text_desc nope de)" ]'
+
+echo "9) the preset prompt shows the module texts"
+# The menu goes to stderr, the chosen preset to stdout — capture stderr only. No pipe into
+# grep: with pipefail an early-exiting grep would SIGPIPE the writer and fail the check.
+menu() { module_preset_prompt core "${1:-}" <<<"" 2>&1 >/dev/null; }
+MENU_DE="$(menu de)"
+MENU_FALLBACK="$(LANG=fr_FR menu)"
+check "--lang de shows German names"                  '[[ "$MENU_DE" == *Fernzugriff* ]]'
+check "--lang de shows German descriptions"           '[[ "$MENU_DE" == *"über Tailscale"* ]]'
+check "--lang de lists the research modules"          '[[ "$MENU_DE" == *Workflow-Memory* ]]'
+check "--lang de speaks German around the list"       '[[ "$MENU_DE" == *"Welche Module"* ]]'
+check "no flag + LANG=fr_FR shows English"            '[[ "$MENU_FALLBACK" == *"Remote access"* ]]'
+check "no flag + LANG=fr_FR has no German text"       '[[ "$MENU_FALLBACK" != *Fernzugriff* ]]'
+check "no flag + LANG=fr_FR speaks English"           '[[ "$MENU_FALLBACK" == *"Which modules"* ]]'
+check "every feature module is offered exactly once"  '[ "$(printf "%s\n" "$MENU_DE" | grep -c "^ \{9\}[^ ].* — ")" -eq "${#MODULE_CATALOG_FEATURE_KEYS[@]}" ]'
+check "the language never changes the result"         '[ "$(LANG=fr_FR module_preset_prompt research <<<"" 2>/dev/null)" = research ]'
 
 echo
 echo "passed: $PASS, failed: $FAIL"
