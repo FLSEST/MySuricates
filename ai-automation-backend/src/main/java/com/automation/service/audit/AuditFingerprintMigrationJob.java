@@ -49,6 +49,7 @@ public class AuditFingerprintMigrationJob {
     private final AuditFindingTodoRepository findingTodoRepository;
     private final AuditFindingOccurrenceRepository occurrenceRepository;
     private final TodoRepository todoRepository;
+    private final ManagedTodoReconciler managedTodoReconciler;
     private final TransactionTemplate transactionTemplate;
     private final ModuleRegistry modules;
 
@@ -97,11 +98,15 @@ public class AuditFingerprintMigrationJob {
             groups.computeIfAbsent(newFingerprint(finding), key -> new ArrayList<>()).add(finding);
         }
         Map<String, AuditFinding> survivors = new LinkedHashMap<>();
+        List<AuditFinding> mergeTargets = new ArrayList<>();
         int merged = 0;
         for (Map.Entry<String, List<AuditFinding>> group : groups.entrySet()) {
             List<AuditFinding> sorted = new ArrayList<>(group.getValue());
             sorted.sort(OLDEST_FIRST);
             AuditFinding target = sorted.get(0);
+            if (sorted.size() > 1) {
+                mergeTargets.add(target);
+            }
             String targetSubject = target.getSubject();
             for (AuditFinding duplicate : sorted.subList(1, sorted.size())) {
                 // Das Loeschen ist nicht umkehrbar — beide Roh-Subjects bleiben im Log nachvollziehbar.
@@ -128,7 +133,22 @@ public class AuditFingerprintMigrationJob {
             }
         }
         findingRepository.flush();
+        closeManagedTodosOfTerminalTargets(mergeTargets);
         return new int[]{merged, rehashed};
+    }
+
+    /**
+     * Ist ein zusammengefuehrtes Ziel terminal (akzeptiertes Risiko, verworfen, aufgeloest), haengt
+     * das umgehaengte managed TODO der Dublette sonst dauerhaft offen im Fix-Loop: die
+     * Abwesenheits-Schleife von {@code AuditIngestionService} fasst terminale Findings nie wieder
+     * an. Dieselbe Regel wie beim Dispositionswechsel im Audit Center.
+     */
+    private void closeManagedTodosOfTerminalTargets(List<AuditFinding> mergeTargets) {
+        for (AuditFinding target : mergeTargets) {
+            if (ManagedTodoReconciler.isTerminal(target)) {
+                managedTodoReconciler.reconcileFinding(target.getId());
+            }
+        }
     }
 
     private void mergeInto(AuditFinding target, AuditFinding duplicate) {
@@ -178,7 +198,10 @@ public class AuditFingerprintMigrationJob {
             target.setStatus(AuditFindingStatus.OPEN);
             target.setResolvedAt(null);
         } else if (duplicate.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
+            // Wieder offen heisst: kein Behebungsdatum — sonst zeigt das Audit Center ein
+            // wartendes Finding mit resolvedAt an.
             target.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
+            target.setResolvedAt(null);
         }
     }
 

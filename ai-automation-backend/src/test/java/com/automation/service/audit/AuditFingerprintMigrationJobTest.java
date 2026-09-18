@@ -165,6 +165,89 @@ class AuditFingerprintMigrationJobTest {
         assertThat(merged.getLastSeenAt()).isEqualTo(T2);
         assertThat(findingTodoRepository.findByTodoId(todoId)).extracting(AuditFindingTodo::getFindingId)
                 .containsExactly(accepted.getId());
+        assertThat(todoRepository.findById(todoId)).get()
+                .as("das verwaltete TODO der Dublette haengt sonst dauerhaft offen im Fix-Loop")
+                .extracting(Todo::getStatus).isEqualTo(Todo.Status.DONE);
+    }
+
+    /**
+     * Gegenprobe zum Spiegelfall: erbt das Ziel die Akzeptanz des Wiedergaengers, muss auch dessen
+     * umgehaengtes managed TODO geschlossen werden — die Absence-Schleife von
+     * {@code AuditIngestionService} fasst terminale Findings nie wieder an.
+     */
+    @Test
+    void closesTheManagedTodoWhenTheMergedTargetInheritsATerminalDisposition() {
+        AuditFinding resolved = saveFinding("ContainerShellService", AuditFindingStatus.RESOLVED, 3, T0, T1, reportOld, "run-old");
+        AuditFinding acceptedTwin = saveFinding("ContainerShellService.execute", AuditFindingStatus.ACCEPTED_RISK, 1, T2, T2, reportNew, "run-new");
+        acceptedTwin.setDispositionNote("Bewusst so, Aufrufer sind validiert");
+        acceptedTwin.setDispositionAt(T2);
+        acceptedTwin.setResolvedAt(T2);
+        findingRepository.saveAndFlush(acceptedTwin);
+        String todoId = todoRepository.save(Todo.builder().title("Shell-Aufruf ohne Escaping")
+                .status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).projectId(projectId)
+                .source(Todo.Source.WORKFLOW).sourceAgent("audit-center")
+                .referenceType("audit_finding").referenceId(acceptedTwin.getId()).build()).getId();
+        findingTodoRepository.save(AuditFindingTodo.builder()
+                .findingId(acceptedTwin.getId()).todoId(todoId).managed(true).build());
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findById(resolved.getId()).orElseThrow().getStatus())
+                .isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(findingTodoRepository.findByTodoId(todoId)).extracting(AuditFindingTodo::getFindingId)
+                .as("der Link zeigt auf das zusammengefuehrte Ziel").containsExactly(resolved.getId());
+        assertThat(todoRepository.findById(todoId)).get()
+                .extracting(Todo::getStatus).isEqualTo(Todo.Status.DONE);
+        assertThat(todoRepository.findById(todoId)).get()
+                .as("Verweis auf das akzeptierte Finding bleibt erhalten")
+                .extracting(Todo::getReferenceId).isEqualTo(resolved.getId());
+    }
+
+    /**
+     * Ein nicht-terminales Ziel schliesst nichts: das managed TODO der Dublette bleibt offen und
+     * haengt am Ziel — sonst verschwaende der Merge einen echten Fix-Auftrag.
+     */
+    @Test
+    void keepsTheManagedTodoOpenWhenTheMergedTargetIsNotTerminal() {
+        AuditFinding older = saveFinding("ContainerShellService", AuditFindingStatus.RESOLVED, 3, T0, T1, reportOld, "run-old");
+        AuditFinding newer = saveFinding("ContainerShellService.execute", AuditFindingStatus.OPEN, 1, T2, T2, reportNew, "run-new");
+        String todoId = todoRepository.save(Todo.builder().title("Shell-Aufruf ohne Escaping")
+                .status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).projectId(projectId)
+                .source(Todo.Source.WORKFLOW).sourceAgent("audit-center")
+                .referenceType("audit_finding").referenceId(newer.getId()).build()).getId();
+        findingTodoRepository.save(AuditFindingTodo.builder()
+                .findingId(newer.getId()).todoId(todoId).managed(true).build());
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findById(older.getId()).orElseThrow().getStatus())
+                .isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(todoRepository.findById(todoId)).get()
+                .extracting(Todo::getStatus).isEqualTo(Todo.Status.OPEN);
+    }
+
+    /**
+     * Ein zur Wiedervorlage stehender Wiedergaenger zieht das aufgeloeste Ziel zurueck in
+     * {@code AWAITING_VERIFICATION} — dann darf kein Loesungszeitpunkt stehen bleiben, sonst zeigt
+     * das Audit Center ein offenes Finding mit Behebungsdatum.
+     */
+    @Test
+    void clearsResolvedAtWhenTheTargetFallsBackToAwaitingVerification() {
+        AuditFinding resolved = saveFinding("ContainerShellService", AuditFindingStatus.RESOLVED, 3, T0, T1, reportOld, "run-old");
+        AuditFinding twin = saveFinding("ContainerShellService.execute", AuditFindingStatus.AWAITING_VERIFICATION, 1, T2, T2, reportNew, "run-new");
+        assertThat(twin.getResolvedAt()).isNull();
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding merged = findingRepository.findById(resolved.getId()).orElseThrow();
+        assertThat(merged.getStatus()).isEqualTo(AuditFindingStatus.AWAITING_VERIFICATION);
+        assertThat(merged.getResolvedAt()).as("kein Behebungsdatum an einem wieder offenen Finding").isNull();
     }
 
     /**

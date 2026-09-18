@@ -49,7 +49,8 @@ class AuditFingerprintMigrationJobResilienceTest {
     void setUp() {
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         job = new AuditFingerprintMigrationJob(findingRepository, findingTodoRepository, occurrenceRepository,
-                todoRepository, new TransactionTemplate(transactionManager), modules);
+                todoRepository, new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
+                new TransactionTemplate(transactionManager), modules);
         when(modules.isEnabled(ModuleCatalog.AUDIT)).thenReturn(true);
     }
 
