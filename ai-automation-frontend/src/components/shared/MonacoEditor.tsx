@@ -76,7 +76,7 @@ export function MonacoEditor({
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       lineNumbers: 'on',
-      fontFamily: 'JetBrains Mono, Fira Code, monospace',
+      fontFamily: "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
       fontSize: 13,
       tabSize: 2,
       padding: { top: 12 },
