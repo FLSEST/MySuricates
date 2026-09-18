@@ -53,6 +53,48 @@ JSON envelope:
 Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
+## Fact Sheet Pattern: the shell measures, the AI interprets
+
+An audit workflow does **not** let the AI count for itself. A shell block in front of the
+report block measures deterministically and emits a fact sheet:
+
+```text
+## FAKTENBLATT
+FAKT files_over_300: 19
+FAKT backend_tests_failures: 0
+NICHT GEMESSEN: step_results_bytes (shell blocks must not read the SQLite database)
+TREFFER repository_in_loop: mapper/WishMapper.java:36 workflowRepository.find (loop from line 34)
+
+## PFLICHTFELDER
+PFLICHT-FAKTEN: database_bytes source_files_scanned transactional_slow_call_count
+```
+
+Rules:
+
+- `FAKT <name>: <value>` is a measurement, `NICHT GEMESSEN: <name> (<reason>)` a deliberate
+  gap, `TREFFER <name>: <file>:<line> …` a candidate with its location. An error path in the
+  measuring block always produces a NICHT GEMESSEN line — never a silent zero: "no cycles
+  found" and "cycle detection failed" must not look the same.
+- The report prompt carries the measuring rule "evaluate the fact sheet only; do not measure
+  or count anything yourself", names the responsible FAKT lines per dimension, and requires
+  every number in the report to cite its FAKT line. Raw logs are included only truncated
+  (last 80 lines per measuring block) — to classify a failure, not as counting material.
+- The gate block deterministically checks that the mandatory FAKT lines are present and
+  otherwise sets `gate_status: RED` with `gate_category: audit-invalid`. Without that check
+  an AI report could be green although the measuring block delivered nothing.
+- Fact sheet blocks read placeholders only as `set -- {{ block.<name>.output }}` and set
+  `"shell_escape_variables": true` (hygiene gate `TemplateHygieneGateTest`). They neither
+  call the REST API nor open the SQLite database.
+
+Converted audits in `workflow-pool/`:
+
+| Workflow | Measurement | Self-test |
+|---|---|---|
+| Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, lines, churn) | `scripts/tests/test-arch-metrics.sh` |
+| Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
+| Performance audit | block `facts` (actuator, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
+| Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
+
 ## Lifecycle
 
 - Failed runs, missing report blocks, and invalid envelopes are historized as
