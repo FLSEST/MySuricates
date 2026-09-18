@@ -165,6 +165,62 @@ OUT5=$(bash "$SCRIPT" 2>&1); RC5=$?
 echo "$OUT5"
 check "Diff-Skript laeuft gegen das echte Repo durch (exit 0 oder 1)" '[ "$RC5" -eq 0 ] || [ "$RC5" -eq 1 ]'
 
+echo "6) Regressions-Fixture: produces/consumes duerfen keinen Zusatz-Pfad erzeugen; @RequestMapping(method=...) wird erkannt"
+CTRL2="$TMP/controller2"
+mkdir -p "$CTRL2"
+
+# IMPORTANT-Fix (Review 2cbc00a7): @GetMapping(value=..., produces="text/markdown") und
+# @PostMapping(value=..., consumes=..., produces=...) duerfen NUR den value/path-Pfad liefern,
+# nicht jeden Anfuehrungszeichen-String in der Annotation (der urspruengliche Bug las
+# "text/markdown"/"application/xml"/"application/json" faelschlich als weitere Endpunkte).
+# MINOR-Fix: bare @RequestMapping(method = RequestMethod.X, path = "...") statt @XMapping
+# muss denselben Zweig in extract_controllers() durchlaufen wie @PutMapping("...").
+cat > "$CTRL2/MiscMappingController.java" <<'JAVA'
+package com.automation.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RequestMapping("/api/v1/misc")
+@RestController
+public class MiscMappingController {
+
+    @GetMapping(value = "/{id}/snippet", produces = "text/markdown")
+    public String snippet() { return ""; }
+
+    @PostMapping(value = "/{id}/import", consumes = "application/xml", produces = "application/json")
+    public String importData() { return ""; }
+
+    @RequestMapping(method = RequestMethod.PUT, path = "/{id}/status")
+    public String setStatus() { return ""; }
+}
+JAVA
+
+DOC_MISC="$TMP/api-referenz.misc.md"
+cat > "$DOC_MISC" <<'MD'
+## Misc
+
+### `GET /api/v1/misc/{id}/snippet`
+
+Snippet abrufen.
+
+### `POST /api/v1/misc/{id}/import`
+
+Daten importieren.
+
+### `PUT /api/v1/misc/{id}/status`
+
+Status setzen.
+MD
+
+OUT6=$(bash "$SCRIPT" "$CTRL2" "$DOC_MISC" "$DOC_MISC" 2>&1); RC6=$?
+check "Exit 0: produces/consumes + @RequestMapping(method=...) ergeben exakte Deckung" '[ "$RC6" -eq 0 ]'
+check "keine Ausgabe (kein Bogus-Endpunkt, kein NUR_IN_DOC fuer /status)" '[ -z "$OUT6" ]'
+check "kein 'text/markdown' als eigener Pfad extrahiert"   '! grep -qF "text/markdown" <<<"$OUT6"'
+check "kein 'application/xml' als eigener Pfad extrahiert" '! grep -qF "application/xml" <<<"$OUT6"'
+check "kein 'application/json' als eigener Pfad extrahiert" '! grep -qF "application/json" <<<"$OUT6"'
+check "@RequestMapping(method=PUT, path=...) korrekt erkannt (keine NUR_IN_DOC-Zeile fuer /status)" \
+  '! grep -qF "misc/{id}/status" <<<"$OUT6"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
