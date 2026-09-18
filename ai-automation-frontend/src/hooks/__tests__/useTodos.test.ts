@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http, HttpResponse } from 'msw';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
-import { useTodos, useTodoCount, useCreateTodo, useDeleteTodo, useResolveTodo } from '../useTodos';
+import { useTodos, useTodoCount, useCreateTodo, useDeleteTodo, useResolveTodo, useProjectActiveTodos } from '../useTodos';
+import { PROJECT_ACTIVE_TODOS_PREVIEW_SIZE, PROJECT_ACTIVE_TODOS_STALE_MS } from '../../components/todo/todoConstants';
+
+const BASE = '/api/v1';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -77,5 +81,47 @@ describe('useResolveTodo', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.workflowId).toBe('w1');
+  });
+});
+
+describe('useProjectActiveTodos', () => {
+  const emptyPage = { content: [], page: 0, size: PROJECT_ACTIVE_TODOS_PREVIEW_SIZE, totalElements: 0, totalPages: 0 };
+
+  it('asks for the cockpit preview page size and both active statuses', async () => {
+    let requested: URL | null = null;
+    server.use(http.get(`${BASE}/todos`, ({ request }) => {
+      requested = new URL(request.url);
+      return HttpResponse.json(emptyPage);
+    }));
+
+    const { result } = renderHook(() => useProjectActiveTodos('p1', true), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const url = requested as unknown as URL;
+    expect(url.searchParams.get('projectId')).toBe('p1');
+    expect(url.searchParams.getAll('status')).toEqual(['OPEN', 'IN_PROGRESS']);
+    expect(url.searchParams.get('size')).toBe(String(PROJECT_ACTIVE_TODOS_PREVIEW_SIZE));
+  });
+
+  it('does not refetch while the preview is still fresh (staleTime)', async () => {
+    let calls = 0;
+    server.use(http.get(`${BASE}/todos`, () => {
+      calls += 1;
+      return HttpResponse.json(emptyPage);
+    }));
+    // gcTime must outlive the unmount, otherwise the cache entry is dropped and refetched anyway.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: qc }, children);
+
+    const first = renderHook(() => useProjectActiveTodos('p1', true), { wrapper });
+    await waitFor(() => expect(first.result.current.isSuccess).toBe(true));
+    first.unmount();
+
+    const second = renderHook(() => useProjectActiveTodos('p1', true), { wrapper });
+    await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
+
+    expect(PROJECT_ACTIVE_TODOS_STALE_MS).toBeGreaterThan(0);
+    expect(calls).toBe(1);
   });
 });

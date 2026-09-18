@@ -12,7 +12,7 @@ import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
 import {
-  STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS,
+  STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS, SEARCH_DEBOUNCE_MS,
   ACTIVE_STATUSES, KANBAN_COLUMN_STATUSES, filterShowsStatus,
   type ViewMode, type TodoStatusFilter,
 } from '../components/todo/todoConstants';
@@ -57,7 +57,7 @@ export function Todos() {
   const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [search]);
   const [showAllTags, setShowAllTags] = useState(false);

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
+import { PROJECT_ACTIVE_TODOS_PREVIEW_SIZE, PROJECT_ACTIVE_TODOS_STALE_MS } from '../components/todo/todoConstants';
 import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse, WorkflowRun } from '../types';
 
 /** Poll faster while a fix run is resolving one of the loaded todos. */
@@ -96,11 +97,11 @@ export function useProjectActiveTodos(projectId: string, enabled: boolean) {
       sp.set('projectId', projectId);
       sp.append('status', 'OPEN');
       sp.append('status', 'IN_PROGRESS');
-      sp.set('size', '12');
+      sp.set('size', String(PROJECT_ACTIVE_TODOS_PREVIEW_SIZE));
       return api.get<PageResponse<Todo>>(`/todos?${sp.toString()}`);
     },
     enabled: enabled && !!projectId,
-    staleTime: 30_000,
+    staleTime: PROJECT_ACTIVE_TODOS_STALE_MS,
   });
 }
 

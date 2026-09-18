@@ -26,6 +26,27 @@ export const SOURCES: TodoSource[] = ['USER', 'AI', 'WORKFLOW'];
 
 export const MAX_VISIBLE_TAGS = 8;
 
+/**
+ * Search entry on the todos page waits this long after the last keystroke before it queries.
+ * Long enough that a typed word produces one request instead of one per character, short
+ * enough to still feel immediate — the free-text filter runs a LIKE over title and description
+ * server-side, so every keystroke would be a real query.
+ */
+export const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * How many active todos the cockpit shows per expanded project card. A preview, not the list:
+ * the full set is one click away on the todos page, and a project with dozens of open todos
+ * must not stretch the card (or the query) without bound.
+ */
+export const PROJECT_ACTIVE_TODOS_PREVIEW_SIZE = 12;
+
+/**
+ * How long that preview stays fresh. Expanding and collapsing cards must not re-query on every
+ * toggle; todos change on a human timescale, so half a minute of staleness is invisible here.
+ */
+export const PROJECT_ACTIVE_TODOS_STALE_MS = 30_000;
+
 export type ViewMode = 'list' | 'board';
 
 export const priorityColor: Record<TodoPriority, string> = {

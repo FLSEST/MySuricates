@@ -13,10 +13,15 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.audit.AuditCenterService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,6 +54,27 @@ class TodoServiceTest {
 
     @InjectMocks
     private TodoService todoService;
+
+    // --- findAll ---
+
+    /**
+     * The list order lives in the specification ({@link TodoSpecifications#listSpec}) because
+     * the business order CRITICAL &gt; HIGH &gt; MEDIUM &gt; LOW needs a CASE expression. A sorted
+     * {@code Pageable} would silently overwrite that order-by, so it must stay unsorted (aa434aee).
+     */
+    @Test
+    void findAll_passesUnsortedPageable_soTheSpecOrderSurvives() {
+        when(todoRepository.findAll(ArgumentMatchers.<Specification<Todo>>any(), any(Pageable.class)))
+                .thenReturn(Page.<Todo>empty());
+
+        todoService.findAll(1, 25, null, null, null, null, null, null);
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(todoRepository).findAll(ArgumentMatchers.<Specification<Todo>>any(), pageable.capture());
+        assertThat(pageable.getValue().getSort().isUnsorted()).isTrue();
+        assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(25);
+    }
 
     // --- findById ---
 
