@@ -2,6 +2,7 @@ import { CalendarClock } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
 import { useT } from '../../i18n';
+import { WidgetSkeleton } from './WidgetSkeleton';
 
 function formatTime(iso: string): string {
   try {
@@ -23,8 +24,9 @@ function formatDate(iso: string): string {
 
 export function UpcomingSchedulesCard() {
   const t = useT();
-  const { data: today } = useRemainingToday();
-  const { data: week } = useRemainingThisWeek();
+  const { data: today, isLoading: todayLoading } = useRemainingToday();
+  const { data: week, isLoading: weekLoading } = useRemainingThisWeek();
+  if (todayLoading || weekLoading) return <WidgetSkeleton size="chart" />;
 
   // Combine today + rest-of-week, deduplicate by scheduleId, limit to 5
   const allSchedules = [

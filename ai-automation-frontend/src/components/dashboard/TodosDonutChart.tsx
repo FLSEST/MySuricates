@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { ChartCard } from './ChartCard';
 import { useTodoCount } from '../../hooks/useTodos';
 import { useT } from '../../i18n';
+import { WidgetSkeleton } from './WidgetSkeleton';
 
 const COLORS = {
   open: 'var(--color-text-tertiary)',
@@ -13,7 +14,7 @@ const COLORS = {
 
 export function TodosDonutChart() {
   const t = useT();
-  const { data: counts } = useTodoCount();
+  const { data: counts, isLoading } = useTodoCount();
 
   const chartData = useMemo(() => {
     if (!counts) return [];
@@ -25,6 +26,7 @@ export function TodosDonutChart() {
     ].filter((d) => d.value > 0);
   }, [counts, t]);
 
+  if (isLoading) return <WidgetSkeleton size="chart" />;
   const total = (counts?.open ?? 0) + (counts?.inProgress ?? 0) + (counts?.done ?? 0) + (counts?.backlog ?? 0);
 
   return (
