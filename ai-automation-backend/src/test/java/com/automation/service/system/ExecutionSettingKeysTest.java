@@ -61,23 +61,34 @@ class ExecutionSettingKeysTest {
     }
 
     @Test
-    void bounds_returnsMinMaxPair() {
-        assertThat(ExecutionSettingKeys.bounds("claude-reserved-for-interactive")).containsExactly(0, 10);
+    void boundsEntry_exposesMinMaxAndNumberKind() {
+        ExecutionSettingKeys.Bound bound = ExecutionSettingKeys.BOUNDS.get("claude-reserved-for-interactive");
+
+        assertThat(bound.min()).isEqualTo(0);
+        assertThat(bound.max()).isEqualTo(10);
+        assertThat(bound.decimal()).isFalse();
+    }
+
+    /**
+     * TODO 4218fcaa: ganzzahlige und Bruch-Schluessel stehen in <b>einer</b> Map, damit ein neuer
+     * Schluessel nur an einer Stelle eingetragen werden muss.
+     */
+    @Test
+    void integerAndDecimalKeys_liveInTheOneBoundsMap() {
+        assertThat(ExecutionSettingKeys.BOUNDS.get("todo-similarity-keyword-threshold").decimal()).isTrue();
+        assertThat(ExecutionSettingKeys.BOUNDS.get("execution-max-concurrent").decimal()).isFalse();
     }
 
     @Test
     void everyAliasMapsToAKnownKey_andEveryKeyHasAnAlias() {
         Set<String> allKeys = new HashSet<>(ExecutionSettingKeys.BOUNDS.keySet());
-        allKeys.addAll(ExecutionSettingKeys.DECIMAL_BOUNDS.keySet());
         assertThat(ExecutionSettingKeys.KEY_ALIASES.values()).containsExactlyInAnyOrderElementsOf(allKeys);
     }
 
     @Test
     void everyBoundsEntry_hasMinNotAboveMax() {
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                assertThat(bounds[0]).as("bounds of %s", key).isLessThanOrEqualTo(bounds[1]));
-        ExecutionSettingKeys.DECIMAL_BOUNDS.forEach((key, bounds) ->
-                assertThat(bounds[0]).as("bounds of %s", key).isLessThanOrEqualTo(bounds[1]));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                assertThat(bound.min()).as("bounds of %s", key).isLessThanOrEqualTo(bound.max()));
     }
 
     @Test
