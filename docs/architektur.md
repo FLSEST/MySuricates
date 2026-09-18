@@ -68,9 +68,9 @@ automation:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
 
-Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal).
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` waehlt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Praefix, sonst `en`) — das Ergebnis (welche Module aktiv sind) aendert sich dadurch nicht.
 
-**Katalog** (einzige Quelle: `modules/ModuleCatalog`):
+**Katalog** (einzige Quelle: `modules/ModuleCatalog`, 18 Feature-Module + 4 Härtungsschalter = 22 Schlüssel):
 
 | Stufe | Module | Reifegrad |
 |---|---|---|
@@ -78,6 +78,19 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 | `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
 | `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimentell |
+
+Der Katalog wird zusätzlich als reine Bash-Arrays nach `scripts/lib/module-catalog.generated.sh`
+exportiert — eingelesen von `scripts/lib/module-preset.sh`, das vor jedem Build läuft und deshalb
+weder ein Backend noch `jq` voraussetzen darf. Die Datei wird nicht von Hand gepflegt: Nach einer
+Änderung am Katalog oder an den Anzeigetexten (`ai-automation-frontend/src/data/modules.<lang>.json`)
+neu erzeugen mit:
+
+```bash
+cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
+```
+
+Ohne Regenerierung schlägt `ModuleCatalogTextsTest` rot fehl, sobald die generierte Datei nicht mehr
+zum Katalog passt — wer ein Modul hinzufügt, erfährt es spätestens dort.
 
 **Durchsetzung**
 

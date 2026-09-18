@@ -428,6 +428,22 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 - **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
+### Modul-Katalog
+
+Wer ein Modul zu `modules/ModuleCatalog` hinzufügt oder ändert, muss `scripts/lib/module-catalog.generated.sh`
+neu erzeugen — die Datei wird nicht von Hand gepflegt, sondern von `ModuleCatalogTextsTest` aus dem
+Katalog und den Anzeigetexten (`ai-automation-frontend/src/data/modules.<lang>.json`) abgeleitet:
+
+```bash
+cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
+```
+
+Ohne Regenerierung schlägt der Test rot fehl, sobald die generierte Datei nicht mehr zum Katalog
+passt. `scripts/lib/module-preset.sh` liest die generierte Datei vor jedem Build ein — bewusst ohne
+Backend oder `jq` vorauszusetzen. `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der
+Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`); das Ergebnis (welche Module aktiv
+sind) ändert sich dadurch nicht. Details zum Katalog selbst: [architektur.md](architektur.md#module-system-startkonfiguration).
+
 ## Hygiene-Gate
 
 `scripts/ci/public-hygiene.sh` prueft, was in ein oeffentliches Repository geriete. Die Regeln —

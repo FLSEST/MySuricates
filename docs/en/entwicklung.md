@@ -428,6 +428,24 @@ Workflows can accumulate knowledge across runs:
 - **WorkflowTemplateSeeder:** Creates 66 built-in templates on startup (idempotent, updates on version bump)
 - Template definitions as JSON under `src/main/resources/templates/builtin/`
 
+### Module Catalog
+
+Whoever adds or changes a module in `modules/ModuleCatalog` must regenerate
+`scripts/lib/module-catalog.generated.sh` — the file is not hand-maintained, it is derived from the
+catalog and the display texts (`ai-automation-frontend/src/data/modules.<lang>.json`) by
+`ModuleCatalogTextsTest`:
+
+```bash
+cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
+```
+
+Without regeneration, the test fails red as soon as the generated file no longer matches the
+catalog. `scripts/lib/module-preset.sh` reads the generated file before every build — deliberately
+without requiring a backend or `jq`. `scripts/setup.sh --lang de|en` only chooses the display
+language of the module texts in the terminal (default: the `$LANG` prefix, else `en`); it never
+changes the outcome (which modules are active). Details on the catalog itself:
+[architektur.md](architektur.md#module-system-startup-configuration).
+
 ## Hygiene gate
 
 `scripts/ci/public-hygiene.sh` checks what would end up in a public repository. The rules —
