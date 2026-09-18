@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
 import static com.automation.executor.blocks.AgenticPromptBuilder.truncate;
@@ -174,7 +175,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "foreach".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("foreach");
     }
 }

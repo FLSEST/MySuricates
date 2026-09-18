@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Native todo-update block (TODO 9f6d7f14): aktualisiert ein TODO direkt über
@@ -62,7 +63,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "todo-update".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("todo-update");
     }
 }

@@ -24,6 +24,9 @@ import java.util.Map;
  * the newest row (legacy data, a bypass writer, a raw DB edit), that state is written first as
  * {@link ChangeSource#UNTRACKED} — drift becomes visible instead of silently lost.
  * {@code WorkflowWriterAllowlistTest} pins the few writers that bypass this class.
+ *
+ * <p>Being that one place, it is also where a definition is refused: a sealed workflow, and block
+ * types no executor can run ({@link BlockTypeValidator}).
  */
 @Component
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class WorkflowMutationGateway {
     private final WorkflowVersionService versions;
     private final WorkflowDefinitionHasher hasher;
     private final ActivityLogService activityLog;
+    private final BlockTypeValidator blockTypes;
 
     /**
      * @param saved  workflow after the change (already saved, same transaction)
@@ -49,6 +53,9 @@ public class WorkflowMutationGateway {
             throw new HardeningException(ErrorCode.WORKFLOW_SEALED, "Workflow '" + saved.getName()
                     + "' is sealed — unseal it before changing " + String.join(", ", changedFields));
         }
+        // Runs inside the caller's transaction like the seal check: an unknown type rolls the save
+        // back, so no definition the executor cannot run is ever stored (TODO 89dd9e34).
+        blockTypes.rejectUnknown(after.blocks());
         String afterHash = hasher.hash(after);
         String beforeHash = before == null ? null : hasher.hash(before);
         if (beforeHash != null && !describedByNewestVersion(saved.getId(), beforeHash)) {

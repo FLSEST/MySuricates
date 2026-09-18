@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -26,8 +27,8 @@ public class ApprovalBlockExecutor implements BlockExecutor {
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
-    public boolean supports(String blockType) {
-        return "approval".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("approval");
     }
 
     @Override

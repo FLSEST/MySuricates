@@ -1,6 +1,7 @@
 package com.automation.service.assistant;
 
 import com.automation.executor.BlockExecutor;
+import com.automation.executor.BlockTypeRegistry;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -30,7 +31,8 @@ import static org.mockito.Mockito.withSettings;
  *
  * <p>Fails when an executor is added without maintaining
  * {@link BlockTypesIndexSection#BLOCK_TYPES} (assistant context + {@code GET /system/capabilities})
- * or {@link AssistantToolValidator#KNOWN_BLOCK_TYPES}.
+ * or {@link AssistantToolValidator#KNOWN_BLOCK_TYPES}, and when either list drifts from
+ * {@link BlockTypeRegistry} — the set the save-time block-type check uses.
  */
 class BlockTypeListsGuardTest {
 
@@ -45,6 +47,20 @@ class BlockTypeListsGuardTest {
     void everyExecutorIsListedExactlyOnce_inAssistantToolValidator() {
         assertListMatchesExecutors("AssistantToolValidator.KNOWN_BLOCK_TYPES",
                 new TreeSet<>(AssistantToolValidator.KNOWN_BLOCK_TYPES));
+    }
+
+    /** The registry is what the save-time check uses (TODO 89dd9e34) — the hand list must match it. */
+    @Test
+    void assistantListMatchesTheBlockTypeRegistry() {
+        List<BlockExecutor> executors = new java.util.ArrayList<>();
+        for (Class<?> executorClass : executorClasses()) {
+            executors.add((BlockExecutor) Mockito.mock(executorClass,
+                    withSettings().defaultAnswer(CALLS_REAL_METHODS)));
+        }
+
+        assertThat(new BlockTypeRegistry(executors).knownTypes())
+                .as("BlockTypeRegistry vs. AssistantToolValidator.KNOWN_BLOCK_TYPES")
+                .containsExactlyElementsOf(new TreeSet<>(AssistantToolValidator.KNOWN_BLOCK_TYPES));
     }
 
     @Test

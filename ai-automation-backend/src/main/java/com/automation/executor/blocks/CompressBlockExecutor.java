@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -62,8 +63,8 @@ public class CompressBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "compress".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("compress");
     }
 
     private static void fail(StepResult result, Map<String, Object> config, String error) {

@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -173,7 +174,7 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "skill-capability".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("skill-capability");
     }
 }
