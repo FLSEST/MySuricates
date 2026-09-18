@@ -78,6 +78,7 @@ In addition to its type-specific config fields, every block also supports these 
 | `on_failure` | string | `"stop"` | Behavior on failure: `"stop"` (terminate workflow) or `"continue"` (proceed with next block) |
 | `provider` | string | null | **AI-capable blocks only** (`simple`, `agentic`, `skill-capability`, `compress-ai` and the inline `command` of `retry`, `foreach`, `while`, `conditional`, `switch`): AI provider for this block only (`CLAUDE`, `PI`, `CODEX`; for `compress-ai` only `CLAUDE`). Precedence block > workflow > system default. On the `integration` block, `provider` instead names the integration provider (`google-calendar`, …). |
 | `model` | string | null | **AI-capable blocks only** (including `compress-ai`): model for this block only (CLI alias `opus`/`sonnet`, concrete id or pi `<backend>/<model>`). Precedence block > workflow > provider default. If a block sets a *different* `provider` than the workflow, the workflow model is not inherited (model ids are provider-specific). |
+| `effort` | string | null | **AI-capable blocks only**: reasoning effort `low`/`medium`/`high`/`xhigh` for this block only. Precedence block > workflow (`workflow.effort`) > provider default; unset emits no flag at all. Claude maps it to `--effort`, pi to `--thinking`, codex ignores it. The value actually used is visible in the run details as step metadata `aiRequest.effort`. |
 
 Additionally, every block supports an optional top-level field (not inside `config`):
 
@@ -555,6 +556,39 @@ Reads a file (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, ...) and extracts pla
   { "type": "simple", "config": { "command": "Summarize:\n\n{{ text }}" } }
 ]
 ```
+
+---
+
+### `todo-create` / `todo-update` / `todo-close` — Native TODO Operations
+
+Create or change TODOs directly through the TodoService — **no REST self-call, no DB access, 0 tokens**. They replace the anti-pattern `curl POST /api/v1/todos` from shell/agentic blocks.
+
+**`todo-create`**:
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | **required** | Title (template-capable) |
+| `description` | string | null | Markdown description (template-capable) |
+| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
+| `tags` | list or string | null | List or comma-separated |
+| `project_id` | string | context variable `project_id` | Target project |
+| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
+| `source_agent` | string | `workflow` | Source agent label |
+| `variable_name` | string | `todo_id` | Context variable that receives the new TODO id |
+
+**`todo-update`**: `id` (required, template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed.
+
+**`todo-close`**: `id` (required, template-capable) — sets the status to DONE.
+
+```json
+[
+  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+  { "type": "simple", "config": { "command": "Fix the problem ..." } },
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
+]
+```
+
+**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see §Auto-TODO/detector format). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
 
 ---
 
