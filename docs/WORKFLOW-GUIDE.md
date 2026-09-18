@@ -310,6 +310,12 @@ Jeder Case hat:
 
 Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
+Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfuegbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgefuehrten Case-Bloecke.
+
+Die Bloecke eines Case laufen nacheinander und schieben dabei `{{ previous_output }}` weiter — wie die Iterationen einer `while`-Schleife. Der zweite Block eines Case sieht also die Ausgabe des ersten, nicht mehr die des Schritts vor dem switch (auch bei unbenannten Bloecken). Wer den Stand von vor dem switch braucht, benennt den betreffenden Block und referenziert `{{ block.<name>.output }}`.
+
+Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind ueberschreibt also einen gleichnamigen frueheren Block, und nach dem switch ueberschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
+
 ```json
 {
   "type": "switch",

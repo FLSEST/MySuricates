@@ -307,6 +307,12 @@ Each case has:
 
 Nested blocks in `cases` and `default` are limited to `shell` and `simple` — other types (including `compress`/`compress-ai`) are rejected with an error message.
 
+A `name` on a nested block makes its output available as `{{ block.<name>.output }}` in later steps; without a name only `{{ previous_output }}` carries it. The switch block's own output stays the concatenation of all executed case blocks.
+
+The blocks of a case run in sequence and each one moves `{{ previous_output }}` along — like the iterations of a `while` loop. The second block of a case therefore sees the first one's output, no longer the step before the switch (unnamed blocks included). If you need the state from before the switch, name that block and reference `{{ block.<name>.output }}`.
+
+Block names should be unique across the workflow: on a collision the last write wins. A case block overwrites an earlier block of the same name, and after the switch its aggregated output in turn overwrites an equally named child.
+
 ```json
 {
   "type": "switch",

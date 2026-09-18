@@ -96,6 +96,10 @@ public class SwitchBlockExecutor implements BlockExecutor {
             if (blockResult.getOutput() != null) {
                 if (!outputs.isEmpty()) outputs.append("\n");
                 outputs.append(blockResult.getOutput());
+                // A named case block is addressable as {{ block.<name>.output }} downstream, like a
+                // top-level block; unnamed ones only move previous_output. In a tainted run the case
+                // output is shell-escaped downstream, same as in WhileBlockExecutor (12a3b244).
+                context.recordOutput(nestedBlock.getName(), blockResult.getOutput());
             }
             if (blockResult.getStatus() == StepStatus.FAILED) {
                 anyFailed = true;

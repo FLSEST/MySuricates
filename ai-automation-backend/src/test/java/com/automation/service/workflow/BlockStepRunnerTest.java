@@ -8,9 +8,11 @@ import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.blocks.SwitchBlockExecutor;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.live.LiveLineKind;
 import com.automation.service.live.LiveOutput;
 import com.automation.service.live.LiveOutputSink;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -373,5 +376,39 @@ class BlockStepRunnerTest {
         assertThat(source.status()).isEqualTo(StepStatus.FAILED);
         assertThat(source.exitCode()).isEqualTo(2);
         assertThat(source.blockType()).isEqualTo("simple");
+    }
+
+    // ── runStep: name collisions ───────────────────────────────────────────
+
+    /**
+     * Block names are meant to be unique per workflow. When a switch case block carries the same
+     * name as the switch itself, the last writer wins: the case block records its output during
+     * execution, the runner overwrites it with the block's own (aggregated) output afterwards.
+     * The other direction — a case block overwriting an earlier top-level block — is pinned in
+     * {@code SwitchBlockExecutorTest} (12a3b244).
+     */
+    @Test
+    void runStep_switchAggregateOverwritesAnEquallyNamedCaseBlock() {
+        context.setProjectPath("/test/project");
+        CommandExecutorService commandExecutor = mock(CommandExecutorService.class);
+        when(commandExecutor.executeStepOnHost(any()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                        .output("aus dem Kind").build())
+                .thenReturn(StepResult.builder().stepIndex(2).status(StepStatus.COMPLETED)
+                        .output("und noch was").build());
+        Map<String, Object> config = new HashMap<>(Map.of(
+                "expression", "A",
+                "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                        Map.of("type", "simple", "name", "router", "config", Map.of("command", "tu was")),
+                        Map.of("type", "simple", "config", Map.of("command", "und weiter")))))));
+        BlockDefinition switchBlock = BlockDefinition.builder()
+                .type("switch").name("router").config(config).build();
+        StepResult step = runner.startStep(run, 0, switchBlock);
+
+        runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
+
+        // während der Ausführung stand "aus dem Kind" unter dem Namen; danach gewinnt das Aggregat
+        assertThat(step.getOutput()).isEqualTo("aus dem Kind\nund noch was");
+        assertThat(context.getBlockOutput("router")).isEqualTo("aus dem Kind\nund noch was");
     }
 }

@@ -60,4 +60,42 @@ class ExecutionModeTest {
         assertThatThrownBy(() -> ExecutionMode.rejectUnknown(List.of(switchBlock)))
                 .hasMessageStartingWith("Block 'fallback': unknown execution_mode 'bash'");
     }
+
+    /** d15fb3a3: same containers as BlockTypeValidator — a plain {@code blocks} list counts too. */
+    @Test
+    void rejectUnknownChecksBlocksNestedInAPlainBlocksList() {
+        Map<String, Object> foreachConfig = new HashMap<>(Map.of(
+                "items", List.of("a"),
+                "blocks", List.of(Map.of("type", "shell", "name", "inner",
+                        "config", Map.of("execution_mode", "shel")))));
+        BlockDefinition foreach = BlockDefinition.builder().type("foreach").config(foreachConfig).build();
+
+        assertThatThrownBy(() -> ExecutionMode.rejectUnknown(List.of(foreach)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("Block 'inner': unknown execution_mode 'shel'");
+    }
+
+    @Test
+    void rejectUnknownRecursesIntoASwitchInsideASwitchCase() {
+        Map<String, Object> inner = Map.of("type", "switch", "name", "inner-switch",
+                "config", Map.of("cases", List.of(Map.of("value", "x", "blocks", List.of(
+                        Map.of("type", "shell", "name", "deep", "config", Map.of("execution_mode", "bash")))))));
+        Map<String, Object> outerConfig = new HashMap<>(Map.of(
+                "cases", List.of(Map.of("value", "a", "blocks", List.of(inner)))));
+        BlockDefinition outer = BlockDefinition.builder().type("switch").config(outerConfig).build();
+
+        assertThatThrownBy(() -> ExecutionMode.rejectUnknown(List.of(outer)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("Block 'deep': unknown execution_mode 'bash'");
+    }
+
+    @Test
+    void nestedEntriesWithoutAConfigMapAreTolerated() {
+        Map<String, Object> switchConfig = new HashMap<>(Map.of(
+                "cases", List.of(Map.of("value", "a", "blocks", List.of(Map.of("type", "shell")))),
+                "default", "not-a-list"));
+        BlockDefinition switchBlock = BlockDefinition.builder().type("switch").config(switchConfig).build();
+
+        assertThatNoException().isThrownBy(() -> ExecutionMode.rejectUnknown(List.of(switchBlock)));
+    }
 }
