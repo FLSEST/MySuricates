@@ -22,9 +22,13 @@ check() {  # $1 = label, $2 = shell condition
 }
 
 # ---------------------------------------------------------------------------
-# Fixture: 20 ungetestete Klassen (mehr als das alte Top-15-Fenster), zwei duenn
-# getestete und eine Klasse ohne jede "public "-Zeile (die brachte im alten Block
-# "grep -c ... || echo 0" zum Ausgeben von zwei Zeilen -> [: Ganzzahl erwartet).
+# Fixture: 21 ungetestete Klassen (mehr als das alte Top-15-Fenster), davon eine
+# ohne jede "public "-Zeile, zwei duenn getestete und eine getestete Klasse ohne
+# "public "-Zeile. Die Klassen ohne "public " sind der Regressionsfall zu
+# "grep -c ... || echo 0": grep gibt bei 0 Treffern "0" aus UND Exit 1 zurueck,
+# das alte "|| echo 0" haengte eine zweite Null an. Im UNTESTED-Abschnitt
+# verschob das die Spalten der Messzeile (im Repo 24 von 115 Zeilen), in den
+# duennen Tests brach es die Pruefung mit "Ganzzahliger Ausdruck erwartet" ab.
 # ---------------------------------------------------------------------------
 FIX="$TMP/fixture"
 MAIN="$FIX/ai-automation-backend/src/main/java/com/automation"
@@ -52,6 +56,10 @@ java_class "$MAIN/controller/ThinTwo.java" 70 10
 # Getestet, aber ohne public-Zeile: darf keinen Shell-Fehler ausloesen
 { echo "package com.automation.controller;"; echo "class NoPublic {}"; } > "$MAIN/controller/NoPublic.java"
 { echo "class NoPublicTest {"; echo "    @Test void a() {}"; echo "}"; } > "$TESTS/NoPublicTest.java"
+# Ungetestet UND ohne public-Zeile: der im Repo haeufige Fall (24 von 115),
+# dessen Messzeile die alte Variante verstuemmelt hat
+{ echo "package com.automation.controller;"; echo "enum NoPublicUntested { A, B }"; } \
+  > "$MAIN/controller/NoPublicUntested.java"
 echo "export const x = 1;" > "$FIX/ai-automation-frontend/src/x.ts"
 git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.invalid \
   add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
@@ -76,15 +84,16 @@ THIN_ROWS="$TMP/thin.txt"
 awk '/^DUENNE TESTS gesamt:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out.txt" > "$THIN_ROWS"
 
 echo "1) Vollstaendigkeit statt Top-N-Fenster"
-check "Zaehlzeile 'UNTESTED gesamt: 20'"      'grep -qx "UNTESTED gesamt: 20" "$TMP/out.txt"'
-check "20 gelistete ungetestete Klassen"      '[ "$(wc -l < "$UNTESTED_ROWS")" -eq 20 ]'
+check "Zaehlzeile 'UNTESTED gesamt: 21'"      'grep -qx "UNTESTED gesamt: 21" "$TMP/out.txt"'
+check "21 gelistete ungetestete Klassen"      '[ "$(wc -l < "$UNTESTED_ROWS")" -eq 21 ]'
 check "kleinste Klasse (Rang 20) gelistet"    'grep -q "Untested01.java" "$UNTESTED_ROWS"'
 check "groesste Klasse gelistet"              'grep -q "Untested20.java" "$UNTESTED_ROWS"'
+check "Klasse ohne public-Zeile gelistet"     'grep -q "^controller/NoPublicUntested\.java${TAB}[0-9]\+$" "$UNTESTED_ROWS"'
 check "kein head -15 im Messblock"            '! grep -q "head -15" "$TMP/command.sh"'
 
 echo "2) Kompaktes, stabiles Zeilenformat (paket/Klasse.java<TAB>LOC)"
 check "jede Zeile paket/Klasse.java<TAB>LOC" \
-  'ROWS=$(grep -cE "^[a-z][a-zA-Z0-9/]*/[A-Za-z0-9]+\.java${TAB}[0-9]+$" "$UNTESTED_ROWS"); [ "$ROWS" -eq 20 ]'
+  'ROWS=$(grep -cE "^[a-z][a-zA-Z0-9/]*/[A-Za-z0-9]+\.java${TAB}[0-9]+$" "$UNTESTED_ROWS"); [ "$ROWS" -eq 21 ]'
 check "kein com/automation-Praefix"           '! grep -q "com/automation" "$UNTESTED_ROWS"'
 check "kein absoluter Pfad in den Zeilen"     '! grep -q "^/" "$UNTESTED_ROWS"'
 check "absteigend nach LOC sortiert" \
@@ -98,7 +107,10 @@ check "ThinOne gelistet"                      'grep -q "^ThinOne\.java${TAB}" "$
 check "ThinTwo gelistet"                      'grep -q "^ThinTwo\.java${TAB}" "$THIN_ROWS"'
 check "keine Ganzzahl-Fehlermeldung (stderr)" '! grep -qiE "Ganzzahl|integer expression" "$TMP/err.txt"'
 
-echo "4) Report-Prompt bindet den Snapshot an die vollstaendige Liste"
+echo "4) Soll-Groesse des Snapshots"
+check "Zeile 'ERWARTETE FINDINGS: 23'"        'grep -qx "ERWARTETE FINDINGS: 23" "$TMP/out.txt"'
+
+echo "5) Report-Prompt bindet den Snapshot an die vollstaendige Liste"
 PROMPT="$TMP/prompt.txt"
 python3 - "$DEF" > "$PROMPT" <<'PY'
 import json, sys
@@ -110,6 +122,69 @@ check "Prompt nennt 'UNTESTED gesamt'"        'grep -q "UNTESTED gesamt" "$PROMP
 check "Prompt nennt kein Top-15-Fenster"      '! grep -q "Top 15" "$PROMPT"'
 check "Prompt begruendet snapshotComplete"    'grep -q "snapshotComplete" "$PROMPT"'
 check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *false\|snapshotComplete\":false" "$PROMPT"'
+
+echo "6) Gate-Verdict prueft den Snapshot deterministisch"
+# Platzhalter werden wie in TemplateResolver.resolveShellSafe single-quoted eingesetzt
+# (Block fuehrt "shell_escape_variables": true), damit der Block lokal laufen kann.
+render_gate() {  # $1 = previous_output, $2 = metrik-output, $3 = report-output
+  python3 - "$DEF" "$1" "$2" "$3" <<'PY'
+import json, re, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+blocks = [b for b in definition['blocks']
+          if b.get('config', {}).get('label', '').startswith('Gate-Verdict')]
+assert len(blocks) == 1, f"erwartet genau einen Gate-Block, gefunden: {len(blocks)}"
+config = blocks[0]['config']
+assert config.get('shell_escape_variables') is True, "Gate-Block braucht shell_escape_variables"
+values = {'previous_output': sys.argv[2],
+          'block.metrics.output': sys.argv[3],
+          'block.report.output': sys.argv[4]}
+def substitute(match):
+    key = match.group(1).strip()
+    assert key in values, f"unerwarteter Platzhalter: {key}"
+    return "'" + values[key].replace("'", "'\\''") + "'"
+print(re.sub(r'\{\{\s*([^}]+?)\s*}}', substitute, config['command']))
+PY
+}
+
+envelope_report() {  # $1 = anzahl ruleKeys, $2 = snapshotComplete (true|false)
+  local i findings=""
+  for ((i = 0; i < $1; i++)); do
+    findings="$findings{\"ruleKey\":\"test-coverage.untested-class\",\"subject\":\"p/C$i.java\",\"severity\":\"MEDIUM\",\"title\":\"t\"},"
+  done
+  printf '### Coverage-Coach\n\ngate_status: YELLOW\n\n<!-- mysuricates:audit-result:v1\n{"snapshotComplete":%s,"findings":[%s]}\n-->\n' \
+    "$2" "${findings%,}"
+}
+
+GATE_METRICS="$(printf 'UNTESTED gesamt: 20\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 20\n')"
+GATE_PREV="$(printf 'Kurzfassung\ngate_status: YELLOW\n')"
+
+run_gate() {  # $1 = report-output, schreibt Gate-Ausgabe nach $TMP/gate.txt
+  render_gate "$GATE_PREV" "$GATE_METRICS" "$1" > "$TMP/gate.sh"
+  bash "$TMP/gate.sh" > "$TMP/gate.txt" 2> "$TMP/gate-err.txt"
+}
+
+run_gate "$(envelope_report 20 true)"
+check "20/20 Findings: nicht RED"            '! grep -q "gate_status: RED" "$TMP/gate.txt"'
+check "20/20 Findings: Status aus Report"    'grep -qx "gate_status: YELLOW" "$TMP/gate.txt"'
+check "20/20 Findings: test-coverage"        'grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+check "Gate laeuft ohne stderr"              '[ ! -s "$TMP/gate-err.txt" ]'
+
+run_gate "$(envelope_report 18 true)"
+check "18/20 Findings: RED"                  'grep -qx "gate_status: RED" "$TMP/gate.txt"'
+check "18/20 Findings: audit-incomplete"     'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
+check "18/20 Findings: Zahlen im Grund"      'grep "^gate_description:" "$TMP/gate.txt" | grep -q "18" && grep "^gate_description:" "$TMP/gate.txt" | grep -q "20"'
+
+run_gate "$(printf '### Coverage-Coach\n\ngate_status: GREEN\n')"
+check "kein Envelope: RED"                   'grep -qx "gate_status: RED" "$TMP/gate.txt"'
+check "kein Envelope: audit-invalid"         'grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
+
+run_gate "$(envelope_report 20 false)"
+check "snapshotComplete false: RED"          'grep -qx "gate_status: RED" "$TMP/gate.txt"'
+check "snapshotComplete false: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
+
+GATE_METRICS="$(printf 'UNTESTED gesamt: 20\n')" run_gate "$(envelope_report 20 true)"
+check "ohne ERWARTETE FINDINGS: RED"         'grep -qx "gate_status: RED" "$TMP/gate.txt"'
+check "ohne ERWARTETE FINDINGS: incomplete"  'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
