@@ -234,7 +234,7 @@ public class AuditCenterService {
                 finding.getEvidence(), TodoMapper.jsonToList(finding.getTags()), finding.getStatus(), finding.getFirstSeenRunId(),
                 finding.getLastSeenRunId(), finding.getFirstSeenAt(), finding.getLastSeenAt(), finding.getOccurrenceCount(),
                 finding.getRegressionCount(), finding.getResolvedAt(), finding.getDispositionNote(),
-                finding.getDispositionEvidence(), finding.getDispositionAt(), links);
+                finding.getDispositionEvidence(), finding.getDispositionAt(), finding.isUnknownRuleKey(), links);
     }
 
     private AuditFinding requireFinding(String id) {
@@ -272,6 +272,6 @@ public class AuditCenterService {
                                        String firstSeenRunId, String lastSeenRunId, Instant firstSeenAt, Instant lastSeenAt,
                                        int occurrenceCount, int regressionCount, Instant resolvedAt,
                                        String dispositionNote, String dispositionEvidence, Instant dispositionAt,
-                                       List<TodoLink> todos) {}
+                                       boolean unknownRuleKey, List<TodoLink> todos) {}
     public record TodoLink(String id, String title, Todo.Status status, boolean managed) {}
 }

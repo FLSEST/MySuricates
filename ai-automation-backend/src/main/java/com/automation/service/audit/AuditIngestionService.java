@@ -94,7 +94,8 @@ public class AuditIngestionService {
         List<AuditFinding> touched = new ArrayList<>();
 
         for (ParsedFinding item : parsedFindings) {
-            String ruleKey = resolveRuleKey(event, report, item, reportedRuleKeys);
+            AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, item, reportedRuleKeys);
+            String ruleKey = resolution.ruleKey();
             String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
             if (!seenFingerprints.add(fingerprint)) continue;
 
@@ -123,6 +124,9 @@ public class AuditIngestionService {
             // subject ist reines Anzeigeattribut — der neueste Wert gewinnt, der Fingerprint haengt
             // an seiner normalisierten Form und bleibt dadurch ueber Drift hinweg stabil.
             finding.setSubject(item.subject());
+            // Bei jedem Ingest neu gesetzt, in beide Richtungen: ergaenzt der Katalog den Key,
+            // faellt die Markierung beim naechsten Lauf von selbst weg (TODO ffa6d846).
+            finding.setUnknownRuleKey(resolution.unknown());
             finding.setSeverity(item.severity());
             finding.setTitle(item.title());
             finding.setDescription(item.description());
@@ -167,8 +171,8 @@ public class AuditIngestionService {
      * im Activity-Log gemeldet — sonst faellt die Drift erst an den Wiedergaenger-Findings auf
      * (Audit-TODO 8fc9a401).
      */
-    private String resolveRuleKey(WorkflowRunCompletedEvent event, AuditReport report, ParsedFinding item,
-                                  Set<String> reportedRuleKeys) {
+    private AuditRuleKeyCatalog.Resolution resolveRuleKey(WorkflowRunCompletedEvent event, AuditReport report,
+                                                          ParsedFinding item, Set<String> reportedRuleKeys) {
         AuditRuleKeyCatalog.Resolution resolution = ruleKeyCatalog.resolve(report.getAuditKey(), item.ruleKey());
         if (resolution.unknown() && reportedRuleKeys.add(item.ruleKey())) {
             String message = "Audit '" + report.getAuditKey() + "': unbekannter ruleKey '" + item.ruleKey()
@@ -177,7 +181,7 @@ public class AuditIngestionService {
             log.warn("{} (run {})", message, event.getRunId());
             activityLog.warn(ActivityLog.LogCategory.EXECUTION, message, "AuditIngestionService", event.getRunId());
         }
-        return resolution.ruleKey();
+        return resolution;
     }
 
     private Todo ensureManagedTodo(AuditFinding finding, AuditReport report) {

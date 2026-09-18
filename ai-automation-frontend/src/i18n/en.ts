@@ -1668,6 +1668,8 @@ export const en = {
     reviewDue: 'review due on',
     evidenceSnapshot: 'Evidence snapshot at acceptance',
     dispositionNote: 'Disposition note',
+    unknownRuleKey: 'Rule not in the catalog',
+    unknownRuleKeyHint: 'This ruleKey is not listed in audit/rule-keys.json. The rule identity is therefore unverified: if the next run spells it differently, a new finding appears instead of a repeat sighting.',
   },
   cockpit: {
     title: 'Cockpit',

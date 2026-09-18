@@ -84,7 +84,7 @@ class AuditControllerTest {
                 .thenReturn(new AuditFindingResponse("f1", "proj-1", "mysuricates.health", "fp", "size.class", "Big.java",
                         AuditSeverity.HIGH, "Big.java ist zu gross", null, "Big.java: 320 LOC", List.of(),
                         AuditFindingStatus.ACCEPTED_RISK, "run-0", "run-1", acceptedAt, acceptedAt, 2, 0, acceptedAt,
-                        "Split geplant", "Big.java: 320 LOC", acceptedAt, List.of()));
+                        "Split geplant", "Big.java: 320 LOC", acceptedAt, false, List.of()));
 
         mockMvc.perform(patch("/api/v1/audit-findings/f1").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"ACCEPTED_RISK\",\"dispositionNote\":\"Split geplant\"}"))

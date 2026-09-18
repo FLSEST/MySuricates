@@ -203,6 +203,59 @@ class AuditIngestionServiceTest {
         verify(activityLog, times(2)).warn(any(), anyString(), anyString(), anyString());
     }
 
+    /**
+     * Das Flag am Finding (TODO ffa6d846): Im Audit Center war einem Finding bisher nicht
+     * anzusehen, dass seine Regel-Identitaet ungeprueft ist — die Meldung stand nur im
+     * Activity-Log, also genau dort, wo niemand nachsieht, der ein Finding beurteilt.
+     */
+    @Test
+    void unknownRuleKey_marksTheFinding() {
+        stubCoverageRun("run-1", "coverage.mystery");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        assertThat(savedFinding().isUnknownRuleKey())
+                .as("ein Key ausserhalb des Katalogs macht den Fingerprint unzuverlaessig — das muss"
+                        + " am Finding sichtbar sein, nicht nur im Log")
+                .isTrue();
+    }
+
+    /** Ein bekannter Key markiert nicht — auch nicht der auf den Katalog normalisierte. */
+    @Test
+    void knownAndDriftedRuleKeys_doNotMarkTheFinding() {
+        stubCoverageRun("run-1", "Test-Coverage.Untested_Class");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        assertThat(savedFinding().isUnknownRuleKey()).isFalse();
+    }
+
+    /**
+     * Die Markierung faellt von selbst weg, sobald der Katalog den Key kennt: Das Flag wird bei
+     * JEDEM Ingest neu gesetzt, nicht nur beim Anlegen. Sonst bliebe ein einmal markiertes
+     * Finding fuer immer markiert und die Anzeige waere nach der Katalog-Ergaenzung falsch.
+     */
+    @Test
+    void markIsClearedOnTheNextIngestOnceTheCatalogKnowsTheKey() {
+        AuditFinding marked = AuditFinding.builder()
+                .id("f-marked").projectId(PROJECT).auditKey(COVERAGE_KEY).fingerprint("fp")
+                .ruleKey("test-coverage.untested-class").subject("Big.java")
+                .severity(AuditSeverity.LOW).title("t").status(AuditFindingStatus.OPEN)
+                .firstSeenReportId("r0").lastSeenReportId("r0").firstSeenRunId("run-0").lastSeenRunId("run-0")
+                .firstSeenAt(ACCEPTED_AT).lastSeenAt(ACCEPTED_AT).unknownRuleKey(true).build();
+        // stubCoverageRunEnvelope statt stubCoverageRun: letzteres setzt den Lookup auf
+        // Optional.empty(), hier soll das vorhandene Finding gefunden werden.
+        stubCoverageRunEnvelope("run-1", "test-coverage.untested-class");
+        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
+                .thenReturn(Optional.of(marked));
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        assertThat(savedFinding().getId()).as("das vorhandene Finding wurde fortgeschrieben, nicht ersetzt")
+                .isEqualTo("f-marked");
+        assertThat(marked.isUnknownRuleKey()).isFalse();
+    }
+
     /** Ein Audit ohne Katalogeintrag wird nicht geprueft — die uebrigen Audits vergeben frei. */
     @Test
     void anAuditWithoutCatalogEntry_isNotChecked() {
@@ -221,7 +274,14 @@ class AuditIngestionServiceTest {
     }
 
     /** Ein Coverage-Run mit je einem LOW-Finding pro ruleKey (LOW erzeugt kein verwaltetes TODO). */
+    /** Coverage-Run ohne Annahme darueber, ob es das Finding schon gibt — das stubt der Aufrufer. */
     private void stubCoverageRun(String runId, String... ruleKeys) {
+        stubCoverageRunEnvelope(runId, ruleKeys);
+        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
+                .thenReturn(Optional.empty());
+    }
+
+    private void stubCoverageRunEnvelope(String runId, String... ruleKeys) {
         StringBuilder findings = new StringBuilder();
         for (int i = 0; i < ruleKeys.length; i++) {
             findings.append(i > 0 ? "," : "").append("{\"ruleKey\":\"").append(ruleKeys[i])
@@ -235,8 +295,6 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage Audit").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
-                .thenReturn(Optional.empty());
         when(findingRepository.findByProjectIdAndAuditKey(PROJECT, COVERAGE_KEY)).thenReturn(List.of());
     }
 
