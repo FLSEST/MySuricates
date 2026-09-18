@@ -218,6 +218,25 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>-javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
+                    <!--
+                        Test runs must be reproducible from the classpath alone.
+                        Spring Boot's DEFAULT spring.config.location also contains
+                        "optional:file:./" and "optional:file:./config/", and Surefire forks the
+                        test JVM with the module directory (ai-automation-backend/) as working
+                        directory — so the untracked developer config
+                        ai-automation-backend/config/application.yml silently joined every local
+                        test run and made it measure a different configuration than CI
+                        (7 failures in ModuleGuard/ModuleUiToggleIntegrationTest, TODO 39e55535).
+                        Pinning the location to the two classpath entries drops exactly the
+                        filesystem half of the default and keeps application.yml plus the
+                        profile-specific application-<profile>.yml working.
+                        Passed as a system property, NOT via argLine: the argLine above wins over
+                        any -DargLine, and systemPropertyVariables composes cleanly with it.
+                        Guarded by ExternalConfigIsolationTest.
+                    -->
+                    <systemPropertyVariables>
+                        <spring.config.location>optional:classpath:/,optional:classpath:/config/</spring.config.location>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 

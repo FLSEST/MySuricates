@@ -41,8 +41,9 @@ public final class ExecutionMode {
     }
 
     /**
-     * Validates {@code execution_mode} in every block, including blocks nested in switch
-     * {@code cases[].blocks} and {@code default}.
+     * Validates {@code execution_mode} in every block, including nested ones — switch
+     * {@code cases[].blocks} and {@code default} as well as a plain {@code blocks} list. The tree
+     * is walked by {@link NestedBlocks}, the same walker the block-type check uses (d15fb3a3).
      *
      * @throws IllegalArgumentException naming the first block with an unknown value
      */
@@ -53,6 +54,7 @@ public final class ExecutionMode {
         for (BlockDefinition block : blocks) {
             if (block != null) {
                 checkConfig(block.getName() != null ? block.getName() : block.getType(), block.getConfig());
+                NestedBlocks.visit(block.getConfig(), nested -> checkConfig(nested.label(), nested.config()));
             }
         }
     }
@@ -64,27 +66,6 @@ public final class ExecutionMode {
         Object raw = config.get(KEY);
         if (raw != null && !(raw instanceof String value && VALID.contains(value))) {
             throw new IllegalArgumentException("Block '" + blockLabel + "': " + invalidMessage(raw));
-        }
-        if (config.get("cases") instanceof List<?> cases) {
-            for (Object entry : cases) {
-                if (entry instanceof Map<?, ?> caseEntry) {
-                    checkNested(caseEntry.get("blocks"));
-                }
-            }
-        }
-        checkNested(config.get("default"));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void checkNested(Object nestedBlocks) {
-        if (!(nestedBlocks instanceof List<?> list)) {
-            return;
-        }
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> nested && nested.get("config") instanceof Map<?, ?> nestedConfig) {
-                Object label = nested.get("name") != null ? nested.get("name") : nested.get("type");
-                checkConfig(String.valueOf(label), (Map<String, Object>) nestedConfig);
-            }
         }
     }
 

@@ -1,0 +1,15 @@
+{
+  "id" : "builtin-without-prompt",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "name" : "Ohne Prompt",
+  "icon" : "❌",
+  "description" : "Testfall: die zugehoerige .md-Datei fehlt absichtlich.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "noop",
+      "description" : "Tut nichts."
+    }
+  ]
+}

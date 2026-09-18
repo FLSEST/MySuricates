@@ -9,6 +9,7 @@
   },
   "icon": "🧪",
   "category": "CODE",
+  "scope": "repo",
   "tags": [
     "quality-gate",
     "git",

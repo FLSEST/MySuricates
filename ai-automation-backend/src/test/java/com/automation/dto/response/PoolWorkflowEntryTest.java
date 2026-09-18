@@ -27,6 +27,7 @@ class PoolWorkflowEntryTest {
                 description,
                 "icon.svg",
                 "automation",
+                "portable",
                 tags,
                 blocks,
                 "Be careful",
@@ -43,6 +44,7 @@ class PoolWorkflowEntryTest {
         assertThat(entry.description()).isEqualTo(description);
         assertThat(entry.icon()).isEqualTo("icon.svg");
         assertThat(entry.category()).isEqualTo("automation");
+        assertThat(entry.scope()).isEqualTo("portable");
         assertThat(entry.tags()).containsExactly("tag1", "tag2");
         assertThat(entry.blocks()).containsExactly(block);
         assertThat(entry.instructions()).isEqualTo("Be careful");
@@ -57,7 +59,7 @@ class PoolWorkflowEntryTest {
     @Test
     void should_acceptNullValues_when_constructedWithNulls() {
         PoolWorkflowEntry entry = new PoolWorkflowEntry(
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         assertThat(entry.id()).isNull();
@@ -65,6 +67,7 @@ class PoolWorkflowEntryTest {
         assertThat(entry.description()).isNull();
         assertThat(entry.icon()).isNull();
         assertThat(entry.category()).isNull();
+        assertThat(entry.scope()).isNull();
         assertThat(entry.tags()).isNull();
         assertThat(entry.blocks()).isNull();
         assertThat(entry.instructions()).isNull();
@@ -82,6 +85,7 @@ class PoolWorkflowEntryTest {
                 "id",
                 Map.of(),
                 Map.of(),
+                "",
                 "",
                 "",
                 List.of(),
@@ -113,9 +117,9 @@ class PoolWorkflowEntryTest {
         Map<String, Object> ctx = Map.of("k", "v");
         Map<String, Object> meta = Map.of("m", "v");
 
-        PoolWorkflowEntry a = new PoolWorkflowEntry("id", name, description, "icon", "cat", tags, blocks,
+        PoolWorkflowEntry a = new PoolWorkflowEntry("id", name, description, "icon", "cat", "repo", tags, blocks,
                 "ins", "model", "1.0", "author", ctx, meta, "f.json");
-        PoolWorkflowEntry b = new PoolWorkflowEntry("id", name, description, "icon", "cat", tags, blocks,
+        PoolWorkflowEntry b = new PoolWorkflowEntry("id", name, description, "icon", "cat", "repo", tags, blocks,
                 "ins", "model", "1.0", "author", ctx, meta, "f.json");
 
         assertThat(a).isEqualTo(b);
@@ -124,16 +128,16 @@ class PoolWorkflowEntryTest {
 
     @Test
     void should_notBeEqual_when_idDiffers() {
-        PoolWorkflowEntry a = new PoolWorkflowEntry("id-1", null, null, null, null, null, null, null, null, null, null, null, null, null);
-        PoolWorkflowEntry b = new PoolWorkflowEntry("id-2", null, null, null, null, null, null, null, null, null, null, null, null, null);
+        PoolWorkflowEntry a = new PoolWorkflowEntry("id-1", null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        PoolWorkflowEntry b = new PoolWorkflowEntry("id-2", null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_filenameDiffers() {
-        PoolWorkflowEntry a = new PoolWorkflowEntry("id", null, null, null, null, null, null, null, null, null, null, null, null, "a.json");
-        PoolWorkflowEntry b = new PoolWorkflowEntry("id", null, null, null, null, null, null, null, null, null, null, null, null, "b.json");
+        PoolWorkflowEntry a = new PoolWorkflowEntry("id", null, null, null, null, null, null, null, null, null, null, null, null, null, "a.json");
+        PoolWorkflowEntry b = new PoolWorkflowEntry("id", null, null, null, null, null, null, null, null, null, null, null, null, null, "b.json");
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -141,7 +145,7 @@ class PoolWorkflowEntryTest {
     @Test
     void should_containFieldValues_when_toStringInvoked() {
         PoolWorkflowEntry entry = new PoolWorkflowEntry(
-                "wf-1", Map.of("en", "Name"), Map.of("en", "Desc"), "icon", "cat",
+                "wf-1", Map.of("en", "Name"), Map.of("en", "Desc"), "icon", "cat", "repo",
                 List.of("tag"), List.of(), "instr", "model-x", "2.0", "auth",
                 Map.of(), Map.of(), "file.json"
         );
@@ -158,7 +162,7 @@ class PoolWorkflowEntryTest {
     @Test
     void should_returnNonNullHashCode_when_allFieldsNull() {
         PoolWorkflowEntry entry = new PoolWorkflowEntry(
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null
         );
 
         // hashCode() must not throw on null fields

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Executes "document" blocks: extracts text from a PDF/DOCX/XLSX/HTML/TXT file
@@ -107,7 +108,7 @@ public class DocumentBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "document".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("document");
     }
 }

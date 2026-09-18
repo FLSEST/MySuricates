@@ -1,7 +1,20 @@
 {
-  "name": "Projekt-Müll-Cleanup",
+  "name": {
+    "de": "Projekt-Müll-Cleanup",
+    "en": "Project Junk Cleanup"
+  },
   "icon": "🧹",
-  "description": "Scannt ein Projektverzeichnis nach Junk-Dateien (JVM-Crashdumps, Debug-Screenshots, Editor-/Merge-Reste, Log-/Tmp-Reste), verschiebt ausschließlich ungetrackte Treffer in eine Quarantäne mit Restore-Manifest (~/.mysuricates/quarantine) und purgt Batches älter als retention_days. Reine Shell-Blöcke, 0 AI-Tokens. Kontext: target_dir, junk_patterns, min_age_days, retention_days, dry_run.",
+  "description": {
+    "de": "Scannt ein Projektverzeichnis nach Junk-Dateien (JVM-Crashdumps, Debug-Screenshots, Editor-/Merge-Reste, Log-/Tmp-Reste), verschiebt ausschließlich ungetrackte Treffer in eine Quarantäne mit Restore-Manifest und purgt Batches älter als retention_days. Reine Shell-Blöcke, 0 AI-Tokens. Kontext: target_dir, junk_patterns, min_age_days, retention_days, dry_run.",
+    "en": "Scans a project directory for junk files (JVM crash dumps, debug screenshots, editor/merge leftovers, log/tmp remains), moves only untracked hits into a quarantine with a restore manifest, and purges batches older than retention_days. Shell blocks only, 0 AI tokens. Context: target_dir, junk_patterns, min_age_days, retention_days, dry_run."
+  },
+  "category": "CUSTOM",
+  "scope": "portable",
+  "tags": [
+    "cleanup",
+    "maintenance",
+    "shell"
+  ],
   "instructions": "Reiner Shell-Workflow ohne AI-Blöcke.",
   "version": "1.0.0",
   "defaultContext": {

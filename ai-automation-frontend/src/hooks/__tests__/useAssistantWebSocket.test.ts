@@ -6,8 +6,12 @@ let onConnectCb: (() => void) | null = null;
 let onDisconnectCb: (() => void) | null = null;
 let onStompErrorCb: (() => void) | null = null;
 let lastWsUrl: string | null = null;
+let lastSockJsOptions: Record<string, unknown> | undefined;
+let lastClientConfig: Record<string, unknown> | null = null;
 // Captures the webSocketFactory so activate() can invoke it and trigger SockJS instantiation
 let capturedWebSocketFactory: (() => unknown) | undefined;
+// beforeConnect fetches the handshake ticket — stompjs awaits it before every connect attempt
+let capturedBeforeConnect: (() => Promise<void>) | undefined;
 
 interface SubscribeRecord {
   destination: string;
@@ -24,14 +28,16 @@ vi.mock('@stomp/stompjs', () => {
   class MockClient {
     connected = false;
     constructor(config: Record<string, unknown>) {
+      lastClientConfig = config;
       onConnectCb = config.onConnect as () => void;
       onDisconnectCb = config.onDisconnect as () => void;
       onStompErrorCb = config.onStompError as () => void;
       capturedWebSocketFactory = config.webSocketFactory as (() => unknown) | undefined;
+      capturedBeforeConnect = config.beforeConnect as (() => Promise<void>) | undefined;
     }
     activate = mockActivate.mockImplementation(() => {
-      // Invoke factory so the SockJS constructor runs and lastWsUrl is captured
-      if (capturedWebSocketFactory) capturedWebSocketFactory();
+      // The handshake itself (beforeConnect + webSocketFactory) is driven explicitly by the
+      // ticket tests via openSocket(); everything else only needs the connected state.
       this.connected = true;
       if (onConnectCb) onConnectCb();
     });
@@ -48,16 +54,22 @@ vi.mock('@stomp/stompjs', () => {
       }
     );
   }
-  return { Client: MockClient };
+  return { Client: MockClient, ReconnectionTimeMode: { LINEAR: 0, EXPONENTIAL: 1 } };
 });
 
 // Use a class (not an arrow fn) so that `new SockJS(url)` works correctly
 vi.mock('sockjs-client', () => ({
   default: class MockSockJS {
-    constructor(url: string) {
+    constructor(url: string, _protocols?: unknown, options?: Record<string, unknown>) {
       lastWsUrl = url;
+      lastSockJsOptions = options;
     }
   },
+}));
+
+const mockFetchWsTicket = vi.fn();
+vi.mock('../../api/client', () => ({
+  api: { fetchWsTicket: (...args: unknown[]) => mockFetchWsTicket(...args) },
 }));
 
 import { useAssistantWebSocket } from '../useAssistantWebSocket';
@@ -67,15 +79,27 @@ function findSubscription(destination: string): SubscribeRecord | undefined {
   return subscriptions.find((s) => s.destination === destination);
 }
 
+/** Runs the handshake the way stompjs does: beforeConnect, then webSocketFactory. */
+async function openSocket() {
+  await capturedBeforeConnect?.();
+  capturedWebSocketFactory?.();
+}
+
 beforeEach(() => {
   onConnectCb = null;
   onDisconnectCb = null;
   onStompErrorCb = null;
   lastWsUrl = null;
+  lastSockJsOptions = undefined;
+  lastClientConfig = null;
   capturedWebSocketFactory = undefined;
+  capturedBeforeConnect = undefined;
   subscriptions.length = 0;
   mockActivate.mockClear();
   mockDeactivate.mockClear();
+  mockFetchWsTicket.mockReset();
+  let ticketCount = 0;
+  mockFetchWsTicket.mockImplementation(() => Promise.resolve(`ticket-${++ticketCount}`));
   // reset api key
   useSettingsStore.setState({ apiKey: '' });
 });
@@ -102,17 +126,46 @@ describe('useAssistantWebSocket', () => {
       await waitFor(() => expect(result.current.connected).toBe(true));
     });
 
-    it('should_include_apiKey_in_websocket_url_when_set', async () => {
+    it('should_fetch_a_ticket_and_never_put_the_apiKey_in_the_url', async () => {
       useSettingsStore.setState({ apiKey: 'secret-key' });
       renderHook(() => useAssistantWebSocket('req-1', null));
-      await waitFor(() => expect(lastWsUrl).not.toBeNull());
-      expect(lastWsUrl).toContain('apiKey=secret-key');
+      await waitFor(() => expect(capturedBeforeConnect).toBeDefined());
+
+      await act(async () => { await openSocket(); });
+
+      expect(mockFetchWsTicket).toHaveBeenCalledTimes(1);
+      expect(lastWsUrl).toContain('/ws?ticket=ticket-1');
+      expect(lastWsUrl).not.toContain('apiKey=');
+      expect(lastWsUrl).not.toContain('secret-key');
     });
 
-    it('should_not_include_apiKey_param_when_apiKey_is_empty', async () => {
+    it('should_fetch_a_fresh_ticket_on_every_reconnect', async () => {
       renderHook(() => useAssistantWebSocket('req-1', null));
-      await waitFor(() => expect(lastWsUrl).not.toBeNull());
-      expect(lastWsUrl).not.toContain('apiKey=');
+      await waitFor(() => expect(capturedBeforeConnect).toBeDefined());
+
+      await act(async () => { await openSocket(); });
+      await act(async () => { await openSocket(); });
+
+      expect(mockFetchWsTicket).toHaveBeenCalledTimes(2);
+      expect(lastWsUrl).toContain('ticket=ticket-2');
+    });
+
+    it('should_use_the_websocket_transport_only', async () => {
+      renderHook(() => useAssistantWebSocket('req-1', null));
+      await waitFor(() => expect(capturedBeforeConnect).toBeDefined());
+
+      await act(async () => { await openSocket(); });
+
+      // Ein SockJS-Fallback-Transport eröffnet eine neue Session und braucht ein zweites Ticket
+      expect(lastSockJsOptions).toEqual({ transports: ['websocket'] });
+    });
+
+    it('should_back_off_exponentially_between_reconnects', async () => {
+      renderHook(() => useAssistantWebSocket('req-1', null));
+      await waitFor(() => expect(lastClientConfig).not.toBeNull());
+
+      expect(lastClientConfig?.reconnectTimeMode).toBe(1 /* ReconnectionTimeMode.EXPONENTIAL */);
+      expect(lastClientConfig?.maxReconnectDelay).toBe(60_000);
     });
 
     it('should_deactivate_client_on_unmount', async () => {

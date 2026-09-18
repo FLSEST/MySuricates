@@ -37,7 +37,11 @@ public final class StageChain {
             if (stage.inputKind() == StageKind.JSON && current == StageKind.TEXT) {
                 throw new CompressionException("Stufe " + position + " (" + op + "): erwartet JSON, aber eine vorherige Stufe liefert Text");
             }
-            stage.validate(config);
+            try {
+                stage.validate(config);
+            } catch (CompressionException e) {
+                throw namePositionAndOp(position, op, e);
+            }
             steps.add(new Step(stage, config));
             current = stage.outputKind();
         }
@@ -65,14 +69,32 @@ public final class StageChain {
         return new Outcome(text, metadata, notes);
     }
 
-    /** Runs one stage; its errors name the stage position and op ("Stufe 2 (lines.filter): …"). */
+    /**
+     * Runs one stage; its errors name the stage position and op exactly once ("Stufe 2 (lines.filter): …").
+     * A message the stage already prefixed with its own "Stufe &lt;op&gt;: " loses that prefix — the position
+     * form contains the op already.
+     */
     private static StageResult apply(Step step, int position, String text, RegexGuard guard) {
         try {
             return step.stage().apply(text, step.config(), guard);
         } catch (CompressionException e) {
-            String prefix = "Stufe " + position;
-            if (e.getMessage() != null && e.getMessage().startsWith(prefix)) throw e;
-            throw new CompressionException(prefix + " (" + step.stage().op() + "): " + e.getMessage());
+            throw namePositionAndOp(position, step.stage().op(), e);
         }
+    }
+
+    /**
+     * Rewrites a stage's error to name its position and op exactly once ("Stufe 2 (lines.filter):
+     * …"), for both configuration errors ({@link #parse}) and run-time errors ({@link #apply}). A
+     * message the stage already prefixed with its own "Stufe &lt;op&gt;: " ({@link
+     * StageConfig#where}) loses that prefix — the position form contains the op already. Already
+     * positioned (e.g. re-thrown by a caller) it passes through unchanged.
+     */
+    private static CompressionException namePositionAndOp(int position, String op, CompressionException e) {
+        String prefix = "Stufe " + position;
+        String message = e.getMessage() == null ? "" : e.getMessage();
+        if (message.startsWith(prefix)) return e;
+        String ownPrefix = StageConfig.where(op) + ": ";
+        if (message.startsWith(ownPrefix)) message = message.substring(ownPrefix.length());
+        return new CompressionException(prefix + " (" + op + "): " + message);
     }
 }

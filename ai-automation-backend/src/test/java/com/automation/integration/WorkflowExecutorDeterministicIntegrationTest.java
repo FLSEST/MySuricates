@@ -14,6 +14,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.project.ContainerService;
 import com.automation.service.workflow.WorkflowExecutor;
 import jakarta.persistence.EntityManager;
@@ -52,6 +53,7 @@ class WorkflowExecutorDeterministicIntegrationTest {
     );
 
     @Autowired private WorkflowExecutor workflowExecutor;
+    @Autowired private ExecutionCommandService executionCommandService;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private WorkflowRepository workflowRepository;
     @Autowired private WorkflowRunRepository workflowRunRepository;
@@ -258,6 +260,69 @@ class WorkflowExecutorDeterministicIntegrationTest {
         assertThat(run.getError()).containsEntry("blockType", "shell");
     }
 
+    @Test
+    void resumeAfterWrapperBlock_runsTheBlocksThatNeverRan() {
+        Project project = createProject("resume-foreach");
+        Workflow workflow = createWorkflow(project, "resume after foreach",
+                block("foreach", Map.of(
+                        "variable_name", "item",
+                        "items", List.of("one", "two"),
+                        "command", "echo item-{{ item }}",
+                        "execution_mode", "shell",
+                        "timeout_seconds", 5
+                )),
+                shell("echo a >> a.log"),
+                // Fails once, succeeds on the resumed attempt — so the run stops here and c never runs
+                shell("if [ -f b.flag ]; then echo b >> b.log; else touch b.flag; exit 1; fi"),
+                shell("echo c >> c.log"));
+
+        WorkflowRun run = executeAndWait(workflow, Map.of());
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
+        List<StepResult> steps = stepsFor(run);
+        assertThat(steps).hasSize(3);            // foreach, a, b — c was never reached
+        // The foreach consumed extra step indices for its items: b's index is ahead of its block position
+        assertThat(steps.get(2).getStepIndex()).isGreaterThan(2);
+
+        markInterrupted(run, steps.get(2));
+
+        WorkflowRun resumed = resumeAndWait(run);
+
+        assertThat(resumed.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(lineCount(project, "a.log")).as("completed block must not run again").isEqualTo(1);
+        assertThat(lineCount(project, "b.log")).as("interrupted block must run again").isEqualTo(1);
+        assertThat(lineCount(project, "c.log")).as("block after the interrupted one must run").isEqualTo(1);
+        assertThat(stepsFor(resumed)).extracting(StepResult::getStepIndex).doesNotHaveDuplicates();
+    }
+
+    /** Puts the run into the state an application restart leaves behind: run INTERRUPTED, last step still RUNNING. */
+    private void markInterrupted(WorkflowRun run, StepResult lastStep) {
+        StepResult step = stepResultRepository.findById(lastStep.getId()).orElseThrow();
+        step.setStatus(StepStatus.RUNNING);
+        step.setOutput(null);
+        step.setCompletedAt(null);
+        stepResultRepository.saveAndFlush(step);
+
+        WorkflowRun stored = workflowRunRepository.findById(run.getId()).orElseThrow();
+        stored.setStatus(RunStatus.INTERRUPTED);
+        stored.setCompletedAt(null);
+        stored.setError(null);
+        workflowRunRepository.saveAndFlush(stored);
+        entityManager.clear();
+    }
+
+    private int lineCount(Project project, String fileName) {
+        Path file = Path.of(project.getPath(), fileName);
+        if (!Files.exists(file)) {
+            return 0;
+        }
+        try {
+            return Files.readAllLines(file).size();
+        } catch (Exception e) {
+            throw new AssertionError("Failed to read " + file, e);
+        }
+    }
+
     private Project createProject(String name) {
         Path projectPath = tempDir.resolve(name);
         try {
@@ -287,7 +352,16 @@ class WorkflowExecutorDeterministicIntegrationTest {
     }
 
     private WorkflowRun executeAndWait(Workflow workflow, Map<String, Object> context) {
-        WorkflowRun started = workflowExecutor.execute(workflow, context, TriggerSource.MANUAL);
+        return waitForTerminal(workflowExecutor.execute(workflow, context, TriggerSource.MANUAL));
+    }
+
+    /** Resumes through the transactional service the REST endpoint uses — the executor itself needs the session. */
+    private WorkflowRun resumeAndWait(WorkflowRun run) {
+        executionCommandService.resumeFromStep(run.getId());
+        return waitForTerminal(workflowRunRepository.findById(run.getId()).orElseThrow());
+    }
+
+    private WorkflowRun waitForTerminal(WorkflowRun started) {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
         RunStatus lastStatus = started.getStatus();
         while (Instant.now().isBefore(deadline)) {

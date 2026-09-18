@@ -4,18 +4,24 @@
     "en": "System Performance Analysis"
   },
   "description": {
-    "de": "Sammelt System- und App-Metriken via Actuator und analysiert Bottlenecks. Erstellt ein TODO mit Optimierungsempfehlungen.",
-    "en": "Collects system and app metrics via Actuator, analyzes bottlenecks, and creates a TODO with optimization recommendations."
+    "de": "Sammelt System- und App-Metriken via Actuator und analysiert Bottlenecks. Der Gate-Status am Ende der Analyse lässt die Plattform ein TODO mit Optimierungsempfehlungen anlegen (RED = hohe, YELLOW = mittlere Priorität); bei GREEN werden offene TODOs dieses Workflows geschlossen.",
+    "en": "Collects system and app metrics via Actuator and analyzes bottlenecks. The gate status at the end of the analysis makes the platform create a TODO with optimization recommendations (RED = high, YELLOW = medium priority); on GREEN it closes this workflow's open TODOs."
   },
   "icon": "⚡",
   "category": "MONITORING",
+  "scope": "repo",
   "tags": ["performance", "monitoring", "system", "backend"],
   "model": "opus",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "author": "MySuricates",
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "auto"
+    }
+  },
   "defaultContext": {
     "backend_url": "http://localhost:9090",
-    "project_id": "{{ project_id }}",
     "log_file": "ai-automation-backend/data/logs/mysuricates.log",
     "db_file": "ai-automation-backend/data/automation.db"
   },
@@ -34,20 +40,6 @@
         "label": "Performance analysieren",
         "timeout_seconds": 600,
         "command": "Analysiere die folgenden System- und App-Metriken der MySuricates-Plattform (Spring Boot + SQLite + React):\n\n{{ previous_output }}\n\nErstelle einen strukturierten Performance-Bericht:\n\n## 1. Zusammenfassung\nGesamtbewertung in 2-3 Saetzen: Wie ist der aktuelle Zustand? Was faellt am staerksten auf?\n\n## 2. Gefundene Bottlenecks\n\n| Komponente | Problem | Messwert | Schweregrad |\n|---|---|---|---|\n| ... | ... | ... | KRITISCH / HOCH / MITTEL / NIEDRIG |\n\nBewerte folgende Bereiche:\n- **Backend Health**: status != UP = HOCH; DB status != UP = KRITISCH\n- **JVM-Heap**: used/max > 70% = MITTEL, > 85% = HOCH, > 95% = KRITISCH\n- **CPU-Auslastung**: process.cpu.usage > 50% = MITTEL, > 80% = HOCH\n- **System-Load**: > Anzahl Kerne = MITTEL, > 2x Kerne = HOCH\n- **Logs**: > 50 ERRORs = MITTEL, > 200 = HOCH; Timeout-Eintraege = HOCH\n- **DB-Groesse**: > 500MB = MITTEL, > 2GB = HOCH\n- **Disk Free**: < 10 GB = HOCH, < 2 GB = KRITISCH\n\n## 3. Optimierungsempfehlungen\n\n### Kurzfristig (< 1 Tag, Konfiguration & Tuning)\n- Konkrete Config-Aenderungen mit erwarteter Wirkung\n\n### Mittelfristig (< 1 Woche, Code-Anpassungen)\n- Spezifische Code-Stellen oder Queries die optimiert werden sollten\n\n### Langfristig (> 1 Woche, Architektur)\n- Strukturelle Verbesserungen (z.B. DB-Migration, Caching, Async)\n\n## 4. Gate-Status\n\nBasierend auf den Findings:\n- KRITISCH gefunden → RED\n- HOCH gefunden (kein KRITISCH) → YELLOW\n- Nur MITTEL/NIEDRIG oder nichts → GREEN\n\nAm Ende genau diese Zeilen ausgeben (keine Markdown-Formatierung):\n\ngate_status: GREEN\ngate_category: performance\ngate_description: <Kurzbeschreibung des schwersten Problems oder 'Kein kritischer Befund'>"
-      }
-    },
-    {
-      "type": "agentic",
-      "config": {
-        "label": "TODO anlegen",
-        "max_iterations": 8,
-        "max_total_tokens": 150000,
-        "iteration_timeout_seconds": 120,
-        "total_timeout_seconds": 600,
-        "require_approval": false,
-        "max_repeated_actions": 3,
-        "goal": "Lege basierend auf der Performance-Analyse ein TODO in MySuricates an.\n\nANALYSE:\n{{ previous_output }}\n\nBESTEHENDE OFFENE TODOs (zur Duplikat-Pruefung):\n{{ open_todos }}\n\nVORGEHEN:\n1. Wenn das Gate NICHT GREEN ist (also YELLOW oder RED): Erstelle oder aktualisiere das TODO:\n   - Falls in OPEN_TODOS bereits ein TODO mit 'Performance-Optimierung' im Titel und tag 'performance' existiert: PATCH /api/v1/todos/<id> mit neuer Beschreibung\n   - Sonst: POST /api/v1/todos mit:\n     * title: \"Performance-Optimierung: <hauptsaechliches Problem laut Analyse>\"\n     * description: Vollstaendiger Markdown-Report aus der Analyse (Zusammenfassung, Bottleneck-Tabelle, alle Empfehlungen)\n     * priority: Bei KRITISCH-Findings -> HIGH, bei nur HOCH -> HIGH, bei nur MITTEL -> MEDIUM\n     * tags: [\"performance\", \"backend\"]\n     * projectId: \"{{ project_id }}\"\n     * source: \"AI\"\n     * sourceAgent: \"performance-analysis-workflow\"\n\n2. Wenn Gate GREEN: Kein TODO anlegen. Ausgabe: 'System laeuft gut — kein Performance-TODO noetig.'\n\nAPI-Key: aus app_settings holen oder bestehendes Token nutzen. Backend-URL: {{ backend_url }}\nWICHTIG: X-API-Key Header bei allen curl-Aufrufen.",
-        "success_criteria": "TODO wurde angelegt oder aktualisiert (bei YELLOW/RED), oder Bestaetigung ausgegeben dass kein TODO noetig ist (bei GREEN)."
       }
     }
   ]

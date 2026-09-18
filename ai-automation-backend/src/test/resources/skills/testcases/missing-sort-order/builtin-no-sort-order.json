@@ -1,0 +1,14 @@
+{
+  "id" : "builtin-no-sort-order",
+  "version" : "1.0.0",
+  "name" : "Ohne sortOrder",
+  "icon" : "🚫",
+  "description" : "Testfall: sortOrder fehlt und darf nicht still zu 0 werden.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "noop",
+      "description" : "Tut nichts."
+    }
+  ]
+}

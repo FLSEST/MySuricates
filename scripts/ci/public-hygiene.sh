@@ -229,13 +229,59 @@ check_gitignore_leaks() {
     # Muster wie *.bak oder sehr kurze Namen taugen nicht als Signal.
     case "$base" in *'*'*|*'?'*|*'['*) continue ;; esac
     [ "${#base}" -lt 6 ] && continue
+    hygiene_gitignore_leak_is_generic "$base" && continue
     line="$(grep -nF -- "$base" .gitignore | head -1 | cut -d: -f1)"
     [ -n "$line" ] && annotate ".gitignore" "$line" "nennt '$base' — der Name steht in $exclude und wird durch .gitignore oeffentlich"
   done < "$exclude"
 }
 
 # ---------------------------------------------------------------------------
-# Check 7 — Symlinks, die aus dem Repository hinausfuehren
+# Check 7 — SECURITY.md: vorhanden, kein privater Kontakt, echter Meldeweg
+#
+# Was ein Besucher als Meldeweg fuer Sicherheitsluecken vorfindet, soll GitHubs
+# private Sicherheitshinweise sein, keine Mailadresse — sonst entsteht wieder
+# eine Personendaten-Frage. Nur getrackter Bestand, siehe hygiene-rules.sh.
+# ---------------------------------------------------------------------------
+check_security_md() {
+  local f="$HYGIENE_SECURITY_FILE"
+  local content
+  if [ "$MODE" = "worktree" ]; then
+    # --worktree beschreibt bewusst auch Ungetracktes (siehe check_worktree_strays) — hier
+    # ist die Arbeitskopie die richtige Quelle.
+    if [ ! -f "$f" ]; then
+      annotate "$f" 1 "Datei fehlt — kein dokumentierter Meldeweg fuer Sicherheitsluecken"
+      return
+    fi
+    content="$(cat -- "$f" 2>/dev/null)"
+  else
+    # --tracked ist die Release-Frage: was landet im Repository. Eine Datei, die nur auf
+    # Platte liegt (noch nicht "git add"ed), zaehlt dafuer nicht — sonst meldet das Gate
+    # OK, obwohl SECURITY.md gar nicht getrackt ist.
+    if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      annotate "$f" 1 "ist nicht getrackt — kein dokumentierter Meldeweg fuer Sicherheitsluecken im Bestand"
+      return
+    fi
+    content="$(git show "HEAD:$f" 2>/dev/null)"
+  fi
+  local line
+  line="$(grep -nE "$HYGIENE_SECURITY_EMAIL_REGEX" <<<"$content" | head -1 | cut -d: -f1)"
+  if [ -n "$line" ]; then
+    annotate "$f" "$line" "enthaelt eine E-Mail-Adresse — Meldeweg soll GitHub Private Vulnerability Reporting sein, keine Mailadresse"
+  fi
+  local term found=0
+  for term in "${HYGIENE_SECURITY_REQUIRED_TERMS[@]}"; do
+    if grep -qiF -- "$term" <<<"$content"; then
+      found=1
+      break
+    fi
+  done
+  if [ "$found" -eq 0 ]; then
+    annotate "$f" 1 "nennt keinen der erwarteten Begriffe (${HYGIENE_SECURITY_REQUIRED_TERMS[*]}) — Meldeweg unklar"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Check 8 — Symlinks, die aus dem Repository hinausfuehren
 #
 # git grep liest keine Symlink-Blobs; ein getrackter Link mit absolutem Ziel
 # (z. B. unter dem Entwickler-Home) rutscht an Check 2 vorbei. Ausserdem zeigt
@@ -305,6 +351,7 @@ else
     esac
   done < <(check_weight)
   check_gitignore_leaks
+  check_security_md
   report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays
 fi

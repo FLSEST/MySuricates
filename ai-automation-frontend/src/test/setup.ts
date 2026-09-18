@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import { resetAuthStatusCache, resetRateLimitBackoff } from '../api/client';
 
 afterEach(() => {
   cleanup();
+  // Module-level state in the API client (429 backoff deadlines, cached auth status)
+  // must not leak from one test into the next (d89b2cc1).
+  resetRateLimitBackoff();
+  resetAuthStatusCache();
 });
 
 // matchMedia mock

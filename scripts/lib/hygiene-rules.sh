@@ -23,6 +23,7 @@ HYGIENE_PATTERNS=(
   "test-e2e-key|hardcoded test API key string"
   "ebf4f50c-20c2-4c35-a84a-a0b350124523|internal project UUID"
   "changeme|known default credential"
+  "[auto-generated]|nie ersetzter Stempel-Platzhalter, ersatzlos streichen (siehe TODO 994af971)"
 )
 
 # ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ HYGIENE_SELF_EXCLUDE=(
   "scripts/ci/public-hygiene.sh"
   "scripts/ci/pool-neutrality.sh"
   "scripts/git-hooks/pre-commit"
+  "scripts/tests/test-public-hygiene.sh"
 )
 
 # ---------------------------------------------------------------------------
@@ -53,6 +55,113 @@ HYGIENE_BACKUP_GLOBS=(
 HYGIENE_MAX_BLOB_BYTES=${HYGIENE_MAX_BLOB_BYTES:-5242880}   # 5 MiB
 # Ab dieser Größe zählt ein doppelt getrackter Blob als Dublette.
 HYGIENE_DUP_MIN_BYTES=${HYGIENE_DUP_MIN_BYTES:-262144}      # 256 KiB
+
+# ---------------------------------------------------------------------------
+# SECURITY.md — Pflichtdatei mit einem echten Meldeweg
+#
+# Nur im getrackten Bestand geprueft (--tracked/--worktree), nicht bei --staged:
+# jeder Commit einzeln zu blockieren waere zu aufdringlich fuer eine Datei, die
+# sich selten aendert. Die Release-Frage ist "ist der Zustand am Ende richtig?".
+# ---------------------------------------------------------------------------
+HYGIENE_SECURITY_FILE="SECURITY.md"
+HYGIENE_SECURITY_EMAIL_REGEX='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'
+# Mindestens einer dieser Begriffe muss vorkommen (Meldeweg erkennbar).
+HYGIENE_SECURITY_REQUIRED_TERMS=(
+  "Private vulnerability reporting"
+  "Security Advisories"
+)
+
+# ---------------------------------------------------------------------------
+# Kuratierungsregeln für den öffentlichen Workflow-Pool (TODO 523702f4)
+#
+# Der Plan steht in docs/workflow-pool-kuratierung.md; die Werte hier sind seine
+# maschinell prüfbare Seite. Gelesen von scripts/ci/pool-neutrality.sh.
+# ---------------------------------------------------------------------------
+
+# Erlaubte Werte des Pflichtfelds "scope".
+#   repo     — greift auf die Struktur dieses Repositories zu
+#   portable — über project_path (o. ä.) parametrisiert, läuft in jedem Projekt
+HYGIENE_POOL_SCOPES=("repo" "portable")
+
+# Registrierte Blocktypen. Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend
+# (dort selbst gegen die BlockExecutor-Klassen gepinnt, BlockTypeListsGuardTest).
+# scripts/tests/test-public-hygiene.sh vergleicht beide Listen — driftet eine,
+# fällt es dort auf.
+HYGIENE_POOL_BLOCK_TYPES=(
+  agentic approval compress compress-ai conditional document foreach
+  human-input integration retry shell simple skill-capability sub-workflow
+  switch todo-close todo-create todo-update while
+)
+
+# Kennzeichen, an denen ein Eintrag an DIESES Repository gebunden ist. In einem
+# Eintrag mit scope: portable sind sie ein Befund — wer ihn in sein eigenes
+# Projekt installiert, läuft sonst ins Leere.
+HYGIENE_POOL_REPO_MARKERS=(
+  "ai-automation-backend" "ai-automation-frontend" "scripts/" "mvnw" "workflow-pool/"
+)
+
+# Schlüssel, die eine laufende Instanz bezeichnen. Als Feld der Definition, im
+# defaultContext oder in den Metadaten sind sie ein Befund — es sei denn, der
+# Wert ist leer oder eine Template-Variable ({{ project_id }}), denn das ist
+# gerade die portable Parametrisierung.
+HYGIENE_POOL_INSTANCE_KEYS=(
+  "projectId" "project_id" "workflowId" "workflow_id" "runId" "run_id"
+  "scheduleId" "schedule_id" "chainId" "chain_id" "executionId" "execution_id"
+)
+
+# ---------------------------------------------------------------------------
+# Kriterium „Definition ruft die eigene REST-API oder liest Zugangsdaten"
+# (TODO 1ccdc6d5)
+#
+# Die Hausregel lautet: Workflow-Blöcke rufen weder die eigene REST-API noch die
+# Datenbank auf — alles, was sie brauchen, injiziert der WorkflowExecutor als
+# Kontextvariable ({{ open_todos }}, {{ previous_report }}, …). In einer
+# mitveröffentlichten Definition kommt ein zweites Problem dazu: ein Prompt, der
+# erklärt, wie man sich den API-Key aus app_settings holt, ist eine Anleitung
+# zum Auslesen von Zugangsdaten — jeder Leser installiert sie mit.
+# ---------------------------------------------------------------------------
+
+# Zugangsdaten: keine Ausnahme, das Vorkommen allein ist der Befund.
+HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings")
+
+# Eigene REST-API. Das Präfix allein genügt nicht als Befund: mocking-gap-audit
+# führt "/api/v1/" als Suchmuster in einer Liste von Netzwerk-Kennzeichen, und
+# das ist kein Aufruf. Gemeldet wird erst die Kombination aus Pfad und Aufruf.
+HYGIENE_POOL_API_PREFIX="/api/v1/"
+HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.client")
+
+# Ohne API-Key erreichbar (ApiKeyAuthFilter) und deshalb als Lebenszeichen-Sonde
+# erlaubt — mysuricates-performance-audit misst damit die Antwortzeit.
+HYGIENE_POOL_API_ALLOWED=(
+  "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
+)
+
+# Direkter Datenbankzugriff. Die Datei anzusehen (stat, du) bleibt erlaubt —
+# gemeint ist das Lesen des Inhalts, das an Hibernate und pool-size=1 vorbeigeht.
+HYGIENE_POOL_DB_FILES=("automation.db")
+HYGIENE_POOL_DB_ACCESS=("sqlite3" "SELECT " "INSERT INTO" "UPDATE " "DELETE FROM" ".tables" ".schema")
+
+# ---------------------------------------------------------------------------
+# Generische Build-Namen: in .git/info/exclude UND .gitignore erlaubt
+#
+# check_gitignore_leaks (public-hygiene.sh) meldet sonst jeden Namen aus der
+# lokalen exclude-Datei, der auch in .gitignore auftaucht, als Leck. Diese
+# Namen sind zu generisch, um etwas Persoenliches zu verraten — jedes
+# Node/Java/Python-Projekt erzeugt sie. Die Regel bleibt fuer alles andere in
+# Kraft, insbesondere workflow-pool/* (siehe TODO 819b387e).
+# ---------------------------------------------------------------------------
+HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES=(
+  "node_modules" "target" "dist" "build" ".venv" "__pycache__" "*.log"
+)
+
+# hygiene_gitignore_leak_is_generic <basisname>
+hygiene_gitignore_leak_is_generic() {
+  local base="$1" n
+  for n in "${HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES[@]}"; do
+    [ "$base" = "$n" ] && return 0
+  done
+  return 1
+}
 
 # ---------------------------------------------------------------------------
 # Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung

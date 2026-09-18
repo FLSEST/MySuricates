@@ -9,6 +9,7 @@
   },
   "icon": "📝",
   "category": "CONTENT",
+  "scope": "portable",
   "tags": ["documentation", "readme", "markdown"],
   "blocks": [
     {

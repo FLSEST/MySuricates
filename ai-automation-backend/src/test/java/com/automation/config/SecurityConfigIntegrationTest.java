@@ -71,12 +71,6 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
-    void publicEndpoint_integrationSnippet_accessibleWithoutAuth() throws Exception {
-        mockMvc.perform(get("/api/v1/system/integration-snippet"))
-                .andExpect(status().is(not(403)));
-    }
-
-    @Test
     void publicEndpoint_oauthCallback_accessibleWithoutAuth() throws Exception {
         mockMvc.perform(get("/api/v1/integrations/github/callback"))
                 .andExpect(status().is(not(403)));
@@ -103,11 +97,24 @@ class SecurityConfigIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void protectedEndpoint_integrationSnippet_withoutAuth_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/system/integration-snippet"))
+                .andExpect(status().isForbidden());
+    }
+
     // --- Group 3: Protected endpoints with valid API key ---
 
     @Test
     void protectedEndpoint_apiWithValidKey_succeeds() throws Exception {
         mockMvc.perform(get("/api/v1/projects")
+                        .header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void protectedEndpoint_integrationSnippet_withValidKey_succeeds() throws Exception {
+        mockMvc.perform(get("/api/v1/system/integration-snippet")
                         .header(API_KEY_HEADER, VALID_API_KEY))
                 .andExpect(status().isOk());
     }

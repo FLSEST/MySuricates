@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -30,8 +31,8 @@ public class IntegrationBlockExecutor implements BlockExecutor {
     private final ModuleRegistry modules;
 
     @Override
-    public boolean supports(String blockType) {
-        return "integration".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("integration");
     }
 
     @Override

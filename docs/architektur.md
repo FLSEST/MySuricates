@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Architektur
 
 ## Systemübersicht
@@ -68,9 +66,9 @@ automation:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
 
-Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal).
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` waehlt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Praefix, sonst `en`) — das Ergebnis (welche Module aktiv sind) aendert sich dadurch nicht.
 
-**Katalog** (einzige Quelle: `modules/ModuleCatalog`):
+**Katalog** (einzige Quelle: `modules/ModuleCatalog`, 18 Feature-Module + 4 Härtungsschalter = 22 Schlüssel):
 
 | Stufe | Module | Reifegrad |
 |---|---|---|
@@ -78,6 +76,19 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 | `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
 | `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimentell |
+
+Der Katalog wird zusätzlich als reine Bash-Arrays nach `scripts/lib/module-catalog.generated.sh`
+exportiert — eingelesen von `scripts/lib/module-preset.sh`, das vor jedem Build läuft und deshalb
+weder ein Backend noch `jq` voraussetzen darf. Die Datei wird nicht von Hand gepflegt: Nach einer
+Änderung am Katalog oder an den Anzeigetexten (`ai-automation-frontend/src/data/modules.<lang>.json`)
+neu erzeugen mit:
+
+```bash
+cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
+```
+
+Ohne Regenerierung schlägt `ModuleCatalogTextsTest` rot fehl, sobald die generierte Datei nicht mehr
+zum Katalog passt — wer ein Modul hinzufügt, erfährt es spätestens dort.
 
 **Durchsetzung**
 
@@ -110,7 +121,7 @@ Vier Schalter unter `automation.hardening.*` — derselbe Mechanismus wie bei de
 
 **Run-Zulassung** — Jeder Run-Auslöser ruft `WorkflowExecutor.execute(…, TriggerSource)` und geht damit durch `RunAdmission`, bevor eine Run-Zeile existiert. Regeln in dieser Reihenfolge: (1) ein versiegelter Workflow muss seinem Siegel entsprechen, (2) mit `require-sealed-for-unattended` braucht ein unbeaufsichtigter Run einen versiegelten Workflow. Ein abgelehnter Run hinterlässt **keine Run-Zeile und keinen DLQ-Eintrag**, nur einen `SECURITY`-Eintrag im Activity-Log; REST-Aufrufer bekommen den Fehlercode.
 
-**Herkunft von Änderungen (immer an)** — Alle Schreiber von Definitionsfeldern gehen durch `WorkflowService` → `WorkflowMutationGateway`. Jede Änderung schreibt eine Versionszeile mit dem Zustand **nach** der Änderung (Nummer = MAX+1) und einem `changeSource`, den der aufrufende Server-Code bestimmt, nie der Request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`). Passt der Hash der neuesten Zeile nicht zum aktuellen Stand (Altbestand, Änderung am Service vorbei), wird dieser Stand zuerst als `untracked` gesichert. Reine Etiketten-Änderungen erzeugen keine Version. `WorkflowWriterAllowlistTest` legt fest, wer `WorkflowRepository.save` sonst noch aufrufen darf.
+**Herkunft von Änderungen (immer an)** — Alle Schreiber von Definitionsfeldern gehen durch `WorkflowService` → `WorkflowMutationGateway`. Jede Änderung schreibt eine Versionszeile mit dem Zustand **nach** der Änderung (Nummer = MAX+1) und einem `changeSource`, den der aufrufende Server-Code bestimmt, nie der Request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`). Passt der Hash der neuesten Zeile nicht zum aktuellen Stand (Altbestand, Änderung am Service vorbei), wird dieser Stand zuerst als `untracked` gesichert. Reine Etiketten-Änderungen erzeugen keine Version. `WorkflowWriterAllowlistTest` legt fest, wer `WorkflowRepository.save` sonst noch aufrufen darf. Dieselbe Stelle lehnt unbekannte Blocktypen ab: `BlockTypeValidator` prüft jeden Blocktyp — verschachtelte in `switch`-`cases[].blocks` und `default` eingeschlossen — gegen die Executor-Registry (`BlockTypeRegistry`, gespeist aus allen `BlockExecutor`-Beans) und wirft **400 `INVALID_ARGUMENT`** mit dem unbekannten Typ und der Liste der erlaubten Typen. Die Prüfung läuft in der Transaktion des Aufrufers, der Speichervorgang wird also zurückgerollt.
 
 **Versiegeln** — `seal` hält den aktuellen Hash in `sealed_hash` fest (mit `sealed_at` und einem WARN-`SECURITY`-Eintrag). Versiegelte Workflows lehnen Definitionsänderungen und Löschen mit **409 `WORKFLOW_SEALED`** ab; Umbenennen bleibt möglich. Reparieren (`POST …/repair`) wird ebenso sofort abgelehnt, automatisches Auto-Repair überspringt versiegelte Workflows vor jedem KI-Aufruf, und die Oberfläche sperrt „Optimieren“ und „Reparieren“. Weicht die Definition beim Start vom Siegel ab (etwa nach einer Änderung direkt in der Datenbank) oder lässt sie sich nicht prüfen, startet der Run nicht: **409 `WORKFLOW_TAMPERED`**, ERROR-`SECURITY`-Eintrag mit erwartetem und tatsächlichem Hash. Beide Prüfungen gelten unabhängig vom Schalter — `sealing` regelt nur Setzen und Lösen, Ausschalten ist kein stilles Entsiegeln.
 
@@ -122,6 +133,23 @@ Vier Schalter unter `automation.hardening.*` — derselbe Mechanismus wie bei de
 
 Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kontextschlüssel `__parent_trigger_source` weiter: `ChainExecutor` setzt ihn für jeden Eintrag selbst (Eingaben können ihn nicht vorgeben), `SubWorkflowBlockExecutor` reicht die effektive Herkunft des Eltern-Runs durch, und Webhook-Payloads dürfen keine `__`-Schlüssel enthalten. Fehlt der Schlüssel oder ist er unlesbar, gilt der Run als unbeaufsichtigt. Abgelehnt wird mit **403 `UNATTENDED_REQUIRES_SEAL`**. Mit diesem Schalter sind Auto-Repair und Wishes faktisch aus: Sie laufen unbeaufsichtigt und müssten versiegelte Workflows ändern.
 
+**Vertrauensklassen der Kontextwerte** — Jede Kontextvariable eines Runs trägt eine von drei Klassen (`executor/VariableTrust`, Buchführung in `executor/ExecutionContextTaint`). Die Klasse entscheidet, ob der Wert in einer Shell-Kommandozeile roh eingesetzt oder in POSIX-Single-Quotes gepackt wird — und ob er den Run *taintet*, also alle Folgeausgaben mitescapt.
+
+| Klasse | Quelle | In Shell-Blöcken | In KI-Prompts | Taintet den Run |
+|---|---|---|---|---|
+| **trusted** | Workflow-Defaults, Systemwerte (`project_path`, `workflow_run_id`, `workflow_definition_hash`), blockinterne Werte, Antworten aus `approval`/`human-input`, jedes `setVariable` | roh eingesetzt | roh | nein |
+| **untrusted extern** | Webhook-Payload, wiederhergestellte `__untrusted_keys` (Resume, Sub-Workflow), aus getainteten Ausgaben abgeleitete Variablen (`step_N_output`, foreach-Items, `document`-Extrakte) | immer single-quoted | roh | ja, ab dem Setzen |
+| **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | erst wenn der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde |
+
+- **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den reservierten Kontextschlüsseln `__untrusted_keys` und `__untrusted_outputs`, damit er Resume und Sub-Workflow-Übergabe überlebt. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
+- **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` nur im KI-Prompt verwendet (`resolveTemplate`) oder gar nicht, bleibt untainted.
+- **Bewusst trusted:** Antworten aus `approval`- und `human-input`-Blöcken kommen über die API-Key-geschützte REST-Schnittstelle von der Person, der die Instanz gehört — sie werden nicht escaped. Ebenso überschreibt `setVariable` (etwa eine Workflow-Variable, die einen Webhook-Wert gleichen Namens überdeckt) die Untrusted-Markierung absichtlich: Der Wert kommt dann aus der Definition, nicht vom Aufrufer. `replaceValue` (Workspace-Pfad-Remapping) tauscht dagegen nur den Wert und lässt die Klasse stehen.
+- **Bekannte Grenzen:**
+  1. In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab.
+  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
+  3. Das Nutzungs-Flag der Plattform-Daten selbst wird nicht exportiert; es braucht das nicht, weil die erste Ausgabe nach der Substitution den Taint in `__untrusted_outputs` schreibt.
+  4. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
+
 **Webhook-Signaturen** — `POST /api/v1/webhooks/{id}/secret` erzeugt ein Secret (32 Zufallsbytes, hex), zeigt es genau einmal und speichert es AES-GCM-verschlüsselt (`IntegrationEncryptionService`, Schlüssel außerhalb der Datenbank) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` entfernt es. Hat ein Webhook ein Secret, prüft `WebhookSignatureVerifier` vor dem JSON-Parsen den Header `X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`, das Format von GitHub und Gitea) als HMAC-SHA256 über die rohen Request-Bytes, Vergleich in konstanter Zeit — sonst **401 `WEBHOOK_SIGNATURE_INVALID`**. Wie beim Siegel bleibt ein gespeichertes Secret wirksam, wenn der Schalter später aus ist. Responses verraten nur `signatureRequired`.
 
 ## Backend-Architektur
@@ -129,7 +157,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 34 Controller)
+Controller (REST API, 43 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -148,7 +176,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          34 REST-Controller
+├── controller/          43 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -179,7 +207,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames; Import (Roundtrip): BpmnImportAdapter (liest `mysuricates:blockConfig` der direkten `<process>`-Kinder zurück, lehnt Fremd-BPMN ab), BpmnDom (XXE-gehärtetes JDK-DOM-Parsen), BpmnImportException → 400; Interfaces `export/ProcessFormatAdapter` (Export) + `export/ProcessFormatImporter` (Import, Ergebnis `ImportedWorkflow`)
+│   ├── export/bpmn/     BpmnModelBuilder (Kette/Einzel-Task/Schleife) + BpmnNodeFactory (Ids, Platzierung, Kanten, Command-Tasks), BpmnGatewayBuilder (conditional/switch: Split/Rows/Merge), BpmnEdgeRouter (rechtwinkliges Waypoint-Routing), DataFlowReferenceScanner (Platzhalter-Scan `block.x.output`/`previous_output`/`step_N_output`/compress-`source`) + BpmnDataFlowBuilder (Datenobjekte und -assoziationen unter der Task-Reihe; Import überliest sie), BpmnBlockText (Labels, Doku, Config-Helfer), BpmnSegment (Teil-Graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames; Import (Roundtrip): BpmnImportAdapter (liest `mysuricates:blockConfig` der direkten `<process>`-Kinder zurück, lehnt Fremd-BPMN ab), BpmnDom (XXE-gehärtetes JDK-DOM-Parsen), BpmnImportException → 400; Interfaces `export/ProcessFormatAdapter` (Export) + `export/ProcessFormatImporter` (Import, Ergebnis `ImportedWorkflow`)
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService (+ ThreadDumpCollector)
 │   ├── repair/          AutoRepairService
@@ -198,7 +226,7 @@ com.automation
 │   └── blocks/          19 Block-Executors + Agentic-Hilfsklassen (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Konfigurationsklassen, Seeder (Skill, Template, OnboardingProfile)
-├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
+├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor, WebSocketTicketService
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message-DTOs
@@ -206,7 +234,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 34 REST-Controller
+### Alle 43 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -245,6 +273,14 @@ com.automation
 | `ReportsController` | `/api/v1/reports` | Report-Generierung und -Abruf |
 | `AuditController` | `/api/v1/audits`, `/api/v1/audit-*` | Audit-Übersicht, Report-Historie, Findings und TODO-Verknüpfungen |
 | `DocsController` | `/api/v1/docs` | Markdown-Dokumentation lesen |
+| `SystemSettingsController` | `/api/v1/system` | Laufzeit-Settings: App-Settings (`GET`/`PUT /settings/{key}`), Execution-Config |
+| `SystemAiProviderController` | `/api/v1/system` | AI-Provider- und Capability-Auskunft: Provider-Liste, Capabilities, Pi-Katalog, Modelle je Provider (+ Refresh) |
+| `SystemModulesController` | `/api/v1/system/modules` | Runtime-Modul-Umschalter für die Settings-UI (nur bei `automation.modules.ui-editable=true`, Härtung nie schaltbar) |
+| `SystemAccessController` | `/api/v1/system` | Zugriffs-Oberfläche: Remote Access (Tailscale) Enable/Disable/Status, lokales Dateisystem (Browse, Open-Path, Integration-Snippet) |
+| `SystemMaintenanceController` | `/api/v1/system` | Wartung: Auto-Repair, VACUUM, Datenbank-Backups (Liste, Erstellen, Download) |
+| `DashboardLayoutController` | `/api/v1/dashboard/layouts` | Versionsverlauf des Dashboard-Layouts (Core-Feature, kein Modul-Gate) |
+| `WorkflowSealController` | `/api/v1/workflows/{id}` | Siegeln/Entsiegeln eines Workflows (nur bei `automation.hardening.sealing=true`; bestehende Siegel bleiben auch bei ausgeschaltetem Schalter wirksam) |
+| `WebSocketTicketController` | `/api/v1/ws-ticket` | Vergibt kurzlebige Einmal-Tickets für den WebSocket-Handshake (kein Modul-Gate, gewöhnliches API-Rate-Limit gilt) |
 
 ### Workflow-Ausführung
 
@@ -261,6 +297,8 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
 
 **Steuerbarkeit ab Schritt 1:** Noch vor dem Submit registriert der `WorkflowExecutor` einen provisorischen `ExecutionContext` in der `WorkflowExecutionRegistry`. Ein Cancel greift damit auch, solange der Run noch auf einen Semaphore-Slot oder den Container-Start wartet — der Ausführungs-Thread übernimmt beim Tausch gegen den echten Context dessen Cancel-/Pause-Flag. Folge: `getActiveRunCount()` zählt auch wartende Runs, wodurch `GhostRunWatchdogService` den Permit eines startenden Runs nicht mehr als Leak freigibt.
+
+**Resume schneidet nach Blöcken, nicht nach Step-Indizes** (`ResumePlan`): `POST /executions/{id}/resume-from-step` setzt hinter dem letzten COMPLETED-Step an. Maßgeblich ist dessen **Position** in der Blockliste, nicht sein `stepIndex` — Wrapper-Blöcke (foreach, while, retry, conditional, switch) ziehen pro Item/Iteration einen weiteren Index, sodass der Index eines Blocks seiner Position vorauseilt. Grundlage ist die Zusage von `BlockStepRunner`: genau ein persistierter Step pro Top-Level-Block, in Blockreihenfolge (innere Items werden nie gespeichert). Die Steps des fortgesetzten Abschnitts werden über `ExecutionContext.startStepIndicesAt` oberhalb aller bereits persistierten Indizes weitergezählt, bleiben also eindeutig und sortierbar. Vorher wurde der frisch vergebene Index gegen den persistierten verglichen — nach einem Wrapper übersprang der Resume damit Blöcke, die nie gelaufen waren (TODO `1be423b4`).
 
 **Container-Start/-Stop ohne Transaktion:** `ProjectService.startContainer`/`stopContainer` sind bewusst **nicht** `@Transactional`: der Docker-Aufruf liegt zwischen zwei kurzen `TransactionTemplate`-Bursts (STARTING → Docker außerhalb jeder Transaktion → RUNNING/ERROR), weil `ContainerService` dabei den Projekt-Monitor hält — eine umschließende Transaktion würde die einzige Connection über den ganzen 5–15-s-Docker-Start pinnen und einen parallelen Workflow-Run (der den Monitor zuerst nimmt) in den 120-s-Connection-Timeout laufen lassen (Lock-Order-Inversion Monitor ↔ Connection). Weil der STARTING-Burst bereits vor dem Docker-Start committet, holt `ProjectStatusReconciler` beim `ApplicationReadyEvent` alle Projekte ab, die ein Absturz in diesem Fenster in STARTING zurückgelassen hat (RUNNING-Container-Zeile ⇒ RUNNING, sonst STOPPED) — das Projekt-Gegenstück zu `WorkflowExecutor.cleanupZombieRuns`. `ProjectService.delete` folgt demselben Muster in umgekehrter Reihenfolge: zuerst der Archivierungs-Burst (`archivedAt` + ActivityLog), danach der Docker-Stop außerhalb jeder Transaktion — schlägt er fehl, bleibt das Projekt archiviert (ERROR-Log), und nur der verwaiste Container bleibt zurück, den `DockerOrphanReconciler`/Idle-Cleanup einsammeln.
 
@@ -410,7 +448,9 @@ Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:
 
 ## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)
 
-Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) liefern im Report-Block einen Envelope `<!-- mysuricates:audit-result:v1 {…} -->`, den `AuditResultParser` zerlegt. `AuditIngestionService.ingest` (auf `WorkflowRunCompletedEvent`) speichert pro Run einen `AuditReport` (VALID/INVALID) und gleicht die Findings per Fingerprint (SHA-256 über projectId/auditKey/ruleKey/subject) ab:
+Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`) liefern im Report-Block einen Envelope `<!-- mysuricates:audit-result:v1 {…} -->`, den `AuditResultParser` zerlegt. `AuditIngestionService.ingest` (auf `WorkflowRunCompletedEvent`) speichert pro Run einen `AuditReport` (VALID/INVALID) und gleicht die Findings per Fingerprint (SHA-256 über projectId/auditKey/ruleKey/**normalisiertes** subject) ab:
+
+- **Normalisierung** (`AuditSubjectNormalizer`): alles ab dem ersten `:` und ein klein geschriebenes Methoden-Suffix hinter einem Klassennamen fallen weg (`ContainerShellService.execute` → `ContainerShellService`, `application.yml:key-store-password` → `application.yml`); Pfade mit `/` und Dateinamen ohne Klassenpräfix bleiben ganz. Das modellgenerierte `subject` driftet sonst zwischen Runs und erzeugt Wiedergänger (altes Finding `RESOLVED`, neues `OPEN`, verwaltetes TODO fälschlich `DONE`). Das gespeicherte `subject` ist reines Anzeigeattribut: bei einem Treffer gewinnt der neueste Wert. `AuditFingerprintMigrationJob` (Startup, idempotent) rechnet Altbestände um und führt Wiedergänger auf das älteste Finding zusammen (Zähler addiert, TODO-Links und Vorkommen ziehen mit). Eine menschliche Disposition (`ACCEPTED_RISK`, `DISMISSED`) schlägt dabei immer — egal ob sie am Ziel oder am Wiedergänger hängt; Status und Disposition (`dispositionNote`/`-Evidence`/`-At`, `resolvedAt`) wandern zusammen, wiedereröffnet wird nur über `AuditAcceptancePolicy` (belegte Verschlechterung). Jede Zusammenführung wird vor dem Löschen mit beiden IDs, beiden Roh-Subjects und dem `ruleKey` protokolliert; ein fehlschlagender Scope wird geloggt und blockiert weder die übrigen noch den Start.
 
 - **Neu** → `OPEN`; **wieder da** nach `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **nicht mehr im Snapshot** → `RESOLVED` (nur OPEN/AWAITING_VERIFICATION). Terminale Status `ACCEPTED_RISK` und `DISMISSED` werden bei Abwesenheit nicht angefasst.
 - **Verwaltete TODOs**: nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN` (`ensureManagedTodo`, Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken und Wiedervorlagen lösen keinen Fix-Loop aus. `reconcileManagedTodos` schließt das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen.
@@ -579,7 +619,11 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 - Skills werden in der `skills`-DB-Tabelle gespeichert, nicht in Frontend oder In-Memory-Beans hardcodiert
 - **19 Built-in Skills** werden beim Start durch `SkillSeeder` eingespielt (idempotent)
-- Skill-Definitionen liegen in `BuiltInSkills` (Reihenfolge) und `BuiltIn<Kategorie>Skills` (`config/`-Package)
+- **Ablage:** `src/main/resources/skills/builtin/<id>.json` (Metadaten: `sortOrder`, `version`, `name`, `icon`, `description`, `category`, `capabilities` inkl. `writes`/`async`/`handlerClass`/Schemata) plus `<id>.md` mit dem Prompt-Text. Geladen von `BuiltInSkillLoader` (Vorbild `BuiltInTemplateLoader`); die Java-Klassen `BuiltInSkills`/`BuiltIn<Kategorie>Skills` gibt es nicht mehr
+- Die `.md` wird **byte-genau** übernommen (kein Trim, kein angehängter Zeilenumbruch). `BuiltInSkillsSnapshotTest` vergleicht alle Skills kanonisch mit `src/test/resources/skills/builtin-snapshot.json` und schlägt bei jeder unbeabsichtigten Änderung fehl; gewollte Änderungen mit `./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true` neu schreiben
+- **Versionsregel:** `SkillSeeder` seedet versionsbasiert (Semver-Vergleich in `SeedVersions`, wie `WorkflowTemplateSeeder`) — fehlende Skills werden angelegt, vorhandene nur bei höherer Ressourcen-`version` überschrieben (inkl. Capabilities). Eine inhaltliche Änderung an einem Built-in braucht also eine höhere `version` in der JSON, sonst erreicht sie bestehende Instanzen nicht. Nutzer-Skills (`builtin=false`) und in den Ressourcen entfallene Built-ins bleiben unangetastet
+- **Gate zur Versionsregel:** `BuiltInSkillVersionGateTest` hasht je Skill die `<id>.json` (kanonisch) plus die `<id>.md` (byte-genau) gegen die eingecheckte Liste `src/test/resources/skills/builtin-versions.json` und schlägt fehl, wenn sich der Hash ohne höhere `version` geändert hat oder die Liste veraltet ist — nach einem gewollten Bump mit `./mvnw test -Dtest=BuiltInSkillVersionGateTest -Dskills.versions.write=true` neu schreiben und mitcommitten
+- Loader-Fehler sind hart: fehlende `.md`, Dateiname ≠ `id`, fehlender oder doppelter `sortOrder`, fehlende/unbekannte `category` oder ein leeres Verzeichnis brechen den Start ab, statt ein unvollständiges Skill-Set zu seeden
 - Built-in Skills haben stabile IDs (z.B. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` registriert alle Skills auch im In-Memory `SkillRegistry` für Capability-Lookups
 - `SkillRegistry` hängt nicht mehr von `SkillProvider`-Beans ab — Seeder übernimmt die Registrierung
@@ -785,7 +829,7 @@ Response (DTO) → React Query Cache → UI-Update
 ## WebSocket (Live-Logs + Status)
 
 - **Protokoll:** STOMP über SockJS
-- **Endpunkt:** `/ws` (SockJS Handshake)
+- **Endpunkt:** `/ws` (SockJS Handshake, Authentifizierung per Ticket — siehe [WebSocket-Authentifizierung](#websocket-authentifizierung))
 - **Broker:** Simple Message Broker auf `/topic`
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow-Ausführungs-Logs
@@ -832,7 +876,6 @@ Response (DTO) → React Query Cache → UI-Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
-- `GET /api/v1/system/integration-snippet`
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)
@@ -849,6 +892,36 @@ Response (DTO) → React Query Cache → UI-Update
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
+**Server-Eimer global, Client-Sperre pro Pfad — die Asymmetrie ist Absicht.** Der Server zählt in
+*einem* Eimer pro Client-IP über alle Endpunkte hinweg; ein 429 bedeutet also „du insgesamt bist zu
+schnell". Der Client (`api/client.ts`) merkt sich die Sperre dagegen **pro Endpunkt-Muster** (der
+Pfad ohne Query und mit durch `{id}` ersetzten UUIDs, damit `/executions/{id}` nicht pro Run einen
+eigenen Schlüssel bekommt).
+
+Dazu kommt eine **kurze Sperre über die übrigen Pfade: höchstens 2 s (`GLOBAL_BACKOFF_SECONDS`),
+gedeckelt durch `Retry-After`** — schickt der Server `Retry-After: 0`, entsteht gar keine globale
+Sperre. Zwei Endpunkte sind davon ausgenommen (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (eine
+blockierte Ticket-Anfrage kostet den WebSocket einen Reconnect-Versuch und verdoppelt seinen
+exponentiellen Abstand, aus 2 s wird also ein viel längerer Ausfall) und `GET /system/auth-status`
+(der `ApiKeyGuard` rendert nichts, bevor der antwortet — die App bliebe leer statt den
+Rate-Limit-Hinweis zu zeigen). Ihre eigene Pfad-Sperre gilt für sie weiterhin; ausgenommen sind sie
+nur von *fremden* 429ern.
+
+Daraus folgt: Nach einem 429-Sturm lässt der Client nach spätestens 2 s wieder einzelne Muster los,
+und jedes Muster sammelt sein eigenes 429 ein, bis seine `Retry-After`-Sperre steht. Die kurze
+globale Sperre nimmt dem Sturm die Spitze, ohne die beiden Auswege zu verschließen. Erholung läuft
+ohne Reload: Ein Timer auf der letzten Frist (`scheduleExpiry`) meldet das Ablaufen, und
+`installRateLimitRecovery` invalidiert beim Übergang aktiv → inaktiv **einmal alle Queries im
+Fehlerzustand** — `retry` ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft
+montierte Queries (Sidebar, Layout, Dashboard) blieben sonst bis zum Reload rot.
+
+**Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
+(oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake
+geht mit leerem `?ticket=` raus. Der Interceptor lehnt ihn ab, stompjs plant den nächsten Versuch
+mit wachsendem Abstand — das ist der gewollte Weg, statt einer offenen Promise-Ablehnung, die den
+Reconnect-Zyklus abreißen ließe. Ein leeres Ticket in den Server-Logs ist also kein Angriff, sondern
+ein Client, dessen Ticket-Abruf gerade nicht durchkam.
+
 ### Request-Size-Limit
 
 - **Filter:** `ActivityLogSizeLimitFilter`
@@ -857,7 +930,18 @@ Response (DTO) → React Query Cache → UI-Update
 
 ### WebSocket-Authentifizierung
 
-- **Interceptor:** `WebSocketAuthInterceptor` — validiert API-Key bei WebSocket-Handshake
+Weder SockJS noch ein rohes Browser-WebSocket kann beim Handshake eigene Header senden — die Authentifizierung muss also über die URL laufen. Der API-Key darf dort nicht stehen (Browser-History, Proxy-Logs), deshalb geht ein **kurzlebiges Einmal-Ticket** voraus:
+
+1. Client ruft `POST /api/v1/ws-ticket` auf — **mit dem API-Key im Header**, wie jeder andere Endpunkt (unterliegt dem normalen API-Rate-Limit). Antwort: `{ "ticket": "<43 Zeichen>", "expiresInSeconds": 30 }`
+2. Client hängt das Ticket als `?ticket=…` an die Handshake-URL (`/ws` und `/ws/terminal/{runId}`)
+3. `WebSocketAuthInterceptor` löst das Ticket ein und lässt den Handshake durch — **genau einmal und nur vor Ablauf**. Ein `?apiKey=` wird abgelehnt (401, Handshake abgebrochen) und mit eigenem Hinweis protokolliert.
+
+- **Ticket-Speicher:** `WebSocketTicketService` — rein in-memory (insertion-geordnete `LinkedHashMap` mit `synchronized`-Zugriff statt `ConcurrentHashMap`, kein DB-Zugriff im Handshake), 32 zufällige Bytes URL-safe Base64, abgelaufene Einträge werden bei jedem `issue()`/`consume()` weggeräumt (kein Scheduler). Zusätzlich ist der Speicher über `removeEldestEntry` hart auf **`MAX_OPEN_TICKETS` = 1000 offene Tickets** gedeckelt; darüber fällt per FIFO das älteste heraus (der betroffene Client holt beim nächsten Versuch einfach ein neues). Tickets überleben keinen Neustart — genau ihre gedachte Lebensdauer.
+- **Laufzeit:** `automation.websocket.ticket-ttl-seconds` (Default 30, Env `AUTOMATION_WS_TICKET_TTL_SECONDS`)
+- **Frontend:** `api.fetchWsTicket()`; `useWebSocket`/`useAssistantWebSocket` holen das Ticket in stompjs' `beforeConnect` (läuft vor jedem Verbindungsversuch inkl. Reconnect), das Run-Terminal vor `new WebSocket(...)`. Ein Wächter-Test verbietet `apiKey=` in `src/`.
+- **Kein SockJS-Fallback:** Die Clients laufen mit `transports: ['websocket']`. SockJS legt für jeden Fallback-Transport (xhr-streaming, xhr-polling) eine eigene Session an und bräuchte dafür ein zweites Ticket — das erste ist nach dem WebSocket-Versuch verbraucht. **Die Instanz braucht also einen WebSocket-fähigen Pfad** (Proxy/Reverse-Proxy muss Upgrades durchlassen); einen HTTP-Fallback gibt es nicht mehr.
+- **Reconnect:** `reconnectDelay: 5000` mit `ReconnectionTimeMode.EXPONENTIAL` und `maxReconnectDelay: 60000` — jeder Versuch kostet einen `POST /ws-ticket` und soll bei totem Backend nicht gegen das API-Rate-Limit laufen.
+- **Deaktiviert:** Bei `automation.security.enabled=false` oder ohne konfigurierten Key lässt der Interceptor jeden Handshake durch (wie der `ApiKeyAuthFilter`).
 
 ### CORS
 
@@ -931,6 +1015,10 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 | V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
 
+## Architektur-Gates
+
+Zwei JUnit-Tests im Paket `com.automation.architecture` halten die gemessene Struktur fest, beide auf denselben jdeps-Paketkanten wie `scripts/public-readiness/arch-metrics.sh` (Abschnitt `## packages`) und ohne neue Abhängigkeit: `PackageCycleRatchetTest` pinnt die 13 heute wechselseitig abhängigen Paketpaare als Allowlist — ein neues Paar bricht den Build, ein aufgelöstes wird nur als Hinweis gemeldet —, und `LayerRuleTest` verbietet die Kantenklassen `service.* → controller.*`, `controller.* → repository.*` und `repository.* → service.*` (Allowlist heute leer). Gemessen wird immer das Build-Verzeichnis, aus dem die Tests selbst geladen wurden (`target/` bzw. `target-ide/` im IDE-Profil), nie ein danebenliegender veralteter Stand; fehlt es oder fehlt jdeps, werden beide Tests mit klarer Meldung übersprungen statt still grün zu laufen; ihr blinder Fleck sind Abhängigkeiten, die nur als generisches Typargument auftauchen und im Bytecode gelöscht sind.
+
 ## Verzeichnisstruktur
 
 ```
@@ -968,7 +1056,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 68 Flyway-Migrationen (V1–V68)
+│           └── db/migration/          ← 73 Flyway-Migrationen (V1–V73)
 │
 └── ai-automation-frontend/
     ├── package.json

@@ -1,6 +1,5 @@
 package com.automation.executor.compress;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.util.Map;
@@ -33,11 +32,11 @@ final class JsonLimitStage implements CompressionStage {
     @Override
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
         String where = StageConfig.where(op());
-        JsonNode root = JsonPaths.parse(input, op());
-        ArrayNode array = JsonPaths.arrayAt(root, StageConfig.string(config, "path", "", where), op());
+        JsonPaths.Document doc = JsonPaths.arrayIn(input, StageConfig.string(config, "path", "", where), op());
+        ArrayNode array = doc.array();
         int count = StageConfig.intValue(config, "count", null, 0, 1_000_000, where);
         int removed = Math.max(0, array.size() - count);
         while (array.size() > count) array.remove(array.size() - 1);
-        return new StageResult(JsonPaths.write(root), "−" + CompressionNumbers.fmt(removed) + " Einträge");
+        return new StageResult(JsonPaths.write(doc.root()), "−" + CompressionNumbers.fmt(removed) + " Einträge");
     }
 }

@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Workflow Building Guide
 
 Practical guide for creating effective workflows in MySuricates. Covers all block types, proven patterns, timeout configuration, and common pitfalls.
@@ -65,6 +63,10 @@ Access in block configs with `{{ filepath }}` or `{{ language }}`.
 
 MySuricates supports 19 block types. Each block has a `type` and a `config` map.
 
+**Unknown block types are refused at save time** (HTTP 400; the message names the type and the allowed ones). The check runs against the executor registry (`BlockTypeRegistry` — all registered `BlockExecutor` beans) and recurses into nested blocks (`switch` `cases[].blocks` and `default`). A missing or blank `type` counts as unknown. It applies to every write path alike: UI, REST API, import, pool install, seeder and factory. A typo like `"shel"` therefore fails immediately instead of mid-run.
+
+**Restoring an old version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) passes the same check: if the old definition uses a type that no longer exists, the restore fails with 400 — a definition the platform can no longer run does not come back.
+
 ### Common Block Properties
 
 In addition to its type-specific config fields, every block also supports these common properties:
@@ -74,6 +76,7 @@ In addition to its type-specific config fields, every block also supports these 
 | `on_failure` | string | `"stop"` | Behavior on failure: `"stop"` (terminate workflow) or `"continue"` (proceed with next block) |
 | `provider` | string | null | **AI-capable blocks only** (`simple`, `agentic`, `skill-capability`, `compress-ai` and the inline `command` of `retry`, `foreach`, `while`, `conditional`, `switch`): AI provider for this block only (`CLAUDE`, `PI`, `CODEX`; for `compress-ai` only `CLAUDE`). Precedence block > workflow > system default. On the `integration` block, `provider` instead names the integration provider (`google-calendar`, …). |
 | `model` | string | null | **AI-capable blocks only** (including `compress-ai`): model for this block only (CLI alias `opus`/`sonnet`, concrete id or pi `<backend>/<model>`). Precedence block > workflow > provider default. If a block sets a *different* `provider` than the workflow, the workflow model is not inherited (model ids are provider-specific). |
+| `effort` | string | null | **AI-capable blocks only**: reasoning effort `low`/`medium`/`high`/`xhigh` for this block only. Precedence block > workflow (`workflow.effort`) > provider default; unset emits no flag at all. Claude maps it to `--effort`, pi to `--thinking`, codex ignores it. The value actually used is visible in the run details as step metadata `aiRequest.effort`. |
 
 Additionally, every block supports an optional top-level field (not inside `config`):
 
@@ -126,7 +129,7 @@ Executes a shell command on the host or inside a Docker container.
 | `command` | string | **required** | Shell command(s) to execute |
 | `container_image` | string | null | Docker image (see execution environment; the server may restrict this via an allowlist) |
 | `timeout_seconds` | int | 300 | Execution timeout |
-| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) and the block outputs derived from them are **always** escaped, regardless of this option |
+| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`), the block outputs derived from them, and `{{ previous_report }}` / `{{ open_todos }}` are **always** escaped, regardless of this option |
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
 | `mounts` | list | `[]` | Additional Docker volume mounts in format `host:container[:ro\|rw]` (only effective when `container_image` is set) |
 
@@ -163,10 +166,19 @@ Executes a shell command on the host or inside a Docker container.
 > untrusted input (schedule, manual start, TodoTrigger, chain) every block output is substituted
 > raw exactly as before.
 
-> **Careful with `{{ previous_report }}` / `{{ open_todos }}`:** these values are injected from the
-> PREVIOUS run and are NOT covered by the run-level taint propagation above (they don't come from
-> the current run and carry no `__untrusted_*` marker) — treat them like foreign/untrusted data in
-> shell blocks anyway: write them unquoted too, or escape them explicitly (open TODO c2634caa).
+> **`{{ previous_report }}` / `{{ open_todos }}`:** both are **always** treated as untrusted and are
+> therefore **always single-quoted** in shell blocks — in every run, regardless of the trigger and of
+> `shell_escape_variables`. The reason: `previous_report` is the output of an earlier run (which may
+> have processed a webhook payload), and `open_todos` contains titles from imported issues. So write
+> these placeholders **unquoted** (`REPORT={{ previous_report }}`, not `REPORT="{{ previous_report }}"`).
+> Nothing changes in AI prompts (they are never escaped). The two variables do **not** trigger taint
+> propagation: block outputs of an otherwise clean run stay raw as before.
+>
+> **Consequence for forwarded values:** writing `previous_report`/`open_todos` into a block output or
+> into an `items_command` (e.g. `items_command: "echo {{ previous_report }}"`) loses the quoting for
+> the follow-up placeholders: the call itself is quoted, but the resulting `{{ previous_output }}`,
+> `{{ block.<name>.output }}` and `foreach` items count as trusted in an otherwise clean run and are
+> substituted raw. Set `"shell_escape_variables": true` explicitly on such follow-up blocks.
 
 ```json
 {
@@ -292,6 +304,12 @@ Each case has:
 - `blocks`: List of block definitions to execute on match
 
 Nested blocks in `cases` and `default` are limited to `shell` and `simple` — other types (including `compress`/`compress-ai`) are rejected with an error message.
+
+A `name` on a nested block makes its output available as `{{ block.<name>.output }}` in later steps; without a name only `{{ previous_output }}` carries it. The switch block's own output stays the concatenation of all executed case blocks.
+
+The blocks of a case run in sequence and each one moves `{{ previous_output }}` along — like the iterations of a `while` loop. The second block of a case therefore sees the first one's output, no longer the step before the switch (unnamed blocks included). If you need the state from before the switch, name that block and reference `{{ block.<name>.output }}`.
+
+Block names should be unique across the workflow: on a collision the last write wins. A case block overwrites an earlier block of the same name, and after the switch its aggregated output in turn overwrites an equally named child.
 
 ```json
 {
@@ -467,6 +485,8 @@ Executes another workflow as a nested step.
 
 **Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
 
+**Markers**: The step merely passes the child run's last output through (step metadata `derivedOutput: true`). Any `gate_status:` and `todo_item:` markers inside it are evaluated in the child run only — the parent run deliberately leaves them out of its gate summary and TODO list.
+
 **When to use**: Composing complex workflows from smaller, reusable ones.
 
 ---
@@ -540,6 +560,39 @@ Reads a file (PDF, DOCX, XLSX, PPTX, HTML, TXT, EPUB, RTF, ...) and extracts pla
   { "type": "simple", "config": { "command": "Summarize:\n\n{{ text }}" } }
 ]
 ```
+
+---
+
+### `todo-create` / `todo-update` / `todo-close` — Native TODO Operations
+
+Create or change TODOs directly through the TodoService — **no REST self-call, no DB access, 0 tokens**. They replace the anti-pattern `curl POST /api/v1/todos` from shell/agentic blocks.
+
+**`todo-create`**:
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `title` | string | **required** | Title (template-capable) |
+| `description` | string | null | Markdown description (template-capable) |
+| `priority` | string | `MEDIUM` | HIGH / MEDIUM / LOW / CRITICAL |
+| `tags` | list or string | null | List or comma-separated |
+| `project_id` | string | context variable `project_id` | Target project |
+| `source` | string | `WORKFLOW` | USER / AI / WORKFLOW |
+| `source_agent` | string | `workflow` | Source agent label |
+| `variable_name` | string | `todo_id` | Context variable that receives the new TODO id |
+
+**`todo-update`**: `id` (required, template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed.
+
+**`todo-close`**: `id` (required, template-capable) — sets the status to DONE.
+
+```json
+[
+  { "type": "todo-create", "config": { "title": "Fix {{ component }}", "priority": "HIGH", "tags": ["bug"] } },
+  { "type": "simple", "config": { "command": "Fix the problem ..." } },
+  { "type": "todo-close", "config": { "id": "{{ todo_id }}" } }
+]
+```
+
+**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see §Auto-TODO/detector format). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
 
 ---
 
@@ -638,8 +691,8 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the definition has changed since the last successful run (hash comparison; timestamps when no hash exists) |
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
 | `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"` |
-| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries |
+| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 
 ### Context Variables
 
@@ -675,6 +728,19 @@ Answers from `approval` and `human-input` blocks are stored as context variables
 ## 4. Proven Workflow Patterns
 
 These patterns are distilled from the 65+ built-in templates. Each pattern has a clear structure and use case.
+
+### Block Choice: Frugality Ladder
+
+Workflow construction follows the same YAGNI logic as code — the first rung that fits wins:
+
+1. **Can it be deterministic?** → `shell` block (0 tokens, fast, reproducible)
+2. **Does a single AI call suffice?** → `simple` (1 call) instead of `agentic` (N calls: REASON + ACT per iteration)
+3. **`agentic` only** when the necessary steps are unknown up front and the result is verifiable
+4. **Existing block type before new platform feature** — check the reference in section 2 first
+5. **Few blocks before many** — every block costs tokens, runtime, and is its own timeout risk
+
+No blocks "just in case" (summaries, reports, formatting that nobody reads).
+The token budget is tight: every avoided AI call stretches the runtime of the allowance.
 
 ### Pattern 1: Sequential Simple Chain
 
@@ -939,6 +1005,12 @@ The model is set at the workflow level (`workflow.model` field) or left as null 
 | `opus` | Analysis, audits, security reviews | Precision, fewer hallucinations, deep reasoning | Slower, more expensive |
 | `sonnet` | Code generation, routine tasks | Fast, good enough for most tasks | Can hallucinate findings in analyses |
 | `haiku` | Simple classification, extraction | Very fast, inexpensive | Limited reasoning depth |
+| `fable` | Heaviest reasoning/agentic tasks | Strongest model | Most expensive tier |
+
+The values are **CLI aliases** of the Claude CLI and always point to the newest model of their
+family — they never go stale. A concrete id (e.g. `claude-opus-5`) can be typed freely into the
+model field when a workflow should be pinned to a version. The suggestion list in the UI comes from
+`GET /api/v1/system/ai-providers/{id}/models` (pi: `pi --list-models`, codex: local model cache).
 
 ### Critical Rule
 
@@ -966,6 +1038,50 @@ Via API:
 In the workflow entity, the `model` field is passed via the `--model` flag to the Claude CLI.
 
 **Important**: A null model field uses the system default, which may be Sonnet. When Opus is needed, set it explicitly.
+
+### Reasoning Effort
+
+In addition to the model, a uniform effort level can be set per workflow (`workflow.effort` field, UI: sidebar → "Reasoning Effort"). Valid values: `low`, `medium`, `high`, `xhigh`. Unset (null) = provider default, **no** flag is emitted.
+
+| Provider | CLI Mapping | Notes |
+|---|---|---|
+| Claude | `--effort <level>` | REASON and ACT calls |
+| Pi | `--thinking <level>` | Explicit effort wins over the maxTurns heuristic; without effort the ACT path behaves as before (no flag) |
+| Codex | — | Ignored (`supportsEffort=false`), the UI hides the slider |
+
+**Per-block override**: block config key `"effort"` overrides the workflow level (precedence: block > workflow > provider default). Invalid block values are ignored with a warning.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analyze the architecture ...",
+    "effort": "xhigh"
+  }
+}
+```
+
+Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details.
+
+### Provider and Model per Block
+
+Following the same pattern as `effort`, AI-capable blocks (`simple`, `agentic`, `skill-capability`, and the inline `command` of `retry`, `foreach`, `while`, `conditional`, `switch`) can set the provider and model for themselves only — config keys `"provider"` and `"model"`. Resolution: **Block > Workflow > System default** (`AiProviderRegistry.resolve()` or the provider's default model). Without a block key, existing workflows behave unchanged.
+
+```json
+[
+  { "type": "shell",  "config": { "command": "git diff --stat HEAD~1" } },
+  { "type": "simple", "config": { "command": "Summarize the diff:\n\n{{ previous_output }}", "model": "haiku" } },
+  { "type": "simple", "config": { "command": "Assess the architecture risks ...", "provider": "PI", "model": "anthropic/opus", "effort": "high" } }
+]
+```
+
+Rules:
+- A block that only sets `provider` does **not** inherit the workflow model when the provider differs from the workflow's provider — model ids are provider-specific (`opus` vs. `anthropic/opus`). With the same provider (or without `provider`), the workflow model still applies.
+- Nested blocks (e.g. `blocks` in `switch`) carry their own keys; the wrapper block does not pass its values down to child blocks.
+- The `integration` block uses `provider` for the integration provider and is not an AI block — no override applies there.
+- In the UI block editor, the "AI provider and model for this block" fields appear only on AI-capable block types; the model suggestions come from the host catalog of the chosen provider (`GET /api/v1/system/ai-providers/{id}/models`), free text remains allowed.
+- The values actually used appear in the step metadata of the run details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (for `agentic` additionally top-level `provider`/`model`).
+- Wrapper blocks (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) carry the `aiRequest`, `provider`, and `requestedModel` of their **first inner AI call** into their aggregate step (provider and model are constant per block); the run page shows them as pills. Additional keys: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, item label truncated to 120 characters), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Pure shell iterations carry no `aiRequest`.
 
 ---
 
@@ -1330,6 +1446,8 @@ If the provider is not connected or the API fails, the block is marked as `FAILE
 ---
 
 ## Appendix: Template Quick Reference
+
+What belongs in the public workflow pool, how it differs from the built-in templates and which criteria the hygiene gate enforces is described in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
 All 65+ built-in templates with their primary pattern:
 

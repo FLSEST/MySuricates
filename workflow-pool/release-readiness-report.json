@@ -9,6 +9,7 @@
   },
   "icon": "📋",
   "category": "CUSTOM",
+  "scope": "portable",
   "tags": ["quality-gate", "report", "release"],
   "blocks": [
     {

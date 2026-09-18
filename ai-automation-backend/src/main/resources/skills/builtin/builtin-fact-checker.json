@@ -1,0 +1,74 @@
+{
+  "id" : "builtin-fact-checker",
+  "sortOrder" : 14,
+  "version" : "1.0.0",
+  "name" : "Fact Checker",
+  "icon" : "✅",
+  "description" : "Verifies claims, checks statistics, and assesses information reliability.",
+  "category" : "RESEARCH",
+  "capabilities" : [
+    {
+      "name" : "verify_claims",
+      "description" : "Verify factual claims in the provided text",
+      "inputSchema" : {
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "claims" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "check_statistics",
+      "description" : "Verify statistics and numerical claims",
+      "inputSchema" : {
+        "properties" : {
+          "statistics" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "results" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "assess_reliability",
+      "description" : "Assess the reliability of a source or document",
+      "inputSchema" : {
+        "properties" : {
+          "source" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "factors" : {
+            "type" : "array"
+          },
+          "score" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

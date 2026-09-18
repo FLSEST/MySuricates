@@ -44,11 +44,16 @@ public class WorkflowPoolController {
         ));
     }
 
+    /**
+     * @param scope {@code repo} oder {@code portable} — Pool-Metadatum, ohne Angabe {@code portable}.
+     *              Regelwerk: {@code docs/workflow-pool-kuratierung.md}.
+     */
     @PostMapping("/export/{workflowId}")
     public ResponseEntity<ExportToPoolResponse> exportToPool(
             @PathVariable String workflowId,
+            @RequestParam(required = false) String scope,
             @RequestBody(required = false) ExportToPoolRequest request) throws IOException {
-        ExportToPoolResponse result = poolService.exportToPool(workflowId, request);
+        ExportToPoolResponse result = poolService.exportToPool(workflowId, request, scope);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 }

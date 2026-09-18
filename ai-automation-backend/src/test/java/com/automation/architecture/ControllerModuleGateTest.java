@@ -45,6 +45,9 @@ class ControllerModuleGateTest {
             "SystemSettingsController",
             "TodoController",
             "TodoTriggerController",
+            // Live logs, assistant and the run terminal all handshake through /ws — the ticket
+            // endpoint that authenticates them is core, even though the terminal itself is a module.
+            "WebSocketTicketController",
             "WorkflowController",
             "WorkflowPoolController",
             "WorkflowTemplateController");

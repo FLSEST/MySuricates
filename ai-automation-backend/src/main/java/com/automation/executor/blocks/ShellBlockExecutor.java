@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
 
@@ -79,11 +80,7 @@ public class ShellBlockExecutor implements BlockExecutor {
                 ? result.output() + "\n\n[RECOVERY] " + buildRecoveryHint(result.exitCode(), command)
                 : result.output();
         if (Boolean.TRUE.equals(config.get("checked_command"))) {
-            String category = String.valueOf(config.getOrDefault("check_category", "build-check"))
-                    .replaceAll("[^a-zA-Z0-9_-]", "-");
-            output = "gate_status: " + (result.exitCode() == 0 ? "GREEN" : "RED")
-                    + "\ngate_category: " + category
-                    + "\ngate_description: Command exit " + result.exitCode() + "\n\n" + output;
+            output = CheckedCommandGate.decorate(output, result.exitCode(), config.get("check_category"));
         }
         step.setOutput(output);
         step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
@@ -100,8 +97,8 @@ public class ShellBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "shell".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("shell");
     }
 
     /**

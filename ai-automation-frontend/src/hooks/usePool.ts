@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { PoolWorkflowEntry, ExportToPoolRequest, ExportToPoolResponse } from '../types';
+import type { PoolWorkflowEntry, ExportToPoolRequest, ExportToPoolResponse, PoolScope } from '../types';
 
 export function usePoolWorkflows() {
   return useQuery({
@@ -31,11 +31,18 @@ export function usePoolExport() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: ({ workflowId, request }: { workflowId: string; request?: ExportToPoolRequest }) =>
-      api.post<ExportToPoolResponse>(`/pool/export/${workflowId}`, request ?? {}),
-    onSuccess: () => {
+    mutationFn: ({ workflowId, request, scope }: { workflowId: string; request?: ExportToPoolRequest; scope?: PoolScope }) =>
+      api.post<ExportToPoolResponse>(
+        `/pool/export/${encodeURIComponent(workflowId)}?scope=${encodeURIComponent(scope ?? 'portable')}`,
+        request ?? {},
+      ),
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['pool'] });
-      toast.success(t.factory.exportedToPool);
+      if (data.sanitizedPaths.length > 0) {
+        toast.success(`${t.factory.exportedToPool} ${t.factory.exportSanitizedPaths.replace('{paths}', data.sanitizedPaths.join(', '))}`);
+      } else {
+        toast.success(t.factory.exportedToPool);
+      }
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.factory.exportFailed)),
   });

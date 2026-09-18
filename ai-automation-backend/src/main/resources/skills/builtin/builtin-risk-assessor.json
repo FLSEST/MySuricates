@@ -1,0 +1,71 @@
+{
+  "id" : "builtin-risk-assessor",
+  "sortOrder" : 16,
+  "version" : "1.0.0",
+  "name" : "Risk Assessor",
+  "icon" : "⚠️",
+  "description" : "Identifies risks, creates risk matrices, and suggests mitigations.",
+  "category" : "BUSINESS",
+  "capabilities" : [
+    {
+      "name" : "identify_risks",
+      "description" : "Identify potential risks in a project or scenario",
+      "inputSchema" : {
+        "properties" : {
+          "context" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "risks" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "create_risk_matrix",
+      "description" : "Create a risk matrix with probability and impact ratings",
+      "inputSchema" : {
+        "properties" : {
+          "risks" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "matrix" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "suggest_mitigations",
+      "description" : "Suggest mitigation strategies for identified risks",
+      "inputSchema" : {
+        "properties" : {
+          "risks" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "mitigations" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

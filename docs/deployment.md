@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Deployment
 
 ## Docker Compose
@@ -316,6 +314,69 @@ networks:
     driver: bridge
 ```
 
+## Reverse-Proxy
+
+Seit dem Umstieg auf Einmal-Tickets für den WebSocket-Handshake (TODO 05b759f6) erzwingt das
+Frontend `transports: ['websocket']` und schaltet den SockJS-Fallback (HTTP-Polling) bewusst ab: Ein
+Einmal-Ticket ist nur für den ersten Verbindungsversuch gültig und überlebt keinen
+Transport-Wechsel. Ein Reverse-Proxy vor MySuricates **muss** WebSocket-Verbindungen also per
+HTTP-Upgrade durchreichen — ohne Upgrade-Unterstützung verbindet sich die App nicht mehr.
+
+Auf `localhost`, über Tailscale und in den Stable-/Test-Containern ist das der Fall (direkter
+Zugriff, kein Proxy dazwischen); der Bruch entsteht erst bei eigenen Reverse-Proxy-Deployments.
+
+### nginx
+
+```nginx
+location /ws/ {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 3600s;
+}
+
+location / {
+    proxy_pass http://127.0.0.1:9090;
+    proxy_set_header Host $host;
+}
+```
+
+### Caddy
+
+Caddy erkennt WebSocket-Upgrades automatisch — es braucht keine gesonderte Konfiguration:
+
+```caddyfile
+example.com {
+    reverse_proxy 127.0.0.1:9090
+}
+```
+
+### Fehlerbild
+
+Fehlt die Upgrade-Weiterleitung, kommt der `ticket`-Query-Parameter trotzdem noch beim Backend an (er
+steckt in der URL, nicht in einem Header) — `WebSocketAuthInterceptor.beforeHandshake` läuft vor
+Springs eigener Upgrade-Prüfung und verbraucht ein an sich gültiges Ticket also selbst dann, wenn der
+Protokollwechsel gleich danach an den fehlenden Headern scheitert. Tickets sind bewusst kurzlebig und
+Einmalgebrauch (TTL 30 s, `WebSocketTicketService`): Beim Nachstellen des Problems (`curl`,
+wiederholtes Neuladen, ein aus den Browser-DevTools kopiertes Ticket) zeigt das Backend-Log eine von
+zwei Zeilen aus `WebSocketAuthInterceptor`:
+
+```
+WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}
+```
+
+— ein vorgelegtes Ticket ist abgelaufen, schon verbraucht oder erraten; oder
+
+```
+WebSocket handshake rejected: no ticket presented by {}
+```
+
+— es kam gar kein `ticket`-Parameter an (z. B. weil ein Test-Werkzeug oder ein Proxy die Query
+verwirft). Das ist kein Ticket-Bug. Prüfen: Antwortet der Proxy auf den `/ws/**`-Pfad mit Status 101
+(Switching Protocols)?
+
 ## Vertrauensmodell und Netzwerk-Exposition
 
 MySuricates ist fuer den **lokalen Betrieb durch eine vertrauenswuerdige Person** gebaut. Es ist kein
@@ -333,6 +394,46 @@ Die Claude CLI wird ausserdem mit `automation.cli.skip-permissions` = **`true`**
 (`AUTOMATION_CLI_SKIP_PERMISSIONS`). Sie fragt also nicht vor Werkzeugnutzung nach. Ausnahme: wird
 einem Aufruf eine Werkzeug-Whitelist mitgegeben, entfaellt das Flag und die CLI erzwingt die Liste —
 so arbeiten `skill-capability`-Bloecke ohne `allow_writes` nur lesend.
+
+### Drei Vertrauensklassen fuer Kontextwerte
+
+Nicht jeder Wert, den ein Workflow in einen Shell-Befehl einsetzt, kommt aus der Definition. Jede
+Kontextvariable traegt deshalb eine von drei Klassen; sie entscheidet, ob der Wert roh in die
+Kommandozeile geht oder in POSIX-Single-Quotes gepackt wird.
+
+| Klasse | Woher der Wert kommt | In Shell-Bloecken | In KI-Prompts | Faerbt den Run |
+|---|---|---|---|---|
+| **trusted** | Workflow-Defaults, Systemwerte (`project_path`, `workflow_run_id`), blockinterne Werte, Antworten aus `approval`/`human-input` | roh eingesetzt | roh | nein |
+| **untrusted extern** | Webhook-Nutzlast und alles, was daraus abgeleitet ist (Blockausgaben, `step_N_output`, foreach-Items) — auch ueber Resume und Sub-Workflows hinweg | immer single-quoted | roh | ja, ab dem Setzen |
+| **Plattform-Daten** | `previous_report` und `open_todos`, die in **jeden** Run injiziert werden | immer single-quoted | roh | erst, wenn der Platzhalter wirklich in einem Shell-Befehl steht |
+
+„Faerbt den Run" heisst: Ab diesem Moment werden auch alle Folgeausgaben des Runs gequotet, denn ein
+Block kann fremde Bytes in seine Ausgabe holen, ohne einen Platzhalter zu nennen. Die Faerbung ist
+klebrig und ueberlebt Resume und Sub-Workflow-Uebergabe. Plattform-Daten faerben bewusst erst bei
+Nutzung: Sie stecken in jedem Run, eine Faerbung beim Injizieren wuerde jeden Run faerben und die
+Bedeutung der Ausgabe-Platzhalter in den mitgelieferten Templates aendern.
+
+Bewusst **nicht** escaped werden Antworten aus `approval`- und `human-input`-Bloecken: Sie kommen
+ueber die API-Key-geschuetzte Schnittstelle von der Person, der die Instanz gehoert. Und setzt ein
+Workflow eine Variable selbst (`setVariable`), gilt sie wieder als vertrauenswuerdig — der Wert
+stammt dann aus der Definition, nicht vom Aufrufer.
+
+Grenzen, die man kennen sollte:
+
+- **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
+  hilft das Modell nicht.
+- **Der Weg ueber einen KI-Block waescht die Faerbung ab.** Stehen Plattform-Daten in einem
+  `simple`- oder `agentic`-Prompt, faerbt das den Run nicht; die KI-Antwort gilt als ungefaerbt; ein
+  folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. In den mitgelieferten
+  Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und ist nur
+  deshalb unauffaellig, weil dort alle Folge-Shell-Bloecke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
+  jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
+  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschuetzt.
+- **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefaerbten Wert
+  in eine Datei schreibt und diese spaeter ausfuehrt, liegt ausserhalb dessen, was sich quoten laesst.
+
+Technische Fassung mit Klassennamen und reservierten Kontextschluesseln:
+[Workflow-Haertung](architektur.md#workflow-härtung-optional).
 
 ### Wo gelauscht wird
 
@@ -354,7 +455,6 @@ Ausgenommen sind:
 | Pfad | Zweck |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
-| `/api/v1/system/integration-snippet` | Einbettbares Snippet |
 | `/actuator/health` | Healthcheck fuer Docker |
 | `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprueft) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |

@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
 
@@ -152,7 +153,7 @@ public class WhileBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "while".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("while");
     }
 }

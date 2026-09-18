@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Assistant System
 
 Der Assistant ist ein kontext-sensitiver Chat-Assistent, der als Floating-Panel in der Plattform verfügbar ist. Er kennt die aktuelle Seite, kann Workflows anlegen oder erklären und schlägt kontextsensitive Aktionen vor.
@@ -309,7 +307,7 @@ Alle implementieren `AssistantContextSection` mit `append(StringBuilder sb, bool
 5. **SkillsIndexSection** — Max 20 Einträge, Desc: 80 Zeichen
 6. **IntegrationsIndexSection** — Alle Provider mit Connected/Disconnected-Status
 7. **ChainsIndexSection** — Max 15 Einträge, Desc: 80 Zeichen
-8. **BlockTypesIndexSection** — 14 Block-Typen (statische Liste; sie hinkt den 17 registrierten Block-Executoren hinterher — die drei `todo-*`-Typen fehlen)
+8. **BlockTypesIndexSection** — 19 Block-Typen (statische Liste; deckungsgleich mit den 19 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`)
 9. **FailedWorkflowsContextSection** — Kaputte Workflows via `WorkflowDebugService`, Error: 160 Zeichen
 
 ### Zusätzlich auf **OVERVIEW**-Seiten
@@ -379,7 +377,7 @@ Persistence-Key: `'assistant-sessions'` (localStorage)
 
 ### WebSocket-Integration (`hooks/useAssistantWebSocket.ts`)
 
-- **Protokoll**: STOMP über SockJS, URL `{origin}/ws?apiKey={key}`
+- **Protokoll**: STOMP über SockJS, URL `{origin}/ws?ticket={ticket}` — das Einmal-Ticket holt `beforeConnect` per `api.fetchWsTicket()` vor jedem Verbindungsversuch (auch vor jedem Reconnect); der API-Key bleibt im Header
 - **Reconnect-Delay**: 5000ms
 
 Zwei STOMP-Subscriptions:

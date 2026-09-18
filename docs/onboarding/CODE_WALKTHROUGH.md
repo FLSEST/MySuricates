@@ -138,7 +138,7 @@ Workflow (1) → (N) WorkflowRun      // @OneToMany
 **Wichtige Felder:**
 ```java
 String instructions;    // Workflow-spezifische Instruktionen (Monaco-Editor)
-String model;           // KI-Modell (z.B. "claude-opus-4-6")
+String model;           // KI-Modell -- CLI-Alias, z.B. "opus" / "sonnet" / "haiku"
 String templateId;      // Rueckverweis auf Template
 ```
 
@@ -192,7 +192,7 @@ const { data } = useQuery({
 
 **Pfad:** `ai-automation-frontend/src/types/index.ts`
 
-**Zweck:** Zentrale TypeScript-Typdefinitionen fuer die gesamte Frontend-Anwendung.
+**Zweck:** Zentrale TypeScript-Typdefinitionen fuer die gesamte Frontend-Anwendung. `BLOCK_TYPES` ist dabei die fuehrende Frontend-Liste der Block-Typen -- `types/__tests__/blockTypes.test.ts` und das Backend-Pendant `BlockTypeListsGuardTest` halten sie mit den Executoren gleich.
 
 **Wichtige Typen:**
 ```typescript
@@ -200,12 +200,18 @@ const { data } = useQuery({
 type ProjectType = 'CODE' | 'RESEARCH' | 'CONTENT' | 'BUSINESS' | 'PERSONAL';
 type ProjectStatus = 'STOPPED' | 'STARTING' | 'RUNNING' | 'ERROR';
 
-// Block-Typen (11 Varianten)
-type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while'
-  | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
+// Block-Typen (19 Varianten, Quelle: BLOCK_TYPES)
+export const BLOCK_TYPES = [
+  'simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch',
+  'skill-capability', 'approval', 'agentic', 'sub-workflow', 'human-input',
+  'integration', 'document', 'todo-create', 'todo-update', 'todo-close',
+  'compress', 'compress-ai',
+] as const;
+export type BlockType = (typeof BLOCK_TYPES)[number];
 
 // Ausfuehrungs-Status
-type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS'
+  | 'FAILED' | 'CANCELLED' | 'INTERRUPTED';
 type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 // Kern-Interfaces
@@ -249,7 +255,7 @@ export function useUpdateWorkflow() { ... }
 export function useDeleteWorkflow() { ... }
 ```
 
-Dieses Pattern wird in allen 16 Hook-Dateien konsistent angewendet.
+Dieses Pattern wird in allen Hook-Dateien unter `src/hooks/` konsistent angewendet (Stand 2026-09-18: 52 Dateien).
 
 ---
 
@@ -257,7 +263,7 @@ Dieses Pattern wird in allen 16 Hook-Dateien konsistent angewendet.
 
 **Pfad:** `ai-automation-frontend/src/App.tsx`
 
-**Zweck:** Root-Komponente mit React Router v6 Konfiguration und Code-Splitting.
+**Zweck:** Root-Komponente mit React Router v7 Konfiguration und Code-Splitting.
 
 **Routing-Struktur:**
 ```typescript

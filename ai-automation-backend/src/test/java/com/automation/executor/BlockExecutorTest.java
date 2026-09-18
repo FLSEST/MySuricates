@@ -5,6 +5,8 @@ import com.automation.entity.StepResult;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BlockExecutorTest {
@@ -49,8 +51,8 @@ class BlockExecutorTest {
             }
 
             @Override
-            public boolean supports(String blockType) {
-                return "test-block".equals(blockType);
+            public Set<String> supportedTypes() {
+                return Set.of("test-block");
             }
         };
 
@@ -68,8 +70,8 @@ class BlockExecutorTest {
             }
 
             @Override
-            public boolean supports(String blockType) {
-                return "my-block".equals(blockType);
+            public Set<String> supportedTypes() {
+                return Set.of("my-block");
             }
         };
 
@@ -94,8 +96,8 @@ class BlockExecutorTest {
             }
 
             @Override
-            public boolean supports(String blockType) {
-                return false;
+            public Set<String> supportedTypes() {
+                return Set.of();
             }
         };
 

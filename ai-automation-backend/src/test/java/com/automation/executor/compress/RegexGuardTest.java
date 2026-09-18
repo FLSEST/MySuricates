@@ -3,6 +3,7 @@ package com.automation.executor.compress;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,11 +53,41 @@ class RegexGuardTest {
     }
 
     @Test
-    void stackOverflow_becomesCompressionException() {
+    void manyShortLines_stopAtTheDeadline_notOnlyBetweenStages() {
+        Duration budget = Duration.ofMillis(200);
+        RegexGuard guard = RegexGuard.startingNow(budget);
+        Pattern harmless = RegexGuard.compile("^\\w+: \\d+$", 0, "Stufe test");
+        long start = System.nanoTime();
+
+        assertThatThrownBy(() -> {
+            for (int i = 0; i < 5_000_000; i++) guard.find(harmless, "warn: 12345");
+        }).isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
+
+        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(budget.multipliedBy(2));
+    }
+
+    /**
+     * Runs in a thread with an explicitly small stack: whether {@code ^(a|b)*$} overflows must not depend on
+     * the default stack size of whoever runs the suite (-Xss, JDK, CI agent).
+     */
+    @Test
+    void stackOverflow_becomesCompressionException() throws InterruptedException {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofSeconds(30));
         Pattern deep = RegexGuard.compile("^(a|b)*$", 0, "Stufe test");
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
 
-        assertThatThrownBy(() -> guard.find(deep, "ab".repeat(5000)))
+        Thread smallStack = new Thread(null, () -> {
+            try {
+                guard.find(deep, "ab".repeat(5000));
+            } catch (Throwable t) {
+                thrown.set(t);
+            }
+        }, "regex-guard-small-stack", 256 * 1024);
+        smallStack.start();
+        smallStack.join(30_000);
+
+        assertThat(smallStack.isAlive()).as("Matching ist beendet").isFalse();
+        assertThat(thrown.get())
                 .isInstanceOf(CompressionException.class)
                 .hasMessage("Muster zu tief verschachtelt für Zeile mit 10.000 Zeichen");
     }
@@ -70,6 +101,17 @@ class RegexGuardTest {
 
         assertThat(out).hasSize(12_000);
         assertThat(out).startsWith("b").endsWith("a");
+    }
+
+    /** validate() and apply() ask for the same pattern — it must be compiled once, not twice. */
+    @Test
+    void compile_reusesTheCompiledPattern() {
+        Pattern first = RegexGuard.compile("^ab+c$", 0, "Stufe test");
+
+        assertThat(RegexGuard.compile("^ab+c$", 0, "Stufe test")).isSameAs(first);
+        assertThat(RegexGuard.compile("^ab+c$", Pattern.CASE_INSENSITIVE, "Stufe test")).isNotSameAs(first);
+        assertThatThrownBy(() -> RegexGuard.compile("(unvollständig", 0, "Stufe test"))
+                .isInstanceOf(CompressionException.class).hasMessageContaining("ungültiger regulärer Ausdruck");
     }
 
     @Test

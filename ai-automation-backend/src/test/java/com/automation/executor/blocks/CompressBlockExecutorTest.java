@@ -18,10 +18,14 @@ class CompressBlockExecutorTest {
 
     private final CompressBlockExecutor executor = new CompressBlockExecutor();
 
+    /** Mirrors the UI preset "java-log" (frontend {@code components/workflow/compression.ts}). */
     private static final List<Map<String, Object>> JAVA_LOG_STAGES = List.of(
             Map.of("op", "text.normalize"),
             Map.of("op", "lines.filter", "exclude", List.of("^\\s+at ", ":: Spring Boot ::", "^[\\s/\\\\|()_'`=.,-]+$")),
-            Map.of("op", "lines.replace", "pattern", "^\\d{4}-\\d{2}-\\d{2}T[\\d:.]+Z?\\s*", "replacement", ""),
+            Map.of("op", "text.normalize"),
+            Map.of("op", "lines.replace",
+                    "pattern", "^(?:\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+Z?|\\d{2}:\\d{2}:\\d{2}[.,]\\d+)\\s*",
+                    "replacement", ""),
             Map.of("op", "lines.dedupe", "count", true),
             Map.of("op", "text.truncate", "max_chars", 18000, "keep", "head_tail"));
 
@@ -85,6 +89,20 @@ class CompressBlockExecutorTest {
         assertThat(ctx.getBlockOutput("backend_tests")).isEqualTo(log);
     }
 
+    /** Pilot run 301e29f4: the lines start with a time only, so lines.replace did not match and dedupe folded nothing. */
+    @Test
+    void javaLogPreset_foldsLinesThatStartWithATimeOnly() {
+        String log = ("21:32:58.761 [main] INFO c.a.SomeTest : Started SomeTest in 1.2 seconds\n").repeat(3)
+                + "21:33:01.004 [main] ERROR c.a.Foo : expected in test\n";
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.FAILED, 1, log);
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests", "stages", JAVA_LOG_STAGES)), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(r.getOutput()).endsWith("\n\n3× [main] INFO c.a.SomeTest : Started SomeTest in 1.2 seconds"
+                + "\n[main] ERROR c.a.Foo : expected in test");
+    }
+
     @Test
     void header_usesStoredStatusAndExitCode_notLogText() {
         ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.FAILED, 1, "BUILD SUCCESS\nalles gut");
@@ -125,6 +143,37 @@ class CompressBlockExecutorTest {
         assertThat(r.getOutput().length()).isLessThanOrEqualTo(1000);
         assertThat(r.getOutput()).contains("· Obergrenze (−");
         assertThat(((Map<?, ?>) r.getMetadata().get("compression")).get("capped")).isEqualTo(true);
+    }
+
+    /** Header note and the notice inside the body must name one and the same number of cut characters. */
+    @Test
+    void cap_headerAndBodyNameTheSameCutNumber() {
+        ExecutionContext ctx = contextWithShellSource("big", StepStatus.COMPLETED, 0, "x".repeat(10_000));
+
+        StepResult r = executor.execute(block(Map.of("source", "big",
+                "stages", List.of(Map.of("op", "text.normalize")), "max_chars", 1000)), ctx);
+
+        java.util.regex.Matcher header = java.util.regex.Pattern
+                .compile("Obergrenze \\(−([\\d.]+) Zeichen\\)").matcher(r.getOutput());
+        java.util.regex.Matcher body = java.util.regex.Pattern
+                .compile("\\[… ([\\d.]+) Zeichen ausgelassen …]").matcher(r.getOutput());
+        assertThat(header.find()).isTrue();
+        assertThat(body.find()).isTrue();
+        assertThat(header.group(1)).isEqualTo(body.group(1));
+    }
+
+    @Test
+    void skippedSource_isNamedInTheHeader() {
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.SKIPPED, null, "nicht gelaufen");
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests",
+                "stages", List.of(Map.of("op", "text.normalize")))), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(r.getOutput()).startsWith("## backend_tests — SKIPPED · 312 s · 14 → 14 Zeichen");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> compression = (Map<String, Object>) r.getMetadata().get("compression");
+        assertThat(((Map<?, ?>) compression.get("source")).get("status")).isEqualTo("SKIPPED");
     }
 
     @Test
@@ -180,6 +229,44 @@ class CompressBlockExecutorTest {
         assertThat(r.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException: kaputt");
         assertThat(r.getMetadata()).containsEntry("derivedOutput", true).containsKey("error");
         assertThat(r.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    void failureWithoutMessage_staysAReadableFailure() {
+        ExecutionContext nullMessage = mock(ExecutionContext.class);
+        when(nullMessage.getSourceSteps()).thenThrow(new com.automation.executor.compress.CompressionException(null));
+        ExecutionContext runtimeWithoutMessage = mock(ExecutionContext.class);
+        when(runtimeWithoutMessage.getSourceSteps()).thenThrow(new IllegalStateException());
+        Map<String, Object> config = Map.of("source", "backend_tests", "stages", List.of(Map.of("op", "text.normalize")));
+
+        StepResult blank = executor.execute(block(config), nullMessage);
+        StepResult runtime = executor.execute(block(config), runtimeWithoutMessage);
+
+        assertThat(blank.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(blank.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: unbekannter Fehler");
+        assertThat(blank.getMetadata()).containsEntry("derivedOutput", true).containsEntry("error", "unbekannter Fehler");
+        assertThat(runtime.getOutput()).isEqualTo("Komprimierung fehlgeschlagen: IllegalStateException");
+    }
+
+    @Test
+    void chainOverAnEmptyCompression_doesNotCompressTheLeerMarker() {
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.COMPLETED, 0, "a\nb");
+        StepResult first = executor.execute(block(Map.of("source", "backend_tests",
+                "stages", List.of(Map.of("op", "lines.filter", "include", List.of("ERROR"))))), ctx);
+        assertThat(first.getOutput()).endsWith("\n\n(leer)");
+        Map<String, Object> md = new HashMap<>(first.getMetadata());
+        md.put("blockType", "compress");
+        ctx.recordOutput("backend_kompakt", first.getOutput());
+        ctx.getSourceSteps().record("backend_kompakt", StepResult.builder().stepIndex(1).status(first.getStatus())
+                .output(first.getOutput()).metadata(md).build());
+
+        StepResult second = executor.execute(BlockDefinition.builder().type("compress").name("noch_kompakter")
+                .config(Map.of("source", "backend_kompakt", "stages", List.of(Map.of("op", "text.normalize")))).build(), ctx);
+
+        assertThat(second.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(second.getOutput()).startsWith("## backend_tests (über backend_kompakt) — COMPLETED · exit 0 · 312 s · 0 → 0 Zeichen");
+        assertThat(second.getOutput()).endsWith("\n\n(leer)");
+        assertThat(((Map<?, ?>) second.getMetadata().get("compression")).get("inChars")).isEqualTo(0);
     }
 
     @Test

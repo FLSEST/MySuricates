@@ -786,4 +786,225 @@ class SwitchBlockExecutorTest {
         assertThat(result.getOutput()).contains("Blocktyp 'compress' wird in switch nicht unterstützt");
         verifyNoInteractions(commandExecutor);
     }
+
+    @Test
+    void execute_nestedDocumentBlock_isRejectedNamingTheBlockWithoutAnyCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "document", "name", "report", "config", Map.of("command", "write it"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("document").contains("report");
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    void execute_nestedBlockWithoutType_isRejectedInsteadOfRunningAsAiCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("name", "typeless", "config", Map.of("command", "Analysiere das Repo"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("typeless");
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    void execute_nestedBlockWithBlankType_isRejectedInsteadOfRunningAsAiCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "  ", "config", Map.of("command", "Analysiere das Repo"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+        verify(commandExecutor, never()).executeStepAsShell(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void execute_nestedNamedSimpleBlock_passesTheNameToTheHostRequest() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("reviewed").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "review", "config", Map.of("command", "Pruefe das"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        verify(commandExecutor).executeStepOnHost(captor.capture());
+        assertThat(captor.getValue().block().getName()).isEqualTo("review");
+    }
+
+    @Test
+    void deserializeBlock_keepsTheNestedBlockName() {
+        BlockDefinition nested = executor.deserializeBlock(
+                Map.of("type", "simple", "name", "review", "config", Map.of("command", "check")));
+
+        assertThat(nested.getType()).isEqualTo("simple");
+        assertThat(nested.getName()).isEqualTo("review");
+        assertThat(nested.getConfig()).containsEntry("command", "check");
+    }
+
+    /** 12a3b244: a name on a case block must also make its output addressable downstream. */
+    @Test
+    void execute_namedCaseBlock_outputIsAvailableUnderItsName() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("reviewed").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "review", "config", Map.of("command", "Pruefe das"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutput("review")).isEqualTo("reviewed");
+        assertThat(context.resolveTemplate("{{ block.review.output }}")).isEqualTo("reviewed");
+    }
+
+    @Test
+    void execute_namedBlocksInTheDefaultBranch_areRecordedTooAndKeepTheirOwnOutput() {
+        StepResult first = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("collected").build();
+        StepResult second = StepResult.builder()
+                .stepIndex(2).status(StepStatus.COMPLETED).output("summarised").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(first, second);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "nothing-matches");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "config", Map.of("command", "skip"))))));
+        config.put("default", List.of(
+                Map.of("type", "simple", "name", "collect", "config", Map.of("command", "sammle")),
+                Map.of("type", "simple", "name", "summarise", "config", Map.of("command", "fasse zusammen"))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutput("collect")).isEqualTo("collected");
+        assertThat(context.getBlockOutput("summarise")).isEqualTo("summarised");
+    }
+
+    @Test
+    void execute_unnamedCaseBlock_recordsNoNamedOutput() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "config", Map.of("command", "arbeite"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutputs()).isEmpty();
+    }
+
+    /**
+     * Case blocks run in sequence and each one moves {@code previous_output}, like the iterations
+     * of a while loop — a second block in the same case sees the first one's output, not the step
+     * before the switch (12a3b244).
+     */
+    @Test
+    void execute_caseWithTwoBlocks_theSecondSeesTheFirstsOutputAsPreviousOutput() {
+        context.setPreviousOutput("vor dem switch");
+        StepResult first = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("erster").build();
+        StepResult second = StepResult.builder()
+                .stepIndex(2).status(StepStatus.COMPLETED).output("zweiter").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(first, second);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks", List.of(
+                Map.of("type", "simple", "config", Map.of("command", "Start: {{ previous_output }}")),
+                Map.of("type", "simple", "config", Map.of("command", "Dann: {{ previous_output }}"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        verify(commandExecutor, times(2)).executeStepOnHost(captor.capture());
+        assertThat(captor.getAllValues().getFirst().block().getConfig())
+                .containsEntry("command", "Start: vor dem switch");
+        assertThat(captor.getAllValues().get(1).block().getConfig())
+                .containsEntry("command", "Dann: erster");
+    }
+
+    /**
+     * Block names are meant to be unique per workflow. When they are not, the last writer wins —
+     * a case block overwrites the output an earlier top-level block stored under the same name.
+     * The other direction (the switch's own aggregate overwriting its child) is pinned in
+     * {@code BlockStepRunnerTest}.
+     */
+    @Test
+    void execute_caseBlockNameCollidesWithAnEarlierBlock_theCaseBlockWins() {
+        context.recordOutput("report", "alt");
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("neu").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks", List.of(
+                Map.of("type", "simple", "name", "report", "config", Map.of("command", "schreibe"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.getBlockOutput("report")).isEqualTo("neu");
+    }
+
+    /** Taint is sticky: a case output in an untrusted run is shell-escaped downstream like any other. */
+    @Test
+    void execute_namedCaseBlockInUntrustedRun_outputIsRecordedAsTainted() {
+        context.setUntrustedVariable("payload", "harmless");
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("a; id").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "scan", "config", Map.of("command", "scanne"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.resolveShellTemplate("echo {{ block.scan.output }}", false))
+                .isEqualTo("echo 'a; id'");
+    }
+
+    @Test
+    void execute_nestedNamedShellBlock_passesTheNameToTheStepBlock() {
+        StepResult shellResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepAsShell(any(), any(), anyInt(), anyInt())).thenReturn(shellResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "shell", "name", "cleanup", "config", Map.of("command", "rm -rf tmp/"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<BlockDefinition> captor = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(any(), captor.capture(), anyInt(), anyInt());
+        assertThat(captor.getValue().getName()).isEqualTo("cleanup");
+    }
 }

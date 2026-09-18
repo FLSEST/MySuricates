@@ -15,11 +15,13 @@
 #   ./scripts/setup.sh --start        # nach erfolgreichem Setup direkt starten
 #   ./scripts/setup.sh --show-key     # API-Key voll anzeigen (Default: maskiert)
 #   ./scripts/setup.sh --preset core  # Modul-Preset ohne Rückfrage: core | research | full
+#   ./scripts/setup.sh --lang de      # Sprache der Modultexte: de | en (Default: $LANG, sonst en)
 #   ./scripts/setup.sh --install --start
 #   ./scripts/setup.sh --help
 #
 # Das Modul-Preset landet in ai-automation-backend/config/application.yml — nur wenn die
 # Datei noch nicht existiert. Ohne --preset wird im Terminal gefragt, sonst gilt core.
+# --lang ändert nur die Anzeige der Modultexte, nie das Ergebnis; unbekannte Sprache → en.
 #
 # set -e bewusst NICHT: der Checker probiert absichtlich evtl. fehlende Tools.
 set -uo pipefail
@@ -35,6 +37,7 @@ DO_INSTALL=0
 DO_START=0
 SHOW_KEY=0
 PRESET=""
+LANG_OPT=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --install) DO_INSTALL=1 ;;
@@ -42,8 +45,10 @@ while [ "$#" -gt 0 ]; do
     --show-key) SHOW_KEY=1 ;;
     --preset)  PRESET="${2:-}"; shift ;;
     --preset=*) PRESET="${1#--preset=}" ;;
+    --lang)    LANG_OPT="${2:-}"; shift ;;
+    --lang=*)  LANG_OPT="${1#--lang=}" ;;
     -h|--help)
-      sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) echo "Unbekannte Option: $1 (siehe --help)" >&2; exit 2 ;;
@@ -54,6 +59,9 @@ if [ -n "$PRESET" ] && ! module_preset_valid "$PRESET"; then
   echo "Unbekanntes Preset: $PRESET (erlaubt: ${MODULE_PRESETS})" >&2
   exit 2
 fi
+# Anzeigesprache der Modultexte: --lang, sonst $LANG-Präfix, sonst en. Kein Fehlerfall —
+# eine Sprache ohne eigene JSON-Datei zeigt einfach die englischen Texte.
+TEXT_LANG="$(module_text_lang "$LANG_OPT")"
 
 # ---------------------------------------------------------------------------
 # Ausgabe-Helfer (Farben nur im TTY)
@@ -340,12 +348,12 @@ if [ -e "$LOCAL_CONFIG" ]; then
 else
   if [ -z "$PRESET" ]; then
     if [[ -t 0 && -t 1 ]]; then
-      PRESET="$(module_preset_prompt core)"
+      PRESET="$(module_preset_prompt core "$TEXT_LANG")"
     else
       PRESET="core"
     fi
   fi
-  if module_preset_write "$LOCAL_CONFIG" "$PRESET"; then
+  if module_preset_write "$LOCAL_CONFIG" "$PRESET" "$TEXT_LANG"; then
     ok "Modul-Preset ${C_BLD}${PRESET}${C_RST} → ai-automation-backend/config/application.yml"
     echo "      Später ändern: Datei bearbeiten und Backend neu starten (Übersicht: Settings → Module & Härtung)"
   else

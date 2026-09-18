@@ -33,13 +33,24 @@ public final class StepAiMetadata {
         if (request.priority()) {
             params.put("priority", true);
         }
-        if (request.allowedTools() != null && !request.allowedTools().isEmpty()) {
-            params.put("allowedTools", String.join(",", request.allowedTools()));
-        }
-        if (request.disallowedTools() != null && !request.disallowedTools().isEmpty()) {
-            params.put("disallowedTools", String.join(",", request.disallowedTools()));
-        }
+        putTools(params, "allowedTools", request.allowedTools());
+        putTools(params, "disallowedTools", request.disallowedTools());
         return params;
+    }
+
+    /**
+     * Adds a tool list as a comma-separated string, blank entries dropped. The {@code NO_TOOLS} sentinel
+     * ({@code [""]}, "no built-in tools at all") therefore adds nothing instead of an empty string — same
+     * convention as model and effort, which are omitted when blank.
+     */
+    private static void putTools(Map<String, Object> params, String key, List<String> tools) {
+        if (tools == null) {
+            return;
+        }
+        List<String> named = tools.stream().filter(t -> t != null && !t.isBlank()).toList();
+        if (!named.isEmpty()) {
+            params.put(key, String.join(",", named));
+        }
     }
 
     /** Same shape without a request object (agentic loop): provider, model and effort actually used. */

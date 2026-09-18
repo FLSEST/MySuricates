@@ -38,6 +38,26 @@ automation:
   modules:
     # Integration tests exercise every controller; single tests disable a module via @TestPropertySource.
     preset: full
+    # Belt and braces next to the surefire spring.config.location pin (pom.xml): these are the keys
+    # the untracked dev config ai-automation-backend/config/application.yml sets, and they are what
+    # broke the module tests when it leaked into the test JVM (TODO 39e55535). Values = the defaults
+    # a clean checkout has, so nothing changes for CI.
+    ui-editable: false
+  hardening:
+    # ModuleCatalog defaults — provenance on, the rest off. Do not "harden" the test run here:
+    # the point is that tests see the same configuration as a fresh checkout.
+    provenance: true
+    sealing: false
+    require-sealed-for-unattended: false
+    webhook-signatures: false
+  scheduler:
+    # The dev config parks skip-until on a future instant to pause the triggers and turns
+    # catch-up-on-resume off along with it; tests must not inherit either. Values = the defaults
+    # from SchedulerConfig / TodoTriggerConfig.
+    skip-until: ""
+    catch-up-on-resume: true
+  todo-trigger:
+    skip-until: ""
   security:
     enabled: false
   tray:

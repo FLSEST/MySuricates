@@ -1,0 +1,83 @@
+{
+  "id" : "builtin-blog-writer",
+  "sortOrder" : 10,
+  "version" : "1.0.0",
+  "name" : "Blog & Article Writer",
+  "icon" : "📝",
+  "description" : "Writes engaging blog posts and articles with SEO optimization.",
+  "category" : "CONTENT",
+  "capabilities" : [
+    {
+      "name" : "write_article",
+      "description" : "Write a complete blog post or article on a given topic",
+      "inputSchema" : {
+        "properties" : {
+          "tone" : {
+            "type" : "string"
+          },
+          "topic" : {
+            "type" : "string"
+          },
+          "wordCount" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "article" : {
+            "type" : "string"
+          },
+          "meta" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "create_article_outline",
+      "description" : "Create a structured outline for an article",
+      "inputSchema" : {
+        "properties" : {
+          "topic" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "outline" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "suggest_headlines",
+      "description" : "Generate headline suggestions for content",
+      "inputSchema" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "topic" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "headlines" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

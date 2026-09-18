@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Architecture
 
 ## System Overview
@@ -68,9 +66,9 @@ automation:
     sealing: true       # hardening flags are independent of the preset
 ```
 
-Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (dashes as `_`, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). The stable and test profiles use `full`; `scripts/setup.sh` writes the chosen preset to `ai-automation-backend/config/application.yml`. Templates "minimal" and "maximal": `ai-automation-backend/config-examples/`, explained in [deployment.md](deployment.md#configurations-minimal-and-maximal).
+Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (dashes as `_`, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). The stable and test profiles use `full`; `scripts/setup.sh` writes the chosen preset to `ai-automation-backend/config/application.yml`. Templates "minimal" and "maximal": `ai-automation-backend/config-examples/`, explained in [deployment.md](deployment.md#configurations-minimal-and-maximal). `scripts/setup.sh --lang de|en` only chooses the display language of the module texts in the terminal (default: the `$LANG` prefix, else `en`) — it never changes the outcome (which modules are active).
 
-**Catalog** (single source: `modules/ModuleCatalog`):
+**Catalog** (single source: `modules/ModuleCatalog`, 18 feature modules + 4 hardening switches = 22 keys):
 
 | Tier | Modules | Maturity |
 |---|---|---|
@@ -78,6 +76,18 @@ Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUT
 | `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
 | `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimental |
+
+The catalog is additionally exported as plain bash arrays to `scripts/lib/module-catalog.generated.sh`
+— read by `scripts/lib/module-preset.sh`, which runs before every build and therefore must not
+require a backend or `jq`. The file is not hand-maintained: after a change to the catalog or to the
+display texts (`ai-automation-frontend/src/data/modules.<lang>.json`), regenerate it with:
+
+```bash
+cd ai-automation-backend && ./mvnw test -Dtest=ModuleCatalogTextsTest -Dmodule.catalog.write=true
+```
+
+Without regeneration, `ModuleCatalogTextsTest` fails red as soon as the generated file no longer
+matches the catalog — whoever adds a module finds out at the latest there.
 
 **Enforcement**
 
@@ -110,7 +120,7 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 
 **Run admission** — Every run trigger calls `WorkflowExecutor.execute(…, TriggerSource)` and therefore passes `RunAdmission` before a run row exists. Rules in this order: (1) a sealed workflow must match its seal, (2) with `require-sealed-for-unattended` an unattended run needs a sealed workflow. A refused run leaves **no run row and no DLQ entry**, only a `SECURITY` entry in the activity log; REST callers get the error code.
 
-**Change provenance (always on)** — Every writer of definition fields goes through `WorkflowService` → `WorkflowMutationGateway`. Each change writes a version row with the state **after** the change (number = MAX+1) and a `changeSource` chosen by the calling server code, never by the request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`). If the newest row's hash does not match the current state (legacy data, a change that bypassed the service), that state is first saved as `untracked`. Label-only changes create no version. `WorkflowWriterAllowlistTest` pins who else may call `WorkflowRepository.save`.
+**Change provenance (always on)** — Every writer of definition fields goes through `WorkflowService` → `WorkflowMutationGateway`. Each change writes a version row with the state **after** the change (number = MAX+1) and a `changeSource` chosen by the calling server code, never by the request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`). If the newest row's hash does not match the current state (legacy data, a change that bypassed the service), that state is first saved as `untracked`. Label-only changes create no version. `WorkflowWriterAllowlistTest` pins who else may call `WorkflowRepository.save`. The same place refuses unknown block types: `BlockTypeValidator` checks every block type — nested ones in `switch` `cases[].blocks` and `default` included — against the executor registry (`BlockTypeRegistry`, fed by all `BlockExecutor` beans) and throws **400 `INVALID_ARGUMENT`** naming the unknown type and the allowed ones. The check runs inside the caller's transaction, so the save is rolled back.
 
 **Sealing** — `seal` records the current hash in `sealed_hash` (with `sealed_at` and a WARN `SECURITY` entry). Sealed workflows reject definition changes and deletion with **409 `WORKFLOW_SEALED`**; renaming still works. Repair (`POST …/repair`) is refused right away as well, automatic auto-repair skips sealed workflows before any AI call, and the UI disables "Optimize" and "Repair". If the definition no longer matches the seal at start (e.g. after a change made directly in the database) or cannot be verified, the run does not start: **409 `WORKFLOW_TAMPERED`**, ERROR `SECURITY` entry with expected and actual hash. Both checks apply regardless of the switch — `sealing` only gates setting and removing seals, so switching it off never silently unseals.
 
@@ -122,6 +132,23 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 
 Chains and sub-workflows pass their starter's origin on in the reserved context key `__parent_trigger_source`: `ChainExecutor` sets it for every entry itself (inputs cannot preset it), `SubWorkflowBlockExecutor` hands down the parent run's effective origin, and webhook payloads may not contain `__` keys. A missing or unreadable key counts as unattended. Refusals answer **403 `UNATTENDED_REQUIRES_SEAL`**. With this switch, auto-repair and wishes are effectively off: they run unattended and would have to modify sealed workflows.
 
+**Trust classes of context values** — Every context variable of a run carries one of three classes (`executor/VariableTrust`, bookkeeping in `executor/ExecutionContextTaint`). The class decides whether the value is substituted raw into a shell command line or wrapped in POSIX single quotes — and whether it *taints* the run, i.e. whether everything derived from it is escaped too.
+
+| Class | Source | In shell blocks | In AI prompts | Taints the run |
+|---|---|---|---|---|
+| **trusted** | workflow defaults, system values (`project_path`, `workflow_run_id`, `workflow_definition_hash`), block-internal values, answers from `approval`/`human-input`, any `setVariable` | substituted raw | raw | no |
+| **untrusted external** | webhook payload, restored `__untrusted_keys` (resume, sub-workflow), variables derived from tainted output (`step_N_output`, foreach items, `document` extracts) | always single-quoted | raw | yes, from the moment it is set |
+| **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | only once the placeholder was really substituted into a shell command line |
+
+- **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the reserved context keys `__untrusted_keys` and `__untrusted_outputs` so it survives resume and sub-workflow hand-over. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
+- **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that uses `{{ previous_report }}` only in an AI prompt (`resolveTemplate`), or not at all, stays untainted.
+- **Deliberately trusted:** answers from `approval` and `human-input` blocks arrive through the API-key-protected REST interface from the person who owns the instance — they are not escaped. Likewise `setVariable` (e.g. a workflow variable shadowing a webhook field of the same name) clears the untrusted mark on purpose: the value then comes from the definition, not from the caller. `replaceValue` (workspace path remapping) in contrast only swaps the value and leaves the class in place.
+- **Known limits:**
+  1. Nothing is escaped in AI prompts — a prompt is not a command line, and the trust model does not defend against prompt injection.
+  2. **Laundering through an AI block:** platform data in a `simple` or `agentic` prompt does not taint the run (limit 1); the AI's answer is recorded by `recordOutput` as untainted; a following shell block then substitutes `{{ previous_output }}` **raw**. The path platform data → AI prompt → shell block therefore bypasses the quoting entirely. It occurs eight times in the bundled definitions (seven pool workflows, one built-in template) and only stays harmless there because every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **Recommendation for your own workflows: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+  3. The platform-data "used in a shell path" flag itself is not exported; it does not need to be, because the first output after the substitution writes the taint into `__untrusted_outputs`.
+  4. A shell block that writes a tainted value into a file itself and later executes that file is outside what quoting can see.
+
 **Webhook signatures** — `POST /api/v1/webhooks/{id}/secret` generates a secret (32 random bytes, hex), shows it exactly once and stores it AES-GCM-encrypted (`IntegrationEncryptionService`, key outside the database) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` removes it. For a webhook with a secret, `WebhookSignatureVerifier` checks `X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`, the GitHub/Gitea format) as HMAC-SHA256 over the raw request bytes before the JSON is parsed, compared in constant time — otherwise **401 `WEBHOOK_SIGNATURE_INVALID`**. As with seals, a stored secret stays in force if the switch is later turned off. Responses only reveal `signatureRequired`.
 
 ## Backend Architecture
@@ -129,7 +156,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 33 Controllers)
+Controller (REST API, 43 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -148,7 +175,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          33 REST Controllers
+├── controller/          43 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -178,7 +205,7 @@ com.automation
 │   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException
-│   ├── export/bpmn/     BpmnModelBuilder (chain/single task/loop) + BpmnNodeFactory (ids, placement, edges, command tasks), BpmnGatewayBuilder (conditional/switch: split/rows/merge), BpmnEdgeRouter (right-angle waypoint routing), BpmnBlockText (labels, docs, config helpers), BpmnSegment (sub-graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
+│   ├── export/bpmn/     BpmnModelBuilder (chain/single task/loop) + BpmnNodeFactory (ids, placement, edges, command tasks), BpmnGatewayBuilder (conditional/switch: split/rows/merge), BpmnEdgeRouter (right-angle waypoint routing), DataFlowReferenceScanner (placeholder scan for `block.x.output`/`previous_output`/`step_N_output`/compress `source`) + BpmnDataFlowBuilder (data objects and associations below the task row; the import skips them), BpmnBlockText (labels, docs, config helpers), BpmnSegment (sub-graph), BpmnXmlRenderer, BpmnExportAdapter, BpmnModel, BpmnNames
 │   ├── search/          SemanticWorkflowSearchService
 │   ├── watchdog/        ConnectionPoolWatchdogService
 │   ├── repair/          AutoRepairService
@@ -197,7 +224,7 @@ com.automation
 │   └── blocks/          19 Block Executors + Agentic helper classes (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Configuration classes, Seeders (Skill, Template, OnboardingProfile)
-├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor
+├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor, WebSocketTicketService
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception classes
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message DTOs
@@ -205,12 +232,13 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 33 REST Controllers
+### All 43 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, archiving, container lifecycle, context generation |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills, optimize, similar, repair, versions |
+| `WorkflowImportController` | `/api/v1/workflows/import` | BPMN import (`POST /bpmn?projectId=…`, body = BPMN XML) → new workflow (201); foreign BPMN/broken XML/too large → 400 |
 | `ExecutionController` | `/api/v1/executions` | List, detail, pause, resume, resume-from-step, cancel, retry, approve, approval-check, todos-approve, notes, command |
 | `SkillController` | `/api/v1/skills` | CRUD, capabilities, export/import |
 | `ScheduleController` | `/api/v1/schedules` | CRUD, enable/disable, runs, calendar, preview, remaining-stats, chain-schedules, maintenance |
@@ -241,7 +269,16 @@ com.automation
 | `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list, task export targets |
 | `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding profiles CRUD, reset, history |
 | `ReportsController` | `/api/v1/reports` | Report generation and retrieval |
+| `AuditController` | `/api/v1/audits`, `/api/v1/audit-*` | Audit overview, report history, findings and TODO links |
 | `DocsController` | `/api/v1/docs` | Read Markdown documentation |
+| `SystemSettingsController` | `/api/v1/system` | Runtime settings: app settings (`GET`/`PUT /settings/{key}`), execution config |
+| `SystemAiProviderController` | `/api/v1/system` | AI provider and capability information: provider list, capabilities, Pi catalog, models per provider (+ refresh) |
+| `SystemModulesController` | `/api/v1/system/modules` | Runtime module switches for the settings UI (only when `automation.modules.ui-editable=true`; hardening switches never switchable) |
+| `SystemAccessController` | `/api/v1/system` | Access surface: remote access (Tailscale) enable/disable/status, local filesystem (browse, open-path, integration snippet) |
+| `SystemMaintenanceController` | `/api/v1/system` | Maintenance: auto-repair, VACUUM, database backups (list, create, download) |
+| `DashboardLayoutController` | `/api/v1/dashboard/layouts` | Version history of the dashboard layout (core feature, no module gate) |
+| `WorkflowSealController` | `/api/v1/workflows/{id}` | Seal/unseal a workflow (only when `automation.hardening.sealing=true`; existing seals stay effective even if the switch is turned off) |
+| `WebSocketTicketController` | `/api/v1/ws-ticket` | Issues short-lived, single-use tickets for the WebSocket handshake (no module gate, ordinary API rate limit applies) |
 
 ### Workflow Execution
 
@@ -258,6 +295,8 @@ The workflow engine executes blocks sequentially. The Claude CLI always runs **o
 8. `WorkflowRunCompletedEvent` is fired → `AutoTodoService` reacts
 
 **Controllable from step 1:** before submitting the run, `WorkflowExecutor` registers a provisional `ExecutionContext` in the `WorkflowExecutionRegistry`. A cancel therefore takes effect while the run is still waiting for a semaphore slot or for its container to start — the execution thread carries the cancel/pause flag over when it swaps in the real context. As a result `getActiveRunCount()` also counts queued runs, which stops `GhostRunWatchdogService` from releasing the permit of a starting run as a leak.
+
+**Resume cuts by blocks, not by step index** (`ResumePlan`): `POST /executions/{id}/resume-from-step` picks up after the last COMPLETED step. What counts is that step's **position** in the block list, not its `stepIndex` — wrapper blocks (foreach, while, retry, conditional, switch) draw one more index per item or iteration, so a block's index runs ahead of its position. This rests on the guarantee `BlockStepRunner` gives: exactly one persisted step per top-level block, in block order (inner items are never persisted). The resumed segment's steps continue above every index already persisted (`ExecutionContext.startStepIndicesAt`), so indices stay unique and sortable. Previously the freshly allocated index was compared against the persisted one — after a wrapper block, the resume skipped blocks that had never run (TODO `1be423b4`).
 
 **Container start/stop outside transactions:** `ProjectService.startContainer`/`stopContainer` are deliberately **not** `@Transactional`: the Docker call sits between two short `TransactionTemplate` bursts (STARTING → Docker outside any transaction → RUNNING/ERROR), because `ContainerService` holds the per-project monitor while it runs — an enclosing transaction would pin the single connection for the whole 5–15 s Docker start and push a concurrent workflow run (which takes the monitor first) into the 120 s connection timeout (lock-order inversion between monitor and connection). Because the STARTING burst commits before the Docker start, `ProjectStatusReconciler` picks up every project a crash in that window left in STARTING on `ApplicationReadyEvent` (RUNNING container row ⇒ RUNNING, otherwise STOPPED) — the project-level counterpart of `WorkflowExecutor.cleanupZombieRuns`. `ProjectService.delete` follows the same pattern in reverse order: the archive burst (`archivedAt` + activity log) commits first, the Docker stop runs outside any transaction afterwards — if it fails the project stays archived (ERROR log) and only the orphaned container is left for `DockerOrphanReconciler`/idle cleanup to reap.
 
@@ -541,7 +580,11 @@ Claude Code sessions can also serve as templates for workflows:
 
 - Skills are stored in the `skills` DB table, not hardcoded in frontend or in-memory beans
 - **19 built-in skills** are seeded at startup by `SkillSeeder` (idempotent)
-- Skill definitions are in `BuiltInSkills` (order) and `BuiltIn<Category>Skills` (`config/` package)
+- **Location:** `src/main/resources/skills/builtin/<id>.json` (metadata: `sortOrder`, `version`, `name`, `icon`, `description`, `category`, `capabilities` incl. `writes`/`async`/`handlerClass`/schemas) plus `<id>.md` holding the prompt text. Loaded by `BuiltInSkillLoader` (modelled on `BuiltInTemplateLoader`); the Java classes `BuiltInSkills`/`BuiltIn<Category>Skills` are gone
+- The `.md` is taken **byte-for-byte** (no trim, no appended newline). `BuiltInSkillsSnapshotTest` compares all skills canonically against `src/test/resources/skills/builtin-snapshot.json` and fails on any unintended change; rewrite intended changes with `./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true`
+- **Version rule:** `SkillSeeder` seeds version-based (semver comparison in `SeedVersions`, like `WorkflowTemplateSeeder`) — missing skills are inserted, existing ones are only overwritten when the resource `version` is higher (capabilities included). So a content change to a built-in needs a higher `version` in its JSON, otherwise it never reaches existing instances. User skills (`builtin=false`) and built-ins no longer present in the resources are left untouched
+- **Gate for the version rule:** `BuiltInSkillVersionGateTest` hashes each skill's `<id>.json` (canonically) plus its `<id>.md` (byte-for-byte) against the checked-in list `src/test/resources/skills/builtin-versions.json` and fails when the hash changed without a higher `version` or when the list is stale — after an intended bump, rewrite and commit it with `./mvnw test -Dtest=BuiltInSkillVersionGateTest -Dskills.versions.write=true`
+- Loader failures are hard: a missing `.md`, a filename that differs from the `id`, a missing or duplicate `sortOrder`, a missing/unknown `category` or an empty directory abort startup instead of seeding an incomplete skill set
 - Built-in skills have stable IDs (e.g. `builtin-code-review`, `builtin-test-generator`)
 - `SkillSeeder` also registers all skills in the in-memory `SkillRegistry` for capability lookups
 - `SkillRegistry` no longer depends on `SkillProvider` beans — the seeder handles registration
@@ -747,7 +790,7 @@ Response (DTO) → React Query Cache → UI Update
 ## WebSocket (Live Logs + Status)
 
 - **Protocol:** STOMP over SockJS
-- **Endpoint:** `/ws` (SockJS handshake)
+- **Endpoint:** `/ws` (SockJS handshake, authenticated by ticket — see [WebSocket Authentication](#websocket-authentication))
 - **Broker:** Simple Message Broker on `/topic`
 - **Topics:**
   - `/topic/executions/{runId}/logs` — Workflow execution logs
@@ -794,7 +837,6 @@ Response (DTO) → React Query Cache → UI Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
-- `GET /api/v1/system/integration-snippet`
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)
@@ -811,6 +853,34 @@ Response (DTO) → React Query Cache → UI Update
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
 
+**Global server bucket, per-path client lock — the asymmetry is deliberate.** The server counts in
+*one* bucket per client IP across all endpoints, so a 429 means "you as a whole are too fast". The
+client (`api/client.ts`) in contrast remembers the lock **per endpoint pattern** (the path without
+its query and with UUIDs replaced by `{id}`, so `/executions/{id}` does not get one key per run).
+
+On top of that comes a **short lock over the remaining paths: at most 2 s
+(`GLOBAL_BACKOFF_SECONDS`), capped by `Retry-After`** — with `Retry-After: 0` no global lock is
+created at all. Two endpoints are exempt from it (`GLOBAL_LOCK_EXEMPT`): `POST /ws-ticket` (a blocked
+ticket request costs the WebSocket one reconnect attempt and doubles its exponential delay, turning
+2 s into a much longer outage) and `GET /system/auth-status` (the `ApiKeyGuard` renders nothing until
+it answers — the app would stay empty instead of showing the rate-limit hint). Their own path lock
+still applies to them; they are only exempt from *somebody else's* 429.
+
+The consequence: after a 429 storm the client releases individual patterns again after at most 2 s,
+and each pattern collects its own 429 until its `Retry-After` lock is in place. The short global lock
+takes the peak off the storm without closing the two ways out. Recovery needs no reload: a timer on
+the last deadline (`scheduleExpiry`) reports the expiry, and `installRateLimitRecovery` invalidates
+**every query in an error state once** on the active → inactive transition — `retry` is off for 429
+and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar, layout,
+dashboard) would otherwise stay red until a reload.
+
+**An empty `?ticket=` in the handshake is the client fallback.** If `POST /ws-ticket` runs into a
+lock (or fails otherwise), `useWebSocket` sets `wsTicket = ''` in `beforeConnect` and the handshake
+goes out with an empty `?ticket=`. The interceptor refuses it, stompjs schedules the next attempt
+with a growing delay — that is the intended path, rather than an unhandled promise rejection that
+would tear the reconnect cycle apart. An empty ticket in the server logs is therefore not an attack
+but a client whose ticket request did not get through.
+
 ### Request Size Limit
 
 - **Filter:** `ActivityLogSizeLimitFilter`
@@ -819,7 +889,18 @@ Response (DTO) → React Query Cache → UI Update
 
 ### WebSocket Authentication
 
-- **Interceptor:** `WebSocketAuthInterceptor` — validates API key during WebSocket handshake
+Neither SockJS nor a raw browser WebSocket can send its own headers during the handshake, so authentication has to travel in the URL. The API key must not end up there (browser history, proxy logs), so a **short-lived single-use ticket** goes first:
+
+1. The client calls `POST /api/v1/ws-ticket` — **with the API key in the header**, like every other endpoint (subject to the normal API rate limit). Response: `{ "ticket": "<43 chars>", "expiresInSeconds": 30 }`
+2. The client appends the ticket as `?ticket=…` to the handshake URL (`/ws` and `/ws/terminal/{runId}`)
+3. `WebSocketAuthInterceptor` redeems the ticket and lets the handshake through — **exactly once and only before it expires**. An `?apiKey=` is refused (401, handshake aborted) and logged with its own message.
+
+- **Ticket store:** `WebSocketTicketService` — purely in memory (insertion-ordered `LinkedHashMap` with `synchronized` access instead of a `ConcurrentHashMap`, no DB access during a handshake), 32 random bytes URL-safe Base64, expired entries are swept on every `issue()`/`consume()` (no scheduler). On top of that the store is hard-capped via `removeEldestEntry` at **`MAX_OPEN_TICKETS` = 1000 outstanding tickets**; beyond that the oldest one is dropped FIFO-style (the affected client simply fetches a new one on its next attempt). Tickets do not survive a restart — exactly their intended lifetime.
+- **Lifetime:** `automation.websocket.ticket-ttl-seconds` (default 30, env `AUTOMATION_WS_TICKET_TTL_SECONDS`)
+- **Frontend:** `api.fetchWsTicket()`; `useWebSocket`/`useAssistantWebSocket` fetch the ticket in stompjs' `beforeConnect` (runs before every connect attempt including reconnects), the run terminal before `new WebSocket(...)`. A guard test forbids `apiKey=` anywhere in `src/`.
+- **No SockJS fallback:** the clients run with `transports: ['websocket']`. SockJS opens a separate session for every fallback transport (xhr-streaming, xhr-polling) and would need a second ticket — the first one is spent after the WebSocket attempt. **The instance therefore needs a WebSocket-capable path** (any proxy in front must pass upgrades through); there is no HTTP fallback any more.
+- **Reconnect:** `reconnectDelay: 5000` with `ReconnectionTimeMode.EXPONENTIAL` and `maxReconnectDelay: 60000` — every attempt costs a `POST /ws-ticket` and must not run into the API rate limit while the backend is down.
+- **Disabled:** With `automation.security.enabled=false` or no configured key the interceptor lets every handshake through (like `ApiKeyAuthFilter`).
 
 ### CORS
 
@@ -890,6 +971,10 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V65 | Catch-up-on-resume on schedules |
 | V66 | Todo export link |
 
+## Architecture Gates
+
+Two JUnit tests in package `com.automation.architecture` pin the measured structure, both on the same jdeps package edges as `scripts/public-readiness/arch-metrics.sh` (section `## packages`) and without any new dependency: `PackageCycleRatchetTest` pins today's 13 mutually dependent package pairs as an allowlist — a new pair fails the build, a resolved one is only reported as a hint — and `LayerRuleTest` forbids the edge classes `service.* → controller.*`, `controller.* → repository.*` and `repository.* → service.*` (allowlist empty today). What gets measured is always the build directory the tests themselves were loaded from (`target/`, or `target-ide/` under the IDE profile), never a stale one sitting next to it; if it or jdeps is missing, both tests are skipped with a clear message instead of passing silently; their blind spot is a dependency that only appears as a generic type argument and is erased from the bytecode.
+
 ## Directory Structure
 
 ```
@@ -927,7 +1012,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 66 Flyway migrations (V1–V66)
+│           └── db/migration/          ← 73 Flyway migrations (V1–V73)
 │
 └── ai-automation-frontend/
     ├── package.json

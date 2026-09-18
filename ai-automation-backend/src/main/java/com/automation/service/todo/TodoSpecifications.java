@@ -1,6 +1,8 @@
 package com.automation.service.todo;
 
 import com.automation.entity.Todo;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -9,14 +11,57 @@ import java.util.List;
 
 /**
  * JPA {@link Specification} for the todo list filters (project, status, priority, source, tag,
- * free-text). ARCHIVED todos are hidden unless a status filter names them explicitly.
+ * free-text) and its order. ARCHIVED todos are hidden unless a status filter names them
+ * explicitly.
  *
  * <p>Extracted from {@code TodoService} (Audit-TODO 671add26). Pure query construction, no
  * repository access.
  */
 public final class TodoSpecifications {
 
+    /**
+     * Business order of the todo list: most urgent first. {@code Todo.priority} is persisted as
+     * STRING, so ordering the column itself reads alphabetically (CRITICAL, HIGH, LOW, MEDIUM)
+     * and buries MEDIUM behind LOW — hence the explicit rank (aa434aee). The enum's own ordinal
+     * is no help either: it is declared lowest-first for historical reasons.
+     */
+    static final List<Todo.Priority> PRIORITY_ORDER = List.of(
+            Todo.Priority.CRITICAL, Todo.Priority.HIGH, Todo.Priority.MEDIUM, Todo.Priority.LOW);
+
     private TodoSpecifications() {
+    }
+
+    /**
+     * The todo list as the UI shows it: the filters of
+     * {@link #buildSpec(String, List, String, String, String, String)} plus the list order
+     * (priority first, newest first within a priority).
+     *
+     * <p>The order lives in the specification because it needs a CASE expression, which a
+     * {@code Sort} cannot express. Callers must therefore pass an <b>unsorted</b> {@code Pageable}:
+     * Spring Data applies a sorted one <i>after</i> the specification and would overwrite the
+     * order-by.
+     */
+    public static Specification<Todo> listSpec(
+            String projectId, List<String> status, String priority, String source, String tag, String q) {
+        return buildSpec(projectId, status, priority, source, tag, q).and(orderByPriorityThenNewest());
+    }
+
+    /** Order-only specification (no predicate): priority rank ascending, then newest first. */
+    static Specification<Todo> orderByPriorityThenNewest() {
+        return (root, query, cb) -> {
+            // Count queries have no order-by (Spring Data clears it anyway) and no createdAt need.
+            if (query != null && !Long.class.equals(query.getResultType())) {
+                Expression<Todo.Priority> priority = root.get("priority");
+                CriteriaBuilder.SimpleCase<Todo.Priority, Integer> rank = cb.selectCase(priority);
+                for (int i = 0; i < PRIORITY_ORDER.size(); i++) {
+                    rank = rank.when(PRIORITY_ORDER.get(i), i);
+                }
+                query.orderBy(
+                        cb.asc(rank.otherwise(PRIORITY_ORDER.size())),
+                        cb.desc(root.get("createdAt")));
+            }
+            return null;
+        };
     }
 
     public static Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {

@@ -623,7 +623,7 @@ class WishPromptBuilderTest {
 
             PoolWorkflowEntry poolEntry = new PoolWorkflowEntry(
                     "pool-1", Map.of("en", "Pool Deploy"), Map.of("en", "Deploys apps"),
-                    null, null, List.of(), List.of(BlockDefinition.builder().type("shell").config(Map.of("command", "deploy")).build()),
+                    null, null, null, List.of(), List.of(BlockDefinition.builder().type("shell").config(Map.of("command", "deploy")).build()),
                     null, null, null, null, null, null, null
             );
             when(workflowPoolService.listAll()).thenReturn(List.of(poolEntry));

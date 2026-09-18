@@ -1,0 +1,83 @@
+{
+  "id" : "builtin-email-drafter",
+  "sortOrder" : 11,
+  "version" : "1.0.0",
+  "name" : "Email Drafter",
+  "icon" : "📧",
+  "description" : "Drafts professional emails and suggests improvements for existing ones.",
+  "category" : "CONTENT",
+  "capabilities" : [
+    {
+      "name" : "draft_email",
+      "description" : "Draft a professional email based on context and purpose",
+      "inputSchema" : {
+        "properties" : {
+          "context" : {
+            "type" : "string"
+          },
+          "purpose" : {
+            "type" : "string"
+          },
+          "tone" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "body" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "improve_email",
+      "description" : "Improve an existing email draft",
+      "inputSchema" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "changes" : {
+            "type" : "array"
+          },
+          "improved" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "suggest_subject_lines",
+      "description" : "Generate effective email subject lines",
+      "inputSchema" : {
+        "properties" : {
+          "emailContent" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "subjects" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

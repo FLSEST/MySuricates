@@ -46,6 +46,18 @@ jobs:
           java-version: "21"
           distribution: temurin
           cache: maven
+      # Regressionswaechter fuer ExternalConfigIsolationTest (TODO b7e0d357): CI legt sonst nie
+      # eine config/application.yml an, also lief der reale Leak-Pfad hier nie durch. Werte
+      # bewusst abweichend vom Classpath-Default, damit ein Leck sichtbar waere.
+      - name: Externe config/application.yml mit abweichenden Werten anlegen
+        run: |
+          mkdir -p config
+          cat > config/application.yml <<'EOF'
+          automation:
+            modules:
+              preset: core
+              ui-editable: true
+          EOF
       # Surefire fuehrt Unit- und Integrationstests gemeinsam aus. Die Integrationstests
       # aktivieren das Spring-Profil "integration" per @ActiveProfiles; ein eigenes
       # Maven-Profil dafuer gibt es nicht. Jede Test-JVM bekommt ihre eigene SQLite-Datei

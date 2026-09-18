@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Native todo-create block (TODO 9f6d7f14): legt ein TODO direkt über den
@@ -71,7 +72,7 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "todo-create".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("todo-create");
     }
 }

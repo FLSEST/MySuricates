@@ -14,12 +14,21 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 
 import java.util.Map;
 
+/**
+ * Authenticates every WebSocket handshake — STOMP/SockJS on {@code /ws} and the raw run terminal on
+ * {@code /ws/terminal/**} — with a single-use ticket from {@link WebSocketTicketService}.
+ *
+ * <p>The API key is deliberately <em>not</em> accepted as a query parameter any more: handshake URLs
+ * end up in browser history and proxy logs. Clients call {@code POST /api/v1/ws-ticket} with the key
+ * in the header and append the returned ticket instead.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
     private final ApiKeyService apiKeyService;
+    private final WebSocketTicketService ticketService;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -33,17 +42,32 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             return true;
         }
 
-        String apiKey = null;
+        String ticket = null;
+        boolean legacyApiKeyParam = false;
         if (request instanceof ServletServerHttpRequest servletRequest) {
-            apiKey = servletRequest.getServletRequest().getParameter("apiKey");
+            ticket = servletRequest.getServletRequest().getParameter("ticket");
+            legacyApiKeyParam = servletRequest.getServletRequest().getParameter("apiKey") != null;
         }
 
-        if (apiKeyService.matchesEffectiveApiKey(apiKey)) {
+        // A ticket is only ever handed out to a caller that presented the key in the header, so
+        // redeeming one is proof of authentication — and it works exactly once.
+        if (ticketService.consume(ticket)) {
             return true;
         }
 
-        log.warn("WebSocket handshake rejected: invalid or missing API key from {}",
-                request.getRemoteAddress());
+        if (legacyApiKeyParam) {
+            log.warn("WebSocket handshake rejected: apiKey query parameter is no longer accepted "
+                    + "(use POST /api/v1/ws-ticket), from {}", request.getRemoteAddress());
+        } else if (ticket != null && !ticket.isBlank()) {
+            // Ein vorgelegtes Ticket, das nicht zieht: abgelaufen, schon verbraucht — oder geraten.
+            log.warn("WebSocket handshake rejected: invalid ticket (expired, already used or forged) from {}",
+                    request.getRemoteAddress());
+        } else {
+            // Kein oder leeres Ticket: Browser/Health-Checks/Crawler klopfen ganz ohne Parameter an,
+            // und useWebSocket.ts haengt bei fehlgeschlagenem Ticket-Abruf bewusst ein leeres
+            // ?ticket= an — beides kein Vorfall.
+            log.debug("WebSocket handshake rejected: no ticket presented by {}", request.getRemoteAddress());
+        }
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         return false;
     }

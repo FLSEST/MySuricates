@@ -488,6 +488,172 @@ class ExecutionContextTest {
         assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
     }
 
+    // ── Platform data variables: always escaped, a run-level taint source on use ──
+
+    @Test
+    void setUntrustedPlatformVariable_isSingleQuotedInShellCommands() {
+        context.setUntrustedPlatformVariable("previous_report", "x; rm -rf /");
+
+        assertThat(context.isUntrusted("previous_report")).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo 'x; rm -rf /'");
+    }
+
+    @Test
+    void setUntrustedPlatformVariable_staysRawForNonShellUse() {
+        context.setUntrustedPlatformVariable("open_todos", "a'b");
+
+        assertThat(context.resolveTemplate("say {{ open_todos }}")).isEqualTo("say a'b");
+    }
+
+    @Test
+    void setUntrustedPlatformVariable_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+        context.recordOutput("scan", "a | b");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("a | b a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void setVariable_clearsThePlatformMark() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        context.setVariable("previous_report", "clean");
+
+        assertThat(context.isUntrusted("previous_report")).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo clean");
+    }
+
+    @Test
+    void setUntrustedVariable_upgradesAPlatformVariableToAFullTaintSource() {
+        context.setUntrustedPlatformVariable("previous_report", "x");
+        context.setUntrustedVariable("previous_report", "y; id");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.getUntrustedVariables()).containsExactly("previous_report");
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo 'y; id'");
+    }
+
+    // ── Platform data taints the run once it really lands in a shell command line ──
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_taintsTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo 'x; id'");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+    }
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_escapesLaterDerivedVariables() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+        context.resolveShellTemplate("echo {{ previous_report }}", false);
+
+        context.setDerivedVariable("item", "a.txt; id");
+
+        assertThat(context.isUntrusted("item")).isTrue();
+        assertThat(context.resolveShellTemplate("cat {{ item }}", false)).isEqualTo("cat 'a.txt; id'");
+    }
+
+    @Test
+    void platformVariable_substitutedIntoAShellCommand_taintsLaterBlockOutputs() {
+        context.setUntrustedPlatformVariable("open_todos", "todos");
+        context.resolveShellTemplate("echo {{open_todos}}", false);
+
+        context.recordOutput("scan", "a | b");
+
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("'a | b' 'a | b'");
+        assertThat(context.exportTaint()).containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                java.util.List.of(ExecutionContext.PREVIOUS_OUTPUT_NAME, "scan"));
+    }
+
+    @Test
+    void platformVariable_substitutedWithEscapeAll_taintsTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", true))
+                .isEqualTo("echo 'report'");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+    }
+
+    @Test
+    void platformVariable_usedOnlyInAPrompt_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        assertThat(context.resolveTemplate("Bewerte: {{ previous_report }}")).isEqualTo("Bewerte: x; id");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void platformVariable_notMentionedInTheShellCommand_leavesTheRunUntainted() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.setVariable("branch", "main");
+
+        assertThat(context.resolveShellTemplate("git checkout {{ branch }}", false))
+                .isEqualTo("git checkout main");
+
+        context.recordOutput("scan", "a | b");
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }}", false)).isEqualTo("a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void platformVariable_clearedBeforeUse_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.setVariable("previous_report", "clean");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo clean");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+    }
+
+    // ── replaceValue: value changes, trust label stays ──────────────────────────
+
+    @Test
+    void replaceValue_platformVariable_keepsThePlatformLabel() {
+        context.setUntrustedPlatformVariable("previous_report", "/source/repo/a.java");
+
+        context.replaceValue("previous_report", "/runs/run/repo/a.java; id");
+
+        assertThat(context.isUntrusted("previous_report")).isTrue();
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo '/runs/run/repo/a.java; id'");
+    }
+
+    @Test
+    void replaceValue_untrustedVariable_staysExternallyUntrusted() {
+        context.setUntrustedVariable("branch", "/source/repo");
+
+        context.replaceValue("branch", "/runs/run/repo; id");
+
+        assertThat(context.isUntrusted("branch")).isTrue();
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.getUntrustedVariables()).containsExactly("branch");
+        assertThat(context.resolveShellTemplate("cd {{ branch }}", false)).isEqualTo("cd '/runs/run/repo; id'");
+    }
+
+    @Test
+    void replaceValue_trustedVariable_staysTrusted() {
+        context.setVariable("target_file", "/source/repo/a.java");
+
+        context.replaceValue("target_file", "/runs/run/repo/a.java");
+
+        assertThat(context.isUntrusted("target_file")).isFalse();
+        assertThat(context.resolveShellTemplate("cat {{ target_file }}", false))
+                .isEqualTo("cat /runs/run/repo/a.java");
+    }
+
     // ── Taint propagation: outputs derived from untrusted input ─────────────────
 
     @Test

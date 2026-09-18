@@ -1,5 +1,3 @@
-> *Zuletzt aktualisiert: [auto-generated]*
-
 # Workflow Building Guide
 
 Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst alle Block-Typen, bewaehrte Patterns, Timeout-Konfiguration und haeufige Fallstricke.
@@ -65,6 +63,10 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 MySuricates unterstuetzt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
+**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprueft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Bloecken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zaehlt dabei als unbekannt. Das gilt fuer jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
+
+Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Pruefung: enthaelt die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausfuehrbare Definition kommt nicht zurueck.
+
 ### Allgemeine Block-Eigenschaften
 
 Jeder Block unterstuetzt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:
@@ -127,7 +129,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
 | `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung; Server kann per Allowlist einschraenken) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
-| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) und die daraus abgeleiteten Block-Ausgaben werden **immer** escaped, unabhaengig von dieser Option |
+| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhaengig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
@@ -165,11 +167,21 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
 > Chain) bleiben alle Block-Ausgaben unveraendert roh.
 
-> **Achtung `{{ previous_report }}` / `{{ open_todos }}`:** Diese aus dem VORHERIGEN Run injizierten
-> Werte werden von der run-level Taint-Propagation oben NICHT erfasst (sie stammen nicht aus dem
-> aktuellen Run und tragen keinen `__untrusted_*`-Marker) und sind in Shell-Bloecken trotzdem wie
-> fremde/unvertrauenswuerdige Daten zu behandeln — also ebenfalls unquoted schreiben oder explizit
-> escapen (offenes TODO c2634caa).
+> **`{{ previous_report }}` / `{{ open_todos }}`:** Beide werden **immer** als nicht
+> vertrauenswuerdig behandelt und in Shell-Bloecken deshalb **stets single-quoted** — in jedem Run,
+> unabhaengig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
+> eines frueheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthaelt
+> Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
+> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts aendert
+> sich nichts (dort wird nie escaped). Die beiden Variablen loesen **keine** Taint-Propagation aus:
+> Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
+>
+> **Folge fuer weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
+> oder in ein `items_command` schreibt (z. B. `items_command: "echo {{ previous_report }}"`),
+> verliert das Quoting fuer die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
+> entstehenden `{{ previous_output }}`, `{{ block.<name>.output }}` und `foreach`-Items gelten in
+> einem sonst sauberen Run als vertrauenswuerdig und werden roh eingesetzt. In solchen
+> Folge-Bloecken deshalb explizit `"shell_escape_variables": true` setzen.
 
 ```json
 {
@@ -295,6 +307,12 @@ Jeder Case hat:
 - `blocks`: Liste von Block-Definitionen bei Treffer
 
 Verschachtelte Bloecke in `cases` und `default` sind auf `shell` und `simple` beschraenkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
+
+Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfuegbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgefuehrten Case-Bloecke.
+
+Die Bloecke eines Case laufen nacheinander und schieben dabei `{{ previous_output }}` weiter — wie die Iterationen einer `while`-Schleife. Der zweite Block eines Case sieht also die Ausgabe des ersten, nicht mehr die des Schritts vor dem switch (auch bei unbenannten Bloecken). Wer den Stand von vor dem switch braucht, benennt den betreffenden Block und referenziert `{{ block.<name>.output }}`.
+
+Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind ueberschreibt also einen gleichnamigen frueheren Block, und nach dem switch ueberschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
 
 ```json
 {
@@ -472,6 +490,8 @@ Fuehrt einen anderen Workflow als verschachtelten Schritt aus.
 | `workflow_id` | string | **erforderlich** | ID des auszufuehrenden Workflows |
 
 **Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkulaere Referenzen werden erkannt. 30-Minuten-Timeout.
+
+**Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run uebernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
 
 **Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.
 
@@ -678,8 +698,8 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geaendert hat (Hash-Vergleich; ohne Hash ueber Zeitstempel) |
 | `{{ workflow_definition_hash }}` | SHA-256 der ausgefuehrten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
 | `{{ trigger_source }}` | Ausloeser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"` |
-| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege |
+| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
+| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
 
 ### Kontext-Variablen
 
@@ -1437,6 +1457,8 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlaegt, wird der Block 
 ---
 
 ## Anhang: Template-Kurzreferenz
+
+Was in den oeffentlichen Workflow-Pool gehoert, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
 Alle 65+ eingebauten Templates mit ihrem primaeren Pattern:
 

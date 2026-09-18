@@ -6,6 +6,7 @@ import { Spinner } from '../ui';
 import { usePoolExport } from '../../hooks/usePool';
 import { useFactoryTopics } from '../../hooks/useWorkflowFactory';
 import { useT } from '../../i18n';
+import type { PoolScope } from '../../types';
 
 interface ExportToPoolModalProps {
   open: boolean;
@@ -30,6 +31,7 @@ export function ExportToPoolModal({
   const [category, setCategory] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [author, setAuthor] = useState('MySuricates');
+  const [scope, setScope] = useState<PoolScope>('portable');
 
   const handleExport = () => {
     const tags = tagsInput.trim()
@@ -38,6 +40,7 @@ export function ExportToPoolModal({
 
     exportMutation.mutate({
       workflowId,
+      scope,
       request: {
         nameEn: nameEn || undefined,
         nameDe: nameDe || undefined,
@@ -81,6 +84,39 @@ export function ExportToPoolModal({
     >
       <p className="text-sm text-text-secondary mb-4">{t.factory.exportDesc}</p>
       <div className="space-y-3">
+        <div>
+          <span className="block text-sm font-medium text-text-secondary mb-1">{t.factory.exportScopeLabel}</span>
+          <div className="space-y-2">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="pool-export-scope"
+                value="portable"
+                checked={scope === 'portable'}
+                onChange={() => setScope('portable')}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm text-text">{t.factory.exportScopePortable}</span>
+                <span className="block text-xs text-text-secondary">{t.factory.exportScopePortableHint}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="pool-export-scope"
+                value="repo"
+                checked={scope === 'repo'}
+                onChange={() => setScope('repo')}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm text-text">{t.factory.exportScopeRepo}</span>
+                <span className="block text-xs text-text-secondary">{t.factory.exportScopeRepoHint}</span>
+              </span>
+            </label>
+          </div>
+        </div>
         <Input
           label={t.factory.nameEn}
           value={nameEn}

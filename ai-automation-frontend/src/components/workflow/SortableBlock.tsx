@@ -81,7 +81,11 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
           <span className="text-xs font-mono px-2 py-0.5 rounded-sm bg-surface text-text-secondary">
             #{index + 1}
           </span>
-          <Badge variant={blockTypeVariant[block.type] || 'accent'}>{t.workflows.blockTypes[block.type]}</Badge>
+          {/* Since 64966be0 the editor offers what the SERVER registers: a type this build has
+              no label for shows its raw name instead of an empty badge (as StepCardChrome does) */}
+          <Badge variant={blockTypeVariant[block.type] || 'accent'}>
+            {t.workflows.blockTypes[block.type] ?? block.type}
+          </Badge>
           {block.skillIds && block.skillIds.length > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-accent">
               <Zap className="w-3 h-3" />

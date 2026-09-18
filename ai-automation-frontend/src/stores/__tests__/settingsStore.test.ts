@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useSettingsStore } from '../settingsStore';
+import { useSettingsStore, PAGE_SIZE_MIN, PAGE_SIZE_MAX } from '../settingsStore';
 
 describe('settingsStore', () => {
   beforeEach(() => {
-    useSettingsStore.setState({ apiKey: '', advancedMode: false, autoTodoDefault: false });
+    useSettingsStore.setState({ apiKey: '', advancedMode: false, autoTodoDefault: false, listPageSize: 30, kanbanColumnSize: 50 });
   });
 
   it('has correct initial state', () => {
@@ -40,6 +40,34 @@ describe('settingsStore', () => {
     expect(useSettingsStore.getState().autoTodoDefault).toBe(true);
     useSettingsStore.getState().setAutoTodoDefault(false);
     expect(useSettingsStore.getState().autoTodoDefault).toBe(false);
+  });
+
+  it('todo page sizes default to 30 (list) and 50 (kanban column)', () => {
+    const state = useSettingsStore.getState();
+    expect(state.listPageSize).toBe(30);
+    expect(state.kanbanColumnSize).toBe(50);
+  });
+
+  it('clamps the list page size to 10–200', () => {
+    const { setListPageSize } = useSettingsStore.getState();
+    setListPageSize(5);
+    expect(useSettingsStore.getState().listPageSize).toBe(PAGE_SIZE_MIN);
+    setListPageSize(5000);
+    expect(useSettingsStore.getState().listPageSize).toBe(PAGE_SIZE_MAX);
+    setListPageSize(75);
+    expect(useSettingsStore.getState().listPageSize).toBe(75);
+  });
+
+  it('clamps the kanban column size to 10–200 and ignores garbage input', () => {
+    const { setKanbanColumnSize } = useSettingsStore.getState();
+    setKanbanColumnSize(1);
+    expect(useSettingsStore.getState().kanbanColumnSize).toBe(PAGE_SIZE_MIN);
+    setKanbanColumnSize(201);
+    expect(useSettingsStore.getState().kanbanColumnSize).toBe(PAGE_SIZE_MAX);
+    setKanbanColumnSize(Number.NaN);
+    expect(useSettingsStore.getState().kanbanColumnSize).toBe(PAGE_SIZE_MAX);
+    setKanbanColumnSize(80.6);
+    expect(useSettingsStore.getState().kanbanColumnSize).toBe(80);
   });
 
   it('multiple setters do not interfere with each other', () => {

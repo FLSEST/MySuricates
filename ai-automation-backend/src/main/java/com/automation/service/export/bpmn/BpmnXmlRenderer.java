@@ -52,6 +52,9 @@ class BpmnXmlRenderer {
             for (BpmnModel.Edge e : model.edges) {
                 appendFlow(doc, process, e);
             }
+            for (BpmnModel.DataObject d : model.dataObjects) {
+                appendDataObject(doc, process, d);
+            }
 
             appendDiagram(doc, definitions, model);
             return serialize(doc);
@@ -79,7 +82,8 @@ class BpmnXmlRenderer {
         if (n.defaultFlowId != null) {
             el.setAttribute("default", n.defaultFlowId);
         }
-        // Reihenfolge laut XSD: documentation, extensionElements, loopCharacteristics, script, Kinder
+        // Reihenfolge laut XSD (tActivity): documentation, extensionElements, property,
+        // dataInputAssociation, dataOutputAssociation, loopCharacteristics, script, Kinder
         if (n.documentation != null && !n.documentation.isBlank()) {
             appendChild(doc, el, "documentation").setTextContent(n.documentation);
         }
@@ -95,6 +99,7 @@ class BpmnXmlRenderer {
             cfg.setTextContent(n.configJson);
             ext.appendChild(cfg);
         }
+        appendDataAssociations(doc, el, n);
         if ("multiInstanceSequential".equals(n.loop)) {
             appendChild(doc, el, "multiInstanceLoopCharacteristics").setAttribute("isSequential", "true");
         } else if ("standardLoop".equals(n.loop)) {
@@ -109,6 +114,39 @@ class BpmnXmlRenderer {
         for (BpmnModel.Edge childEdge : n.childEdges) {
             appendFlow(doc, el, childEdge);
         }
+    }
+
+    /**
+     * Datenassoziationen der Aktivität. {@code dataInputAssociation/targetRef} ist laut XSD ein
+     * IDREF auf ein Element der Aktivität — dafür dient (wie bei bpmn.io/Camunda) ein leeres
+     * {@code property} als Platzhalter; die Semantik des Datenflusses steckt im {@code sourceRef}.
+     */
+    private void appendDataAssociations(Document doc, Element el, BpmnModel.Node n) {
+        if (n.dataPropertyId != null) {
+            Element property = appendChild(doc, el, "property");
+            property.setAttribute("id", n.dataPropertyId);
+            property.setAttribute("name", "__targetRef_placeholder");
+        }
+        for (BpmnModel.DataAssociation a : n.dataInputs) {
+            Element assoc = appendChild(doc, el, "dataInputAssociation");
+            assoc.setAttribute("id", a.id);
+            appendChild(doc, assoc, "sourceRef").setTextContent(a.dataReferenceId);
+            appendChild(doc, assoc, "targetRef").setTextContent(n.dataPropertyId);
+        }
+        for (BpmnModel.DataAssociation a : n.dataOutputs) {
+            Element assoc = appendChild(doc, el, "dataOutputAssociation");
+            assoc.setAttribute("id", a.id);
+            appendChild(doc, assoc, "targetRef").setTextContent(a.dataReferenceId);
+        }
+    }
+
+    private void appendDataObject(Document doc, Element process, BpmnModel.DataObject d) {
+        Element object = appendChild(doc, process, "dataObject");
+        object.setAttribute("id", d.id);
+        Element reference = appendChild(doc, process, "dataObjectReference");
+        reference.setAttribute("id", d.referenceId);
+        reference.setAttribute("dataObjectRef", d.id);
+        reference.setAttribute("name", d.name);
     }
 
     private void appendFlow(Document doc, Element parent, BpmnModel.Edge e) {
@@ -130,8 +168,40 @@ class BpmnXmlRenderer {
         plane.setAttribute("bpmnElement", model.processId);
         diagram.appendChild(plane);
         appendShapes(doc, plane, model.nodes);
+        appendDataShapes(doc, plane, model.dataObjects);
         appendEdgesDi(doc, plane, model.edges);
+        appendDataEdgesDi(doc, plane, model.dataAssociations);
         appendChildDi(doc, plane, model.nodes);
+    }
+
+    private void appendDataShapes(Document doc, Element plane, java.util.List<BpmnModel.DataObject> objects) {
+        for (BpmnModel.DataObject d : objects) {
+            Element shape = doc.createElementNS(NS_DI, "bpmndi:BPMNShape");
+            shape.setAttribute("id", "shape_" + d.referenceId);
+            shape.setAttribute("bpmnElement", d.referenceId);
+            Element bounds = doc.createElementNS(NS_DC, "dc:Bounds");
+            bounds.setAttribute("x", fmt(d.x));
+            bounds.setAttribute("y", fmt(d.y));
+            bounds.setAttribute("width", fmt(d.w));
+            bounds.setAttribute("height", fmt(d.h));
+            shape.appendChild(bounds);
+            plane.appendChild(shape);
+        }
+    }
+
+    private void appendDataEdgesDi(Document doc, Element plane, java.util.List<BpmnModel.DataAssociation> associations) {
+        for (BpmnModel.DataAssociation a : associations) {
+            Element edge = doc.createElementNS(NS_DI, "bpmndi:BPMNEdge");
+            edge.setAttribute("id", "edge_" + a.id);
+            edge.setAttribute("bpmnElement", a.id);
+            for (double[] wp : a.waypoints) {
+                Element waypoint = doc.createElementNS(NS_DDI, "di:waypoint");
+                waypoint.setAttribute("x", fmt(wp[0]));
+                waypoint.setAttribute("y", fmt(wp[1]));
+                edge.appendChild(waypoint);
+            }
+            plane.appendChild(edge);
+        }
     }
 
     private void appendShapes(Document doc, Element plane, java.util.List<BpmnModel.Node> nodes) {

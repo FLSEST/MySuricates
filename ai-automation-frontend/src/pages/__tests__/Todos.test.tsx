@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { Todos } from '../Todos';
+import { SEARCH_DEBOUNCE_MS } from '../../components/todo/todoConstants';
 import type { Todo } from '../../types';
 
 const BASE = '/api/v1';
@@ -126,5 +127,35 @@ describe('Todos — deep link ?todoId=', () => {
 
     expect(await screen.findByText('Deep linked todo')).toBeInTheDocument();
     expect(screen.queryByDisplayValue('Deep linked todo')).toBeNull();
+  });
+});
+
+describe('Todos — search debounce', () => {
+  /** Registers a /todos endpoint that records every free-text query it is asked for. */
+  function recordingEndpoints(queries: string[]) {
+    server.use(
+      http.get(`${BASE}/todos/count`, () => HttpResponse.json({ open: 0, inProgress: 0, done: 0, backlog: 0, archived: 0 })),
+      http.get(`${BASE}/todos`, ({ request }) => {
+        const q = new URL(request.url).searchParams.get('q');
+        if (q) queries.push(q);
+        return HttpResponse.json({ content: [], page: 0, size: 30, totalElements: 0, totalPages: 0 });
+      }),
+      http.get(`${BASE}/integrations`, () => HttpResponse.json([])),
+      http.get(`${BASE}/todo-triggers`, () => HttpResponse.json([])),
+    );
+  }
+
+  it('sends one query for a burst of keystrokes, not one per character', async () => {
+    const queries: string[] = [];
+    recordingEndpoints(queries);
+    renderWithProviders(<Todos />, { route: '/todos' });
+
+    const input = await screen.findByPlaceholderText('Search...');
+    fireEvent.change(input, { target: { value: 'l' } });
+    fireEvent.change(input, { target: { value: 'lo' } });
+    fireEvent.change(input, { target: { value: 'log' } });
+    expect(queries).toEqual([]);   // nothing goes out while the user is still typing
+
+    await waitFor(() => expect(queries).toEqual(['log']), { timeout: SEARCH_DEBOUNCE_MS * 10 });
   });
 });

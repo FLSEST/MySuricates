@@ -9,6 +9,9 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowVersion;
 import com.automation.exception.ErrorCode;
 import com.automation.exception.HardeningException;
+import com.automation.executor.BlockExecutor;
+import com.automation.executor.BlockTypeRegistry;
+import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,12 +46,14 @@ class WorkflowMutationGatewayTest {
     @Mock private ActivityLogService activityLog;
 
     private final WorkflowDefinitionHasher hasher = new WorkflowDefinitionHasher();
+    private final BlockTypeValidator blockTypes = new BlockTypeValidator(new BlockTypeRegistry(List.of(
+            executorFor("shell"), executorFor("simple"), executorFor("switch"))));
     private WorkflowMutationGateway gateway;
     private Workflow workflow;
 
     @BeforeEach
     void setUp() {
-        gateway = new WorkflowMutationGateway(versions, hasher, activityLog);
+        gateway = new WorkflowMutationGateway(versions, hasher, activityLog, blockTypes);
         workflow = Workflow.builder().id("wf-1").name("Deploy")
                 .blocks(new ArrayList<>(List.of(BlockDefinition.builder().type("shell").config(new HashMap<>(Map.of("command", "make"))).build())))
                 .instructions("old").activatedSkills(new ArrayList<>())
@@ -136,12 +142,100 @@ class WorkflowMutationGatewayTest {
     }
 
     @Test
+    void unknownBlockTypeIsRefusedOnCreate_namingTypeAndAllowedTypes() {
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("frobnicate").name("weird").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, null, ChangeSource.USER, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("frobnicate")
+                .hasMessageContaining("weird")
+                .hasMessageContaining("shell, simple, switch");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
+    void unknownBlockTypeIsRefusedOnUpdate() {
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("shel").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, before, ChangeSource.POOL_INSTALL, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("shel");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
+    void unknownBlockTypeNestedInASwitchCaseIsRefused() {
+        Map<String, Object> config = new HashMap<>(Map.of("cases", List.of(Map.of(
+                "value", "a", "blocks", List.of(Map.of("type", "document", "name", "nested"))))));
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("switch").name("route").config(config).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, null, ChangeSource.IMPORT, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("document").hasMessageContaining("nested");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    /** Restoring an old version goes through the gateway too: a definition we can no longer run stays gone. */
+    @Test
+    void restoringAVersionWithAnUnknownTypeIsRefused() {
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("frobnicate").name("legacy").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, before, ChangeSource.RESTORE, "restore v3"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("frobnicate");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
+    void blockWithoutATypeIsRefused() {
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().name("typeless").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, null, ChangeSource.USER, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("typeless");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
+    void labelOnlyChangeOfALegacyWorkflowWithUnknownTypeStillPasses() {
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("frobnicate").config(new HashMap<>()).build())));
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        workflow.setName("Renamed");
+
+        gateway.record(workflow, before, ChangeSource.USER, null);
+
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
     void requireUnsealedBlocksDeleteOfSealedWorkflows() {
         gateway.requireUnsealed(workflow, "deleting it"); // unsealed: no-op
         workflow.setSealed(true);
 
         assertThatThrownBy(() -> gateway.requireUnsealed(workflow, "deleting it"))
                 .isInstanceOf(HardeningException.class).hasMessageContaining("deleting it");
+    }
+
+    private static BlockExecutor executorFor(String type) {
+        return new BlockExecutor() {
+            @Override
+            public com.automation.entity.StepResult execute(BlockDefinition block, ExecutionContext context) {
+                return null;
+            }
+
+            @Override
+            public Set<String> supportedTypes() {
+                return Set.of(type);
+            }
+        };
     }
 
     @SuppressWarnings("unchecked")

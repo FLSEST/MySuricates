@@ -96,6 +96,10 @@ public class SwitchBlockExecutor implements BlockExecutor {
             if (blockResult.getOutput() != null) {
                 if (!outputs.isEmpty()) outputs.append("\n");
                 outputs.append(blockResult.getOutput());
+                // A named case block is addressable as {{ block.<name>.output }} downstream, like a
+                // top-level block; unnamed ones only move previous_output. In a tainted run the case
+                // output is shell-escaped downstream, same as in WhileBlockExecutor (12a3b244).
+                context.recordOutput(nestedBlock.getName(), blockResult.getOutput());
             }
             if (blockResult.getStatus() == StepStatus.FAILED) {
                 anyFailed = true;
@@ -114,8 +118,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "switch".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("switch");
     }
 
     /**
@@ -167,6 +171,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 : new HashMap<>();
         return BlockDefinition.builder()
                 .type(type)
+                .name(blockMap.get("name") instanceof String name ? name : null)
                 .config(blockConfig)
                 .build();
     }
@@ -177,11 +182,18 @@ public class SwitchBlockExecutor implements BlockExecutor {
      */
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
-        if (type != null && !"shell".equals(type) && !"simple".equals(type)) {
+        // Auch ein fehlender/leerer Typ wird abgelehnt: sonst fiele er unten in den KI-Zweig und
+        // liefe als stiller Prompt aus config.command (89dd9e34).
+        if (!"shell".equals(type) && !"simple".equals(type)) {
             Instant now = Instant.now();
+            String typeLabel = type == null || type.isBlank() ? "(kein Typ)" : type;
+            String label = nestedBlock.getName() != null && !nestedBlock.getName().isBlank()
+                    ? nestedBlock.getName() + " (" + typeLabel + ")"
+                    : typeLabel;
             return StepResult.builder().stepIndex(context.nextStepIndex()).status(StepStatus.FAILED)
-                    .input("switch: " + type)
-                    .output("Blocktyp '" + type + "' wird in switch nicht unterstützt — nur shell und simple (89dd9e34)")
+                    .input("switch: " + label)
+                    .output("Blocktyp '" + typeLabel + "' wird in switch nicht unterstützt — nur shell und simple"
+                            + " (Block: " + label + ", 89dd9e34)")
                     .startedAt(now).completedAt(now).durationMs(0L).build();
         }
         Map<String, Object> nestedConfig = nestedBlock.getConfig();
@@ -198,9 +210,12 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 : context.resolveTemplate((String) nestedConfig.get("command"));
 
         if (isShell) {
+            BlockDefinition shellBlock =
+                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context);
+            shellBlock.setName(nestedBlock.getName());
             return commandExecutor.executeStepAsShell(
                     context.getProjectPath(),
-                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context),
+                    shellBlock,
                     context.nextStepIndex(),
                     shellTimeout
             );
@@ -210,6 +225,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
                             .projectPath(context.getProjectPath())
                             .block(BlockDefinition.builder()
                                     .type("simple")
+                                    .name(nestedBlock.getName())
                                     .config(Map.of("command", command))
                                     .build())
                             .stepIndex(context.nextStepIndex())

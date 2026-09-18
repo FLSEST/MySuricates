@@ -5,6 +5,8 @@ import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { modulesFixture } from '../../../test/modules';
 import { useI18nStore } from '../../../i18n';
+import { moduleText } from '../../../i18n/modules';
+import type { ModuleName } from '../../../types';
 import { ModulesCard } from '../ModulesCard';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -68,6 +70,33 @@ describe('ModulesCard', () => {
     expect(within(row).getByText('Disable')).toBeInTheDocument();
     expect(within(row).getByText('Requires: Chains')).toBeInTheDocument();
     expect(within(row).getByText('AUTOMATION_MODULES_WISHES=false')).toBeInTheDocument();
+  });
+
+  it('describes a known module in the selected language, not in the backend English', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    serve([]);
+    renderWithProviders(<ModulesCard />);
+
+    const row = await screen.findByTestId('module-chains');
+    fireEvent.click(within(row).getByRole('button', { expanded: false }));
+
+    expect(within(row).getByText(moduleText('chains', 'de').description)).toBeInTheDocument();
+    expect(within(row).queryByText('chains description')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the backend description for a module this build does not know', async () => {
+    const fixture = modulesFixture('core', [], false);
+    fixture.modules = [
+      ...fixture.modules,
+      { ...fixture.modules[0], name: 'future-module' as ModuleName, description: 'A module added after this UI build' },
+    ];
+    server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(fixture)));
+    renderWithProviders(<ModulesCard />);
+
+    const row = await screen.findByTestId('module-future-module');
+    fireEvent.click(within(row).getByRole('button', { expanded: false }));
+
+    expect(within(row).getByText('A module added after this UI build')).toBeInTheDocument();
   });
 
   describe('with automation.modules.ui-editable', () => {

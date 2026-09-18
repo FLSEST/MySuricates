@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Getter
@@ -62,11 +61,8 @@ public class ExecutionContext {
     /** Pseudo block name for the run's {@code previous_output} inside {@link #UNTRUSTED_OUTPUTS_VARIABLE}. */
     public static final String PREVIOUS_OUTPUT_NAME = "previous_output";
 
-    /** Variables from untrusted sources — always shell-escaped when they land in a shell command. */
-    private final Set<String> untrustedVariables = ConcurrentHashMap.newKeySet();
-
-    /** Block outputs derived from untrusted input — shell-escaped like untrusted variables. */
-    private final OutputTaint outputTaint = new OutputTaint();
+    /** Trust label per variable plus the run's output taint. See {@link ExecutionContextTaint}. */
+    private final ExecutionContextTaint taint = new ExecutionContextTaint();
 
     /** Named block outputs keyed by block name. Resolved via {{ block.<name>.output }}. */
     @Builder.Default
@@ -75,10 +71,7 @@ public class ExecutionContext {
     @Builder.Default private final SourceStepIndex sourceSteps = new SourceStepIndex(); // compress sources, see SourceStepIndex
 
     @Builder.Default
-    private final AtomicInteger stepCounter = new AtomicInteger(0);
-
-    @Builder.Default
-    private final AtomicInteger preAllocatedIndex = new AtomicInteger(-1);
+    private final StepIndexCounter stepIndices = new StepIndexCounter();
 
     @Builder.Default
     private final AtomicBoolean paused = new AtomicBoolean(false);
@@ -101,19 +94,18 @@ public class ExecutionContext {
     @Builder.Default
     private final RunProcessRegistration activeProcess = new RunProcessRegistration();
 
-    /**
-     * Reserve the next step index for a RUNNING placeholder.
-     * The subsequent call to nextStepIndex() will return this same value.
-     */
+    /** Reserves the next step index for a RUNNING placeholder; see {@link StepIndexCounter}. */
     public int preAllocateStepIndex() {
-        int idx = stepCounter.getAndIncrement();
-        preAllocatedIndex.set(idx);
-        return idx;
+        return stepIndices.preAllocate();
     }
 
     public int nextStepIndex() {
-        int pre = preAllocatedIndex.getAndSet(-1);
-        return pre >= 0 ? pre : stepCounter.getAndIncrement();
+        return stepIndices.next();
+    }
+
+    /** Resume: starts this segment's step indices above the ones already persisted. */
+    public void startStepIndicesAt(int firstIndex) {
+        stepIndices.startAt(firstIndex);
     }
 
     public void setRunMetadata(String key, Object value) {
@@ -123,13 +115,19 @@ public class ExecutionContext {
     /** Sets a trusted variable (workflow defaults, system values, block-internal values). Clears any taint. */
     public void setVariable(String name, Object value) {
         variables.put(name, value);
-        untrustedVariables.remove(name);
+        taint.markTrusted(name);
     }
 
     /** Sets a variable that came from an untrusted external source (webhook payload etc.). */
     public void setUntrustedVariable(String name, Object value) {
         variables.put(name, value);
-        untrustedVariables.add(name);
+        taint.markUntrusted(name);
+    }
+
+    /** Platform data injected into every run ({@code previous_report}, {@code open_todos}): always shell-escaped, and a run-level taint source only once it is really substituted into a shell command line. See {@link ExecutionContextTaint}. */
+    public void setUntrustedPlatformVariable(String name, Object value) {
+        variables.put(name, value);
+        taint.markPlatform(name);
     }
 
     /** Sets a variable derived from block output ({@code step_N_output}, foreach items): untrusted iff tainted. */
@@ -138,13 +136,16 @@ public class ExecutionContext {
         else setVariable(name, value);
     }
 
-    public boolean isUntrusted(String name) {
-        return untrustedVariables.contains(name);
+    /** Replaces a variable's value and leaves its trust label untouched (workspace path remapping). */
+    public void replaceValue(String name, Object value) {
+        variables.put(name, value);
     }
 
-    /** True as soon as the run carries untrusted input — an untrusted variable or a tainted output. */
+    public boolean isUntrusted(String name) { return taint.isUntrusted(name); }
+
+    /** True as soon as the run carries untrusted input — an external variable, a tainted output, or platform data that reached a shell command line. */
     public boolean hasUntrustedInput() {
-        return !untrustedVariables.isEmpty() || !outputTaint.isEmpty();
+        return taint.hasUntrustedInput();
     }
 
     /**
@@ -156,23 +157,19 @@ public class ExecutionContext {
         boolean tainted = hasUntrustedInput();
         setPreviousOutput(output);
         setBlockOutput(blockName, output);
-        if (tainted) outputTaint.mark(blockName);
+        if (tainted) taint.markOutput(blockName);
     }
 
     /** Re-applies one exported taint name ({@link #PREVIOUS_OUTPUT_NAME} or a block name). */
     public void markOutputUntrusted(String name) {
-        if (PREVIOUS_OUTPUT_NAME.equals(name)) outputTaint.markPreviousOutput();
-        else outputTaint.markBlockOutput(name);
+        if (PREVIOUS_OUTPUT_NAME.equals(name)) taint.markPreviousOutput();
+        else taint.markBlockOutput(name);
     }
 
     /** Taint as reserved input-context keys for persistence and hand-over; empty for a clean run. */
-    public Map<String, Object> exportTaint() {
-        return outputTaint.export(untrustedVariables);
-    }
+    public Map<String, Object> exportTaint() { return taint.export(); }
 
-    public Set<String> getUntrustedVariables() {
-        return Set.copyOf(untrustedVariables);
-    }
+    public Set<String> getUntrustedVariables() { return taint.untrustedVariables(); }
 
     public Object getVariable(String name) {
         return variables.get(name);
@@ -212,18 +209,20 @@ public class ExecutionContext {
      * single quotes (internal quotes escaped as '\''). See {@link TemplateResolver#resolveShellSafe}.
      */
     public String resolveTemplateShellSafe(String template) {
-        return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables);
+        return TemplateResolver.resolveShellSafe(template, previousOutput, blockOutputs, variables,
+                taint::substitutedIntoShell);
     }
 
     /**
      * Resolves a template that becomes a shell command line. With {@code escapeAll} every
      * placeholder is single-quoted; otherwise only untrusted variables and tainted block outputs
-     * are, trusted values stay raw. See {@link TemplateResolver#resolveShell}.
+     * are, trusted values stay raw. Substituted platform data taints the run from here on
+     * ({@link ExecutionContextTaint#substitutedIntoShell}). See {@link TemplateResolver#resolveShell}.
      */
     public String resolveShellTemplate(String template, boolean escapeAll) {
         if (escapeAll) return resolveTemplateShellSafe(template);
         return TemplateResolver.resolveShell(template, previousOutput, blockOutputs, variables,
-                outputTaint.snapshot(untrustedVariables));
+                taint.snapshot(), taint::substitutedIntoShell);
     }
 
     static String shellEscape(String value) {

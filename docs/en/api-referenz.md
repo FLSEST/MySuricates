@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # API Reference
 
 ## General
@@ -349,6 +347,22 @@ Export a workflow as portable JSON (without IDs, without project assignment).
   "exportedAt": "2025-02-22T14:00:00Z"
 }
 ```
+
+### `GET /api/v1/workflows/{id}/export/bpmn`
+
+Export a workflow as BPMN 2.0 XML (Camunda Modeler compatible).
+
+**Response:** File download (`.bpmn`, `Content-Disposition: attachment`)
+
+### `POST /api/v1/workflows/import/bpmn`
+
+Import a workflow previously exported via `GET /api/v1/workflows/{id}/export/bpmn` as a **new** workflow (roundtrip). Only accepts MySuricates' own exports (BPMN extension `mysuricates:blockConfig`); foreign BPMN, broken XML, or oversized input returns `400` — nothing is created in that case.
+
+**Query parameter:** `projectId` (required) — target project
+
+**Request:** `Content-Type: application/xml` or `text/xml`, body = BPMN XML
+
+**Response:** `201` with `WorkflowResponse`
 
 ### `POST /api/v1/workflows/import`
 
@@ -828,6 +842,12 @@ Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `avai
 
 `kind`: `line` (raw line), `text`, `tool`, `tool_result`, `tool_error`, `result`, `system`. `stepNames`: block names of steps with buffered lines (key = `stepIndex`).
 
+### `DELETE /api/v1/executions/{id}`
+
+Delete a run together with its steps and loose references to it. `409` if the run is still active or an audit report is attached to it. TODOs and audit data are never deleted along with it.
+
+**Response:** `204 No Content`
+
 ### `POST /api/v1/executions/{id}/todos/approve`
 
 Approve or reject auto-generated TODOs of a run.
@@ -1140,6 +1160,12 @@ Disable a schedule.
 Delete a schedule.
 
 **Response:** `204 No Content`
+
+### `GET /api/v1/schedules/catch-up`
+
+Query the sequential catch-up queue: the missed occurrence currently being caught up (after a cold start/resume) and the ones still waiting. Not persisted — due occurrences are re-queued after a restart.
+
+**Response:** `CatchUpQueue.Snapshot` (`active`, `pending[]`)
 
 ### `GET /api/v1/schedules/maintenance`
 
@@ -1692,6 +1718,81 @@ Fix workflows started by a TodoTrigger set `todoTriggerRun: true` in the run met
 
 ---
 
+## Audit Center
+
+Read-only view of audit workflow results (gate status per audit run) and the findings derived from them, plus promotion of individual findings to TODOs. Module `audit` (`automation.modules.audit`) — when disabled, every endpoint below responds with `404 MODULE_DISABLED`.
+
+### `GET /api/v1/audits`
+
+List all audits (grouped by project + `auditKey`) with the latest valid report for each. Optional filters: `projectId`, `category`, `gateStatus`.
+
+**Response:** `AuditSummary[]`
+
+### `GET /api/v1/audits/{auditKey}`
+
+Details of an audit (summary + latest report). Required parameter: `projectId`.
+
+**Response:** `AuditDetail`
+
+### `GET /api/v1/audits/{auditKey}/reports`
+
+All reports of an audit, paginated (`page`, `size`). Required parameter: `projectId`.
+
+**Response:** `PageResponse<AuditReportResponse>`
+
+### `GET /api/v1/audit-reports/{id}`
+
+Retrieve a single audit report.
+
+**Response:** `AuditReportResponse`
+
+### `GET /api/v1/audit-findings`
+
+List findings across all audits, paginated (`page`, `size`). Optional filters: `projectId`, `auditKey`, `status`, `severity`.
+
+**Response:** `PageResponse<AuditFindingResponse>`
+
+### `GET /api/v1/audit-findings/{id}`
+
+Retrieve a single finding.
+
+**Response:** `AuditFindingResponse`
+
+### `PATCH /api/v1/audit-findings/{id}`
+
+Change a finding's status or disposition note.
+
+**Request:**
+
+| Field | Type | Required |
+|---|---|---|
+| `status` | Enum (`AuditFindingStatus`) | No |
+| `dispositionNote` | String | No |
+
+**Response:** `AuditFindingResponse`
+
+### `POST /api/v1/audit-findings/{id}/todos`
+
+Create a MySuricates-managed TODO from the finding ("managed TODO").
+
+**Response:** `AuditFindingResponse`
+
+### `POST /api/v1/audit-findings/{id}/todo-links`
+
+Manually link an existing TODO to the finding.
+
+**Request:** `{ "todoId": "uuid" }`
+
+**Response:** `AuditFindingResponse`
+
+### `DELETE /api/v1/audit-findings/{id}/todo-links/{todoId}`
+
+Remove the link between a finding and a TODO.
+
+**Response:** `204 No Content`
+
+---
+
 ## Notifications
 
 Notifications upon workflow completion (webhook or desktop).
@@ -1865,6 +1966,18 @@ Remove the settings switch: the module follows the startup configuration again. 
 Retrieve the model catalog of the Pi provider.
 
 **Response:** `PiCatalog`
+
+### `GET /api/v1/system/ai-providers/{id}/models`
+
+Models this provider offers on this host (host discovery via CLI or local cache, TTL-cached). Never fails because of a missing CLI — returns `available: false` with `reason` instead.
+
+**Response:** `ModelCatalog` (`providerId`, `available`, `source`, `fetchedAt`, `reason`, `models[]`)
+
+### `POST /api/v1/system/ai-providers/{id}/models/refresh`
+
+Bypass the cache and probe the host now.
+
+**Response:** `ModelCatalog`
 
 ### `POST /api/v1/system/client-errors`
 
@@ -3019,6 +3132,10 @@ Install a pool workflow into a project.
 
 Export an existing workflow to the pool.
 
+**Query parameter:** `scope` = `repo` | `portable` (optional, default `portable`) — pool metadata separating repo-bound from portable entries. An unknown value yields `400`. Rule set: [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
+
+The export writes no instance bindings: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` with a concrete value and UUID values are dropped; a UUID inside a text is replaced with `REDACTED-UUID`.
+
 **Request (optional):**
 
 ```json
@@ -3033,7 +3150,7 @@ Export an existing workflow to the pool.
 }
 ```
 
-**Response:** `201` with `ExportToPoolResponse` (`poolId`, `filename`)
+**Response:** `201` with `ExportToPoolResponse` (`poolId`, `filename`, `sanitizedPaths`). `sanitizedPaths` names the cleaned-up spots by path — for a `sub-workflow` block it holds `blocks[N].config.workflowId`, and the entry is only installable once that reference has been filled in.
 
 ---
 
@@ -3352,7 +3469,22 @@ Other types: `status`, `approval_required`/`approval_resolved`, `human_input_req
 ### Terminal WebSocket
 
 ```
-Endpoint: ws://localhost:9090/ws/terminal/{runId}?apiKey=...
+Endpoint: ws://localhost:9090/ws/terminal/{runId}?ticket=...
 ```
 
-For real-time container access (interactive shell). Raw WebSocket (no SockJS/STOMP). Max 3 sessions per container. Authentication via `apiKey` query parameter.
+For real-time container access (interactive shell). Raw WebSocket (no SockJS/STOMP). Max 3 sessions per container. Authentication via a short-lived single-use ticket from `POST /api/v1/ws-ticket` (API key in the header) — an `apiKey` query parameter is refused. The same applies to the STOMP/SockJS handshake on `/ws`.
+
+### Handshake ticket
+
+```
+POST /api/v1/ws-ticket
+Header: X-API-Key: <key>
+```
+
+Response:
+
+```json
+{ "ticket": "kxJ9…", "expiresInSeconds": 30 }
+```
+
+Redeemable exactly once, then invalid; likewise after it expires. Fetch a fresh ticket for every connect attempt, including every reconnect.

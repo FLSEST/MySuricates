@@ -71,6 +71,310 @@ check "--tracked meldet Verstoss (exit 1)"     '[ "$RC" -eq 1 ]'
 check "Gate nennt escape-link"                 'grep -q "escape-link" <<<"$OUT"'
 check "sub/ok-link bleibt unbeanstandet"       '! grep -q "ok-link" <<<"$OUT"'
 
+echo "8) docs/plans ist im echten Repository untrackt und ignoriert (TODO 6e9e00e9)"
+TRACKED_PLANS="$(cd "$REPO" && git ls-files docs/plans)"
+check "keine getrackten Dateien unter docs/plans" '[ -z "$TRACKED_PLANS" ]'
+check ".gitignore ignoriert docs/plans/"          'grep -qxF "docs/plans/" "$REPO/.gitignore"'
+
+echo "9) entrypoint.sh hat keinen persoenlichen APP_USER-Default (TODO 0cf6bd37)"
+ENTRYPOINT_DEFAULT="$(printf '%s' 'APP_USER="${APP_USER:-flo}"')"
+check "kein 'flo' als APP_USER-Default" \
+  '! grep -qF "$ENTRYPOINT_DEFAULT" "$REPO/ai-automation-backend/docker/entrypoint.sh"'
+
+echo "10) SECURITY.md fehlt, enthaelt eine Mailadresse, oder nennt keinen Meldeweg"
+make_repo "$TMP/sec"
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlendes SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md"                 'grep -q "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'Contact: security@example.com\n\nSee Security Advisories.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Mailadresse in SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Mailadresse"                  'grep -qi "Mail" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'No contact info, no reporting path here.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec2 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlender Meldeweg erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+
+( cd "$TMP/sec" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec3 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "korrektes SECURITY.md akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "11) --tracked prueft den getrackten Bestand, nicht die Arbeitskopie"
+make_repo "$TMP/sec2"
+( cd "$TMP/sec2" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "nur auf Platte liegende SECURITY.md wird nicht akzeptiert (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md als nicht getrackt"                         'grep -qi "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec2" && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "einmal committete SECURITY.md wird akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "12) Pool-Kuratierungsregeln (TODO 523702f4): scope, projectId, Beschreibung/Tags, Blocktypen"
+POOL="$TMP/pool"
+mkdir -p "$POOL"
+write_pool() { cat > "$POOL/$1.json"; }
+
+write_pool ok-portable <<'JSON'
+{"name": {"de": "Portabel", "en": "Portable"},
+ "description": {"de": "Prueft ein Projekt.", "en": "Checks a project."},
+ "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_path": ""},
+ "blocks": [{"type": "shell", "config": {"command": "cd {{ project_path }} && ls"}},
+            {"type": "simple", "config": {"goal": "Fasse zusammen."}}]}
+JSON
+
+write_pool ok-repo <<'JSON'
+{"name": {"de": "Repo-gebunden", "en": "Repo bound"},
+ "description": {"de": "Prueft dieses Repository.", "en": "Checks this repository."},
+ "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh && ./mvnw -q test"}}]}
+JSON
+
+write_pool missing-scope <<'JSON'
+{"name": {"de": "Ohne", "en": "Without"},
+ "description": {"de": "Text.", "en": "Text."}, "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool bad-scope <<'JSON'
+{"name": {"de": "Falsch", "en": "Wrong"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "private", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool has-projectid <<'JSON'
+{"name": {"de": "Gebunden", "en": "Bound"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "projectId": "proj-42",
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool ctx-projectid <<'JSON'
+{"name": {"de": "Kontext", "en": "Context"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_id": "e1b2c3d4"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool ctx-placeholder <<'JSON'
+{"name": {"de": "Platzhalter", "en": "Placeholder"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "defaultContext": {"project_id": "{{ project_id }}"},
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool empty-tags <<'JSON'
+{"name": {"de": "Ohne Tags", "en": "No tags"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": [],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool empty-desc <<'JSON'
+{"name": {"de": "Ohne Text", "en": "No text"},
+ "description": {"de": "", "en": ""}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool string-desc <<'JSON'
+{"name": "Nur ein String",
+ "description": "Nur ein String statt de/en.", "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls"}}]}
+JSON
+
+write_pool unknown-blocktype <<'JSON'
+{"name": {"de": "Unbekannt", "en": "Unknown"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "magic", "config": {}}]}
+JSON
+
+# Ein Block ohne "config" ist gueltiges JSON und laeuft im Backend (config ist optional).
+write_pool blocktype-ohne-config <<'JSON'
+{"name": {"de": "Ohne Config", "en": "No config"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "alchemy"}]}
+JSON
+
+# Die einzigen echten Verschachtelungsorte sind switch -> cases[].blocks und default
+# (SwitchBlockExecutor.java:37-38,59,67; ExecutionMode.java:68-76).
+write_pool nested-blocktype <<'JSON'
+{"name": {"de": "Verschachtelt", "en": "Nested"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "switch", "config": {"expression": "{{ x }}",
+   "cases": [{"when": "a", "blocks": [{"type": "sorcery", "config": {}},
+                                      {"type": "wizardry"}]}]}}]}
+JSON
+
+write_pool switch-default-blocktype <<'JSON'
+{"name": {"de": "Default-Zweig", "en": "Default branch"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "switch", "config": {"expression": "{{ x }}",
+   "cases": [{"when": "a", "blocks": [{"type": "shell", "config": {"command": "ls"}}]}],
+   "default": [{"type": "secretblock"}]}}]}
+JSON
+
+write_pool portable-repo-dep <<'JSON'
+{"name": {"de": "Portabel?", "en": "Portable?"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh"}}]}
+JSON
+
+# UUIDs schreibt nicht jeder Erzeuger klein — der Sanitizer im Backend prueft beide Schreibweisen.
+write_pool uppercase-uuid <<'JSON'
+{"name": {"de": "Grossbuchstaben", "en": "Uppercase"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "echo 3F2504E0-4F89-11D3-9A0C-0305E82C3301"}}]}
+JSON
+
+write_pool dot-home-path <<'JSON'
+{"name": {"de": "Punktverzeichnis", "en": "Dot directory"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls ~/.mysuricates/quarantine"}}]}
+JSON
+
+# --- Kriterium "ruft die eigene REST-API oder liest Zugangsdaten" (TODO 1ccdc6d5) ---
+write_pool self-api-curl <<'JSON'
+{"name": {"de": "Self-Call", "en": "Self call"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/todos"}}]}
+JSON
+
+write_pool self-api-prompt <<'JSON'
+{"name": {"de": "Prompt-Call", "en": "Prompt call"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "agentic", "config": {"goal": "Lege ein TODO an: POST /api/v1/todos mit dem Report."}}]}
+JSON
+
+write_pool api-key-header <<'JSON'
+{"name": {"de": "Key", "en": "Key"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "simple", "config": {"command": "Setze den X-API-Key Header bei allen Aufrufen."}}]}
+JSON
+
+write_pool app-settings-key <<'JSON'
+{"name": {"de": "Store", "en": "Store"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "simple", "config": {"command": "Den API-Key aus app_settings holen."}}]}
+JSON
+
+write_pool db-sqlite <<'JSON'
+{"name": {"de": "DB", "en": "DB"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "sqlite3 data/automation.db 'SELECT count(*) FROM todos'"}}]}
+JSON
+
+# Erlaubt: Dateigroesse ansehen ist kein Datenbankzugriff (mysuricates-performance-audit).
+write_pool db-filesize-ok <<'JSON'
+{"name": {"de": "Groesse", "en": "Size"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "stat -c %s ai-automation-backend/data/automation.db"}}]}
+JSON
+
+# Erlaubt: die auth-freie Health-Sonde.
+write_pool api-health-ok <<'JSON'
+{"name": {"de": "Sonde", "en": "Probe"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s -o /dev/null -w '%{time_total}' http://localhost:9090/api/v1/system/health"}}]}
+JSON
+
+# Erlaubt: das Praefix als Suchmuster in einer Liste, ohne Aufruf (mocking-gap-audit).
+write_pool api-prefix-as-marker-ok <<'JSON'
+{"name": {"de": "Marker", "en": "Marker"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "python3 -c \"MARKERS = ['resttemplate', 'webclient', '/api/v1/', 'wiremock']\""}}]}
+JSON
+
+OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
+check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
+check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
+check "ok-repo darf scripts/ und mvnw nutzen"  '! grep -q "ok-repo" <<<"$OUT"'
+check "fehlendes scope erkannt"                'grep -q "missing-scope.*SCOPE" <<<"$OUT"'
+check "ungueltiges scope erkannt"              'grep -q "bad-scope.*SCOPE" <<<"$OUT"'
+check "projectId im Eintrag erkannt"           'grep -q "has-projectid.*PROJECT-ID" <<<"$OUT"'
+check "project_id im defaultContext erkannt"   'grep -q "ctx-projectid.*PROJECT-ID" <<<"$OUT"'
+check "Platzhalter-project_id bleibt erlaubt"  '! grep -q "ctx-placeholder" <<<"$OUT"'
+check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$OUT"'
+check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'
+check "description als String erkannt"         'grep -q "string-desc.*DESCRIPTION" <<<"$OUT"'
+check "unbekannter Blocktyp erkannt"           'grep -q "unknown-blocktype.*BLOCK-TYPE" <<<"$OUT"'
+check "unbekannter Blocktyp in cases[].blocks" 'grep -q "nested-blocktype.*BLOCK-TYPE.*sorcery" <<<"$OUT"'
+check "cases[].blocks und ohne config"         'grep -q "nested-blocktype.*BLOCK-TYPE.*wizardry" <<<"$OUT"'
+check "switch-default ohne config erkannt"     'grep -q "switch-default-blocktype.*BLOCK-TYPE.*secretblock" <<<"$OUT"'
+check "switch selbst bleibt unbeanstandet"     '! grep -q "BLOCK-TYPE.*switch$" <<<"$OUT"'
+check "unbekannter Blocktyp ohne config"       'grep -q "blocktype-ohne-config.*BLOCK-TYPE.*alchemy" <<<"$OUT"'
+check "portable mit scripts/-Pfad erkannt"     'grep -q "portable-repo-dep.*REPO-DEP" <<<"$OUT"'
+check "UUID in Grossbuchstaben erkannt"        'grep -q "uppercase-uuid.*UUID" <<<"$OUT"'
+check "Tilde-Pfad auf Punktverzeichnis erkannt" 'grep -q "dot-home-path.*PATH-HOME" <<<"$OUT"'
+check "curl auf die eigene API erkannt"        'grep -q "self-api-curl.*SELF-API" <<<"$OUT"'
+check "API-Aufruf im Prompt erkannt"           'grep -q "self-api-prompt.*SELF-API" <<<"$OUT"'
+check "X-API-Key erkannt"                      'grep -q "api-key-header.*CREDENTIAL" <<<"$OUT"'
+check "app_settings erkannt"                   'grep -q "app-settings-key.*CREDENTIAL" <<<"$OUT"'
+check "sqlite3 auf die DB erkannt"             'grep -q "db-sqlite.*DB-DIRECT" <<<"$OUT"'
+check "Dateigroesse der DB bleibt erlaubt"     '! grep -q "db-filesize-ok" <<<"$OUT"'
+check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$OUT"'
+check "API-Praefix als Suchmuster erlaubt"     '! grep -q "api-prefix-as-marker-ok" <<<"$OUT"'
+
+echo "13) Die Blocktyp-Liste des Gates deckt sich mit der Registry im Backend"
+REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"
+JAVA_TYPES="$(grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("//;s/"//' | sort | tr '\n' ' ')"
+# shellcheck source=../lib/hygiene-rules.sh
+. "$REPO/scripts/lib/hygiene-rules.sh"
+GATE_TYPES="$(printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]:-}" | sort | tr '\n' ' ')"
+check "Registry-Liste nicht leer"              '[ -n "$JAVA_TYPES" ]'
+check "Gate-Liste deckt sich mit der Registry" '[ "$JAVA_TYPES" = "$GATE_TYPES" ]'
+
+echo "14) Die getrackten Pool-Definitionen erfuellen die Kuratierungsregeln"
+OUT=$(cd "$REPO" && bash scripts/ci/pool-neutrality.sh 2>&1); RC=$?
+check "Pool-Neutralitaet im Bestand OK (exit 0)" '[ "$RC" -eq 0 ]'
+[ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
+echo "15) docs/analysis.md (DE/EN) ist im echten Repository untrackt und ignoriert (TODO 72900609)"
+TRACKED_ANALYSIS="$(cd "$REPO" && git ls-files docs/analysis.md docs/en/analysis.md)"
+check "keine getrackten analysis.md-Dateien"      '[ -z "$TRACKED_ANALYSIS" ]'
+check ".gitignore ignoriert docs/analysis.md"     'grep -qxF "docs/analysis.md" "$REPO/.gitignore"'
+check ".gitignore ignoriert docs/en/analysis.md"  'grep -qxF "docs/en/analysis.md" "$REPO/.gitignore"'
+
+echo "16) docs/specs ist im echten Repository untrackt und ignoriert (TODO 089473cd)"
+TRACKED_SPECS="$(cd "$REPO" && git ls-files docs/specs)"
+check "keine getrackten Dateien unter docs/specs" '[ -z "$TRACKED_SPECS" ]'
+check ".gitignore ignoriert docs/specs/"          'grep -qxF "docs/specs/" "$REPO/.gitignore"'
+
+echo "17) Der [auto-generated]-Stempel ist aus dem getrackten Doku-Bestand entfernt (TODO 994af971)"
+STAMPED="$(cd "$REPO" && git grep -l -F "[auto-generated]" -- '*.md' 2>/dev/null || true)"
+check "kein getracktes .md mit [auto-generated]-Stempel" '[ -z "$STAMPED" ]'
+
+echo "18) Hygiene-Gate lehnt einen neu hinzugefuegten [auto-generated]-Stempel in .md ab (TODO 994af971)"
+make_repo "$TMP/stamp"
+( cd "$TMP/stamp" && mkdir -p docs && printf '> *Zuletzt aktualisiert: [auto-generated]*\n\n# Test\n' > docs/sample.md && $GIT add docs/sample.md )
+OUT=$(cd "$TMP/stamp" && $GIT commit -q -m stamp 2>&1); RC=$?
+check "commit mit [auto-generated]-Stempel abgelehnt" '[ "$RC" -ne 0 ]'
+check "Gate nennt den Stempel"                        'grep -qi "auto-generated" <<<"$OUT"'
+( cd "$TMP/stamp" && git reset -q )
+OUT=$(cd "$TMP/stamp" && printf '# Anderer Text ohne Stempel\n' > docs/sample.md && $GIT add docs/sample.md && $GIT commit -q -m ok 2>&1); RC=$?
+check "commit ohne Stempel bleibt erlaubt (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "19) ai-automation-frontend/cypress/TODO-TESTS.md ist untrackt und ignoriert (TODO af7e5d22)"
+TRACKED_CYPRESS_NOTE="$(cd "$REPO" && git ls-files ai-automation-frontend/cypress/TODO-TESTS.md)"
+check "TODO-TESTS.md nicht getrackt" '[ -z "$TRACKED_CYPRESS_NOTE" ]'
+check ".gitignore ignoriert TODO-TESTS.md" \
+  'grep -qxF "ai-automation-frontend/cypress/TODO-TESTS.md" "$REPO/.gitignore"'
+
+echo "20) Die in der Doku genannten Zahlen decken sich mit dem Code (TODO 3df2df73)"
+# Laeuft in ~0,4 s und braucht kein Netz — deshalb hier und nicht nur als eigener Test.
+OUT=$(cd "$REPO" && bash scripts/public-readiness/doc-facts-check.sh 2>&1); RC=$?
+check "keine Zahlen-Drift in docs/ und README.de.md (exit 0)" '[ "$RC" -eq 0 ]'
+[ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
+echo "21) check_gitignore_leaks nimmt generische Build-Namen aus (TODO 819b387e)"
+make_repo "$TMP/leak"
+( cd "$TMP/leak" && printf 'ai-automation-frontend/node_modules/\nworkflow-pool/privat.json\n' >> .gitignore && $GIT add .gitignore && $GIT commit -q -m gitignore )
+( cd "$TMP/leak" && printf 'ai-automation-frontend/node_modules\nworkflow-pool/privat.json\n' > .git/info/exclude )
+OUT=$(cd "$TMP/leak" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "generischer Name node_modules bleibt unbeanstandet" '! grep -q "node_modules" <<<"$OUT"'
+check "workflow-pool-Eintrag weiterhin als Leck erkannt"    'grep -q "privat.json" <<<"$OUT"'
+check "Gate meldet weiterhin einen Verstoss (exit 1)"       '[ "$RC" -eq 1 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

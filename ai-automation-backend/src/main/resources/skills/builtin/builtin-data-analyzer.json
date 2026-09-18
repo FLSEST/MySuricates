@@ -1,0 +1,77 @@
+{
+  "id" : "builtin-data-analyzer",
+  "sortOrder" : 8,
+  "version" : "1.0.0",
+  "name" : "Data Analyzer",
+  "icon" : "📊",
+  "description" : "Analyzes datasets to detect patterns, anomalies, and generate statistics.",
+  "category" : "DATA",
+  "capabilities" : [
+    {
+      "name" : "analyze_dataset",
+      "description" : "Perform statistical analysis on a dataset",
+      "inputSchema" : {
+        "properties" : {
+          "data" : {
+            "type" : "string"
+          },
+          "format" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "insights" : {
+            "type" : "array"
+          },
+          "statistics" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "detect_anomalies",
+      "description" : "Detect anomalies and outliers in data",
+      "inputSchema" : {
+        "properties" : {
+          "data" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "anomalies" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "generate_statistics",
+      "description" : "Generate descriptive statistics for data columns",
+      "inputSchema" : {
+        "properties" : {
+          "data" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "statistics" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

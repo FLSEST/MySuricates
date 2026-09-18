@@ -1,0 +1,15 @@
+{
+  "id" : "builtin-bar",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "name" : "Falscher Dateiname",
+  "icon" : "🚫",
+  "description" : "Testfall: Dateiname passt nicht zur id.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "noop",
+      "description" : "Tut nichts."
+    }
+  ]
+}

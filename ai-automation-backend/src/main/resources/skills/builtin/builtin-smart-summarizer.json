@@ -1,0 +1,74 @@
+{
+  "id" : "builtin-smart-summarizer",
+  "sortOrder" : 6,
+  "version" : "1.0.0",
+  "name" : "Smart Summarizer",
+  "icon" : "📋",
+  "description" : "Creates concise summaries, extracts key points, and generates outlines.",
+  "category" : "DOCUMENT",
+  "capabilities" : [
+    {
+      "name" : "summarize_text",
+      "description" : "Create a concise summary of the provided text",
+      "inputSchema" : {
+        "properties" : {
+          "level" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "extract_key_points",
+      "description" : "Extract key points and main arguments from text",
+      "inputSchema" : {
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "keyPoints" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "create_outline",
+      "description" : "Generate a structured outline from text content",
+      "inputSchema" : {
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "outline" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

@@ -57,6 +57,9 @@ class AssistantContextBuilderIntegrationTest {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private com.automation.executor.BlockTypeRegistry blockTypeRegistry;
+
     private final List<String> createdRunIds = new ArrayList<>();
 
     @AfterEach
@@ -69,6 +72,19 @@ class AssistantContextBuilderIntegrationTest {
             }
         });
         createdRunIds.clear();
+    }
+
+    /**
+     * Pins the block-type source of truth against the wired application (TODO 89dd9e34): the
+     * {@code BlockTypeRegistry} bean — fed by the real {@code BlockExecutor} beans, which the
+     * classpath-scan variant in {@code BlockTypeListsGuardTest} cannot see — must agree with the
+     * hand-maintained assistant list. A new executor that nobody lists fails here.
+     */
+    @Test
+    void blockTypeRegistryBeanMatchesTheAssistantBlockTypeList() {
+        assertThat(blockTypeRegistry.knownTypes())
+                .as("BlockTypeRegistry bean vs. AssistantToolValidator.KNOWN_BLOCK_TYPES")
+                .containsExactlyInAnyOrderElementsOf(AssistantToolValidator.KNOWN_BLOCK_TYPES);
     }
 
     @Test

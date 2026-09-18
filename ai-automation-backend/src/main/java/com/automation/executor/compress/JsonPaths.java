@@ -42,6 +42,16 @@ final class JsonPaths {
         return node;
     }
 
+    /** Parsed document plus the array a stage works on — the shared entry of json.limit/sort/to_lines. */
+    record Document(JsonNode root, ArrayNode array) {
+    }
+
+    /** Parses {@code input} and resolves {@code path} to an array in one step (errors name the op). */
+    static Document arrayIn(String input, String path, String op) {
+        JsonNode root = parse(input, op);
+        return new Document(root, arrayAt(root, path, op));
+    }
+
     static ArrayNode arrayAt(JsonNode root, String path, String op) {
         if (at(root, path) instanceof ArrayNode array) return array;
         String shown = path == null || path.isBlank() ? "(Wurzel)" : path;

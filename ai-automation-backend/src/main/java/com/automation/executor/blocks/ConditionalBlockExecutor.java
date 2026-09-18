@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 
 import static com.automation.config.ExecutionDefaults.SHELL_TIMEOUT_SECONDS;
 
@@ -123,7 +124,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "conditional".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("conditional");
     }
 }

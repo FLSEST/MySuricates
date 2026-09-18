@@ -1,5 +1,3 @@
-> *Last updated: [auto-generated]*
-
 # Data Model
 
 ## ER Diagram (Core)
@@ -434,7 +432,7 @@ erDiagram
 | `created_at` | TEXT | | Creation time |
 | `updated_at` | TEXT | | Update time |
 
-19 built-in skills are created by `SkillSeeder` at startup (idempotent). Built-in skills have stable IDs (e.g. `builtin-code-review`).
+19 built-in skills are created by `SkillSeeder` at startup (idempotent, updates on version bump). The definitions live as `src/main/resources/skills/builtin/<id>.json` + `<id>.md` (prompt). Built-in skills have stable IDs (e.g. `builtin-code-review`).
 
 ### `capabilities`
 
@@ -448,7 +446,7 @@ erDiagram
 | `input_schema` | TEXT | | JSON schema for input |
 | `output_schema` | TEXT | | JSON schema for output |
 | `async` | INTEGER | NOT NULL, DEFAULT 0 | Asynchronous execution |
-| `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability modifies files/state (V64). Block config must set `allow_writes: true`; kept in sync by BuiltInSkills.capWrites(...) |
+| `writes` | INTEGER | NOT NULL, DEFAULT 0 | Capability modifies files/state (V64). Block config must set `allow_writes: true`; the source is `"writes": true` in `skills/builtin/<id>.json` |
 
 ### `workflows`
 

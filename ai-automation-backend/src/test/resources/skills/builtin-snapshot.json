@@ -1,0 +1,1660 @@
+[
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Perform a comprehensive code review on the provided source code",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "code" : {
+              "type" : "string"
+            },
+            "language" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_code",
+        "outputSchema" : {
+          "properties" : {
+            "issues" : {
+              "type" : "array"
+            },
+            "summary" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-code-review",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate fix suggestions for identified code issues",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "code" : {
+              "type" : "string"
+            },
+            "issues" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_fixes",
+        "outputSchema" : {
+          "properties" : {
+            "fixes" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-code-review",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Analyze code for style issues, anti-patterns, and best practice violations",
+        "handlerClass" : "com.automation.skills.handlers.code.LintHandler",
+        "inputSchema" : {
+          "code" : "string",
+          "language" : "string"
+        },
+        "name" : "lint",
+        "outputSchema" : {
+          "issues" : "array"
+        },
+        "skillBackReference" : "builtin-code-review",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Identify security vulnerabilities (OWASP Top 10, injection, XSS)",
+        "handlerClass" : "com.automation.skills.handlers.code.SecurityScanHandler",
+        "inputSchema" : {
+          "code" : "string"
+        },
+        "name" : "security_scan",
+        "outputSchema" : {
+          "vulnerabilities" : "array"
+        },
+        "skillBackReference" : "builtin-code-review",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Automated code review that identifies bugs, style issues, and suggests improvements.",
+    "icon" : "🔍",
+    "id" : "builtin-code-review",
+    "name" : "Code Review",
+    "prompt" : "You are a senior code reviewer. Analyze the provided code for:\n- Bugs and logic errors\n- Security vulnerabilities (SQL injection, XSS, etc.)\n- Performance issues and inefficiencies\n- Code style and readability\n- Adherence to best practices and design patterns\n\nProvide specific, actionable feedback with line references. Categorize issues by severity (critical, warning, info). Suggest concrete fixes with code examples where appropriate.",
+    "sortOrder" : 1,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Generate unit tests for the provided code",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "code" : {
+              "type" : "string"
+            },
+            "framework" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "generate_unit_tests",
+        "outputSchema" : {
+          "properties" : {
+            "tests" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-test-generator",
+        "writes" : true
+      },
+      {
+        "async" : false,
+        "description" : "Generate integration tests for component interactions",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "components" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "generate_integration_tests",
+        "outputSchema" : {
+          "properties" : {
+            "tests" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-test-generator",
+        "writes" : true
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Automatically generates unit and integration tests for your code.",
+    "icon" : "🧪",
+    "id" : "builtin-test-generator",
+    "name" : "Test Generator",
+    "prompt" : "You are a testing expert. Generate comprehensive tests for the provided code:\n- Write unit tests covering all functions and edge cases\n- Include positive, negative, and boundary test cases\n- Generate integration tests for component interactions\n- Use appropriate mocking strategies for external dependencies\n- Follow the testing framework conventions of the target language (JUnit, pytest, Jest, etc.)\n\nOutput well-structured, runnable test code with clear test names describing the expected behavior.",
+    "sortOrder" : 2,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Scan source code for security vulnerabilities",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "code" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "scan_vulnerabilities",
+        "outputSchema" : {
+          "properties" : {
+            "vulnerabilities" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-security-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Detect hardcoded secrets and credentials in code",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "code" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "check_secrets",
+        "outputSchema" : {
+          "properties" : {
+            "secrets" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-security-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Audit project dependencies for known vulnerabilities",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "dependencies" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "audit_dependencies",
+        "outputSchema" : {
+          "properties" : {
+            "advisories" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-security-analyzer",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Scans code and dependencies for security vulnerabilities and leaked secrets.",
+    "icon" : "🛡️",
+    "id" : "builtin-security-analyzer",
+    "name" : "Security Analyzer",
+    "prompt" : "You are a security analyst. Perform thorough security analysis:\n- Scan for OWASP Top 10 vulnerabilities\n- Detect hardcoded secrets, API keys, and credentials\n- Audit dependency versions for known CVEs\n- Check for insecure configurations\n- Identify authentication and authorization weaknesses\n\nReport findings with severity levels (critical, high, medium, low), CVSS scores where applicable, and remediation steps.",
+    "sortOrder" : 3,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Check text for grammar, spelling, and punctuation errors",
+        "handlerClass" : "com.automation.skills.handlers.document.GrammarCheckHandler",
+        "inputSchema" : {
+          "properties" : {
+            "language" : {
+              "type" : "string"
+            },
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "check_grammar",
+        "outputSchema" : {
+          "properties" : {
+            "corrections" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-grammar-style",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Suggest style improvements for better readability",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "improve_style",
+        "outputSchema" : {
+          "properties" : {
+            "readabilityScore" : {
+              "type" : "number"
+            },
+            "suggestions" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-grammar-style",
+        "writes" : false
+      }
+    ],
+    "category" : "DOCUMENT",
+    "configSchema" : { },
+    "description" : "Checks grammar, spelling, and writing style for professional documents.",
+    "icon" : "✏️",
+    "id" : "builtin-grammar-style",
+    "name" : "Grammar & Style Editor",
+    "prompt" : "You are a professional editor. Review text for:\n- Grammar and spelling errors\n- Punctuation and sentence structure\n- Writing style consistency and clarity\n- Readability (Flesch-Kincaid score estimation)\n- Tone appropriateness for the target audience\n\nProvide corrections with explanations. Suggest alternative phrasings for unclear passages. Rate overall readability on a 1-10 scale.",
+    "sortOrder" : 4,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Translate text from one language to another",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "sourceLanguage" : {
+              "type" : "string"
+            },
+            "targetLanguage" : {
+              "type" : "string"
+            },
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "translate_text",
+        "outputSchema" : {
+          "properties" : {
+            "detectedLanguage" : {
+              "type" : "string"
+            },
+            "translation" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-document-translator",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Detect the language of the provided text",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "detect_language",
+        "outputSchema" : {
+          "properties" : {
+            "confidence" : {
+              "type" : "number"
+            },
+            "language" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-document-translator",
+        "writes" : false
+      }
+    ],
+    "category" : "DOCUMENT",
+    "configSchema" : { },
+    "description" : "Translates documents between languages while preserving formatting and context.",
+    "icon" : "🌍",
+    "id" : "builtin-document-translator",
+    "name" : "Document Translator",
+    "prompt" : "You are a professional translator. Translate text accurately while:\n- Preserving the original meaning and nuance\n- Maintaining formatting (markdown, HTML, etc.)\n- Adapting idioms and cultural references appropriately\n- Keeping technical terminology consistent\n- Detecting the source language automatically when not specified\n\nProvide natural, fluent translations that read as if originally written in the target language.",
+    "sortOrder" : 5,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Create a concise summary of the provided text",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "level" : {
+              "type" : "string"
+            },
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "summarize_text",
+        "outputSchema" : {
+          "properties" : {
+            "summary" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-smart-summarizer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Extract key points and main arguments from text",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "extract_key_points",
+        "outputSchema" : {
+          "properties" : {
+            "keyPoints" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-smart-summarizer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate a structured outline from text content",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "create_outline",
+        "outputSchema" : {
+          "properties" : {
+            "outline" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-smart-summarizer",
+        "writes" : false
+      }
+    ],
+    "category" : "DOCUMENT",
+    "configSchema" : { },
+    "description" : "Creates concise summaries, extracts key points, and generates outlines.",
+    "icon" : "📋",
+    "id" : "builtin-smart-summarizer",
+    "name" : "Smart Summarizer",
+    "prompt" : "You are a summarization expert. Process text to:\n- Create concise summaries at configurable detail levels (brief, standard, detailed)\n- Extract key points and main arguments\n- Generate structured outlines with hierarchy\n- Identify action items and decisions\n- Preserve critical data points and statistics\n\nOutput structured, scannable content that captures the essence of the original text.",
+    "sortOrder" : 6,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Extract text from images",
+        "handlerClass" : "com.automation.skills.handlers.document.OCRHandler",
+        "inputSchema" : {
+          "image" : "string"
+        },
+        "name" : "ocr",
+        "outputSchema" : {
+          "text" : "string"
+        },
+        "skillBackReference" : "builtin-document-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Verify facts against sources",
+        "handlerClass" : "com.automation.skills.handlers.document.FactCheckHandler",
+        "inputSchema" : {
+          "text" : "string"
+        },
+        "name" : "fact_check",
+        "outputSchema" : {
+          "results" : "array"
+        },
+        "skillBackReference" : "builtin-document-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Check grammar and spelling",
+        "handlerClass" : "com.automation.skills.handlers.document.GrammarCheckHandler",
+        "inputSchema" : {
+          "text" : "string"
+        },
+        "name" : "grammar_check",
+        "outputSchema" : {
+          "corrections" : "array"
+        },
+        "skillBackReference" : "builtin-document-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Create document summaries",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "length" : "integer",
+          "text" : "string"
+        },
+        "name" : "summarize",
+        "outputSchema" : {
+          "summary" : "string"
+        },
+        "skillBackReference" : "builtin-document-analyzer",
+        "writes" : false
+      }
+    ],
+    "category" : "DOCUMENT",
+    "configSchema" : { },
+    "description" : "Analyze documents for quality, grammar, facts, and structure.",
+    "icon" : "📄",
+    "id" : "builtin-document-analyzer",
+    "name" : "Document Analyzer",
+    "prompt" : "You are an expert document analyzer. You have the following capabilities:\n- OCR: Extract text from images and scanned documents\n- Fact Checking: Verify facts against known sources and flag unverifiable claims\n- Grammar Check: Check grammar, spelling, and style for clarity and correctness\n- Summarize: Create concise summaries maintaining key points and structure\n\nWhen using these capabilities, be thorough and provide structured output.",
+    "sortOrder" : 7,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Perform statistical analysis on a dataset",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "data" : {
+              "type" : "string"
+            },
+            "format" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "analyze_dataset",
+        "outputSchema" : {
+          "properties" : {
+            "insights" : {
+              "type" : "array"
+            },
+            "statistics" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-data-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Detect anomalies and outliers in data",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "data" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "detect_anomalies",
+        "outputSchema" : {
+          "properties" : {
+            "anomalies" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-data-analyzer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate descriptive statistics for data columns",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "data" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "generate_statistics",
+        "outputSchema" : {
+          "properties" : {
+            "statistics" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-data-analyzer",
+        "writes" : false
+      }
+    ],
+    "category" : "DATA",
+    "configSchema" : { },
+    "description" : "Analyzes datasets to detect patterns, anomalies, and generate statistics.",
+    "icon" : "📊",
+    "id" : "builtin-data-analyzer",
+    "name" : "Data Analyzer",
+    "prompt" : "You are a data analyst. Analyze provided data to:\n- Calculate descriptive statistics (mean, median, mode, std dev, percentiles)\n- Detect anomalies and outliers using statistical methods\n- Identify trends, patterns, and correlations\n- Generate data quality reports (missing values, duplicates, type mismatches)\n- Provide visualization recommendations\n\nPresent findings in a structured format with confidence intervals where applicable.",
+    "sortOrder" : 8,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Generate a formatted report from analysis results",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "data" : {
+              "type" : "object"
+            },
+            "template" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "generate_report",
+        "outputSchema" : {
+          "properties" : {
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-report-generator",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Create chart/visualization specifications from data",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "data" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "create_visualization_spec",
+        "outputSchema" : {
+          "properties" : {
+            "charts" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-report-generator",
+        "writes" : false
+      }
+    ],
+    "category" : "DATA",
+    "configSchema" : { },
+    "description" : "Creates formatted reports and visualization specifications from data.",
+    "icon" : "📄",
+    "id" : "builtin-report-generator",
+    "name" : "Report Generator",
+    "prompt" : "You are a report generation specialist. Create professional reports:\n- Generate structured reports in markdown format\n- Include executive summaries and detailed analysis sections\n- Create visualization specifications (chart types, axes, colors)\n- Format data tables with appropriate precision\n- Add contextual commentary explaining findings\n\nReports should be publication-ready with clear sections, proper formatting, and actionable conclusions.",
+    "sortOrder" : 9,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Write a complete blog post or article on a given topic",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "tone" : {
+              "type" : "string"
+            },
+            "topic" : {
+              "type" : "string"
+            },
+            "wordCount" : {
+              "type" : "number"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "write_article",
+        "outputSchema" : {
+          "properties" : {
+            "article" : {
+              "type" : "string"
+            },
+            "meta" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-blog-writer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Create a structured outline for an article",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "topic" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "create_article_outline",
+        "outputSchema" : {
+          "properties" : {
+            "outline" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-blog-writer",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate headline suggestions for content",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "content" : {
+              "type" : "string"
+            },
+            "topic" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_headlines",
+        "outputSchema" : {
+          "properties" : {
+            "headlines" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-blog-writer",
+        "writes" : false
+      }
+    ],
+    "category" : "CONTENT",
+    "configSchema" : { },
+    "description" : "Writes engaging blog posts and articles with SEO optimization.",
+    "icon" : "📝",
+    "id" : "builtin-blog-writer",
+    "name" : "Blog & Article Writer",
+    "prompt" : "You are a content writer. Create compelling articles:\n- Write engaging, well-structured blog posts and articles\n- Optimize for SEO with proper heading hierarchy and keyword placement\n- Create attention-grabbing introductions and conclusions\n- Generate outlines before writing for structured content\n- Suggest compelling headlines and meta descriptions\n\nAdapt tone and style to the target audience. Use clear, concise language with proper paragraph breaks for readability.",
+    "sortOrder" : 10,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Draft a professional email based on context and purpose",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "context" : {
+              "type" : "string"
+            },
+            "purpose" : {
+              "type" : "string"
+            },
+            "tone" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "draft_email",
+        "outputSchema" : {
+          "properties" : {
+            "body" : {
+              "type" : "string"
+            },
+            "subject" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-email-drafter",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Improve an existing email draft",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "email" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "improve_email",
+        "outputSchema" : {
+          "properties" : {
+            "changes" : {
+              "type" : "array"
+            },
+            "improved" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-email-drafter",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate effective email subject lines",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "emailContent" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_subject_lines",
+        "outputSchema" : {
+          "properties" : {
+            "subjects" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-email-drafter",
+        "writes" : false
+      }
+    ],
+    "category" : "CONTENT",
+    "configSchema" : { },
+    "description" : "Drafts professional emails and suggests improvements for existing ones.",
+    "icon" : "📧",
+    "id" : "builtin-email-drafter",
+    "name" : "Email Drafter",
+    "prompt" : "You are an email communication expert. Help with emails:\n- Draft professional emails for various contexts (business, follow-up, cold outreach)\n- Improve existing email drafts for clarity and impact\n- Suggest compelling subject lines with good open rates\n- Adapt tone (formal, casual, persuasive) to context\n- Keep emails concise and action-oriented\n\nFollow email best practices: clear subject, greeting, body, CTA, and sign-off.",
+    "sortOrder" : 11,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Create a social media post for a specific platform",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "platform" : {
+              "type" : "string"
+            },
+            "topic" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "create_post",
+        "outputSchema" : {
+          "properties" : {
+            "hashtags" : {
+              "type" : "array"
+            },
+            "post" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-social-media",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Suggest relevant hashtags for content",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "content" : {
+              "type" : "string"
+            },
+            "platform" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_hashtags",
+        "outputSchema" : {
+          "properties" : {
+            "hashtags" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-social-media",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Adapt existing content for a different social media platform",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "content" : {
+              "type" : "string"
+            },
+            "targetPlatform" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "adapt_for_platform",
+        "outputSchema" : {
+          "properties" : {
+            "adapted" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-social-media",
+        "writes" : false
+      }
+    ],
+    "category" : "CONTENT",
+    "configSchema" : { },
+    "description" : "Creates platform-optimized social media posts with hashtag suggestions.",
+    "icon" : "📱",
+    "id" : "builtin-social-media",
+    "name" : "Social Media Creator",
+    "prompt" : "You are a social media strategist. Create engaging posts:\n- Write platform-optimized content (Twitter/X, LinkedIn, Instagram, Facebook)\n- Suggest relevant and trending hashtags\n- Adapt content format and length for each platform\n- Create attention-grabbing hooks and CTAs\n- Suggest optimal posting times and engagement strategies\n\nFollow platform-specific best practices for character limits, formatting, and audience engagement.",
+    "sortOrder" : 12,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : true,
+        "description" : "Research a topic and compile structured findings",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "depth" : {
+              "type" : "string"
+            },
+            "topic" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "research_topic",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "summary" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-research-assistant",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Analyze and evaluate research sources for credibility",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "sources" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "analyze_sources",
+        "outputSchema" : {
+          "properties" : {
+            "evaluations" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-research-assistant",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Identify knowledge gaps in research coverage",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "research" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "identify_gaps",
+        "outputSchema" : {
+          "properties" : {
+            "gaps" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-research-assistant",
+        "writes" : false
+      }
+    ],
+    "category" : "RESEARCH",
+    "configSchema" : { },
+    "description" : "Researches topics, analyzes sources, and identifies knowledge gaps.",
+    "icon" : "🔬",
+    "id" : "builtin-research-assistant",
+    "name" : "Research Assistant",
+    "prompt" : "You are a research assistant. Help with research tasks:\n- Research topics thoroughly with structured findings\n- Analyze and evaluate source credibility and relevance\n- Identify gaps in current knowledge or coverage\n- Synthesize information from multiple sources\n- Create annotated bibliographies and reference lists\n\nPresent findings in academic-quality format with proper citations and clear methodology.",
+    "sortOrder" : 13,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Verify factual claims in the provided text",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "text" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "verify_claims",
+        "outputSchema" : {
+          "properties" : {
+            "claims" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-fact-checker",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Verify statistics and numerical claims",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "statistics" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "check_statistics",
+        "outputSchema" : {
+          "properties" : {
+            "results" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-fact-checker",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Assess the reliability of a source or document",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "source" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "assess_reliability",
+        "outputSchema" : {
+          "properties" : {
+            "factors" : {
+              "type" : "array"
+            },
+            "score" : {
+              "type" : "number"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-fact-checker",
+        "writes" : false
+      }
+    ],
+    "category" : "RESEARCH",
+    "configSchema" : { },
+    "description" : "Verifies claims, checks statistics, and assesses information reliability.",
+    "icon" : "✅",
+    "id" : "builtin-fact-checker",
+    "name" : "Fact Checker",
+    "prompt" : "You are a fact-checker. Verify information rigorously:\n- Verify factual claims against known information\n- Check statistics and numerical data for accuracy\n- Assess the reliability and bias of sources\n- Identify misleading or out-of-context claims\n- Rate confidence level for each verification\n\nProvide clear verdicts (confirmed, unconfirmed, false, misleading) with supporting evidence and reasoning.",
+    "sortOrder" : 14,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Process raw meeting notes into structured format",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "notes" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "process_meeting_notes",
+        "outputSchema" : {
+          "properties" : {
+            "decisions" : {
+              "type" : "array"
+            },
+            "summary" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-meeting-notes",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Extract action items with assignees and deadlines",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "notes" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "extract_action_items",
+        "outputSchema" : {
+          "properties" : {
+            "actionItems" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-meeting-notes",
+        "writes" : false
+      }
+    ],
+    "category" : "BUSINESS",
+    "configSchema" : { },
+    "description" : "Processes meeting notes to extract action items, decisions, and summaries.",
+    "icon" : "🗒️",
+    "id" : "builtin-meeting-notes",
+    "name" : "Meeting Notes Processor",
+    "prompt" : "You are a meeting notes processor. Extract structured information:\n- Create concise meeting summaries\n- Extract action items with assignees and deadlines\n- Identify key decisions and their rationale\n- List open questions and follow-ups\n- Organize by topic/agenda item\n\nOutput in a clean, scannable format that can be shared with attendees and stakeholders.",
+    "sortOrder" : 15,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Identify potential risks in a project or scenario",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "context" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "identify_risks",
+        "outputSchema" : {
+          "properties" : {
+            "risks" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-risk-assessor",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Create a risk matrix with probability and impact ratings",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "risks" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "create_risk_matrix",
+        "outputSchema" : {
+          "properties" : {
+            "matrix" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-risk-assessor",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Suggest mitigation strategies for identified risks",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "risks" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_mitigations",
+        "outputSchema" : {
+          "properties" : {
+            "mitigations" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-risk-assessor",
+        "writes" : false
+      }
+    ],
+    "category" : "BUSINESS",
+    "configSchema" : { },
+    "description" : "Identifies risks, creates risk matrices, and suggests mitigations.",
+    "icon" : "⚠️",
+    "id" : "builtin-risk-assessor",
+    "name" : "Risk Assessor",
+    "prompt" : "You are a risk assessment specialist. Analyze risks:\n- Identify potential risks across categories (technical, financial, operational, legal)\n- Assess probability and impact for each risk\n- Create risk matrices with prioritized rankings\n- Suggest concrete mitigation strategies\n- Define risk indicators and monitoring approaches\n\nPresent risks in a structured format with clear severity ratings and actionable mitigation plans.",
+    "sortOrder" : 16,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Recommend a tech stack for a given spec, with reasoning",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "available_recipes" : {
+              "items" : {
+                "type" : "string"
+              },
+              "type" : "array"
+            },
+            "spec" : {
+              "description" : "Parsed spec frontmatter + body summary",
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "research_stack",
+        "outputSchema" : {
+          "properties" : {
+            "reasoning" : {
+              "type" : "string"
+            },
+            "stack" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-spec-architect",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Pick a concrete stack object given hints, type, and constraints",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "constraints" : {
+              "type" : "object"
+            },
+            "stack_hint" : {
+              "type" : "object"
+            },
+            "type" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "propose_stack",
+        "outputSchema" : {
+          "properties" : {
+            "auth" : {
+              "type" : "string"
+            },
+            "db" : {
+              "type" : "string"
+            },
+            "framework" : {
+              "type" : "string"
+            },
+            "recipe" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-spec-architect",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Order features by dependency, attach snippet hints and complexity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "features" : {
+              "type" : "array"
+            },
+            "stack" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "decompose_features",
+        "outputSchema" : {
+          "properties" : {
+            "feature_order" : {
+              "type" : "array"
+            },
+            "per_feature" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-spec-architect",
+        "writes" : false
+      }
+    ],
+    "category" : "BUSINESS",
+    "configSchema" : { },
+    "description" : "Reads a SaaS-Factory spec.md, researches a fitting tech stack, and decomposes the build plan into ordered features.",
+    "icon" : "🏛️",
+    "id" : "builtin-spec-architect",
+    "name" : "Spec Architect",
+    "prompt" : "You are the architect of the SaaS-Factory pipeline. Given a spec.md (YAML frontmatter + markdown vision):\n\n1. Read the spec carefully. The frontmatter declares: name, slug, type, features, target_users, optional brand/constraints/stack_hint/budget. The markdown body is the source of truth for the *intent* — the frontmatter is structured metadata.\n2. If `stack_hint` is set, respect it. Otherwise, pick a stack that fits the `type` and `features`:\n   - saas / internal-tool with auth+db → Next.js + Prisma + Postgres + a Magic-Link auth library\n   - content-site / mobile-pwa → Astro or SvelteKit with Tailwind\n   - data-pipeline → FastAPI + Postgres + SQLAlchemy/Alembic\n3. Honor `constraints.language_preference` and `constraints.must_avoid` strictly.\n4. For each feature, propose:\n   - the implementation order (dependencies first)\n   - the most relevant snippet path under `snippets/<stack>/<feature>/`, if it would exist\n   - rough complexity estimate (S/M/L) and risk notes\n5. Output a structured JSON build plan with: `stack` (object), `stack_reasoning` (1-2 sentences), `feature_order` (array of feature ids in build order), `per_feature` (map of feature-id → {snippet_hint, complexity, risks}), and `open_questions` (array — things the user must decide before scaffold).\n\nBe honest about uncertainty. If the spec is ambiguous, surface it as an `open_questions` entry rather than silently picking. Prefer well-trodden defaults over novel stacks unless the spec demands otherwise. Cite the available stack-recipes (under recipes/) when one fits.",
+    "sortOrder" : 17,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Implement a single feature in the target project",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "feature" : {
+              "type" : "object"
+            },
+            "project_path" : {
+              "type" : "string"
+            },
+            "stack" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "implement_feature",
+        "outputSchema" : {
+          "properties" : {
+            "files_changed" : {
+              "type" : "array"
+            },
+            "summary" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-feature-implementer",
+        "writes" : true
+      },
+      {
+        "async" : false,
+        "description" : "Write unit/integration tests for an implemented feature",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "feature" : {
+              "type" : "object"
+            },
+            "stack" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "write_tests",
+        "outputSchema" : {
+          "properties" : {
+            "test_files" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-feature-implementer",
+        "writes" : true
+      },
+      {
+        "async" : false,
+        "description" : "Wire a feature into the app's router/navigation/layout",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "feature_id" : {
+              "type" : "string"
+            },
+            "project_path" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "apply_routes_glue",
+        "outputSchema" : {
+          "properties" : {
+            "files_changed" : {
+              "type" : "array"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-feature-implementer",
+        "writes" : true
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Implements a single feature in a generated SaaS app, reuses snippets when available, writes accompanying tests.",
+    "icon" : "🛠️",
+    "id" : "builtin-feature-implementer",
+    "name" : "Feature Implementer",
+    "prompt" : "You are a senior full-stack engineer working inside a generated SaaS app. The project context (.claude/rules/project-context.md) describes the chosen stack and conventions.\n\nFor each feature:\n1. Check if a snippet exists under the project's parent `snippets/<stack>/<feature>/` directory — if yes, use `factory snippet-apply` *via shell* before generating code, then only fill in the remaining gaps.\n2. Generate or augment files using the established stack conventions (e.g. Next.js App Router routes under src/app/, Prisma schema additions under prisma/schema.prisma, server actions in src/lib/).\n3. Write at least one unit test per feature, hitting the framework's testing tool (Jest, Vitest, pytest, …). Tests should be runnable via `factory test <project>`.\n4. Update Prisma schema if a new model is needed; trigger migration via `factory migrate` rather than running `prisma migrate dev` directly.\n5. Update README.md briefly to document the new feature (1-2 sentences max).\n\nHard rules:\n- Never claim success without confirming `factory test` passes (lint, typecheck, unit). If a test fails, debug and fix — don't hide failures.\n- Never invent libraries or APIs. If you need a dependency that's not installed, add it to package.json and run install.\n- Never commit secrets or hardcode credentials — use `.env` and `.env.example`.\n- Use absolute paths when touching files outside the current working directory.\n- Stay within the scope of the requested feature — no incidental refactors.",
+    "sortOrder" : 18,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Generate hero, features, and CTA copy for the landing page",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "spec" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "write_landing_copy",
+        "outputSchema" : {
+          "properties" : {
+            "cta" : {
+              "type" : "object"
+            },
+            "features" : {
+              "type" : "array"
+            },
+            "hero" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-marketing-copywriter",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Generate SEO and Open-Graph meta tags",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "landing_copy" : {
+              "type" : "object"
+            },
+            "spec" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "generate_meta_tags",
+        "outputSchema" : {
+          "properties" : {
+            "description" : {
+              "type" : "string"
+            },
+            "og_description" : {
+              "type" : "string"
+            },
+            "og_title" : {
+              "type" : "string"
+            },
+            "title" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-marketing-copywriter",
+        "writes" : false
+      },
+      {
+        "async" : false,
+        "description" : "Compose a text-to-image prompt for the OG image",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "spec" : {
+              "type" : "object"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "suggest_og_image_prompt",
+        "outputSchema" : {
+          "properties" : {
+            "prompt" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-marketing-copywriter",
+        "writes" : false
+      }
+    ],
+    "category" : "CONTENT",
+    "configSchema" : { },
+    "description" : "Generates landing-page copy, meta tags, and OG-image prompts for a generated SaaS, matching the spec's brand and target users.",
+    "icon" : "📝",
+    "id" : "builtin-marketing-copywriter",
+    "name" : "Marketing Copywriter",
+    "prompt" : "You write marketing copy for SaaS-Factory generated apps. Given a spec (target users, brand tone, primary color, features), produce:\n\n1. **Hero**: a 6-10 word headline + a 1-2 sentence subheadline. Speak to the user's pain, then the relief — never feature-list in the hero.\n2. **3-5 Feature blocks**: each a short title (3-5 words), one-line description (~15 words), and a single concrete benefit. Map to the spec's features but rephrase from the user's POV.\n3. **CTA**: a primary button label (≤4 words) and a single supporting micro-line about risk-reversal (e.g. \"no credit card needed\").\n4. **Meta tags**: SEO title (≤60 chars), meta description (≤155 chars), OG-title (≤60), OG-description (≤155).\n5. **OG-image prompt**: a 1-2 sentence text-to-image prompt that captures the app's identity, ready for a downstream image generator.\n\nRules:\n- Match the brand tone exactly (if `tone: \"pragmatisch, ehrlich, ermutigend\"`, that's how you write — no \"transform your life\" boilerplate).\n- Target the user persona literally (`target_users`). If they're \"Berufstätige im Übergang\", talk to that person — not \"everyone\".\n- Avoid AI-tells: no \"unleash\", \"leverage\", \"seamless\", \"elevate\", \"in today's fast-paced world\", \"Imagine a world where\", etc.\n- Output structured JSON, no prose explanations.",
+    "sortOrder" : 19,
+    "version" : "1.0.0"
+  }
+]

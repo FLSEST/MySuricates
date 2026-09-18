@@ -19,9 +19,9 @@ final class WorkspaceInputPaths {
         new HashMap<>(context.getVariables()).forEach((name, value) -> {
             if (name.equals("project_path") || name.startsWith("workspace_")
                     || name.equals("execution_path") || name.startsWith("execution_path_")) return;
-            Object mapped = remapValue(value, prefix, workspace);
-            if (context.isUntrusted(name)) context.setUntrustedVariable(name, mapped);
-            else context.setVariable(name, mapped);
+            // Value-only write: the setters would re-label the variable, and the trust classes are
+            // three (trusted / external untrusted / platform data), not two.
+            context.replaceValue(name, remapValue(value, prefix, workspace));
         });
     }
 

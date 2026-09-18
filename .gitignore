@@ -24,9 +24,16 @@ docs/superpowers/
 
 # Frontend build artifacts
 ai-automation-frontend/node_modules/
+# Worktrees legen node_modules als Symlink an (kein Verzeichnis) - die Zeile
+# oben (mit Schraegstrich) greift dafuer nicht.
+ai-automation-frontend/node_modules
 ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
+# Arbeitsnotiz vom 2026-03-09, seither veraltet ("164 Tests in 14 Specs",
+# tatsaechlich 19 Specs) und keine veroeffentlichte Doku. Entscheidung Flo
+# 2026-09-18 (TODO af7e5d22): untracken.
+ai-automation-frontend/cypress/TODO-TESTS.md
 ai-automation-frontend/playwright/results/
 # Showcase-Aufnahmen: 27,6 MiB, von nichts im Repo referenziert. Sie liegen lokal
 # weiter, gehoeren aber nicht in den getrackten Baum (Entscheidung 2026-09-12).
@@ -65,6 +72,21 @@ ai-automation-backend/src/main/resources/docs/
 /review/
 docs/public/generated/
 screenshots/raw/
+
+# Interne Planungsdokumente (Entwuerfe, Bestandsaufnahmen, Session-/TODO-Bezuege).
+# Entscheidung Flo 2026-09-16 (TODO 6e9e00e9): nicht veroeffentlichen, lokal behalten.
+docs/plans/
+
+# Interne Doku-Gap-Analyse von Maerz 2026 (v0.6.2), veraltete "Actual"-Werte,
+# nicht in der Doku-Tabelle verlinkt. Entscheidung Flo 2026-09-18 (TODO 72900609):
+# untracken statt aktualisieren.
+docs/analysis.md
+docs/en/analysis.md
+
+# Planungsdokument mit Instanz-UUIDs und einer Session-ID, kein EN-Gegenstueck.
+# Gleiches Genre wie docs/plans/. Entscheidung Flo 2026-09-18 (TODO 089473cd):
+# untracken.
+docs/specs/
 
 # Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
 # *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und

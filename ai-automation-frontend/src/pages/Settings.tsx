@@ -7,6 +7,7 @@ import { useTestingStatus, useTestingStart, useTestingStop, useTestingReset, use
 import { GeneralSettingsCard } from '../components/settings/GeneralSettingsCard';
 import { AppearanceCard } from '../components/settings/AppearanceCard';
 import { SecurityCard } from '../components/settings/SecurityCard';
+import { TodoSettingsCard } from '../components/settings/TodoSettingsCard';
 import { RemoteAccessCard } from '../components/settings/RemoteAccessCard';
 import { BackupCard } from '../components/settings/BackupCard';
 import { SystemInfoCard } from '../components/settings/SystemInfoCard';
@@ -18,6 +19,7 @@ import { WishSettingsCard } from '../components/settings/WishSettingsCard';
 import { SettingsNav, type NavSection } from '../components/settings/SettingsNav';
 import { SettingsSection } from '../components/settings/SettingsSection';
 import { ModulesCard } from '../components/settings/ModulesCard';
+import { StartupConfigCard } from '../components/settings/StartupConfigCard';
 import { useModuleEnabled } from '../hooks/useModules';
 
 export function Settings() {
@@ -78,6 +80,7 @@ export function Settings() {
         <div className="flex-1 min-w-0 space-y-10">
           <SettingsSection id="general" title={t.settings.settingsNavGeneral}>
             <GeneralSettingsCard />
+            <TodoSettingsCard />
             <SecurityCard />
           </SettingsSection>
 
@@ -140,6 +143,7 @@ export function Settings() {
           )}
 
           <SettingsSection id="modules" title={t.modules.navTitle}>
+            <StartupConfigCard />
             <ModulesCard />
           </SettingsSection>
 

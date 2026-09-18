@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,28 +15,28 @@ import java.util.regex.Pattern;
 final class TemplateResolver {
 
     private static final Pattern SENTINEL = Pattern.compile("\\x00untrusted-\\d+\\x00");
-    /**
-     * {@code {{x}}} or {@code {{ x }}} — exactly the two spellings the resolver has always supported. Keys may
-     * contain spaces (block names like "Build Report"); an asymmetric spelling yields a key with a leading or
-     * trailing space that matches nothing and stays literal.
-     */
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{( ?)([^{}]+?)\\1\\}\\}");
+    /** Shared with static analyses (BPMN data-flow export) — see {@link PlaceholderSyntax#PLACEHOLDER}. */
+    private static final Pattern PLACEHOLDER = PlaceholderSyntax.PLACEHOLDER;
+
+    /** No caller interested in which placeholders were substituted (prompt paths). */
+    private static final Consumer<String> IGNORE = key -> { };
 
     private TemplateResolver() {}
 
-    /** Raw substitution — values are inserted verbatim. */
+    /** Raw substitution — values are inserted verbatim. Never reports substitutions: prompts are not a shell path. */
     static String resolve(String template, String previousOutput,
                           Map<String, String> blockOutputs, Map<String, Object> vars) {
-        return substitute(template, previousOutput, blockOutputs, vars, false);
+        return substitute(template, previousOutput, blockOutputs, vars, false, IGNORE);
     }
 
     /**
      * Shell-safe substitution: each value is wrapped in POSIX single quotes with internal
-     * single quotes escaped as '\'' to prevent shell injection.
+     * single quotes escaped as '\'' to prevent shell injection. {@code onSubstitution} is told the
+     * key of every placeholder that really resolved (see {@link #resolveShell}).
      */
-    static String resolveShellSafe(String template, String previousOutput,
-                                   Map<String, String> blockOutputs, Map<String, Object> vars) {
-        return substitute(template, previousOutput, blockOutputs, vars, true);
+    static String resolveShellSafe(String template, String previousOutput, Map<String, String> blockOutputs,
+                                   Map<String, Object> vars, Consumer<String> onSubstitution) {
+        return substitute(template, previousOutput, blockOutputs, vars, true, onSubstitution);
     }
 
     /**
@@ -52,14 +53,24 @@ final class TemplateResolver {
     }
 
     /**
-     * Substitution for shell command lines with mixed trust: trusted values are inserted raw
-     * (byte-identical to {@link #resolve}), untrusted ones single-quoted. Untrusted values are
+     * Substitution for shell command lines with mixed trust: every trusted placeholder resolves
+     * exactly as in {@link #resolve}, untrusted ones are single-quoted. Untrusted values are
      * substituted last, in a single pass that never re-scans what it inserted, so an
      * attacker-controlled value can neither break out of its quotes nor pull other values' raw
      * content into the command line.
+     *
+     * <p>{@code onSubstitution} is told the key of every escaped placeholder that really occurred in
+     * the template — the signal that turns platform data into a run-level taint source
+     * ({@link ExecutionContextTaint#substitutedIntoShell}). A placeholder that is merely <em>defined</em>
+     * reports nothing, so a run that never names it stays untainted.
+     *
+     * <p>The {@link Taint#NONE} shortcut below only skips the bookkeeping, not a behaviour
+     * difference. A real workflow run never takes it: {@code previous_report} and {@code open_todos}
+     * are always escaped ({@link ExecutionContext#setUntrustedPlatformVariable}), so the taint set
+     * is never empty there.
      */
     static String resolveShell(String template, String previousOutput, Map<String, String> blockOutputs,
-                               Map<String, Object> vars, Taint taint) {
+                               Map<String, Object> vars, Taint taint, Consumer<String> onSubstitution) {
         if (template == null) return null;
         if (taint.isEmpty()) return resolve(template, previousOutput, blockOutputs, vars);
 
@@ -79,8 +90,10 @@ final class TemplateResolver {
         }
         for (String name : taint.variables()) {
             trustedVars.remove(name);
+            String before = resolved;
             resolved = defer(resolved, deferred, String.valueOf(vars.get(name)),
                     "{{ " + name + " }}", "{{" + name + "}}");
+            if (!resolved.equals(before)) onSubstitution.accept(name);
         }
         resolved = resolve(resolved, previousOutput, trustedOutputs, trustedVars);
         return substituteSentinels(resolved, deferred);
@@ -120,13 +133,15 @@ final class TemplateResolver {
      * scanned again, so a value that itself contains {@code {{ … }}} (a log, an AI answer) stays literal.
      */
     private static String substitute(String template, String previousOutput, Map<String, String> blockOutputs,
-                                     Map<String, Object> vars, boolean escape) {
+                                     Map<String, Object> vars, boolean escape, Consumer<String> onSubstitution) {
         if (template == null) return null;
         Matcher matcher = PLACEHOLDER.matcher(template);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
-            String raw = lookup(matcher.group(2), previousOutput, blockOutputs, vars);
+            String key = matcher.group(2);
+            String raw = lookup(key, previousOutput, blockOutputs, vars);
             String replacement = raw == null ? matcher.group() : value(raw, escape);
+            if (raw != null) onSubstitution.accept(key);
             matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(out);

@@ -132,8 +132,8 @@
   --color-assistant-raised: var(--color-assistant-raised);
   --color-assistant-border: var(--color-assistant-border);
 
-  --font-sans: Plus Jakarta Sans, system-ui, sans-serif;
-  --font-mono: JetBrains Mono, Fira Code, monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;

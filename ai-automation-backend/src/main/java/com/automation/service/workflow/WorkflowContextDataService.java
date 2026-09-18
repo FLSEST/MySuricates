@@ -45,8 +45,11 @@ public class WorkflowContextDataService {
      */
     public void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
         try {
-            context.setVariable("previous_report", loadPreviousReport(workflowId));
-            context.setVariable("open_todos", loadOpenTodos(projectId));
+            // Untrusted: both carry foreign text — an earlier run's output (which may have processed a
+            // webhook payload) and TODO titles from imports. In shell blocks they are always quoted;
+            // in prompts nothing changes. See ExecutionContext#setUntrustedPlatformVariable.
+            context.setUntrustedPlatformVariable("previous_report", loadPreviousReport(workflowId));
+            context.setUntrustedPlatformVariable("open_todos", loadOpenTodos(projectId));
         } catch (Exception e) {
             log.warn("Failed to inject platform data: {}", e.getMessage());
         }

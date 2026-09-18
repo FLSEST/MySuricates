@@ -115,6 +115,9 @@ public class AuditIngestionService {
                     log.info("Accepted audit finding {} ({}) re-assessed: {}", finding.getId(), finding.getTitle(), outcome);
                 }
             }
+            // subject ist reines Anzeigeattribut — der neueste Wert gewinnt, der Fingerprint haengt
+            // an seiner normalisierten Form und bleibt dadurch ueber Drift hinweg stabil.
+            finding.setSubject(item.subject());
             finding.setSeverity(item.severity());
             finding.setTitle(item.title());
             finding.setDescription(item.description());
@@ -205,10 +208,16 @@ public class AuditIngestionService {
                 + " · [Evidence run](/workflows/" + report.getWorkflowId() + "/run/" + report.getWorkflowRunId() + ")";
     }
 
-    private static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
+    /**
+     * Identitaet eines Findings: Projekt, Audit, Regel und das <em>normalisierte</em> subject
+     * ({@link AuditSubjectNormalizer}) — modellgenerierte Suffix-Drift im subject erzeugt damit
+     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d).
+     */
+    static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(
-                    String.join("\n", projectId, auditKey, ruleKey, subject).getBytes(StandardCharsets.UTF_8));
+                    String.join("\n", projectId, auditKey, ruleKey, AuditSubjectNormalizer.normalize(subject))
+                            .getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
