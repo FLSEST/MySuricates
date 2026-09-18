@@ -1008,6 +1008,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V72 | Encrypted HMAC signing secret on webhook triggers |
 | V73 | Versioned dashboard layout snapshots (`dashboard_layout_versions`) |
 | V74 | Daily aggregate of the measured request cost per route (`request_metrics_daily`) |
+| V75 | Marker for findings whose ruleKey is outside the catalog (`unknown_rule_key`) |
 
 ## Architecture Gates
 
@@ -1052,7 +1053,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 74 Flyway migrations (V1–V74)
+│           └── db/migration/          ← 75 Flyway migrations (V1–V75)
 │
 └── ai-automation-frontend/
     ├── package.json

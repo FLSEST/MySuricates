@@ -1052,6 +1052,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
 | V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
 | V74 | Tagesaggregat der gemessenen Request-Kosten je Route (`request_metrics_daily`) |
+| V75 | Kennzeichen fuer Findings mit ruleKey ausserhalb des Katalogs (`unknown_rule_key`) |
 
 ## Architektur-Gates
 
@@ -1096,7 +1097,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 74 Flyway-Migrationen (V1–V74)
+│           └── db/migration/          ← 75 Flyway-Migrationen (V1–V75)
 │
 └── ai-automation-frontend/
     ├── package.json

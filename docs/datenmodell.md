@@ -1248,6 +1248,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V72 | `V72__webhook_signing_secret.sql` | `signing_secret_enc` in webhook_triggers (verschlüsseltes HMAC-Signatur-Secret) |
 | V73 | `V73__dashboard_layout_versions.sql` | dashboard_layout_versions-Tabelle + Index (versionierte Dashboard-Layout-Snapshots) |
 | V74 | `V74__request_metrics_daily.sql` | request_metrics_daily-Tabelle (Tagesabschluss der Request-Kosten je Route: Aufrufe, p50/p95, Wartezeit-Anteil, SQL-Statements, Antwort-Bytes) |
+| V75 | `V75__audit_finding_unknown_rule_key.sql` | unknown_rule_key in audit_findings (Finding mit ruleKey ausserhalb des Katalogs, Vorbelegung 0) |
 
 ## SQLite-Besonderheiten
 

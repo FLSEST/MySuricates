@@ -144,12 +144,39 @@ OAuth2 providers brauchen authorize- und token-URL.
 Die Migrationstabelle:
 
 | V1-V2 | Basistabellen |
-| V3-V4 | Indexe |
+| V3-V5 | Indexe |
 MD_EOF
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "Teilmengen/KI-Provider/Tabellen ohne Befund" '! grep -q "docs/noise.md" <<<"$OUT"'
 check "ohne Drift wieder exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/noise.md"
+
+# Spannen-Zeilen und Loecher (TODO ffa6d846 / c9c9f3eb): docs/architektur.md fasst zwei
+# Migrationen zu "| V28-V29 | ... |" zusammen. Wer die Spanne nicht liest, haelt das fuer ein
+# Loch. Wer nur die Hoechstnummer prueft, uebersieht ein echtes -- genau so ist beim Nachtragen
+# von V75 die V74-Zeile verschwunden, ohne dass das Gate etwas sagte.
+echo "4h) Migrationstabelle: Spannen zaehlen, Loecher fallen auf"
+cat > "$FAKE/docs/tabelle-spanne.md" <<'MD_EOF'
+# Vollstaendig ueber Spannen
+| V1-V2 | Basis |
+| V3-V5 | Rest |
+MD_EOF
+cat > "$FAKE/docs/tabelle-loch.md" <<'MD_EOF'
+# Loch in der Mitte
+| V1 | Basis |
+| V5 | Rest |
+MD_EOF
+cat > "$FAKE/docs/tabelle-beginnt-spaet.md" <<'MD_EOF'
+# Beginnt bewusst spaet
+| V4 | Indexe |
+| V5 | Rest |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1)
+check "Spanne deckt die Reihe ab: kein Befund" '! grep -q "tabelle-spanne.md" <<<"$OUT"'
+check "fehlende Zeile in der Mitte gemeldet" \
+  'grep -qE "^DRIFT docs/tabelle-loch.md:[0-9]+ migration-table-luecke: 1 Zeile\(n\) fehlen.*V2" <<<"$OUT"'
+check "spaet beginnende Tabelle ist kein Loch" '! grep -q "tabelle-beginnt-spaet.md" <<<"$OUT"'
+rm "$FAKE/docs/tabelle-spanne.md" "$FAKE/docs/tabelle-loch.md" "$FAKE/docs/tabelle-beginnt-spaet.md"
 
 echo "4d) Weitere Formulierungen fuer Templates"
 cat > "$FAKE/docs/wording.md" <<'MD_EOF'
@@ -297,14 +324,29 @@ cat > "$FAKE/docs/tabelle-aktuell.md" <<'MD_EOF'
 | Migration | Datei | Wirkung |
 |---|---|---|
 | V1 | `V1__init.sql` | Grundtabellen |
+| V2 | `V2__step.sql` | Zwischenschritt |
+| V5 | `V5__step.sql` | Letzter Stand |
+MD_EOF
+# Dieselbe Tabelle ohne die V2-Zeile: Hoechststand stimmt, eine vorhandene Migration fehlt
+# trotzdem. Genau diese Luecke ist beim Nachtragen von V75 unbemerkt entstanden.
+cat > "$FAKE/docs/tabelle-loch-real.md" <<'MD_EOF'
+# Schema mit fehlender Zeile
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
 | V5 | `V5__step.sql` | Letzter Stand |
 MD_EOF
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "veraltete Migrationstabelle gemeldet" \
   'grep -qE "^DRIFT docs/tabelle-alt.md:5 migration-table sagt 3, Code 5" <<<"$OUT"'
 check "als Auszug ausgewiesene Tabelle bleibt frei" '! grep -q "tabelle-auszug.md" <<<"$OUT"'
-check "aktuelle Tabelle bleibt frei"                '! grep -q "tabelle-aktuell.md" <<<"$OUT"'
-rm "$FAKE/docs/tabelle-alt.md" "$FAKE/docs/tabelle-auszug.md" "$FAKE/docs/tabelle-aktuell.md"
+check "aktuelle, vollstaendige Tabelle bleibt frei"  '! grep -q "tabelle-aktuell.md" <<<"$OUT"'
+check "vorhandene Migration fehlt in der Tabelle: gemeldet" \
+  'grep -qE "^DRIFT docs/tabelle-loch-real.md:[0-9]+ migration-table-luecke: 1 Zeile\(n\) fehlen.*V2" <<<"$OUT"'
+check "eine nie existierende Nummer wird NICHT als fehlend gemeldet" \
+  '! grep -qE "tabelle-loch-real.md.*(V3|V4)" <<<"$OUT"'
+rm "$FAKE/docs/tabelle-alt.md" "$FAKE/docs/tabelle-auszug.md" "$FAKE/docs/tabelle-aktuell.md" \
+   "$FAKE/docs/tabelle-loch-real.md"
 
 echo "11) README-Kopfzahlen: Commits mit Toleranz, Testzahlen nur mit Datum"
 ( cd "$FAKE" && git init -q . && $GIT add -A && $GIT commit -q -m eins \

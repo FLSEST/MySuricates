@@ -1248,6 +1248,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V72 | `V72__webhook_signing_secret.sql` | `signing_secret_enc` in webhook_triggers (encrypted HMAC signing secret) |
 | V73 | `V73__dashboard_layout_versions.sql` | dashboard_layout_versions table + index (versioned dashboard layout snapshots) |
 | V74 | `V74__request_metrics_daily.sql` | request_metrics_daily table (daily close of the request cost per route: calls, p50/p95, wait share, SQL statements, response bytes) |
+| V75 | `V75__audit_finding_unknown_rule_key.sql` | unknown_rule_key in audit_findings (finding whose ruleKey is outside the catalog, default 0) |
 
 ## SQLite Specifics
 

@@ -75,6 +75,16 @@ fact_migrations() {
   [ -d "$MIGRATIONS" ] || { MISSING+=("migrations: $MIGRATIONS fehlt"); echo 0; return; }
   find "$MIGRATIONS" -maxdepth 1 -name 'V*.sql' | wc -l | tr -d ' '
 }
+# Alle vorhandenen Nummern, nicht nur Anzahl und Hoechststand: Die Vollstaendigkeitspruefung
+# der Migrationstabellen vergleicht gegen die WIRKLICH vorhandenen Dateien. Eine Reihe
+# anzunehmen waere falsch -- Nummern koennen uebersprungen worden sein, und eine nie
+# existierende V4 als fehlende Tabellenzeile zu melden waere ein Fehlalarm (TODO ffa6d846).
+fact_migration_numbers() {
+  [ -d "$MIGRATIONS" ] || { echo "[]"; return; }
+  find "$MIGRATIONS" -maxdepth 1 -name 'V*.sql' -printf '%f\n' 2>/dev/null \
+    | sed -n 's/^V\([0-9]\{1,\}\)__.*/\1/p' | sort -n \
+    | paste -sd',' - | sed 's/^/[/; s/$/]/' | sed 's/\[\]/[]/'
+}
 fact_templates() {
   [ -d "$RES/templates/builtin" ] || { MISSING+=("templates: $RES/templates/builtin fehlt"); echo 0; return; }
   find "$RES/templates/builtin" -maxdepth 1 -name '*.json' | wc -l | tr -d ' '
@@ -97,6 +107,7 @@ BLOCK_TYPES="$(fact_block_types)"
 CONTROLLERS="$(fact_controllers)"
 MIGRATION_MAX="$(fact_migration_max)"
 MIGRATION_COUNT="$(fact_migrations)"
+MIGRATION_NUMBERS="$(fact_migration_numbers)"
 TEMPLATES="$(fact_templates)"
 SKILLS="$(fact_skills)"
 PROVIDERS="$(fact_providers)"
@@ -214,8 +225,8 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
-  "$BLOCK_TYPES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" \
+DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
+  "$BLOCK_TYPES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
   "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?

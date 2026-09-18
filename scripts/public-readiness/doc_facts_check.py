@@ -162,7 +162,10 @@ def span_is_declared_excerpt(line, match, expected):
 #   grob, aber vom Auftrag so gewollt — die eine Formulierung in
 #   docs/onboarding/ARCHITECTURE.md ist der ganze Anwendungsfall.
 # ---------------------------------------------------------------------------
-TABLE_MIGRATION_ROW = re.compile(r"^\|\s*`?V(\d+)`?\s*\|")
+# Eine Zeile darf eine Nummer ODER eine Spanne tragen: docs/architektur.md fasst zwei
+# Migrationen zu "| V28–V29 | Wishes + Wish-Reference-Workflow-IDs |" zusammen. Ohne die
+# Spanne haelt die Vollstaendigkeitspruefung das fuer ein Loch (sie tat es beim ersten Lauf).
+TABLE_MIGRATION_ROW = re.compile(rf"^\|\s*`?V(\d+)`?(?:\s*{DASH}\s*`?V(\d+)`?)?\s*\|")
 
 # Kopftabelle von README.de.md: "rund 1 420 Commits" — der Text sagt "rund",
 # deshalb mit Toleranz. Tausendertrenner koennen Leer-, Schmal- oder Punktzeichen sein.
@@ -238,26 +241,62 @@ def digits(text):
     return int(re.sub(r"\D", "", text))
 
 
-def check_migration_table(rel, lines, expected, findings):
+def check_migration_table(rel, lines, expected, numbers, findings):
     if expected is None:
         return
     current = re.compile(rf"\bV{expected}\b")
     best = best_no = best_line = None
+    seen = {}
     names_current_outside = False
     for no, line in enumerate(lines, 1):
         if IGNORE_MARKER in line:
             continue
         match = TABLE_MIGRATION_ROW.match(line.lstrip())
         if match:
-            said = int(match.group(1))
+            first = int(match.group(1))
+            last = int(match.group(2)) if match.group(2) else first
+            for said in range(first, max(first, last) + 1):
+                seen.setdefault(said, no)
+            said = max(first, last)
             if best is None or said > best:
                 best, best_no, best_line = said, no, line
         elif current.search(line):
             names_current_outside = True
+    if best == expected:
+        check_migration_table_complete(rel, seen, best, best_no, numbers, findings)
     if best is None or best == expected or names_current_outside:
         return
     findings.append(f"DRIFT {rel}:{best_no} migration-table sagt {best}, Code {expected}"
                     f" | {best_line.strip()[:120]}")
+
+
+def check_migration_table_complete(rel, seen, best, best_no, numbers, findings):
+    """Keine Luecke zwischen der kleinsten und der groessten gelisteten Nummer.
+
+    Die Pruefung auf die HOECHSTE Nummer allein hat eine blinde Stelle, und sie ist beim
+    Nachtragen von V75 (TODO ffa6d846) aufgefallen: Ein fehlerhafter Einschub hat die
+    V74-Zeile zerschnitten, die Tabelle sprang von V73 auf V75 — und das Gate blieb gruen,
+    weil die Hoechstnummer stimmte. Eine Tabelle mit Loch ist als Nachschlagewerk aber genau
+    dort falsch, wo jemand nachsieht.
+
+    Geprueft wird nur, wenn die Tabelle bis zur aktuellen Hoechstnummer reicht — dann
+    behauptet sie Vollstaendigkeit, und ein Loch ist ein Befund. Bleibt sie darunter, meldet
+    das schon die Standpruefung, und ein ausgewiesener Auszug (docs/onboarding) soll nicht
+    zusaetzlich wegen fehlender Zeilen anschlagen. Die Spanne beginnt bei der kleinsten
+    gelisteten Nummer: Eine Tabelle, die bewusst erst bei V20 anfaengt, ist kein Befund.
+
+    Verglichen wird gegen die WIRKLICH vorhandenen Migrationsdateien (migration-numbers),
+    nicht gegen eine durchgezaehlte Reihe. Sonst waere eine nie existierende Nummer ein
+    Fehlalarm — Migrationsnummern koennen uebersprungen werden.
+    """
+    if best is None or not numbers:
+        return
+    missing = [n for n in numbers if min(seen) <= n <= best and n not in seen]
+    if not missing:
+        return
+    shown = ", ".join(f"V{n}" for n in missing[:8]) + ("…" if len(missing) > 8 else "")
+    findings.append(f"DRIFT {rel}:{best_no} migration-table-luecke: {len(missing)} Zeile(n)"
+                    f" fehlen zwischen V{min(seen)} und V{best} ({shown})")
 
 
 def check_readme_head(rel, no, line, facts, findings):
@@ -377,7 +416,8 @@ def scan(root, rel, facts, findings):
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
         check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
                               findings)
-    check_migration_table(rel, lines, facts.get("migration-max"), findings)
+    check_migration_table(rel, lines, facts.get("migration-max"),
+                          facts.get("migration-numbers"), findings)
     return
 
 
