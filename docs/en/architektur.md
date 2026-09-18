@@ -397,6 +397,11 @@ gate_description: <description>
 - **RED → `COMPLETED`:** RED gates do not change the run status — `AutoTodoService` creates a TODO instead
 - `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
 
+A shell block does not have to write these markers itself: `checked_command`/`check_category`
+derive the gate automatically from the exit code, giving precedence to the script's own marker when
+it is at least as severe — details and examples:
+[WORKFLOW-GUIDE.md → `checked_command` / `check_category`](WORKFLOW-GUIDE.md#checked_command--check_category--gate-derived-automatically-from-the-exit-code).
+
 **AutoTodoService:**
 - Reacts to `WorkflowRunCompletedEvent`
 - RED gate → TODO with `HIGH` priority

@@ -132,6 +132,8 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhängig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusätzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
+| `checked_command` | bool | false | Leitet aus dem Exit-Code automatisch ein Gate ab (`gate_status`/`gate_category`/`gate_description`, siehe [Quality-Gate-Marker](#quality-gate-marker) → „`checked_command` / `check_category`") und stellt `set -e -o pipefail` voran |
+| `check_category` | string | `build-check` | Kategorie für das aus `checked_command` abgeleitete Gate — nur ein Rückfall, wenn das Skript selbst keine `gate_category` liefert |
 
 > **Platzhalter in Heredocs:** `{{ var }}` innerhalb eines quoted Heredocs (`<<'PY'`) landet als
 > Quelltext im Interpreter — bei `PID = '{{ project_id }}'` wird jeder Wert mit `'` zu Python-Code.
@@ -943,6 +945,53 @@ curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metadata.gate_summa
 curl -s -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
+
+### `checked_command` / `check_category` — Gate automatisch aus dem Exit-Code
+
+Statt selbst `gate_status`-Zeilen zu `echo`en, kann ein `shell`-Block das dem `CheckedCommandGate`
+überlassen: `"checked_command": true` stellt dem Befehl `set -e -o pipefail` voran und leitet aus
+dem Exit-Code ein Gate ab — **Exit 0 → `GREEN`, Exit ≠0 → `RED`**, Standardkategorie `build-check`
+(überschreibbar über `check_category`), Beschreibung `Command exit <code>`.
+
+```json
+{
+  "type": "shell",
+  "config": {
+    "command": "mvn -q test",
+    "checked_command": true,
+    "check_category": "backend-tests"
+  }
+}
+```
+
+**Vorrangregel, wenn das Skript selbst schon einen Gate-Marker ausgibt** (`CheckedCommandGate`,
+seit b19f5225): Der eigene Marker des Skripts gewinnt, sobald er **mindestens so streng** ist wie
+der aus dem Exit-Code abgeleitete — bei gleicher Schwere gewinnt also ebenfalls das Skript. Nur wenn
+der Exit-Code strenger ausfällt als das, was das Skript selbst meldet (oder das Skript gar keinen
+Marker liefert), setzt sich der Exit-Code durch. Kategorie und Beschreibung aus `check_category`
+bzw. dem Default sind dabei immer nur ein Rückfall: Sie werden nur ergänzt, wenn das gewinnende
+Skript-Gate diese Felder selbst nicht mitliefert (ein „nackter" `gate_status:` ohne Kategorie bleibt
+sonst kategorielos).
+
+Beispiel: Ein Skript, das selbst ein milderes `YELLOW` meldet, aber mit einem Fehler-Exit-Code
+abbricht — der Exit-Code (`RED`) ist strenger und gewinnt:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+echo "gate_status: YELLOW"
+echo "gate_category: lint-warnings"
+exit 2   # strenger als YELLOW → das Block-Gate meldet RED, nicht YELLOW
+```
+
+Meldet das Skript dagegen ein gleich strenges oder strengeres Gate als der Exit-Code nahelegt (z. B.
+selbst `gate_status: RED` bei Exit 1), bleibt dessen `gate_category`/`gate_description` erhalten statt
+durch `check_category`/den Default ersetzt zu werden.
+
+Getestet in `ShellBlockExecutorTest` (u. a. `execute_checkedCommandExitZero_doesNotShadowTheScriptsOwnWorseGate`,
+`execute_checkedCommandFailing_stillEscalatesAMilderScriptGate`,
+`execute_checkedCommandFailingWithItsOwnRed_keepsTheScriptsCategoryAndDescription`,
+`execute_checkedCommandWithABareScriptGate_fillsInCategoryAndDescriptionFromTheBlock`).
 
 ---
 
