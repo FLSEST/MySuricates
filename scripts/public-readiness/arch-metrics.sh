@@ -50,6 +50,16 @@
 # Eintrag wird nie ersetzt. Zwei Laeufe desselben Commits kommen sich damit nicht in die
 # Quere; schlimmstenfalls verwirft einer sein frisch kopiertes Staging.
 #
+# Bekanntes Restrisiko (TODO 26b3da40): Das Aufraeumen haelt nur die juengsten CACHE_KEEP=3
+# Eintraege und sperrt keinen, der gerade gelesen wird. Messen VIER Laeufe gleichzeitig je
+# einen anderen Commit, kann der vierte den Eintrag eines aktiven Lesers verdraengen. Das
+# frische Stempeln beim Treffer macht den Fall unwahrscheinlich (der aktive Eintrag ist dann
+# der juengste), schliesst ihn aber nicht aus. Folge waere ein Messfehler, keine falsche
+# Zahl: jdeps findet die Klassen nicht mehr und der Lauf weist das als NICHT GEMESSEN aus.
+# Vier gleichzeitige Architektur-Messungen verschiedener Commits kommen im heutigen Betrieb
+# nicht vor (die Audits laufen nach Zeitplan hintereinander); tritt es auf, ist die Antwort
+# eine Sperrdatei je Eintrag, nicht ein groesseres CACHE_KEEP.
+#
 # Bewusst ohne common.sh: dessen run_limited/MAX_LINES wuerde das Faktenblatt kuerzen und
 # cd_root die uebergebene Wurzel ignorieren.
 #

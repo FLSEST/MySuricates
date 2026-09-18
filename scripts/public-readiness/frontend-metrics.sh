@@ -46,6 +46,10 @@
 # ein Paket ist, zaehlt als external; ein relativer Pfad ohne Datei als unresolved — beide
 # stehen in ## summary, damit eine kaputte Aufloesung nicht als Kantenfreiheit durchgeht.
 #
+# Typpositionen mit import(): `typeof import('m')` und `import('m').Typ` zaehlen als Typkante,
+# nicht als dynamischer Import — tsc loescht beides (TODO 26b3da40). Abgegrenzt wird am
+# Folgezeichen: eine Promise-Methode (.then/.catch/.finally) ist ein Laufzeit-Import.
+#
 # Bekannte Grenze: ein nicht-literaler Spezifizierer (`import(variable)`, aus Strings
 # zusammengesetzte Pfade) wird nicht erfasst — er hat keinen Pfad, den man ohne Bundler
 # aufloesen koennte. Im heutigen Frontend kommt das nicht vor; sollte es auftreten, fehlt die
@@ -136,6 +140,20 @@ EXPORT_RE = re.compile(SPEC % "export", re.M)
 # Kollidiert nicht mit den statischen Mustern oben — dort folgt auf `import` ein
 # Leerzeichen, hier eine Klammer.
 DYNAMIC_RE = re.compile(r"""import\s*\(\s*['"]([^'"]+)['"]\s*\)""")
+
+# Typ-Query: `typeof import('m')` und `import('m').Typ` stehen in Typposition, tsc loescht
+# beides restlos — das ist eine Typkante, keine dynamische (TODO 26b3da40). Vorher zaehlten
+# beide Formen als dynamischer Import, wodurch type_edges, dynamic_edges und dynamic_imports
+# je um die Zahl dieser Stellen daneben lagen.
+#
+# Die Abgrenzung zum echten Laufzeit-Import haengt daran, was auf die Klammer folgt: bei
+# einer Typ-Query ein Typname, bei einem Laufzeit-Import eine Promise-Methode
+# (`import('m').then(…)`). Deshalb sind then/catch/finally ausgenommen; ein Zugriff auf eine
+# andere Eigenschaft der Promise waere sinnlos. `(await import('m')).default` trifft das
+# Muster nicht, dort steht die Klammer dazwischen.
+TYPE_QUERY_RE = re.compile(
+    r"""typeof\s+import\s*\(\s*['"]([^'"]+)['"]\s*\)"""
+    r"""|import\s*\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*(?!then\b|catch\b|finally\b)[A-Za-z_$]""")
 
 # Eine Kante je (von, nach); trifft dasselbe Paar in mehreren Formen zu, gewinnt die
 # staerkste Bindung: statisch zur Laufzeit > dynamisch (aufgeschoben) > nur Typ (geloescht).
@@ -269,9 +287,17 @@ for rel in sorted(MODULES):
     emit("module", rel, lines, directory)
     for clause, spec in IMPORT_RE.findall(text) + EXPORT_RE.findall(text):
         record(rel, spec, "type" if type_only(clause) else "runtime")
-    for spec in DYNAMIC_RE.findall(text):
-        emit("dyncall", rel, spec)
-        record(rel, spec, "dynamic")
+    # Typ-Queries zuerst: ihre Fundstellen sind danach fuer den dynamischen Durchgang gesperrt,
+    # sonst zaehlte dieselbe Stelle zweimal (einmal als Typ-, einmal als dynamische Kante).
+    type_query_spans = []
+    for match in TYPE_QUERY_RE.finditer(text):
+        record(rel, match.group(1) or match.group(2), "type")
+        type_query_spans.append((match.start(), match.end()))
+    for match in DYNAMIC_RE.finditer(text):
+        if any(start <= match.start() < end for start, end in type_query_spans):
+            continue
+        emit("dyncall", rel, match.group(1))
+        record(rel, match.group(1), "dynamic")
 
 for (source, target) in sorted(edges):
     emit("edge", source, target, edges[(source, target)])
