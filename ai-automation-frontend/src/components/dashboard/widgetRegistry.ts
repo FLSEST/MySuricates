@@ -1,5 +1,6 @@
 import type { WidgetSize } from './dashboardLayout';
 import { describedBy, type DashboardWidgetDef } from './widgetDefinition';
+import { INSIGHTS_WIDGETS } from './insightsWidgetDefs';
 import {
   ActiveProjectsStat, TotalWorkflowsStat, RunsTodayStat, SuccessRateStat, TotalCostStat,
   PlannedTodayStat, PlannedThisWeekStat, BuildInfoStat,
@@ -94,6 +95,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDef[] = [
     id: 'quick-actions', category: 'overview', size: 'third', component: QuickActionsCard,
     label: (t) => t.dashboard.quickActions, description: describedBy('quickActions'),
   },
+  ...INSIGHTS_WIDGETS,
 ];
 
 export const DASHBOARD_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.map((w) => w.id);
