@@ -373,6 +373,7 @@ export const en = {
       presetNone: 'Choose a preset …',
       presets: {
         'java-log': 'Maven / Java log',
+        'maven-summary': 'Maven / Java log (summary)',
         'npm-build': 'npm build / lint',
         'feed-json': 'Feed JSON',
         'ai-report': 'AI report → key sections',

@@ -2,6 +2,61 @@ import { describe, it, expect } from 'vitest';
 import { applyPreset, compressedSourcesUsed, compressionSummary, COMPRESS_PRESETS, isCompressionBlock } from '../compression';
 import type { BlockDefinition } from '../../../types';
 
+/**
+ * Faithful mirror of the backend stages a log preset uses — `TextNormalizeStage`,
+ * `LinesFilterStage`, `TextTruncateStage` (ai-automation-backend, executor/compress). It lets a
+ * preset be checked against a real log fixture here instead of only by the shape of its config.
+ * Regexes in the presets are Java syntax; the ones used here are identical in JavaScript.
+ */
+function runStages(stages: Array<Record<string, unknown>>, input: string): string {
+  return stages.reduce((text, stage) => {
+    switch (stage.op) {
+      case 'text.normalize': return normalize(text);
+      case 'lines.filter': return filterLines(text, stage);
+      case 'text.truncate': {
+        const max = stage.max_chars as number;
+        if (text.length > max) throw new Error(`fixture longer than max_chars ${max} — truncation not emulated`);
+        return text;
+      }
+      default: throw new Error(`stage ${String(stage.op)} not emulated`);
+    }
+  }, input);
+}
+
+/** ANSI/CR dropped, trailing whitespace stripped, runs of blank lines collapsed to one. */
+function normalize(text: string): string {
+  const out: string[] = [];
+  let previousBlank = true; // also drops leading blank lines
+  for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
+    const stripped = line.replace(/\s+$/, '');
+    if (stripped === '' && previousBlank) continue;
+    out.push(stripped);
+    previousBlank = stripped === '';
+  }
+  while (out.length > 0 && out[out.length - 1] === '') out.pop();
+  return out.join('\n');
+}
+
+/** Exclude wins over include; with an include list, dropped runs leave a "[… N Zeilen …]" marker. */
+function filterLines(text: string, stage: Record<string, unknown>): string {
+  const include = ((stage.include as string[]) ?? []).map((r) => new RegExp(r));
+  const exclude = ((stage.exclude as string[]) ?? []).map((r) => new RegExp(r));
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let gap = 0;
+  let kept = 0;
+  for (const line of lines) {
+    const keep = !exclude.some((r) => r.test(line)) && (include.length === 0 || include.some((r) => r.test(line)));
+    if (!keep) { gap += 1; continue; }
+    if (gap > 0 && include.length > 0) out.push(`[… ${gap} Zeilen …]`);
+    gap = 0;
+    out.push(line);
+    kept += 1;
+  }
+  if (gap > 0 && include.length > 0 && kept > 0) out.push(`[… ${gap} Zeilen …]`);
+  return out.join('\n');
+}
+
 describe('compression helpers', () => {
   it('recognises both compression types', () => {
     expect(isCompressionBlock('compress')).toBe(true);
@@ -43,6 +98,59 @@ describe('compression helpers', () => {
       .toBe('INFO 4711 --- [main] c.a.SomeTest : Started');
     expect('[ERROR] Tests run: 2140, Failures: 2'.replace(timestamps, ''))
       .toBe('[ERROR] Tests run: 2140, Failures: 2');
+  });
+
+  it('keeps only the verdict lines of a Maven log (maven-summary)', () => {
+    const log = [
+      '[INFO] Scanning for projects...',
+      '[INFO] ',
+      '[INFO] --- surefire:3.2.5:test (default-test) @ ai-automation-backend ---',
+      '[INFO] Running com.automation.executor.CompressBlockTest',
+      '21:32:58.761 [main] INFO c.a.Boot -- Started in 4.2 s',
+      '[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0 -- in com.automation.executor.CompressBlockTest',
+      '[INFO] Running com.automation.workflow.WorkflowExecutorTest',
+      '[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0 <<< FAILURE! -- in com.automation.workflow.WorkflowExecutorTest',
+      '[ERROR] com.automation.workflow.WorkflowExecutorTest.runsBlocks -- Time elapsed: 0.04 s <<< FAILURE!',
+      'org.opentest4j.AssertionFailedError: expected: <2> but was: <1>',
+      '[ERROR] \tat com.automation.workflow.WorkflowExecutorTest.runsBlocks(WorkflowExecutorTest.java:42)',
+      '[ERROR] \t... 17 more',
+      '[INFO] ',
+      '[INFO] Results:',
+      '[INFO] ',
+      '[ERROR] Failures: ',
+      '[ERROR]   WorkflowExecutorTest.runsBlocks:42 expected: <2> but was: <1>',
+      '[INFO] ',
+      '[ERROR] Tests run: 15, Failures: 1, Errors: 0, Skipped: 0',
+      '[INFO] ',
+      '[INFO] ------------------------------------------------------------------------',
+      '[INFO] BUILD FAILURE',
+      '[INFO] ------------------------------------------------------------------------',
+      '[INFO] Total time:  2:14 min',
+    ].join('\n');
+
+    expect(runStages(COMPRESS_PRESETS['maven-summary'], log)).toBe([
+      '[… 5 Zeilen …]',
+      '[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0 -- in com.automation.executor.CompressBlockTest',
+      '[… 1 Zeilen …]',
+      '[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0 <<< FAILURE! -- in com.automation.workflow.WorkflowExecutorTest',
+      '[ERROR] com.automation.workflow.WorkflowExecutorTest.runsBlocks -- Time elapsed: 0.04 s <<< FAILURE!',
+      '[… 4 Zeilen …]',
+      '[INFO] Results:',
+      '[… 1 Zeilen …]',
+      '[ERROR] Failures:',
+      '[ERROR]   WorkflowExecutorTest.runsBlocks:42 expected: <2> but was: <1>',
+      '[… 1 Zeilen …]',
+      '[ERROR] Tests run: 15, Failures: 1, Errors: 0, Skipped: 0',
+      '[… 2 Zeilen …]',
+      '[INFO] BUILD FAILURE',
+      '[… 2 Zeilen …]',
+    ].join('\n'));
+  });
+
+  it('maven-summary keeps the stack frames out that java-log would carry in', () => {
+    const frames = '[ERROR] \tat com.automation.X.y(X.java:1)\n[ERROR] \t... 3 more';
+
+    expect(runStages(COMPRESS_PRESETS['maven-summary'], frames)).toBe('');
   });
 
   it('leaves invalid JSON untouched', () => {

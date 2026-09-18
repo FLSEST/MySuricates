@@ -375,6 +375,7 @@ export const de: TranslationKeys = {
       presetNone: 'Vorlage wählen …',
       presets: {
         'java-log': 'Maven-/Java-Log',
+        'maven-summary': 'Maven-/Java-Log (Zusammenfassung)',
         'npm-build': 'npm-Build/Lint',
         'feed-json': 'Feed-JSON',
         'ai-report': 'KI-Report → Kernabschnitte',
