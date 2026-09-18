@@ -11,12 +11,18 @@ import {
   type DashboardLayout,
   type DashboardView,
   type DashboardViewFilter,
+  type WidgetInstance,
 } from './dashboardLayout';
 
-/** Appends an empty view and makes it the active one. */
-export function addLayoutView(layout: DashboardLayout, name: string, id: string): DashboardLayout {
+/** The shown view: the active one, or the first view when the id is stale. */
+export function activeViewOf(layout: DashboardLayout): DashboardView | undefined {
+  return layout.views.find((v) => v.id === layout.activeViewId) ?? layout.views[0];
+}
+
+/** Appends a view (empty, or with the widgets of a template) and makes it the active one. */
+export function addLayoutView(layout: DashboardLayout, name: string, id: string, widgets: WidgetInstance[] = []): DashboardLayout {
   if (layout.views.length >= LAYOUT_LIMITS.views || layout.views.some((v) => v.id === id)) return layout;
-  return { activeViewId: id, views: [...layout.views, { id, name: cleanViewName(name), widgets: [] }] };
+  return { activeViewId: id, views: [...layout.views, { id, name: cleanViewName(name), widgets: [...widgets] }] };
 }
 
 export function renameLayoutView(layout: DashboardLayout, viewId: string, name: string): DashboardLayout {

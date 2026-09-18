@@ -6,7 +6,7 @@ import {
   type DashboardView,
   type WidgetInstance,
 } from '../../components/dashboard/dashboardLayout';
-import { useDashboardLayoutStore } from '../dashboardLayoutStore';
+import { selectActiveView, useDashboardLayoutStore } from '../dashboardLayoutStore';
 import { useDashboardSyncStore } from '../dashboardSyncStore';
 
 const single = (id: string, extra: Partial<WidgetInstance> = {}): WidgetInstance => ({ instanceId: id, type: id, ...extra });
@@ -194,5 +194,16 @@ describe('dashboardLayoutStore', () => {
     });
     expect(useDashboardLayoutStore.getState().activeViewId).toBe('start');
     expect(useDashboardSyncStore.getState().dirty).toBe(false);
+  });
+
+  it('adds a view with template widgets as one local change and selects the shown view', () => {
+    const widgets = [single('b'), single('a', { hidden: true })];
+
+    const id = useDashboardLayoutStore.getState().addView('Betrieb', widgets) ?? '';
+
+    expect(selectActiveView(useDashboardLayoutStore.getState())).toEqual({ id, name: 'Betrieb', widgets });
+    expect(useDashboardSyncStore.getState().dirty).toBe(true);
+    useDashboardLayoutStore.setState({ activeViewId: 'gone' });
+    expect(selectActiveView(useDashboardLayoutStore.getState())?.id).toBe('default');
   });
 });

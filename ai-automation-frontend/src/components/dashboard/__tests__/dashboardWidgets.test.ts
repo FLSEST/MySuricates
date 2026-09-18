@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+  LAYOUT_LIMITS,
   createDefaultLayout,
   createInstanceId,
   isCustomizedLayout,
@@ -8,10 +9,14 @@ import {
 } from '../dashboardLayout';
 import {
   addWidgetInstance,
+  addWidgetToView,
+  isRemovableWidget,
   moveWidget,
   normalizeWidgets,
   removeWidgetInstance,
   setWidgetHidden,
+  setWidgetSize,
+  templateWidgets,
   updateWidgetConfig,
 } from '../dashboardWidgets';
 
@@ -123,5 +128,60 @@ describe('instance operations', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('catalog widgets', () => {
+  const CATALOG_TYPES: WidgetTypeInfo[] = [...TYPES, { id: 'chart-x', catalogOnly: true }];
+
+  it('never appends catalog singletons, but keeps them under their type id once added', () => {
+    expect(normalizeWidgets([], CATALOG_TYPES)).toEqual([single('a'), single('b'), single('c')]);
+    expect(normalizeWidgets([single('chart-x'), { instanceId: 'chart-x-2', type: 'chart-x' }], CATALOG_TYPES))
+      .toEqual([single('chart-x'), single('a'), single('b'), single('c')]);
+  });
+
+  it('allows removing catalog singletons and multi widgets, never standard singletons', () => {
+    expect(CATALOG_TYPES.filter(isRemovableWidget).map((t) => t.id)).toEqual(['note', 'chart-x']);
+  });
+
+  it('shows a hidden singleton again, appends a missing one and leaves a shown one alone', () => {
+    const widgets = [single('a', { hidden: true }), single('b')];
+    expect(addWidgetToView(widgets, CATALOG_TYPES, 'a')).toEqual([single('a'), single('b')]);
+    expect(addWidgetToView(widgets, CATALOG_TYPES, 'chart-x')).toEqual([...widgets, single('chart-x')]);
+    expect(addWidgetToView(widgets, CATALOG_TYPES, 'b')).toBe(widgets);
+    expect(addWidgetToView(widgets, CATALOG_TYPES, 'unknown')).toBe(widgets);
+  });
+
+  it('adds multi instances with a cleaned, sorted config and respects the widget limit', () => {
+    expect(addWidgetToView([], CATALOG_TYPES, 'note', { zeta: 1, alpha: 'x', 'bad key': true }, 'note-00000001'))
+      .toEqual([{ instanceId: 'note-00000001', type: 'note', config: { alpha: 'x', zeta: 1 } }]);
+    expect(Object.keys(addWidgetToView([], CATALOG_TYPES, 'note', { zeta: 1, alpha: 'x' }, 'note-00000002')[0]?.config ?? {}))
+      .toEqual(['alpha', 'zeta']);
+
+    const full = Array.from({ length: LAYOUT_LIMITS.widgetsPerView }, (_, i) => ({ instanceId: `note-${i}`, type: 'note' }));
+    expect(addWidgetToView(full, CATALOG_TYPES, 'note', {}, 'note-00000003')).toBe(full);
+    expect(addWidgetToView(full, CATALOG_TYPES, 'chart-x')).toBe(full);
+    const fullWithHidden = [...full.slice(1), single('a', { hidden: true })];
+    expect(addWidgetToView(fullWithHidden, CATALOG_TYPES, 'a').at(-1)).toEqual(single('a'));
+  });
+
+  it('sets a size and removes it again for the default', () => {
+    const widgets = [single('a'), single('b', { size: 'full' })];
+    expect(setWidgetSize(widgets, 'a', 'twoThirds')).toEqual([single('a', { size: 'twoThirds' }), single('b', { size: 'full' })]);
+    expect(setWidgetSize(widgets, 'b', undefined)).toEqual([single('a'), single('b')]);
+    expect(setWidgetSize(widgets, 'b', 'full')).toBe(widgets);
+    expect(setWidgetSize(widgets, 'missing', 'stat')).toBe(widgets);
+  });
+
+  it('builds a template view: listed widgets visible in order, other standard singletons hidden', () => {
+    expect(templateWidgets(['c', 'chart-x', 'note', 'unknown', 'c'], CATALOG_TYPES)).toEqual([
+      single('c'),
+      single('chart-x'),
+      single('a', { hidden: true }),
+      single('b', { hidden: true }),
+    ]);
+    // The view shows exactly the template's widgets, also after normalizing.
+    const normalized = normalizeWidgets(templateWidgets(['b'], CATALOG_TYPES), CATALOG_TYPES);
+    expect(normalized.filter((w) => !w.hidden).map((w) => w.instanceId)).toEqual(['b']);
   });
 });

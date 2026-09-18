@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LAYOUT_LIMITS, createDefaultLayout } from '../dashboardLayout';
+import { LAYOUT_LIMITS, createDefaultLayout, layoutContentKey } from '../dashboardLayout';
 import { migrateLayout, sanitizeLayout } from '../dashboardLayoutSanitize';
 
 describe('sanitizeLayout', () => {
@@ -47,6 +47,18 @@ describe('sanitizeLayout', () => {
         { id: 'plan', name: 'P'.repeat(LAYOUT_LIMITS.nameLength), widgets: [] },
       ],
     });
+  });
+
+  it('sorts config keys like the backend, so equal configs give equal content keys', () => {
+    const withConfig = (config: Record<string, unknown>) => sanitizeLayout({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [{ instanceId: 'note-1', type: 'note', config }] }],
+    });
+    const first = withConfig({ zeta: 1, alpha: 'a', Beta: true });
+    const second = withConfig({ Beta: true, zeta: 1, alpha: 'a' });
+
+    expect(Object.keys(first.views[0]?.widgets[0]?.config ?? {})).toEqual(['Beta', 'alpha', 'zeta']);
+    expect(layoutContentKey(first)).toBe(layoutContentKey(second));
   });
 
   it('keeps only the first widget per instance id within a view', () => {

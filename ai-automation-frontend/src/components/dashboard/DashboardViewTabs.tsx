@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Copy, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui';
 import { useT } from '../../i18n';
-import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
+import { selectActiveView, useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { LAYOUT_LIMITS, truncateCodePoints, type DashboardView } from './dashboardLayout';
 
 interface DashboardViewTabsProps {
@@ -146,7 +146,7 @@ function SortableTab({ view, label, active, disabled, renaming, onSelect, onRena
 export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps) {
   const t = useT();
   const views = useDashboardLayoutStore((s) => s.views);
-  const activeViewId = useDashboardLayoutStore((s) => s.activeViewId);
+  const activeView = useDashboardLayoutStore(selectActiveView);
   const setActiveView = useDashboardLayoutStore((s) => s.setActiveView);
   const addView = useDashboardLayoutStore((s) => s.addView);
   const renameView = useDashboardLayoutStore((s) => s.renameView);
@@ -162,7 +162,6 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
   // One view outside edit mode: no tab strip, the dashboard looks as it did before views existed.
   if (!editMode && views.length < 2) return null;
 
-  const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
   const labelOf = (view: DashboardView) => view.name || t.dashboard.views.defaultName;
   const atLimit = views.length >= LAYOUT_LIMITS.views;
   const limitHint = t.dashboard.views.limitReached.replace('{max}', () => String(LAYOUT_LIMITS.views));

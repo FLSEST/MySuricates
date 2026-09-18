@@ -53,7 +53,10 @@ export interface DashboardLayout {
 /** What the layout functions need to know about a registered widget. */
 export interface WidgetTypeInfo {
   id: string;
+  /** Any number of instances with their own config; only added explicitly, can be removed. */
   multiple?: boolean;
+  /** A singleton that never appears by itself: added from the catalog, can be removed. */
+  catalogOnly?: boolean;
 }
 
 export const DEFAULT_VIEW_ID = 'default';
@@ -123,11 +126,17 @@ function isConfigValue(value: unknown): value is WidgetConfigValue {
     || typeof value === 'boolean';
 }
 
-/** Valid config entries only (key pattern, primitive values, key limit); undefined when none are left. */
+/**
+ * Valid config entries only (key pattern, primitive values, key limit), sorted by key like the
+ * backend's canonical JSON, so equal configs compare equal in layoutContentKey. Undefined when none
+ * are left.
+ */
 export function sanitizeConfig(value: unknown): WidgetConfig | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const entries = Object.entries(value as Record<string, unknown>)
     .filter((entry): entry is [string, WidgetConfigValue] => CONFIG_KEY_PATTERN.test(entry[0]) && isConfigValue(entry[1]))
+    // Keys are ASCII, so code-unit order equals the backend's TreeMap (String.compareTo) order.
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .slice(0, LAYOUT_LIMITS.configKeys);
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }

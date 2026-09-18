@@ -10,6 +10,7 @@ import {
   type WidgetInstance,
 } from '../dashboardLayout';
 import {
+  activeViewOf,
   addLayoutView,
   duplicateLayoutView,
   moveLayoutView,
@@ -52,6 +53,18 @@ describe('view operations', () => {
     expect(addLayoutView(twoViews, '', 'ops')).toBe(twoViews);
     const full: DashboardLayout = { activeViewId: 'v0', views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => view(`v${i}`)) };
     expect(addLayoutView(full, '', 'view-00000002')).toBe(full);
+  });
+
+  it('adds a view with the given widgets as a copy of the list', () => {
+    const widgets = [single('b'), single('a', { hidden: true })];
+    const added = addLayoutView(twoViews, 'Betrieb', 'view-00000006', widgets);
+    expect(added.views[2]).toEqual(view('view-00000006', { name: 'Betrieb', widgets }));
+    expect(added.views[2]?.widgets).not.toBe(widgets);
+  });
+
+  it('finds the shown view, falling back to the first view for a stale id', () => {
+    expect(activeViewOf({ ...twoViews, activeViewId: 'ops' })?.id).toBe('ops');
+    expect(activeViewOf({ ...twoViews, activeViewId: 'gone' })?.id).toBe('default');
   });
 
   it('renames a view and leaves unknown views and unchanged names alone', () => {

@@ -11,6 +11,7 @@ import {
   type WidgetInstance,
 } from '../components/dashboard/dashboardLayout';
 import {
+  activeViewOf,
   addLayoutView,
   duplicateLayoutView,
   moveLayoutView,
@@ -39,8 +40,8 @@ interface DashboardLayoutState extends DashboardLayout {
   upsertView: (view: DashboardView) => boolean;
   /** Shows another view. Per device: never a local change, never a new version. */
   setActiveView: (viewId: string) => void;
-  /** Appends an empty view and shows it. Its id, or null at the view limit. */
-  addView: (name?: string) => string | null;
+  /** Appends a view (empty, or with a template's widgets) and shows it. Its id, or null at the view limit. */
+  addView: (name?: string, widgets?: WidgetInstance[]) => string | null;
   renameView: (viewId: string, name: string) => void;
   /** Copies widgets and filter into a new view right after the original and shows it. Its id, or null at the limit. */
   duplicateView: (viewId: string, name: string) => string | null;
@@ -49,6 +50,9 @@ interface DashboardLayoutState extends DashboardLayout {
   moveView: (draggedViewId: string, overViewId: string) => void;
   setViewFilter: (viewId: string, filter: DashboardViewFilter) => void;
 }
+
+/** The shown view — shared selector for every component that reads the active view. */
+export const selectActiveView = (state: DashboardLayout): DashboardView | undefined => activeViewOf(state);
 
 function updateActiveView(state: DashboardLayout, widgets: WidgetInstance[]): Pick<DashboardLayout, 'views'> {
   return { views: state.views.map((v) => (v.id === state.activeViewId ? { ...v, widgets } : v)) };
@@ -101,9 +105,9 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>()(
           const next = selectLayoutView({ activeViewId, views }, viewId);
           if (next.activeViewId !== activeViewId) set({ activeViewId: next.activeViewId });
         },
-        addView: (name = '') => {
+        addView: (name = '', widgets = []) => {
           const id = createViewId();
-          return change((layout) => addLayoutView(layout, name, id)) ? id : null;
+          return change((layout) => addLayoutView(layout, name, id, widgets)) ? id : null;
         },
         renameView: (viewId, name) => {
           change((layout) => renameLayoutView(layout, viewId, name));

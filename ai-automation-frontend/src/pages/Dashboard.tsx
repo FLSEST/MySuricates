@@ -8,7 +8,7 @@ import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFil
 import { DashboardViewTabs } from '../components/dashboard/DashboardViewTabs';
 import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
 import { LayoutSyncConflictBanner } from '../components/dashboard/LayoutSyncConflictBanner';
-import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
+import { selectActiveView, useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import { useDashboardLayout } from '../hooks/useDashboardLayout';
 import { hasLocalLayoutChanges, useDashboardLayoutSync } from '../hooks/useDashboardLayoutSync';
 import { useDashboardViewParam } from '../hooks/useDashboardViewParam';
@@ -39,7 +39,7 @@ function LiveClock() {
 
 /** The active view's filter decides what the page's one learning-dashboard query loads (spec E4). */
 export function Dashboard() {
-  const filter = useDashboardLayoutStore((s) => (s.views.find((v) => v.id === s.activeViewId) ?? s.views[0])?.filter);
+  const filter = useDashboardLayoutStore((s) => selectActiveView(s)?.filter);
   return (
     <DashboardDataProvider filter={filter}>
       <DashboardPage />

@@ -1,6 +1,6 @@
 import { useT } from '../../i18n';
 import { useProjects } from '../../hooks/useProjects';
-import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
+import { selectActiveView, useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { TimeRangeSelector } from '../insights/TimeRangeSelector';
 import { DASHBOARD_DEFAULT_DAYS } from './dashboardDataContext';
 import type { DashboardViewFilter } from './dashboardLayout';
@@ -17,7 +17,7 @@ interface DashboardViewFilterBarProps {
  */
 export function DashboardViewFilterBar({ editMode, disabled }: DashboardViewFilterBarProps) {
   const t = useT();
-  const view = useDashboardLayoutStore((s) => s.views.find((v) => v.id === s.activeViewId) ?? s.views[0]);
+  const view = useDashboardLayoutStore(selectActiveView);
   const setViewFilter = useDashboardLayoutStore((s) => s.setViewFilter);
   const { data: projects } = useProjects();
 

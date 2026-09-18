@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSystemModules } from './useModules';
-import { useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
+import { selectActiveView, useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
 import type { WidgetInstance } from '../components/dashboard/dashboardLayout';
 import { moveWidget, normalizeWidgets, setWidgetHidden } from '../components/dashboard/dashboardWidgets';
 import { DASHBOARD_WIDGETS, type DashboardWidgetDef } from '../components/dashboard/widgetRegistry';
@@ -15,12 +15,9 @@ const WIDGETS_BY_ID = new Map(DASHBOARD_WIDGETS.map((w) => [w.id, w]));
 /** The active dashboard view resolved against the widget registry and the enabled modules. */
 export function useDashboardLayout() {
   const { data: modules } = useSystemModules();
-  const views = useDashboardLayoutStore((s) => s.views);
-  const activeViewId = useDashboardLayoutStore((s) => s.activeViewId);
+  const storedWidgets = useDashboardLayoutStore((s) => selectActiveView(s)?.widgets);
   const setActiveViewWidgets = useDashboardLayoutStore((s) => s.setActiveViewWidgets);
   const resetActiveView = useDashboardLayoutStore((s) => s.resetActiveView);
-
-  const storedWidgets = (views.find((v) => v.id === activeViewId) ?? views[0])?.widgets;
 
   // Full list incl. hidden and module-disabled widgets, so edits keep their positions.
   const widgets = useMemo(
