@@ -70,7 +70,11 @@ class DerivedOutputProducersTest {
     private static final Map<String, String> NOT_COPYING = Map.of(
             // looks up only the workflow id of the current run; its output is its own transcript
             "com/automation/executor/blocks/AgenticBlockExecutor.java",
-            "reads only the current run's workflow id, never another step's output");
+            "reads only the current run's workflow id, never another step's output",
+            // registers its own named case steps as compression sources (2718c20e); its output is the
+            // concatenation of the case steps it ran itself, never a copy of a foreign step
+            "com/automation/executor/blocks/SwitchBlockExecutor.java",
+            "writes its own nested case steps to the source index, never reads another step's output");
 
     @Test
     void derivedOutputIsSetOnlyByTheKnownProducers() throws IOException {

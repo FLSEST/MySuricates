@@ -89,14 +89,17 @@ final class BpmnGatewayBuilder {
         List<String> rowNames = new ArrayList<>();
         double maxChainWidth = TASK_W;
         for (int k = 0; k < cases.size(); k++) {
-            BpmnSegment row = chains.buildChain(toBlockDefinitions(cases.get(k).get("blocks")), idBase + "_c" + k);
+            BpmnSegment row = chains.buildChain(toBlockDefinitions(cases.get(k).get("blocks")),
+                    BpmnBranchBlocks.casePrefix(idBase, k));
             stripDerivedBlockConfig(row.nodes);
             rows.add(row);
             rowNames.add(str(cases.get(k), "value").isBlank() ? "case" + k : str(cases.get(k), "value"));
             maxChainWidth = Math.max(maxChainWidth, row.width);
         }
         List<BlockDefinition> defaultBlocks = toBlockDefinitions(c.get("default"));
-        BpmnSegment defaultRow = defaultBlocks.isEmpty() ? null : chains.buildChain(defaultBlocks, idBase + "_default");
+        BpmnSegment defaultRow = defaultBlocks.isEmpty()
+                ? null
+                : chains.buildChain(defaultBlocks, BpmnBranchBlocks.defaultPrefix(idBase));
         if (defaultRow != null) {
             stripDerivedBlockConfig(defaultRow.nodes);
             maxChainWidth = Math.max(maxChainWidth, defaultRow.width);

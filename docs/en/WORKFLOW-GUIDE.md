@@ -633,11 +633,13 @@ Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · t
 
 Status and exit code come from the stored step data, never from the log text. Gate and TODO markers inside compression outputs are **not** evaluated at run completion — the original step remains authoritative.
 
+Any name that also resolves as `{{ block.<name>.output }}` works as a `source` — top-level blocks and named `switch` case blocks (2718c20e). The header then shows the status, exit code and duration of the case step, not those of the whole `switch`. Nested blocks without a name (`foreach`/`while` iterations) only move `previous_output`; there, `"previous"` is the right source.
+
 **`compress`** (rule-based, 0 tokens):
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `source` | string | **required** | Block name of an earlier top-level block, or `"previous"` |
+| `source` | string | **required** | Block name of an earlier block (a named `switch` case block counts too), or `"previous"` |
 | `stages` | list | **required** | Stages `{ "op": …, … }`, run in order |
 | `max_chars` | int | 20000 | hard ceiling including header lines; above it, head/tail is trimmed |
 | `timeout_seconds` | int | 30 | time budget (guards against expensive regex) |

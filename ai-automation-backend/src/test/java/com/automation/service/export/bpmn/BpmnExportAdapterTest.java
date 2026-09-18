@@ -37,8 +37,17 @@ class BpmnExportAdapterTest {
 
     @Test
     void goldenFileLinearBleibtStabil() throws Exception {
-        Path golden = Path.of("src/test/resources/bpmn/golden/linear.bpmn");
-        String actual = adapter.export(WorkflowFixtures.linear());
+        assertGolden("linear", adapter.export(WorkflowFixtures.linear()));
+    }
+
+    /** Verzweigter Datenfluss (7557b928): Assoziationen an den Zweig-Tasks, nicht am Gateway. */
+    @Test
+    void goldenFileBranchingBleibtStabil() throws Exception {
+        assertGolden("branching", adapter.export(WorkflowFixtures.branching()));
+    }
+
+    private static void assertGolden(String name, String actual) throws Exception {
+        Path golden = Path.of("src/test/resources/bpmn/golden/" + name + ".bpmn");
         if (!Files.exists(golden)) {
             Files.createDirectories(golden.getParent());
             Files.writeString(golden, actual);

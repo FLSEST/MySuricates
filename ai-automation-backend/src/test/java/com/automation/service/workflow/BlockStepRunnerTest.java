@@ -9,6 +9,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.blocks.SwitchBlockExecutor;
+import com.automation.executor.compress.CompressionSources;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -410,5 +411,39 @@ class BlockStepRunnerTest {
         // während der Ausführung stand "aus dem Kind" unter dem Namen; danach gewinnt das Aggregat
         assertThat(step.getOutput()).isEqualTo("aus dem Kind\nund noch was");
         assertThat(context.getBlockOutput("router")).isEqualTo("aus dem Kind\nund noch was");
+    }
+
+    /**
+     * Seit 2718c20e trägt {@code SwitchBlockExecutor} seine benannten Case-Schritte selbst in den
+     * Quellen-Index ein — und setzt damit auch dessen {@code last()}. Dass die Komprimierungs-Quelle
+     * {@code "previous"} danach trotzdem den <em>switch</em> meint und nicht den letzten Case-Schritt,
+     * hängt allein an der Reihenfolge in {@link BlockStepRunner#runStep}: der eigene Schritt des
+     * Blocks wird NACH dessen Ausführung eingetragen und überschreibt den Case-Eintrag. Ein Umbau,
+     * der das Eintragen vorzieht, bräche die Semantik von {@code "previous"} still — deshalb hier
+     * festgehalten.
+     */
+    @Test
+    void runStep_previousQuelleMeintDenSwitch_nichtDenLetztenCaseSchritt() {
+        context.setProjectPath("/test/project");
+        CommandExecutorService commandExecutor = mock(CommandExecutorService.class);
+        when(commandExecutor.executeStepOnHost(any()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                        .output("aus dem Kind").build());
+        Map<String, Object> config = new HashMap<>(Map.of(
+                "expression", "A",
+                "cases", List.of(Map.of("value", "A", "blocks", List.of(
+                        Map.of("type", "simple", "name", "befund", "config", Map.of("command", "tu was")))))));
+        BlockDefinition switchBlock = BlockDefinition.builder()
+                .type("switch").name("verteiler").config(config).build();
+        StepResult step = runner.startStep(run, 0, switchBlock);
+
+        runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
+
+        // Der Case-Schritt ist unter seinem Namen ansprechbar …
+        assertThat(context.getSourceSteps().find("befund")).isPresent();
+        // … "previous" meint aber den switch: sein Schritt wurde zuletzt eingetragen.
+        CompressionSources.Resolved previous = CompressionSources.resolve(context, "previous");
+        assertThat(previous.origin().blockName()).isEqualTo("verteiler");
+        assertThat(previous.label()).isEqualTo("verteiler");
     }
 }
