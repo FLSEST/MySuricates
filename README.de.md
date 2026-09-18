@@ -34,7 +34,7 @@ die wiederkehrende Lehre.
 
 ## Was da steht
 
-Stand 2026-09-18, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
+Stand 2026-09-19, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
 `wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-18 in einem
 isolierten Worktree:
 

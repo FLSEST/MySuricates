@@ -2,7 +2,7 @@
 
 # MySuricates
 
-A research project exploring how far software development can be operated in a controlled way with AI agents — and a runnable system where this can be observed.
+A research project exploring how far software development can be run in a controlled way with AI agents — and a working system where this can be observed.
 
 MySuricates is a local workflow platform: workflows consist of blocks that are either deterministic (shell, branch, loop) or call an AI. This mix has produced a feedback loop that generates findings about its own codebase, turns them into TODOs, triggers fix workflows, and verifies the result again. The code was largely created in AI sessions, part of it through this feedback loop itself.
 
@@ -27,9 +27,9 @@ As of 2026-09-18, commit count and line counts from the working tree on that day
 
 | | |
 |---|---|
-| Created since | 2026-02-15, about 1,420 commits, one author |
-| Backend | Java 21 / Spring Boot 3.4, about 64,000 lines, 43 REST controllers, 73 Flyway migrations |
-| Frontend | React 19 / TypeScript, about 61,000 lines |
+| Created since | 2026-02-15, around 1,550 commits, one author |
+| Backend | Java 21 / Spring Boot 3.4, around 67,000 lines, 45 REST controllers, 74 Flyway migrations |
+| Frontend | React 19 / TypeScript, around 66,000 lines |
 | Tests | Backend 8,767 (0 failures, 1 skipped), Frontend 1,013 — run from 2026-09-18 |
 | Building blocks | 19 block types, 66 workflow templates, 19 built-in skills, 7 integration providers |
 
@@ -39,7 +39,9 @@ The test numbers are a dated finding. Since 2026-09-12, CI has checked that they
 
 Experimental. The system runs daily on one machine and had completed around 2,400 runs as of 2026-09-12 — it has never been operated under load, with multiple users, or outside a trusted network.
 
-The debt is not hidden; it is counted. On 2026-09-12, the Audit Center listed **89 findings**: 26 open (including 1 critical, 4 high), 25 waiting for verification, 38 completed. In substance, they are almost entirely structural: services and UI components that are too large and too tightly coupled, blurry controller/repository boundaries, storage and retention topics. How these findings are produced and what the statuses mean is described in the [Audit workflow protocol](docs/en/audit-workflow-protocol.md).
+The debt is not hidden; it is counted. On 2026-09-12, the Audit Center listed **89 findings**:
+26 open (including 1 critical, 4 high), 25 waiting for verification, 38 completed. In substance, they are almost entirely structural: services and UI components that are too large and too tightly coupled, blurry controller/repository boundaries, storage and retention topics. How these findings are produced and what the statuses mean is described in the
+[Audit workflow protocol](docs/en/audit-workflow-protocol.md).
 
 Known hard limits:
 
@@ -49,7 +51,8 @@ Known hard limits:
 
 ## Before you start it
 
-Shell blocks and AI calls run **on the host with your permissions**, not in a container; the Claude CLI does not ask for confirmation before using tools by default. Backend and frontend listen on all network interfaces, and some endpoints do not require an API key. MySuricates is built for local operation by a trusted person — for remote access, put a VPN in front of it, not an open port. Full details: [Trust model and network exposure](docs/en/deployment.md#vertrauensmodell-und-netzwerk-exposition).
+Shell blocks and AI calls run **on the host with your permissions**, not in a container; the Claude CLI does not ask for confirmation before using tools by default. Backend and frontend listen on all network interfaces, and some endpoints do not require an API key. MySuricates is built for local operation by a trusted person — for remote access, put a VPN in front of it, not an open port. Full details:
+[Trust model and network exposure](docs/en/deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
 ## Tech stack
 
@@ -71,7 +74,8 @@ Execution happens **on the host**: shell blocks through the user's shell, AI blo
 
 ## Quickstart
 
-> New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)** walks you through the setup step by step. Short version: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
+> New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
+> walks you through the setup step by step. Short version: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
 # 1. Clone repository
