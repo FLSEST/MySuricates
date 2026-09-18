@@ -1054,13 +1054,12 @@ autotrigger/
 └── ai-automation-frontend/
     ├── package.json
     ├── vite.config.ts
-    ├── tailwind.config.ts
     ├── eslint.config.js               ← Flat config (ESLint 9+)
     ├── index.html
     └── src/
         ├── App.tsx                    ← Router
         ├── main.tsx                   ← Entry point
-        ├── index.css                  ← Global styles
+        ├── index.css                  ← Global styles + Tailwind 4 configuration (@theme inline)
         ├── api/client.ts              ← HTTP client (singleton)
         ├── types/index.ts             ← TypeScript types
         ├── pages/                     ← 37 pages (incl. simple mode variants)
