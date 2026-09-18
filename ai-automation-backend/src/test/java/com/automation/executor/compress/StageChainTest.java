@@ -17,8 +17,19 @@ class StageChainTest {
         assertThatThrownBy(() -> StageChain.parse(List.of(Map.of("op", "nope"))))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("unbekannte Operation 'nope'");
         assertThatThrownBy(() -> StageChain.parse(List.of(Map.of("op", "text.truncate"))))
-                .hasMessageContaining("Stufe text.truncate").hasMessageContaining("max_chars");
+                .hasMessageContaining("Stufe 1 (text.truncate)").hasMessageContaining("max_chars");
         assertThatThrownBy(() -> StageChain.parse(List.of("text.normalize"))).hasMessageContaining("Stufe 1");
+    }
+
+    @Test
+    void parse_configError_namesPositionAndOp_likeARuntimeError() {
+        assertThatThrownBy(() -> StageChain.parse(List.of(
+                Map.of("op", "text.normalize"),
+                Map.of("op", "text.truncate"))))
+                .isInstanceOf(CompressionException.class)
+                .hasMessageStartingWith("Stufe 2 (text.truncate): ")
+                .hasMessageContaining("max_chars")
+                .satisfies(e -> assertThat(e.getMessage().split("Stufe", -1)).as("genau eine Stufen-Angabe").hasSize(2));
     }
 
     @Test
