@@ -1342,6 +1342,8 @@ If the provider is not connected or the API fails, the block is marked as `FAILE
 
 ## Appendix: Template Quick Reference
 
+What belongs in the public workflow pool, how it differs from the built-in templates and which criteria the hygiene gate enforces is described in [workflow-pool-curation.md](workflow-pool-curation.md).
+
 All 65+ built-in templates with their primary pattern:
 
 | Template | Pattern | Category |
