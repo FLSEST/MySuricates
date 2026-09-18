@@ -2,12 +2,18 @@
  * Reproduktion zu d89b2cc1: Nach einem 429 hält die geöffnete App das Rate-Limit selbst voll.
  *
  * Die App-Hülle (ApiKeyGuard + SecurityBanner + eine Seite mit useSystemModules und
- * useAssistantSuggestions) wird mit einem fetch gerendert, das ausnahmslos 429 mit
- * `Retry-After: 5` beantwortet. Gezählt werden echte Netzanfragen pro Pfad (ohne Query)
- * über ein Fenster von 2 s Fake-Zeit.
+ * useAssistantSuggestions) wird mit einem fetch gerendert, das 429 mit `Retry-After: 5`
+ * beantwortet. Gezählt werden echte Netzanfragen pro Pfad (ohne Query) über ein Fenster
+ * von 2 s Fake-Zeit.
  *
  * Erwartung nach dem Fix: höchstens eine Netzanfrage pro Endpoint im Backoff-Fenster,
  * nach Ablauf des Fensters genau eine neue.
+ *
+ * Zwei Szenarien, weil `/system/auth-status` die Hülle steuert:
+ *  - `all-429`: auch auth-status ist limitiert. Der Guard bleibt unentschieden und zeigt
+ *    nichts — es darf trotzdem nur eine auth-status-Anfrage geben (zwei Guards + StrictMode).
+ *  - `security-off`: auth-status antwortet 200, alles andere 429. So ist die App montiert
+ *    wie im beobachteten Vorfall und die Query-Endpunkte sind messbar.
  */
 import React from 'react';
 import { render, act } from '@testing-library/react';
@@ -45,6 +51,22 @@ function rateLimitedResponse(): Response {
   );
 }
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+/** Installiert den zählenden fetch-Mock. `authStatus` steuert nur /system/auth-status. */
+function stubFetch(authStatus: 'rate-limited' | 'security-off') {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const path = pathOf(input);
+    requests.push(path);
+    if (path === '/system/auth-status' && authStatus === 'security-off') {
+      return jsonResponse({ securityEnabled: false });
+    }
+    return rateLimitedResponse();
+  }));
+}
+
 /** Query-Client mit denselben Defaults wie main.tsx (429 wird nicht wiederholt). */
 function createAppQueryClient() {
   return new QueryClient({
@@ -77,6 +99,8 @@ function Shell() {
   );
 }
 
+// StrictMode wie in main.tsx: das Doppelmount des Dev-Servers gehört zum reproduzierten
+// Verhalten und darf die Anfragezahl nicht verdoppeln.
 function renderShell(queryClient: QueryClient) {
   return render(
     <React.StrictMode>
@@ -95,23 +119,27 @@ async function advance(ms: number) {
   });
 }
 
+function prepare() {
+  requests = [];
+  resetRateLimitBackoff();
+  resetAuthStatusCache();
+  useSettingsStore.setState({ apiKey: '' });
+  vi.useFakeTimers();
+}
+
+function teardown() {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  useSettingsStore.setState({ apiKey: '' });
+}
+
 describe('429 storm reproduction (d89b2cc1)', () => {
   beforeEach(() => {
-    requests = [];
-    resetRateLimitBackoff();
-    resetAuthStatusCache();
-    useSettingsStore.setState({ apiKey: '' });
-    vi.useFakeTimers();
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      requests.push(pathOf(input));
-      return rateLimitedResponse();
-    }));
+    prepare();
+    stubFetch('security-off');
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-  });
+  afterEach(teardown);
 
   it('feuert im Backoff-Fenster höchstens eine Netzanfrage pro Endpoint', async () => {
     const queryClient = createAppQueryClient();
@@ -145,6 +173,7 @@ describe('429 storm reproduction (d89b2cc1)', () => {
     await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     view.unmount();
     queryClient.clear();
+    resetAuthStatusCache(); // ein Reload würde den App-weiten Cache ebenfalls verlieren
     renderShell(queryClient);
     await advance(500);
 
@@ -152,6 +181,35 @@ describe('429 storm reproduction (d89b2cc1)', () => {
     for (const path of ['/system/auth-status', '/system/capabilities', '/assistant/suggestions']) {
       expect(after[path] - (before[path] ?? 0), `${path}: ${JSON.stringify(after)}`).toBe(1);
     }
+  });
+});
+
+describe('429 auf /system/auth-status (d89b2cc1)', () => {
+  beforeEach(() => {
+    prepare();
+    stubFetch('rate-limited');
+  });
+
+  afterEach(teardown);
+
+  it('fragt auth-status trotz zweier Guards und StrictMode nur einmal an', async () => {
+    renderShell(createAppQueryClient());
+    await advance(2000);
+
+    expect(countsByPath()['/system/auth-status']).toBe(1);
+  });
+
+  it('unterstellt bei 429 nicht „Security aus" und zeigt die App nicht ohne Key', async () => {
+    const view = renderShell(createAppQueryClient());
+    await advance(2000);
+
+    // Guard bleibt unentschieden: weder Kinder noch das Key-Formular.
+    expect(view.queryByTestId('page')).toBeNull();
+    expect(view.container.textContent).toBe('');
+    // …und ohne montierte Kinder gibt es auch keine Query-Anfragen.
+    const counts = countsByPath();
+    expect(counts['/system/capabilities']).toBeUndefined();
+    expect(counts['/assistant/suggestions']).toBeUndefined();
   });
 });
 
@@ -164,41 +222,35 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     return <div>page</div>;
   }
 
-  beforeEach(() => {
-    mounts = 0;
-    requests = [];
-    resetRateLimitBackoff();
-    resetAuthStatusCache();
-    useSettingsStore.setState({ apiKey: 'stored-key' });
-    vi.useFakeTimers();
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const path = pathOf(input);
-      requests.push(path);
-      if (path === '/system/auth-status') {
-        return new Response(JSON.stringify({ securityEnabled: true }), {
-          status: 200, headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      // Alles andere ist rate-limited — wie im beobachteten Vorfall.
-      return rateLimitedResponse();
-    }));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    useSettingsStore.setState({ apiKey: '' });
-  });
-
-  it('mountet die Kinder genau einmal, obwohl der gespeicherte Key geprüft wird', async () => {
-    const queryClient = createAppQueryClient();
-    render(
+  // Bewusst ohne StrictMode: dessen Doppelmount würde jede Zahl verdoppeln und damit
+  // verdecken, ob der Guard selbst ein zweites Mal mountet. Gemessen wird genau das.
+  function renderGuard(queryClient: QueryClient) {
+    return render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <ApiKeyGuard><CountingPage /></ApiKeyGuard>
         </MemoryRouter>
       </QueryClientProvider>,
     );
+  }
+
+  beforeEach(() => {
+    mounts = 0;
+    prepare();
+    useSettingsStore.setState({ apiKey: 'stored-key' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = pathOf(input);
+      requests.push(path);
+      if (path === '/system/auth-status') return jsonResponse({ securityEnabled: true });
+      // Alles andere ist rate-limited — wie im beobachteten Vorfall.
+      return rateLimitedResponse();
+    }));
+  });
+
+  afterEach(teardown);
+
+  it('mountet die Kinder genau einmal, obwohl der gespeicherte Key geprüft wird', async () => {
+    renderGuard(createAppQueryClient());
     await advance(2000);
 
     expect(mounts, `Kinder wurden ${mounts}× gemountet`).toBe(1);
@@ -206,14 +258,7 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
   });
 
   it('behält den gespeicherten Key, wenn die Prüfung 429 bekommt', async () => {
-    const queryClient = createAppQueryClient();
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
-          <ApiKeyGuard><CountingPage /></ApiKeyGuard>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderGuard(createAppQueryClient());
     await advance(2000);
 
     expect(useSettingsStore.getState().apiKey).toBe('stored-key');

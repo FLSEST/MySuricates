@@ -1411,7 +1411,7 @@ export const de: TranslationKeys = {
     connect: 'Verbinden',
   },
   errors: {
-    rateLimited: 'Zu viele Anfragen — die App pausiert kurz und versucht es von selbst erneut.',
+    rateLimited: 'Zu viele Anfragen — bitte kurz warten und erneut versuchen.',
   },
   runs: {
     title: 'Ausführungs-Verlauf',

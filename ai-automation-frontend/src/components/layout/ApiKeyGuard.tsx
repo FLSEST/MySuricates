@@ -18,9 +18,18 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     fetchAuthStatus()
-      .then((data) => setSecurityEnabled(data.securityEnabled === true))
-      .catch(() => setSecurityEnabled(false));
+      .then((data) => { if (!cancelled) setSecurityEnabled(data.securityEnabled === true); })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // A rate-limited answer says nothing about the security setting — assuming "off"
+        // here would hand out the app without a key. Stay undecided (render nothing) and
+        // let a reload ask again once the backoff window is over (d89b2cc1).
+        if ((err as { status?: number } | null)?.status === 429) return;
+        setSecurityEnabled(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // Validate stored API key on load

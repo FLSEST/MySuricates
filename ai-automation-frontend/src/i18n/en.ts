@@ -1414,7 +1414,7 @@ export const en = {
     connect: 'Connect',
   },
   errors: {
-    rateLimited: 'Too many requests — the app is pausing briefly and will retry on its own.',
+    rateLimited: 'Too many requests — please wait a moment and try again.',
   },
   runs: {
     title: 'Run History',
