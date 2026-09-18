@@ -1,6 +1,7 @@
 import type { WidgetSize } from './dashboardLayout';
 import { describedBy, type DashboardWidgetDef } from './widgetDefinition';
 import { INSIGHTS_WIDGETS } from './insightsWidgetDefs';
+import { WORKFLOW_WIDGETS } from './workflowWidgetDefs';
 import {
   ActiveProjectsStat, TotalWorkflowsStat, RunsTodayStat, SuccessRateStat, TotalCostStat,
   PlannedTodayStat, PlannedThisWeekStat, BuildInfoStat,
@@ -96,6 +97,7 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetDef[] = [
     label: (t) => t.dashboard.quickActions, description: describedBy('quickActions'),
   },
   ...INSIGHTS_WIDGETS,
+  ...WORKFLOW_WIDGETS,
 ];
 
 export const DASHBOARD_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.map((w) => w.id);

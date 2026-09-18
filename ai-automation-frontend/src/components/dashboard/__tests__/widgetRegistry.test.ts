@@ -61,4 +61,16 @@ describe('dashboard widget registry', () => {
       if (widget.configForm) expect(widget.multiple).toBe(true);
     }
   });
+
+  it('registers the two workflow widgets as configurable multi widgets', () => {
+    const workflowWidgets = DASHBOARD_WIDGETS.filter((w) => w.category === 'workflows');
+
+    expect(workflowWidgets.map((w) => w.id)).toEqual(['workflow-status', 'workflow-result']);
+    for (const widget of workflowWidgets) {
+      expect(widget.multiple).toBe(true);
+      expect(widget.configForm).toBeDefined();
+      // Never a standard singleton: they must not appear in every view (DEFAULT_WIDGET_IDS above).
+      expect(DEFAULT_WIDGET_IDS).not.toContain(widget.id);
+    }
+  });
 });

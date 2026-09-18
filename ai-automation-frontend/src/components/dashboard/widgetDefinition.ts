@@ -23,7 +23,7 @@ type DescriptionKey = keyof TranslationKeys['dashboard']['catalog']['description
 export const describedBy = (key: DescriptionKey) => (t: TranslationKeys) => t.dashboard.catalog.descriptions[key];
 
 /** Groups of the "Add widget" catalog, in display order. */
-export const WIDGET_CATEGORIES = ['overview', 'runs', 'costs', 'quality', 'planning'] as const;
+export const WIDGET_CATEGORIES = ['overview', 'runs', 'costs', 'quality', 'planning', 'workflows'] as const;
 export type WidgetCategory = (typeof WIDGET_CATEGORIES)[number];
 
 export interface DashboardWidgetDef {

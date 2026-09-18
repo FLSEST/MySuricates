@@ -301,6 +301,7 @@ export const en = {
         costs: 'Cost & models',
         quality: 'Quality',
         planning: 'Planning & todos',
+        workflows: 'Workflows',
       },
       descriptions: {
         statActiveProjects: 'Number of projects whose container is running.',
@@ -330,6 +331,8 @@ export const en = {
         insightsCostOverTime: 'AI cost per day.',
         insightsDurationOverTime: 'Average run duration per day.',
         insightsTokens: 'Input and output tokens in the time range.',
+        workflowStatus: 'Status, time, duration and quality gate of one workflow’s latest run.',
+        workflowResult: 'The result one workflow reports for the dashboard — as plain text, never as markup.',
       },
     },
     sync: {

@@ -303,6 +303,7 @@ export const de: TranslationKeys = {
         costs: 'Kosten & Modelle',
         quality: 'Qualität',
         planning: 'Planung & Todos',
+        workflows: 'Workflows',
       },
       descriptions: {
         statActiveProjects: 'Anzahl der Projekte, deren Container läuft.',
@@ -332,6 +333,8 @@ export const de: TranslationKeys = {
         insightsCostOverTime: 'KI-Kosten pro Tag.',
         insightsDurationOverTime: 'Durchschnittliche Ausführungsdauer pro Tag.',
         insightsTokens: 'Eingabe- und Ausgabe-Tokens im Zeitraum.',
+        workflowStatus: 'Status, Zeitpunkt, Dauer und Quality Gate des letzten Runs eines Workflows.',
+        workflowResult: 'Das Ergebnis, das ein Workflow fürs Dashboard meldet — als reiner Text, nie als Markup.',
       },
     },
     sync: {

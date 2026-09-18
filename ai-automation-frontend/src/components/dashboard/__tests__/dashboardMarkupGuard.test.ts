@@ -44,6 +44,8 @@ describe('dashboard markup guard', () => {
     '/WorkflowStatusWidget.tsx',
     '/WorkflowWidgetStates.tsx',
     '/WorkflowWidgetProvider.tsx',
+    '/WorkflowWidgetConfigForm.tsx',
+    '/workflowWidgetDefs.ts',
     '/workflowWidgetContract.ts',
     '/workflowWidgetContext.ts',
   ])('covers %s', (file) => {
