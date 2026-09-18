@@ -725,6 +725,19 @@ Answers from `approval` and `human-input` blocks are stored as context variables
 
 These patterns are distilled from the 65+ built-in templates. Each pattern has a clear structure and use case.
 
+### Block Choice: Frugality Ladder
+
+Workflow construction follows the same YAGNI logic as code — the first rung that fits wins:
+
+1. **Can it be deterministic?** → `shell` block (0 tokens, fast, reproducible)
+2. **Does a single AI call suffice?** → `simple` (1 call) instead of `agentic` (N calls: REASON + ACT per iteration)
+3. **`agentic` only** when the necessary steps are unknown up front and the result is verifiable
+4. **Existing block type before new platform feature** — check the reference in section 2 first
+5. **Few blocks before many** — every block costs tokens, runtime, and is its own timeout risk
+
+No blocks "just in case" (summaries, reports, formatting that nobody reads).
+The token budget is tight: every avoided AI call stretches the runtime of the allowance.
+
 ### Pattern 1: Sequential Simple Chain
 
 **Structure**: `simple` -> `simple` -> `simple` -> `simple`
@@ -988,6 +1001,12 @@ The model is set at the workflow level (`workflow.model` field) or left as null 
 | `opus` | Analysis, audits, security reviews | Precision, fewer hallucinations, deep reasoning | Slower, more expensive |
 | `sonnet` | Code generation, routine tasks | Fast, good enough for most tasks | Can hallucinate findings in analyses |
 | `haiku` | Simple classification, extraction | Very fast, inexpensive | Limited reasoning depth |
+| `fable` | Heaviest reasoning/agentic tasks | Strongest model | Most expensive tier |
+
+The values are **CLI aliases** of the Claude CLI and always point to the newest model of their
+family — they never go stale. A concrete id (e.g. `claude-opus-5`) can be typed freely into the
+model field when a workflow should be pinned to a version. The suggestion list in the UI comes from
+`GET /api/v1/system/ai-providers/{id}/models` (pi: `pi --list-models`, codex: local model cache).
 
 ### Critical Rule
 
@@ -1015,6 +1034,50 @@ Via API:
 In the workflow entity, the `model` field is passed via the `--model` flag to the Claude CLI.
 
 **Important**: A null model field uses the system default, which may be Sonnet. When Opus is needed, set it explicitly.
+
+### Reasoning Effort
+
+In addition to the model, a uniform effort level can be set per workflow (`workflow.effort` field, UI: sidebar → "Reasoning Effort"). Valid values: `low`, `medium`, `high`, `xhigh`. Unset (null) = provider default, **no** flag is emitted.
+
+| Provider | CLI Mapping | Notes |
+|---|---|---|
+| Claude | `--effort <level>` | REASON and ACT calls |
+| Pi | `--thinking <level>` | Explicit effort wins over the maxTurns heuristic; without effort the ACT path behaves as before (no flag) |
+| Codex | — | Ignored (`supportsEffort=false`), the UI hides the slider |
+
+**Per-block override**: block config key `"effort"` overrides the workflow level (precedence: block > workflow > provider default). Invalid block values are ignored with a warning.
+
+```json
+{
+  "type": "simple",
+  "config": {
+    "command": "Analyze the architecture ...",
+    "effort": "xhigh"
+  }
+}
+```
+
+Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details.
+
+### Provider and Model per Block
+
+Following the same pattern as `effort`, AI-capable blocks (`simple`, `agentic`, `skill-capability`, and the inline `command` of `retry`, `foreach`, `while`, `conditional`, `switch`) can set the provider and model for themselves only — config keys `"provider"` and `"model"`. Resolution: **Block > Workflow > System default** (`AiProviderRegistry.resolve()` or the provider's default model). Without a block key, existing workflows behave unchanged.
+
+```json
+[
+  { "type": "shell",  "config": { "command": "git diff --stat HEAD~1" } },
+  { "type": "simple", "config": { "command": "Summarize the diff:\n\n{{ previous_output }}", "model": "haiku" } },
+  { "type": "simple", "config": { "command": "Assess the architecture risks ...", "provider": "PI", "model": "anthropic/opus", "effort": "high" } }
+]
+```
+
+Rules:
+- A block that only sets `provider` does **not** inherit the workflow model when the provider differs from the workflow's provider — model ids are provider-specific (`opus` vs. `anthropic/opus`). With the same provider (or without `provider`), the workflow model still applies.
+- Nested blocks (e.g. `blocks` in `switch`) carry their own keys; the wrapper block does not pass its values down to child blocks.
+- The `integration` block uses `provider` for the integration provider and is not an AI block — no override applies there.
+- In the UI block editor, the "AI provider and model for this block" fields appear only on AI-capable block types; the model suggestions come from the host catalog of the chosen provider (`GET /api/v1/system/ai-providers/{id}/models`), free text remains allowed.
+- The values actually used appear in the step metadata of the run details: `aiRequest.provider`, `aiRequest.model`, `aiRequest.effort` (for `agentic` additionally top-level `provider`/`model`).
+- Wrapper blocks (`retry`, `foreach`, `while`, `conditional`, `switch`, `skill-capability`) carry the `aiRequest`, `provider`, and `requestedModel` of their **first inner AI call** into their aggregate step (provider and model are constant per block); the run page shows them as pills. Additional keys: `foreach` → `totalItems` + `items` (`{index, item, status, durationMs}`, max. 500, item label truncated to 120 characters), `while` → `iterationCount` + `iterations`, `retry` → `attempts` + `maxAttempts`, `conditional` → `conditionMet`, `switch` → `expression` + `matchedCase`. Pure shell iterations carry no `aiRequest`.
 
 ---
 
