@@ -55,6 +55,21 @@ HYGIENE_MAX_BLOB_BYTES=${HYGIENE_MAX_BLOB_BYTES:-5242880}   # 5 MiB
 HYGIENE_DUP_MIN_BYTES=${HYGIENE_DUP_MIN_BYTES:-262144}      # 256 KiB
 
 # ---------------------------------------------------------------------------
+# SECURITY.md — Pflichtdatei mit einem echten Meldeweg
+#
+# Nur im getrackten Bestand geprueft (--tracked/--worktree), nicht bei --staged:
+# jeder Commit einzeln zu blockieren waere zu aufdringlich fuer eine Datei, die
+# sich selten aendert. Die Release-Frage ist "ist der Zustand am Ende richtig?".
+# ---------------------------------------------------------------------------
+HYGIENE_SECURITY_FILE="SECURITY.md"
+HYGIENE_SECURITY_EMAIL_REGEX='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'
+# Mindestens einer dieser Begriffe muss vorkommen (Meldeweg erkennbar).
+HYGIENE_SECURITY_REQUIRED_TERMS=(
+  "Private vulnerability reporting"
+  "Security Advisories"
+)
+
+# ---------------------------------------------------------------------------
 # Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung
 #
 # Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.

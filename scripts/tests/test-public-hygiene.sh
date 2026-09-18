@@ -71,6 +71,25 @@ check "--tracked meldet Verstoss (exit 1)"     '[ "$RC" -eq 1 ]'
 check "Gate nennt escape-link"                 'grep -q "escape-link" <<<"$OUT"'
 check "sub/ok-link bleibt unbeanstandet"       '! grep -q "ok-link" <<<"$OUT"'
 
+echo "8) SECURITY.md fehlt, enthaelt eine Mailadresse, oder nennt keinen Meldeweg"
+make_repo "$TMP/sec"
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlendes SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md"                 'grep -q "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'Contact: security@example.com\n\nSee Security Advisories.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Mailadresse in SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Mailadresse"                  'grep -qi "Mail" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'No contact info, no reporting path here.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec2 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlender Meldeweg erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+
+( cd "$TMP/sec" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec3 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "korrektes SECURITY.md akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

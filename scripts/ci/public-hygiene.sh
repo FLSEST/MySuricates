@@ -235,7 +235,37 @@ check_gitignore_leaks() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 7 — Symlinks, die aus dem Repository hinausfuehren
+# Check 7 — SECURITY.md: vorhanden, kein privater Kontakt, echter Meldeweg
+#
+# Was ein Besucher als Meldeweg fuer Sicherheitsluecken vorfindet, soll GitHubs
+# private Sicherheitshinweise sein, keine Mailadresse — sonst entsteht wieder
+# eine Personendaten-Frage. Nur getrackter Bestand, siehe hygiene-rules.sh.
+# ---------------------------------------------------------------------------
+check_security_md() {
+  local f="$HYGIENE_SECURITY_FILE"
+  if [ ! -f "$f" ]; then
+    annotate "$f" 1 "Datei fehlt — kein dokumentierter Meldeweg fuer Sicherheitsluecken"
+    return
+  fi
+  local line
+  line="$(grep -nE "$HYGIENE_SECURITY_EMAIL_REGEX" "$f" 2>/dev/null | head -1 | cut -d: -f1)"
+  if [ -n "$line" ]; then
+    annotate "$f" "$line" "enthaelt eine E-Mail-Adresse — Meldeweg soll GitHub Private Vulnerability Reporting sein, keine Mailadresse"
+  fi
+  local term found=0
+  for term in "${HYGIENE_SECURITY_REQUIRED_TERMS[@]}"; do
+    if grep -qF -- "$term" "$f" 2>/dev/null; then
+      found=1
+      break
+    fi
+  done
+  if [ "$found" -eq 0 ]; then
+    annotate "$f" 1 "nennt keinen der erwarteten Begriffe (${HYGIENE_SECURITY_REQUIRED_TERMS[*]}) — Meldeweg unklar"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Check 8 — Symlinks, die aus dem Repository hinausfuehren
 #
 # git grep liest keine Symlink-Blobs; ein getrackter Link mit absolutem Ziel
 # (z. B. unter dem Entwickler-Home) rutscht an Check 2 vorbei. Ausserdem zeigt
@@ -305,6 +335,7 @@ else
     esac
   done < <(check_weight)
   check_gitignore_leaks
+  check_security_md
   report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays
 fi

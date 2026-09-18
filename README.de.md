@@ -165,6 +165,17 @@ Abgrenzung:
 - `TodoTrigger` startet Workflows regelbasiert/automatisch.
 - Die Todo-Workflow-Verknuepfung ist aktuell ein manueller, optionaler Resolve-Flow pro Todo.
 
+## Beiträge und Support
+
+Issues bleiben offen — aber dieses Repository ist ein Forschungsprojekt eines
+einzelnen Entwicklers, kein betreutes Produkt: kein Support, keine Zusage zu
+Reaktionszeiten, auch nicht auf Pull Requests. Wer trotzdem etwas beitragen
+will, meldet sich am besten zuerst per Issue.
+
+Sicherheitslücken bitte **nicht** als öffentliches Issue melden, sondern über
+den Meldeweg in [SECURITY.md](SECURITY.md) (private Sicherheitshinweise von
+GitHub).
+
 ---
 
 > 🌍 Die englische `README.md` wird vom Workflow **„README DE↔EN Sync"** aus dieser Datei generiert. Bei inhaltlichen Änderungen diese deutsche Quelle bearbeiten und den Workflow laufen lassen.
