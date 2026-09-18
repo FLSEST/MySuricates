@@ -194,12 +194,18 @@ cat > "$FAKE/docs/teilspanne.md" <<'MD_EOF'
 # Migrationen
 Das Grundschema (V1-V3). Aktueller Stand ist V5 in der Produktion.
 Die Tabelle zeigt das Grundschema (V1-V2). V3-V5 ergaenzen Spalten.
+Das Grundschema (V1-V3). V2-V5 ergaenzen Spalten.
+V1-V5 (Grundschema) ist vollstaendig.
 MD_EOF
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "falsche Teilspanne neben blosser Standangabe gemeldet" \
   'grep -qE "^DRIFT docs/teilspanne.md:2 migration-max sagt 3, Code 5" <<<"$OUT"'
 check "belegte Teilspanne mit Fortsetzung bleibt frei" \
   '! grep -qE "^DRIFT docs/teilspanne.md:3" <<<"$OUT"'
+check "Fortsetzung, die nicht anschliesst, belegt nichts" \
+  'grep -qE "^DRIFT docs/teilspanne.md:4 migration-max sagt 3, Code 5" <<<"$OUT"'
+check "vollstaendige Spanne bleibt frei" \
+  '! grep -qE "^DRIFT docs/teilspanne.md:5" <<<"$OUT"'
 rm "$FAKE/docs/teilspanne.md"
 
 echo "4c) Deutscher Dativ-Plural wird erfasst"
@@ -344,6 +350,7 @@ cat > "$FAKE/docs/onboarding/SETUP.md" <<'MD_EOF'
 Starte das Backend mit `mvn spring-boot:run`.
 > **Nicht** `mvn spring-boot:run` verwenden: der RuntimeClasspathGuard bricht ab.
 Das Routing nutzt React Router v6.
+Der Workflow laeuft mit `--model claude-opus-4-6`.
 Die Themes stehen in `tailwind.config.ts`.
 Unter `src/test/java` liegen 715 Testklassen.
 Stand 2026-09-18: 114 Vitest-Dateien unter `src/`.
@@ -361,11 +368,13 @@ check "mvn spring-boot:run gemeldet" \
 check "Warn-Blockquote bleibt erlaubt"          '! grep -q "SETUP.md:3" <<<"$OUT"'
 check "veraltete React-Router-Version gemeldet" \
   'grep -qE "^DRIFT docs/onboarding/SETUP.md:4 verbotenes-muster" <<<"$OUT"'
+check "datierte Modell-ID gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:5 verbotenes-muster.*[Mm]odell" <<<"$OUT"'
 check "nicht existierende Datei gemeldet" \
-  'grep -qE "^DRIFT docs/onboarding/SETUP.md:5 fehlende-datei.*tailwind.config.ts" <<<"$OUT"'
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:6 fehlende-datei.*tailwind.config.ts" <<<"$OUT"'
 check "undatierte Testzahl im Onboarding gemeldet" \
-  'grep -qE "^DRIFT docs/onboarding/SETUP.md:6 testzahl-ohne-datum" <<<"$OUT"'
-check "datierte Testzahl bleibt frei"           '! grep -q "SETUP.md:7" <<<"$OUT"'
+  'grep -qE "^DRIFT docs/onboarding/SETUP.md:7 testzahl-ohne-datum" <<<"$OUT"'
+check "datierte Testzahl bleibt frei"           '! grep -q "SETUP.md:8" <<<"$OUT"'
 rm -r "$FAKE/docs/onboarding"
 
 echo "13) Fehlende Versionsquelle ist ein harter Fehler"

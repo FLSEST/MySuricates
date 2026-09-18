@@ -107,7 +107,7 @@ EXCERPT_MARKERS = re.compile(
 _CONTINUATION = {}
 
 
-def span_is_declared_excerpt(line, start, expected):
+def span_is_declared_excerpt(line, match, expected):
     """Weist sich GENAU DIESE Spanne als Auszug aus?
 
     Die Ausnahme deckt eine Formulierung ab, die es in der Doku wirklich gibt
@@ -116,22 +116,32 @@ def span_is_declared_excerpt(line, start, expected):
         "Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73
          ergaenzen ueberwiegend Spalten und Indizes."
 
-    Zwei Belege muessen zusammenkommen: eine Auszugs-Kennzeichnung unmittelbar
-    vor der Spanne (im selben Satzteil) und eine Fortsetzungsspanne, die bis zur
-    aktuellen Hoechstnummer laeuft. Eine blosse Standangabe im Nebensatz reicht
-    nicht — frueher schaltete jedes "V73" irgendwo in der Zeile die ganze Zeile
-    ab, sodass "Das Grundschema (V1-V50). Aktueller Stand ist V73." unbemerkt
-    blieb. Geprueft wird jede Spanne fuer sich; andere Zahlen derselben Zeile
-    laufen weiter durch die Pruefung.
+    Zwei Belege muessen zusammenkommen:
+
+    1. eine Auszugs-Kennzeichnung unmittelbar vor der Spanne (im selben Satzteil);
+    2. dahinter — nur im Rest der Zeile, nicht davor — eine Fortsetzungsspanne,
+       die luekenlos anschliesst (V<n+1>) und bis zur aktuellen Hoechstnummer
+       laeuft.
+
+    Eine blosse Standangabe im Nebensatz reicht nicht (frueher schaltete jedes
+    "V73" irgendwo in der Zeile die ganze Zeile ab, sodass "Das Grundschema
+    (V1-V50). Aktueller Stand ist V73." unbemerkt blieb), und eine Fortsetzung,
+    die gar nicht anschliesst ("V1-V50. V20-V73"), belegt die Grenze der
+    Teilspanne ebenso wenig. Geprueft wird jede Spanne fuer sich; andere Zahlen
+    derselben Zeile laufen weiter durch die Pruefung.
     """
-    segment = re.split(r"[.;:|]", line[:start])[-1]
+    segment = re.split(r"[.;:|]", line[:match.start()])[-1]
     if not EXCERPT_MARKERS.search(segment):
         return False
-    regex = _CONTINUATION.get(expected)
+    said = int(match.group(1))
+    if said >= expected:
+        return False
+    key = (said, expected)
+    regex = _CONTINUATION.get(key)
     if regex is None:
-        regex = _CONTINUATION[expected] = re.compile(
-            r"\bV\d+\s*" + DASH + rf"\s*V{expected}\b")
-    return bool(regex.search(line))
+        regex = _CONTINUATION[key] = re.compile(
+            rf"\bV{said + 1}\s*" + DASH + rf"\s*V{expected}\b")
+    return bool(regex.search(line[match.end():]))
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +152,15 @@ def span_is_declared_excerpt(line, start, expected):
 # sie hinter dem Code zurueck, fehlen Zeilen. Ausgenommen sind Tabellen, die sich
 # im Fliesstext als Auszug ausweisen, indem sie den aktuellen Stand daneben nennen
 # (docs/onboarding/ARCHITECTURE.md listet V1-V19 und schreibt V73 in den Text).
+#
+# Zwei bewusste Grenzen:
+# - Das Muster haengt an der schlichten Zelle "| V66 |" bzw. "| `V66` |". Eine
+#   Tabelle, die die Nummer auszeichnet ("| **V66** |"), faellt heraus; kommt so
+#   eine Schreibweise auf, gehoert sie hier ergaenzt.
+# - Die Ausnahme wirkt dateiweit: nennt IRGENDEINE Fliesstext-Zeile der Datei die
+#   Hoechstnummer, gelten ALLE Tabellen darin als ausgewiesener Auszug. Das ist
+#   grob, aber vom Auftrag so gewollt — die eine Formulierung in
+#   docs/onboarding/ARCHITECTURE.md ist der ganze Anwendungsfall.
 # ---------------------------------------------------------------------------
 TABLE_MIGRATION_ROW = re.compile(r"^\|\s*`?V(\d+)`?\s*\|")
 
@@ -162,21 +181,34 @@ ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 README_SOURCE = "README.de.md"
 
 # ---------------------------------------------------------------------------
+# Technologietabelle: "| **React** | 19.2 | UI-Framework |"
+#
+# Gilt fuer JEDE gepruefte Datei, nicht nur fuers Onboarding — heute stehen
+# solche Tabellen nur in docs/onboarding/README.md (DE/EN), eine kuenftige
+# anderswo soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
+# genannte Version als richtig, wenn sie ein komponentenweises Praefix der
+# echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
+# ---------------------------------------------------------------------------
+VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
+VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
+
+# ---------------------------------------------------------------------------
 # Onboarding-Paket (docs/onboarding, docs/en/onboarding)
 #
 # Das Paket wurde am 2026-09-18 von Hand gegen den Code geprueft (TODO 8c75f1dd);
 # die Regeln von damals stehen hier, damit die Zahlen nicht wieder ungeprueft
-# altern. Absichtlich nur fuer das Onboarding: "mvn spring-boot:run" steht in
-# docs/entwicklung.md als erklaerter Gegen-Hinweis im Fliesstext, und der
-# Verzeichnisbaum in docs/architektur.md nennt Dateinamen in anderem Kontext.
+# altern. Warum nur das Onboarding — die beiden Regelarten haben verschiedene
+# Gruende:
+#
+# - Kommando-Muster (mvn spring-boot:run) sind anderswo legitim: docs/entwicklung.md
+#   nennt den Befehl als erklaerten Gegen-Hinweis im Fliesstext, ohne Blockquote.
+#   Eine Ausweitung braucht erst eine Umformulierung dort.
+# - Dateinamen-Muster waeren ueberall falsch — docs/architektur.md nennt
+#   tailwind.config.ts in einem Verzeichnisbaum, obwohl es die Datei nicht gibt.
+#   Die Regel ist hier trotzdem nicht ausgeweitet: das ist ein eigenes TODO,
+#   zusammen mit der Korrektur der Fundstelle.
 # ---------------------------------------------------------------------------
 ONBOARDING_PREFIXES = ("docs/onboarding/", "docs/en/onboarding/")
-
-# Technologietabelle: "| **React** | 19.2 | UI-Framework |". Die Doku kuerzt,
-# deshalb gilt die genannte Version als richtig, wenn sie ein komponentenweises
-# Praefix der echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
-VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
-VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
 
 # Verbotene Muster. Blockquote-Zeilen sind ausgenommen: dort steht das Muster
 # als Warnung ("Nicht `mvn spring-boot:run` verwenden"), nicht als Anleitung.
@@ -185,6 +217,10 @@ FORBIDDEN_PATTERNS = [
      "mvn spring-boot:run — der RuntimeClasspathGuard bricht den Start ab"),
     (re.compile(r"React Router v[1-6]\b"),
      "veraltete React-Router-Version (package.json fuehrt v7)"),
+    # Dauerhaft gueltig: Modell-IDs mit Datumsstand veralten von selbst, in der
+    # Doku gelten die Aliase opus/sonnet/haiku/fable.
+    (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d"),
+     "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
 ]
 
 
@@ -293,7 +329,7 @@ def scan(root, rel, facts, findings):
                 for match in regex.finditer(line):
                     said = int(match.group(1))
                     if name == "migration-max" and span_is_declared_excerpt(
-                            line, match.start(), expected):
+                            line, match, expected):
                         continue
                     if said != expected:
                         findings.append(
