@@ -970,6 +970,13 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V64 | Writes flag on capabilities |
 | V65 | Catch-up-on-resume on schedules |
 | V66 | Todo export link |
+| V67 | Reasoning effort on workflows |
+| V68 | Audit reports, findings, occurrences and TODO links |
+| V69 | Evidence snapshot and acceptance timestamp on audit findings (`disposition_evidence`, `disposition_at`) |
+| V70 | Run provenance: definition hash on versions and runs, version reference and `trigger_source` |
+| V71 | Workflow sealing: `sealed`, `sealed_hash`, `sealed_at` on workflows |
+| V72 | Encrypted HMAC signing secret on webhook triggers |
+| V73 | Versioned dashboard layout snapshots (`dashboard_layout_versions`) |
 
 ## Architecture Gates
 

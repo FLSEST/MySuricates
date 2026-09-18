@@ -1011,9 +1011,13 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V64 | Writes-Flag auf Capabilities |
 | V65 | Catch-Up-On-Resume auf Schedules |
 | V66 | Todo-Export-Link |
-| V67 | Aufwandsschätzung auf Workflows |
+| V67 | Reasoning-Effort auf Workflows |
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 | V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
+| V70 | Run-Provenienz: Definitions-Hash auf Versionen und Runs, Versions-Bezug und `trigger_source` |
+| V71 | Workflow-Versiegelung: `sealed`, `sealed_hash`, `sealed_at` auf Workflows |
+| V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
+| V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
 
 ## Architektur-Gates
 
