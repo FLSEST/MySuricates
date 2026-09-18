@@ -1,22 +1,33 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { EyeOff, GripVertical } from 'lucide-react';
+import { EyeOff, GripVertical, Maximize2, Trash2 } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
+import { WIDGET_SIZES, type WidgetSize } from './dashboardLayout';
+import { isRemovableWidget } from './dashboardWidgets';
+import { DashboardMenu } from './DashboardMenu';
 import { WidgetContent } from './WidgetContent';
-import { SLOT_CLASSES, widgetSizeClasses } from './widgetSlot';
+import { SLOT_CLASSES, effectiveWidgetSize, widgetSizeClasses } from './widgetSlot';
 
 interface SortableWidgetSlotProps {
   widget: ResolvedWidget;
   disabled: boolean;
   onHide: (instanceId: string) => void;
+  onResize: (instanceId: string, size: WidgetSize) => void;
+  onRemove: (instanceId: string) => void;
 }
 
-/** A widget in edit mode: inert content, dashed frame, toolbar with drag handle and hide. */
-export function SortableWidgetSlot({ widget, disabled, onHide }: SortableWidgetSlotProps) {
+/** A widget in edit mode: inert content, dashed frame, toolbar with drag handle, size, hide and (if allowed) remove. */
+export function SortableWidgetSlot({ widget, disabled, onHide, onResize, onRemove }: SortableWidgetSlotProps) {
   const t = useT();
   const { def, instance } = widget;
   const label = def.label(t);
+  const currentSize = effectiveWidgetSize(widget);
+  const sizeItems = WIDGET_SIZES.map((size) => ({
+    id: size,
+    label: size === def.size ? t.dashboard.size.defaultOption.replace('{size}', () => t.dashboard.size[size]) : t.dashboard.size[size],
+    checked: size === currentSize,
+  }));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({ id: instance.instanceId, disabled });
   const frame = isDragging
     ? 'z-20 outline-dashed outline-accent opacity-80 shadow-lg'
@@ -42,7 +53,8 @@ export function SortableWidgetSlot({ widget, disabled, onHide }: SortableWidgetS
         <p className="text-sm font-medium text-text-secondary truncate">{label}</p>
         <p className="text-xs text-text-tertiary">{t.dashboard.widgetNoData}</p>
       </div>
-      <div className="absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-surface-overlay p-0.5 shadow-sm">
+      {/* focus-within: an open size menu stays above the toolbars of the slots below. */}
+      <div className="absolute -top-3 right-2 z-10 focus-within:z-30 flex items-center gap-0.5 rounded-lg border border-border bg-surface-overlay p-0.5 shadow-sm">
         <button
           type="button"
           {...attributes}
@@ -54,6 +66,13 @@ export function SortableWidgetSlot({ widget, disabled, onHide }: SortableWidgetS
         >
           <GripVertical className="w-3.5 h-3.5" />
         </button>
+        <DashboardMenu
+          label={`${t.dashboard.size.label}: ${label}`}
+          icon={<Maximize2 className="w-3.5 h-3.5" />}
+          items={sizeItems}
+          disabled={disabled}
+          onSelect={(size) => onResize(instance.instanceId, size as WidgetSize)}
+        />
         <button
           type="button"
           onClick={() => onHide(instance.instanceId)}
@@ -64,6 +83,18 @@ export function SortableWidgetSlot({ widget, disabled, onHide }: SortableWidgetS
         >
           <EyeOff className="w-3.5 h-3.5" />
         </button>
+        {isRemovableWidget(def) && (
+          <button
+            type="button"
+            onClick={() => onRemove(instance.instanceId)}
+            disabled={disabled}
+            className="rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label={`${t.dashboard.removeWidget}: ${label}`}
+            title={t.dashboard.removeWidget}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

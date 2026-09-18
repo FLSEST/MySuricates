@@ -161,6 +161,8 @@ function DashboardPage() {
           disabled={locked}
           onMove={layout.move}
           onHide={(instanceId) => layout.setHidden(instanceId, true)}
+          onResize={layout.setSize}
+          onRemove={layout.remove}
         />
       </div>
 

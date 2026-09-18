@@ -32,6 +32,8 @@ function Harness({ editMode = false }: { editMode?: boolean }) {
       editMode={editMode}
       onMove={layout.move}
       onHide={(instanceId) => layout.setHidden(instanceId, true)}
+      onResize={layout.setSize}
+      onRemove={layout.remove}
     />
   );
 }
@@ -94,5 +96,28 @@ describe('multi-instance widgets', () => {
     expect(useDashboardLayoutStore.getState().views[0]?.widgets).toContainEqual(
       { instanceId: 'test-note-a1', type: 'test-note', config: { text: 'first' }, hidden: true },
     );
+  });
+
+  it('removes one instance for good, keeping its siblings and the singleton', () => {
+    useDashboardLayoutStore.setState({
+      views: [{
+        id: 'default',
+        name: '',
+        widgets: [
+          { instanceId: 'test-note-a1', type: 'test-note', config: { text: 'first' } },
+          { instanceId: 'test-note-b2', type: 'test-note', config: { text: 'second' } },
+        ],
+      }],
+    });
+    renderWithProviders(<Harness editMode />);
+
+    expect(screen.queryByRole('button', { name: 'Remove: Singleton' })).not.toBeInTheDocument();
+    fireEvent.click(within(slots()[0]!).getByRole('button', { name: 'Remove: Note' }));
+
+    expect(screen.queryByText('Note: first')).not.toBeInTheDocument();
+    expect(useDashboardLayoutStore.getState().views[0]?.widgets).toEqual([
+      { instanceId: 'test-note-b2', type: 'test-note', config: { text: 'second' } },
+      { instanceId: 'test-singleton', type: 'test-singleton' },
+    ]);
   });
 });

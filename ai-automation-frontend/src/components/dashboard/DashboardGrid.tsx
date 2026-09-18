@@ -10,6 +10,7 @@ import { SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
+import type { WidgetSize } from './dashboardLayout';
 import { staticSortingStrategy, widgetCollisionDetection } from './dashboardDnd';
 import { SortableWidgetSlot } from './SortableWidgetSlot';
 import { WidgetContent } from './WidgetContent';
@@ -18,13 +19,16 @@ import { SLOT_CLASSES, widgetSizeClasses } from './widgetSlot';
 interface DashboardGridProps {
   widgets: ResolvedWidget[];
   editMode: boolean;
-  /** Locks arranging and hiding (e.g. while a server version is applied). */
+  /** Locks arranging, resizing, hiding and removing (e.g. while a server version is applied). */
   disabled?: boolean;
   onMove: (activeInstanceId: string, overInstanceId: string) => void;
   onHide: (instanceId: string) => void;
+  onResize: (instanceId: string, size: WidgetSize) => void;
+  /** Offered for catalog-only and multi widgets only. */
+  onRemove: (instanceId: string) => void;
 }
 
-export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onHide }: DashboardGridProps) {
+export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onHide, onResize, onRemove }: DashboardGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -57,7 +61,14 @@ export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onH
       <SortableContext items={widgets.map((w) => w.instance.instanceId)} strategy={staticSortingStrategy}>
         <div className="flex flex-wrap gap-4 pt-3">
           {widgets.map((widget) => (
-            <SortableWidgetSlot key={widget.instance.instanceId} widget={widget} disabled={disabled} onHide={onHide} />
+            <SortableWidgetSlot
+              key={widget.instance.instanceId}
+              widget={widget}
+              disabled={disabled}
+              onHide={onHide}
+              onResize={onResize}
+              onRemove={onRemove}
+            />
           ))}
         </div>
       </SortableContext>
