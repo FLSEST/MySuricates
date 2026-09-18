@@ -222,15 +222,10 @@ class BpmnDataFlowExportTest {
     /**
      * Der Gateway-Knoten selbst trägt nie eine Assoziation — BPMN erlaubt das an Gateways nicht.
      *
-     * <p><b>Bekannte Lücke, kein gewolltes Endziel:</b> Beim {@code conditional} fällt damit heute
-     * auch die Referenz aus {@code then_command}/{@code else_command} weg, obwohl es dafür bereits
-     * Tasks gibt ({@code _then}/{@code _else}) — sie tragen sich nur nicht in
-     * {@code activityIdByBase} ein. Anders als beim {@code switch}, dessen Zweig-Blöcke seit
-     * 7557b928 Endpunkte sind (siehe {@link #zweigTasksSindDieEndpunkteDerAssoziationen()}), steht
-     * die Zuordnung hier noch aus; TODO 7557b928 bleibt mit diesem Restumfang offen. Der Test pinnt
-     * also den Ist-Stand, nicht die Zielsemantik: Wird die Lücke geschlossen, gehören die beiden
-     * Assoziationen an {@code _then}/{@code _else} — und dieser Test wird entsprechend umgestellt,
-     * statt die neue Kante zu verhindern.
+     * <p>Das ist die bleibende Notationsgrenze und keine Lücke: Die Referenz steht hier in
+     * {@code condition}, also im Gateway-Ausdruck selbst, und dort gibt es keinen Knoten, an den
+     * eine Assoziation gehören könnte. Für die ZWEIGE gilt das seit TODO 7557b928 nicht mehr —
+     * siehe {@link #zweigKommandosEinesConditionalTragenAssoziationen()}.
      */
     @Test
     void gatewayBloeckeBekommenKeineAssoziation() throws Exception {
@@ -243,6 +238,52 @@ class BpmnDataFlowExportTest {
         assertThat(elements(doc, "dataInputAssociation")).isEmpty();
         assertThat(elements(doc, "dataOutputAssociation")).isEmpty();
         assertThat(elements(doc, "dataObjectReference")).isEmpty();
+    }
+
+    /**
+     * Zweig-Kommandos eines {@code conditional} tragen ihre Assoziation am eigenen Task.
+     *
+     * <p>Vor TODO 7557b928 landete die Referenz beim conditional-Block selbst — also am Gateway —
+     * und wurde verworfen: Der Datenfluss brach an jeder Verzweigung ab, obwohl die Tasks
+     * {@code _then}/{@code _else} längst existierten. Sie waren nur nicht als Endpunkte
+     * eingetragen.
+     */
+    @Test
+    void zweigKommandosEinesConditionalTragenAssoziationen() throws Exception {
+        Workflow wf = WorkflowFixtures.workflow("Gate", List.of(
+                WorkflowFixtures.block("shell", "tests", WorkflowFixtures.ordered("command", "mvn test")),
+                WorkflowFixtures.block("conditional", "pruefung", WorkflowFixtures.ordered(
+                        "condition", "exit == 0",
+                        "then_command", "echo ok: {{ block.tests.output }}",
+                        "else_command", "echo fehler: {{ block.tests.output }}",
+                        "execution_mode", "shell"))));
+
+        Document doc = export(wf);
+
+        assertThat(ownerIdsOf(doc, "dataInputAssociation"))
+                .as("beide Zweig-Tasks verbrauchen die Ausgabe des Test-Blocks")
+                .anySatisfy(owner -> assertThat(owner).endsWith("_then"))
+                .anySatisfy(owner -> assertThat(owner).endsWith("_else"));
+        assertThat(ownerIdsOf(doc, "dataInputAssociation"))
+                .as("nie am Gateway selbst")
+                .noneSatisfy(owner -> assertThat(owner).endsWith("_split"));
+        assertThat(elements(doc, "dataObjectReference")).isNotEmpty();
+    }
+
+    /** Ohne else_command gibt es nur den then-Task — und nur dort eine Assoziation. */
+    @Test
+    void ohneElseZweigTraegtNurDerThenTaskDieAssoziation() throws Exception {
+        Workflow wf = WorkflowFixtures.workflow("Gate", List.of(
+                WorkflowFixtures.block("shell", "tests", WorkflowFixtures.ordered("command", "mvn test")),
+                WorkflowFixtures.block("conditional", "pruefung", WorkflowFixtures.ordered(
+                        "condition", "exit == 0",
+                        "then_command", "echo ok: {{ block.tests.output }}",
+                        "execution_mode", "shell"))));
+
+        Document doc = export(wf);
+
+        assertThat(ownerIdsOf(doc, "dataInputAssociation"))
+                .singleElement().satisfies(owner -> assertThat(owner).endsWith("_then"));
     }
 
     private static List<String> ownerIdsOf(Document doc, String localName) {

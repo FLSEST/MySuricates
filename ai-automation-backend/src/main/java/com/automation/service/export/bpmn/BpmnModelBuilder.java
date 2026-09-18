@@ -79,6 +79,11 @@ class BpmnModelBuilder implements BpmnGatewayBuilder.ChainBuilder {
         return model;
     }
 
+    @Override
+    public void registerActivity(String idBase, String nodeId) {
+        activityIdByBase.put(idBase, nodeId);
+    }
+
     /** Horizontale Kette aus Blöcken; Koordinaten relativ (Zeilenmitte y=0, Beginn x=0). */
     @Override
     public BpmnSegment buildChain(List<BlockDefinition> blocks, String idPrefix) {
