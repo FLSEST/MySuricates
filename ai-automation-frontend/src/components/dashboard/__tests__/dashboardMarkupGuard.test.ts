@@ -24,6 +24,9 @@ const FORBIDDEN: [string, RegExp][] = [
   ['xlinkHref attribute', /\bxlink(Href|:href)\s*=/i],
   ['srcSet attribute', /\bsrc[Ss]et\s*=/],
   ['setAttribute for a URL', /\.setAttribute\s*\(\s*['"](href|src|srcset|xlink:href)/i],
+  // A widget must never open anything from content either — the run route is built from ids that
+  // come from the endpoint, and the widget contract holds no id and no URL at all.
+  ['window.open', /\bwindow\.open\s*\(/],
 ];
 
 describe('dashboard markup guard', () => {
@@ -32,6 +35,19 @@ describe('dashboard markup guard', () => {
     expect(files.some((file) => file.endsWith('/WidgetContent.tsx'))).toBe(true);
     expect(files.some((file) => file.endsWith('/insights/GateStatusChart.tsx'))).toBe(true);
     expect(files.some((file) => file.includes('__tests__'))).toBe(false);
+  });
+
+  // The files that put workflow output on screen (spec E3, phase 5). Named one by one so a rename or
+  // a move can never quietly drop them out of the guard.
+  it.each([
+    '/WorkflowResultWidget.tsx',
+    '/WorkflowStatusWidget.tsx',
+    '/WorkflowWidgetStates.tsx',
+    '/WorkflowWidgetProvider.tsx',
+    '/workflowWidgetContract.ts',
+    '/workflowWidgetContext.ts',
+  ])('covers %s', (file) => {
+    expect(Object.keys(SOURCES).some((path) => path.endsWith(file))).toBe(true);
   });
 
   it('is not vacuous: every source is non-empty and a known file has known content', () => {
