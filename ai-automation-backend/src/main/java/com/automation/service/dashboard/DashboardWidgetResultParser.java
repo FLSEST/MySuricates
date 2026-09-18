@@ -184,6 +184,16 @@ public final class DashboardWidgetResultParser {
         return map;
     }
 
+    /**
+     * The same check for a caller that already holds the contract as fields instead of as marker text
+     * (the {@code dashboard-report} block, and the editor assist after {@link #parse}): the private
+     * {@link #validate} of the marker path, only with the exception passed on instead of swallowed.
+     * Messages name the offending field and never echo its value.
+     */
+    public static Result validateOrThrow(Object candidate) {
+        return validate(MAPPER.valueToTree(candidate));
+    }
+
     /** Throws IllegalArgumentException for anything outside the contract; messages never echo values. */
     private static Result validate(JsonNode node) {
         if (node == null || !node.isObject()) {
@@ -191,11 +201,11 @@ public final class DashboardWidgetResultParser {
         }
         requireOnly(node, RESULT_FIELDS, "dashboard_widget");
         return new Result(
-                text(node.get("title"), MAX_TITLE, false),
-                enumValue(node.get("status"), Result.Status.class, true),
+                text(node.get("title"), MAX_TITLE, false, "title"),
+                enumValue(node.get("status"), Result.Status.class, true, "status"),
                 kpis(node.get("kpis")),
                 items(node.get("items")),
-                text(node.get("summary"), MAX_SUMMARY, false));
+                text(node.get("summary"), MAX_SUMMARY, false, "summary"));
     }
 
     private static void requireOnly(JsonNode node, Set<String> allowed, String path) {
@@ -214,15 +224,17 @@ public final class DashboardWidgetResultParser {
             throw new IllegalArgumentException("kpis must be an array with at most " + MAX_KPIS + " entries");
         }
         List<Result.Kpi> kpis = new ArrayList<>();
-        for (JsonNode entry : node) {
+        for (int i = 0; i < node.size(); i++) {
+            JsonNode entry = node.get(i);
+            String at = "kpis[" + (i + 1) + "]";
             if (!entry.isObject()) {
-                throw new IllegalArgumentException("a kpi must be an object");
+                throw new IllegalArgumentException(at + " must be an object");
             }
-            requireOnly(entry, KPI_FIELDS, "kpi");
+            requireOnly(entry, KPI_FIELDS, at);
             kpis.add(new Result.Kpi(
-                    text(entry.get("label"), MAX_KPI_TEXT, true),
-                    text(entry.get("value"), MAX_KPI_TEXT, true),
-                    enumValue(entry.get("trend"), Result.Trend.class, false)));
+                    text(entry.get("label"), MAX_KPI_TEXT, true, at + ".label"),
+                    text(entry.get("value"), MAX_KPI_TEXT, true, at + ".value"),
+                    enumValue(entry.get("trend"), Result.Trend.class, false, at + ".trend")));
         }
         return List.copyOf(kpis);
     }
@@ -235,26 +247,26 @@ public final class DashboardWidgetResultParser {
             throw new IllegalArgumentException("items must be an array with at most " + MAX_ITEMS + " entries");
         }
         List<String> items = new ArrayList<>();
-        for (JsonNode entry : node) {
-            items.add(text(entry, MAX_ITEM, true));
+        for (int i = 0; i < node.size(); i++) {
+            items.add(text(node.get(i), MAX_ITEM, true, "items[" + (i + 1) + "]"));
         }
         return List.copyOf(items);
     }
 
-    private static <E extends Enum<E>> E enumValue(JsonNode node, Class<E> type, boolean required) {
+    private static <E extends Enum<E>> E enumValue(JsonNode node, Class<E> type, boolean required, String field) {
         if (node == null || node.isNull()) {
             if (required) {
-                throw new IllegalArgumentException("a required enum value is missing");
+                throw new IllegalArgumentException(field + " is required");
             }
             return null;
         }
         if (!node.isTextual()) {
-            throw new IllegalArgumentException("an enum value must be a string");
+            throw new IllegalArgumentException(field + " must be a string");
         }
         try {
             return Enum.valueOf(type, node.textValue().strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("an enum value is outside the contract");
+            throw new IllegalArgumentException(field + " is outside the contract");
         }
     }
 
@@ -262,25 +274,25 @@ public final class DashboardWidgetResultParser {
      * A contract string: trimmed, non-empty, within its cap, free of fatal characters, and (fix
      * round 2, B1+B2) with at least one visible code point remaining — see the class javadoc.
      */
-    private static String text(JsonNode node, int max, boolean required) {
+    private static String text(JsonNode node, int max, boolean required, String field) {
         if (node == null || node.isNull()) {
             if (required) {
-                throw new IllegalArgumentException("a required text is missing");
+                throw new IllegalArgumentException(field + " is required");
             }
             return null;
         }
         if (!node.isTextual()) {
-            throw new IllegalArgumentException("a contract value must be a string");
+            throw new IllegalArgumentException(field + " must be a string");
         }
         String value = node.textValue().strip();
         if (value.isEmpty() || value.length() > max) {
-            throw new IllegalArgumentException("a text is empty or longer than " + max + " characters");
+            throw new IllegalArgumentException(field + " is empty or longer than " + max + " characters");
         }
         if (value.codePoints().anyMatch(DashboardWidgetTextRule::isFatal)) {
-            throw new IllegalArgumentException("a text holds a control, format or private-use character");
+            throw new IllegalArgumentException(field + " holds a control, format or private-use character");
         }
         if (value.codePoints().noneMatch(DashboardWidgetTextRule::isVisible)) {
-            throw new IllegalArgumentException("a text has no visible content");
+            throw new IllegalArgumentException(field + " has no visible content");
         }
         return value;
     }
