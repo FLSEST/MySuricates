@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,14 +61,22 @@ class SystemAiProviderControllerTest {
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
-    /** Real registry, not a mock: preset research with webhooks switched on by override. */
+    /**
+     * Real registry, not a mock: preset research with webhooks switched on by override, and
+     * ui-editable so {@link #capabilities_blockTypesRespectTheModuleGate} can flip a module at
+     * runtime the same way {@code ModuleOverrideService} does in production.
+     */
     @TestConfiguration
     static class Modules {
         @Bean
         ModuleRegistry moduleRegistry() {
-            return ModuleRegistry.of(Map.of("preset", "research", "webhooks", "true"), Map.of());
+            return ModuleRegistry.of(
+                    Map.of("preset", "research", "webhooks", "true", "ui-editable", "true"), Map.of());
         }
     }
+
+    @Autowired
+    private ModuleRegistry moduleRegistry;
 
     @Test
     void aiProviders_returnsProviderList() throws Exception {
@@ -112,6 +121,34 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.modules[?(@.name=='provenance')].kind").value("hardening"))
                 .andExpect(jsonPath("$.modules[?(@.name=='provenance')].enabled").value(true))
                 .andExpect(jsonPath("$.modules[?(@.name=='sealing')].property").value("automation.hardening.sealing"));
+    }
+
+    /**
+     * Exercises the actual filter predicate in {@link SystemAiProviderController#capabilities()},
+     * not just its two halves in isolation (TODO f4231dc9, Fix-Runde 1): with the module off the
+     * gated type is missing from {@code blockTypes}, with it on the type is back — and an ungated
+     * type ('shell') is present either way, so the filter isn't accidentally dropping everything.
+     */
+    @Test
+    void capabilities_blockTypesRespectTheModuleGate() throws Exception {
+        moduleRegistry.applyUiOverrides(Map.of(ModuleCatalog.DASHBOARD_REPORT, false));
+        try {
+            mockMvc.perform(get("/api/v1/system/capabilities"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.blockTypes[*].type", not(hasItem("dashboard-report"))))
+                    .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")));
+
+            moduleRegistry.applyUiOverrides(Map.of(ModuleCatalog.DASHBOARD_REPORT, true));
+
+            mockMvc.perform(get("/api/v1/system/capabilities"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.blockTypes[*].type", hasItem("dashboard-report")))
+                    .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")));
+        } finally {
+            // Reset regardless of assertion outcome above: the ModuleRegistry bean is shared across
+            // this test class's methods (WebMvcTest caches the context), a stuck override would leak.
+            moduleRegistry.applyUiOverrides(Map.of());
+        }
     }
 
     @Test
