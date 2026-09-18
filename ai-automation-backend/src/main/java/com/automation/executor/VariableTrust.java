@@ -13,9 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *       like: always shell-escaped <em>and</em> a run-level taint source, so every block output of
  *       the run is escaped too ({@link OutputTaint}).</li>
  *   <li><b>platform</b> ({@link ExecutionContext#setUntrustedPlatformVariable}) — {@code previous_report}
- *       and {@code open_todos}: always shell-escaped, but not a taint source. They are injected into
- *       <em>every</em> run, so treating them as one would quote every block output of every run and
- *       change the meaning of long-standing shell commands.</li>
+ *       and {@code open_todos}: always shell-escaped, and a taint source only <em>on use</em>. They are
+ *       injected into <em>every</em> run, so tainting at injection time would quote every block output
+ *       of every run and change the meaning of long-standing shell commands; instead the run is tainted
+ *       the moment such a placeholder is really substituted into a shell command line
+ *       ({@link ExecutionContextTaint#substitutedIntoShell}).</li>
  * </ul>
  *
  * <p>The classes are exclusive: the last write for a name wins, {@link ExecutionContext#setVariable}
@@ -47,7 +49,12 @@ final class VariableTrust {
         return external.contains(name) || platform.contains(name);
     }
 
-    /** Only external input taints a run's outputs; platform data does not. */
+    /** True for platform data only — the class that taints the run on use instead of on injection. */
+    boolean isPlatform(String name) {
+        return platform.contains(name);
+    }
+
+    /** Only external input taints a run's outputs from the start; platform data taints it on use. */
     boolean hasExternalInput() {
         return !external.isEmpty();
     }
