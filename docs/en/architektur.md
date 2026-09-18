@@ -915,6 +915,10 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V65 | Catch-up-on-resume on schedules |
 | V66 | Todo export link |
 
+## Architecture Gates
+
+Two JUnit tests in package `com.automation.architecture` pin the measured structure, both on the same jdeps package edges as `scripts/public-readiness/arch-metrics.sh` (section `## packages`) and without any new dependency: `PackageCycleRatchetTest` pins today's 13 mutually dependent package pairs as an allowlist — a new pair fails the build, a resolved one is only reported as a hint — and `LayerRuleTest` forbids the edge classes `service.* → controller.*`, `controller.* → repository.*` and `repository.* → service.*` (allowlist empty today). If `target/classes` or jdeps is missing, both tests are skipped with a clear message instead of passing silently; their blind spot is a dependency that only appears as a generic type argument and is erased from the bytecode.
+
 ## Directory Structure
 
 ```

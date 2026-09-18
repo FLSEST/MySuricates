@@ -956,6 +956,10 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 | V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
 
+## Architektur-Gates
+
+Zwei JUnit-Tests im Paket `com.automation.architecture` halten die gemessene Struktur fest, beide auf denselben jdeps-Paketkanten wie `scripts/public-readiness/arch-metrics.sh` (Abschnitt `## packages`) und ohne neue Abhängigkeit: `PackageCycleRatchetTest` pinnt die 13 heute wechselseitig abhängigen Paketpaare als Allowlist — ein neues Paar bricht den Build, ein aufgelöstes wird nur als Hinweis gemeldet —, und `LayerRuleTest` verbietet die Kantenklassen `service.* → controller.*`, `controller.* → repository.*` und `repository.* → service.*` (Allowlist heute leer). Fehlt `target/classes` oder jdeps, werden beide Tests mit klarer Meldung übersprungen statt still grün zu laufen; ihr blinder Fleck sind Abhängigkeiten, die nur als generisches Typargument auftauchen und im Bytecode gelöscht sind.
+
 ## Verzeichnisstruktur
 
 ```
