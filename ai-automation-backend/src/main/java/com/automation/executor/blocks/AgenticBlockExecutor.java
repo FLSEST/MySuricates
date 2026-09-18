@@ -43,8 +43,8 @@ public class AgenticBlockExecutor implements BlockExecutor {
     private final AgenticStopRules stopRules;
 
     @Override
-    public boolean supports(String blockType) {
-        return "agentic".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("agentic");
     }
 
     @Override

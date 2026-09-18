@@ -114,8 +114,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "switch".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("switch");
     }
 
     /**

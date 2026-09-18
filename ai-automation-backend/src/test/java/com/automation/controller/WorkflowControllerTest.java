@@ -177,6 +177,31 @@ class WorkflowControllerTest {
     }
 
     @Test
+    void createWorkflow_unknownBlockType_returns400WithAllowedTypes() throws Exception {
+        when(workflowService.create(any(), eq(ChangeSource.USER)))
+                .thenThrow(new IllegalArgumentException("Block 'weird' has unknown type 'frobnicate' "
+                        + "— allowed types: agentic, approval, shell, simple"));
+
+        String body = """
+                {
+                    "projectId": "proj-1",
+                    "name": "Test Workflow",
+                    "blocks": [
+                        {"type": "frobnicate", "name": "weird", "config": {}}
+                    ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/workflows")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("frobnicate")))
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("allowed types")));
+    }
+
+    @Test
     void createWorkflow_missingProjectId_returns400() throws Exception {
         String body = """
                 {

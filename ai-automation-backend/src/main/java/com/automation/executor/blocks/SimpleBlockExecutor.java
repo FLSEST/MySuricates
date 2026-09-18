@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -52,7 +53,7 @@ public class SimpleBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "simple".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("simple");
     }
 }

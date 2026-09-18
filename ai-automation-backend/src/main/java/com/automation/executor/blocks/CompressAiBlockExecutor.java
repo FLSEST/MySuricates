@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * compress-ai — condenses one earlier block output with a single AI call that has no tools, runs in a
@@ -112,8 +113,8 @@ public class CompressAiBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "compress-ai".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("compress-ai");
     }
 
     /** Failed call: its (tail-capped) error text; a completed call without text is a failure too. */

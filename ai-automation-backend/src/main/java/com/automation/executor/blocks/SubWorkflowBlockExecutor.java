@@ -39,8 +39,8 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "sub-workflow".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("sub-workflow");
     }
 
     @Override

@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Native todo-close block (TODO 9f6d7f14): setzt ein TODO auf DONE — direkt über
@@ -51,7 +52,7 @@ public class TodoCloseBlockExecutor implements BlockExecutor {
     }
 
     @Override
-    public boolean supports(String blockType) {
-        return "todo-close".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("todo-close");
     }
 }

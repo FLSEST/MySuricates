@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -30,8 +31,8 @@ public class HumanInputBlockExecutor implements BlockExecutor {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Override
-    public boolean supports(String blockType) {
-        return "human-input".equals(blockType);
+    public Set<String> supportedTypes() {
+        return Set.of("human-input");
     }
 
     @Override
