@@ -139,9 +139,12 @@ public class ExecutionContext {
         else setVariable(name, value);
     }
 
-    public boolean isUntrusted(String name) {
-        return variableTrust.isUntrusted(name);
+    /** Replaces a variable's value and leaves its trust label untouched (workspace path remapping). */
+    public void replaceValue(String name, Object value) {
+        variables.put(name, value);
     }
+
+    public boolean isUntrusted(String name) { return variableTrust.isUntrusted(name); }
 
     /** True as soon as the run carries untrusted <em>external</em> input — a variable or a tainted output. */
     public boolean hasUntrustedInput() {
@@ -167,13 +170,9 @@ public class ExecutionContext {
     }
 
     /** Taint as reserved input-context keys for persistence and hand-over; empty for a clean run. */
-    public Map<String, Object> exportTaint() {
-        return outputTaint.export(variableTrust.externalNames());
-    }
+    public Map<String, Object> exportTaint() { return outputTaint.export(variableTrust.externalNames()); }
 
-    public Set<String> getUntrustedVariables() {
-        return variableTrust.externalNames();
-    }
+    public Set<String> getUntrustedVariables() { return variableTrust.externalNames(); }
 
     public Object getVariable(String name) {
         return variables.get(name);

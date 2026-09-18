@@ -170,6 +170,12 @@ Executes a shell command on the host or inside a Docker container.
 > these placeholders **unquoted** (`REPORT={{ previous_report }}`, not `REPORT="{{ previous_report }}"`).
 > Nothing changes in AI prompts (they are never escaped). The two variables do **not** trigger taint
 > propagation: block outputs of an otherwise clean run stay raw as before.
+>
+> **Consequence for forwarded values:** writing `previous_report`/`open_todos` into a block output or
+> into an `items_command` (e.g. `items_command: "echo {{ previous_report }}"`) loses the quoting for
+> the follow-up placeholders: the call itself is quoted, but the resulting `{{ previous_output }}`,
+> `{{ block.<name>.output }}` and `foreach` items count as trusted in an otherwise clean run and are
+> substituted raw. Set `"shell_escape_variables": true` explicitly on such follow-up blocks.
 
 ```json
 {

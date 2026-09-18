@@ -173,6 +173,13 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts aendert
 > sich nichts (dort wird nie escaped). Die beiden Variablen loesen **keine** Taint-Propagation aus:
 > Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
+>
+> **Folge fuer weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
+> oder in ein `items_command` schreibt (z. B. `items_command: "echo {{ previous_report }}"`),
+> verliert das Quoting fuer die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
+> entstehenden `{{ previous_output }}`, `{{ block.<name>.output }}` und `foreach`-Items gelten in
+> einem sonst sauberen Run als vertrauenswuerdig und werden roh eingesetzt. In solchen
+> Folge-Bloecken deshalb explizit `"shell_escape_variables": true` setzen.
 
 ```json
 {

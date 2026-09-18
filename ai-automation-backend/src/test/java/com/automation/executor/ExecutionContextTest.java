@@ -537,6 +537,43 @@ class ExecutionContextTest {
         assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo 'y; id'");
     }
 
+    // ── replaceValue: value changes, trust label stays ──────────────────────────
+
+    @Test
+    void replaceValue_platformVariable_keepsThePlatformLabel() {
+        context.setUntrustedPlatformVariable("previous_report", "/source/repo/a.java");
+
+        context.replaceValue("previous_report", "/runs/run/repo/a.java; id");
+
+        assertThat(context.isUntrusted("previous_report")).isTrue();
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo '/runs/run/repo/a.java; id'");
+    }
+
+    @Test
+    void replaceValue_untrustedVariable_staysExternallyUntrusted() {
+        context.setUntrustedVariable("branch", "/source/repo");
+
+        context.replaceValue("branch", "/runs/run/repo; id");
+
+        assertThat(context.isUntrusted("branch")).isTrue();
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.getUntrustedVariables()).containsExactly("branch");
+        assertThat(context.resolveShellTemplate("cd {{ branch }}", false)).isEqualTo("cd '/runs/run/repo; id'");
+    }
+
+    @Test
+    void replaceValue_trustedVariable_staysTrusted() {
+        context.setVariable("target_file", "/source/repo/a.java");
+
+        context.replaceValue("target_file", "/runs/run/repo/a.java");
+
+        assertThat(context.isUntrusted("target_file")).isFalse();
+        assertThat(context.resolveShellTemplate("cat {{ target_file }}", false))
+                .isEqualTo("cat /runs/run/repo/a.java");
+    }
+
     // ── Taint propagation: outputs derived from untrusted input ─────────────────
 
     @Test

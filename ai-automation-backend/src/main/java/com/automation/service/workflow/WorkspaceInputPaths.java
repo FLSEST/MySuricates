@@ -21,7 +21,7 @@ final class WorkspaceInputPaths {
                     || name.equals("execution_path") || name.startsWith("execution_path_")) return;
             // Value-only write: the setters would re-label the variable, and the trust classes are
             // three (trusted / external untrusted / platform data), not two.
-            context.getVariables().put(name, remapValue(value, prefix, workspace));
+            context.replaceValue(name, remapValue(value, prefix, workspace));
         });
     }
 
