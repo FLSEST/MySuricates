@@ -134,6 +134,78 @@ def span_is_declared_excerpt(line, start, expected):
     return bool(regex.search(line))
 
 
+# ---------------------------------------------------------------------------
+# Migrationstabellen
+#
+# Die Tabellen in docs/datenmodell.md und docs/architektur.md listen je Migration
+# eine Zeile "| V66 | ... |". Massgeblich ist die hoechste genannte Nummer: bleibt
+# sie hinter dem Code zurueck, fehlen Zeilen. Ausgenommen sind Tabellen, die sich
+# im Fliesstext als Auszug ausweisen, indem sie den aktuellen Stand daneben nennen
+# (docs/onboarding/ARCHITECTURE.md listet V1-V19 und schreibt V73 in den Text).
+# ---------------------------------------------------------------------------
+TABLE_MIGRATION_ROW = re.compile(r"^\|\s*`?V(\d+)`?\s*\|")
+
+# Kopftabelle von README.de.md: "rund 1 420 Commits" — der Text sagt "rund",
+# deshalb mit Toleranz. Tausendertrenner koennen Leer-, Schmal- oder Punktzeichen sein.
+COMMITS_CLAIM = re.compile(r"\b([0-9][0-9.   ' ]*)\s*Commits\b")
+COMMITS_TOLERANCE = 0.05
+
+# Testzahlen altern schneller als alles andere. Sie duerfen stehen bleiben, solange
+# sie datiert sind ("Stand 2026-09-18: 715 Testklassen") — eine undatierte Testzahl
+# behauptet Aktualitaet, die niemand geprueft hat.
+TEST_CLAIM = re.compile(
+    r"\b\d[\d.    ]*\s*(?:Testklassen|Testdateien|Vitest-Dateien|Cypress-Specs"
+    r"|test classes|test files|Vitest files|Cypress specs)\b"
+    r"|^\|\s*Tests\s*\|", re.IGNORECASE)
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+
+README_SOURCE = "README.de.md"
+
+
+def digits(text):
+    """"1 420" / "1.420" -> 1420."""
+    return int(re.sub(r"\D", "", text))
+
+
+def check_migration_table(rel, lines, expected, findings):
+    if expected is None:
+        return
+    current = re.compile(rf"\bV{expected}\b")
+    best = best_no = best_line = None
+    names_current_outside = False
+    for no, line in enumerate(lines, 1):
+        if IGNORE_MARKER in line:
+            continue
+        match = TABLE_MIGRATION_ROW.match(line.lstrip())
+        if match:
+            said = int(match.group(1))
+            if best is None or said > best:
+                best, best_no, best_line = said, no, line
+        elif current.search(line):
+            names_current_outside = True
+    if best is None or best == expected or names_current_outside:
+        return
+    findings.append(f"DRIFT {rel}:{best_no} migration-table sagt {best}, Code {expected}"
+                    f" | {best_line.strip()[:120]}")
+
+
+def check_readme_head(rel, no, line, facts, findings):
+    """Kopftabelle von README.de.md: Commit-Zahl und Datierung der Testzahlen."""
+    expected = facts.get("commits")
+    if expected is not None:
+        for match in COMMITS_CLAIM.finditer(line):
+            said = digits(match.group(1))
+            if abs(said - expected) > max(1, round(expected * COMMITS_TOLERANCE)):
+                findings.append(f"DRIFT {rel}:{no} commits sagt {said}, Code {expected}"
+                                f" | {line.strip()[:120]}")
+
+
+def check_test_claim_dated(rel, no, line, findings):
+    if TEST_CLAIM.search(line.strip()) and not ISO_DATE.search(line):
+        findings.append(f"DRIFT {rel}:{no} testzahl-ohne-datum: Testzahlen nur mit Datum"
+                        f" (z. B. 'Stand 2026-09-18') | {line.strip()[:120]}")
+
+
 def scan(root, rel, facts, findings):
     path = os.path.join(root, rel)
     try:
@@ -164,6 +236,10 @@ def scan(root, rel, facts, findings):
                         findings.append(
                             f"DRIFT {rel}:{no} {name} sagt {said}, Code {expected}"
                             f" | {line.strip()[:120]}")
+        if rel == README_SOURCE:
+            check_readme_head(rel, no, line, facts, findings)
+            check_test_claim_dated(rel, no, line, findings)
+    check_migration_table(rel, lines, facts.get("migration-max"), findings)
     return
 
 

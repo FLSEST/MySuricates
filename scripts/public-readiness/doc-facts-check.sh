@@ -84,6 +84,11 @@ fact_providers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("integration-providers: $JAVA_SRC fehlt"); echo 0; return; }
   grep -rl 'implements IntegrationProvider' "$JAVA_SRC" 2>/dev/null | wc -l | tr -d ' '
 }
+# Commit-Zahl der README-Kopftabelle. Kein Git-Repo (Fixture, entpacktes Archiv) ist kein
+# Fehler — dann wird die Zahl nachweislich uebersprungen statt still durchgewunken.
+fact_commits() {
+  git -C "$ROOT" rev-list --count HEAD 2>/dev/null | tr -d ' '
+}
 
 BLOCK_TYPES="$(fact_block_types)"
 CONTROLLERS="$(fact_controllers)"
@@ -92,6 +97,17 @@ MIGRATION_COUNT="$(fact_migrations)"
 TEMPLATES="$(fact_templates)"
 SKILLS="$(fact_skills)"
 PROVIDERS="$(fact_providers)"
+COMMITS="$(fact_commits)"
+
+COMMITS_JSON=""
+COMMITS_NOTE=""
+if [ -n "$COMMITS" ] && [ "$COMMITS" != "0" ]; then
+  COMMITS_JSON=",\"commits\":$COMMITS"
+  COMMITS_NOTE=", Commits $COMMITS"
+else
+  echo "doc-facts-check: uebersprungen — kein Git-Repository (oder kein Commit) unter $ROOT:" \
+       "die Commit-Zahl der README-Kopftabelle wird nicht geprueft." >&2
+fi
 
 # MISSING wird in Subshells nicht gefuellt (Kommandosubstitution) — deshalb hier
 # zusaetzlich gegen 0 pruefen. Das ist die eigentliche Absicherung.
@@ -119,7 +135,8 @@ if [ "$FACTS_ONLY" -eq 1 ]; then
     migrations "$MIGRATION_COUNT" \
     templates "$TEMPLATES" \
     skills "$SKILLS" \
-    integration-providers "$PROVIDERS"
+    integration-providers "$PROVIDERS" \
+    commits "${COMMITS:-(kein Git-Repository)}"
   exit 0
 fi
 
@@ -142,13 +159,13 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"templates":%s,"skills":%s,"integration-providers":%s}' \
+DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"templates":%s,"skills":%s,"integration-providers":%s%s}' \
   "$BLOCK_TYPES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" \
-  "$TEMPLATES" "$SKILLS" "$PROVIDERS")" \
+  "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?
 
 if [ "$RC" -eq 0 ]; then
-  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)."
+  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen und Testzahl-Datierung."
 fi
 exit "$RC"

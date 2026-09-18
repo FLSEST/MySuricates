@@ -14,6 +14,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 SCRIPT="$REPO/scripts/public-readiness/doc-facts-check.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
+GIT="git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false"
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
@@ -235,6 +236,64 @@ echo "9) Das echte Repository ist frei von Zahlen-Drift"
 OUT=$(bash "$SCRIPT" 2>&1); RC=$?
 check "Repo-Lauf ohne Drift (exit 0)" '[ "$RC" -eq 0 ]'
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT" | sed 's/^/     /'
+
+echo "10) Migrationstabellen: die hoechste genannte Vn zaehlt"
+cat > "$FAKE/docs/tabelle-alt.md" <<'MD_EOF'
+# Schema
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V3 | `V3__index.sql` | Indexe |
+MD_EOF
+cat > "$FAKE/docs/tabelle-auszug.md" <<'MD_EOF'
+# Schema (Auszug)
+Die Tabelle beschreibt das Grundschema; der aktuelle Stand ist V5.
+
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V3 | `V3__index.sql` | Indexe |
+MD_EOF
+cat > "$FAKE/docs/tabelle-aktuell.md" <<'MD_EOF'
+# Schema
+| Migration | Datei | Wirkung |
+|---|---|---|
+| V1 | `V1__init.sql` | Grundtabellen |
+| V5 | `V5__step.sql` | Letzter Stand |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Migrationstabelle gemeldet" \
+  'grep -qE "^DRIFT docs/tabelle-alt.md:5 migration-table sagt 3, Code 5" <<<"$OUT"'
+check "als Auszug ausgewiesene Tabelle bleibt frei" '! grep -q "tabelle-auszug.md" <<<"$OUT"'
+check "aktuelle Tabelle bleibt frei"                '! grep -q "tabelle-aktuell.md" <<<"$OUT"'
+rm "$FAKE/docs/tabelle-alt.md" "$FAKE/docs/tabelle-auszug.md" "$FAKE/docs/tabelle-aktuell.md"
+
+echo "11) README-Kopfzahlen: Commits mit Toleranz, Testzahlen nur mit Datum"
+( cd "$FAKE" && git init -q . && $GIT add -A && $GIT commit -q -m eins \
+    && $GIT commit -q --allow-empty -m zwei && $GIT commit -q --allow-empty -m drei )
+cat > "$FAKE/README.de.md" <<'MD_EOF'
+# MySuricates
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 40 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "veraltete Commit-Zahl gemeldet" \
+  'grep -qE "^DRIFT README.de.md:4 commits sagt 40, Code 3" <<<"$OUT"'
+check "Testzahl ohne Datum gemeldet" \
+  'grep -qE "^DRIFT README.de.md:5 testzahl-ohne-datum" <<<"$OUT"'
+cat > "$FAKE/README.de.md" <<'MD_EOF'
+# MySuricates
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 3 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 — Lauf vom 2026-09-18 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "passende Commit-Zahl und datierte Testzahl: exit 0" '[ "$RC" -eq 0 ]'
+check "README.de.md ohne Befund" '! grep -q "README.de.md" <<<"$OUT"'
+rm "$FAKE/README.de.md"
 
 echo
 echo "passed=$PASS failed=$FAIL"
