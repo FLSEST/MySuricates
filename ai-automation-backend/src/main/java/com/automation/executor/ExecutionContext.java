@@ -61,6 +61,9 @@ public class ExecutionContext {
     /** Pseudo block name for the run's {@code previous_output} inside {@link #UNTRUSTED_OUTPUTS_VARIABLE}. */
     public static final String PREVIOUS_OUTPUT_NAME = "previous_output";
 
+    /** Reserved input-context key: {@code true} once platform data reached a shell command line, so that taint survives resume and hand-over even before an output is recorded. */
+    public static final String PLATFORM_IN_SHELL_VARIABLE = "__platform_in_shell";
+
     /** Trust label per variable plus the run's output taint. See {@link ExecutionContextTaint}. */
     private final ExecutionContextTaint taint = new ExecutionContextTaint();
 
@@ -73,26 +76,19 @@ public class ExecutionContext {
     @Builder.Default
     private final StepIndexCounter stepIndices = new StepIndexCounter();
 
-    @Builder.Default
-    private final AtomicBoolean paused = new AtomicBoolean(false);
+    @Builder.Default private final AtomicBoolean paused = new AtomicBoolean(false);
 
-    @Builder.Default
-    private final AtomicBoolean cancelled = new AtomicBoolean(false);
+    @Builder.Default private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
-    @Builder.Default
-    private final AtomicReference<CompletableFuture<String>> pendingApproval = new AtomicReference<>();
+    @Builder.Default private final AtomicReference<CompletableFuture<String>> pendingApproval = new AtomicReference<>();
 
-    @Builder.Default
-    private final AtomicReference<ApprovalRequest> currentApprovalRequest = new AtomicReference<>();
+    @Builder.Default private final AtomicReference<ApprovalRequest> currentApprovalRequest = new AtomicReference<>();
 
-    @Builder.Default
-    private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
+    @Builder.Default private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
 
-    @Builder.Default
-    private final Map<String, Object> runMetadata = new ConcurrentHashMap<>();
+    @Builder.Default private final Map<String, Object> runMetadata = new ConcurrentHashMap<>();
 
-    @Builder.Default
-    private final RunProcessRegistration activeProcess = new RunProcessRegistration();
+    @Builder.Default private final RunProcessRegistration activeProcess = new RunProcessRegistration();
 
     /** Reserves the next step index for a RUNNING placeholder; see {@link StepIndexCounter}. */
     public int preAllocateStepIndex() {
@@ -159,6 +155,9 @@ public class ExecutionContext {
         setBlockOutput(blockName, output);
         if (tainted) taint.markOutput(blockName);
     }
+
+    /** Re-applies the exported {@link #PLATFORM_IN_SHELL_VARIABLE} flag of an earlier segment or the parent run. */
+    public void markPlatformUsedInShell() { taint.markPlatformUsedInShell(); }
 
     /** Re-applies one exported taint name ({@link #PREVIOUS_OUTPUT_NAME} or a block name). */
     public void markOutputUntrusted(String name) {
