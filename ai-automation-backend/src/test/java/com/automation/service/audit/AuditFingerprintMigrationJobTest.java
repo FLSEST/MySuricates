@@ -387,6 +387,9 @@ class AuditFingerprintMigrationJobTest {
         entityManager.clear();
 
         String messages = String.join("\n", log.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
+        assertThat(messages).as("der Appender hat den Lauf ueberhaupt mitgeschrieben: der Merge steht drin")
+                .contains("Audit fingerprint merge: finding " + drifted.getId())
+                .contains("ruleKey " + CANONICAL_RULE_KEY);
         assertThat(messages).as("keine Normalisierungs-Meldung fuer einen geloeschten Datensatz")
                 .doesNotContain("ruleKey normalized: finding " + drifted.getId());
         assertThat(findingRepository.findById(drifted.getId())).isEmpty();
