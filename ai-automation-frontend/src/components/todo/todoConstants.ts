@@ -3,6 +3,24 @@ import { createElement } from 'react';
 import type { TodoStatus, TodoPriority, TodoSource } from '../../types';
 
 export const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
+
+/** Status filter of the todos page: a single status, everything, or the active work (OPEN + IN_PROGRESS). */
+export type TodoStatusFilter = TodoStatus | 'ALL' | 'ACTIVE';
+
+/** What "ACTIVE" means — the default filter: what is actually being worked on. */
+export const ACTIVE_STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS'];
+
+/** Columns of the board. ARCHIVED deliberately has no permanent column — it only
+ *  appears when the archive filter is selected explicitly. */
+export const KANBAN_COLUMN_STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG'];
+
+/** Would the current filter show a todo with this status? (deep links release filters that hide their target) */
+export function filterShowsStatus(filter: TodoStatusFilter, status: TodoStatus): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'ACTIVE') return ACTIVE_STATUSES.includes(status);
+  return filter === status;
+}
+
 export const PRIORITIES: TodoPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 export const SOURCES: TodoSource[] = ['USER', 'AI', 'WORKFLOW'];
 

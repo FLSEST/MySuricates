@@ -1557,6 +1557,7 @@ export const en = {
     tags: 'Tags',
     tagsHint: 'Comma-separated',
     allStatuses: 'All',
+    activeStatuses: 'Open & in progress',
     allSources: 'All Sources',
     allProjects: 'All Projects',
     statuses: {
@@ -1580,7 +1581,7 @@ export const en = {
     sessionId: 'Session',
     showMoreTags: 'Show more',
     showLessTags: 'Show less',
-    kanbanTruncated: 'Showing {shown} of {total} items. Use filters or switch to list view to see all.',
+    columnTruncated: 'Showing {shown} of {total} {label}',
     moreItems: 'more',
     viewList: 'List',
     viewBoard: 'Board',

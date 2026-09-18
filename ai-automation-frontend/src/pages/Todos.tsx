@@ -11,16 +11,21 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
-import { STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS, type ViewMode } from '../components/todo/todoConstants';
+import {
+  STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS,
+  ACTIVE_STATUSES, KANBAN_COLUMN_STATUSES, filterShowsStatus,
+  type ViewMode, type TodoStatusFilter,
+} from '../components/todo/todoConstants';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
-import { TodoKanbanView } from '../components/todo/TodoKanbanView';
+import { TodoKanbanView, type TodoKanbanColumn } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
 import {
-  useTodos, useTodo, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
+  useTodos, useTodoColumn, useTodo, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
 } from '../hooks/useTodos';
 import { useProjects } from '../hooks/useProjects';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useWorkflows } from '../hooks/useWorkflows';
+import { useSettingsStore } from '../stores/settingsStore';
 import { useT } from '../i18n';
 import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
 
@@ -29,7 +34,9 @@ export function Todos() {
   const t = useT();
   const navigate = useNavigate();
   // Filter state (declared before useTodos so we can pass filters to the API)
-  const [statusFilter, setStatusFilter] = usePersistedState<TodoStatus | 'ALL'>('todos-status-filter', 'ALL');
+  // Default: what is actually being worked on. With a 90 %-DONE backlog, ALL is a long,
+  // useless page — ALL stays selectable, and a persisted choice is never overwritten.
+  const [statusFilter, setStatusFilter] = usePersistedState<TodoStatusFilter>('todos-status-filter', 'ACTIVE');
   const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
   const [projectFilter, setProjectFilter] = usePersistedState('todos-project-filter', '');
 
@@ -58,28 +65,78 @@ export function Todos() {
   // View mode
   const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
 
-  // Pagination
+  // Pagination — sizes are user settings, not constants (see TodoSettingsCard)
   const [page, setPage] = useState(0);
-  const LIST_PAGE_SIZE = 30;
-  const KANBAN_PAGE_SIZE = 200;
+  const listPageSize = useSettingsStore((s) => s.listPageSize);
+  const kanbanColumnSize = useSettingsStore((s) => s.kanbanColumnSize);
 
-  // Build server-side filter params
-  const apiParams = useMemo(() => {
+  // Filters without the status — the board adds the status per column
+  const filterParams = useMemo(() => {
     const params: Record<string, string> = {};
-    if (statusFilter !== 'ALL') params.status = statusFilter;
     if (sourceFilter !== 'ALL') params.source = sourceFilter;
     if (projectFilter) params.projectId = projectFilter;
     if (tagFilter) params.tag = tagFilter;
     if (debouncedSearch) params.q = debouncedSearch;
     return params;
-  }, [statusFilter, sourceFilter, projectFilter, tagFilter, debouncedSearch]);
+  }, [sourceFilter, projectFilter, tagFilter, debouncedSearch]);
+
+  // Build server-side filter params for the list view
+  const apiParams = useMemo<Record<string, string | string[]>>(() => {
+    if (statusFilter === 'ALL') return filterParams;
+    if (statusFilter === 'ACTIVE') return { ...filterParams, status: ACTIVE_STATUSES };
+    return { ...filterParams, status: statusFilter };
+  }, [filterParams, statusFilter]);
 
   // Reset page on filter or view mode change
   useEffect(() => { setPage(0); }, [apiParams, viewMode]);
 
-  const pageSize = viewMode === 'list' ? LIST_PAGE_SIZE : KANBAN_PAGE_SIZE;
-  const { data: todosPage, isLoading, error, refetch } = useTodos(apiParams, viewMode === 'list' ? page : 0, pageSize);
-  const todos = todosPage?.content;
+  const isBoard = viewMode === 'board';
+
+  // Which columns the board shows — the status filter narrows them. ARCHIVED has no
+  // permanent column; it only appears when the archive filter is selected explicitly.
+  const boardStatuses = useMemo<TodoStatus[]>(() => {
+    if (statusFilter === 'ALL') return KANBAN_COLUMN_STATUSES;
+    if (statusFilter === 'ACTIVE') return ACTIVE_STATUSES;
+    return [statusFilter];
+  }, [statusFilter]);
+
+  // One query per column — never distribute a mixed page across the columns (b12a1085).
+  const columnEnabled = (status: TodoStatus) => isBoard && boardStatuses.includes(status);
+  const openColumn = useTodoColumn('OPEN', kanbanColumnSize, filterParams, columnEnabled('OPEN'));
+  const inProgressColumn = useTodoColumn('IN_PROGRESS', kanbanColumnSize, filterParams, columnEnabled('IN_PROGRESS'));
+  const doneColumn = useTodoColumn('DONE', kanbanColumnSize, filterParams, columnEnabled('DONE'));
+  const backlogColumn = useTodoColumn('BACKLOG', kanbanColumnSize, filterParams, columnEnabled('BACKLOG'));
+  const archivedColumn = useTodoColumn('ARCHIVED', kanbanColumnSize, filterParams, columnEnabled('ARCHIVED'));
+  const columnQueries = {
+    OPEN: openColumn,
+    IN_PROGRESS: inProgressColumn,
+    DONE: doneColumn,
+    BACKLOG: backlogColumn,
+    ARCHIVED: archivedColumn,
+  } satisfies Record<TodoStatus, ReturnType<typeof useTodoColumn>>;
+
+  const boardColumns: TodoKanbanColumn[] = boardStatuses.map((status) => ({
+    status,
+    todos: columnQueries[status].data?.content ?? [],
+    total: columnQueries[status].data?.totalElements ?? 0,
+    isLoading: columnQueries[status].isLoading,
+  }));
+
+  const listQuery = useTodos(apiParams, page, listPageSize, !isBoard);
+  const todosPage = listQuery.data;
+  const isLoading = isBoard
+    ? boardColumns.length > 0 && boardColumns.every((column) => column.isLoading)
+    : listQuery.isLoading;
+  const error = isBoard
+    ? boardStatuses.map((status) => columnQueries[status].error).find(Boolean) ?? null
+    : listQuery.error;
+  const refetch = () => {
+    if (isBoard) boardStatuses.forEach((status) => columnQueries[status].refetch());
+    else listQuery.refetch();
+  };
+
+  // Todos currently on screen — list rows or the union of all board columns
+  const todos = isBoard ? boardColumns.flatMap((column) => column.todos) : todosPage?.content;
   const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
   const { data: workflows = [] } = useWorkflows();
@@ -151,6 +208,10 @@ export function Todos() {
   const inProgressCount = counts?.inProgress ?? 0;
   const doneCount = counts?.done ?? 0;
   const backlogCount = counts?.backlog ?? 0;
+  /** Distinguishes "nothing matches the filter" from "no todos exist yet". */
+  const hasAnyTodos = openCount + inProgressCount + doneCount + backlogCount + (counts?.archived ?? 0) > 0;
+  /** A board column still loading must not flash the empty state. */
+  const boardStillLoading = isBoard && boardColumns.some((column) => column.isLoading);
 
   const handleQuickAdd = () => {
     if (!quickTitle.trim()) return;
@@ -213,7 +274,7 @@ export function Todos() {
     // Preselect the project unless the link already carried it
     if (!searchParams.get('projectId') && linkedTodo.projectId) setProjectFilter(linkedTodo.projectId);
     // Release persisted filters that would hide exactly this todo
-    if (statusFilter !== 'ALL' && statusFilter !== linkedTodo.status) setStatusFilter('ALL');
+    if (!filterShowsStatus(statusFilter, linkedTodo.status)) setStatusFilter('ALL');
     if (tagFilter && !linkedTodo.tags.includes(tagFilter)) setTagFilter('');
     openEdit(linkedTodo);
     setHighlightId(linkedTodo.id);
@@ -342,6 +403,16 @@ export function Todos() {
       <div className="flex flex-wrap items-center gap-3">
         {/* Status tabs */}
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setStatusFilter('ACTIVE')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === 'ACTIVE'
+                ? 'bg-accent text-text-inverse'
+                : 'text-text-secondary hover:text-text hover:bg-surface-raised'
+            }`}
+          >
+            {t.todos.activeStatuses}
+          </button>
           <button
             onClick={() => setStatusFilter('ALL')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
@@ -474,31 +545,21 @@ export function Todos() {
       )}
 
       {/* Content: List or Board */}
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && !boardStillLoading ? (
         <EmptyState
           icon={<CheckSquare className="w-8 h-8 text-text-tertiary" />}
-          title={search || statusFilter !== 'ALL' || tagFilter ? t.common.noResults : t.todos.title}
-          description={search || statusFilter !== 'ALL' || tagFilter ? undefined : t.todos.noTodos}
+          title={hasAnyTodos ? t.common.noResults : t.todos.title}
+          description={hasAnyTodos ? undefined : t.todos.noTodos}
         />
-      ) : viewMode === 'board' ? (
-        <>
-          <TodoKanbanView
-            todos={filtered}
-            onEdit={openEdit}
-            onStatusChange={handleStatusChange}
-            onResolve={handleResolve}
-            resolveLoadingId={resolveTodo.variables ?? null}
-            totalCounts={statusFilter === 'ALL' ? counts ?? undefined : undefined}
-            highlightId={highlightId}
-          />
-          {todosPage && todosPage.totalElements > KANBAN_PAGE_SIZE && (
-            <p className="text-xs text-text-tertiary text-center mt-2">
-              {t.todos.kanbanTruncated
-                .replace('{shown}', String(filtered.length))
-                .replace('{total}', String(todosPage.totalElements))}
-            </p>
-          )}
-        </>
+      ) : isBoard ? (
+        <TodoKanbanView
+          columns={boardColumns}
+          onEdit={openEdit}
+          onStatusChange={handleStatusChange}
+          onResolve={handleResolve}
+          resolveLoadingId={resolveTodo.variables ?? null}
+          highlightId={highlightId}
+        />
       ) : (
         <>
           <Card padding={false}>

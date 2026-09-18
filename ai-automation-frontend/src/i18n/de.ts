@@ -1554,6 +1554,7 @@ export const de: TranslationKeys = {
     tags: 'Tags',
     tagsHint: 'Kommagetrennt',
     allStatuses: 'Alle',
+    activeStatuses: 'Offen & in Arbeit',
     allSources: 'Alle Quellen',
     allProjects: 'Alle Projekte',
     statuses: {
@@ -1577,7 +1578,7 @@ export const de: TranslationKeys = {
     sessionId: 'Session',
     showMoreTags: 'Mehr anzeigen',
     showLessTags: 'Weniger anzeigen',
-    kanbanTruncated: '{shown} von {total} Einträgen angezeigt. Verwende Filter oder wechsle zur Listenansicht.',
+    columnTruncated: '{shown} von {total} {label} angezeigt',
     moreItems: 'weitere',
     viewList: 'Liste',
     viewBoard: 'Board',
