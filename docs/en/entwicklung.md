@@ -337,6 +337,39 @@ There are two types of git tags:
 | `v0.1.1` | `release.sh` | Semver release marker |
 | `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
 
+### Behavior Changes
+
+Changes that can affect the runtime behavior of existing, self-operated workflows — not just new
+features. Read this before a release if you maintain your own workflow definitions.
+
+**Since 2026-09-18 (commit afa0cdfc): platform data in shell fields taints the run.**
+If you use `{{ previous_report }}` or `{{ open_todos }}` in a shell field of a workflow (e.g.
+`command`, `items_command`), then from this version on, block outputs later in the same run
+(`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) are
+also automatically wrapped in POSIX single quotes — exactly as with a webhook-triggered run. If you
+previously passed such an output unquoted to a following command and relied on the shell's word
+splitting (`some_cmd {{ previous_output }}` became several arguments, one per word), you now get
+**a single quoted argument** instead.
+
+- **How to recognize it:** A following command that used to read several words/arguments from a
+  block output (e.g. `$1`, `$2`, … or a `for word in {{ previous_output }}` loop) now sees only one
+  combined argument, or a loop with exactly one iteration.
+- **Why:** `previous_report` and `open_todos` are treated as untrusted (they can carry content from
+  earlier, possibly webhook-processed runs, or titles from imported issues) and are therefore always
+  quoted. As soon as a shell field actually substitutes one of these placeholders, the whole run is
+  "tainted" from that point on — the same rule as for webhook payloads.
+- **Getting the old behavior back:**
+  - Write the platform data into your own variable first (`setVariable`, or a file) instead of using
+    it directly in the same shell field — a value that comes from the definition or from a
+    self-set variable counts as trusted again and does not taint the run.
+  - Or deliberately work without quoting: redesign the following command so a single quoted argument
+    is enough (e.g. have it expect the argument in quotes instead of splitting it itself).
+  - Among the shipped definitions, one built-in is affected (`saas-continuous-improve.json`); its
+    following block is an AI prompt, whose behavior does not change.
+
+Details on the three trust classes and taint propagation:
+[deployment.md → Trust Model and Network Exposure](deployment.md#trust-model-and-network-exposure).
+
 ## Project Conventions
 
 ### Backend

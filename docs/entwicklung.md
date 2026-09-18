@@ -337,6 +337,43 @@ Es gibt zwei Arten von Git-Tags:
 | `v0.1.1` | `release.sh` | Semver-Release-Markierung |
 | `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |
 
+### Verhaltensänderungen
+
+Änderungen, die das Laufzeitverhalten bestehender, selbst betriebener Workflows beeinflussen
+können — nicht nur neue Features. Vor einem Release lesen, wer eigene Workflow-Definitionen pflegt.
+
+**Seit 2026-09-18 (Commit afa0cdfc): Plattform-Daten in Shell-Feldern färben den Lauf.**
+Wer `{{ previous_report }}` oder `{{ open_todos }}` in einem Shell-Feld eines Workflows verwendet
+(z. B. `command`, `items_command`), sorgt ab dieser Version dafür, dass **danach** im selben Lauf
+auch Blockausgaben (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`,
+`foreach`-Items) automatisch in POSIX-Single-Quotes gesetzt werden — genau wie bei einem
+webhook-ausgelösten Lauf. Wer eine solche Ausgabe bisher unquoted an einen Folgebefehl übergeben hat
+und sich dabei auf die Wortauftrennung der Shell verlassen hat (`some_cmd {{ previous_output }}`
+wurde zu mehreren Argumenten, eines je Wort), bekommt ab jetzt stattdessen **ein einzelnes
+gequotetes Argument**.
+
+- **Woran erkennbar:** Ein Folgebefehl, der vorher mehrere Wörter/Argumente aus einer Blockausgabe
+  gelesen hat (z. B. `$1`, `$2`, … oder eine `for word in {{ previous_output }}`-Schleife), sieht
+  nach dem Update nur noch ein zusammenhängendes Argument bzw. eine Schleife mit genau einem
+  Durchlauf.
+- **Warum:** `previous_report` und `open_todos` gelten als nicht vertrauenswürdig (sie können Inhalte
+  aus früheren, ggf. webhook-verarbeiteten Läufen bzw. aus importierten Issues enthalten) und werden
+  deshalb immer gequotet. Sobald ein Shell-Feld einen dieser Platzhalter tatsächlich einsetzt, gilt
+  der gesamte Lauf ab diesem Punkt als „gefärbt" — dieselbe Regel wie bei Webhook-Payloads.
+- **Altes Verhalten wiederherstellen:**
+  - Plattform-Daten vor der Nutzung in eine eigene Variable schreiben/zwischenspeichern
+    (`setVariable` bzw. eine Datei), statt sie direkt im selben Shell-Feld zu verwenden — ein Wert,
+    der aus der Definition bzw. einer selbst gesetzten Variable stammt, gilt wieder als
+    vertrauenswürdig und färbt den Lauf nicht.
+  - Oder bewusst ohne Quoting arbeiten: den Folgebefehl so umbauen, dass ein einzelnes gequotetes
+    Argument ausreicht (z. B. das Argument in Anführungszeichen erwarten, statt es selbst
+    aufzuteilen).
+  - In den ausgelieferten Definitionen ist ein Built-in betroffen (`saas-continuous-improve.json`);
+    der Folgeblock dort ist ein KI-Prompt, für den sich am Verhalten nichts ändert.
+
+Details zu den drei Vertrauensklassen und zur Taint-Propagation:
+[deployment.md → Vertrauensmodell und Netzwerk-Exposition](deployment.md#vertrauensmodell-und-netzwerk-exposition).
+
 ## Projektkonventionen
 
 ### Backend
