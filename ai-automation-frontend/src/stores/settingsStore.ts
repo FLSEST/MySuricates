@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/** Bounds for the todo page sizes — small enough to stay responsive, large enough to be useful. */
+export const PAGE_SIZE_MIN = 10;
+export const PAGE_SIZE_MAX = 200;
+
+/** Clamps a user-entered page size into [PAGE_SIZE_MIN, PAGE_SIZE_MAX]; garbage falls back to the max. */
+export function clampPageSize(value: number): number {
+  if (!Number.isFinite(value)) return PAGE_SIZE_MAX;
+  return Math.min(PAGE_SIZE_MAX, Math.max(PAGE_SIZE_MIN, Math.floor(value)));
+}
+
 interface SettingsState {
   apiKey: string;
   simpleMode: boolean;
@@ -16,6 +26,10 @@ interface SettingsState {
   sidebarHiddenItems: string[];
   pinnedWorkflowIds: string[];
   simpleOnboardingSeen: boolean;
+  /** Todos list view: rows per page. */
+  listPageSize: number;
+  /** Todos board view: cards loaded per kanban column (one query per column). */
+  kanbanColumnSize: number;
   setApiKey: (key: string) => void;
   setSimpleMode: (enabled: boolean) => void;
   setAdvancedMode: (enabled: boolean) => void;
@@ -30,6 +44,8 @@ interface SettingsState {
   setSidebarHiddenItems: (hidden: string[]) => void;
   togglePinnedWorkflow: (id: string) => void;
   setSimpleOnboardingSeen: (seen: boolean) => void;
+  setListPageSize: (size: number) => void;
+  setKanbanColumnSize: (size: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -49,6 +65,8 @@ export const useSettingsStore = create<SettingsState>()(
       sidebarHiddenItems: [],
       pinnedWorkflowIds: [],
       simpleOnboardingSeen: false,
+      listPageSize: 30,
+      kanbanColumnSize: 50,
       setApiKey: (apiKey) => set({ apiKey }),
       setSimpleMode: (simpleMode) => set({ simpleMode }),
       setAdvancedMode: (advancedMode) => set({ advancedMode }),
@@ -68,6 +86,8 @@ export const useSettingsStore = create<SettingsState>()(
             : [...state.pinnedWorkflowIds, id],
         })),
       setSimpleOnboardingSeen: (simpleOnboardingSeen) => set({ simpleOnboardingSeen }),
+      setListPageSize: (size) => set({ listPageSize: clampPageSize(size) }),
+      setKanbanColumnSize: (size) => set({ kanbanColumnSize: clampPageSize(size) }),
     }),
     { name: 'app-settings' }
   )

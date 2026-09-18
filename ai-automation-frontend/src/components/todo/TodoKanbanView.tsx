@@ -1,12 +1,12 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
-import { Badge } from '../ui';
+import { Badge, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { priorityColor, formatRelative } from './todoConstants';
-import type { Todo, TodoStatus, TodoCountResponse } from '../../types';
+import type { Todo, TodoStatus } from '../../types';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children: string }) {
   return <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>;
@@ -174,55 +174,72 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
 });
 
 /* ─── Kanban Board ──────────────────────────────────────── */
-export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resolveLoadingId, totalCounts, highlightId }: {
+
+/** One column = the result of its own `status=` query (see useTodoColumn). */
+export interface TodoKanbanColumn {
+  status: TodoStatus;
+  /** The cards loaded for this column (at most the configured column size). */
   todos: Todo[];
+  /** Total number of todos with this status on the server — drives the truncation hint. */
+  total: number;
+  isLoading?: boolean;
+}
+
+const COLUMN_STYLE: Record<TodoStatus, { color: string; borderColor: string }> = {
+  OPEN: { color: 'text-text-tertiary', borderColor: 'border-text-tertiary/30' },
+  IN_PROGRESS: { color: 'text-warning', borderColor: 'border-warning/30' },
+  DONE: { color: 'text-success', borderColor: 'border-success/30' },
+  BACKLOG: { color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
+  ARCHIVED: { color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
+};
+
+/** Static class names so Tailwind keeps them (no dynamic `md:grid-cols-${n}`). */
+const GRID_COLS: Record<number, string> = {
+  1: 'md:grid-cols-1',
+  2: 'md:grid-cols-2',
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  5: 'md:grid-cols-5',
+};
+
+export function TodoKanbanView({ columns, onEdit, onStatusChange, onResolve, resolveLoadingId, highlightId }: {
+  columns: TodoKanbanColumn[];
   onEdit: (todo: Todo) => void;
   onStatusChange: (todo: Todo, status: TodoStatus) => void;
   onResolve: (todo: Todo) => void;
   resolveLoadingId?: string | null;
-  totalCounts?: TodoCountResponse;
   highlightId?: string | null;
 }) {
   const t = useT();
 
-  const columns: { status: TodoStatus; label: string; color: string; borderColor: string }[] = [
-    { status: 'OPEN', label: t.todos.statuses.OPEN, color: 'text-text-tertiary', borderColor: 'border-text-tertiary/30' },
-    { status: 'IN_PROGRESS', label: t.todos.statuses.IN_PROGRESS, color: 'text-warning', borderColor: 'border-warning/30' },
-    { status: 'DONE', label: t.todos.statuses.DONE, color: 'text-success', borderColor: 'border-success/30' },
-    { status: 'BACKLOG', label: t.todos.statuses.BACKLOG, color: 'text-text-tertiary/60', borderColor: 'border-text-tertiary/20' },
-  ];
-
-  const totalCountMap: Record<TodoStatus, number | undefined> = totalCounts
-    ? { OPEN: totalCounts.open, IN_PROGRESS: totalCounts.inProgress, DONE: totalCounts.done, BACKLOG: totalCounts.backlog, ARCHIVED: totalCounts.archived }
-    : { OPEN: undefined, IN_PROGRESS: undefined, DONE: undefined, BACKLOG: undefined, ARCHIVED: undefined };
-
-  const grouped = useMemo(() => {
-    const map: Record<TodoStatus, Todo[]> = { OPEN: [], IN_PROGRESS: [], DONE: [], BACKLOG: [], ARCHIVED: [] };
-    todos.forEach((todo) => map[todo.status]?.push(todo));
-    return map;
-  }, [todos]);
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {columns.map(({ status, label, color, borderColor }) => {
-        const loadedCount = grouped[status].length;
-        const realTotal = totalCountMap[status];
-        const isTruncated = realTotal !== undefined && realTotal > loadedCount;
+    <div className={`grid grid-cols-1 ${GRID_COLS[columns.length] ?? 'md:grid-cols-4'} gap-4`}>
+      {columns.map(({ status, todos, total, isLoading }) => {
+        const label = t.todos.statuses[status];
+        const { color, borderColor } = COLUMN_STYLE[status];
+        const loadedCount = todos.length;
+        const isTruncated = total > loadedCount;
         return (
-        <div key={status} className={`rounded-xl border-2 ${borderColor} bg-surface-raised/30 p-3`}>
+        <div
+          key={status}
+          data-testid={`kanban-column-${status}`}
+          className={`rounded-xl border-2 ${borderColor} bg-surface-raised/30 p-3`}
+        >
           {/* Column header */}
           <div className="flex items-center justify-between mb-3">
             <h3 className={`text-sm font-semibold ${color}`}>{label}</h3>
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${color} bg-surface-raised`}>
-              {isTruncated ? `${loadedCount} / ${realTotal}` : (realTotal ?? loadedCount)}
+              {isTruncated ? `${loadedCount} / ${total}` : total}
             </span>
           </div>
           {/* Cards */}
           <div className="space-y-2">
-            {grouped[status].length === 0 ? (
+            {isLoading && loadedCount === 0 ? (
+              <Spinner size="sm" />
+            ) : loadedCount === 0 ? (
               <div className="text-center py-6 text-xs text-text-tertiary">—</div>
             ) : (
-              grouped[status].map((todo) => (
+              todos.map((todo) => (
                 <KanbanCard
                   key={todo.id}
                   todo={todo}
@@ -235,9 +252,12 @@ export function TodoKanbanView({ todos, onEdit, onStatusChange, onResolve, resol
               ))
             )}
             {isTruncated && (
-              <div className="text-center py-2 text-[10px] text-text-tertiary">
-                +{realTotal - loadedCount} {t.todos.moreItems}
-              </div>
+              <p className="text-center py-2 text-[10px] text-text-tertiary">
+                {t.todos.columnTruncated
+                  .replace('{shown}', String(loadedCount))
+                  .replace('{total}', String(total))
+                  .replace('{label}', label)}
+              </p>
             )}
           </div>
         </div>

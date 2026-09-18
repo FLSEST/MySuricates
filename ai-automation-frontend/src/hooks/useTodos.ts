@@ -4,23 +4,63 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { Todo, CreateTodoRequest, UpdateTodoRequest, TodoCountResponse, TodoStatus, PageResponse, WorkflowRun } from '../types';
 
-export function useTodos(params?: Record<string, string>, page = 0, size = 50) {
+/** Poll faster while a fix run is resolving one of the loaded todos. */
+function resolvingRefetchInterval(query: { state: { data?: PageResponse<Todo> } }) {
+  const data = query.state.data;
+  const hasResolvingTodos = data?.content?.some((todo) => todo.status === 'IN_PROGRESS' && !!todo.lastFixRunId);
+  return hasResolvingTodos ? 5_000 : 60_000;
+}
+
+/** Appends one filter value or a list of them (e.g. status=OPEN&status=IN_PROGRESS). */
+function appendFilters(target: URLSearchParams, params?: Record<string, string | string[]>) {
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (Array.isArray(value)) value.forEach((v) => { if (v) target.append(key, v); });
+    else if (value) target.set(key, value);
+  });
+}
+
+export function useTodos(params?: Record<string, string | string[]>, page = 0, size = 50, enabled = true) {
   return useQuery({
     queryKey: ['todos', params, page, size],
     queryFn: () => {
       const searchParams = new URLSearchParams();
       searchParams.set('page', String(page));
       searchParams.set('size', String(size));
-      if (params) {
-        Object.entries(params).forEach(([k, v]) => { if (v) searchParams.set(k, v); });
-      }
+      appendFilters(searchParams, params);
       return api.get<PageResponse<Todo>>(`/todos?${searchParams.toString()}`);
     },
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      const hasResolvingTodos = data?.content?.some((todo) => todo.status === 'IN_PROGRESS' && !!todo.lastFixRunId);
-      return hasResolvingTodos ? 5_000 : 60_000;
+    enabled,
+    refetchInterval: resolvingRefetchInterval,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * One kanban column = one query, always with its own `status` parameter.
+ *
+ * Never slice a mixed page across columns: the list is sorted by recency, so with a
+ * DONE-dominated backlog (1 700 DONE vs. 141 OPEN) the newest N rows contain almost
+ * no OPEN todos and the OPEN column starves (b12a1085).
+ */
+export function useTodoColumn(
+  status: TodoStatus,
+  size: number,
+  filters?: Record<string, string>,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['todos', 'column', status, size, filters],
+    queryFn: () => {
+      const sp = new URLSearchParams();
+      sp.set('page', '0');
+      sp.set('size', String(size));
+      sp.set('status', status);
+      appendFilters(sp, filters);
+      return api.get<PageResponse<Todo>>(`/todos?${sp.toString()}`);
     },
+    enabled,
+    refetchInterval: resolvingRefetchInterval,
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   });
