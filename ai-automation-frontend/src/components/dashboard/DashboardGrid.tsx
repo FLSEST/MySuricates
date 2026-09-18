@@ -1,25 +1,19 @@
 import {
   DndContext,
-  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  rectSortingStrategy,
-  sortableKeyboardCoordinates,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { EyeOff, GripVertical, Plus } from 'lucide-react';
+import { SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { Plus } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
-import type { WidgetConfig } from './dashboardLayout';
-import { WidgetFrame } from './WidgetFrame';
-import { WIDGET_SIZE_CLASSES } from './widgetRegistry';
+import { staticSortingStrategy, widgetCollisionDetection } from './dashboardDnd';
+import { SortableWidgetSlot } from './SortableWidgetSlot';
+import { WidgetContent } from './WidgetContent';
+import { SLOT_CLASSES, widgetSizeClasses } from './widgetSlot';
 
 interface DashboardGridProps {
   widgets: ResolvedWidget[];
@@ -28,26 +22,6 @@ interface DashboardGridProps {
   disabled?: boolean;
   onMove: (activeInstanceId: string, overInstanceId: string) => void;
   onHide: (instanceId: string) => void;
-}
-
-// grid + minmax(0,1fr) lets the card fill the slot in both axes without overflowing (charts).
-const SLOT_CLASSES = 'grid grid-cols-1 grow min-w-0';
-
-const NO_CONFIG: WidgetConfig = Object.freeze({});
-
-function widgetSizeClasses({ def, instance }: ResolvedWidget): string {
-  return WIDGET_SIZE_CLASSES[instance.size ?? def.size];
-}
-
-/** The widget inside its error boundary. Renders no DOM of its own, so empty widgets stay empty. */
-function WidgetContent({ widget }: { widget: ResolvedWidget }) {
-  const t = useT();
-  const Widget = widget.def.component;
-  return (
-    <WidgetFrame label={widget.def.label(t)}>
-      <Widget instanceId={widget.instance.instanceId} config={widget.instance.config ?? NO_CONFIG} />
-    </WidgetFrame>
-  );
 }
 
 export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onHide }: DashboardGridProps) {
@@ -79,71 +53,15 @@ export function DashboardGrid({ widgets, editMode, disabled = false, onMove, onH
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={widgets.map((w) => w.instance.instanceId)} strategy={rectSortingStrategy}>
+    <DndContext sensors={sensors} collisionDetection={widgetCollisionDetection} onDragEnd={handleDragEnd}>
+      <SortableContext items={widgets.map((w) => w.instance.instanceId)} strategy={staticSortingStrategy}>
         <div className="flex flex-wrap gap-4 pt-3">
           {widgets.map((widget) => (
-            <SortableWidget key={widget.instance.instanceId} widget={widget} disabled={disabled} onHide={onHide} />
+            <SortableWidgetSlot key={widget.instance.instanceId} widget={widget} disabled={disabled} onHide={onHide} />
           ))}
         </div>
       </SortableContext>
     </DndContext>
-  );
-}
-
-function SortableWidget({ widget, disabled, onHide }: {
-  widget: ResolvedWidget;
-  disabled: boolean;
-  onHide: (instanceId: string) => void;
-}) {
-  const t = useT();
-  const { def, instance } = widget;
-  const label = def.label(t);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: instance.instanceId, disabled });
-
-  return (
-    <div
-      ref={setNodeRef}
-      data-widget-id={instance.instanceId}
-      data-widget-type={def.id}
-      // Translate, not Transform: slots differ in size and must not be scaled while sorting.
-      style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`${SLOT_CLASSES} ${widgetSizeClasses(widget)} relative rounded-xl outline-2 outline-dashed outline-offset-2 ${
-        isDragging ? 'z-20 outline-accent opacity-80 shadow-lg' : 'outline-accent/40'
-      }`}
-    >
-      {/* Content stays visible but inert — no navigation while arranging. */}
-      <div className="peer grid grid-cols-1 select-none" inert>
-        <WidgetContent widget={widget} />
-      </div>
-      <div className="hidden peer-empty:flex min-h-20 flex-col justify-center rounded-xl border border-card-border bg-surface-raised px-4 py-3">
-        <p className="text-sm font-medium text-text-secondary truncate">{label}</p>
-        <p className="text-xs text-text-tertiary">{t.dashboard.widgetNoData}</p>
-      </div>
-      <div className="absolute -top-3 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-border bg-surface-overlay p-0.5 shadow-sm">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          disabled={disabled}
-          className="cursor-grab touch-none rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-text active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`${t.dashboard.moveWidget}: ${label}`}
-          title={t.dashboard.moveWidget}
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onHide(instance.instanceId)}
-          disabled={disabled}
-          className="rounded-md p-1 text-text-secondary hover:bg-surface-hover hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`${t.dashboard.hideWidget}: ${label}`}
-          title={t.dashboard.hideWidget}
-        >
-          <EyeOff className="w-3.5 h-3.5" />
-        </button>
-      </div>
-    </div>
   );
 }
 
