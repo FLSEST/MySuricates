@@ -129,6 +129,30 @@ check "'vordefinierte Workflow-Vorlagen' erkannt" 'grep -qE "^DRIFT docs/wording
 check "'predefined workflow templates' erkannt"   'grep -qE "^DRIFT docs/wording.md:3 templates sagt 44, Code 6" <<<"$OUT"'
 rm "$FAKE/docs/wording.md"
 
+echo "4e) Zusatz zwischen Beiwort und Substantiv ('19 Built-in + benutzerdefinierte Skills')"
+cat > "$FAKE/docs/zusatz.md" <<'MD_EOF'
+# Glossar
+Wiederverwendbarer Automatisierungsbaustein. 16 Built-in + benutzerdefinierte Skills.
+Reusable automation building block. 16 built-in + user-defined skills.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "'Built-in + benutzerdefinierte Skills' erkannt" 'grep -qE "^DRIFT docs/zusatz.md:2 skills sagt 16, Code 3" <<<"$OUT"'
+check "'built-in + user-defined skills' erkannt"       'grep -qE "^DRIFT docs/zusatz.md:3 skills sagt 16, Code 3" <<<"$OUT"'
+rm "$FAKE/docs/zusatz.md"
+
+echo "4f) Teilspanne des Grundschemas ist kein Migrationsstand"
+cat > "$FAKE/docs/grundschema.md" <<'MD_EOF'
+# Migrationen
+Die folgende Tabelle beschreibt das Grundschema (V1-V2). V3-V5 ergaenzen Spalten und Indizes.
+The table below describes the base schema (V1-V2). V3-V5 mostly add columns.
+Flyway-Migrationen: V1-V2 (SQLite)
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Grundschema-Zeile DE ohne Befund" '! grep -qE "^DRIFT docs/grundschema.md:2" <<<"$OUT"'
+check "Grundschema-Zeile EN ohne Befund" '! grep -qE "^DRIFT docs/grundschema.md:3" <<<"$OUT"'
+check "echte Standangabe weiter gemeldet" 'grep -qE "^DRIFT docs/grundschema.md:4 migration-max sagt 2, Code 5" <<<"$OUT"'
+rm "$FAKE/docs/grundschema.md"
+
 echo "4c) Deutscher Dativ-Plural wird erfasst"
 cat > "$FAKE/docs/dativ.md" <<'MD_EOF'
 # Dativ

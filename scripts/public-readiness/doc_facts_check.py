@@ -24,8 +24,11 @@ import sys
 # ihre Zahlen SIND der Befund von damals, sie duerfen nicht mitwandern.
 # README.md steht nicht im Pruefumfang — es wird aus README.de.md erzeugt.
 # ---------------------------------------------------------------------------
+# docs/analysis.md, docs/plans/ und docs/specs/ sind seit 089473cd/72900609 aus dem
+# getrackten Bestand genommen und ignoriert. In einer Arbeitskopie liegen sie oft
+# trotzdem herum — sie sollen die Release-Frage nicht beeinflussen.
 EXCLUDED_FILES = {"docs/analysis.md", "docs/en/analysis.md", "README.md"}
-EXCLUDED_PREFIXES = ("docs/plans/",)
+EXCLUDED_PREFIXES = ("docs/plans/", "docs/specs/")
 
 # Zeilen mit diesem Marker werden uebersprungen (bewusst alte Zahl im Fliesstext).
 IGNORE_MARKER = "doc-facts-check: ignore"
@@ -68,10 +71,12 @@ PATTERNS = {
         r"\b(\d+)\s+(?:built-?in|workflow|pre-?built|pre-?defined)[- ]"
         r"(?:workflow )?templates?\b",
     ],
-    # Built-in-Skills.
+    # Built-in-Skills. Der optionale "+ <Wort>"-Einschub fängt die Glossar-Formel
+    # „19 Built-in + benutzerdefinierte Skills" / „19 built-in + user-defined skills":
+    # die Zahl gilt dort nur dem ersten Teil, der Zusatz steht bloß dazwischen.
     "skills": [
-        r"\b(\d+)\s+(?:Built-?in|eingebaute|vordefinierte)[- ][Ss]kills?\b",
-        r"\b(\d+)\s+(?:built-?in|predefined|pre-?defined)[- ]skills?\b",
+        r"\b(\d+)\s+(?:Built-?in|eingebaute|vordefinierte)(?:\s*\+\s*\S+)?[- ][Ss]kills?\b",
+        r"\b(\d+)\s+(?:built-?in|predefined|pre-?defined)(?:\s*\+\s*\S+)?[- ]skills?\b",
     ],
     # Integrations-Provider. "KI-Provider" (Claude/Codex/Pi) ist etwas anderes
     # und faellt heraus, weil nur "Integrations-" als Beiwort erlaubt ist.
@@ -89,6 +94,23 @@ COMPILED = {name: [re.compile(p) for p in pats] for name, pats in PATTERNS.items
 
 def is_excluded(rel):
     return rel in EXCLUDED_FILES or rel.startswith(EXCLUDED_PREFIXES)
+
+
+_CURRENT_V = {}
+
+
+def names_current_migration(line, expected):
+    """Nennt die Zeile die hoechste Migration bereits selbst?
+
+    Dann ist ein zusaetzliches "V1-Vn" darin eine Teilspanne und keine
+    Standangabe. docs/onboarding/ARCHITECTURE.md schreibt genau so:
+    "Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73
+    ergaenzen ueberwiegend Spalten und Indizes." — V1-V19 ist dort richtig.
+    """
+    regex = _CURRENT_V.get(expected)
+    if regex is None:
+        regex = _CURRENT_V[expected] = re.compile(rf"\bV{expected}\b")
+    return bool(regex.search(line))
 
 
 def scan(root, rel, facts, findings):
@@ -110,6 +132,8 @@ def scan(root, rel, facts, findings):
             if expected is None:
                 continue
             if is_table and name in TABLE_EXEMPT:
+                continue
+            if name == "migration-max" and names_current_migration(line, expected):
                 continue
             for regex in regexes:
                 for match in regex.finditer(line):
