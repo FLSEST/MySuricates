@@ -9,6 +9,7 @@ import com.automation.modules.ModuleRegistry;
 import com.automation.repository.AuditFindingOccurrenceRepository;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditFindingTodoRepository;
+import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -47,6 +48,7 @@ public class AuditFingerprintMigrationJob {
     private final AuditFindingRepository findingRepository;
     private final AuditFindingTodoRepository findingTodoRepository;
     private final AuditFindingOccurrenceRepository occurrenceRepository;
+    private final TodoRepository todoRepository;
     private final TransactionTemplate transactionTemplate;
     private final ModuleRegistry modules;
 
@@ -55,18 +57,31 @@ public class AuditFingerprintMigrationJob {
         if (!modules.isEnabled(ModuleCatalog.AUDIT)) {
             return;
         }
-        List<Scope> scopes = transactionTemplate.execute(status -> findingRepository.findAll().stream()
-                .map(finding -> new Scope(finding.getProjectId(), finding.getAuditKey())).distinct().toList());
+        List<Scope> scopes;
+        try {
+            scopes = transactionTemplate.execute(status -> findingRepository.findDistinctScopes().stream()
+                    .map(row -> new Scope((String) row[0], (String) row[1])).toList());
+        } catch (Exception e) {
+            log.error("Audit fingerprint migration could not read its scopes, skipping the run: {}", e.toString(), e);
+            return;
+        }
         if (scopes == null || scopes.isEmpty()) {
             return;
         }
         int merged = 0;
         int rehashed = 0;
         for (Scope scope : scopes) {
-            int[] counts = transactionTemplate.execute(status -> migrateScope(scope));
-            if (counts != null) {
-                merged += counts[0];
-                rehashed += counts[1];
+            // Ein kaputter Scope (Constraint, SQLITE_BUSY) darf weder die uebrigen noch den
+            // Backend-Start blockieren — der Job ist idempotent und holt ihn beim naechsten Mal nach.
+            try {
+                int[] counts = transactionTemplate.execute(status -> migrateScope(scope));
+                if (counts != null) {
+                    merged += counts[0];
+                    rehashed += counts[1];
+                }
+            } catch (Exception e) {
+                log.error("Audit fingerprint migration failed for project {} / audit {}, left unchanged: {}",
+                        scope.projectId(), scope.auditKey(), e.toString(), e);
             }
         }
         if (merged > 0 || rehashed > 0) {
@@ -87,7 +102,13 @@ public class AuditFingerprintMigrationJob {
             List<AuditFinding> sorted = new ArrayList<>(group.getValue());
             sorted.sort(OLDEST_FIRST);
             AuditFinding target = sorted.get(0);
+            String targetSubject = target.getSubject();
             for (AuditFinding duplicate : sorted.subList(1, sorted.size())) {
+                // Das Loeschen ist nicht umkehrbar — beide Roh-Subjects bleiben im Log nachvollziehbar.
+                log.info("Audit fingerprint merge: finding {} (subject \"{}\") into {} (subject \"{}\") — "
+                                + "ruleKey {}, project {}, audit {}",
+                        duplicate.getId(), duplicate.getSubject(), target.getId(), targetSubject,
+                        target.getRuleKey(), target.getProjectId(), target.getAuditKey());
                 mergeInto(target, duplicate);
                 relinkTodos(target, duplicate);
                 relinkOccurrences(target, duplicate);
@@ -129,38 +150,45 @@ public class AuditFingerprintMigrationJob {
             target.setEvidence(duplicate.getEvidence());
             target.setTags(duplicate.getTags());
         }
-        if (target.getDispositionNote() == null && duplicate.getDispositionNote() != null) {
-            target.setDispositionNote(duplicate.getDispositionNote());
-            target.setDispositionEvidence(duplicate.getDispositionEvidence());
-            target.setDispositionAt(duplicate.getDispositionAt());
-        }
-        target.setStatus(mergedStatus(target.getStatus(), duplicate.getStatus()));
-        if (target.getStatus() == AuditFindingStatus.OPEN) {
-            target.setResolvedAt(null);
-        }
+        applyStatusAndDisposition(target, duplicate);
     }
 
     /**
-     * Ein offener oder wiedervorgelegter Wiedergaenger zieht das Ziel aus {@code RESOLVED} heraus —
-     * aber niemals aus einer menschlichen Disposition ({@code ACCEPTED_RISK}, {@code DISMISSED}).
-     * Genau diese Wiedergaenger haben die Akzeptanzen bisher unterlaufen; wiedereroeffnet wird ein
-     * akzeptiertes Risiko allein ueber {@link AuditAcceptancePolicy} (belegte Verschlechterung).
+     * Status und Disposition wandern immer <em>zusammen</em>: eine menschliche Disposition
+     * ({@code ACCEPTED_RISK}, {@code DISMISSED}) schlaegt, egal auf welcher Seite sie steht — beim
+     * wahrscheinlichsten Drift-Verlauf ist das aeltere Finding auto-resolved und der juengere
+     * Wiedergaenger der akzeptierte. Genau diese Wiedergaenger haben die Akzeptanzen bisher
+     * unterlaufen; wiedereroeffnet wird ein akzeptiertes Risiko allein ueber
+     * {@link AuditAcceptancePolicy} (belegte Verschlechterung). Ohne Disposition im Spiel zieht ein
+     * offener oder wiedervorgelegter Wiedergaenger das Ziel aus {@code RESOLVED} heraus.
      */
-    private static AuditFindingStatus mergedStatus(AuditFindingStatus target, AuditFindingStatus duplicate) {
-        if (target == AuditFindingStatus.ACCEPTED_RISK || target == AuditFindingStatus.DISMISSED) {
-            return target;
+    private static void applyStatusAndDisposition(AuditFinding target, AuditFinding duplicate) {
+        if (isDisposed(target.getStatus())) {
+            return;
         }
-        if (target == AuditFindingStatus.OPEN || duplicate == AuditFindingStatus.OPEN) {
-            return AuditFindingStatus.OPEN;
+        if (isDisposed(duplicate.getStatus())) {
+            target.setStatus(duplicate.getStatus());
+            target.setDispositionNote(duplicate.getDispositionNote());
+            target.setDispositionEvidence(duplicate.getDispositionEvidence());
+            target.setDispositionAt(duplicate.getDispositionAt());
+            target.setResolvedAt(duplicate.getResolvedAt());
+            return;
         }
-        if (target == AuditFindingStatus.AWAITING_VERIFICATION || duplicate == AuditFindingStatus.AWAITING_VERIFICATION) {
-            return AuditFindingStatus.AWAITING_VERIFICATION;
+        if (target.getStatus() == AuditFindingStatus.OPEN || duplicate.getStatus() == AuditFindingStatus.OPEN) {
+            target.setStatus(AuditFindingStatus.OPEN);
+            target.setResolvedAt(null);
+        } else if (duplicate.getStatus() == AuditFindingStatus.AWAITING_VERIFICATION) {
+            target.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
         }
-        return target;
+    }
+
+    private static boolean isDisposed(AuditFindingStatus status) {
+        return status == AuditFindingStatus.ACCEPTED_RISK || status == AuditFindingStatus.DISMISSED;
     }
 
     private void relinkTodos(AuditFinding target, AuditFinding duplicate) {
         for (AuditFindingTodo link : findingTodoRepository.findByFindingId(duplicate.getId())) {
+            repointTodoReference(target, duplicate, link.getTodoId());
             Optional<AuditFindingTodo> existing =
                     findingTodoRepository.findByFindingIdAndTodoId(target.getId(), link.getTodoId());
             if (existing.isPresent()) {
@@ -172,6 +200,16 @@ public class AuditFingerprintMigrationJob {
                 link.setFindingId(target.getId());
             }
         }
+    }
+
+    /** Sonst zeigen der Deep-Link {@code /reports?finding=…} und {@code todo_reference_id} ins Leere. */
+    private void repointTodoReference(AuditFinding target, AuditFinding duplicate, String todoId) {
+        todoRepository.findById(todoId).ifPresent(todo -> {
+            if (AuditIngestionService.REFERENCE_TYPE.equals(todo.getReferenceType())
+                    && duplicate.getId().equals(todo.getReferenceId())) {
+                todo.setReferenceId(target.getId());
+            }
+        });
     }
 
     private void relinkOccurrences(AuditFinding target, AuditFinding duplicate) {

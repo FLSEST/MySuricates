@@ -1,5 +1,9 @@
 package com.automation.service.audit;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.entity.*;
 import com.automation.repository.AuditFindingOccurrenceRepository;
 import com.automation.repository.AuditFindingRepository;
@@ -8,14 +12,17 @@ import com.automation.repository.AuditReportRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +51,8 @@ class AuditFingerprintMigrationJobTest {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private EntityManager entityManager;
 
+    private final List<ListAppender<ILoggingEvent>> appenders = new ArrayList<>();
+    private Level previousLogLevel;
     private String projectId;
     private String reportOld;
     private String reportNew;
@@ -71,10 +80,17 @@ class AuditFingerprintMigrationJobTest {
                 .referenceType("audit_finding").referenceId(newer.getId()).build()).getId();
         findingTodoRepository.save(AuditFindingTodo.builder()
                 .findingId(newer.getId()).todoId(todoId).managed(true).build());
+        ListAppender<ILoggingEvent> log = attachLogAppender();
 
         job.migrate();
         entityManager.flush();
         entityManager.clear();
+
+        String messages = String.join("\n", log.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
+        assertThat(messages).as("irreversibles Loeschen wird protokolliert")
+                .contains(newer.getId()).contains(older.getId())
+                .contains("ContainerShellService.execute").contains("ContainerShellService")
+                .contains(RULE_KEY);
 
         List<AuditFinding> remaining = findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY);
         assertThat(remaining).extracting(AuditFinding::getId)
@@ -95,6 +111,9 @@ class AuditFingerprintMigrationJobTest {
         assertThat(findingTodoRepository.findByTodoId(todoId)).extracting(AuditFindingTodo::getFindingId)
                 .containsExactly(older.getId());
         assertThat(todoRepository.findById(todoId)).get().extracting(Todo::getStatus).isEqualTo(Todo.Status.OPEN);
+        assertThat(todoRepository.findById(todoId)).get()
+                .as("Deep-Link /reports?finding=… darf nicht ins Leere zeigen")
+                .extracting(Todo::getReferenceId).isEqualTo(older.getId());
         assertThat(occurrenceRepository.findByFindingId(older.getId()))
                 .extracting(AuditFindingOccurrence::getReportId)
                 .containsExactlyInAnyOrder(reportOld, reportNew);
@@ -146,6 +165,56 @@ class AuditFingerprintMigrationJobTest {
         assertThat(merged.getLastSeenAt()).isEqualTo(T2);
         assertThat(findingTodoRepository.findByTodoId(todoId)).extracting(AuditFindingTodo::getFindingId)
                 .containsExactly(accepted.getId());
+    }
+
+    /**
+     * Spiegelfall und wahrscheinlichster Drift-Verlauf: das aeltere Finding wurde auto-resolved,
+     * der juengere Wiedergaenger wurde akzeptiert. Die Disposition schlaegt, egal auf welcher Seite
+     * sie steht — sonst liefe der naechste Ingest ueber RESOLVED → OPEN samt neuem managed TODO.
+     */
+    @Test
+    void resolvedTargetInheritsTheAcceptedRiskOfItsTwin() {
+        AuditFinding resolved = saveFinding("ContainerShellService", AuditFindingStatus.RESOLVED, 3, T0, T1, reportOld, "run-old");
+        AuditFinding acceptedTwin = saveFinding("ContainerShellService.execute", AuditFindingStatus.ACCEPTED_RISK, 1, T2, T2, reportNew, "run-new");
+        acceptedTwin.setDispositionNote("Bewusst so, Aufrufer sind validiert");
+        acceptedTwin.setDispositionEvidence("ContainerShellService.execute: 3 Fundstellen");
+        acceptedTwin.setDispositionAt(T2);
+        acceptedTwin.setResolvedAt(T2);
+        findingRepository.saveAndFlush(acceptedTwin);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY))
+                .extracting(AuditFinding::getId).containsExactly(resolved.getId());
+        AuditFinding merged = findingRepository.findById(resolved.getId()).orElseThrow();
+        assertThat(merged.getStatus()).as("die Disposition des Wiedergaengers schlaegt RESOLVED")
+                .isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Bewusst so, Aufrufer sind validiert");
+        assertThat(merged.getDispositionEvidence()).isEqualTo("ContainerShellService.execute: 3 Fundstellen");
+        assertThat(merged.getDispositionAt()).isEqualTo(T2);
+        assertThat(merged.getResolvedAt()).as("Status und Disposition laufen nicht auseinander").isEqualTo(T2);
+        assertThat(merged.getOccurrenceCount()).isEqualTo(4);
+    }
+
+    private ListAppender<ILoggingEvent> attachLogAppender() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AuditFingerprintMigrationJob.class);
+        previousLogLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
+        appenders.add(appender);
+        return appender;
+    }
+
+    @AfterEach
+    void detachLogAppenders() {
+        Logger logger = (Logger) LoggerFactory.getLogger(AuditFingerprintMigrationJob.class);
+        appenders.forEach(logger::detachAppender);
+        appenders.clear();
+        logger.setLevel(previousLogLevel);
     }
 
     private String saveReport(String runId, Instant generatedAt) {
