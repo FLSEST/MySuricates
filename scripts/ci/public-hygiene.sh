@@ -330,6 +330,42 @@ for path, ref in links:
 PY
 }
 
+# ---------------------------------------------------------------------------
+# Check 9 — getrackte Pool-Dateien gegen die private Ausschlussliste
+#
+# Die persoenlichen Definitionen haelt .git/info/exclude aus dem Bestand. Das
+# gilt aber nur lokal: exclude wird nicht geklont, und in einem frischen Clone
+# holt ein pauschales "git add -A" die Dateien zurueck. Hier faellt das auf.
+#
+# Die Liste selbst liegt nicht im Repository — sie waere sonst genau die
+# Klartext-Namensliste, die exclude vermeiden soll. Fehlt sie, ist das kein
+# Fehler, sondern ein hoerbar uebersprungener Check (Vorlage: die .example-Datei).
+# Gewertet werden nur Treffer unter workflow-pool/, auch wenn ein Muster breiter
+# gefasst ist: die Regel beantwortet die Pool-Frage, keine andere.
+# ---------------------------------------------------------------------------
+check_private_pool_list() {
+  local list="$REPO_ROOT/$HYGIENE_PRIVATE_LIST_FILE"
+  if [ ! -f "$list" ]; then
+    echo "  – ${HYGIENE_PRIVATE_LIST_FILE} fehlt — getrackte Pool-Dateien werden nicht gegen" \
+         "die private Liste geprueft (uebersprungen; Vorlage: ${HYGIENE_PRIVATE_LIST_FILE}.example)"
+    return 0
+  fi
+  local pattern f
+  while IFS= read -r pattern; do
+    pattern="${pattern%%#*}"
+    pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+    pattern="${pattern%"${pattern##*[![:space:]]}"}"
+    [ -z "$pattern" ] && continue
+    while IFS= read -r f; do
+      case "$f" in
+        workflow-pool/*) ;;
+        *) continue ;;
+      esac
+      annotate "$f" 1 "getrackte Pool-Definition passt auf ein Muster aus ${HYGIENE_PRIVATE_LIST_FILE} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
+    done < <(git ls-files -- "$pattern" 2>/dev/null || true)
+  done < "$list"
+}
+
 # Verstoesse aus check_symlinks als Fehler melden.
 report_symlinks() {
   local kind path target
@@ -360,6 +396,7 @@ else
     esac
   done < <(check_weight)
   check_gitignore_leaks
+  check_private_pool_list
   check_security_md
   report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays

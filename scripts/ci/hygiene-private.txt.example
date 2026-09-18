@@ -1,0 +1,18 @@
+# Vorlage fuer scripts/ci/hygiene-private.txt — private Pool-Definitionen.
+#
+# Kopieren nach scripts/ci/hygiene-private.txt (die Kopie gehoert NICHT ins
+# Repository: sie steht in .git/info/exclude, damit im oeffentlichen Bestand
+# keine Klartext-Namensliste landet). Fehlt die Kopie, ueberspringt das
+# Hygiene-Gate den Check mit einer Meldung — sie ist kein Pflichtteil.
+#
+# Wozu: .git/info/exclude haelt die persoenlichen Definitionen aus dem Bestand,
+# wird aber nicht geklont und gilt in keinem Worktree. Ein pauschales
+# "git add -A" in einem frischen Clone committet sie sonst wieder zurueck,
+# ohne dass ein Gate anschlaegt. Diese Liste ist die durchsetzbare Haelfte.
+#
+# Format: ein Glob je Zeile, repo-relativ, Kommentare mit #. Gewertet werden
+# nur Treffer unter workflow-pool/. Die Muster gehoeren zu denselben Dateien,
+# die in .git/info/exclude stehen — beide Stellen zusammen pflegen.
+
+# Beispielmuster (erfunden, trifft nichts):
+workflow-pool/mein-privater-workflow-*.json
