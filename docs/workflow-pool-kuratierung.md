@@ -105,7 +105,7 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 | `HOST-LAN` | keine LAN-Adressen (192.168.x, 10.x, 172.16–31.x) | Regex |
 | `EMAIL` | keine Mailadresse | Regex |
 | `CONTEXT-PII` | kein personenbezogener Schlüssel im `defaultContext` (Kinder, Adresse, IBAN, Lebenslauf …) | Token-Vergleich, der Schlüssel ist das Signal — auch mit Platzhalter als Wert |
-| `BLOCK-TYPE` | jeder Blocktyp (auch in `foreach`/`while`/`conditional`/`switch`/`retry` verschachtelt) steht in der Registry | Listenvergleich |
+| `BLOCK-TYPE` | jeder Blocktyp steht in der Registry, auch die im `switch` verschachtelten (`cases[].blocks` und `default` — die einzigen Stellen, an denen ein Block einen Block enthält; die übrigen Wrapper führen Strings aus) | Listenvergleich |
 | `REPO-DEP` | ein Eintrag mit `scope: portable` nennt keines der Repo-Kennzeichen (`ai-automation-backend`, `ai-automation-frontend`, `scripts/`, `mvnw`, `workflow-pool/`) | Substring-Suche |
 | `PARSE` | die Datei ist gültiges JSON und ein Objekt | `json.load` |
 

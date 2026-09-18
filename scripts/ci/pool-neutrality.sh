@@ -200,10 +200,15 @@ def walk_keys(node, path, out):
         for i, item in enumerate(node):
             walk_keys(item, f"{path}[{i}]", out)
 
-# Config-Schluessel, unter denen wieder Bloecke stehen (foreach, while, conditional,
-# switch, retry). 'cases' enthaelt Objekte, die selbst 'blocks' tragen — die Rekursion
-# laeuft dort ueber den naechsten Schritt hinein.
-BLOCK_CONTAINER_KEYS = {'blocks', 'branch_true', 'branch_false', 'block', 'body', 'then', 'else'}
+# Config-Schluessel, unter denen wieder Bloecke stehen. Es gibt genau zwei, beide vom
+# switch-Block: cases[].blocks und default (SwitchBlockExecutor.java:37-38,59,67, gespiegelt
+# in ExecutionMode.java:68-76). Die anderen Wrapper verschachteln keine Bloecke, sondern
+# fuehren Strings aus: conditional then_command/else_command, foreach/while/retry command.
+#
+# 'cases' selbst steht bewusst NICHT hier: seine Elemente sind Fall-Objekte ({when, blocks}),
+# keine Bloecke. Die Rekursion erreicht ihr 'blocks' im naechsten Schritt ohnehin — und ein
+# Fall-Objekt mit einem eigenen 'type'-Feld wuerde sonst faelschlich als Block gezaehlt.
+BLOCK_CONTAINER_KEYS = {'blocks', 'default'}
 
 def collect_types(node, out, is_block=False):
     """Blocktypen einsammeln.

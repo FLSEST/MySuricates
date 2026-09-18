@@ -105,7 +105,7 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `HOST-LAN` | no LAN addresses (192.168.x, 10.x, 172.16–31.x) | regex |
 | `EMAIL` | no mail address | regex |
 | `CONTEXT-PII` | no personal key in `defaultContext` (children, address, IBAN, CV …) | token comparison; the key is the signal — even with a placeholder as its value |
-| `BLOCK-TYPE` | every block type (including those nested in `foreach`/`while`/`conditional`/`switch`/`retry`) is in the registry | list comparison |
+| `BLOCK-TYPE` | every block type is in the registry, including those nested inside a `switch` (`cases[].blocks` and `default` — the only places where a block contains a block; the other wrappers run strings) | list comparison |
 | `REPO-DEP` | an entry with `scope: portable` mentions none of the repo markers (`ai-automation-backend`, `ai-automation-frontend`, `scripts/`, `mvnw`, `workflow-pool/`) | substring search |
 | `PARSE` | the file is valid JSON and an object | `json.load` |
 

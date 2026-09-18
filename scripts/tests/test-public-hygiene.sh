@@ -196,11 +196,22 @@ write_pool blocktype-ohne-config <<'JSON'
  "blocks": [{"type": "alchemy"}]}
 JSON
 
+# Die einzigen echten Verschachtelungsorte sind switch -> cases[].blocks und default
+# (SwitchBlockExecutor.java:37-38,59,67; ExecutionMode.java:68-76).
 write_pool nested-blocktype <<'JSON'
 {"name": {"de": "Verschachtelt", "en": "Nested"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
- "blocks": [{"type": "foreach", "config": {"blocks": [{"type": "sorcery", "config": {}},
-                                                      {"type": "wizardry"}]}}]}
+ "blocks": [{"type": "switch", "config": {"expression": "{{ x }}",
+   "cases": [{"when": "a", "blocks": [{"type": "sorcery", "config": {}},
+                                      {"type": "wizardry"}]}]}}]}
+JSON
+
+write_pool switch-default-blocktype <<'JSON'
+{"name": {"de": "Default-Zweig", "en": "Default branch"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "switch", "config": {"expression": "{{ x }}",
+   "cases": [{"when": "a", "blocks": [{"type": "shell", "config": {"command": "ls"}}]}],
+   "default": [{"type": "secretblock"}]}}]}
 JSON
 
 write_pool portable-repo-dep <<'JSON'
@@ -235,8 +246,10 @@ check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$
 check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'
 check "description als String erkannt"         'grep -q "string-desc.*DESCRIPTION" <<<"$OUT"'
 check "unbekannter Blocktyp erkannt"           'grep -q "unknown-blocktype.*BLOCK-TYPE" <<<"$OUT"'
-check "unbekannter Blocktyp verschachtelt"     'grep -q "nested-blocktype.*BLOCK-TYPE.*sorcery" <<<"$OUT"'
-check "verschachtelt und ohne config"          'grep -q "nested-blocktype.*BLOCK-TYPE.*wizardry" <<<"$OUT"'
+check "unbekannter Blocktyp in cases[].blocks" 'grep -q "nested-blocktype.*BLOCK-TYPE.*sorcery" <<<"$OUT"'
+check "cases[].blocks und ohne config"         'grep -q "nested-blocktype.*BLOCK-TYPE.*wizardry" <<<"$OUT"'
+check "switch-default ohne config erkannt"     'grep -q "switch-default-blocktype.*BLOCK-TYPE.*secretblock" <<<"$OUT"'
+check "switch selbst bleibt unbeanstandet"     '! grep -q "BLOCK-TYPE.*switch$" <<<"$OUT"'
 check "unbekannter Blocktyp ohne config"       'grep -q "blocktype-ohne-config.*BLOCK-TYPE.*alchemy" <<<"$OUT"'
 check "portable mit scripts/-Pfad erkannt"     'grep -q "portable-repo-dep.*REPO-DEP" <<<"$OUT"'
 check "UUID in Grossbuchstaben erkannt"        'grep -q "uppercase-uuid.*UUID" <<<"$OUT"'
