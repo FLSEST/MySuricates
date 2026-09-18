@@ -65,7 +65,9 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 MySuricates unterstuetzt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
-**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprueft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Bloecken (`switch`-`cases[].blocks` und `default`). Das gilt fuer jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
+**Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprueft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Bloecken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zaehlt dabei als unbekannt. Das gilt fuer jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
+
+Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Pruefung: enthaelt die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausfuehrbare Definition kommt nicht zurueck.
 
 ### Allgemeine Block-Eigenschaften
 

@@ -102,11 +102,57 @@ class BlockTypeValidatorTest {
         assertThatCode(() -> validator.rejectUnknown(List.of(switchBlock))).doesNotThrowAnyException();
     }
 
-    /** A blank or missing type behaves as before (the executor lookup reports it) — no new rejection. */
+    /**
+     * A block without a type is as unexecutable as one with an invented type — and worse in a
+     * switch case, where it used to fall through into the AI branch (TODO 89dd9e34).
+     */
     @Test
-    void blankTypeIsNotRejectedHere() {
-        assertThatCode(() -> validator.rejectUnknown(List.of(block(null, "no-type"), block("  ", "blank"))))
-                .doesNotThrowAnyException();
+    void missingTypeIsRejected() {
+        List<BlockDefinition> blocks = List.of(block(null, "no-type"));
+
+        assertThatThrownBy(() -> validator.rejectUnknown(blocks))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no-type")
+                .hasMessageContaining("foreach, shell, simple, switch");
+    }
+
+    @Test
+    void blankTypeIsRejected() {
+        List<BlockDefinition> blocks = List.of(block("  ", "blank"));
+
+        assertThatThrownBy(() -> validator.rejectUnknown(blocks))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
+    }
+
+    @Test
+    void unnamedBlockWithoutTypeIsRejectedToo() {
+        List<BlockDefinition> blocks = List.of(block(null, null));
+
+        assertThatThrownBy(() -> validator.rejectUnknown(blocks))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void missingTypeInANestedBlockIsRejected() {
+        BlockDefinition switchBlock = block("switch", "route");
+        switchBlock.getConfig().put("cases", List.of(Map.of(
+                "value", "a",
+                "blocks", List.of(Map.of("name", "typeless", "config", Map.of("command", "do it"))))));
+
+        assertThatThrownBy(() -> validator.rejectUnknown(List.of(switchBlock)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("typeless");
+    }
+
+    @Test
+    void blankTypeInASwitchDefaultIsRejected() {
+        BlockDefinition switchBlock = block("switch", "route");
+        switchBlock.getConfig().put("default", List.of(Map.of("type", "", "name", "empty-type")));
+
+        assertThatThrownBy(() -> validator.rejectUnknown(List.of(switchBlock)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("empty-type");
     }
 
     @Test

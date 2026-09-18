@@ -178,14 +178,17 @@ public class SwitchBlockExecutor implements BlockExecutor {
      */
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
-        if (type != null && !"shell".equals(type) && !"simple".equals(type)) {
+        // Auch ein fehlender/leerer Typ wird abgelehnt: sonst fiele er unten in den KI-Zweig und
+        // liefe als stiller Prompt aus config.command (89dd9e34).
+        if (!"shell".equals(type) && !"simple".equals(type)) {
             Instant now = Instant.now();
+            String typeLabel = type == null || type.isBlank() ? "(kein Typ)" : type;
             String label = nestedBlock.getName() != null && !nestedBlock.getName().isBlank()
-                    ? nestedBlock.getName() + " (" + type + ")"
-                    : type;
+                    ? nestedBlock.getName() + " (" + typeLabel + ")"
+                    : typeLabel;
             return StepResult.builder().stepIndex(context.nextStepIndex()).status(StepStatus.FAILED)
                     .input("switch: " + label)
-                    .output("Blocktyp '" + type + "' wird in switch nicht unterstützt — nur shell und simple"
+                    .output("Blocktyp '" + typeLabel + "' wird in switch nicht unterstützt — nur shell und simple"
                             + " (Block: " + label + ", 89dd9e34)")
                     .startedAt(now).completedAt(now).durationMs(0L).build();
         }

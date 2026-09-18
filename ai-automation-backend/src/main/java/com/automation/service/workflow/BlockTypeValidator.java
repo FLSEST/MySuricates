@@ -17,9 +17,9 @@ import java.util.Map;
  * already done their work.
  *
  * <p>Nested blocks are checked too: switch {@code cases[].blocks} and {@code default}, plus a
- * plain {@code blocks} list, recursively. A missing or blank type is left alone — the executor
- * lookup reports it as before, and nothing may start rejecting definitions it accepted yesterday
- * beyond the unknown types this guard is about.
+ * plain {@code blocks} list, recursively. A missing or blank type counts as unknown: it is just as
+ * unexecutable, and inside a switch case it used to slip past the type check straight into the AI
+ * branch (a silent {@code config.command} prompt). No live workflow carries one.
  */
 @Component
 @RequiredArgsConstructor
@@ -40,10 +40,12 @@ public class BlockTypeValidator {
     }
 
     private void check(String name, String type, Map<String, Object> config) {
-        if (type != null && !type.isBlank() && !registry.isKnown(type)) {
-            String label = name != null && !name.isBlank() ? name : type;
-            throw new IllegalArgumentException("Block '" + label + "' has unknown type '" + type
-                    + "' — allowed types: " + registry.knownTypesAsText());
+        boolean missing = type == null || type.isBlank();
+        if (missing || !registry.isKnown(type)) {
+            String label = name != null && !name.isBlank() ? name : (missing ? "(unnamed)" : type);
+            throw new IllegalArgumentException("Block '" + label + "' "
+                    + (missing ? "has no type" : "has unknown type '" + type + "'")
+                    + " — allowed types: " + registry.knownTypesAsText());
         }
         checkNested(config);
     }

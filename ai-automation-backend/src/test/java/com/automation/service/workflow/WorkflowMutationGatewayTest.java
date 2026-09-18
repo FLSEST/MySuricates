@@ -179,6 +179,30 @@ class WorkflowMutationGatewayTest {
         verifyNoInteractions(versions, activityLog);
     }
 
+    /** Restoring an old version goes through the gateway too: a definition we can no longer run stays gone. */
+    @Test
+    void restoringAVersionWithAnUnknownTypeIsRefused() {
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("frobnicate").name("legacy").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, before, ChangeSource.RESTORE, "restore v3"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("frobnicate");
+        verifyNoInteractions(versions, activityLog);
+    }
+
+    @Test
+    void blockWithoutATypeIsRefused() {
+        workflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().name("typeless").config(new HashMap<>()).build())));
+
+        assertThatThrownBy(() -> gateway.record(workflow, null, ChangeSource.USER, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("typeless");
+        verifyNoInteractions(versions, activityLog);
+    }
+
     @Test
     void labelOnlyChangeOfALegacyWorkflowWithUnknownTypeStillPasses() {
         workflow.setBlocks(new ArrayList<>(List.of(

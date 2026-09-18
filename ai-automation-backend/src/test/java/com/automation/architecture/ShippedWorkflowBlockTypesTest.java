@@ -73,7 +73,9 @@ class ShippedWorkflowBlockTypesTest {
         for (JsonNode block : blocks) {
             seen++;
             JsonNode type = block.get("type");
-            if (type != null && type.isTextual() && !registry.isKnown(type.asText())) {
+            if (type == null || !type.isTextual() || type.asText().isBlank()) {
+                problems.add(file + ": block without a type");
+            } else if (!registry.isKnown(type.asText())) {
                 problems.add(file + ": block '" + type.asText() + "'");
             }
             JsonNode config = block.get("config");

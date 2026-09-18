@@ -803,6 +803,55 @@ class SwitchBlockExecutorTest {
     }
 
     @Test
+    void execute_nestedBlockWithoutType_isRejectedInsteadOfRunningAsAiCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("name", "typeless", "config", Map.of("command", "Analysiere das Repo"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("typeless");
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    void execute_nestedBlockWithBlankType_isRejectedInsteadOfRunningAsAiCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "  ", "config", Map.of("command", "Analysiere das Repo"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+        verify(commandExecutor, never()).executeStepAsShell(any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void execute_nestedNamedSimpleBlock_passesTheNameToTheHostRequest() {
+        StepResult aiResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("reviewed").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(aiResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "review", "config", Map.of("command", "Pruefe das"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<HostExecutionRequest> captor = ArgumentCaptor.forClass(HostExecutionRequest.class);
+        verify(commandExecutor).executeStepOnHost(captor.capture());
+        assertThat(captor.getValue().block().getName()).isEqualTo("review");
+    }
+
+    @Test
     void deserializeBlock_keepsTheNestedBlockName() {
         BlockDefinition nested = executor.deserializeBlock(
                 Map.of("type", "simple", "name", "review", "config", Map.of("command", "check")));
