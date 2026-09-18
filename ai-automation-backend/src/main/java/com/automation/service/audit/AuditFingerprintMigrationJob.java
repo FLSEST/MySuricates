@@ -140,8 +140,16 @@ public class AuditFingerprintMigrationJob {
         }
     }
 
-    /** Ein offener oder wiedervorgelegter Wiedergaenger zieht das Ziel aus dem Terminalzustand. */
+    /**
+     * Ein offener oder wiedervorgelegter Wiedergaenger zieht das Ziel aus {@code RESOLVED} heraus —
+     * aber niemals aus einer menschlichen Disposition ({@code ACCEPTED_RISK}, {@code DISMISSED}).
+     * Genau diese Wiedergaenger haben die Akzeptanzen bisher unterlaufen; wiedereroeffnet wird ein
+     * akzeptiertes Risiko allein ueber {@link AuditAcceptancePolicy} (belegte Verschlechterung).
+     */
     private static AuditFindingStatus mergedStatus(AuditFindingStatus target, AuditFindingStatus duplicate) {
+        if (target == AuditFindingStatus.ACCEPTED_RISK || target == AuditFindingStatus.DISMISSED) {
+            return target;
+        }
         if (target == AuditFindingStatus.OPEN || duplicate == AuditFindingStatus.OPEN) {
             return AuditFindingStatus.OPEN;
         }

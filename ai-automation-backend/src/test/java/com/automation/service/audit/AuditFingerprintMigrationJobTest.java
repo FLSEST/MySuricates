@@ -110,6 +110,44 @@ class AuditFingerprintMigrationJobTest {
         assertThat(findingTodoRepository.findByTodoId(todoId)).hasSize(1);
     }
 
+    /**
+     * Ein akzeptiertes Risiko ist eine menschliche Entscheidung — ein Wiedergaenger darf sie beim
+     * Zusammenfuehren nicht aufheben. Wiedereroeffnung nur ueber {@link AuditAcceptancePolicy}.
+     */
+    @Test
+    void acceptedRiskTargetStaysAcceptedWhenTheTwinIsOpen() {
+        AuditFinding accepted = saveFinding("ContainerShellService", AuditFindingStatus.ACCEPTED_RISK, 3, T0, T1, reportOld, "run-old");
+        accepted.setDispositionNote("Bewusst so, Aufrufer sind validiert");
+        accepted.setDispositionEvidence("ContainerShellService: 3 Fundstellen");
+        accepted.setDispositionAt(T1);
+        accepted.setResolvedAt(T1);
+        AuditFinding twin = saveFinding("ContainerShellService.execute", AuditFindingStatus.OPEN, 1, T2, T2, reportNew, "run-new");
+        String todoId = todoRepository.save(Todo.builder().title("Shell-Aufruf ohne Escaping")
+                .status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).projectId(projectId)
+                .source(Todo.Source.WORKFLOW).sourceAgent("audit-center")
+                .referenceType("audit_finding").referenceId(twin.getId()).build()).getId();
+        findingTodoRepository.save(AuditFindingTodo.builder()
+                .findingId(twin.getId()).todoId(todoId).managed(true).build());
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY))
+                .extracting(AuditFinding::getId).containsExactly(accepted.getId());
+        AuditFinding merged = findingRepository.findById(accepted.getId()).orElseThrow();
+        assertThat(merged.getStatus()).as("Akzeptanz bleibt, der Wiedergaenger hebt sie nicht auf")
+                .isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(merged.getDispositionNote()).isEqualTo("Bewusst so, Aufrufer sind validiert");
+        assertThat(merged.getDispositionEvidence()).isEqualTo("ContainerShellService: 3 Fundstellen");
+        assertThat(merged.getDispositionAt()).isEqualTo(T1);
+        assertThat(merged.getResolvedAt()).isEqualTo(T1);
+        assertThat(merged.getOccurrenceCount()).isEqualTo(4);
+        assertThat(merged.getLastSeenAt()).isEqualTo(T2);
+        assertThat(findingTodoRepository.findByTodoId(todoId)).extracting(AuditFindingTodo::getFindingId)
+                .containsExactly(accepted.getId());
+    }
+
     private String saveReport(String runId, Instant generatedAt) {
         return reportRepository.save(AuditReport.builder()
                 .projectId(projectId).workflowId("wf-1").workflowRunId(runId).auditKey(AUDIT_KEY)

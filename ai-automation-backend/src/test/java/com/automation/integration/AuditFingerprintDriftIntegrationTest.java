@@ -83,6 +83,34 @@ class AuditFingerprintDriftIntegrationTest {
         assertThat(findingTodoRepository.findByTodoId(todoId)).hasSize(1);
     }
 
+    /**
+     * Vor dem Fix erzeugte ein Drift-Subject ein neues OPEN-Finding samt managed TODO und unterlief
+     * damit die Risiko-Akzeptanz. Jetzt trifft die Ingestion das akzeptierte Finding — und die
+     * Akzeptanz-Policy entscheidet allein (Wiedereroeffnung nur bei belegter Verschlechterung).
+     */
+    @Test
+    void driftingSubjectDoesNotUndoAnAcceptedRisk() {
+        ingest("ContainerShellService", Instant.parse("2026-09-12T10:30:00Z"));
+        AuditFinding accepted = findingRepository.findByProjectIdAndAuditKey(project.getId(), AUDIT_KEY).get(0);
+        accepted.setStatus(AuditFindingStatus.ACCEPTED_RISK);
+        accepted.setDispositionNote("Bewusst so, Aufrufer sind validiert");
+        accepted.setDispositionEvidence(accepted.getEvidence());
+        accepted.setDispositionAt(Instant.parse("2026-09-12T11:00:00Z"));
+        accepted.setResolvedAt(Instant.parse("2026-09-12T11:00:00Z"));
+        findingRepository.saveAndFlush(accepted);
+        long todosBefore = todoRepository.count();
+
+        ingest("ContainerShellService.execute", Instant.parse("2026-09-12T19:16:00Z"));
+
+        List<AuditFinding> findings = findingRepository.findByProjectIdAndAuditKey(project.getId(), AUDIT_KEY);
+        assertThat(findings).hasSize(1);
+        assertThat(findings.get(0).getStatus()).as("ohne belegte Verschlechterung bleibt die Akzeptanz")
+                .isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(findings.get(0).getDispositionNote()).isEqualTo("Bewusst so, Aufrufer sind validiert");
+        assertThat(findings.get(0).getOccurrenceCount()).isEqualTo(2);
+        assertThat(todoRepository.count()).as("kein neues managed TODO").isEqualTo(todosBefore);
+    }
+
     private void ingest(String subject, Instant completedAt) {
         String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":["
                 + "{\"ruleKey\":\"shell.injection\",\"subject\":\"" + subject + "\",\"severity\":\"HIGH\","
