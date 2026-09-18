@@ -29,6 +29,7 @@ class ControllerModuleGateTest {
             "ActivityLogController",
             "CompletionTriggerController",
             "DashboardLayoutController",
+            "DashboardWorkflowController",
             "DeadLetterController",
             "DocsController",
             "ExecutionController",
