@@ -288,6 +288,51 @@ class GranularTodoServiceTest {
         assertThat(created).containsExactly("Fix SQL injection");
     }
 
+    /**
+     * Die Praefix-Regel greift erst ab {@code PREFIX_MIN_LENGTH} = 20 Zeichen: „timeout im executor"
+     * (19) ist als gemeinsamer Anfang noch zu wenig, um einen eigenen Befund zu verwerfen.
+     */
+    @Test
+    void granularTodos_truncatedTitleJustBelowThePrefixMinimum_staysItsOwnTodo() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Timeout im Executor…", "priority", "HIGH", "tags", List.of("backend")),
+                Map.of("title", "Timeout im Executor behebt sich nicht", "priority", "HIGH", "tags", List.of("backend")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactlyInAnyOrder(
+                "Timeout im Executor…", "Timeout im Executor behebt sich nicht");
+    }
+
+    /** Ein Zeichen mehr gemeinsamer Anfang (21) — jetzt ist es die gekuerzte Fassung. */
+    @Test
+    void granularTodos_truncatedTitleJustAboveThePrefixMinimum_isDropped() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Timeout im Executor A…", "priority", "HIGH", "tags", List.of("backend")),
+                Map.of("title", "Timeout im Executor A behebt sich nicht", "priority", "HIGH", "tags", List.of("backend")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactly("Timeout im Executor A behebt sich nicht");
+    }
+
+    /**
+     * Ohne Kuerzungszeichen ist ein gemeinsamer Anfang kein Beweis: „Fehler in Modul A beheben" ist
+     * ein eigener Befund mit eigener Prioritaet und Beschreibung, auch wenn ein zweiter Titel damit
+     * anfaengt. Nur ein mit „…"/„..." abgeschnittener Titel ist nachweislich dieselbe Zeile.
+     */
+    @Test
+    void granularTodos_longerTitleContinuingAShorterOne_staysTwoTodos() {
+        List<Map<String, Object>> items = List.of(
+                Map.of("title", "Fehler in Modul A beheben", "priority", "HIGH", "tags", List.of("backend")),
+                Map.of("title", "Fehler in Modul A beheben, Teil 2", "priority", "LOW", "tags", List.of("backend")));
+
+        List<String> created = createdTitles(items);
+
+        assertThat(created).containsExactlyInAnyOrder(
+                "Fehler in Modul A beheben", "Fehler in Modul A beheben, Teil 2");
+    }
+
     /** Gegenprobe: ein gemeinsamer kurzer Anfang macht aus zwei Befunden keinen einzigen. */
     @Test
     void granularTodos_differentTitles_stayTwoTodos() {

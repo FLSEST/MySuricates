@@ -89,16 +89,20 @@ class AuditRuleKeyCatalogTest {
     void everyRuleKeyFixedInAPoolPromptIsInTheCatalog() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         List<String> violations = new ArrayList<>();
+        Set<String> found = new LinkedHashSet<>();
         for (Path file : poolDefinitions()) {
             JsonNode root = mapper.readTree(file.toFile());
             String auditKey = root.path("metadata").path("audit").path("key").asText("");
             for (String ruleKey : literalRuleKeys(root)) {
+                found.add(ruleKey);
                 if (!catalog.allowedKeys(auditKey).contains(ruleKey)) {
                     violations.add(file.getFileName() + " (" + auditKey + ") vergibt ruleKey '" + ruleKey
                             + "' — in src/main/resources/audit/rule-keys.json nachtragen");
                 }
             }
         }
+        assertThat(found).as("das Gate laeuft sonst stumm gruen, wenn sich das Prompt-Format aendert")
+                .isNotEmpty();
         assertThat(violations).as("Katalog und Pool-Prompts duerfen nicht auseinanderlaufen").isEmpty();
     }
 

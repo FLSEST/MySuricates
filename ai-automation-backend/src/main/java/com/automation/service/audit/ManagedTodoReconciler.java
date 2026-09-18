@@ -51,8 +51,8 @@ public class ManagedTodoReconciler {
             if (todo == null) {
                 continue;
             }
-            Todo.Status target = allTerminal(todo.getId()) ? Todo.Status.DONE : Todo.Status.OPEN;
-            if (todo.getStatus() == target) {
+            Todo.Status target = nextStatus(todo, allTerminal(todo.getId()));
+            if (target == null || todo.getStatus() == target) {
                 continue;
             }
             log.info("Managed audit TODO {} ({}) moves {} → {}", todo.getId(), todo.getTitle(),
@@ -62,6 +62,20 @@ public class ManagedTodoReconciler {
             changed++;
         }
         return changed;
+    }
+
+    /**
+     * Sind alle Findings terminal, wird geschlossen. Zurueck ins Offene geht nur, was der Abgleich
+     * selbst geschlossen hat: ein {@code IN_PROGRESS}- oder {@code ARCHIVED}-TODO ist eine
+     * menschliche Entscheidung und wird nicht ueberschrieben.
+     *
+     * @return Zielstatus oder {@code null}, wenn nichts zu tun ist
+     */
+    private static Todo.Status nextStatus(Todo todo, boolean allTerminal) {
+        if (allTerminal) {
+            return Todo.Status.DONE;
+        }
+        return todo.getStatus() == Todo.Status.DONE ? Todo.Status.OPEN : null;
     }
 
     private boolean allTerminal(String todoId) {

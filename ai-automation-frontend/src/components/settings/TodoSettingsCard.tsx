@@ -20,12 +20,18 @@ interface HygieneForm {
   enabled: boolean;
   staleDays: number;
   maxPerRun: number;
+}
+
+/** The merge check has nothing to do with the archival job — its own setting, its own form. */
+interface SimilarityForm {
   /** Jaccard threshold of the keyword pre-filter — a fraction, not a count */
-  similarityThreshold: number;
+  keywordThreshold: number;
 }
 
 /** Defaults of TodoHygieneConfig — only used until the server config has arrived. */
-const HYGIENE_DEFAULTS: HygieneForm = { enabled: false, staleDays: 30, maxPerRun: 200, similarityThreshold: 0.2 };
+const HYGIENE_DEFAULTS: HygieneForm = { enabled: false, staleDays: 30, maxPerRun: 200 };
+/** Default of TodoSimilarityConfig. */
+const SIMILARITY_DEFAULTS: SimilarityForm = { keywordThreshold: 0.2 };
 
 type Config = ReturnType<typeof useExecutionConfig>['data'];
 
@@ -34,14 +40,19 @@ function toHygieneForm(config: NonNullable<Config>): HygieneForm {
     enabled: (config.todoHygieneEnabled ?? 0) === 1,
     staleDays: config.todoStaleDays ?? HYGIENE_DEFAULTS.staleDays,
     maxPerRun: config.todoHygieneMaxPerRun ?? HYGIENE_DEFAULTS.maxPerRun,
-    similarityThreshold: config.todoSimilarityKeywordThreshold ?? HYGIENE_DEFAULTS.similarityThreshold,
+  };
+}
+
+function toSimilarityForm(config: NonNullable<Config>): SimilarityForm {
+  return {
+    keywordThreshold: config.todoSimilarityKeywordThreshold ?? SIMILARITY_DEFAULTS.keywordThreshold,
   };
 }
 
 /**
- * Everything that steers the todo views in one place: the page sizes (a local preference), the
- * hygiene thresholds of the nightly auto-archival and the similarity threshold of the merge check
- * (runtime settings on the server).
+ * Everything that steers the todos in one place, in three sibling sections: the page sizes (a local
+ * preference), the thresholds of the nightly auto-archival, and the similarity threshold of the
+ * merge check — the latter two runtime settings on the server, saved together.
  */
 export function TodoSettingsCard() {
   const t = useT();
@@ -57,13 +68,17 @@ export function TodoSettingsCard() {
   const [hygiene, setHygiene] = useSyncedState<HygieneForm, Config>(
     config, (c, prev) => (c ? toHygieneForm(c) : prev ?? HYGIENE_DEFAULTS),
   );
+  const [similarity, setSimilarity] = useSyncedState<SimilarityForm, Config>(
+    config, (c, prev) => (c ? toSimilarityForm(c) : prev ?? SIMILARITY_DEFAULTS),
+  );
 
-  const saved = config ? toHygieneForm(config) : null;
-  const hasChanges = !!saved && (
-    hygiene.enabled !== saved.enabled ||
-    hygiene.staleDays !== saved.staleDays ||
-    hygiene.maxPerRun !== saved.maxPerRun ||
-    hygiene.similarityThreshold !== saved.similarityThreshold
+  const savedHygiene = config ? toHygieneForm(config) : null;
+  const savedSimilarity = config ? toSimilarityForm(config) : null;
+  const hasChanges = !!savedHygiene && !!savedSimilarity && (
+    hygiene.enabled !== savedHygiene.enabled ||
+    hygiene.staleDays !== savedHygiene.staleDays ||
+    hygiene.maxPerRun !== savedHygiene.maxPerRun ||
+    similarity.keywordThreshold !== savedSimilarity.keywordThreshold
   );
 
   const handleSave = () => {
@@ -71,7 +86,7 @@ export function TodoSettingsCard() {
       todoHygieneEnabled: hygiene.enabled ? 1 : 0,
       todoStaleDays: hygiene.staleDays,
       todoHygieneMaxPerRun: hygiene.maxPerRun,
-      todoSimilarityKeywordThreshold: hygiene.similarityThreshold,
+      todoSimilarityKeywordThreshold: similarity.keywordThreshold,
     });
   };
 
@@ -179,43 +194,53 @@ export function TodoSettingsCard() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-border">
-              <p className="text-sm font-medium text-text">{t.settings.todoSimilarity}</p>
-              <p className="text-xs text-text-tertiary mb-3">{t.settings.todoSimilarityHint}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="todo-similarity-threshold" className="text-sm font-medium text-text">
-                    {t.settings.todoSimilarityKeywordThreshold}
-                  </label>
-                  <p className="text-xs text-text-tertiary mb-1">{t.settings.todoSimilarityKeywordThresholdHint}</p>
-                  <input
-                    id="todo-similarity-threshold"
-                    type="number"
-                    min={SIMILARITY_MIN}
-                    max={SIMILARITY_MAX}
-                    step={SIMILARITY_STEP}
-                    value={hygiene.similarityThreshold}
-                    onChange={(e) => {
-                      const threshold = parseFloat(e.target.value);
-                      if (!isNaN(threshold)) setHygiene((prev) => ({ ...prev, similarityThreshold: threshold }));
-                    }}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-            </div>
+          </div>
+        )}
+      </div>
 
-            <div className="flex justify-end">
-              <Button size="sm" disabled={!hasChanges || updateConfig.isPending} onClick={handleSave}>
-                {updateConfig.isPending
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Save className="w-4 h-4 mr-1.5" />}
-                {t.settings.executionSave}
-              </Button>
+      {/* Merging similar todos — a sibling setting, not part of the archival job */}
+      <div className="mt-6 pt-5 border-t border-border">
+        <p className="text-sm font-medium text-text">{t.settings.todoSimilarity}</p>
+        <p className="text-xs text-text-tertiary mb-3">{t.settings.todoSimilarityHint}</p>
+
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Spinner /></div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="todo-similarity-threshold" className="text-sm font-medium text-text">
+                {t.settings.todoSimilarityKeywordThreshold}
+              </label>
+              <p className="text-xs text-text-tertiary mb-1">{t.settings.todoSimilarityKeywordThresholdHint}</p>
+              <input
+                id="todo-similarity-threshold"
+                type="number"
+                min={SIMILARITY_MIN}
+                max={SIMILARITY_MAX}
+                step={SIMILARITY_STEP}
+                value={similarity.keywordThreshold}
+                onChange={(e) => {
+                  const threshold = parseFloat(e.target.value);
+                  if (!isNaN(threshold)) setSimilarity({ keywordThreshold: threshold });
+                }}
+                className={inputClass}
+              />
             </div>
           </div>
         )}
       </div>
+
+      {/* One save for both server-side sections */}
+      {!isLoading && (
+        <div className="mt-5 flex justify-end">
+          <Button size="sm" disabled={!hasChanges || updateConfig.isPending} onClick={handleSave}>
+            {updateConfig.isPending
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <Save className="w-4 h-4 mr-1.5" />}
+            {t.settings.executionSave}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

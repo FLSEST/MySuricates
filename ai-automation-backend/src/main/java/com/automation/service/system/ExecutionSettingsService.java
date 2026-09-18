@@ -215,16 +215,20 @@ public class ExecutionSettingsService {
         return result;
     }
 
+    /**
+     * Ein einzelner unbrauchbarer DB-Wert darf den Start nicht kippen: {@link #init} laeuft in
+     * {@code @PostConstruct}, eine Exception hier waere ein Startabbruch. Deshalb umschliesst der
+     * Fang auch das Anwenden selbst, nicht nur die Pruefung.
+     */
     private void applyIfPresent(String key, Consumer<String> applier) {
         appSettingsRepository.get(key).filter(v -> !v.isBlank()).ifPresent(v -> {
             try {
                 ExecutionSettingKeys.validate(key, v);
-            } catch (IllegalArgumentException e) {
-                log.warn("Ignoring unusable DB value for {}: {} ({})", key, v, e.getMessage());
-                return;
+                applier.accept(v);
+                log.debug("Applied DB override for {}: {}", key, v);
+            } catch (RuntimeException e) {
+                log.warn("Ignoring unusable DB value for {}: {} ({})", key, v, e.toString());
             }
-            applier.accept(v);
-            log.debug("Applied DB override for {}: {}", key, v);
         });
     }
 }

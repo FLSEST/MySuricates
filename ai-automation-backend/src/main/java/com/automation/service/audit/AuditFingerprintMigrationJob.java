@@ -41,8 +41,11 @@ public class AuditFingerprintMigrationJob {
 
     /** Marker in {@code app_settings}: bis zu welcher Job-Version wurde schon aufgeraeumt? */
     static final String MARKER_KEY = "audit-fingerprint-migration.version";
-    /** Erhoehen, wenn ein neuer Aufraeumschritt dazukommt — dann laeuft der Job noch einmal. */
-    static final int VERSION = 1;
+    /**
+     * Erhoehen, wenn ein neuer Aufraeumschritt dazukommt — dann laeuft der Job noch einmal.
+     * v2: normalisiert auch den ruleKey ueber {@link AuditRuleKeyCatalog} (Audit-TODO 8fc9a401).
+     */
+    static final int VERSION = 2;
 
     private static final Comparator<AuditFinding> OLDEST_FIRST = Comparator
             .comparing(AuditFinding::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -50,6 +53,7 @@ public class AuditFingerprintMigrationJob {
             .thenComparing(AuditFinding::getId, Comparator.nullsLast(Comparator.naturalOrder()));
 
     private final AuditFindingRepository findingRepository;
+    private final AuditRuleKeyCatalog ruleKeyCatalog;
     private final AuditFindingMerger merger;
     private final ManagedTodoReconciler managedTodoReconciler;
     private final AppSettingsRepository appSettings;
@@ -160,6 +164,7 @@ public class AuditFingerprintMigrationJob {
     private int[] migrateScope(Scope scope) {
         Map<String, List<AuditFinding>> groups = new LinkedHashMap<>();
         for (AuditFinding finding : findingRepository.findByProjectIdAndAuditKey(scope.projectId(), scope.auditKey())) {
+            normalizeRuleKey(finding);
             groups.computeIfAbsent(newFingerprint(finding), key -> new ArrayList<>()).add(finding);
         }
         Map<String, AuditFinding> survivors = new LinkedHashMap<>();
@@ -214,6 +219,23 @@ public class AuditFingerprintMigrationJob {
         }
     }
 
+    /**
+     * Zieht die Schreibweise des ruleKeys auf den Katalogeintrag, wie es die Ingestion seit dem
+     * ruleKey-Katalog tut (Audit-TODO 8fc9a401). Ohne diesen Schritt findet der naechste Ingest ein
+     * gedriftetes Altfinding nicht wieder: es entstuende ein zweiter Datensatz, waehrend der alte
+     * ueber die Abwesenheits-Schleife auf RESOLVED faellt — samt Erstsichtung, Zaehlern und einer
+     * eventuellen Akzeptanz.
+     */
+    private void normalizeRuleKey(AuditFinding finding) {
+        String normalized = ruleKeyCatalog.resolve(finding.getAuditKey(), finding.getRuleKey()).ruleKey();
+        if (normalized != null && !normalized.equals(finding.getRuleKey())) {
+            log.info("Audit ruleKey normalized: finding {} '{}' → '{}' (project {}, audit {})",
+                    finding.getId(), finding.getRuleKey(), normalized, finding.getProjectId(), finding.getAuditKey());
+            finding.setRuleKey(normalized);
+        }
+    }
+
+    /** Erwartet einen bereits ueber {@link #normalizeRuleKey} gezogenen ruleKey. */
     private static String newFingerprint(AuditFinding finding) {
         return AuditIngestionService.fingerprint(finding.getProjectId(), finding.getAuditKey(),
                 finding.getRuleKey(), finding.getSubject());

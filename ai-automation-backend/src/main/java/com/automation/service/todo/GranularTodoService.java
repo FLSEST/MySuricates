@@ -34,7 +34,7 @@ import static com.automation.service.todo.AutoTodoService.TAG_AUTO_WORKFLOW;
 @Slf4j
 public class GranularTodoService {
 
-    /** Ab dieser Laenge gilt ein gemeinsamer Titelanfang als Kuerzung und nicht als Zufall. */
+    /** So lang muss ein abgeschnittener Titel mindestens sein, um als Fragment zu zaehlen. */
     private static final int PREFIX_MIN_LENGTH = 20;
 
     private final TodoRepository todoRepository;
@@ -100,7 +100,7 @@ public class GranularTodoService {
         List<Item> kept = new ArrayList<>();
         for (Item candidate : items) {
             String normalized = normalizeTitle(candidate.title());
-            int existing = indexOfDuplicate(kept, normalized);
+            int existing = indexOfDuplicate(kept, candidate);
             if (existing < 0) {
                 kept.add(candidate);
             } else if (normalizeTitle(kept.get(existing).title()).length() < normalized.length()) {
@@ -115,9 +115,9 @@ public class GranularTodoService {
         return kept;
     }
 
-    private static int indexOfDuplicate(List<Item> kept, String normalized) {
+    private static int indexOfDuplicate(List<Item> kept, Item candidate) {
         for (int i = 0; i < kept.size(); i++) {
-            if (isDuplicate(normalizeTitle(kept.get(i).title()), normalized)) {
+            if (isDuplicate(kept.get(i), candidate)) {
                 return i;
             }
         }
@@ -125,17 +125,35 @@ public class GranularTodoService {
     }
 
     /**
-     * Gleich — oder der kuerzere Titel ist der Anfang des laengeren und dabei lang genug, dass das
-     * kein Zufall mehr ist. Unter {@link #PREFIX_MIN_LENGTH} Zeichen bleiben zwei Befunde, die
-     * zufaellig gleich anfangen ("Hunt rebuild: …"), zwei TODOs.
+     * Gleicher normalisierter Titel — oder der kuerzere ist nachweislich die abgeschnittene Fassung
+     * des laengeren. Nachweislich heisst: er endet auf „…"/„..." <em>und</em> ist mindestens
+     * {@link #PREFIX_MIN_LENGTH} Zeichen lang.
+     *
+     * <p>Beide Bedingungen schuetzen einen eigenstaendigen Befund davor, verworfen zu werden — die
+     * Regel loescht eine ganze Zeile samt Prioritaet, Tags und Beschreibung. „Fehler in Modul A
+     * beheben" ist ein Praefix von „Fehler in Modul A beheben, Teil 2", aber eben kein Fragment,
+     * sondern eine eigene Aufgabe; ohne das Kuerzungszeichen bleiben beide stehen. Und ein Titel,
+     * der schon nach wenigen Zeichen abbricht, taugt auch als Fragment nicht als Beweis.
      */
-    private static boolean isDuplicate(String a, String b) {
-        if (a.equals(b)) {
+    private static boolean isDuplicate(Item a, Item b) {
+        String normalizedA = normalizeTitle(a.title());
+        String normalizedB = normalizeTitle(b.title());
+        if (normalizedA.equals(normalizedB)) {
             return true;
         }
-        String shorter = a.length() <= b.length() ? a : b;
-        String longer = a.length() <= b.length() ? b : a;
-        return shorter.length() >= PREFIX_MIN_LENGTH && longer.startsWith(shorter);
+        boolean aIsShorter = normalizedA.length() <= normalizedB.length();
+        Item shorter = aIsShorter ? a : b;
+        String shorterTitle = aIsShorter ? normalizedA : normalizedB;
+        String longerTitle = aIsShorter ? normalizedB : normalizedA;
+        return wasTruncated(shorter.title())
+                && shorterTitle.length() >= PREFIX_MIN_LENGTH
+                && longerTitle.startsWith(shorterTitle);
+    }
+
+    /** Hat der Titel ein Kuerzungszeichen, ist er ein Fragment und keine eigene Aufgabe. */
+    private static boolean wasTruncated(String title) {
+        String trimmed = title == null ? "" : title.trim();
+        return trimmed.endsWith("…") || trimmed.endsWith("...");
     }
 
     /** Trim, Whitespace-Folgen zu einem Leerzeichen, Kleinschreibung, Kuerzungssuffix („…", „...") weg. */

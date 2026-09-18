@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -568,6 +569,22 @@ class ExecutionSettingsServiceTest {
         service.init();
 
         assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.5);
+    }
+
+    /**
+     * init() laeuft in @PostConstruct: wirft ein Applier beim Anwenden eines gespeicherten Wertes,
+     * darf das den Start nicht verhindern — der Wert wird verworfen, alles andere laeuft weiter.
+     */
+    @Test
+    void init_aFailingApplierDoesNotBreakTheStartup() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.of("7"));
+        when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
+        doThrow(new IllegalStateException("semaphore busy")).when(hostClaudeService).updateMaxConcurrentCalls(7);
+
+        assertThatCode(() -> service.init()).doesNotThrowAnyException();
+
+        assertThat(hostClaudeConfig.getTimeoutSeconds()).as("die uebrigen Werte greifen trotzdem").isEqualTo(600);
     }
 
     @Test

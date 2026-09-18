@@ -57,6 +57,7 @@ class AuditFingerprintMigrationJobMarkerTest {
     void setUp() {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         job = new AuditFingerprintMigrationJob(findingRepository,
+                new AuditRuleKeyCatalog(new com.fasterxml.jackson.databind.ObjectMapper()),
                 new AuditFindingMerger(findingTodoRepository, occurrenceRepository, todoRepository),
                 new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
                 appSettings, new TransactionTemplate(transactionManager), modules);
@@ -65,12 +66,24 @@ class AuditFingerprintMigrationJobMarkerTest {
 
     @Test
     void anExistingMarkerSkipsTheScanEntirely() {
-        when(appSettings.get(MARKER)).thenReturn(Optional.of("1"));
+        when(appSettings.get(MARKER)).thenReturn(Optional.of(String.valueOf(AuditFingerprintMigrationJob.VERSION)));
 
         job.migrateOnStartup();
 
         verifyNoInteractions(findingRepository);
         verify(appSettings, never()).set(anyString(), anyString());
+    }
+
+    /** Eine neue Job-Version raeumt noch einmal auf — der alte Marker haelt sie nicht auf. */
+    @Test
+    void anOlderMarkerRunsTheScanAgain() {
+        when(appSettings.get(MARKER)).thenReturn(Optional.of("1"));
+        when(findingRepository.findDistinctScopes()).thenReturn(List.of());
+
+        job.migrateOnStartup();
+
+        verify(findingRepository).findDistinctScopes();
+        verify(appSettings).set(MARKER, String.valueOf(AuditFingerprintMigrationJob.VERSION));
     }
 
     @Test
@@ -83,7 +96,7 @@ class AuditFingerprintMigrationJobMarkerTest {
         job.migrateOnStartup();
 
         verify(findingRepository).findDistinctScopes();
-        verify(appSettings).set(MARKER, "1");
+        verify(appSettings).set(MARKER, String.valueOf(AuditFingerprintMigrationJob.VERSION));
     }
 
     @Test
