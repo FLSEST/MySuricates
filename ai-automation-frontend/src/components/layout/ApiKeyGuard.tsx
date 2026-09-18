@@ -3,7 +3,7 @@ import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { MeerkatIcon } from './Sidebar';
-import { api, fetchAuthStatus } from '../../api/client';
+import { api, fetchAuthStatus, validateApiKey } from '../../api/client';
 
 export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const t = useT();
@@ -66,17 +66,14 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
     setError('');
 
     try {
-      const res = await fetch('/api/v1/projects', {
-        headers: { 'X-API-Key': inputKey.trim() },
-      });
-
-      if (res.ok) {
-        setApiKey(inputKey.trim());
-      } else {
-        setError(t.security.invalidKey);
-      }
-    } catch {
-      setError(t.security.connectionError);
+      // Über den Client, damit der 429-Backoff auch für die Key-Prüfung gilt (b6feccbc).
+      await validateApiKey(inputKey.trim());
+      setApiKey(inputKey.trim());
+    } catch (err: unknown) {
+      const status = (err as { status?: number } | null)?.status;
+      if (status === 429) setError(t.errors.rateLimited);
+      else if (typeof status === 'number') setError(t.security.invalidKey);
+      else setError(t.security.connectionError);
     } finally {
       setValidating(false);
     }

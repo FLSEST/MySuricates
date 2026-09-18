@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SecurityBanner } from './SecurityBanner';
+import { RateLimitBanner } from './RateLimitBanner';
 import { ApiKeyGuard } from './ApiKeyGuard';
 import { AssistantPanel } from '../AssistantPanel';
 import { CommandPalette } from '../palette/CommandPalette';
@@ -53,6 +54,7 @@ export function Layout() {
           style={{ marginLeft: isMobile ? 0 : collapsed ? 64 : 224 }}
         >
           <SecurityBanner />
+          <RateLimitBanner />
           <Header />
           <main className={isMobile ? 'p-4 pb-20' : 'p-6 pb-20'}>
             <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner /></div>}>

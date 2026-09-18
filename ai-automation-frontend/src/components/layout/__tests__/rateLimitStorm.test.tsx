@@ -16,16 +16,18 @@
  *    wie im beobachteten Vorfall und die Query-Endpunkte sind messbar.
  */
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiKeyGuard } from '../ApiKeyGuard';
 import { SecurityBanner } from '../SecurityBanner';
-import { useSystemModules, isModuleDisabledError } from '../../../hooks/useModules';
+import { useSystemModules } from '../../../hooks/useModules';
 import { useAssistantSuggestions } from '../../../hooks/useAssistant';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../../../api/client';
+import { appQueryDefaults, installRateLimitRecovery } from '../../../api/queryDefaults';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { useI18nStore } from '../../../i18n';
 
 const RETRY_AFTER_SECONDS = 5;
 
@@ -67,21 +69,13 @@ function stubFetch(authStatus: 'rate-limited' | 'security-off') {
   }));
 }
 
-/** Query-Client mit denselben Defaults wie main.tsx (429 wird nicht wiederholt). */
+let recoveryDisposers: Array<() => void> = [];
+
+/** Query-Client genau wie in main.tsx: Defaults + Erholung nach Ablauf der Sperre. */
 function createAppQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 30_000,
-        retry: (failureCount, error) => {
-          if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 429) return false;
-          if (isModuleDisabledError(error)) return false;
-          return failureCount < 1;
-        },
-        refetchOnWindowFocus: false,
-      },
-    },
-  });
+  const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
+  recoveryDisposers.push(installRateLimitRecovery(queryClient));
+  return queryClient;
 }
 
 function Page() {
@@ -121,6 +115,7 @@ async function advance(ms: number) {
 
 function prepare() {
   requests = [];
+  recoveryDisposers = [];
   resetRateLimitBackoff();
   resetAuthStatusCache();
   useSettingsStore.setState({ apiKey: '' });
@@ -128,6 +123,8 @@ function prepare() {
 }
 
 function teardown() {
+  for (const dispose of recoveryDisposers) dispose();
+  recoveryDisposers = [];
   vi.useRealTimers();
   vi.unstubAllGlobals();
   useSettingsStore.setState({ apiKey: '' });
@@ -169,9 +166,10 @@ describe('429 storm reproduction (d89b2cc1)', () => {
     await advance(2000);
     const before = countsByPath();
 
-    // Sperrzeit abwarten, dann neu mounten.
-    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
+    // Vor Ablauf abmelden: gemessen wird hier der Neuaufbau (Reload), nicht die Erholung
+    // montierter Queries — die hat ihren eigenen Test.
     view.unmount();
+    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     queryClient.clear();
     resetAuthStatusCache(); // ein Reload würde den App-weiten Cache ebenfalls verlieren
     renderShell(queryClient);
@@ -254,6 +252,14 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     await advance(2000);
 
     expect(mounts, `Kinder wurden ${mounts}× gemountet`).toBe(1);
+    // Keine einzige Anfrage: der 429 auf /projects (Stored-Key-Prüfung) setzt seit b6feccbc
+    // die globale Kurzsperre, die Kinder mounten direkt danach — capabilities scheitert am
+    // Client, ohne ans Netz zu gehen.
+    expect(countsByPath()['/system/capabilities'] ?? 0).toBe(0);
+
+    // Nach Ablauf der /projects-Sperre holt die Erholung die Query genau einmal nach
+    // (f3fb193f) — ohne sie bliebe die montierte Seite bis zum Reload leer.
+    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     expect(countsByPath()['/system/capabilities']).toBe(1);
   });
 
@@ -262,5 +268,51 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     await advance(2000);
 
     expect(useSettingsStore.getState().apiKey).toBe('stored-key');
+  });
+});
+
+describe('Key-Eingabe läuft über den Backoff (b6feccbc)', () => {
+  beforeEach(() => {
+    prepare();
+    useI18nStore.setState({ locale: 'de' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = pathOf(input);
+      requests.push(path);
+      if (path === '/system/auth-status') return jsonResponse({ securityEnabled: true });
+      return rateLimitedResponse();
+    }));
+  });
+
+  afterEach(() => {
+    teardown();
+    useI18nStore.setState({ locale: 'en' });
+  });
+
+  async function submitKey(view: ReturnType<typeof render>, key: string) {
+    const input = view.container.querySelector('input[type="password"]')!;
+    fireEvent.change(input, { target: { value: key } });
+    const form = view.container.querySelector('form')!;
+    await act(async () => { fireEvent.submit(form); });
+    await advance(50);
+  }
+
+  it('fragt /projects im Sperrfenster nur einmal an und meldet das Rate-Limit', async () => {
+    const view = render(
+      <QueryClientProvider client={createAppQueryClient()}>
+        <MemoryRouter>
+          <ApiKeyGuard><div data-testid="page">page</div></ApiKeyGuard>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await advance(50);
+
+    await submitKey(view, 'typed-key-1');
+    expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
+    expect(view.container.textContent).toContain('Zu viele Anfragen');
+
+    // Zweiter Versuch im Sperrfenster: keine weitere Netzanfrage.
+    await submitKey(view, 'typed-key-2');
+    expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
+    expect(useSettingsStore.getState().apiKey).toBe('');
   });
 });

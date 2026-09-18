@@ -7,13 +7,97 @@ const BASE_URL = '/api/v1';
 /** Fallback lock time when the server sends a 429 without a usable `Retry-After`. */
 const DEFAULT_RETRY_AFTER_SECONDS = 10;
 
-/** Backoff deadlines (epoch ms) per request path, query string stripped. */
+/**
+ * Short lock across *all* endpoints after any 429. A storm usually hits many paths at once
+ * (≈300 GETs on `/executions/{id}` in the observed incident), and a per-path lock would let
+ * the first call of every path through. Two seconds is enough to stop that fan-out without
+ * making the app feel frozen (b6feccbc).
+ */
+const GLOBAL_BACKOFF_SECONDS = 2;
+
+/**
+ * Endpoints the *global* lock must not touch. Their own path lock still applies — this only
+ * says that somebody else's 429 may not take them down with it:
+ *  - `/ws-ticket`: a blocked ticket costs the WebSocket one reconnect attempt and doubles
+ *    its exponential delay, so a 2 s lock turns into a much longer outage.
+ *  - `/system/auth-status`: the ApiKeyGuard renders nothing until this answers; blocking it
+ *    would show an empty app instead of the rate-limit hint.
+ */
+const GLOBAL_LOCK_EXEMPT = new Set(['/ws-ticket', '/system/auth-status']);
+
+/** Backoff deadlines (epoch ms) per endpoint pattern. */
 const rateLimitedUntil = new Map<string, number>();
 
-/** Backoff key: the path without its query, so `?page=x` variants share one lock. */
+/** Deadline (epoch ms) of the short all-endpoints lock; 0 = none. */
+let globalRateLimitedUntil = 0;
+
+/** Fires when the last deadline passes, so the app can recover without a reload. */
+let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Listeners for backoff changes (banner, query recovery). */
+const backoffListeners = new Set<() => void>();
+
+const UUID_SEGMENT = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
+
+/**
+ * Backoff key: the endpoint *pattern*, not the concrete URL — query string dropped (so
+ * `?page=x` variants share one lock) and UUIDs replaced by `{id}` (so `/executions/<a>` and
+ * `/executions/<b>` share one lock instead of opening one per run).
+ */
 function backoffKey(path: string): string {
   const q = path.indexOf('?');
-  return q === -1 ? path : path.slice(0, q);
+  const withoutQuery = q === -1 ? path : path.slice(0, q);
+  return withoutQuery.replace(UUID_SEGMENT, '{id}');
+}
+
+function notifyBackoffListeners(): void {
+  for (const listener of backoffListeners) listener();
+}
+
+/** Latest deadline (epoch ms) currently stored — expired entries included. */
+function latestDeadline(): number {
+  let latest = globalRateLimitedUntil;
+  for (const until of rateLimitedUntil.values()) if (until > latest) latest = until;
+  return latest;
+}
+
+/** Drops deadlines that have passed. Housekeeping only — the readers check the clock. */
+function pruneExpired(now: number): void {
+  for (const [key, until] of rateLimitedUntil) if (now >= until) rateLimitedUntil.delete(key);
+  if (globalRateLimitedUntil !== 0 && now >= globalRateLimitedUntil) globalRateLimitedUntil = 0;
+}
+
+/**
+ * Arms a single timer on the last deadline. Without it nothing recovers: `retry` is off for
+ * 429 and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar,
+ * layout, dashboard) would stay in their error state until a reload.
+ */
+function scheduleExpiry(now: number): void {
+  if (expiryTimer !== null) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
+  const latest = latestDeadline();
+  if (latest <= now) return;
+  expiryTimer = setTimeout(() => {
+    expiryTimer = null;
+    const at = Date.now();
+    pruneExpired(at);
+    notifyBackoffListeners();
+    scheduleExpiry(at);
+  }, latest - now);
+}
+
+/** Records a 429: locks the endpoint pattern plus, briefly, everything else. */
+function lockAfterRateLimit(path: string, retryAfterSeconds: number, now: number = Date.now()): void {
+  pruneExpired(now);
+  if (retryAfterSeconds > 0) {
+    rateLimitedUntil.set(backoffKey(path), now + retryAfterSeconds * 1000);
+  }
+  const globalUntil = now + Math.min(GLOBAL_BACKOFF_SECONDS, Math.max(retryAfterSeconds, 0)) * 1000;
+  if (globalUntil > globalRateLimitedUntil) globalRateLimitedUntil = globalUntil;
+  scheduleExpiry(now);
+  notifyBackoffListeners();
 }
 
 /**
@@ -31,20 +115,49 @@ export function parseRetryAfter(header: string | null | undefined, now: number =
   return Math.max(0, Math.ceil((at - now) / 1000));
 }
 
-/** Remaining lock time for a path in seconds (0 = free). */
+/**
+ * Remaining lock time for a path in seconds (0 = free) — the later of the endpoint
+ * pattern's own deadline and, unless the path is exempt, the short all-endpoints lock.
+ * Pure reader: expired deadlines are dropped by the expiry timer, not here.
+ */
 export function rateLimitRemainingSeconds(path: string, now: number = Date.now()): number {
-  const until = rateLimitedUntil.get(backoffKey(path));
-  if (until === undefined) return 0;
-  if (now >= until) {
-    rateLimitedUntil.delete(backoffKey(path));
-    return 0;
-  }
-  return Math.ceil((until - now) / 1000);
+  const key = backoffKey(path);
+  const own = rateLimitedUntil.get(key) ?? 0;
+  const global = GLOBAL_LOCK_EXEMPT.has(key) ? 0 : globalRateLimitedUntil;
+  const deadline = Math.max(own, global);
+  return deadline > now ? Math.ceil((deadline - now) / 1000) : 0;
+}
+
+/** Latest deadline (epoch ms) of any active backoff; 0 when nothing is locked. */
+export function rateLimitBackoffUntil(now: number = Date.now()): number {
+  const latest = latestDeadline();
+  return latest > now ? latest : 0;
+}
+
+/** True while any endpoint is still in its 429 backoff window. */
+export function isRateLimitBackoffActive(now: number = Date.now()): boolean {
+  return rateLimitBackoffUntil(now) > now;
+}
+
+/**
+ * Notifies on every change of the backoff state — both when a lock starts and when the last
+ * deadline passes (an internal timer pushes that flank). Readers therefore need no tick of
+ * their own.
+ */
+export function subscribeRateLimitBackoff(listener: () => void): () => void {
+  backoffListeners.add(listener);
+  return () => { backoffListeners.delete(listener); };
 }
 
 /** Clears every backoff deadline. Test helper — production code lets them expire. */
 export function resetRateLimitBackoff(): void {
   rateLimitedUntil.clear();
+  globalRateLimitedUntil = 0;
+  if (expiryTimer !== null) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
+  notifyBackoffListeners();
 }
 
 export interface RateLimitError extends ApiError {
@@ -79,7 +192,7 @@ class ApiClient {
     return headers;
   }
 
-  private async request<T>(path: string, options?: RequestInit): Promise<T> {
+  private async request<T>(path: string, options?: RequestInit, responseType: 'json' | 'text' = 'json'): Promise<T> {
     // A 429 locks the path for `Retry-After`: further calls fail fast instead of
     // topping the rate limit up again (d89b2cc1).
     const blockedFor = rateLimitRemainingSeconds(path);
@@ -101,7 +214,7 @@ class ApiClient {
         }));
         if (response.status === 429) {
           const seconds = parseRetryAfter(response.headers.get('Retry-After'));
-          if (seconds > 0) rateLimitedUntil.set(backoffKey(path), Date.now() + seconds * 1000);
+          lockAfterRateLimit(path, seconds);
           throw rateLimitError(seconds, body.error);
         }
         throw { ...body, status: response.status, message: body.error };
@@ -109,6 +222,7 @@ class ApiClient {
 
       if (response.status === 204) return undefined as T;
       const text = await response.text();
+      if (responseType === 'text') return text as T;
       if (!text) return undefined as T;
       return JSON.parse(text);
     } finally {
@@ -116,8 +230,22 @@ class ApiClient {
     }
   }
 
-  get<T>(path: string): Promise<T> {
-    return this.request<T>(path);
+  get<T>(path: string, options?: RequestInit): Promise<T> {
+    return this.request<T>(path, options);
+  }
+
+  /** GET whose answer is not JSON (BPMN-XML) — same backoff, same error shape. */
+  getText(path: string, options?: RequestInit): Promise<string> {
+    return this.request<string>(path, options, 'text');
+  }
+
+  /** POST with a raw (non-JSON) body, e.g. the BPMN import's XML. */
+  postRaw<T>(path: string, body: string, contentType: string): Promise<T> {
+    return this.request<T>(path, {
+      method: 'POST',
+      body,
+      headers: { 'Content-Type': contentType },
+    });
   }
 
   post<T>(path: string, body?: unknown, options?: RequestInit): Promise<T> {
@@ -200,30 +328,27 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-/** Importiert einen BPMN-Prozess als neuen Workflow (Body = XML, kein JSON — daher raw fetch). */
-export async function importWorkflowBpmn(xml: string, projectId: string): Promise<{ id: string }> {
-  const headers: HeadersInit = { 'Content-Type': 'application/xml' };
-  const apiKey = useSettingsStore.getState().apiKey;
-  if (apiKey) headers['X-API-Key'] = apiKey;
-  const res = await fetch(`${BASE_URL}/workflows/import/bpmn?projectId=${encodeURIComponent(projectId)}`, {
-    method: 'POST',
-    headers,
-    body: xml,
-  });
-  if (!res.ok) {
-    let body: unknown;
-    try { body = await res.json(); } catch { body = undefined; }
-    throw body ?? new Error(`BPMN import failed (${res.status})`);
-  }
-  return res.json();
+/**
+ * Importiert einen BPMN-Prozess als neuen Workflow (Body = XML, kein JSON). Läuft über den
+ * Client und damit über den 429-Backoff — ein roher `fetch` würde die Sperre umgehen (b6feccbc).
+ */
+export function importWorkflowBpmn(xml: string, projectId: string): Promise<{ id: string }> {
+  return api.postRaw<{ id: string }>(
+    `/workflows/import/bpmn?projectId=${encodeURIComponent(projectId)}`,
+    xml,
+    'application/xml',
+  );
 }
 
-/** Lädt den BPMN-2.0-Export eines Workflows als XML-String (kein JSON — daher raw fetch). */
-export async function fetchWorkflowBpmn(id: string): Promise<string> {
-  const headers: HeadersInit = {};
-  const apiKey = useSettingsStore.getState().apiKey;
-  if (apiKey) headers['X-API-Key'] = apiKey;
-  const res = await fetch(`${BASE_URL}/workflows/${id}/export/bpmn`, { headers });
-  if (!res.ok) throw new Error(`BPMN export failed (${res.status})`);
-  return res.text();
+/** Lädt den BPMN-2.0-Export eines Workflows als XML-String (kein JSON, aber über den Backoff). */
+export function fetchWorkflowBpmn(id: string): Promise<string> {
+  return api.getText(`/workflows/${id}/export/bpmn`);
+}
+
+/**
+ * Prüft einen eingegebenen API-Key gegen `/projects`. Der getippte Key ersetzt für diesen
+ * einen Aufruf den gespeicherten; der 429-Backoff gilt wie überall (b6feccbc).
+ */
+export function validateApiKey(key: string): Promise<unknown> {
+  return api.get('/projects', { headers: { 'X-API-Key': key } });
 }

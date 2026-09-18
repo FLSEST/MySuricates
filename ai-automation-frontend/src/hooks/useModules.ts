@@ -44,10 +44,17 @@ export function useSystemModules() {
       writeCachedModules(value);
       return value;
     },
-    // Changes come from a restart (reload picks it up) or from the switches below, which
-    // write the new state into this cache directly.
-    staleTime: Infinity,
-    placeholderData: readCachedModules,
+    // `initialData` statt `placeholderData`: letzteres greift in v5 nur bei
+    // status === 'pending'. Nach einem 429 galt damit wieder jedes Modul als „an" und
+    // Navigation und Widgets flackerten (b13509f3). Mit initialData bleibt der zuletzt
+    // bekannte Stand auch im Fehlerfall stehen.
+    initialData: readCachedModules,
+    // Epoch 0 ⇒ der geseedete Stand ist sofort stale, die Query fragt den Server also
+    // trotzdem einmal. Das braucht eine endliche staleTime (mit Infinity wäre nichts je
+    // stale); eine Stunde entspricht praktisch dem bisherigen „einmal pro Seitenaufruf",
+    // Änderungen kommen ohnehin aus einem Neustart oder aus den Schaltern unten.
+    initialDataUpdatedAt: 0,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

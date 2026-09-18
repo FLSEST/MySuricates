@@ -1434,6 +1434,7 @@ export const en = {
   },
   errors: {
     rateLimited: 'Too many requests — please wait a moment and try again.',
+    rateLimitedUntil: 'Too many requests — paused until {time}',
   },
   runs: {
     title: 'Run History',
