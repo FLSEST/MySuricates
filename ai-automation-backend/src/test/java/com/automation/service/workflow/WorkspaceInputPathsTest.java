@@ -23,4 +23,17 @@ class WorkspaceInputPathsTest {
         assertThat(context.getVariable("todo_description")).isEqualTo("Fix '/runs/run/repo/src/Example.java'; $(echo untrusted)");
         assertThat(context.isUntrusted("todo_description")).isTrue();
     }
+
+    @Test
+    void keepsPlatformDataUntrustedWithoutTaintingTheRun() {
+        var context = ExecutionContext.builder().workflowRunId("run").build();
+        context.setUntrustedPlatformVariable("previous_report", "siehe /source/repo/src/Example.java");
+
+        WorkspaceInputPaths.remap(context, Map.of("sourceRepository", "/source/repo", "workspacePath", "/runs/run/repo"));
+
+        assertThat(context.getVariable("previous_report")).isEqualTo("siehe /runs/run/repo/src/Example.java");
+        assertThat(context.isUntrusted("previous_report")).isTrue();
+        // Platform data must not be upgraded to external input — that would taint every block output
+        assertThat(context.hasUntrustedInput()).isFalse();
+    }
 }

@@ -364,6 +364,24 @@ class ShellBlockExecutorTest {
     }
 
     @Test
+    void execute_platformDataVariable_isEscapedWithoutOptIn() {
+        // previous_report / open_todos carry text from earlier runs and imported TODOs
+        context.setUntrustedPlatformVariable("previous_report", "x; rm -rf /");
+        when(shellService.execute(eq("echo 'x; rm -rf /'"), eq("/test/project"), eq(300), any()))
+                .thenReturn(new ShellResult("ok", 0, 10));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("shell")
+                .config(new HashMap<>(Map.of("command", "echo {{ previous_report }}")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getInput()).isEqualTo("echo 'x; rm -rf /'");
+    }
+
+    @Test
     void execute_trustedVariable_staysRawWithoutOptIn() {
         context.setVariable("branch", "main");
         when(shellService.execute(eq("git checkout main"), eq("/test/project"), eq(300), any()))

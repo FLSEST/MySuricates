@@ -215,4 +215,49 @@ class WorkflowContextDataServiceTest {
         assertThat(ctx.getVariable("previous_report")).isEqualTo("(kein vorheriger Report vorhanden)");
         assertThat(ctx.getVariable("open_todos")).isEqualTo("(keine offenen TODOs)");
     }
+
+    @Test
+    void injectPlatformData_marksBothVariablesAsUntrusted() {
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat(ctx.isUntrusted("previous_report")).isTrue();
+        assertThat(ctx.isUntrusted("open_todos")).isTrue();
+        // Platform data is injected into every run — it must not taint the run's own block outputs
+        assertThat(ctx.hasUntrustedInput()).isFalse();
+    }
+
+    @Test
+    void injectPlatformData_previousReportFromAnEarlierRun_isSingleQuotedInShellCommands() {
+        // Cross-run laundering: the earlier run's output may carry attacker-controlled bytes
+        String payload = "x; rm -rf / " + "a".repeat(250);
+        WorkflowRun prev = WorkflowRun.builder().id("run-0").status(RunStatus.COMPLETED).build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(prev));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-0")).thenReturn(List.of(
+                StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("data").build(),
+                StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output(payload).build()));
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat(ctx.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo '" + payload + "'");
+    }
+
+    @Test
+    void injectPlatformData_openTodos_isSingleQuotedInShellCommands() {
+        Todo t = Todo.builder().id("t-1").priority(Todo.Priority.LOW).title("Fix $(id) it").build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of(t));
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        String resolved = ctx.resolveShellTemplate("echo {{ open_todos }}", false);
+        assertThat(resolved).startsWith("echo '<open_todos>").endsWith("</open_todos>'").contains("Fix $(id) it");
+    }
 }

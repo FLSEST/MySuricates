@@ -488,6 +488,55 @@ class ExecutionContextTest {
         assertThat(context.getUntrustedVariables()).isNotSameAs(context.getUntrustedVariables());
     }
 
+    // ── Platform data variables: always escaped, never a run-level taint source ──
+
+    @Test
+    void setUntrustedPlatformVariable_isSingleQuotedInShellCommands() {
+        context.setUntrustedPlatformVariable("previous_report", "x; rm -rf /");
+
+        assertThat(context.isUntrusted("previous_report")).isTrue();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false))
+                .isEqualTo("echo 'x; rm -rf /'");
+    }
+
+    @Test
+    void setUntrustedPlatformVariable_staysRawForNonShellUse() {
+        context.setUntrustedPlatformVariable("open_todos", "a'b");
+
+        assertThat(context.resolveTemplate("say {{ open_todos }}")).isEqualTo("say a'b");
+    }
+
+    @Test
+    void setUntrustedPlatformVariable_doesNotTaintTheRun() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+        context.recordOutput("scan", "a | b");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("{{ previous_output }} {{ block.scan.output }}", false))
+                .isEqualTo("a | b a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void setVariable_clearsThePlatformMark() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        context.setVariable("previous_report", "clean");
+
+        assertThat(context.isUntrusted("previous_report")).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo clean");
+    }
+
+    @Test
+    void setUntrustedVariable_upgradesAPlatformVariableToAFullTaintSource() {
+        context.setUntrustedPlatformVariable("previous_report", "x");
+        context.setUntrustedVariable("previous_report", "y; id");
+
+        assertThat(context.hasUntrustedInput()).isTrue();
+        assertThat(context.getUntrustedVariables()).containsExactly("previous_report");
+        assertThat(context.resolveShellTemplate("echo {{ previous_report }}", false)).isEqualTo("echo 'y; id'");
+    }
+
     // ── Taint propagation: outputs derived from untrusted input ─────────────────
 
     @Test

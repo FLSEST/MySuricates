@@ -24,7 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <li>Output-Platzhalter in Shell-Feldern duerfen nicht in Quotes stehen: in Taint-Runs wird der
  *     Wert bereits single-quoted, eigene Quotes heben das Escaping auf ({@code ''x; id''} fuehrt
  *     {@code id} aus). Korrekte Form: unquoted plus {@code "shell_escape_variables": true},
- *     sonst zerlegt ein mehrzeiliger Output in Runs ohne Taint den Befehl (TODO 1e77e717).</li>
+ *     sonst zerlegt ein mehrzeiliger Output in Runs ohne Taint den Befehl (TODO 1e77e717).
+ *     Gleiches gilt fuer {@code previous_report} und {@code open_todos}: sie sind seit TODO c2634caa
+ *     immer untrusted und werden in jedem Run single-quoted.</li>
  * <li>Keine datierten Claude-Modell-IDs: der Modell-Katalog liefert Aliase (opus/sonnet/haiku/fable),
  *     datierte IDs veralten und zeigen im UI "nicht im Katalog" (TODO 5770c88c).</li>
  * </ol>
@@ -35,7 +37,8 @@ class TemplateHygieneGateTest {
     private static final List<String> SHELL_FIELDS =
             List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command");
     private static final Pattern QUOTED_OUTPUT = Pattern.compile(
-            "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output)\\s*}}['\"]");
+            "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output"
+                    + "|previous_report|open_todos)\\s*}}['\"]");
     private static final Pattern DATED_CLAUDE_MODEL = Pattern.compile("claude-(opus|sonnet|haiku|fable)-\\d");
 
     @Test

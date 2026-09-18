@@ -126,7 +126,7 @@ Executes a shell command on the host or inside a Docker container.
 | `command` | string | **required** | Shell command(s) to execute |
 | `container_image` | string | null | Docker image (see execution environment; the server may restrict this via an allowlist) |
 | `timeout_seconds` | int | 300 | Execution timeout |
-| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`) and the block outputs derived from them are **always** escaped, regardless of this option |
+| `shell_escape_variables` | bool | false | POSIX-safe escape of **all** template variables (single quotes). Variables from webhook payloads (incl. `git_*`), the block outputs derived from them, and `{{ previous_report }}` / `{{ open_todos }}` are **always** escaped, regardless of this option |
 | `mount_docker_socket` | bool | false | Mount Docker socket into the container (only effective when `container_image` is set) |
 | `mounts` | list | `[]` | Additional Docker volume mounts in format `host:container[:ro\|rw]` (only effective when `container_image` is set) |
 
@@ -163,10 +163,13 @@ Executes a shell command on the host or inside a Docker container.
 > untrusted input (schedule, manual start, TodoTrigger, chain) every block output is substituted
 > raw exactly as before.
 
-> **Careful with `{{ previous_report }}` / `{{ open_todos }}`:** these values are injected from the
-> PREVIOUS run and are NOT covered by the run-level taint propagation above (they don't come from
-> the current run and carry no `__untrusted_*` marker) — treat them like foreign/untrusted data in
-> shell blocks anyway: write them unquoted too, or escape them explicitly (open TODO c2634caa).
+> **`{{ previous_report }}` / `{{ open_todos }}`:** both are **always** treated as untrusted and are
+> therefore **always single-quoted** in shell blocks — in every run, regardless of the trigger and of
+> `shell_escape_variables`. The reason: `previous_report` is the output of an earlier run (which may
+> have processed a webhook payload), and `open_todos` contains titles from imported issues. So write
+> these placeholders **unquoted** (`REPORT={{ previous_report }}`, not `REPORT="{{ previous_report }}"`).
+> Nothing changes in AI prompts (they are never escaped). The two variables do **not** trigger taint
+> propagation: block outputs of an otherwise clean run stay raw as before.
 
 ```json
 {
@@ -638,8 +641,8 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the definition has changed since the last successful run (hash comparison; timestamps when no hash exists) |
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
 | `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"` |
-| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries |
+| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 
 ### Context Variables
 

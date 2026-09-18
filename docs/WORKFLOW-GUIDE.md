@@ -127,7 +127,7 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 | `command` | string | **erforderlich** | Shell-Befehl(e) zur Ausfuehrung |
 | `container_image` | string | null | Docker-Image (siehe Ausfuehrungsumgebung; Server kann per Allowlist einschraenken) |
 | `timeout_seconds` | int | 300 | Ausfuehrungs-Timeout |
-| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`) und die daraus abgeleiteten Block-Ausgaben werden **immer** escaped, unabhaengig von dieser Option |
+| `shell_escape_variables` | bool | false | **Alle** Template-Variablen POSIX-sicher escapen (Single-Quotes). Variablen aus Webhook-Payloads (inkl. `git_*`), die daraus abgeleiteten Block-Ausgaben sowie `{{ previous_report }}` und `{{ open_todos }}` werden **immer** escaped, unabhaengig von dieser Option |
 | `mount_docker_socket` | bool | false | Docker-Socket in den Container mounten (nur wirksam wenn `container_image` gesetzt) |
 | `mounts` | list | `[]` | Zusaetzliche Docker-Volume-Mounts im Format `host:container[:ro\|rw]` (nur wirksam wenn `container_image` gesetzt) |
 
@@ -165,11 +165,14 @@ Fuehrt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > **unquoted** schreiben. In Runs ohne untrusted Input (Schedule, manueller Start, TodoTrigger,
 > Chain) bleiben alle Block-Ausgaben unveraendert roh.
 
-> **Achtung `{{ previous_report }}` / `{{ open_todos }}`:** Diese aus dem VORHERIGEN Run injizierten
-> Werte werden von der run-level Taint-Propagation oben NICHT erfasst (sie stammen nicht aus dem
-> aktuellen Run und tragen keinen `__untrusted_*`-Marker) und sind in Shell-Bloecken trotzdem wie
-> fremde/unvertrauenswuerdige Daten zu behandeln — also ebenfalls unquoted schreiben oder explizit
-> escapen (offenes TODO c2634caa).
+> **`{{ previous_report }}` / `{{ open_todos }}`:** Beide werden **immer** als nicht
+> vertrauenswuerdig behandelt und in Shell-Bloecken deshalb **stets single-quoted** — in jedem Run,
+> unabhaengig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
+> eines frueheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthaelt
+> Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
+> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts aendert
+> sich nichts (dort wird nie escaped). Die beiden Variablen loesen **keine** Taint-Propagation aus:
+> Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
 
 ```json
 {
@@ -678,8 +681,8 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_changed_since_last_run }}` | `"true"` oder `"false"` — ob sich die Definition seit dem letzten erfolgreichen Run geaendert hat (Hash-Vergleich; ohne Hash ueber Zeitstempel) |
 | `{{ workflow_definition_hash }}` | SHA-256 der ausgefuehrten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
 | `{{ trigger_source }}` | Ausloeser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"` |
-| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege |
+| `{{ previous_report }}` | Laengster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
+| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglaettet, auf 200/80 Zeichen gekuerzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie koennen aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Eintraege. Gilt immer als nicht vertrauenswuerdig → in Shell-Bloecken stets single-quoted, deshalb unquoted schreiben |
 
 ### Kontext-Variablen
 
