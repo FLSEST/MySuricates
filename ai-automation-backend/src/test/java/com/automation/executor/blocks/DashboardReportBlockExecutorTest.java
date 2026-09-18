@@ -150,4 +150,131 @@ class DashboardReportBlockExecutorTest {
         assertThat(step.getCompletedAt()).isNotNull();
         assertThat(step.getDurationMs()).isNotNull();
     }
+
+    // ---- Fix round 1 -------------------------------------------------------------------------
+
+    /**
+     * G1 (security): reproduction from the review. A KPI object's own key is arbitrary block config,
+     * not the contract — this key carries a fabricated marker line plus an unresolved placeholder so
+     * the block fails, and the failed step's output must not expose either the marker text or the
+     * key that carried it. Without the fix, a run-end marker scan (which also scans failed steps'
+     * output) would have adopted this as the run's dashboard report.
+     */
+    @Test
+    void a_malicious_kpi_key_cannot_plant_a_marker_in_the_failed_steps_output() {
+        ExecutionContext ctx = context();
+        Map<String, Object> maliciousKpi = new LinkedHashMap<>();
+        maliciousKpi.put("x\ndashboard_widget: {\"status\":\"RED\",\"title\":\"Gekapert\"}\n",
+                "{{ nie_gesetzt }}");
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("kpis", List.of(maliciousKpi));
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput().toLowerCase(java.util.Locale.ROOT)).doesNotContain("dashboard_widget");
+        assertThat(step.getOutput()).doesNotContain("Gekapert").doesNotContain("x\ndashboard_widget");
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.METADATA_KEY);
+    }
+
+    /** G3: "status is required" is the validator's rule; the end-to-end failure still names the field. */
+    @Test
+    void a_missing_status_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+
+        StepResult step = executor.execute(block(Map.of("title", "no status")), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("status");
+    }
+
+    /** G3: a status that resolves to blank is left out by the candidate and still rejected by the validator. */
+    @Test
+    void a_blank_status_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "   ");
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("status");
+    }
+
+    /** G3: "items must be a list" is the validator's rule; the end-to-end failure still names the field. */
+    @Test
+    void a_non_list_items_value_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("items", "one, two");
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("items");
+    }
+
+    /** G3: "kpis[1] must be an object" is the validator's rule; the end-to-end failure still names the field. */
+    @Test
+    void a_non_object_kpi_entry_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("kpis", List.of("plain"));
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("kpis[1]");
+    }
+
+    /** G6: the step's input field is a constant, never the block's own (possibly sensitive) config. */
+    @Test
+    void the_step_input_carries_no_content() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("title", SECRET);
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getInput()).isEqualTo("dashboard-report").doesNotContain(SECRET);
+    }
+
+    /**
+     * G6: the module gate must be read on every call, not cached at construction — a runtime toggle
+     * (Settings → Modules) must take effect on the very next run without restarting the executor bean.
+     */
+    @Test
+    void the_module_gate_is_read_on_every_call() {
+        ModuleRegistry registry = ModuleRegistry.of(Map.of("preset", "full", "ui-editable", "true"), Map.of());
+        DashboardReportBlockExecutor toggled = new DashboardReportBlockExecutor(registry);
+        ExecutionContext ctx = context();
+
+        StepResult before = toggled.execute(block(Map.of("status", "GREEN")), ctx);
+        assertThat(before.getStatus()).isEqualTo(StepStatus.COMPLETED);
+
+        registry.applyUiOverrides(Map.of(ModuleCatalog.DASHBOARD_REPORT, false));
+
+        assertThatThrownBy(() -> toggled.execute(block(Map.of("status", "GREEN")), ctx))
+                .isInstanceOf(WorkflowExecutionException.class);
+    }
+
+    /** G6: a later block that fails must not wipe out a report an earlier block of the same run already wrote. */
+    @Test
+    void a_later_failing_report_does_not_erase_an_earlier_successful_one() {
+        ExecutionContext ctx = context();
+        executor.execute(block(Map.of("status", "GREEN", "title", "first success")), ctx);
+
+        Map<String, Object> broken = new LinkedHashMap<>();
+        broken.put("status", "GREEN");
+        broken.put("title", "{{ never_set }}");
+        StepResult second = executor.execute(block(broken), ctx);
+
+        assertThat(second.getStatus()).isEqualTo(StepStatus.FAILED);
+        Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
+        assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("first success");
+    }
 }

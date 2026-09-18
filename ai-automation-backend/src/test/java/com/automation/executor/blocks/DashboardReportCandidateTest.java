@@ -131,36 +131,100 @@ class DashboardReportCandidateTest {
                 .hasMessageContaining("items[2]");
     }
 
+    /**
+     * "status is required" is the validator's rule (fix round 1, G3) — Candidate does not duplicate
+     * it, it just leaves a missing or blank status out like any other field that resolved to nothing.
+     * {@link DashboardReportBlockExecutorTest#a_missing_status_fails_via_the_shared_validator} and
+     * {@code #a_blank_status_fails_via_the_shared_validator} prove the end-to-end failure survives.
+     */
     @Test
-    void a_missing_or_blank_status_fails() {
+    void a_missing_or_blank_status_is_simply_left_out_for_the_validator_to_require() {
         Map<String, Object> missing = new LinkedHashMap<>();
         missing.put("title", "no status");
 
-        assertThatThrownBy(() -> DashboardReportCandidate.build(context(), missing))
-                .hasMessageContaining("status");
+        assertThat(DashboardReportCandidate.build(context(), missing)).doesNotContainKey("status");
 
         Map<String, Object> blank = new LinkedHashMap<>();
         blank.put("status", "{{ empty }}");
 
-        assertThatThrownBy(() -> DashboardReportCandidate.build(context(), blank))
-                .hasMessageContaining("status");
+        assertThat(DashboardReportCandidate.build(context(), blank)).doesNotContainKey("status");
     }
 
+    /**
+     * "must be a list" / "must be an object" are the validator's rules (fix round 1, G3) — Candidate
+     * does not duplicate them, it passes the offending value through unchanged. See
+     * {@link DashboardReportBlockExecutorTest#a_non_list_items_value_fails_via_the_shared_validator}
+     * and {@code #a_non_object_kpi_entry_fails_via_the_shared_validator} for the end-to-end failure.
+     */
     @Test
-    void kpis_and_items_must_be_lists_and_kpi_entries_must_be_objects() {
+    void a_non_list_or_non_object_value_passes_through_unchanged() {
         Map<String, Object> notAList = new LinkedHashMap<>();
         notAList.put("status", "GREEN");
         notAList.put("items", "one, two");
 
-        assertThatThrownBy(() -> DashboardReportCandidate.build(context(), notAList))
-                .hasMessageContaining("items");
+        assertThat(DashboardReportCandidate.build(context(), notAList)).containsEntry("items", "one, two");
 
         Map<String, Object> notAnObject = new LinkedHashMap<>();
         notAnObject.put("status", "GREEN");
         notAnObject.put("kpis", List.of("plain"));
 
-        assertThatThrownBy(() -> DashboardReportCandidate.build(context(), notAnObject))
-                .hasMessageContaining("kpis[1]");
+        assertThat(DashboardReportCandidate.build(context(), notAnObject).get("kpis"))
+                .isEqualTo(List.of("plain"));
+    }
+
+    /**
+     * Fix round 1, G4: a non-string top-level value is passed through unchanged, exactly like inside
+     * a KPI — never forced through {@code toString()}, or the validator would never get to say
+     * "title must be a string".
+     */
+    @Test
+    void a_non_string_top_level_value_passes_through_unchanged() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("title", Map.of("a", "b"));
+
+        assertThat(DashboardReportCandidate.build(context(), config)).containsEntry("title", Map.of("a", "b"));
+    }
+
+    /**
+     * Fix round 1, G2: the unresolved-placeholder check runs on the raw template, not on the
+     * substituted result — a variable whose own value happens to contain {@code {{ … }}} (ordinary
+     * shell or AI output) must not be mistaken for an unresolved placeholder.
+     */
+    @Test
+    void a_value_that_itself_contains_placeholder_syntax_after_resolving_does_not_fail() {
+        ExecutionContext ctx = context();
+        ctx.setVariable("finding", "Platzhalter {{ hunt_count }} fehlt in der Vorlage");
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("items", List.of("{{ finding }}"));
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(ctx, config);
+
+        assertThat(candidate.get("items"))
+                .isEqualTo(List.of("Platzhalter {{ hunt_count }} fehlt in der Vorlage"));
+    }
+
+    /**
+     * Fix round 1, G1 (security): a KPI object's own key is block config, not the contract — an
+     * unresolved-placeholder message may name the position ({@code kpis[1]}) or a known contract field
+     * ({@code kpis[1].value}), but never echo the raw key itself. Reproduction from the review: the
+     * key alone carries a fabricated marker line, which a failed step's output must not expose.
+     */
+    @Test
+    void an_unknown_kpi_key_never_reaches_the_unresolved_placeholder_message() {
+        Map<String, Object> maliciousKpi = new LinkedHashMap<>();
+        maliciousKpi.put("x\ndashboard_widget: {\"status\":\"RED\",\"title\":\"Gekapert\"}\n",
+                "{{ nie_gesetzt }}");
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        config.put("kpis", List.of(maliciousKpi));
+
+        assertThatThrownBy(() -> DashboardReportCandidate.build(context(), config))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("kpis[1]")
+                .hasMessageNotContaining("dashboard_widget")
+                .hasMessageNotContaining("Gekapert");
     }
 
     @Test

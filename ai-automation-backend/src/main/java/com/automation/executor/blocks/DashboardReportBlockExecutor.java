@@ -62,11 +62,20 @@ public class DashboardReportBlockExecutor implements BlockExecutor {
                     DashboardWidgetResultParser.toMetadata(report));
             result.setOutput(summary(report));
             result.setStatus(StepStatus.COMPLETED);
-        } catch (RuntimeException e) {
+        } catch (IllegalArgumentException e) {
+            // The only exception DashboardReportCandidate/validateOrThrow ever throw; their messages
+            // are built from field names and constants only (never a config key, never a candidate
+            // value) — see DashboardReportCandidate's javadoc. Safe to put into step output as-is.
             String message = e.getMessage() == null || e.getMessage().isBlank()
-                    ? e.getClass().getSimpleName() : e.getMessage();
+                    ? "invalid configuration" : e.getMessage();
             log.info("dashboard-report block rejected its config: {}", message);
             result.setOutput("dashboard-report fehlgeschlagen: " + message);
+            result.setStatus(StepStatus.FAILED);
+        } catch (RuntimeException e) {
+            // Anything unexpected: a fixed message, never e.getMessage() — an uncontrolled channel
+            // into step output, which every marker parser reads again at run end.
+            log.warn("dashboard-report block failed unexpectedly", e);
+            result.setOutput("dashboard-report fehlgeschlagen: unerwarteter Fehler");
             result.setStatus(StepStatus.FAILED);
         }
         result.setCompletedAt(Instant.now());
