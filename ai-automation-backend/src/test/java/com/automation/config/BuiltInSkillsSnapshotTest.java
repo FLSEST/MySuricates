@@ -63,7 +63,14 @@ class BuiltInSkillsSnapshotTest {
 
         String expected = Files.readString(snapshot, StandardCharsets.UTF_8);
         assertThat(actual)
-                .as("Built-in-Skills weichen vom Snapshot ab (Prompt-Fidelitaet verletzt)")
+                .as("""
+                        Built-in-Skills weichen vom Snapshot ab (Prompt-Fidelitaet verletzt). Haeufigste \
+                        unbeabsichtigte Ursache: ein Editor hat an eine skills/builtin/<id>.md einen \
+                        finalen Zeilenumbruch angehaengt — die Prompts enden bewusst ohne. Die \
+                        .editorconfig im Repo-Wurzelverzeichnis haelt das fest \
+                        (insert_final_newline = false). Gewollte Aenderung: \
+                        ./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true \
+                        (und die version in der <id>.json erhoehen, siehe BuiltInSkillVersionGateTest)""")
                 .isEqualTo(expected);
     }
 

@@ -1,0 +1,11 @@
+# EditorConfig — https://editorconfig.org
+# Bewusst minimal: hier steht nur, was eine inhaltliche Anforderung des Projekts ist.
+# Allgemeine Formatierung bleibt den Editor-Voreinstellungen ueberlassen.
+root = true
+
+# Die Prompt-Dateien der Built-in-Skills werden byte-genau geladen
+# (BuiltInSkillLoader) und enden bewusst ohne finalen Zeilenumbruch. Haengt ein
+# Editor einen an, aendert sich der Prompt — BuiltInSkillsSnapshotTest und
+# BuiltInSkillVersionGateTest schlagen dann fehl.
+[ai-automation-backend/src/main/resources/skills/builtin/*.md]
+insert_final_newline = false
