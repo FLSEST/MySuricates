@@ -76,6 +76,11 @@ docs/plans/
 docs/analysis.md
 docs/en/analysis.md
 
+# Planungsdokument mit Instanz-UUIDs und einer Session-ID, kein EN-Gegenstueck.
+# Gleiches Genre wie docs/plans/. Entscheidung Flo 2026-09-18 (TODO 089473cd):
+# untracken.
+docs/specs/
+
 # Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
 # *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und
 # bei einem pauschalen 'git add' mitgegangen waere.
