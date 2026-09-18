@@ -153,6 +153,10 @@ public class ExecutionSettingsService {
         m.put("request-metrics-enabled", v -> requestMetricsConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("request-metrics-retention-days", v -> requestMetricsConfig.setRetentionDays(Integer.parseInt(v)));
         m.put("request-metrics-slow-request-ms", v -> requestMetricsConfig.setSlowRequestMs(Long.parseLong(v)));
+        m.put("request-metrics-drift-detection-enabled", v -> requestMetricsConfig.setDriftDetectionEnabled(Integer.parseInt(v) == 1));
+        m.put("request-metrics-drift-factor", v -> requestMetricsConfig.setDriftFactor(Double.parseDouble(v)));
+        m.put("request-metrics-drift-min-calls", v -> requestMetricsConfig.setDriftMinCalls(Integer.parseInt(v)));
+        m.put("request-metrics-baseline-days", v -> requestMetricsConfig.setBaselineDays(Integer.parseInt(v)));
         return m;
     }
 

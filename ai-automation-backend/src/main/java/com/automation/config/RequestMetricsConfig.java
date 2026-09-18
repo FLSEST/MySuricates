@@ -31,4 +31,19 @@ public class RequestMetricsConfig {
 
     /** Emit the {@code Server-Timing} response header. Startup-only, see class comment. */
     private boolean serverTimingEnabled = false;
+
+    /** Report drift at all. */
+    private boolean driftDetectionEnabled = true;
+
+    /** A route is drifting when today's p95 exceeds its baseline by this factor. */
+    private double driftFactor = 2.0;
+
+    /**
+     * Calls a route needs today before it is judged at all. Without this a single cold request
+     * after a restart — JIT not warm, caches empty — reads as a catastrophic regression.
+     */
+    private int driftMinCalls = 20;
+
+    /** How many stored days form the baseline a route is compared against. */
+    private int baselineDays = 7;
 }

@@ -197,6 +197,21 @@ report_prompt "$PERF" "$TMP/perf-prompt.txt"
 
 echo "1) Health-Check: Faktenblatt misst die Groessen deterministisch"
 printf '%s\n' "$FIX" > "$TMP/base.txt"
+
+# Das Backend misst die Request-Kosten selbst und reicht sie als Kontextvariable request_metrics
+# herein (RequestMetricsFactSheet). Hier steht stellvertretend, was es liefert — der Faktenblatt-
+# Block darf sie nur durchreichen, nicht selbst messen.
+cat > "$TMP/request-metrics.txt" <<'REQMETRICS'
+FAKT request_metrics_routes_measured: 2
+FAKT request_metrics_slowest_route: GET /api/v1/todos
+FAKT request_metrics_slowest_p95_ms: 320
+FAKT request_metrics_max_sql_route: GET /api/v1/workflows
+FAKT request_metrics_max_sql_statements: 47
+FAKT request_metrics_max_wait_share_percent: 41.2
+FAKT request_metrics_max_response_bytes: 3061816
+FAKT request_metrics_drifting_routes: 1
+FAKT request_metrics_drift_detail: GET /api/v1/todos x7.5
+REQMETRICS
 VALUES="$(json_values execution_path="$TMP/base.txt" \
   block.backend_tests.output="$TMP/tests-out.txt" \
   block.frontend_build.output="$TMP/build-out.txt" \
@@ -333,7 +348,7 @@ check "Prompt kennt NICHT GEMESSEN"       'grep -q "NICHT GEMESSEN" "$TMP/health
 check "Prompt ohne rohe step_N_outputs"   '! grep -q "step_0_output\|step_1_output\|step_2_output\|step_3_output" "$TMP/health-prompt.txt"'
 
 echo "6) Performance-Audit: Faktenblatt misst Quelltext-Muster statt zu schaetzen"
-PERF_VALUES="$(json_values project_path="$TMP/base.txt")"
+PERF_VALUES="$(json_values project_path="$TMP/base.txt" request_metrics="$TMP/request-metrics.txt")"
 render "$PERF" name:facts "$PERF_VALUES" > "$TMP/perf-facts.sh" 2> "$TMP/perf-facts-render.err"
 check "Faktenblatt-Block 'facts' extrahierbar" '[ -s "$TMP/perf-facts.sh" ]'
 bash "$TMP/perf-facts.sh" > "$TMP/perf-facts.out" 2> "$TMP/perf-facts.err"
@@ -357,6 +372,14 @@ check "FAKT non_main_runtime_timeout_lines: 1" 'grep -qx "FAKT non_main_runtime_
 check "step_results_bytes als Luecke"          'grep -q "^NICHT GEMESSEN: step_results_bytes (" "$TMP/perf-facts.out"'
 check "JVM entweder gemessen oder Luecke" \
   'grep -q "^FAKT jvm_memory_used_bytes: \|^NICHT GEMESSEN: jvm_memory_used_bytes (" "$TMP/perf-facts.out"'
+
+# Request-Kosten: das Backend misst, der Shell-Block reicht nur durch (CLAUDE.md — Shell-Bloecke
+# rufen die REST-API nicht auf).
+check "Request-Kosten im Blatt"        'grep -qx "FAKT request_metrics_slowest_route: GET /api/v1/todos" "$TMP/perf-facts.out"'
+check "SQL-Zahl im Blatt"              'grep -qx "FAKT request_metrics_max_sql_statements: 47" "$TMP/perf-facts.out"'
+check "Wartezeit-Anteil im Blatt"      'grep -qx "FAKT request_metrics_max_wait_share_percent: 41.2" "$TMP/perf-facts.out"'
+check "Drift im Blatt"                 'grep -qx "FAKT request_metrics_drift_detail: GET /api/v1/todos x7.5" "$TMP/perf-facts.out"'
+check "Blatt ruft die REST-API nicht"  '! grep -q "localhost:9090/api/v1" "$TMP/perf-facts.sh"'
 check "Pflichtfeld-Liste im Blatt"             'grep -q "^PFLICHT-FAKTEN: " "$TMP/perf-facts.out"'
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
