@@ -82,9 +82,12 @@ Rules:
 - The gate block deterministically checks that the mandatory FAKT lines are present and
   otherwise sets `gate_status: RED` with `gate_category: audit-invalid`. Without that check
   an AI report could be green although the measuring block delivered nothing.
-- Fact sheet blocks read placeholders only as `set -- {{ block.<name>.output }}` and set
-  `"shell_escape_variables": true` (hygiene gate `TemplateHygieneGateTest`). They neither
-  call the REST API nor open the SQLite database.
+- Fact sheet blocks read block outputs only as `set -- {{ block.<name>.output }}` and set
+  `"shell_escape_variables": true` (hygiene gate `TemplateHygieneGateTest`). Simple values
+  without line breaks — `BASE={{ project_path }}`, `BASE={{ execution_path }}` — are written
+  **unquoted** as well: with `shell_escape_variables` the resolver adds the single quotes
+  itself, so your own quotes (`BASE="{{ project_path }}"`) would end up inside the value.
+  They neither call the REST API nor open the SQLite database.
 
 Converted audits in `workflow-pool/`:
 

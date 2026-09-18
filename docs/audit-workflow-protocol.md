@@ -80,9 +80,12 @@ Regeln:
 - Der Gate-Block prueft deterministisch, ob die Pflicht-FAKT-Zeilen vorliegen, und setzt
   sonst `gate_status: RED` mit `gate_category: audit-invalid`. Ohne diese Pruefung koennte
   ein KI-Report gruen sein, obwohl der Messblock nichts geliefert hat.
-- Faktenblatt-Bloecke lesen Platzhalter nur als `set -- {{ block.<name>.output }}` und
-  setzen `"shell_escape_variables": true` (Hygiene-Gate `TemplateHygieneGateTest`). Sie
-  rufen weder die REST-API auf noch oeffnen sie die SQLite-Datenbank.
+- Faktenblatt-Bloecke lesen Block-Ausgaben nur als `set -- {{ block.<name>.output }}` und
+  setzen `"shell_escape_variables": true` (Hygiene-Gate `TemplateHygieneGateTest`). Einfache
+  Werte ohne Zeilenumbruch — `BASE={{ project_path }}`, `BASE={{ execution_path }}` — stehen
+  ebenfalls **unquoted**: mit `shell_escape_variables` setzt der Resolver die Single-Quotes
+  selbst, eigene Quotes (`BASE="{{ project_path }}"`) landen sonst im Wert. Sie rufen weder
+  die REST-API auf noch oeffnen sie die SQLite-Datenbank.
 
 Umgestellte Audits im `workflow-pool/`:
 
