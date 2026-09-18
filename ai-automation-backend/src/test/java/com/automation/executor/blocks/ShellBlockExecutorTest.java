@@ -428,13 +428,17 @@ class ShellBlockExecutorTest {
     }
 
     @Test
-    void execute_checkedCommandWithoutOwnGate_prependsTheSyntheticGate() {
-        StepResult green = runCheckedCommand("all good", 0);
-        assertThat(green.getOutput()).startsWith("gate_status: GREEN\ngate_category: build-check");
+    void execute_checkedCommandSucceedingWithoutOwnGate_prependsTheGreenGate() {
+        assertThat(runCheckedCommand("all good", 0).getOutput())
+                .startsWith("gate_status: GREEN\ngate_category: build-check\n"
+                        + "gate_description: Command exit 0\n\n");
+    }
 
-        setUp();
-        StepResult red = runCheckedCommand("boom", 3);
-        assertThat(red.getOutput()).startsWith("gate_status: RED\ngate_category: build-check");
+    @Test
+    void execute_checkedCommandFailingWithoutOwnGate_prependsTheRedGate() {
+        assertThat(runCheckedCommand("boom", 3).getOutput())
+                .startsWith("gate_status: RED\ngate_category: build-check\n"
+                        + "gate_description: Command exit 3\n\n");
     }
 
     /**
@@ -476,6 +480,32 @@ class ShellBlockExecutorTest {
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
         assertThat(gate.category()).isEqualTo("tests");
         assertThat(gate.description()).isEqualTo("3 Tests rot");
+    }
+
+    /**
+     * A bare {@code gate_status:} line — e.g. one that travelled in from text the command echoed —
+     * keeps the verdict but must not leave the step without a category: the block's own
+     * {@code check_category} fills the gaps.
+     */
+    @Test
+    void execute_checkedCommandWithABareScriptGate_fillsInCategoryAndDescriptionFromTheBlock() {
+        StepResult result = runCheckedCommand("Durchgereicht:\ngate_status: YELLOW\nEnde\n", 0);
+
+        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.YELLOW);
+        assertThat(gate.category()).isEqualTo("build-check");
+        assertThat(gate.description()).isEqualTo("Command exit 0");
+        assertThat(result.getOutput()).doesNotContain("gate_status: GREEN");
+    }
+
+    @Test
+    void execute_checkedCommandWithScriptGateAndCategoryOnly_keepsTheCategoryAndAddsTheDescription() {
+        StepResult result = runCheckedCommand("gate_status: RED\ngate_category: tests\n", 0);
+
+        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
+        assertThat(gate.category()).isEqualTo("tests");
+        assertThat(gate.description()).isEqualTo("Command exit 0");
     }
 
     @Test
