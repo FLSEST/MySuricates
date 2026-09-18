@@ -12,6 +12,7 @@ import com.automation.config.TaskCommandConfig;
 import com.automation.config.AssistantGuardrailsConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.TodoHygieneConfig;
+import com.automation.config.TodoSimilarityConfig;
 import com.automation.config.RunRetentionConfig;
 import com.automation.config.DashboardLayoutConfig;
 import com.automation.config.WishConfig;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -56,6 +58,7 @@ class ExecutionSettingsServiceTest {
     private RunRetentionConfig runRetentionConfig;
     private DashboardLayoutConfig dashboardLayoutConfig;
     private CompressionConfig compressionConfig;
+    private TodoSimilarityConfig todoSimilarityConfig;
     private ExecutionSettingsService service;
 
     @BeforeEach
@@ -75,6 +78,7 @@ class ExecutionSettingsServiceTest {
         runRetentionConfig = new RunRetentionConfig();
         dashboardLayoutConfig = new DashboardLayoutConfig();
         compressionConfig = new CompressionConfig();
+        todoSimilarityConfig = new TodoSimilarityConfig();
 
         service = new ExecutionSettingsService(
                 appSettingsRepository, executionSemaphore,
@@ -82,7 +86,7 @@ class ExecutionSettingsServiceTest {
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                compressionConfig
+                compressionConfig, todoSimilarityConfig
         );
     }
 
@@ -520,11 +524,73 @@ class ExecutionSettingsServiceTest {
 
     @Test
     void validateAndApply_everyKnownKey_hasRuntimeApplier() {
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                service.validateAndApply(key, String.valueOf(bounds[0])));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                service.validateAndApply(key, bound.format(bound.min())));
 
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                verify(appSettingsRepository).set(key, String.valueOf(bounds[0])));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                verify(appSettingsRepository).set(key, bound.format(bound.min())));
+    }
+
+    @Test
+    void todoSimilarityKeywordThreshold_defaultsToTwoTenths() {
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
+
+        assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.2);
+        assertThat(service.getCurrentSettings()).containsEntry("todoSimilarityKeywordThreshold", 0.2);
+    }
+
+    @Test
+    void validateAndApply_todoSimilarityKeywordThreshold_updatesConfig() {
+        service.validateAndApply("todoSimilarityKeywordThreshold", "0.45");
+
+        verify(appSettingsRepository).set("todo-similarity-keyword-threshold", "0.45");
+        assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.45);
+    }
+
+    @Test
+    void validateAndApply_todoSimilarityKeywordThresholdOutOfBounds_isRejected() {
+        assertThatThrownBy(() -> service.validateAndApply("todo-similarity-keyword-threshold", "0.01"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between 0.05 and 0.9");
+
+        assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.2);
+        verify(appSettingsRepository, never()).set(eq("todo-similarity-keyword-threshold"), anyString());
+    }
+
+    @Test
+    void init_appliesTodoSimilarityKeywordThresholdFromDb() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("todo-similarity-keyword-threshold")).thenReturn(Optional.of("0.5"));
+
+        service.init();
+
+        assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.5);
+    }
+
+    /**
+     * init() laeuft in @PostConstruct: wirft ein Applier beim Anwenden eines gespeicherten Wertes,
+     * darf das den Start nicht verhindern — der Wert wird verworfen, alles andere laeuft weiter.
+     */
+    @Test
+    void init_aFailingApplierDoesNotBreakTheStartup() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("claude-max-concurrent-calls")).thenReturn(Optional.of("7"));
+        when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
+        doThrow(new IllegalStateException("semaphore busy")).when(hostClaudeService).updateMaxConcurrentCalls(7);
+
+        assertThatCode(() -> service.init()).doesNotThrowAnyException();
+
+        assertThat(hostClaudeConfig.getTimeoutSeconds()).as("die uebrigen Werte greifen trotzdem").isEqualTo(600);
+    }
+
+    @Test
+    void init_ignoresAnOutOfBoundsTodoSimilarityKeywordThreshold() {
+        when(appSettingsRepository.get(anyString())).thenReturn(Optional.empty());
+        when(appSettingsRepository.get("todo-similarity-keyword-threshold")).thenReturn(Optional.of("5"));
+
+        service.init();
+
+        assertThat(todoSimilarityConfig.getKeywordThreshold()).isEqualTo(0.2);
     }
 
     @Test

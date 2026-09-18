@@ -100,6 +100,9 @@ public class PoolExportWriter {
         if (workflow.getModel() != null) {
             poolJson.put("model", workflow.getModel());
         }
+        if (workflow.getEffort() != null && !workflow.getEffort().isBlank()) {
+            poolJson.put("effort", workflow.getEffort());
+        }
         poolJson.put("version", workflow.getVersion() != null ? workflow.getVersion() : "1.0.0");
         poolJson.put("author", req.author() != null ? req.author() : "MySuricates");
         if (workflow.getDefaultContext() != null && !workflow.getDefaultContext().isEmpty()) {

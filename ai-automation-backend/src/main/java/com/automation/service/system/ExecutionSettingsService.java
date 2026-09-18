@@ -14,6 +14,7 @@ import com.automation.config.TaskCommandConfig;
 import com.automation.config.TodoGhostWatchdogConfig;
 import com.automation.config.RunRetentionConfig;
 import com.automation.config.TodoHygieneConfig;
+import com.automation.config.TodoSimilarityConfig;
 import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
@@ -58,6 +59,7 @@ public class ExecutionSettingsService {
     private final DashboardLayoutConfig dashboardLayoutConfig;
     private final ModelCatalogService modelCatalogService;
     private final CompressionConfig compressionConfig;
+    private final TodoSimilarityConfig todoSimilarityConfig;
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -82,7 +84,8 @@ public class ExecutionSettingsService {
             RunRetentionConfig runRetentionConfig,
             DashboardLayoutConfig dashboardLayoutConfig,
             ModelCatalogService modelCatalogService,
-            CompressionConfig compressionConfig) {
+            CompressionConfig compressionConfig,
+            TodoSimilarityConfig todoSimilarityConfig) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -103,6 +106,7 @@ public class ExecutionSettingsService {
         this.dashboardLayoutConfig = dashboardLayoutConfig;
         this.modelCatalogService = modelCatalogService;
         this.compressionConfig = compressionConfig;
+        this.todoSimilarityConfig = todoSimilarityConfig;
         this.appliers = buildAppliers();
     }
 
@@ -141,6 +145,7 @@ public class ExecutionSettingsService {
         m.put("wish-default-agentic-total-timeout-seconds", v -> wishConfig.setDefaultAgenticTotalTimeoutSeconds(Integer.parseInt(v)));
         m.put("model-catalog-ttl-seconds", v -> modelCatalogService.setTtlSeconds(Integer.parseInt(v)));
         m.put("compress-ai-max-input-chars", v -> compressionConfig.setMaxAiInputChars(Integer.parseInt(v)));
+        m.put("todo-similarity-keyword-threshold", v -> todoSimilarityConfig.setKeywordThreshold(Double.parseDouble(v)));
         return m;
     }
 
@@ -165,7 +170,7 @@ public class ExecutionSettingsService {
 
     public void validateAndApply(String key, String value) {
         key = ExecutionSettingKeys.resolve(key);
-        ExecutionSettingKeys.parseWithinBounds(key, value);
+        ExecutionSettingKeys.validate(key, value);
 
         appSettingsRepository.set(key, value);
         appliers.get(key).accept(value);
@@ -204,24 +209,25 @@ public class ExecutionSettingsService {
         result.put("wishDefaultAgenticTotalTimeoutSeconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
         result.put("modelCatalogTtlSeconds", modelCatalogService.getTtlSeconds());
         result.put("compressAiMaxInputChars", compressionConfig.getMaxAiInputChars());
+        result.put("todoSimilarityKeywordThreshold", todoSimilarityConfig.getKeywordThreshold());
         result.put("activeRuns", executionRegistry.getActiveRunCount());   // running + queued
         result.put("queuedRuns", executionRegistry.getQueuedRunCount());
         return result;
     }
 
+    /**
+     * Ein einzelner unbrauchbarer DB-Wert darf den Start nicht kippen: {@link #init} laeuft in
+     * {@code @PostConstruct}, eine Exception hier waere ein Startabbruch. Deshalb umschliesst der
+     * Fang auch das Anwenden selbst, nicht nur die Pruefung.
+     */
     private void applyIfPresent(String key, Consumer<String> applier) {
         appSettingsRepository.get(key).filter(v -> !v.isBlank()).ifPresent(v -> {
             try {
-                long[] bounds = ExecutionSettingKeys.bounds(key);
-                long parsed = Long.parseLong(v);
-                if (parsed >= bounds[0] && parsed <= bounds[1]) {
-                    applier.accept(v);
-                    log.debug("Applied DB override for {}: {}", key, v);
-                } else {
-                    log.warn("Ignoring out-of-bounds DB value for {}: {} (bounds: {}-{})", key, v, bounds[0], bounds[1]);
-                }
-            } catch (NumberFormatException e) {
-                log.warn("Ignoring non-numeric DB value for {}: {}", key, v);
+                ExecutionSettingKeys.validate(key, v);
+                applier.accept(v);
+                log.debug("Applied DB override for {}: {}", key, v);
+            } catch (RuntimeException e) {
+                log.warn("Ignoring unusable DB value for {}: {} ({})", key, v, e.toString());
             }
         });
     }

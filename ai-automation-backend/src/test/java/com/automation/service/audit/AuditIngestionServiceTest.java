@@ -4,10 +4,12 @@ import com.automation.entity.*;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.*;
+import com.automation.service.activitylog.ActivityLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +29,8 @@ class AuditIngestionServiceTest {
     private static final Instant ACCEPTED_AT = Instant.parse("2026-03-01T10:00:00Z");
     private static final String PROJECT = "proj-1";
     private static final String AUDIT_KEY = "mysuricates.health";
+    /** Das einzige Audit mit ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
+    private static final String COVERAGE_KEY = "mysuricates.test-coverage";
 
     @Mock private WorkflowRunRepository runRepository;
     @Mock private AuditReportRepository reportRepository;
@@ -35,6 +39,7 @@ class AuditIngestionServiceTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private ActivityLogService activityLog;
 
     private AuditIngestionService service;
 
@@ -42,7 +47,8 @@ class AuditIngestionServiceTest {
     void setUp() {
         service = new AuditIngestionService(runRepository, reportRepository, findingRepository, occurrenceRepository,
                 findingTodoRepository, todoRepository, new AuditResultParser(new ObjectMapper()),
-                new AuditAcceptancePolicy(), eventPublisher);
+                new AuditAcceptancePolicy(), new AuditRuleKeyCatalog(new ObjectMapper()), activityLog,
+                eventPublisher);
         when(reportRepository.save(any())).thenAnswer(inv -> {
             AuditReport report = inv.getArgument(0);
             if (report.getId() == null) report.setId("rep-" + UUID.randomUUID());
@@ -56,8 +62,12 @@ class AuditIngestionServiceTest {
     }
 
     private WorkflowRunCompletedEvent event(String runId) {
+        return event(runId, AUDIT_KEY);
+    }
+
+    private WorkflowRunCompletedEvent event(String runId, String auditKey) {
         Map<String, Object> workflowMetadata = Map.of("audit", Map.of(
-                "enabled", true, "key", AUDIT_KEY, "category", "quality", "reportBlock", "report"));
+                "enabled", true, "key", auditKey, "category", "quality", "reportBlock", "report"));
         return new WorkflowRunCompletedEvent(this, runId, "wf-1", "Health Audit", PROJECT, "/tmp/p",
                 RunStatus.COMPLETED, Map.of(), workflowMetadata, null);
     }
@@ -154,6 +164,80 @@ class AuditIngestionServiceTest {
         assertThat(finding.getDispositionAt()).isEqualTo(ACCEPTED_AT);
         verify(todoRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any(TodoCreatedEvent.class));
+    }
+
+    /**
+     * ruleKey-Drift erzeugt sonst Wiedergaenger-Findings: der Envelope-Key wird auf den
+     * Katalogeintrag normalisiert (Audit-TODO 8fc9a401) — ohne Meldung, das ist der Normalfall.
+     */
+    @Test
+    void driftedRuleKey_isNormalizedOntoTheCatalogEntryWithoutWarning() {
+        stubCoverageRun("run-1", "Test-Coverage.Untested_Class");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        assertThat(savedFinding().getRuleKey()).isEqualTo("test-coverage.untested-class");
+        verifyNoInteractions(activityLog);
+    }
+
+    /** Ein unbekannter Key bleibt erhalten — verworfen wird nichts, gemeldet schon. */
+    @Test
+    void unknownRuleKey_isIngestedAndReportedToTheActivityLog() {
+        stubCoverageRun("run-1", "coverage.mystery");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        assertThat(savedFinding().getRuleKey()).isEqualTo("coverage.mystery");
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), message.capture(), anyString(), eq("run-1"));
+        assertThat(message.getValue()).contains("coverage.mystery").contains(COVERAGE_KEY);
+    }
+
+    /** Derselbe unbekannte Key in mehreren Findings eines Runs meldet sich genau einmal. */
+    @Test
+    void unknownRuleKey_isReportedOncePerRunAndKey() {
+        stubCoverageRun("run-1", "coverage.mystery", "coverage.mystery", "coverage.other");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        verify(activityLog, times(2)).warn(any(), anyString(), anyString(), anyString());
+    }
+
+    /** Ein Audit ohne Katalogeintrag wird nicht geprueft — die uebrigen Audits vergeben frei. */
+    @Test
+    void anAuditWithoutCatalogEntry_isNotChecked() {
+        acceptedFinding("Big.java: 320 LOC", ACCEPTED_AT, true);
+        stubRun("run-1", ACCEPTED_AT.plus(Duration.ofDays(7)), "Big.java: 350 LOC");
+
+        service.ingest(event("run-1"));
+
+        verifyNoInteractions(activityLog);
+    }
+
+    private AuditFinding savedFinding() {
+        ArgumentCaptor<AuditFinding> captor = ArgumentCaptor.forClass(AuditFinding.class);
+        verify(findingRepository, atLeastOnce()).save(captor.capture());
+        return captor.getValue();
+    }
+
+    /** Ein Coverage-Run mit je einem LOW-Finding pro ruleKey (LOW erzeugt kein verwaltetes TODO). */
+    private void stubCoverageRun(String runId, String... ruleKeys) {
+        StringBuilder findings = new StringBuilder();
+        for (int i = 0; i < ruleKeys.length; i++) {
+            findings.append(i > 0 ? "," : "").append("{\"ruleKey\":\"").append(ruleKeys[i])
+                    .append("\",\"subject\":\"Klasse").append(i).append(".java\",\"severity\":\"LOW\","
+                            + "\"title\":\"ungetestet\"}");
+        }
+        String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":["
+                + findings + "]} -->\n# Report";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output(envelope)
+                .metadata(new HashMap<>(Map.of("blockName", "report"))).build();
+        WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage Audit").build())
+                .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
+        when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
+        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
+                .thenReturn(Optional.empty());
+        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, COVERAGE_KEY)).thenReturn(List.of());
     }
 
     @Test

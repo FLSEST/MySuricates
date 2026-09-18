@@ -79,6 +79,10 @@ public class ExecutionContextFactory {
         // Outputs tainted in an earlier segment of this run (resume) or in the parent (sub-workflow)
         reservedNames(inputContext, ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE)
                 .forEach(context::markOutputUntrusted);
+        // Platform data already reached a shell command line earlier in the run (TODO cadfc423)
+        if (Boolean.parseBoolean(String.valueOf(inputContext.get(ExecutionContext.PLATFORM_IN_SHELL_VARIABLE)))) {
+            context.markPlatformUsedInShell();
+        }
         if (resumePreviousOutput != null) {
             context.setPreviousOutput(resumePreviousOutput);
         } else if (inputContext.get("previous_output") != null) {

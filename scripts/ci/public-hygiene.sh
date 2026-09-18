@@ -143,14 +143,23 @@ check_staged_files() {
 # Check 3 — Pool-Neutralität (eigenes Skript, auch vom Built-in-Template genutzt)
 # ---------------------------------------------------------------------------
 check_pool() {
-  local out
-  if out="$(bash "$REPO_ROOT/scripts/ci/pool-neutrality.sh" 2>&1)"; then
-    return 0
-  fi
+  local out rc reported=0
+  out="$(bash "$REPO_ROOT/scripts/ci/pool-neutrality.sh" 2>&1)"
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
   while IFS=$'\t' read -r file tag desc; do
     [ -z "${file:-}" ] && continue
-    case "$file" in *.json) annotate "$file" 1 "[$tag] $desc" ;; esac
+    case "$file" in
+      *.json) annotate "$file" 1 "[$tag] $desc"; reported=1 ;;
+    esac
   done < <(printf '%s\n' "$out")
+  # Ein Abbruch des Unterskripts (exit 2 "Regeldatei fehlt", Python-Traceback, fehlendes
+  # python3) liefert keine TAB-Zeilen mit .json — frueher fiel er hier lautlos weg und das
+  # Gate meldete "OK". Ein Lauf ohne verwertbare Befundzeilen ist deshalb selbst ein Fehler.
+  if [ "$reported" -eq 0 ]; then
+    annotate "scripts/ci/pool-neutrality.sh" 1 \
+      "Pool-Neutralitaet abgebrochen (exit ${rc}) ohne verwertbare Befundzeilen: $(printf '%s' "$out" | tr '\n' ' ')"
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -321,6 +330,60 @@ for path, ref in links:
 PY
 }
 
+# ---------------------------------------------------------------------------
+# Check 9 — Pool-Dateien im Index gegen die private Ausschlussliste
+#
+# Die persoenlichen Definitionen haelt .git/info/exclude aus dem Bestand. Das
+# gilt aber nur lokal: exclude wird nicht geklont, und in einem frischen Clone
+# holt ein pauschales "git add -A" die Dateien zurueck. Hier faellt das auf —
+# in allen drei Modi, denn git ls-files liest den Index und sieht damit auch
+# gestagte Dateien vor dem Commit.
+#
+# Die Liste selbst liegt nicht im Repository — sie waere sonst genau die
+# Klartext-Namensliste, die exclude vermeiden soll. Fehlt sie, ist das kein
+# Fehler, sondern ein hoerbar uebersprungener Check (Vorlage: die .example-Datei).
+# Gewertet werden nur Treffer unter workflow-pool/, auch wenn ein Muster breiter
+# gefasst ist: die Regel beantwortet die Pool-Frage, keine andere.
+# ---------------------------------------------------------------------------
+check_private_pool_list() {
+  local list="$REPO_ROOT/$HYGIENE_PRIVATE_LIST_FILE"
+  if [ ! -f "$list" ]; then
+    echo "  – ${HYGIENE_PRIVATE_LIST_FILE} fehlt — getrackte Pool-Dateien werden nicht gegen" \
+         "die private Liste geprueft (uebersprungen; Vorlage: ${HYGIENE_PRIVATE_LIST_FILE}.example)"
+    return 0
+  fi
+  local pattern f out rc lineno=0
+  # "|| [ -n "$pattern" ]" nimmt die letzte Zeile mit, wenn die Datei ohne
+  # Zeilenumbruch endet — sonst ist eine einzeilige Liste ein lautloser No-op.
+  while IFS= read -r pattern || [ -n "$pattern" ]; do
+    lineno=$((lineno + 1))
+    pattern="${pattern%%#*}"
+    pattern="${pattern#"${pattern%%[![:space:]]*}"}"
+    pattern="${pattern%"${pattern##*[![:space:]]}"}"
+    [ -z "$pattern" ] && continue
+    # Die Muster stammen aus .git/info/exclude und sind dort oft mit fuehrendem
+    # "/" auf die Repo-Wurzel verankert. Als Pathspec bricht git daran ab
+    # ("Invalid path '/workflow-pool'"), deshalb hier abstreifen.
+    pattern="${pattern#/}"
+    out="$(git ls-files -- "$pattern" 2>&1)"
+    rc=$?
+    # Ein Muster, das git nicht aufloesen kann, ist ein Fehler und kein Grund,
+    # stillschweigend nichts zu pruefen: frueher verschluckte "|| true" den Fall.
+    if [ "$rc" -ne 0 ]; then
+      annotate "$HYGIENE_PRIVATE_LIST_FILE" "$lineno" \
+        "Muster '${pattern}' ist keine gueltige Pfadangabe (git ls-files exit ${rc}): $(printf '%s' "$out" | tr '\n' ' ')"
+      continue
+    fi
+    while IFS= read -r f; do
+      case "$f" in
+        workflow-pool/*) ;;
+        *) continue ;;
+      esac
+      annotate "$f" 1 "Pool-Definition im Index passt auf ein Muster aus ${HYGIENE_PRIVATE_LIST_FILE} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
+    done <<<"$out"
+  done < "$list"
+}
+
 # Verstoesse aus check_symlinks als Fehler melden.
 report_symlinks() {
   local kind path target
@@ -338,6 +401,10 @@ echo "Public-Hygiene-Gate (${MODE})"
 if [ "$MODE" = "staged" ]; then
   check_staged_files
   check_patterns_staged
+  # Der Pre-Commit-Moment ist genau das Szenario: ein pauschales "git add -A" hat
+  # die privaten Definitionen gerade in den Index geholt. git ls-files liest den
+  # Index, die Pruefung sieht sie also schon vor dem Commit.
+  check_private_pool_list
   report_symlinks
 else
   check_tracked_but_ignored
@@ -351,6 +418,7 @@ else
     esac
   done < <(check_weight)
   check_gitignore_leaks
+  check_private_pool_list
   check_security_md
   report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays

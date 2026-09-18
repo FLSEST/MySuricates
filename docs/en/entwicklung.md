@@ -166,6 +166,29 @@ mvn test jacoco:report
 
 The tests use `spring-boot-starter-test` (JUnit 5, MockMvc) and `spring-security-test`. Each controller has its own test class in `src/test/java/com/automation/controller/`.
 
+**Targeted test selection and architecture ratchets:** A topic-scoped `-Dtest` selection (e.g.
+`*Todo*,ControllerModuleGateTest`) does not automatically cover `PackageCycleRatchetTest`,
+`LayerRuleTest` and `SourceSizeRatchetTest` — these three measure the compiled classes via jdeps or
+file sizes and only catch anything when they actually run. Whoever creates a new class, moves a
+class between packages, or renames a package runs them additionally — either targeted
+(`mvn test -Dtest='PackageCycleRatchetTest,LayerRuleTest,SourceSizeRatchetTest'`) or via
+`bash scripts/tests/arch-guard.sh` (runs exactly these three and reports the runtime). Without this
+extra run, a new package cycle or layer violation only surfaces at the full integration checkpoint,
+not already on the feature branch (seen on 2026-09-18: a new cycle between `com.automation.event`
+and `com.automation.modules` had to be fixed after the fact on main because the implementer's
+targeted test selection did not include the three classes).
+
+**Targeted run against a class with `@Nested` tests:** 73 test classes in the repo (as of
+2026-09-18, `grep -rl "@Nested" --include="*.java" . | grep -v .claude/worktrees | grep /src/test/ | wc -l`)
+use `@Nested`. Convention: use `-Dtest='Class*'` instead of `-Dtest='Class'` — the wildcard form is
+guaranteed to also match every `@Nested` inner class and stays reliable regardless of the Surefire
+version/configuration. **Warning:** whichever form you pick, the outer class's own text report
+(`target/surefire-reports/<Class>.txt`) always reports `Tests run: 0` for the outer class itself,
+because it has no `@Test` methods of its own — that is normal, not empty. A run whose `@Nested`
+tests genuinely did not execute for some other reason can still look "green" from that single line
+if you only check it, or a truncated `tail`. What actually matters is the final
+`Results: Tests run: N` line of the whole Maven run, or its exit code.
+
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
 **No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
@@ -336,6 +359,39 @@ There are two types of git tags:
 |---|---|---|
 | `v0.1.1` | `release.sh` | Semver release marker |
 | `stable-20250225-143022` | `staging.sh promote` | Deployment timestamp |
+
+### Behavior Changes
+
+Changes that can affect the runtime behavior of existing, self-operated workflows — not just new
+features. Read this before a release if you maintain your own workflow definitions.
+
+**Since 2026-09-18 (commit afa0cdfc): platform data in shell fields taints the run.**
+If you use `{{ previous_report }}` or `{{ open_todos }}` in a shell field of a workflow (e.g.
+`command`, `items_command`), then from this version on, block outputs later in the same run
+(`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) are
+also automatically wrapped in POSIX single quotes — exactly as with a webhook-triggered run. If you
+previously passed such an output unquoted to a following command and relied on the shell's word
+splitting (`some_cmd {{ previous_output }}` became several arguments, one per word), you now get
+**a single quoted argument** instead.
+
+- **How to recognize it:** A following command that used to read several words/arguments from a
+  block output (e.g. `$1`, `$2`, … or a `for word in {{ previous_output }}` loop) now sees only one
+  combined argument, or a loop with exactly one iteration.
+- **Why:** `previous_report` and `open_todos` are treated as untrusted (they can carry content from
+  earlier, possibly webhook-processed runs, or titles from imported issues) and are therefore always
+  quoted. As soon as a shell field actually substitutes one of these placeholders, the whole run is
+  "tainted" from that point on — the same rule as for webhook payloads.
+- **Getting the old behavior back:**
+  - Write the platform data into your own variable first (`setVariable`, or a file) instead of using
+    it directly in the same shell field — a value that comes from the definition or from a
+    self-set variable counts as trusted again and does not taint the run.
+  - Or deliberately work without quoting: redesign the following command so a single quoted argument
+    is enough (e.g. have it expect the argument in quotes instead of splitting it itself).
+  - Among the shipped definitions, one built-in is affected (`saas-continuous-improve.json`); its
+    following block is an AI prompt, whose behavior does not change.
+
+Details on the three trust classes and taint propagation:
+[deployment.md → Trust Model and Network Exposure](deployment.md#trust-model-and-network-exposure).
 
 ## Project Conventions
 

@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Entfernt Instanz-Bindungen aus einer Pool-JSON, bevor sie geschrieben wird.
@@ -40,10 +41,23 @@ public class PoolExportSanitizer {
     /** Template-Variable wie {@code {{ project_id }}} — eine Parametrisierung, kein Instanzwert. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{[^}]*}}");
 
-    /** Normalisiert (ohne {@code _}/{@code -}, klein) verglichen. */
-    private static final Set<String> INSTANCE_REFERENCE_KEYS = Set.of(
-            "projectid", "workflowid", "runid", "scheduleid", "chainid",
-            "executionid", "instanceid", "todoid", "sourcerunid", "lastfixrunid");
+    /**
+     * Die Instanz-Referenzschlüssel in camelCase — die eine Quelle für Export und Hygiene-Gate.
+     * {@code PoolSanitizerKeysTest} erzeugt daraus {@code scripts/lib/pool-sanitizer.generated.sh},
+     * das {@code scripts/ci/pool-neutrality.sh} liest (TODO 96640e6f). Verglichen wird normalisiert
+     * (ohne {@code _}/{@code -}, klein), {@code project_id} zählt also mit.
+     */
+    private static final List<String> INSTANCE_REFERENCE_KEYS = List.of(
+            "projectId", "workflowId", "runId", "scheduleId", "chainId",
+            "executionId", "instanceId", "todoId", "sourceRunId", "lastFixRunId");
+
+    private static final Set<String> NORMALIZED_INSTANCE_REFERENCE_KEYS =
+            INSTANCE_REFERENCE_KEYS.stream().map(PoolExportSanitizer::normalize).collect(Collectors.toSet());
+
+    /** Instanz-Referenzschlüssel in camelCase, in Deklarationsreihenfolge. */
+    public static List<String> instanceReferenceKeys() {
+        return INSTANCE_REFERENCE_KEYS;
+    }
 
     private final List<String> removedPaths = new ArrayList<>();
 
@@ -103,9 +117,12 @@ public class PoolExportSanitizer {
         return node;
     }
 
+    private static String normalize(String key) {
+        return key.toLowerCase(Locale.ROOT).replace("_", "").replace("-", "");
+    }
+
     private static boolean isInstanceReference(String key, Object value) {
-        String normalized = key.toLowerCase(Locale.ROOT).replace("_", "").replace("-", "");
-        if (!INSTANCE_REFERENCE_KEYS.contains(normalized)) {
+        if (!NORMALIZED_INSTANCE_REFERENCE_KEYS.contains(normalize(key))) {
             return false;
         }
         if (!(value instanceof String s)) {

@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { modulesFixture } from '../../test/modules';
 import { isModuleDisabledError, useModuleEnabled, useSystemModules } from '../useModules';
+import { SYSTEM_CAPABILITIES_KEY } from '../useSystemCapabilities';
 import { useChains } from '../useChains';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -65,7 +66,8 @@ describe('gated module queries', () => {
       return HttpResponse.json([]);
     }));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-    qc.setQueryData(['system', 'modules'], modulesFixture('core', ['chains']));
+    // shared capabilities query (a42969a6) — the raw response shape both hooks select from
+    qc.setQueryData(SYSTEM_CAPABILITIES_KEY, { routes: [], ...modulesFixture('core', ['chains']) });
     const wrapper = ({ children }: { children: ReactNode }) =>
       createElement(QueryClientProvider, { client: qc }, children);
 

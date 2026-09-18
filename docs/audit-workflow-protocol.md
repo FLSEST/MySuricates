@@ -51,6 +51,15 @@ JSON-Envelope:
 Titel und Beschreibung duerfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
+### ruleKey-Katalog
+
+Gibt ein Prompt seinem Modell feste `ruleKey`s vor, stehen sie in
+`ai-automation-backend/src/main/resources/audit/rule-keys.json` unter ihrem `auditKey`. Die
+Ingestion normalisiert dann Schreibweisen-Drift (Kleinschreibung, `_` → `-`, Plural vor `-count`:
+`god-classes-count` → `god-class-count`). Ein Key, der auch danach nicht im Katalog steht, wird
+trotzdem uebernommen — mit einer Warnung im Activity-Log, einmal je Run und Key. Ein `auditKey`
+ohne Katalogeintrag wird nicht geprueft; sein Prompt vergibt die Keys frei.
+
 ## Faktenblatt-Muster: die Shell misst, die KI interpretiert
 
 Ein Audit-Workflow laesst die KI **nicht** selbst zaehlen. Ein Shell-Block vor dem

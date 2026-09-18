@@ -140,14 +140,13 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 | **untrusted external** | webhook payload, restored `__untrusted_keys` (resume, sub-workflow), variables derived from tainted output (`step_N_output`, foreach items, `document` extracts) | always single-quoted | raw | yes, from the moment it is set |
 | **platform data** | `previous_report`, `open_todos` — injected by `WorkflowContextDataService` into **every** run | always single-quoted | raw | only once the placeholder was really substituted into a shell command line |
 
-- **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the reserved context keys `__untrusted_keys` and `__untrusted_outputs` so it survives resume and sub-workflow hand-over. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
+- **Taint propagation:** in a tainted run `recordOutput` escapes every further block output (`previous_output`, `{{ block.<name>.output }}`) and `setDerivedVariable` marks every variable derived from it as untrusted. The taint turns sticky as soon as one output has been recorded or platform data has reached a command line — from then on even a later `setVariable` on the variable that caused it no longer clears it, because a block can pull foreign bytes into its output without naming any placeholder (reading a file, calling an API). Before that point — external input with no recorded output yet — a `setVariable` on exactly that variable still clears the taint. It is persisted in the three reserved context keys `__untrusted_keys`, `__untrusted_outputs` and `__platform_in_shell` (the last one the platform-data usage flag, `true` once it is raised) so it survives resume and sub-workflow hand-over — even when no output has been recorded since the substitution. A clean run exports nothing and stays byte-identical to the behaviour from before taint tracking.
 - **Why platform data only taints on use:** it is present in every run. Tainting at injection time would taint every run and change the meaning of the output placeholders in the bundled templates. `TemplateResolver.resolveShell`/`resolveShellSafe` therefore report back which placeholders were really substituted into a command line; only that report arms the taint (`ExecutionContextTaint.substitutedIntoShell`). A run that uses `{{ previous_report }}` only in an AI prompt (`resolveTemplate`), or not at all, stays untainted.
 - **Deliberately trusted:** answers from `approval` and `human-input` blocks arrive through the API-key-protected REST interface from the person who owns the instance — they are not escaped. Likewise `setVariable` (e.g. a workflow variable shadowing a webhook field of the same name) clears the untrusted mark on purpose: the value then comes from the definition, not from the caller. `replaceValue` (workspace path remapping) in contrast only swaps the value and leaves the class in place.
 - **Known limits:**
   1. Nothing is escaped in AI prompts — a prompt is not a command line, and the trust model does not defend against prompt injection.
-  2. **Laundering through an AI block:** platform data in a `simple` or `agentic` prompt does not taint the run (limit 1); the AI's answer is recorded by `recordOutput` as untainted; a following shell block then substitutes `{{ previous_output }}` **raw**. The path platform data → AI prompt → shell block therefore bypasses the quoting entirely. It occurs eight times in the bundled definitions (seven pool workflows, one built-in template) and only stays harmless there because every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **Recommendation for your own workflows: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
-  3. The platform-data "used in a shell path" flag itself is not exported; it does not need to be, because the first output after the substitution writes the taint into `__untrusted_outputs`.
-  4. A shell block that writes a tainted value into a file itself and later executes that file is outside what quoting can see.
+  2. **Laundering through an AI block:** platform data in a `simple` or `agentic` prompt does not taint the run (limit 1); the AI's answer is recorded by `recordOutput` as untainted; a following shell block then substitutes `{{ previous_output }}` **raw**. The path platform data → AI prompt → shell block therefore bypasses the quoting entirely. It occurs six times in the bundled definitions (six pool workflows, no built-in template) and only stays harmless there because every one of those follow-up shell blocks sets `"shell_escape_variables": true`. **Recommendation for your own workflows: set `"shell_escape_variables": true` in every shell block that consumes an AI block's output** — without that opt-in the path is unprotected.
+  3. A shell block that writes a tainted value into a file itself and later executes that file is outside what quoting can see.
 
 **Webhook signatures** — `POST /api/v1/webhooks/{id}/secret` generates a secret (32 random bytes, hex), shows it exactly once and stores it AES-GCM-encrypted (`IntegrationEncryptionService`, key outside the database) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` removes it. For a webhook with a secret, `WebhookSignatureVerifier` checks `X-Signature: sha256=<hex>` (or `X-Hub-Signature-256`, the GitHub/Gitea format) as HMAC-SHA256 over the raw request bytes before the JSON is parsed, compared in constant time — otherwise **401 `WEBHOOK_SIGNATURE_INVALID`**. As with seals, a stored secret stays in force if the switch is later turned off. Responses only reveal `signatureRequired`.
 
@@ -396,6 +395,11 @@ gate_description: <description>
 - **YELLOW → `COMPLETED_WITH_ERRORS`:** Run is completed with this status instead of `COMPLETED`
 - **RED → `COMPLETED`:** RED gates do not change the run status — `AutoTodoService` creates a TODO instead
 - `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
+
+A shell block does not have to write these markers itself: `checked_command`/`check_category`
+derive the gate automatically from the exit code, giving precedence to the script's own marker when
+it is at least as severe — details and examples:
+[WORKFLOW-GUIDE.md → `checked_command` / `check_category`](WORKFLOW-GUIDE.md#checked_command--check_category--gate-derived-automatically-from-the-exit-code).
 
 **AutoTodoService:**
 - Reacts to `WorkflowRunCompletedEvent`
@@ -871,8 +875,12 @@ and each pattern collects its own 429 until its `Retry-After` lock is in place. 
 takes the peak off the storm without closing the two ways out. Recovery needs no reload: a timer on
 the last deadline (`scheduleExpiry`) reports the expiry, and `installRateLimitRecovery` invalidates
 **every query in an error state once** on the active → inactive transition — `retry` is off for 429
-and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar, layout,
-dashboard) would otherwise stay red until a reload.
+and `refetchOnMount` only fires on a mount, so permanently mounted queries would otherwise stay red
+until a reload. What it picks up is exactly what really is in `error`. Queries with `initialData`
+(`useSystemModules`, `useBlockTypes`) stay on `success` even after a 429 and are therefore never
+touched by the recovery — deliberately: the last known module and block-type state should stay put
+instead of making navigation and widgets flicker (b13509f3). They pick the server state up on their
+next mount, because `initialDataUpdatedAt: 0` makes the seeded state stale at once.
 
 **An empty `?ticket=` in the handshake is the client fallback.** If `POST /ws-ticket` runs into a
 lock (or fails otherwise), `useWebSocket` sets `wsTicket = ''` in `beforeConnect` and the handshake
@@ -970,6 +978,13 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V64 | Writes flag on capabilities |
 | V65 | Catch-up-on-resume on schedules |
 | V66 | Todo export link |
+| V67 | Reasoning effort on workflows |
+| V68 | Audit reports, findings, occurrences and TODO links |
+| V69 | Evidence snapshot and acceptance timestamp on audit findings (`disposition_evidence`, `disposition_at`) |
+| V70 | Run provenance: definition hash on versions and runs, version reference and `trigger_source` |
+| V71 | Workflow sealing: `sealed`, `sealed_hash`, `sealed_at` on workflows |
+| V72 | Encrypted HMAC signing secret on webhook triggers |
+| V73 | Versioned dashboard layout snapshots (`dashboard_layout_versions`) |
 
 ## Architecture Gates
 

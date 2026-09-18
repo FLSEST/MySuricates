@@ -2,7 +2,11 @@ package com.automation.service.system;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ExecutionSettingKeysTest {
@@ -57,19 +61,69 @@ class ExecutionSettingKeysTest {
     }
 
     @Test
-    void bounds_returnsMinMaxPair() {
-        assertThat(ExecutionSettingKeys.bounds("claude-reserved-for-interactive")).containsExactly(0, 10);
+    void boundsEntry_exposesMinMaxAndNumberKind() {
+        ExecutionSettingKeys.Bound bound = ExecutionSettingKeys.BOUNDS.get("claude-reserved-for-interactive");
+
+        assertThat(bound.min()).isEqualTo(0);
+        assertThat(bound.max()).isEqualTo(10);
+        assertThat(bound.decimal()).isFalse();
+    }
+
+    /**
+     * TODO 4218fcaa: ganzzahlige und Bruch-Schluessel stehen in <b>einer</b> Map, damit ein neuer
+     * Schluessel nur an einer Stelle eingetragen werden muss.
+     */
+    @Test
+    void integerAndDecimalKeys_liveInTheOneBoundsMap() {
+        assertThat(ExecutionSettingKeys.BOUNDS.get("todo-similarity-keyword-threshold").decimal()).isTrue();
+        assertThat(ExecutionSettingKeys.BOUNDS.get("execution-max-concurrent").decimal()).isFalse();
     }
 
     @Test
     void everyAliasMapsToAKnownKey_andEveryKeyHasAnAlias() {
-        assertThat(ExecutionSettingKeys.KEY_ALIASES.values())
-                .containsExactlyInAnyOrderElementsOf(ExecutionSettingKeys.BOUNDS.keySet());
+        Set<String> allKeys = new HashSet<>(ExecutionSettingKeys.BOUNDS.keySet());
+        assertThat(ExecutionSettingKeys.KEY_ALIASES.values()).containsExactlyInAnyOrderElementsOf(allKeys);
     }
 
     @Test
     void everyBoundsEntry_hasMinNotAboveMax() {
-        ExecutionSettingKeys.BOUNDS.forEach((key, bounds) ->
-                assertThat(bounds[0]).as("bounds of %s", key).isLessThanOrEqualTo(bounds[1]));
+        ExecutionSettingKeys.BOUNDS.forEach((key, bound) ->
+                assertThat(bound.min()).as("bounds of %s", key).isLessThanOrEqualTo(bound.max()));
+    }
+
+    @Test
+    void aDecimalKeyIsResolvedLikeAnyOther() {
+        assertThat(ExecutionSettingKeys.resolve("todoSimilarityKeywordThreshold"))
+                .isEqualTo("todo-similarity-keyword-threshold");
+    }
+
+    @Test
+    void validate_decimalKey_acceptsFractionsWithinBounds() {
+        assertThatCode(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "0.35"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "0.05"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "0.9"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validate_decimalKey_rejectsOutOfBoundsAndNonNumbers() {
+        assertThatThrownBy(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "0.01"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("todo-similarity-keyword-threshold must be between 0.05 and 0.9, got 0.01");
+        assertThatThrownBy(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "1"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must be between 0.05 and 0.9");
+        assertThatThrownBy(() -> ExecutionSettingKeys.validate("todo-similarity-keyword-threshold", "viel"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Value must be a number: viel");
+    }
+
+    @Test
+    void validate_integerKey_stillUsesTheIntegerBounds() {
+        assertThatThrownBy(() -> ExecutionSettingKeys.validate("execution-max-concurrent", "0.5"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Value must be a number: 0.5");
     }
 }

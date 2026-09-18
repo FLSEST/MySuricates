@@ -15,37 +15,80 @@ final class ExecutionSettingKeys {
     private ExecutionSettingKeys() {
     }
 
-    static final Map<String, long[]> BOUNDS = Map.ofEntries(
-            Map.entry("execution-max-concurrent",          new long[]{1, 50}),
-            Map.entry("claude-max-concurrent-calls",       new long[]{1, 20}),
-            Map.entry("claude-reserved-for-interactive",   new long[]{0, 10}),
-            Map.entry("claude-timeout-seconds",            new long[]{30, 3600}),
-            Map.entry("claude-inter-call-delay-ms",        new long[]{0, 30000}),
-            Map.entry("chain-workflow-timeout-minutes",    new long[]{5, 1440}),
-            Map.entry("rate-limit-enabled",                new long[]{0, 1}),
-            Map.entry("rate-limit-requests-per-minute",    new long[]{10, 10000}),
-            Map.entry("assistant-chat-timeout-seconds",    new long[]{30, 900}),
-            Map.entry("task-command-timeout-seconds",      new long[]{10, 3600}),
-            Map.entry("allow-extra-mounts",                new long[]{0, 1}),
-            Map.entry("todo-hygiene-enabled",              new long[]{0, 1}),
-            Map.entry("todo-stale-days",                   new long[]{7, 365}),
-            Map.entry("todo-hygiene-max-per-run",          new long[]{10, 2000}),
-            Map.entry("run-retention-days",                new long[]{0, 730}),
-            Map.entry("run-retention-max-per-night",       new long[]{10, 5000}),
-            Map.entry("dashboard-layout-retention-count",  new long[]{1, 1000}),
-            Map.entry("todo-watchdog-enabled",             new long[]{0, 1}),
-            Map.entry("todo-watchdog-stale-hours",         new long[]{1, 720}),
-            Map.entry("assistant-max-actions-per-hour",    new long[]{1, 500}),
-            Map.entry("scheduler-catch-up-on-resume",      new long[]{0, 1}),
-            Map.entry("scheduler-resume-grace-minutes",    new long[]{1, 60}),
-            Map.entry("summarization-timeout-seconds",     new long[]{30, 600}),
-            Map.entry("factory-timeout-seconds",           new long[]{60, 3600}),
-            Map.entry("wish-total-timeout-minutes",        new long[]{5, 1440}),
-            Map.entry("wish-workflow-wait-minutes",        new long[]{1, 120}),
-            Map.entry("wish-default-shell-timeout-seconds",             new long[]{30, 3600}),
-            Map.entry("wish-default-agentic-total-timeout-seconds",     new long[]{60, 86400}),
-            Map.entry("model-catalog-ttl-seconds",         new long[]{30, 86400}),
-            Map.entry("compress-ai-max-input-chars",       new long[]{1000, 400000})
+    /**
+     * Grenzen eines Schluessels. {@code decimal} entscheidet, ob ein Bruch erlaubt ist und wie die
+     * Fehlermeldung die Zahlen schreibt (ganzzahlig {@code 1 und 50}, Bruch {@code 0.05 und 0.9}).
+     *
+     * <p>Ein gemeinsamer Typ statt zweier Maps (TODO 4218fcaa): ein neuer Schluessel wird nur an
+     * einer Stelle eingetragen, und beide Gate-Tests pruefen dieselbe Quelle.
+     */
+    record Bound(double min, double max, boolean decimal) {
+
+        /** Schluessel mit ganzzahligem Wert. */
+        static Bound whole(long min, long max) {
+            return new Bound(min, max, false);
+        }
+
+        /** Schluessel, dessen Wert ein Bruch sein darf. */
+        static Bound fraction(double min, double max) {
+            return new Bound(min, max, true);
+        }
+
+        /**
+         * Parst den Wert im Zahlenformat des Schluessels.
+         *
+         * @throws IllegalArgumentException wenn der Wert keine passende Zahl ist
+         */
+        double parse(String value) {
+            try {
+                return decimal ? Double.parseDouble(value) : Long.parseLong(value);
+            } catch (NumberFormatException | NullPointerException e) {
+                throw new IllegalArgumentException("Value must be a number: " + value);
+            }
+        }
+
+        boolean contains(double value) {
+            return value >= min && value <= max;
+        }
+
+        /** Schreibt eine Zahl so, wie die Fehlermeldung dieses Schluessels sie zeigt. */
+        String format(double value) {
+            return decimal ? String.valueOf(value) : String.valueOf((long) value);
+        }
+    }
+
+    static final Map<String, Bound> BOUNDS = Map.ofEntries(
+            Map.entry("execution-max-concurrent",          Bound.whole(1, 50)),
+            Map.entry("claude-max-concurrent-calls",       Bound.whole(1, 20)),
+            Map.entry("claude-reserved-for-interactive",   Bound.whole(0, 10)),
+            Map.entry("claude-timeout-seconds",            Bound.whole(30, 3600)),
+            Map.entry("claude-inter-call-delay-ms",        Bound.whole(0, 30000)),
+            Map.entry("chain-workflow-timeout-minutes",    Bound.whole(5, 1440)),
+            Map.entry("rate-limit-enabled",                Bound.whole(0, 1)),
+            Map.entry("rate-limit-requests-per-minute",    Bound.whole(10, 10000)),
+            Map.entry("assistant-chat-timeout-seconds",    Bound.whole(30, 900)),
+            Map.entry("task-command-timeout-seconds",      Bound.whole(10, 3600)),
+            Map.entry("allow-extra-mounts",                Bound.whole(0, 1)),
+            Map.entry("todo-hygiene-enabled",              Bound.whole(0, 1)),
+            Map.entry("todo-stale-days",                   Bound.whole(7, 365)),
+            Map.entry("todo-hygiene-max-per-run",          Bound.whole(10, 2000)),
+            Map.entry("run-retention-days",                Bound.whole(0, 730)),
+            Map.entry("run-retention-max-per-night",       Bound.whole(10, 5000)),
+            Map.entry("dashboard-layout-retention-count",  Bound.whole(1, 1000)),
+            Map.entry("todo-watchdog-enabled",             Bound.whole(0, 1)),
+            Map.entry("todo-watchdog-stale-hours",         Bound.whole(1, 720)),
+            Map.entry("assistant-max-actions-per-hour",    Bound.whole(1, 500)),
+            Map.entry("scheduler-catch-up-on-resume",      Bound.whole(0, 1)),
+            Map.entry("scheduler-resume-grace-minutes",    Bound.whole(1, 60)),
+            Map.entry("summarization-timeout-seconds",     Bound.whole(30, 600)),
+            Map.entry("factory-timeout-seconds",           Bound.whole(60, 3600)),
+            Map.entry("wish-total-timeout-minutes",        Bound.whole(5, 1440)),
+            Map.entry("wish-workflow-wait-minutes",        Bound.whole(1, 120)),
+            Map.entry("wish-default-shell-timeout-seconds",             Bound.whole(30, 3600)),
+            Map.entry("wish-default-agentic-total-timeout-seconds",     Bound.whole(60, 86400)),
+            Map.entry("model-catalog-ttl-seconds",         Bound.whole(30, 86400)),
+            Map.entry("compress-ai-max-input-chars",       Bound.whole(1000, 400000)),
+            Map.entry("todo-similarity-keyword-threshold", Bound.fraction(0.05, 0.9))
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -79,7 +122,8 @@ final class ExecutionSettingKeys {
             Map.entry("wishDefaultShellTimeoutSeconds",             "wish-default-shell-timeout-seconds"),
             Map.entry("wishDefaultAgenticTotalTimeoutSeconds",      "wish-default-agentic-total-timeout-seconds"),
             Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds"),
-            Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars")
+            Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars"),
+            Map.entry("todoSimilarityKeywordThreshold",  "todo-similarity-keyword-threshold")
     );
 
     /**
@@ -96,27 +140,33 @@ final class ExecutionSettingKeys {
     }
 
     /**
+     * Prueft einen Wert gegen die Grenzen seines Schluessels — ganzzahlig oder als Bruch.
+     *
+     * @throws IllegalArgumentException wenn der Wert keine Zahl ist oder ausserhalb der Grenzen liegt
+     */
+    static void validate(String key, String value) {
+        checkedValue(key, value);
+    }
+
+    /**
      * Parses {@code value} and checks it against the bounds of the canonical {@code key}.
      *
      * @throws IllegalArgumentException if the value is not a number or outside the bounds
      */
     static long parseWithinBounds(String key, String value) {
-        long[] bounds = BOUNDS.get(key);
-        long parsed;
-        try {
-            parsed = Long.parseLong(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Value must be a number: " + value);
-        }
-        if (parsed < bounds[0] || parsed > bounds[1]) {
-            throw new IllegalArgumentException(
-                    key + " must be between " + bounds[0] + " and " + bounds[1] + ", got " + parsed);
-        }
-        return parsed;
+        return (long) checkedValue(key, value);
     }
 
-    /** Bounds of a canonical key as {@code {min, max}}. */
-    static long[] bounds(String key) {
-        return BOUNDS.get(key);
+    private static double checkedValue(String key, String value) {
+        Bound bound = BOUNDS.get(key);
+        if (bound == null) {
+            throw new IllegalArgumentException("Unknown execution setting: " + key);
+        }
+        double parsed = bound.parse(value);
+        if (!bound.contains(parsed)) {
+            throw new IllegalArgumentException(key + " must be between " + bound.format(bound.min())
+                    + " and " + bound.format(bound.max()) + ", got " + bound.format(parsed));
+        }
+        return parsed;
     }
 }

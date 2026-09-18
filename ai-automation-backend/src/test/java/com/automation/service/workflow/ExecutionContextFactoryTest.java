@@ -282,6 +282,25 @@ class ExecutionContextFactoryTest {
                 .isEqualTo("echo 'main; id' 'out'");
     }
 
+    /**
+     * TODO cadfc423: faerbt ein Lauf, weil Plattform-Daten in einer Shell-Kommandozeile gelandet
+     * sind, ueberlebt das Flag Export und Import — auch ohne verbuchte Ausgabe dazwischen.
+     */
+    @Test
+    void create_platformDataUsedInShell_roundTripsWithoutAnyRecordedOutput() {
+        ExecutionContext source = ExecutionContext.builder().workflowRunId("run-0").build();
+        source.setUntrustedPlatformVariable("previous_report", "bericht");
+        source.resolveShellTemplate("echo {{ previous_report }}", false);
+        Map<String, Object> input = new java.util.HashMap<>(source.exportTaint());
+
+        ExecutionContext ctx = factory.create(seed(input, null, "", "", "", "a | b"));
+        ctx.setDerivedVariable("item", "a.txt; id");
+
+        assertThat(ctx.hasUntrustedInput()).isTrue();
+        assertThat(ctx.isUntrusted("item")).isTrue();
+        assertThat(ctx.resolveShellTemplate("cat {{ item }}", false)).isEqualTo("cat 'a.txt; id'");
+    }
+
     @Test
     void create_withoutUntrustedOutputs_previousOutputStaysRaw() {
         ExecutionContext ctx = factory.create(seed(Map.of("foo", "bar"), null, "", "", "", "a | b"));

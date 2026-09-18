@@ -18,6 +18,7 @@ const CONFIG = {
   todoHygieneEnabled: 1,
   todoStaleDays: 45,
   todoHygieneMaxPerRun: 300,
+  todoSimilarityKeywordThreshold: 0.35,
   activeRuns: 0,
 };
 
@@ -52,6 +53,25 @@ describe('TodoSettingsCard — hygiene thresholds', () => {
 
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toMatchObject({ todoStaleDays: 90, todoHygieneMaxPerRun: 300, todoHygieneEnabled: 1 });
+  });
+
+  it('shows the similarity threshold from the server', async () => {
+    serve([]);
+    renderWithProviders(<TodoSettingsCard />);
+
+    expect(await screen.findByLabelText('Similarity threshold')).toHaveValue(0.35);
+  });
+
+  it('saves a changed similarity threshold as a fraction', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    serve(bodies);
+    renderWithProviders(<TodoSettingsCard />);
+
+    fireEvent.change(await screen.findByLabelText('Similarity threshold'), { target: { value: '0.5' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ todoSimilarityKeywordThreshold: 0.5 });
   });
 
   it('turns the scheduled archival off', async () => {

@@ -166,6 +166,31 @@ mvn test jacoco:report
 
 Die Tests nutzen `spring-boot-starter-test` (JUnit 5, MockMvc) und `spring-security-test`. Jeder Controller hat eine eigene Testklasse in `src/test/java/com/automation/controller/`.
 
+**Gezielte Testauswahl und Architektur-Ratchets:** Eine themenbezogene `-Dtest`-Auswahl (z. B.
+`*Todo*,ControllerModuleGateTest`) deckt `PackageCycleRatchetTest`, `LayerRuleTest` und
+`SourceSizeRatchetTest` nicht automatisch ab — diese drei messen über jdeps bzw. Dateigrößen die
+kompilierten Klassen und schlagen nur an, wenn sie tatsächlich mitlaufen. Wer eine neue Klasse
+anlegt, eine Klasse zwischen Paketen verschiebt oder ein Paket umbenennt, führt sie zusätzlich aus —
+entweder gezielt (`mvn test -Dtest='PackageCycleRatchetTest,LayerRuleTest,SourceSizeRatchetTest'`)
+oder über `bash scripts/tests/arch-guard.sh` (führt genau diese drei aus und weist die Laufzeit
+aus). Ohne diesen zusätzlichen Lauf fällt ein neuer Paketzyklus oder eine Schichtverletzung erst
+beim vollen Integrations-Checkpoint auf, nicht schon im Feature-Branch (gesehen 2026-09-18: ein
+neuer Zyklus zwischen `com.automation.event` und `com.automation.modules` musste nachträglich auf
+main behoben werden, weil die gezielte Testauswahl des Implementers die drei Klassen nicht
+enthielt).
+
+**Gezielter Lauf gegen eine Klasse mit `@Nested`-Tests:** 73 Testklassen im Repo (Stand 2026-09-18,
+`grep -rl "@Nested" --include="*.java" . | grep -v .claude/worktrees | grep /src/test/ | wc -l`)
+nutzen `@Nested`. Konvention: `-Dtest='Klasse*'` statt `-Dtest='Klasse'` — die Wildcard-Form
+matcht garantiert auch alle `@Nested`-Inneren-Klassen und bleibt unabhängig von
+Surefire-Version/-Konfiguration verlässlich. **Warnung:** Egal welche Form man wählt — der
+Text-Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet immer
+`Tests run: 0` für die äußere Klasse selbst, weil dort keine eigenen `@Test`-Methoden liegen; das
+ist normal, nicht leer. Ein Lauf, dessen `@Nested`-Tests aus irgendeinem Grund wirklich nicht
+mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur diese eine Zeile oder
+einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
+`Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
+
 **Klassengrößen-Ratchet:** `architecture/SourceSizeRatchetTest` zählt die Zeilen aller Dateien unter `src/main/java` und schlägt fehl, sobald eine Datei über 300 Zeilen liegt, die nicht in der Allowlist des Tests steht — oder eine gelistete Datei über ihre eingetragene Obergrenze wächst. Die Liste kennt nur eine Richtung: Wer eine gelistete Klasse verkleinert, senkt ihre Obergrenze; fällt sie auf ≤300 Zeilen, fliegt der Eintrag raus. Neue Dateien über 300 Zeilen werden gesplittet, nicht eingetragen (Audit-TODO 1e248ab9). Keine externe Dependency, reiner JUnit-Test.
 
 **Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist. Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
@@ -188,13 +213,13 @@ npm run lint
 
 ### E2E-Tests (Cypress)
 
-Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt ueber die API angelegt und geloescht.
+Die E2E-Tests laufen mit [Cypress](https://www.cypress.io/) gegen das **echte Backend** (kein Mocking). Testdaten werden per `cy.request()` direkt über die API angelegt und gelöscht.
 
 Es gibt zwei Zielmodi:
 - **Dev**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:9090`
 - **Test**: Frontend-Proxy und Cypress-Helper zeigen auf `localhost:8090`
 
-**Wichtig:** Frontend und Cypress muessen immer mit demselben `CYPRESS_TARGET` gestartet werden, sonst erzeugt das UI Daten auf einer anderen Instanz als das Setup/Cleanup.
+**Wichtig:** Frontend und Cypress müssen immer mit demselben `CYPRESS_TARGET` gestartet werden, sonst erzeugt das UI Daten auf einer anderen Instanz als das Setup/Cleanup.
 
 ### Dev-Target (Standard)
 
@@ -206,10 +231,10 @@ cd ai-automation-frontend
 # Frontend startet mit Proxy auf Dev (:9090)
 npm run dev
 
-# Cypress interaktiv oeffnen (Browser-UI)
+# Cypress interaktiv öffnen (Browser-UI)
 npm run cy:open
 
-# Cypress headless ausfuehren (CI-Modus)
+# Cypress headless ausführen (CI-Modus)
 npm run cy:run
 
 # Alias
@@ -220,7 +245,7 @@ Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` 
 
 ### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
 
-**Voraussetzung:** Test-Instanz auf Port `8090` laeuft.
+**Voraussetzung:** Test-Instanz auf Port `8090` läuft.
 
 ```bash
 # Beispiel: Test-Instanz mit festem API-Key starten
@@ -242,7 +267,7 @@ CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run dev:e2e:test
 CYPRESS_TARGET=test CYPRESS_TEST_API_KEY=<test-api-key> npm run test:e2e:test
 ```
 
-Optional koennen die Ziele auch direkt ueberschrieben werden:
+Optional können die Ziele auch direkt überschrieben werden:
 
 ```bash
 CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
@@ -253,8 +278,8 @@ CYPRESS_WS_BASE_URL=ws://localhost:8090
 
 - **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev
 - **Test-Target:** dieselben Daten landen auf der Test-Instanz
-- `cy.apiCleanup()` raeumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
-- Fuer die Test-Instanz kann zusaetzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewuenscht ist
+- `cy.apiCleanup()` räumt nur Cypress-Testdaten mit dem Prefix `Cypress` auf
+- Für die Test-Instanz kann zusätzlich `POST /api/v1/testing/reset` verwendet werden, wenn ein kompletter Reset gewünscht ist
 
 **Teststruktur:**
 
@@ -336,6 +361,43 @@ Es gibt zwei Arten von Git-Tags:
 |---|---|---|
 | `v0.1.1` | `release.sh` | Semver-Release-Markierung |
 | `stable-20250225-143022` | `staging.sh promote` | Deployment-Zeitstempel |
+
+### Verhaltensänderungen
+
+Änderungen, die das Laufzeitverhalten bestehender, selbst betriebener Workflows beeinflussen
+können — nicht nur neue Features. Vor einem Release lesen, wer eigene Workflow-Definitionen pflegt.
+
+**Seit 2026-09-18 (Commit afa0cdfc): Plattform-Daten in Shell-Feldern färben den Lauf.**
+Wer `{{ previous_report }}` oder `{{ open_todos }}` in einem Shell-Feld eines Workflows verwendet
+(z. B. `command`, `items_command`), sorgt ab dieser Version dafür, dass **danach** im selben Lauf
+auch Blockausgaben (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`,
+`foreach`-Items) automatisch in POSIX-Single-Quotes gesetzt werden — genau wie bei einem
+webhook-ausgelösten Lauf. Wer eine solche Ausgabe bisher unquoted an einen Folgebefehl übergeben hat
+und sich dabei auf die Wortauftrennung der Shell verlassen hat (`some_cmd {{ previous_output }}`
+wurde zu mehreren Argumenten, eines je Wort), bekommt ab jetzt stattdessen **ein einzelnes
+gequotetes Argument**.
+
+- **Woran erkennbar:** Ein Folgebefehl, der vorher mehrere Wörter/Argumente aus einer Blockausgabe
+  gelesen hat (z. B. `$1`, `$2`, … oder eine `for word in {{ previous_output }}`-Schleife), sieht
+  nach dem Update nur noch ein zusammenhängendes Argument bzw. eine Schleife mit genau einem
+  Durchlauf.
+- **Warum:** `previous_report` und `open_todos` gelten als nicht vertrauenswürdig (sie können Inhalte
+  aus früheren, ggf. webhook-verarbeiteten Läufen bzw. aus importierten Issues enthalten) und werden
+  deshalb immer gequotet. Sobald ein Shell-Feld einen dieser Platzhalter tatsächlich einsetzt, gilt
+  der gesamte Lauf ab diesem Punkt als „gefärbt" — dieselbe Regel wie bei Webhook-Payloads.
+- **Altes Verhalten wiederherstellen:**
+  - Plattform-Daten vor der Nutzung in eine eigene Variable schreiben/zwischenspeichern
+    (`setVariable` bzw. eine Datei), statt sie direkt im selben Shell-Feld zu verwenden — ein Wert,
+    der aus der Definition bzw. einer selbst gesetzten Variable stammt, gilt wieder als
+    vertrauenswürdig und färbt den Lauf nicht.
+  - Oder bewusst ohne Quoting arbeiten: den Folgebefehl so umbauen, dass ein einzelnes gequotetes
+    Argument ausreicht (z. B. das Argument in Anführungszeichen erwarten, statt es selbst
+    aufzuteilen).
+  - In den ausgelieferten Definitionen ist ein Built-in betroffen (`saas-continuous-improve.json`);
+    der Folgeblock dort ist ein KI-Prompt, für den sich am Verhalten nichts ändert.
+
+Details zu den drei Vertrauensklassen und zur Taint-Propagation:
+[deployment.md → Vertrauensmodell und Netzwerk-Exposition](deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
 ## Projektkonventionen
 
@@ -444,72 +506,72 @@ sind) ändert sich dadurch nicht. Details zum Katalog selbst: [architektur.md](a
 
 ## Hygiene-Gate
 
-`scripts/ci/public-hygiene.sh` prueft, was in ein oeffentliches Repository geriete. Die Regeln —
+`scripts/ci/public-hygiene.sh` prüft, was in ein öffentliches Repository geriete. Die Regeln —
 verbotene Literale, Sicherungsdatei-Muster, Allowlist-Pfad, Schwellwerte — stehen in
 `scripts/lib/hygiene-rules.sh` und werden von der CI und vom pre-commit-Hook gemeinsam gelesen.
 
-| Modus | Wer | Prueft | Verhalten |
+| Modus | Wer | Prüft | Verhalten |
 |---|---|---|---|
 | `--tracked` (Default) | CI | getrackter Bestand | Fehler |
-| `--worktree` | lokal | zusaetzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
+| `--worktree` | lokal | zusätzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
 | `--staged` | pre-commit-Hook | nur gestagte Aenderungen | Fehler |
 
-Geprueft wird:
+Geprüft wird:
 
-1. **Getrackt, aber ignoriert.** Frueher eine handgepflegte Liste von zehn Verzeichnisnamen, jetzt
-   `git ls-files --cached --ignored --exclude-standard`. Damit ist jede kuenftige Ignore-Regel
-   automatisch abgedeckt. Bewusste Ausnahmen stehen mit Begruendung in
+1. **Getrackt, aber ignoriert.** Früher eine handgepflegte Liste von zehn Verzeichnisnamen, jetzt
+   `git ls-files --cached --ignored --exclude-standard`. Damit ist jede künftige Ignore-Regel
+   automatisch abgedeckt. Bewusste Ausnahmen stehen mit Begründung in
    `scripts/ci/hygiene-allowlist.txt` — nur Pfade, nie Musterliterale, damit die Allowlist selbst
    nichts preisgibt.
-2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefuegten Zeilen.
-3. **Pool-Neutralitaet** ueber `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
+2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefügten Zeilen.
+3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
    Built-in-Template `pool-neutrality-audit` (dort mit `--all`, weil es den Pool einer laufenden
-   Instanz prueft und nicht nur den getrackten Release-Bestand).
-4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Pruefsumme ab 256 KiB sind ein
-   Fehler, eine einzelne getrackte Datei ueber 5 MiB eine Warnung.
+   Instanz prüft und nicht nur den getrackten Release-Bestand).
+4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Prüfsumme ab 256 KiB sind ein
+   Fehler, eine einzelne getrackte Datei über 5 MiB eine Warnung.
 5. **Streunende Sicherungsdateien** (nur `--worktree`): weder getrackt noch ignoriert. Beim Stagen
    ist derselbe Fund ein Fehler.
-6. **`.gitignore` verraet keine privaten Dateinamen.** Die Datei ist getrackt und geht mit der
-   Veroeffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
-   steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort faellt die Pruefung
+6. **`.gitignore` verrät keine privaten Dateinamen.** Die Datei ist getrackt und geht mit der
+   Veröffentlichung mit — auch ihre Kommentare. Nennt sie einen Namen, der in `.git/info/exclude`
+   steht, ist das ein Verstoss. In der CI gibt es die exclude-Datei nicht, dort fällt die Prüfung
    still aus.
-7. **Symlinks, die aus dem Repository hinausfuehren.** Getrackte (bzw. gestagte) Links mit absolutem
+7. **Symlinks, die aus dem Repository hinausführen.** Getrackte (bzw. gestagte) Links mit absolutem
    Ziel oder mit einem relativen Ziel oberhalb der Repo-Wurzel sind ein Fehler. `git grep` liest keine
-   Symlink-Blobs, deshalb faengt Check 2 einen Entwickler-Pfad im Linkziel nicht; ausserdem zeigt so ein
+   Symlink-Blobs, deshalb fängt Check 2 einen Entwickler-Pfad im Linkziel nicht; ausserdem zeigt so ein
    Link in jedem Clone, Worktree und Run-Snapshot auf den Original-Checkout statt in den eigenen Baum.
    Beispiel: `ai-automation-backend/workflow-pool` muss auf `../workflow-pool` zeigen, weil das Backend
-   mit cwd `ai-automation-backend/` laeuft und den Pool relativ aufloest.
+   mit cwd `ai-automation-backend/` läuft und den Pool relativ auflöst.
 
-Den Hook installiert `scripts/install-hooks.sh` ueber `core.hooksPath` (laeuft in `setup.sh` mit).
+Den Hook installiert `scripts/install-hooks.sh` über `core.hooksPath` (läuft in `setup.sh` mit).
 
-### Wenn das Gate anschlaegt
+### Wenn das Gate anschlägt
 
 Kein Bypass per Reflex. `git commit --no-verify` existiert, aber ein Treffer ist fast immer echt:
-ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehoert. Erst schauen,
+ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehört. Erst schauen,
 was gestaged ist.
 
-## Abhaengigkeits-Meldungen (Frontend)
+## Abhängigkeits-Meldungen (Frontend)
 
 `npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.
 Nach einer ersten Reduktion von zwanzig auf sieben wurden auch die beiden notwendigen
-Major-Upgrades durchgefuehrt.
+Major-Upgrades durchgeführt.
 
-**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam ueber
+**Abgetragen:** die Laufzeit-Kette zuerst. `dompurify` kam über
 `@monaco-editor/react` → `monaco-editor` und stand auf 3.4.12, dem oberen Rand des
-verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS ueber einen abgehaengten Teilbaum). Ein blankes
+verwundbaren Bereichs (GHSA-55q2-fjhq-7xh7, XSS über einen abgehängten Teilbaum). Ein blankes
 Update bewegt es nicht, weil ein `overrides`-Eintrag die Version pinnt — der Eintrag steht jetzt
-auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` fuer alles Weitere
+auf `^3.4.13`, installiert ist 3.4.15. Danach `npm audit fix` ohne `--force` für alles Weitere
 in Range.
 
 **Weitere Updates:**
 
 | Paket | Aktualisierung |
 |---|---|
-| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhaengigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
+| `cypress` und seine Transitiven | Cypress 15.21.1 ersetzt die verwundbaren Abhängigkeiten von Cypress 13; auch `qs` ist aktualisiert. |
 | `react-router-dom` / `react-router` | Version 7.18.3 behebt die gemeldeten Router-Befunde. Der bestehende Schutz `isInternalAppPath()` gegen protokollrelative und Backslash-Pfade bleibt bestehen. |
 
-Nachpruefen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Pruefung).
-Fuer Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
+Nachprüfen mit `npm audit`, `npm test` und `npm run build` (einschliesslich TypeScript-Prüfung).
+Für Cypress 15 gelten Node.js 20/22/24+ und unter Linux glibc >= 2.31;
 siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
 
 ## Bekannte Einschränkungen

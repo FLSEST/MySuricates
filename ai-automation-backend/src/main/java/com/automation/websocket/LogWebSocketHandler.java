@@ -1,6 +1,5 @@
 package com.automation.websocket;
 
-import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +32,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code TerminalWebSocketHandler} on their own path instead — a different, unrelated mechanism.
  * The frontend confirms a live consumer: {@code useWebSocket.ts} subscribes to exactly this topic.
  *
- * <p>{@link #broadcastLogMessage} and {@link #broadcastStatusChange} are currently unused in
- * production — {@code ExecutionBroadcaster}/{@code RunLiveLogService} publish to the same topic
- * and are what every real call site uses. Kept for now since {@code LogWebSocketHandlerTest}
- * exercises them directly; a follow-up can remove them once nothing still expects the public API.
+ * <p>This class does <b>not</b> broadcast run output itself: {@code ExecutionBroadcaster} and
+ * {@code RunLiveLogService} publish to the same topic and are what every real call site uses. Two
+ * unused {@code broadcastLogMessage}/{@code broadcastStatusChange} duplicates were removed with
+ * TODO 7adaf187; do not reintroduce them here.
  */
 @Component
 @RequiredArgsConstructor
@@ -85,20 +84,6 @@ public class LogWebSocketHandler {
         runSubscribers.values().forEach(subscribers -> subscribers.remove(sessionId));
         runSubscribers.entrySet().removeIf(entry -> entry.getValue().isEmpty());
         log.debug("Client {} disconnected", sessionId);
-    }
-
-    public void broadcastLogMessage(String runId, Map<String, Object> logData) {
-        messagingTemplate.convertAndSend(
-                "/topic/executions/" + runId + "/logs",
-                logData
-        );
-    }
-
-    public void broadcastStatusChange(String runId, RunStatus status) {
-        messagingTemplate.convertAndSend(
-                "/topic/executions/" + runId + "/logs",
-                Map.of("type", "status", "runId", runId, "status", status)
-        );
     }
 
     public boolean hasSubscribers(String runId) {

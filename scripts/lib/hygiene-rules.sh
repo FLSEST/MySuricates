@@ -104,10 +104,19 @@ HYGIENE_POOL_REPO_MARKERS=(
 # defaultContext oder in den Metadaten sind sie ein Befund — es sei denn, der
 # Wert ist leer oder eine Template-Variable ({{ project_id }}), denn das ist
 # gerade die portable Parametrisierung.
-HYGIENE_POOL_INSTANCE_KEYS=(
-  "projectId" "project_id" "workflowId" "workflow_id" "runId" "run_id"
-  "scheduleId" "schedule_id" "chainId" "chain_id" "executionId" "execution_id"
-)
+#
+# HYGIENE_POOL_INSTANCE_KEYS steht nicht hier, sondern kommt aus der generierten
+# Datei daneben: Quelle ist PoolExportSanitizer im Backend, das dieselben
+# Schlüssel beim Export entfernt. Vorher waren es zwei Listen ohne Kopplung —
+# driftete eine, merkte es niemand (TODO 96640e6f).
+HYGIENE_RULES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh" ]; then
+  # shellcheck source=pool-sanitizer.generated.sh
+  . "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh"
+else
+  echo "FEHLER: scripts/lib/pool-sanitizer.generated.sh fehlt (erzeugt von PoolSanitizerKeysTest)." >&2
+  return 2 2>/dev/null || exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # Kriterium „Definition ruft die eigene REST-API oder liest Zugangsdaten"
@@ -169,6 +178,19 @@ hygiene_gitignore_leak_is_generic() {
 # Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.
 # ---------------------------------------------------------------------------
 HYGIENE_ALLOWLIST_FILE="scripts/ci/hygiene-allowlist.txt"
+
+# ---------------------------------------------------------------------------
+# Private Ausschlussliste für den Workflow-Pool (TODO 0640f29b)
+#
+# Die persönlichen Pool-Definitionen bleiben über .git/info/exclude aus dem
+# Bestand — dort steht keine Klartext-Namensliste im öffentlichen Repository.
+# exclude wird aber nicht geklont und gilt in keinem Worktree: ein pauschales
+# "git add -A" holt die Dateien zurück, ohne dass etwas anschlägt. Diese Liste
+# ist die durchsetzbare Hälfte davon; sie liegt selbst nicht im Repository
+# (auch sie steht in .git/info/exclude). Fehlt sie, wird der Check hörbar
+# übersprungen statt still zu bestehen. Vorlage: die .example-Datei daneben.
+# ---------------------------------------------------------------------------
+HYGIENE_PRIVATE_LIST_FILE="scripts/ci/hygiene-private.txt"
 
 # Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).
 hygiene_allowlist_paths() {

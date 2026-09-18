@@ -66,7 +66,7 @@ automation:
     sealing: true       # Härtungs-Flags sind vom Preset unabhängig
 ```
 
-Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` waehlt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Praefix, sonst `en`) — das Ergebnis (welche Module aktiv sind) aendert sich dadurch nicht.
+Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (Bindestriche als `_`, z. B. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). Stable- und Test-Profil setzen `full`; `scripts/setup.sh` schreibt das gewählte Preset nach `ai-automation-backend/config/application.yml`. Vorlagen „minimal“ und „maximal“: `ai-automation-backend/config-examples/`, erklärt in [deployment.md](deployment.md#konfigurationen-minimal-und-maximal). `scripts/setup.sh --lang de|en` wählt nur die Anzeigesprache der Modultexte im Terminal (Default: `$LANG`-Präfix, sonst `en`) — das Ergebnis (welche Module aktiv sind) ändert sich dadurch nicht.
 
 **Katalog** (einzige Quelle: `modules/ModuleCatalog`, 18 Feature-Module + 4 Härtungsschalter = 22 Schlüssel):
 
@@ -141,14 +141,13 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 | **untrusted extern** | Webhook-Payload, wiederhergestellte `__untrusted_keys` (Resume, Sub-Workflow), aus getainteten Ausgaben abgeleitete Variablen (`step_N_output`, foreach-Items, `document`-Extrakte) | immer single-quoted | roh | ja, ab dem Setzen |
 | **Plattform-Daten** | `previous_report`, `open_todos` — von `WorkflowContextDataService` in **jeden** Run injiziert | immer single-quoted | roh | erst wenn der Platzhalter wirklich in eine Shell-Kommandozeile substituiert wurde |
 
-- **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den reservierten Kontextschlüsseln `__untrusted_keys` und `__untrusted_outputs`, damit er Resume und Sub-Workflow-Übergabe überlebt. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
+- **Taint-Ausbreitung:** Ist ein Run getaintet, escapt `recordOutput` jede weitere Blockausgabe (`previous_output`, `{{ block.<name>.output }}`) und `setDerivedVariable` markiert jede daraus abgeleitete Variable als untrusted. Klebrig wird der Taint, sobald eine Ausgabe verbucht wurde oder Plattform-Daten in eine Kommandozeile gelangt sind — ab dann hebt ihn auch ein späteres `setVariable` auf die auslösende Variable nicht mehr auf, weil ein Block Fremdbytes ohne Platzhalter in seine Ausgabe holen kann (Datei lesen, API aufrufen). Davor, also bei externem Input ohne jede verbuchte Ausgabe, entfernt ein `setVariable` auf genau diese Variable den Taint noch. Persistiert wird er in den drei reservierten Kontextschlüsseln `__untrusted_keys`, `__untrusted_outputs` und `__platform_in_shell` (Letzteres das Nutzungs-Flag der Plattform-Daten, `true` sobald es gesetzt ist), damit er Resume und Sub-Workflow-Übergabe überlebt — auch dann, wenn nach der Substitution noch keine Ausgabe verbucht wurde. Ein sauberer Run exportiert nichts und bleibt byte-identisch zum Verhalten vor der Taint-Einführung.
 - **Warum Plattform-Daten erst bei Nutzung tainten:** Sie stecken in jedem Run. Würden sie beim Injizieren tainten, wäre jeder Run getaintet und die Ausgabe-Platzhalter in den mitgelieferten Templates bekämen eine andere Bedeutung. Deshalb meldet `TemplateResolver.resolveShell`/`resolveShellSafe` zurück, welche Platzhalter tatsächlich in eine Kommandozeile eingesetzt wurden; erst diese Meldung schaltet den Taint scharf (`ExecutionContextTaint.substitutedIntoShell`). Ein Run, der `{{ previous_report }}` nur im KI-Prompt verwendet (`resolveTemplate`) oder gar nicht, bleibt untainted.
 - **Bewusst trusted:** Antworten aus `approval`- und `human-input`-Blöcken kommen über die API-Key-geschützte REST-Schnittstelle von der Person, der die Instanz gehört — sie werden nicht escaped. Ebenso überschreibt `setVariable` (etwa eine Workflow-Variable, die einen Webhook-Wert gleichen Namens überdeckt) die Untrusted-Markierung absichtlich: Der Wert kommt dann aus der Definition, nicht vom Aufrufer. `replaceValue` (Workspace-Pfad-Remapping) tauscht dagegen nur den Wert und lässt die Klasse stehen.
 - **Bekannte Grenzen:**
   1. In KI-Prompts wird nichts escaped — ein Prompt ist keine Kommandozeile, Prompt-Injection wehrt das Trust-Modell nicht ab.
-  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
-  3. Das Nutzungs-Flag der Plattform-Daten selbst wird nicht exportiert; es braucht das nicht, weil die erste Ausgabe nach der Substitution den Taint in `__untrusted_outputs` schreibt.
-  4. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
+  2. **Die Wäsche über den KI-Block:** Plattform-Daten in einem `simple`- oder `agentic`-Prompt tainten den Run nicht (Punkt 1); die KI-Antwort wird über `recordOutput` als untainted verbucht; ein folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. Der Weg Plattform-Daten → KI-Prompt → Shell-Block umgeht das Quoting also vollständig. In den mitgelieferten Definitionen kommt diese Form sechsmal vor (sechs Pool-Workflows, kein Built-in-Template) und fällt nur deshalb nicht auf, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Empfehlung für eigene Workflows: In jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet, `"shell_escape_variables": true` setzen** — ohne dieses Opt-in ist der Pfad ungeschützt.
+  3. Ein Shell-Block, der einen getainteten Wert selbst in eine Datei schreibt und diese später wieder ausführt, liegt außerhalb dessen, was das Quoting sehen kann.
 
 **Webhook-Signaturen** — `POST /api/v1/webhooks/{id}/secret` erzeugt ein Secret (32 Zufallsbytes, hex), zeigt es genau einmal und speichert es AES-GCM-verschlüsselt (`IntegrationEncryptionService`, Schlüssel außerhalb der Datenbank) in `webhook_triggers.signing_secret_enc`; `DELETE …/secret` entfernt es. Hat ein Webhook ein Secret, prüft `WebhookSignatureVerifier` vor dem JSON-Parsen den Header `X-Signature: sha256=<hex>` (alternativ `X-Hub-Signature-256`, das Format von GitHub und Gitea) als HMAC-SHA256 über die rohen Request-Bytes, Vergleich in konstanter Zeit — sonst **401 `WEBHOOK_SIGNATURE_INVALID`**. Wie beim Siegel bleibt ein gespeichertes Secret wirksam, wenn der Schalter später aus ist. Responses verraten nur `signatureRequired`.
 
@@ -402,6 +401,11 @@ gate_description: <beschreibung>
 - **YELLOW → `COMPLETED_WITH_ERRORS`:** Run wird mit diesem Status beendet statt `COMPLETED`
 - **RED → `COMPLETED`:** RED-Gates ändern den Run-Status nicht — `AutoTodoService` erstellt stattdessen ein TODO
 - `GateStatusResolver` — leitet Gate-Status aus Run-Status ab, wenn kein expliziter Marker existiert (`FAILED` → RED, `COMPLETED` → GREEN)
+
+Ein Shell-Block muss diese Marker nicht selbst schreiben: `checked_command`/`check_category` leiten
+das Gate automatisch aus dem Exit-Code ab, mit Vorrang für einen eigenen (mindestens gleich
+strengen) Marker des Skripts — Details und Beispiele:
+[WORKFLOW-GUIDE.md → `checked_command` / `check_category`](WORKFLOW-GUIDE.md#checked_command--check_category--gate-automatisch-aus-dem-exit-code).
 
 **AutoTodoService:**
 - Reagiert auf `WorkflowRunCompletedEvent`
@@ -913,7 +917,12 @@ globale Sperre nimmt dem Sturm die Spitze, ohne die beiden Auswege zu verschlie�
 ohne Reload: Ein Timer auf der letzten Frist (`scheduleExpiry`) meldet das Ablaufen, und
 `installRateLimitRecovery` invalidiert beim Übergang aktiv → inaktiv **einmal alle Queries im
 Fehlerzustand** — `retry` ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft
-montierte Queries (Sidebar, Layout, Dashboard) blieben sonst bis zum Reload rot.
+montierte Queries blieben sonst bis zum Reload rot. Erfasst wird dabei genau das, was wirklich auf
+`error` steht. Queries mit `initialData` (`useSystemModules`, `useBlockTypes`) stehen auch nach
+einem 429 weiter auf `success` und werden von der Erholung deshalb nie angefasst — gewollt: der
+zuletzt bekannte Modul- bzw. Blocktyp-Stand soll stehen bleiben, statt Navigation und Widgets
+flackern zu lassen (b13509f3). Ihren Serverstand holen sie beim nächsten Mount nach, weil
+`initialDataUpdatedAt: 0` den geseedeten Stand sofort stale macht.
 
 **Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
 (oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake
@@ -1011,9 +1020,13 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V64 | Writes-Flag auf Capabilities |
 | V65 | Catch-Up-On-Resume auf Schedules |
 | V66 | Todo-Export-Link |
-| V67 | Aufwandsschätzung auf Workflows |
+| V67 | Reasoning-Effort auf Workflows |
 | V68 | Audit-Reports, Findings, Occurrences und TODO-Verknüpfungen |
 | V69 | Beweis-Snapshot und Akzeptanz-Zeitpunkt auf Audit-Findings (`disposition_evidence`, `disposition_at`) |
+| V70 | Run-Provenienz: Definitions-Hash auf Versionen und Runs, Versions-Bezug und `trigger_source` |
+| V71 | Workflow-Versiegelung: `sealed`, `sealed_hash`, `sealed_at` auf Workflows |
+| V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
+| V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
 
 ## Architektur-Gates
 

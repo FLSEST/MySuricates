@@ -1,5 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
+import {
+  capabilityModules, useSystemCapabilities, writeCachedModules, SYSTEM_CAPABILITIES_KEY,
+  type SystemCapabilities,
+} from './useSystemCapabilities';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { ModuleInfo, ModuleName, SystemModules } from '../types';
@@ -12,50 +16,9 @@ import type { ModuleInfo, ModuleName, SystemModules } from '../types';
  * enforces it regardless (404 MODULE_DISABLED).
  */
 
-const CACHE_KEY = 'mysuricates-modules';
-
-function readCachedModules(): SystemModules | undefined {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as SystemModules) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function writeCachedModules(value: SystemModules) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(value));
-  } catch {
-    // per-browser convenience only (avoids nav flicker on reload)
-  }
-}
-
+/** Module state, from the shared capabilities query (see {@link useSystemCapabilities}). */
 export function useSystemModules() {
-  return useQuery({
-    queryKey: ['system', 'modules'],
-    queryFn: async (): Promise<SystemModules> => {
-      const caps = await api.get<Partial<SystemModules> & { modulesUiEditable?: boolean }>('/system/capabilities');
-      const value: SystemModules = {
-        preset: caps.preset ?? 'full',
-        uiEditable: caps.modulesUiEditable ?? false,
-        modules: caps.modules ?? [],
-      };
-      writeCachedModules(value);
-      return value;
-    },
-    // `initialData` statt `placeholderData`: letzteres greift in v5 nur bei
-    // status === 'pending'. Nach einem 429 galt damit wieder jedes Modul als „an" und
-    // Navigation und Widgets flackerten (b13509f3). Mit initialData bleibt der zuletzt
-    // bekannte Stand auch im Fehlerfall stehen.
-    initialData: readCachedModules,
-    // Epoch 0 ⇒ der geseedete Stand ist sofort stale, die Query fragt den Server also
-    // trotzdem einmal. Das braucht eine endliche staleTime (mit Infinity wäre nichts je
-    // stale); eine Stunde entspricht praktisch dem bisherigen „einmal pro Seitenaufruf",
-    // Änderungen kommen ohnehin aus einem Neustart oder aus den Schaltern unten.
-    initialDataUpdatedAt: 0,
-    staleTime: 60 * 60 * 1000,
-  });
+  return useSystemCapabilities(capabilityModules);
 }
 
 function useModuleSwitch<TArg>(request: (arg: TArg) => Promise<SystemModules>, successMessage: (t: ReturnType<typeof useT>) => string) {
@@ -66,7 +29,9 @@ function useModuleSwitch<TArg>(request: (arg: TArg) => Promise<SystemModules>, s
     mutationFn: request,
     onSuccess: (value) => {
       // Takes effect immediately: navigation, routes and gated queries follow this cache
-      qc.setQueryData(['system', 'modules'], value);
+      qc.setQueryData<SystemCapabilities>(SYSTEM_CAPABILITIES_KEY, (old) => ({
+        ...old, preset: value.preset, modulesUiEditable: value.uiEditable, modules: value.modules,
+      }));
       writeCachedModules(value);
       toast.success(successMessage(t));
     },

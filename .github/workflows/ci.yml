@@ -21,6 +21,16 @@ jobs:
         run: bash scripts/tests/test-public-hygiene.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
+      # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
+      # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
+      - name: Doku-Zahlen gegen den Code pruefen
+        run: bash scripts/public-readiness/doc-facts-check.sh
+      - name: Doku-Zahlen-Gate Selbsttest
+        run: bash scripts/tests/test-doc-facts-check.sh
+      - name: Audit-Fakten Selbsttest
+        run: bash scripts/tests/test-audit-facts.sh
+      - name: Coverage-Snapshot Selbsttest
+        run: bash scripts/tests/test-coverage-snapshot.sh
 
   gitleaks:
     name: Gitleaks Secret Scan
