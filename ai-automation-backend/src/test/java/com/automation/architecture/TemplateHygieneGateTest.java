@@ -2,6 +2,7 @@ package com.automation.architecture;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,19 +46,76 @@ class TemplateHygieneGateTest {
     void should_notQuoteOutputPlaceholders_inShellFields() throws IOException {
         List<String> violations = new ArrayList<>();
         for (Path file : definitionFiles()) {
-            walkBlocks(MAPPER.readTree(file.toFile()), node -> {
-                JsonNode config = node.get("config");
-                for (String field : SHELL_FIELDS) {
-                    JsonNode value = config.get(field);
-                    if (value != null && value.isTextual() && QUOTED_OUTPUT.matcher(value.asText()).find()) {
-                        violations.add(file.getFileName() + " -> " + field);
-                    }
-                }
-            });
+            walkBlocks(MAPPER.readTree(file.toFile()),
+                    node -> collectQuotedOutputViolations(node, file.getFileName().toString(), violations));
         }
         assertThat(violations)
                 .as("quoted Output-Platzhalter in Shell-Feldern (unquoted + shell_escape_variables verwenden)")
                 .isEmpty();
+    }
+
+    /**
+     * A simple block with an output placeholder in {@code command} is not a false positive: the
+     * field is a Claude prompt there ({@code SimpleBlockExecutor} resolves it via
+     * {@code resolveTemplate}, never through a shell), so quoting it changes nothing about shell
+     * injection. Only blocks that actually run {@code command}/{@code condition}/… through a shell
+     * (type {@code shell}, or a foreach/while/conditional/retry/switch-nested block with
+     * {@code execution_mode: shell} — see {@link com.automation.executor.ExecutionMode}; {@code
+     * items_command} on {@code foreach} always runs as shell, see {@code ForEachBlockExecutor})
+     * must be checked (TODO aeac3bb1).
+     */
+    @Test
+    void should_ignoreShellFields_onBlockTypesThatDoNotRunThemAsShell() {
+        ObjectNode simpleBlock = MAPPER.createObjectNode();
+        simpleBlock.put("type", "simple");
+        simpleBlock.putObject("config").put("command", "Summarize '{{ previous_output }}' briefly.");
+
+        List<String> simpleViolations = new ArrayList<>();
+        collectQuotedOutputViolations(simpleBlock, "unit-test.json", simpleViolations);
+        assertThat(simpleViolations)
+                .as("simple block 'command' is an AI prompt, not a shell field")
+                .isEmpty();
+
+        ObjectNode shellBlock = MAPPER.createObjectNode();
+        shellBlock.put("type", "shell");
+        shellBlock.putObject("config").put("command", "echo '{{ previous_output }}'");
+
+        List<String> shellViolations = new ArrayList<>();
+        collectQuotedOutputViolations(shellBlock, "unit-test.json", shellViolations);
+        assertThat(shellViolations)
+                .as("an actual shell block with a quoted output placeholder must still be flagged")
+                .containsExactly("unit-test.json -> command");
+    }
+
+    /** Visits {@code node} itself (not its nested blocks — the caller's {@link #walkBlocks} does
+     * the recursion) and records a violation per quoted-output {@link #SHELL_FIELDS} entry that is
+     * actually executed as shell for this block. */
+    private static void collectQuotedOutputViolations(JsonNode node, String fileLabel, List<String> out) {
+        JsonNode config = node.get("config");
+        String type = node.path("type").asText(null);
+        for (String field : SHELL_FIELDS) {
+            if (!isShellField(field, type, config)) {
+                continue;
+            }
+            JsonNode value = config.get(field);
+            if (value != null && value.isTextual() && QUOTED_OUTPUT.matcher(value.asText()).find()) {
+                out.add(fileLabel + " -> " + field);
+            }
+        }
+    }
+
+    /**
+     * Whether {@code field} on a block of {@code type} (with {@code config}) is actually run
+     * through a shell. {@code items_command} on {@code foreach} always is (it only ever collects
+     * iteration targets, see {@code ForEachBlockExecutor}); every other shell field depends on the
+     * block being type {@code shell} itself, or carrying {@code execution_mode: shell} (foreach,
+     * while, conditional, retry, and a switch-nested shell/simple block — {@code ExecutionMode}).
+     */
+    private static boolean isShellField(String field, String type, JsonNode config) {
+        if ("items_command".equals(field)) {
+            return "foreach".equals(type);
+        }
+        return "shell".equals(type) || "shell".equals(config.path("execution_mode").asText(null));
     }
 
     @Test
