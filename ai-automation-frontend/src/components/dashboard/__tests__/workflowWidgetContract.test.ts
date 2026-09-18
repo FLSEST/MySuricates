@@ -90,24 +90,57 @@ describe('workflow widget contract', () => {
     ['bom', 'bom﻿text'],
     ['private use', 'privateuse'],
     ['bell', 'bell'],
-    // Backend hardening: non-breaking/invisible blanks embedded in otherwise readable text —
-    // DashboardWidgetResultParser#isInvisible rejects these anywhere in a string, not just when
-    // the whole string is blank-only (see also the blank-only cases below).
-    ['non-breaking space', 'nb space'],
-    ['figure space', 'figure space'],
-    ['narrow no-break space', 'narrow space'],
-    // Blank-only strings: individually legal Unicode letters/symbols that render as blank and are
-    // not stripped by trim() — the practical exploit this hardening round closes.
-    ['blank-only non-breaking space', ' '],
-    ['blank-only figure space', ' '],
-    ['blank-only narrow no-break space', ' '],
-    ['blank-only hangul filler', 'ㅤ'],
-    ['blank-only braille blank', '⠀'],
-    ['blank-only hangul choseong filler', 'ᅟ'],
-    ['blank-only hangul jungseong filler', 'ᅠ'],
-    ['blank-only halfwidth hangul filler', 'ﾠ'],
-  ])('rejects %s', (_name, text) => {
+  ])('rejects %s (fatal anywhere in the string)', (_name, text) => {
     expect(parseWorkflowResult({ status: 'GREEN', items: [text] })).toBeNull();
+  });
+
+  // Fix round 2 (B1+B2): a code point that is merely "not visible" (every space separator other
+  // than U+0020, the filler denylist, the non-format default-ignorables, unassigned) is legal
+  // anywhere in a string that still has visible content elsewhere — DashboardWidgetTextRule#isVisible
+  // only decides whether a code point counts toward that "at least one visible" requirement, it does
+  // not make the whole string fatal. Round 1's stricter "any space separator anywhere is fatal"
+  // broke ordinary German text such as "12 000", "z. B." or "§ 5" and is not the backend's rule.
+  it.each([
+    ['non-breaking space embedded in visible text', 'nb space', 'nb space'],
+    ['figure space embedded in visible text', 'figure space', 'figure space'],
+    ['narrow no-break space embedded in visible text', 'narrow space', 'narrow space'],
+    ['German thousands separator (narrow no-break space)', '12 000 Zeilen', '12 000 Zeilen'],
+    ['German abbreviation (non-breaking space)', 'z. B.', 'z. B.'],
+    ['German paragraph reference (non-breaking space)', '§ 5 Abs. 1', '§ 5 Abs. 1'],
+    ['emoji with a variation selector', '✅️', '✅️'],
+  ])('accepts %s: %s', (_name, text, expected) => {
+    expect(parseWorkflowResult({ status: 'GREEN', items: [text] })).toEqual({
+      status: 'GREEN', kpis: [], items: [expected],
+    });
+  });
+
+  // Blank-only strings: only "not visible" code points remain, so none of them counts toward "at
+  // least one visible code point" — rejected in every field the contract validates as a string.
+  const CLASS_TWO_ALONE: readonly [string, string][] = [
+    ['non-breaking space', ' '],
+    ['figure space', ' '],
+    ['narrow no-break space', ' '],
+    ['hangul filler', 'ㅤ'],
+    ['braille pattern blank', '⠀'],
+    ['hangul choseong filler', 'ᅟ'],
+    ['hangul jungseong filler', 'ᅠ'],
+    ['halfwidth hangul filler', 'ﾠ'],
+  ];
+
+  it.each(CLASS_TWO_ALONE)('rejects a title made only of %s', (_name, blank) => {
+    expect(parseWorkflowResult({ status: 'GREEN', title: blank })).toBeNull();
+  });
+  it.each(CLASS_TWO_ALONE)('rejects a kpi label made only of %s', (_name, blank) => {
+    expect(parseWorkflowResult({ status: 'GREEN', kpis: [{ label: blank, value: 'v' }] })).toBeNull();
+  });
+  it.each(CLASS_TWO_ALONE)('rejects a kpi value made only of %s', (_name, blank) => {
+    expect(parseWorkflowResult({ status: 'GREEN', kpis: [{ label: 'l', value: blank }] })).toBeNull();
+  });
+  it.each(CLASS_TWO_ALONE)('rejects an item made only of %s', (_name, blank) => {
+    expect(parseWorkflowResult({ status: 'GREEN', items: [blank] })).toBeNull();
+  });
+  it.each(CLASS_TWO_ALONE)('rejects a summary made only of %s', (_name, blank) => {
+    expect(parseWorkflowResult({ status: 'GREEN', summary: blank })).toBeNull();
   });
 
   it('parses an entry and downgrades a result that does not match the contract', () => {
@@ -141,6 +174,8 @@ describe('workflow widget contract', () => {
     expect(parseWorkflowEntry({ ...base, workflowName: '   ' })?.workflowName).toBeNull();
     expect(parseWorkflowEntry({ ...base, workflowName: null })?.workflowName).toBeNull();
     expect(parseWorkflowEntry({ ...base, workflowName: 'Nightly QA' })?.workflowName).toBe('Nightly QA');
+    // A non-breaking space is "not visible" but not fatal: legal next to visible text (fix round 2).
+    expect(parseWorkflowEntry({ ...base, workflowName: 'Team QA' })?.workflowName).toBe('Team QA');
   });
 
   it('collects the configured workflow ids of the shown widgets, sorted and deduplicated', () => {

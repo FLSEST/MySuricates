@@ -9,11 +9,20 @@
  * (null), and the widget shows its neutral state instead.
  *
  * Markup is not filtered: '<script>' stays ordinary text here and is harmless because widgets render
- * these values only as React text nodes. What is rejected are characters that make text read
- * differently than it looks — control, format (zero width, BOM, bidi overrides), separators,
- * surrogates and private use, plus (mirroring the backend's hardening round) every space-like
- * separator except the ordinary U+0020 and a denylist of invisible filler letters/symbols that are
- * not classified as separators at all.
+ * these values only as React text nodes. Two different rules apply on purpose here, mirroring
+ * DashboardWidgetTextRule/DashboardWidgetResultParser#text exactly (fix round 2, B1+B2 — round 1's
+ * "any space separator anywhere is fatal" was a different and stricter rule than the backend's own,
+ * which broke ordinary German text such as "12 000", "z. B." or "§ 5"):
+ * 1. Fatal anywhere in the string — rejects the string regardless of what else is there: control
+ *    (Cc) and format (Cf, zero width, BOM, bidi overrides included) characters, line/paragraph
+ *    separators, lone surrogates, private-use code points.
+ * 2. Not visible, but merely excluded from counting — legal anywhere in the string; a string is
+ *    valid only if at least one of its code points is neither in this class nor an ordinary U+0020
+ *    space: every space separator other than U+0020 (so a non-breaking, figure or narrow no-break
+ *    space no longer breaks a thousands separator or an abbreviation), the known invisible filler
+ *    letters/symbols (U+2800, U+3164, U+115F, U+1160, U+FFA0), the non-format default-ignorable code
+ *    points (U+034F, U+17B4-U+17B5, U+180B-U+180F, U+FE00-U+FE0F, U+E0100-U+E01EF — a lone variation
+ *    selector or vowel-shaping mark without a base character), and unassigned code points.
  */
 
 import type { ResolvedWidget } from '../../hooks/useDashboardLayout';
@@ -74,28 +83,45 @@ const RUN_STATUSES: readonly RunStatus[] = [
 ];
 const RESULT_FIELDS = new Set(['title', 'status', 'kpis', 'items', 'summary']);
 const KPI_FIELDS = new Set(['label', 'value', 'trend']);
-// Control, format, line/paragraph separator, surrogate, private use and space separator (checked
-// per code point below, with an exception for the ordinary U+0020 — see isInvisible).
-const INVISIBLE_CATEGORY = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Co}\p{Zs}]/u;
+
+/** Mirrors DashboardWidgetTextRule#isFatal exactly: fatal wherever it occurs in the string. */
+const FATAL = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{Co}]/u;
+
 /**
  * Filler code points that are individually legal Unicode (not control/format/separator) but render
  * as blank: HANGUL FILLER and its choseong/jungseong siblings, HALFWIDTH HANGUL FILLER, and BRAILLE
- * PATTERN BLANK. Mirrors DashboardWidgetResultParser.INVISIBLE_FILLERS exactly.
+ * PATTERN BLANK. Mirrors DashboardWidgetTextRule.INVISIBLE_FILLERS exactly.
  */
 const INVISIBLE_FILLERS = new Set([0x2800, 0x3164, 0x115f, 0x1160, 0xffa0]);
 
+/** Space separator (any) or unassigned — part of "not visible", checked per code point below. */
+const NOT_VISIBLE_CATEGORY = /[\p{Zs}\p{Cn}]/u;
+
 /**
- * Mirrors DashboardWidgetResultParser#isInvisible exactly: any control, format, line/paragraph
- * separator, surrogate, private-use or space-separator code point (except the ordinary U+0020), plus
- * the filler denylist above — checked anywhere in the text, not only when the whole string is blank.
+ * Non-format default-ignorable code points: individually legal Unicode (mostly category Mn) that
+ * render as nothing on their own — a bare combining grapheme joiner, a lone variation selector, or a
+ * Mongolian/Khmer vowel-shaping mark without its base. Mirrors
+ * DashboardWidgetTextRule#isNonFormatDefaultIgnorable exactly (named as explicit ranges because no
+ * JS API exposes a direct Default_Ignorable_Code_Point lookup either).
  */
-function hasInvisible(text: string): boolean {
-  for (const char of text) {
-    const codePoint = char.codePointAt(0) ?? 0;
-    if (codePoint === 0x20) continue;
-    if (INVISIBLE_FILLERS.has(codePoint) || INVISIBLE_CATEGORY.test(char)) return true;
-  }
-  return false;
+function isNonFormatDefaultIgnorable(codePoint: number): boolean {
+  return codePoint === 0x034f
+    || (codePoint >= 0x17b4 && codePoint <= 0x17b5)
+    || (codePoint >= 0x180b && codePoint <= 0x180f)
+    || (codePoint >= 0xfe00 && codePoint <= 0xfe0f)
+    || (codePoint >= 0xe0100 && codePoint <= 0xe01ef);
+}
+
+/**
+ * True for a code point that counts toward "the string has visible content". Mirrors
+ * DashboardWidgetTextRule#isVisible exactly: a normal space (U+0020) is legal but does not itself
+ * count — nor does every space separator other than U+0020, the invisible filler letters/symbols,
+ * the non-format default-ignorable code points, or an unassigned code point.
+ */
+function isVisible(codePoint: number, char: string): boolean {
+  if (codePoint === 0x20) return false;
+  if (INVISIBLE_FILLERS.has(codePoint) || isNonFormatDefaultIgnorable(codePoint)) return false;
+  return !NOT_VISIBLE_CATEGORY.test(char);
 }
 
 export function isWorkflowId(value: unknown): value is string {
@@ -113,11 +139,22 @@ export function workflowIdsOf(widgets: readonly ResolvedWidget[]): string[] {
   return [...ids].sort().slice(0, MAX_WORKFLOW_WIDGET_IDS);
 }
 
-/** A contract string, or null when it is missing, not a string, empty, too long or not plainly visible. */
+/**
+ * A contract string: trimmed, non-empty, within its cap, free of fatal characters, and with at least
+ * one visible code point remaining — mirrors DashboardWidgetResultParser#text exactly. Null for
+ * anything that fails one of those checks; invisible-but-not-fatal characters elsewhere in an
+ * otherwise visible string are kept as-is, not stripped.
+ */
 function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
   const text = value.trim();
-  if (text.length === 0 || text.length > max || hasInvisible(text)) return null;
+  if (text.length === 0 || text.length > max) return null;
+  let sawVisible = false;
+  for (const char of text) {
+    if (FATAL.test(char)) return null;
+    if (!sawVisible && isVisible(char.codePointAt(0) ?? 0, char)) sawVisible = true;
+  }
+  if (!sawVisible) return null;
   return text;
 }
 
