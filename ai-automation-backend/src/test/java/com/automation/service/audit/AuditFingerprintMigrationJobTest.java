@@ -46,6 +46,7 @@ class AuditFingerprintMigrationJobTest {
     private static final Instant T2 = Instant.parse("2026-09-12T19:16:00Z");
 
     @Autowired private AuditFingerprintMigrationJob job;
+    @Autowired private AuditRuleKeyCatalog ruleKeyCatalog;
     @Autowired private AuditFindingRepository findingRepository;
     @Autowired private AuditFindingTodoRepository findingTodoRepository;
     @Autowired private AuditFindingOccurrenceRepository occurrenceRepository;
@@ -321,6 +322,76 @@ class AuditFingerprintMigrationJobTest {
         assertThat(merged.getOccurrenceCount()).isEqualTo(4);
     }
 
+    /**
+     * Der haeufigste Realfall: ein <em>einzelnes</em> gedriftetes Altfinding ohne Zwilling. Hier
+     * muss die neue Schreibweise wirklich in der DB landen — im Zwillingsfall traegt der
+     * ueberlebende Datensatz den kanonischen Key ohnehin, dort beweist nichts die Schreibung.
+     */
+    @Test
+    void writesTheCatalogueKeyAndFingerprintOfALoneDriftedFinding() {
+        String subject = "service/workflow/RunAdmission.java";
+        AuditFinding drifted = saveCoverageFinding("Test-Coverage.Untested_Class", subject,
+                AuditFindingStatus.OPEN, T1, T1);
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding stored = findingRepository.findById(drifted.getId()).orElseThrow();
+        assertThat(stored.getRuleKey()).as("der katalogisierte Key steht in der DB")
+                .isEqualTo(CANONICAL_RULE_KEY);
+        assertThat(stored.getFingerprint()).as("genau der Fingerprint, den der naechste Ingest bildet")
+                .isEqualTo(AuditIngestionService.fingerprint(projectId, COVERAGE_AUDIT_KEY,
+                        CANONICAL_RULE_KEY, subject));
+    }
+
+    /**
+     * Gegenprobe mit einem Key, den die Normalisierung veraendern <em>wuerde</em>: nur der
+     * fehlende Katalogeintrag haelt ihn fest. Mit einem bereits kanonischen Key bewiese der Test
+     * nichts — er bliebe auch gruen, wenn normalize() bedingungslos liefe.
+     */
+    @Test
+    void leavesADriftedRuleKeyOfAnUncataloguedAuditAlone() {
+        String driftedKey = "Shell_Injection";
+        assertThat(AuditRuleKeyCatalog.normalize(driftedKey))
+                .as("die Normalisierung wuerde diesen Key veraendern")
+                .isNotEqualTo(driftedKey);
+        assertThat(ruleKeyCatalog.isChecked(AUDIT_KEY))
+                .as("dieses Audit hat keinen Katalogeintrag").isFalse();
+        AuditFinding finding = saveFinding(driftedKey, "ContainerShellService",
+                AuditFindingStatus.OPEN, 1, T1, T1, reportOld, "run-old");
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findById(finding.getId()).orElseThrow().getRuleKey())
+                .isEqualTo(driftedKey);
+    }
+
+    /**
+     * Ein Finding, das gleich danach als Dublette geloescht wird, braucht die neue Schreibweise
+     * nicht: das UPDATE waere verworfen und die Log-Zeile behauptete eine Aenderung, die niemand
+     * je sieht. Gezogen wird der Key erst am ueberlebenden Datensatz.
+     */
+    @Test
+    void doesNotRewriteTheRuleKeyOfAFindingItDeletesAsADuplicate() {
+        String subject = "service/workflow/RunAdmission.java";
+        saveCoverageFinding(CANONICAL_RULE_KEY, subject, AuditFindingStatus.OPEN, T0, T1);
+        AuditFinding drifted = saveCoverageFinding("Test-Coverage.Untested_Class", subject,
+                AuditFindingStatus.OPEN, T2, T2);
+        ListAppender<ILoggingEvent> log = attachLogAppender();
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        String messages = String.join("\n", log.list.stream().map(ILoggingEvent::getFormattedMessage).toList());
+        assertThat(messages).as("keine Normalisierungs-Meldung fuer einen geloeschten Datensatz")
+                .doesNotContain("ruleKey normalized: finding " + drifted.getId());
+        assertThat(findingRepository.findById(drifted.getId())).isEmpty();
+    }
+
     /** Ein Audit ohne Katalogeintrag behaelt seine Keys — dort vergibt der Prompt sie frei. */
     @Test
     void leavesRuleKeysOfAnUncataloguedAuditAlone() {
@@ -374,9 +445,15 @@ class AuditFingerprintMigrationJobTest {
 
     private AuditFinding saveFinding(String subject, AuditFindingStatus status, int occurrences,
                                      Instant firstSeenAt, Instant lastSeenAt, String reportId, String runId) {
+        return saveFinding(RULE_KEY, subject, status, occurrences, firstSeenAt, lastSeenAt, reportId, runId);
+    }
+
+    private AuditFinding saveFinding(String ruleKey, String subject, AuditFindingStatus status, int occurrences,
+                                     Instant firstSeenAt, Instant lastSeenAt, String reportId, String runId) {
         AuditFinding saved = findingRepository.saveAndFlush(AuditFinding.builder()
-                .projectId(projectId).auditKey(AUDIT_KEY).fingerprint(legacyFingerprint(subject))
-                .ruleKey(RULE_KEY).subject(subject).severity(AuditSeverity.HIGH)
+                .projectId(projectId).auditKey(AUDIT_KEY)
+                .fingerprint(legacyFingerprint(AUDIT_KEY, ruleKey, subject))
+                .ruleKey(ruleKey).subject(subject).severity(AuditSeverity.HIGH)
                 .title("Shell-Aufruf ohne Escaping").evidence(subject + ": 3 Fundstellen").status(status)
                 .resolvedAt(status == AuditFindingStatus.RESOLVED ? lastSeenAt : null)
                 .firstSeenReportId(reportId).lastSeenReportId(reportId)
