@@ -4,10 +4,86 @@
     "Ein auditKey ohne Eintrag wird nicht geprueft; ein unbekannter ruleKey wird normalisiert und",
     "sonst trotzdem ingestiert (WARN im Activity-Log). AuditRuleKeyCatalogTest haelt den Katalog",
     "mit den Pool-Prompts synchron: jeder dort woertlich vergebene ruleKey muss hier stehen.",
-    "Schluessel, die mit _ beginnen, sind Kommentare."
+    "Schluessel, die mit _ beginnen, sind Kommentare.",
+    "",
+    "Seit TODO a17e2d19 deckt der Katalog alle sechs ausgelieferten Audits ab, nicht mehr nur",
+    "test-coverage. Die Vokabulare sind aus den real vergebenen Keys der Instanz geclustert: Die",
+    "Prompts hatten vorher nur den Platzhalter 'stabile-regel-id', und das Ergebnis war eine",
+    "Identitaet je Lauf statt je Regel — im Health-Audit 25 verschiedene Keys auf 26 Findings",
+    "(god-class-count / god-classes-count / complexity.god-class-count fuer dieselbe Sache).",
+    "Wer einen Key ergaenzt, ergaenzt ihn AUCH im Prompt der betroffenen Definition unter",
+    "'Erlaubte ruleKey-Werte' — AuditRuleKeyCatalogTest erzwingt das in dieser Richtung."
   ],
   "mysuricates.test-coverage": [
     "test-coverage.untested-class",
     "test-coverage.thin-test"
+  ],
+  "mysuricates.architecture": [
+    "arch.god-class",
+    "arch.god-component",
+    "arch.high-coupling",
+    "arch.cross-layer-violation",
+    "arch.package-cycle",
+    "arch.duplicated-logic"
+  ],
+  "mysuricates.health": [
+    "health.tests-failing",
+    "health.build-broken",
+    "health.lint-findings",
+    "health.type-errors",
+    "health.oversized-sources",
+    "health.bundle-size",
+    "health.db-size",
+    "health.log-errors",
+    "health.doc-drift",
+    "health.dependency-vulnerability",
+    "health.provider-unavailable",
+    "health.gate-incident"
+  ],
+  "mysuricates.performance": [
+    "perf.db.size",
+    "perf.db.vacuum-missing",
+    "perf.db.unindexed-column",
+    "perf.db.connection-hold",
+    "perf.db.repository-loop",
+    "perf.log.timeouts",
+    "perf.log.warnings",
+    "perf.log.errors",
+    "perf.frontend.bundle-size",
+    "perf.request.slow-route",
+    "perf.request.sql-statements",
+    "perf.jvm.metrics-unavailable"
+  ],
+  "mysuricates.security": [
+    "sec.injection.shell",
+    "sec.injection.sql",
+    "sec.xss",
+    "sec.auth.credentials",
+    "sec.auth.token-handling",
+    "sec.access-control",
+    "sec.data-exposure",
+    "sec.dependency-vulnerability",
+    "sec.ratelimit-bypass",
+    "sec.crypto.key-handling",
+    "sec.taint.cross-run"
+  ],
+  "project.public-readiness": [
+    "public.docs.missing-license",
+    "public.docs.missing-community-files",
+    "public.docs.internal-plans",
+    "public.secrets.keyword-hits",
+    "public.secrets.internal-paths",
+    "public.config.root-env-example",
+    "public.surface.debug-exposure",
+    "public.surface.undocumented-endpoints",
+    "public.architecture.no-boundary-checks",
+    "public.deadcode.markers",
+    "public.neutrality.pool-override",
+    "public.tests.low-ratio",
+    "public.screenshots.missing-app-screenshots",
+    "public.evidence.dependency-audit-missing",
+    "public.evidence.claude-dir-tracking",
+    "public.evidence.git-status-empty",
+    "public.evidence.script-inconsistency"
   ]
 }

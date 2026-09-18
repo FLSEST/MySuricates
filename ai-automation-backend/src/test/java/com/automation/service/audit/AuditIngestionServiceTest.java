@@ -28,8 +28,14 @@ import static org.mockito.Mockito.*;
 class AuditIngestionServiceTest {
     private static final Instant ACCEPTED_AT = Instant.parse("2026-03-01T10:00:00Z");
     private static final String PROJECT = "proj-1";
-    private static final String AUDIT_KEY = "mysuricates.health";
-    /** Das einzige Audit mit ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
+    /**
+     * Erfundener auditKey ohne Katalogeintrag: Die Tests hier pruefen die Akzeptanz-Politik, nicht
+     * das ruleKey-Vokabular. Mit einem echten Schluessel wuerde jedes ergaenzte Vokabular sie
+     * mitreissen (seit TODO a17e2d19 haben alle ausgelieferten Audits einen Katalog) — dann meldete
+     * die Ingestion den Fixture-Key 'size.class' als unbekannt und verifyNoInteractions schluege an.
+     */
+    private static final String AUDIT_KEY = "test.audit-ohne-katalog";
+    /** Ein Audit MIT ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
     private static final String COVERAGE_KEY = "mysuricates.test-coverage";
 
     @Mock private WorkflowRunRepository runRepository;

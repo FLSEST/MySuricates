@@ -48,9 +48,14 @@ class AuditRuleKeyCatalogTest {
         assertThat(AuditRuleKeyCatalog.normalize("god-class-count")).isEqualTo("god-class-count");
     }
 
+    /**
+     * Bewusst ein erfundener auditKey: Seit TODO a17e2d19 haben alle sechs ausgelieferten Audits
+     * einen Katalogeintrag. Ein echter Schluessel als Beispiel wuerde diesen Test beim naechsten
+     * ergaenzten Vokabular wieder rot machen — vorher stand hier mysuricates.architecture.
+     */
     @Test
     void anAuditWithoutCatalogEntryIsNotChecked() {
-        AuditRuleKeyCatalog.Resolution resolution = catalog.resolve("mysuricates.architecture", "was-auch-immer");
+        AuditRuleKeyCatalog.Resolution resolution = catalog.resolve("test.audit-ohne-katalog", "was-auch-immer");
 
         assertThat(resolution.ruleKey()).isEqualTo("was-auch-immer");
         assertThat(resolution.unknown()).isFalse();
