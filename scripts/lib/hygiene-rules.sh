@@ -104,10 +104,19 @@ HYGIENE_POOL_REPO_MARKERS=(
 # defaultContext oder in den Metadaten sind sie ein Befund — es sei denn, der
 # Wert ist leer oder eine Template-Variable ({{ project_id }}), denn das ist
 # gerade die portable Parametrisierung.
-HYGIENE_POOL_INSTANCE_KEYS=(
-  "projectId" "project_id" "workflowId" "workflow_id" "runId" "run_id"
-  "scheduleId" "schedule_id" "chainId" "chain_id" "executionId" "execution_id"
-)
+#
+# HYGIENE_POOL_INSTANCE_KEYS steht nicht hier, sondern kommt aus der generierten
+# Datei daneben: Quelle ist PoolExportSanitizer im Backend, das dieselben
+# Schlüssel beim Export entfernt. Vorher waren es zwei Listen ohne Kopplung —
+# driftete eine, merkte es niemand (TODO 96640e6f).
+HYGIENE_RULES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh" ]; then
+  # shellcheck source=pool-sanitizer.generated.sh
+  . "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh"
+else
+  echo "FEHLER: scripts/lib/pool-sanitizer.generated.sh fehlt (erzeugt von PoolSanitizerKeysTest)." >&2
+  return 2 2>/dev/null || exit 2
+fi
 
 # ---------------------------------------------------------------------------
 # Kriterium „Definition ruft die eigene REST-API oder liest Zugangsdaten"
