@@ -1,0 +1,90 @@
+{
+  "chains": {
+    "name": "Chains",
+    "description": "Chains several workflows into a pipeline that runs one after another."
+  },
+  "assistant": {
+    "name": "Assistant",
+    "description": "Chat assistant and page suggestions that can read and edit platform objects."
+  },
+  "learning": {
+    "name": "Insights & learning",
+    "description": "Run insights, recommendations and statistics per block type."
+  },
+  "memory": {
+    "name": "Workflow memory",
+    "description": "Knowledge collected from finished runs and injected into later runs."
+  },
+  "audit": {
+    "name": "Audit center",
+    "description": "Findings from audit workflows, with reports and promotion to TODOs."
+  },
+  "bpmn": {
+    "name": "BPMN export/import",
+    "description": "Exports workflows as BPMN and reads MySuricates BPMN exports back in."
+  },
+  "integrations": {
+    "name": "Integrations",
+    "description": "External services (GitHub, Jira, Trello, Google, Confluence, Taskwarrior) via OAuth, plus integration blocks, TODO tracker export and calendar."
+  },
+  "webhooks": {
+    "name": "Webhooks",
+    "description": "Inbound webhook triggers that start workflows from outside."
+  },
+  "remote-access": {
+    "name": "Remote access",
+    "description": "Remote access to this instance via Tailscale."
+  },
+  "terminal": {
+    "name": "Run terminal",
+    "description": "Interactive terminal into a run's container over WebSocket."
+  },
+  "staging": {
+    "name": "Stable & test instances",
+    "description": "Stable and test instances in Docker, including definition sync between instances."
+  },
+  "conversion": {
+    "name": "Run → workflow conversion",
+    "description": "Turns a finished run into a reusable workflow."
+  },
+  "dialog-import": {
+    "name": "Dialog import",
+    "description": "Imports a chat dialog and converts it into a workflow."
+  },
+  "onboarding-profiles": {
+    "name": "Onboarding profiles",
+    "description": "Onboarding profiles for projects."
+  },
+  "skills": {
+    "name": "Skills",
+    "description": "Skill packages and the skill-capability block type."
+  },
+  "debug": {
+    "name": "Workflow debugger",
+    "description": "Runs a workflow step by step so you can follow what happens."
+  },
+  "factory": {
+    "name": "Workflow factory",
+    "description": "Generates workflows from a description and repairs failing ones on its own."
+  },
+  "wishes": {
+    "name": "Wishes",
+    "description": "Decomposes free-text goals into workflows and chains."
+  },
+  "provenance": {
+    "name": "Definition hash & run provenance",
+    "description": "Every run records a SHA-256 hash of the workflow definition, its version and the trigger source."
+  },
+  "sealing": {
+    "name": "Sealed workflows",
+    "description": "Sealed definitions reject edits and refuse to run once they have been tampered with."
+  },
+  "require-sealed-for-unattended": {
+    "name": "Unattended runs only when sealed",
+    "description": "Unattended runs (schedules, webhooks, triggers, auto-repair, wishes and the chains or sub-workflows they start) only start sealed workflows."
+  },
+  "webhook-signatures": {
+    "name": "Webhook signatures (HMAC)",
+    "description": "Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."
+  }
+}

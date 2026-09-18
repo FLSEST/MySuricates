@@ -5,6 +5,7 @@ import type { BadgeVariant } from '../ui/Badge';
 import { ConfigSnippet } from './ConfigSnippet';
 import { useResetModule, useSetModuleEnabled, useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
+import { useModuleName } from '../../i18n/modules';
 import { envSnippet, yamlSnippet } from '../../utils/moduleSnippets';
 import type { ModuleInfo, ModuleMaturity } from '../../types';
 
@@ -89,6 +90,7 @@ function ModuleGroup({ title, modules, editable, note }: {
 
 function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: boolean }) {
   const t = useT();
+  const moduleName = useModuleName();
   const [open, setOpen] = useState(false);
   const setEnabled = useSetModuleEnabled();
   const reset = useResetModule();
@@ -110,7 +112,7 @@ function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: bool
             className={`w-2 h-2 rounded-full shrink-0 ${m.enabled ? 'bg-success' : 'bg-text-tertiary'}`}
             aria-label={onOff(m.enabled)}
           />
-          <span className="text-sm font-medium text-text">{t.modules.names[m.name]}</span>
+          <span className="text-sm font-medium text-text">{moduleName(m.name)}</span>
           <span className="text-xs text-text-tertiary">{onOff(m.enabled)}</span>
           {m.overridden && <Badge variant="warning">{t.modules.overridden}</Badge>}
           <span className="ml-auto flex flex-wrap gap-1.5">
@@ -122,7 +124,7 @@ function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: bool
         {editable && (
           <Toggle
             enabled={m.enabled}
-            ariaLabel={t.modules.switchLabel.replace('{name}', t.modules.names[m.name])}
+            ariaLabel={t.modules.switchLabel.replace('{name}', moduleName(m.name))}
             disabled={setEnabled.isPending || reset.isPending}
             onChange={(enabled) => setEnabled.mutate({ name: m.name, enabled })}
           />
@@ -133,7 +135,7 @@ function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: bool
           <p className="text-xs text-text-secondary">{m.description}</p>
           {m.requires.length > 0 && (
             <p className="text-xs text-text-secondary">
-              {t.modules.requires}: {m.requires.map((r) => t.modules.names[r]).join(', ')}
+              {t.modules.requires}: {m.requires.map((r) => moduleName(r)).join(', ')}
             </p>
           )}
           {m.overridden && (

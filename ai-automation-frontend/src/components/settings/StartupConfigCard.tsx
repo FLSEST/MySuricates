@@ -3,6 +3,7 @@ import { Card, Badge } from '../ui';
 import { ConfigSnippet } from './ConfigSnippet';
 import { useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
+import { useModuleName } from '../../i18n/modules';
 import type { ModuleInfo } from '../../types';
 
 const SETUP_COMMAND = './scripts/setup.sh --preset <core|research|full>';
@@ -61,6 +62,7 @@ export function StartupConfigCard() {
 
 function ModuleStateList({ title, modules }: { title: string; modules: ModuleInfo[] }) {
   const t = useT();
+  const moduleName = useModuleName();
   if (modules.length === 0) return null;
   return (
     <div>
@@ -76,7 +78,7 @@ function ModuleStateList({ title, modules }: { title: string; modules: ModuleInf
               className={`w-2 h-2 rounded-full shrink-0 ${m.enabled ? 'bg-success' : 'bg-text-tertiary'}`}
               aria-hidden="true"
             />
-            <span className="text-text">{t.modules.names[m.name]}</span>
+            <span className="text-text">{moduleName(m.name)}</span>
             <span className="text-xs text-text-tertiary">{m.enabled ? t.modules.enabled : t.modules.disabled}</span>
           </li>
         ))}
