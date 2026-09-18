@@ -175,7 +175,7 @@ ActivityLog (unabhaengig)
 
 ### Datenbank-Migrationen (Flyway, aktuell V1-V73)
 
-Die folgende Tabelle beschreibt das Grundschema (V1-V19). Spaetere Migrationen bis V73 ergaenzen Spalten, Indizes und Tabellen; die Liste steht unter `src/main/resources/db/migration/`.
+Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V73 ergaenzen ueberwiegend Spalten und Indizes an diesen Tabellen sowie einzelne neue Tabellen; die vollstaendige Liste steht unter `src/main/resources/db/migration/`.
 
 | Migration | Tabelle | Beschreibung |
 |---|---|---|

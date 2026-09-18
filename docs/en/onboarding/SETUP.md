@@ -189,14 +189,11 @@ cd ai-automation-backend
 mvn test
 ```
 
-As of 2026-09-18, `src/test/java` holds 715 test classes (`find src/test/java \( -name '*Test.java' -o -name '*Tests.java' \) | wc -l`), split into:
-- **Service tests** (299): Unit tests for business logic
-- **Integration tests** (77): Spring context against a file-based SQLite DB
-- **Executor tests** (44): Tests for block execution logic
-- **Controller tests** (43): Tests for REST endpoints
-- **Security tests** (8): API key, rate limiting
+As of 2026-09-18, `src/test/java` holds 715 test classes. That number ages -- re-measure rather than quote it:
 
-These numbers age -- re-measure rather than quote them.
+```bash
+find src/test/java \( -name '*Test.java' -o -name '*Tests.java' \) | wc -l
+```
 
 ### Frontend (Vitest + Cypress E2E)
 
@@ -209,6 +206,13 @@ npm test
 # E2E -- prerequisite: backend must be running!
 npm run test:e2e    # Headless
 npm run cy:open     # Interactive
+```
+
+As of 2026-09-18: 114 Vitest files under `src/` and 19 Cypress specs under `cypress/e2e/`. Re-measure with:
+
+```bash
+find src \( -name '*.test.ts' -o -name '*.test.tsx' \) | wc -l
+ls cypress/e2e | wc -l
 ```
 
 > **Note:** Cypress automatically detects the API key from the SQLite database (see `cypress.config.ts`).

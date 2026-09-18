@@ -263,7 +263,7 @@ Dieses Pattern wird in allen Hook-Dateien unter `src/hooks/` konsistent angewend
 
 **Pfad:** `ai-automation-frontend/src/App.tsx`
 
-**Zweck:** Root-Komponente mit React Router v6 Konfiguration und Code-Splitting.
+**Zweck:** Root-Komponente mit React Router v7 Konfiguration und Code-Splitting.
 
 **Routing-Struktur:**
 ```typescript

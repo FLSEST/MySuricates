@@ -265,7 +265,7 @@ This pattern is applied consistently across all hook files under `src/hooks/` (a
 
 **Path:** `ai-automation-frontend/src/App.tsx`
 
-**Purpose:** Root component with React Router v6 configuration and code splitting.
+**Purpose:** Root component with React Router v7 configuration and code splitting.
 
 **Routing structure:**
 ```typescript
