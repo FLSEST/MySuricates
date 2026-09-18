@@ -26,6 +26,9 @@ export default defineConfig(() => {
   return {
     define: {
       __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+      // Shim für sockjs-client, das bare `global` referenziert (siehe node_modules/sockjs-client/lib/*.js).
+      // Ersetzt das bisherige Inline-<script>var global = globalThis;</script> in index.html (CSP-Verstoß).
+      global: 'globalThis',
     },
     plugins: [
       react(),
