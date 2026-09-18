@@ -1980,6 +1980,13 @@ export const de: TranslationKeys = {
     disabledPageHowTo: 'Zum Einschalten in die Backend-Konfiguration eintragen und neu starten:',
     disabledPageSettingsLink: 'Alle Module',
   },
+  startupConfig: {
+    title: 'Startkonfiguration',
+    subtitle: 'Rein lesende Übersicht, mit welcher Konfiguration diese Instanz gestartet wurde (GET /api/v1/system/capabilities). Hier lässt sich nichts aus der App heraus ändern — Konfiguration bearbeiten und neu starten, oder den Befehl unten nutzen.',
+    uiEditableLabel: 'Über die Einstellungen schaltbar',
+    uiEditableRisk: 'Jeder mit API-Key kann Funktionsmodule hier schalten. Auf öffentlich erreichbaren Instanzen ausgeschaltet lassen.',
+    setupCommand: 'Preset ändern',
+  },
   commandPalette: {
     placeholder: 'Was willst du machen?',
     workflows: 'Workflows',
