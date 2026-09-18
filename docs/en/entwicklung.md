@@ -19,18 +19,16 @@ Docker is only needed for container-execution workflow blocks — the backend bo
 ### Starting the Backend
 
 ```bash
-cd ai-automation-backend
-
-# Download dependencies and compile
-mvn clean compile
-
-# Start (port 9090)
-mvn spring-boot:run
-
-# Alternative: build JAR and run
-mvn clean package -DskipTests
-java -jar target/ai-automation-backend-0.7.3-SNAPSHOT.jar
+# From the repo root — builds a fat JAR, copies it to ~/.local/state/autotrigger-dev/runtime/
+# and starts it from there (port 9090). Idempotent; also starts the frontend.
+scripts/start-autotrigger-dev.sh            # start
+scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build JAR → start
+scripts/start-autotrigger-dev.sh stop
 ```
+
+`mvn spring-boot:run` is **deliberately blocked**: the backend aborts at startup from `target/classes`
+with a message (`RuntimeClasspathGuard`), see [Builds next to the running dev backend](#builds-next-to-the-running-dev-backend).
+Escape hatch for special cases: `-Dautomation.runtime.allow-classes-dir=true`.
 
 The backend automatically creates `data/automation.db` on first start and runs Flyway migrations.
 
@@ -52,7 +50,7 @@ The Vite dev server automatically proxies `/api/*` and `/ws/*` to `localhost:909
 
 Terminal 1 (Backend):
 ```bash
-cd ai-automation-backend && mvn spring-boot:run
+scripts/start-autotrigger-dev.sh
 ```
 
 Terminal 2 (Frontend):
@@ -112,15 +110,34 @@ docker compose --profile build-only build
 
 ## Builds next to the running dev backend
 
-The dev backend (`mvn spring-boot:run`) runs with `-cp target/classes` — a **directory**, not a
-JAR. The JVM lazily loads classes from disk for its entire lifetime.
+The dev backend runs from a **JAR copy** at `~/.local/state/autotrigger-dev/runtime/current.jar`
+(`scripts/start-autotrigger-dev.sh`), not from `target/classes`. Reason: a JVM with `-cp target/classes`
+lazily loads classes from disk for its entire lifetime. Any build that rewrites this directory pulls
+the classes out from under it → `NoClassDefFoundError`, sticky (the JVM caches the resolution
+failure), only a restart heals it. There were three writers: Maven from workflows/sessions
+(2026-07-27: eleven dead runs), `staging.sh`, and the **IDE** — VS Code's Java extension (Eclipse
+compiler) deleted the javac helper classes for enum switches overnight on 2026-09-13 (three dead
+scheduled runs) and replaced MapStruct implementations with error stubs the following morning (498
+false test errors).
 
-A second Maven run in the same checkout rewrites `target/classes` and pulls the classes out from
-under the running JVM → `NoClassDefFoundError`. The failure is **sticky** (the classloader caches
-the load failure); only a restart heals it. On 2026-07-27 eleven workflow runs died this way.
+Three protection layers, all mechanical:
 
-**Rule:** No `mvn` and no `npm run build` in the main checkout while the dev backend is running.
-Instead:
+1. **JAR copy** — `restart` builds `mvn clean package -DskipTests`, copies the JAR into the state
+   folder (name `backend-<time>-<sha>[-dirty].jar`, the last two are kept) and starts `java -jar` with
+   cwd `ai-automation-backend` (`./data/automation.db` stays put). `restart` checks via the API
+   beforehand whether workflow runs are active and aborts if so (`--force` overrides).
+2. **IDE profile** — the `pom.xml` profile `ide-eclipse-output` (active only when m2e sets the
+   `m2e.version` property) places the IDE build under `target-ide/`. VS Code/Eclipse therefore never
+   write into `target/`. Check with: `mvn help:evaluate -Dexpression=project.build.directory -DforceStdout -Dm2e.version=1.0`.
+3. **Fail-fast** — `RuntimeClasspathGuard` in `AiAutomationApplication.main` aborts a start from
+   `target/classes` with exit code 2. `/api/v1/system/info` shows `runtimeMode` (`jar` |
+   `classes-dir`); in the escape-hatch case (`-Dautomation.runtime.allow-classes-dir=true` or
+   `AUTOMATION_ALLOW_CLASSES_DIR=true`) the ActivityLog warns on startup.
+
+This makes `mvn test`, `mvn clean`, and `npm run build` in the main checkout harmless for the running
+backend. **For workflows, the QA worktree remains the right place**, because two concurrent Maven
+runs in the same `target/` (e.g. a scheduled run + a Claude session) produce incorrect results for
+each other:
 
 ```bash
 WT=$(scripts/qa-worktree.sh prepare)   # creates/syncs ~/.mysuricates/qa-worktree/autotrigger to HEAD
@@ -129,8 +146,8 @@ cd "$WT/ai-automation-backend" && mvn test
 
 The worktree is detached at the main checkout's `HEAD` and persists between runs (`target/` and
 `node_modules/` are reused). **Uncommitted changes are not included** — whatever runs there tests
-the committed state. The "AutoPilot Backend Quality Gate" workflow uses exactly this worktree. The
-same rule applies to `./scripts/staging.sh test-promote`, which runs `mvn clean` in the main checkout.
+the committed state. The "AutoPilot Backend Quality Gate" and "self-care-platform-health" workflows
+use exactly this worktree.
 
 ## Tests
 
@@ -156,6 +173,8 @@ The tests use `spring-boot-starter-test` (JUnit 5, MockMvc) and `spring-security
 **No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
 
 **Integration encryption key pinned to a temp path in the test profile:** Since 2026-09-12, just like `integration.db.path`, `IntegrationTestDbSessionListener` also sets `integration.key.path` (a per-JVM temp file, deleted on teardown), which `application-integration.yml`'s `automation.integration.key-file` points to — without this pin, `IntegrationEncryptionService.init()` would generate a fresh AES key into the developer's real `~/.autotrigger/` on every `@SpringBootTest` with empty `app_settings` (happened 2026-08-06, shadowing the real key for months).
+
+**Backups disabled and pinned to a temp directory in the test profile:** The same trap a third time (2026-09-13): `automation.backup` defaults to `enabled: true` and `directory: ${user.home}/.autotrigger/backups/dev`, and `application-integration.yml` did not override either — every Spring context of an integration test backed up its throwaway test DB into the real Dev backup directory on startup, rotating away real backups in the process (retain count 30). Since then the test profile sets `automation.backup.enabled: false` and points `directory` at `integration.backup.dir`, which `IntegrationTestDbSessionListener` points at a temp directory per test JVM and deletes recursively at session end. The rotation in `DatabaseBackupService` is additionally hardened: it only counts and deletes files matching its own naming scheme `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manual copies or foreign `.db` files in the same directory stay visible but are never rotated. Check: `ls ~/.autotrigger/backups/dev | wc -l` must stay the same before and after `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest`.
 
 ### Frontend Tests
 
@@ -368,7 +387,7 @@ The backend comprises **38 REST controllers** and **19 block types**:
 
 **Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`
 
-**Flyway migrations:** V1–V68 (SQLite)
+**Flyway migrations:** V1–V69 (SQLite)
 
 ### Gate Status System
 
@@ -438,6 +457,12 @@ What is checked:
 6. **`.gitignore` gives away no private filenames.** The file is tracked and ships with the
    publication — comments included. If it names something listed in `.git/info/exclude`, that is a
    violation. CI has no exclude file, so the check simply does not fire there.
+7. **Symlinks that point outside the repository.** Tracked (or staged) links with an absolute
+   target, or a relative target above the repo root, are an error. `git grep` does not read symlink
+   blobs, so check 2 does not catch a developer path inside the link target; also, such a link points
+   at the original checkout instead of its own tree in every clone, worktree and run snapshot.
+   Example: `ai-automation-backend/workflow-pool` must point at `../workflow-pool`, because the
+   backend runs with cwd `ai-automation-backend/` and resolves the pool relatively.
 
 `scripts/install-hooks.sh` installs the hook via `core.hooksPath` (and runs as part of `setup.sh`).
 
@@ -449,8 +474,9 @@ staged first.
 
 ## Dependency advisories (frontend)
 
-`npm audit` in the frontend reported twenty vulnerabilities on 2026-09-12. After the update seven
-remain, all without a fix available inside the declared version ranges.
+`npm audit` in the frontend reports **0 vulnerabilities** after the updates from 2026-09-12.
+After an initial reduction from twenty to seven, the two remaining major upgrades were carried
+out as well.
 
 **Cleared:** the runtime chain first. `dompurify` arrived via `@monaco-editor/react` →
 `monaco-editor` and sat at 3.4.12, the upper edge of the vulnerable range (GHSA-55q2-fjhq-7xh7,
@@ -458,15 +484,16 @@ XSS through a detached subtree). A plain update does not move it because an `ove
 the version — that entry is now `^3.4.13`, installed is 3.4.15. Then `npm audit fix` without
 `--force` for everything else in range.
 
-**Deliberately open:**
+**Further updates:**
 
-| Package | Why it stays |
+| Package | Update |
 |---|---|
-| `cypress` and its transitives (`@cypress/request`, `uuid`, `extract-zip`, `qs`) | The fix is Cypress 15, a major bump. Pure test tooling, it does not run in the shipped frontend or in CI. Separate task. |
-| `react-router-dom` / `react-router` | Open redirect via backslash in `<Link>` and `useNavigate` (up to 7.17.0). The fix is react-router-dom 7, a framework migration. **The reachable path is closed at the source instead:** the assistant renders LLM text as markdown and used to pass any `href` starting with `/` to `navigate()` — `/\evil.example` would have left the app. `isInternalAppPath()` in `src/components/assistantPanelUtils.ts` rejects protocol-relative and backslash paths, with a test. |
+| `cypress` and its transitives | Cypress 15.21.1 replaces the vulnerable dependencies of Cypress 13; `qs` is updated too. |
+| `react-router-dom` / `react-router` | Version 7.18.3 fixes the reported router findings. The existing protection `isInternalAppPath()` against protocol-relative and backslash paths stays in place. |
 
-Re-check with `npm audit`; after the cleanup `npm run build`, `npm test` and `npx tsc --noEmit`
-are green and `npm run lint` is unchanged at 0 errors.
+Re-check with `npm audit`, `npm test` and `npm run build` (including the TypeScript check).
+Cypress 15 requires Node.js 20/22/24+ and, on Linux, glibc >= 2.31;
+see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-simple-upgrade-paths-from-13-and-14).
 
 ## Known Limitations
 
