@@ -328,12 +328,22 @@ check "Dateigroesse der DB bleibt erlaubt"     '! grep -q "db-filesize-ok" <<<"$
 check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$OUT"'
 check "API-Praefix als Suchmuster erlaubt"     '! grep -q "api-prefix-as-marker-ok" <<<"$OUT"'
 
-echo "13) Die Blocktyp-Liste des Gates deckt sich mit der Registry im Backend"
+echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
+# Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern
+# wird von BlockTypesGateListTest aus BlockTypesIndexSection.BLOCK_TYPES erzeugt.
+# Dieser Check ist damit der Drift-Test ohne Maven: rot, wenn eine Seite geaendert
+# wurde, ohne die Datei neu zu erzeugen.
 REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"
+GENERATED_TYPES="$REPO/scripts/lib/block-types.generated.sh"
 JAVA_TYPES="$(grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("//;s/"//' | sort | tr '\n' ' ')"
 # shellcheck source=../lib/hygiene-rules.sh
 . "$REPO/scripts/lib/hygiene-rules.sh"
 GATE_TYPES="$(printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]:-}" | sort | tr '\n' ' ')"
+check "erzeugte Blocktyp-Datei vorhanden"      '[ -f "$GENERATED_TYPES" ]'
+check "Datei als erzeugt gekennzeichnet" \
+  'grep -q "generiert von BlockTypesGateListTest" "$GENERATED_TYPES"'
+check "Liste kommt aus der erzeugten Datei, nicht aus hygiene-rules.sh" \
+  '! grep -qE "^HYGIENE_POOL_BLOCK_TYPES=\(" "$REPO/scripts/lib/hygiene-rules.sh"'
 check "Registry-Liste nicht leer"              '[ -n "$JAVA_TYPES" ]'
 check "Gate-Liste deckt sich mit der Registry" '[ "$JAVA_TYPES" = "$GATE_TYPES" ]'
 

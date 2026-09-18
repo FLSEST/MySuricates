@@ -87,11 +87,12 @@ HYGIENE_POOL_SCOPES=("repo" "portable")
 # (dort selbst gegen die BlockExecutor-Klassen gepinnt, BlockTypeListsGuardTest).
 # scripts/tests/test-public-hygiene.sh vergleicht beide Listen — driftet eine,
 # fällt es dort auf.
-HYGIENE_POOL_BLOCK_TYPES=(
-  agentic approval compress compress-ai conditional document foreach
-  human-input integration retry shell simple skill-capability sub-workflow
-  switch todo-close todo-create todo-update while
-)
+# HYGIENE_POOL_BLOCK_TYPES steht nicht hier, sondern kommt aus der generierten
+# Datei daneben (Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend, erzeugt
+# von BlockTypesGateListTest). Vorher war die Liste handgepflegt und wurde erst
+# nachtraeglich von Check 13 der Hygiene-Tests verglichen — ein neuer Blocktyp
+# fiel also erst auf, wenn jemand diese Tests laufen liess (TODO bdc784e1).
+# Eingelesen wird sie unten zusammen mit pool-sanitizer.generated.sh.
 
 # Kennzeichen, an denen ein Eintrag an DIESES Repository gebunden ist. In einem
 # Eintrag mit scope: portable sind sie ein Befund — wer ihn in sein eigenes
@@ -115,6 +116,14 @@ if [ -f "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh" ]; then
   . "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh"
 else
   echo "FEHLER: scripts/lib/pool-sanitizer.generated.sh fehlt (erzeugt von PoolSanitizerKeysTest)." >&2
+  return 2 2>/dev/null || exit 2
+fi
+
+if [ -f "$HYGIENE_RULES_DIR/block-types.generated.sh" ]; then
+  # shellcheck source=block-types.generated.sh
+  . "$HYGIENE_RULES_DIR/block-types.generated.sh"
+else
+  echo "FEHLER: scripts/lib/block-types.generated.sh fehlt (erzeugt von BlockTypesGateListTest)." >&2
   return 2 2>/dev/null || exit 2
 fi
 
