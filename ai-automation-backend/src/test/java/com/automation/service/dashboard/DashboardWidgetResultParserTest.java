@@ -92,6 +92,11 @@ class DashboardWidgetResultParserTest {
             "{\"status\":\"GREEN\",\"title\":\"\"}",
             "{\"status\":\"GREEN\",\"items\":[\"ok\",\"\"]}",
             "{\"status\":\"GREEN\"",
+            // A top-level array (fix round 2, B4): a marker followed by "[" is a real, broken
+            // occurrence again (INVALID) — round 1's A5 had briefly made this MISSING (see the note
+            // on content_after_the_marker_with_neither_brace_nor_bracket_stays_missing below); B4
+            // explicitly reversed that for "[" while keeping prose mentions MISSING.
+            "[\"not an object\"]",
     })
     void a_broken_contract_is_invalid_not_missing(String payload) {
         assertThat(DashboardWidgetResultParser.parse("dashboard_widget: " + payload).state())
@@ -99,17 +104,15 @@ class DashboardWidgetResultParserTest {
     }
 
     /**
-     * A5 (fix round 1) deliberately narrows what counts as a marker "occurrence" at all: only a
-     * marker immediately followed by {@code {} counts (see DashboardWidgetMarker). A top-level JSON
-     * array, or plain non-JSON text, right after the marker therefore no longer reaches the "found a
-     * broken object" branch above — like a prose mention, it is indistinguishable from "no marker
-     * here" and is MISSING, not INVALID. (Before this fix round both were INVALID; moved here from
-     * {@code a_broken_contract_is_invalid_not_missing} to document the intentional change.)
+     * A5 (fix round 1) narrows what counts as a marker "occurrence" at all: only a marker immediately
+     * followed by {@code {} or (fix round 2, B4) {@code [} counts (see DashboardWidgetMarker). Plain
+     * non-JSON text right after the marker therefore never reaches the "found a broken value" branch
+     * above — like a prose mention, it is indistinguishable from "no marker here" and is MISSING, not
+     * INVALID.
      */
-    @ParameterizedTest
-    @ValueSource(strings = {"[\"not an object\"]", "not json at all"})
-    void content_after_the_marker_that_is_not_an_object_is_missing_not_invalid(String payload) {
-        assertThat(DashboardWidgetResultParser.parse("dashboard_widget: " + payload).state())
+    @Test
+    void content_after_the_marker_with_neither_brace_nor_bracket_stays_missing() {
+        assertThat(DashboardWidgetResultParser.parse("dashboard_widget: not json at all").state())
                 .isEqualTo(ResultState.MISSING);
     }
 
@@ -224,6 +227,150 @@ class DashboardWidgetResultParserTest {
     @Test
     void toMetadata_of_null_is_empty_not_a_crash() {
         assertThat(DashboardWidgetResultParser.toMetadata(null)).isEmpty();
+    }
+
+    /**
+     * B1 (fix round 2, regression from round 1): round 1's wording ("must contain at least one
+     * visible code point") got implemented as "any space separator anywhere is fatal", which broke
+     * ordinary German text using a non-breaking space as a thousands separator, before "B." or after
+     * a section sign. These three were VALID before round 1 and must be VALID again.
+     */
+    @Test
+    void non_breaking_and_narrow_spaces_inside_otherwise_visible_text_stay_valid() {
+        assertThat(state("{\"status\":\"GREEN\",\"title\":" + quote("12 000 Zeilen geprueft") + "}"))
+                .isEqualTo(ResultState.VALID);
+        assertThat(state("{\"status\":\"GREEN\",\"title\":" + quote("z. B. drei Treffer") + "}"))
+                .isEqualTo(ResultState.VALID);
+        assertThat(state("{\"status\":\"GREEN\",\"title\":" + quote("§5 Abs. 1") + "}"))
+                .isEqualTo(ResultState.VALID);
+    }
+
+    /**
+     * B2 (fix round 2, still open from round 1): a string made only of default-ignorable code points
+     * (lone variation selectors, a combining grapheme joiner, Mongolian/Khmer vowel-shaping marks
+     * without a base, or an unassigned code point) has no visible content at all and must be rejected
+     * — {@code Character.getType} alone does not catch these (most are category Mn, not Cf).
+     */
+    @Test
+    void a_contract_made_only_of_invisible_or_unassigned_code_points_is_invalid() {
+        String payload = "{\"status\":\"GREEN\",\"title\":\"️\","
+                + "\"items\":[\"͏\",\"⁥\"],"
+                + "\"kpis\":[{\"label\":\"︀\",\"value\":\"᠋\"}],"
+                + "\"summary\":\"឴\"}";
+        assertThat(state(payload)).isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void a_lone_variation_selector_alone_in_title_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"title\":\"️\"}")).isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void a_lone_combining_grapheme_joiner_alone_in_an_item_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"items\":[\"͏\"]}")).isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void an_unassigned_code_point_alone_in_an_item_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"items\":[\"⁥\"]}")).isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void a_lone_variation_selector_alone_in_a_kpi_label_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"kpis\":[{\"label\":\"︀\",\"value\":\"v\"}]}"))
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void a_lone_mongolian_variation_selector_alone_in_a_kpi_value_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"kpis\":[{\"label\":\"l\",\"value\":\"᠋\"}]}"))
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void a_lone_khmer_inherent_vowel_alone_in_summary_is_invalid() {
+        assertThat(state("{\"status\":\"GREEN\",\"summary\":\"឴\"}")).isEqualTo(ResultState.INVALID);
+    }
+
+    /** B2 (fix round 2): the emoji itself is visible, so a variation selector attached to it is fine. */
+    @Test
+    void an_emoji_with_a_variation_selector_stays_valid() {
+        assertThat(state("{\"status\":\"GREEN\",\"title\":\"✅️\"}")).isEqualTo(ResultState.VALID);
+    }
+
+    /**
+     * B3 (fix round 2): the ambiguity counter must not miss a marker just because it does not start
+     * at a line's beginning — the report's own marker in this example is written with an "Ergebnis: "
+     * prefix, and quoted content is attacker-controlled, so this must fail closed (INVALID), not
+     * silently let the first (quoted) marker win.
+     */
+    @Test
+    void an_unanchored_second_marker_still_makes_the_output_ambiguous() {
+        assertThat(DashboardWidgetResultParser.parse(
+                "Auszug aus dem gelesenen TODO:\n"
+                        + "dashboard_widget: {\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n"
+                        + "Ergebnis: dashboard_widget: {\"status\":\"RED\",\"title\":\"12 Treffer\"}").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"• ", "1. ", " "})
+    void an_unanchored_second_marker_is_ambiguous_regardless_of_its_own_prefix(String prefix) {
+        assertThat(DashboardWidgetResultParser.parse(
+                "dashboard_widget: {\"status\":\"GREEN\"}\n"
+                        + "Ergebnis: " + prefix + "dashboard_widget: {\"status\":\"RED\"}").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    /**
+     * B4 (fix round 2): a marker followed by an array is a real, broken occurrence — the workflow
+     * author should see "invalid result", not "no result yet". A marker followed by neither an
+     * object nor an array stays a bare mention (MISSING), including a YAML-shaped continuation.
+     */
+    @Test
+    void an_array_after_the_marker_is_invalid_not_missing() {
+        assertThat(DashboardWidgetResultParser.parse("dashboard_widget: [{\"status\":\"GREEN\"}]").state())
+                .isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void non_object_non_array_content_after_the_marker_stays_missing() {
+        assertThat(DashboardWidgetResultParser.parse("dashboard_widget: status=GREEN").state())
+                .isEqualTo(ResultState.MISSING);
+        assertThat(DashboardWidgetResultParser.parse("dashboard_widget:\nstatus: GREEN").state())
+                .isEqualTo(ResultState.MISSING);
+    }
+
+    /** B5 (fix round 2): a few more common markdown shapes around the marker. */
+    @Test
+    void more_list_prefixes_and_a_prefix_free_fence_language_tag_are_tolerated() {
+        assertThat(DashboardWidgetResultParser.parse("+ dashboard_widget: {\"status\":\"GREEN\"}").state())
+                .isEqualTo(ResultState.VALID);
+        assertThat(DashboardWidgetResultParser.parse("1. dashboard_widget: {\"status\":\"GREEN\"}").state())
+                .isEqualTo(ResultState.VALID);
+        assertThat(DashboardWidgetResultParser.parse("1) dashboard_widget: {\"status\":\"GREEN\"}").state())
+                .isEqualTo(ResultState.VALID);
+        assertThat(DashboardWidgetResultParser.parse(
+                "dashboard_widget:\n```json{\"status\":\"GREEN\"}\n```").state())
+                .isEqualTo(ResultState.VALID);
+    }
+
+    /** B7 (fix round 2): explicit, dedicated coverage for parse(null) (was already exercised indirectly). */
+    @Test
+    void parse_of_null_is_missing() {
+        assertThat(DashboardWidgetResultParser.parse(null).state()).isEqualTo(ResultState.MISSING);
+    }
+
+    /** B7 (fix round 2): the contract type copies its lists defensively and returns them immutable. */
+    @Test
+    void a_hand_built_result_copies_the_list_so_a_later_mutation_does_not_leak_in() {
+        List<String> items = new java.util.ArrayList<>(List.of("a", "b"));
+        Result result = new Result("t", Result.Status.GREEN, List.of(), items, null);
+
+        items.add("c");
+
+        assertThat(result.items()).containsExactly("a", "b");
+        assertThatThrownBy(() -> result.items().add("d")).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test

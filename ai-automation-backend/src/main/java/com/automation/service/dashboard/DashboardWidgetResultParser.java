@@ -24,22 +24,42 @@ import java.util.Set;
  * <p>The parser does <b>not</b> filter markup. {@code <script>} stays ordinary text inside the
  * contract; it is harmless because the frontend renders contract values only as React text nodes.
  * What the parser does reject is structure it does not know (unknown fields, wrong types), anything
- * over its limits, and characters that make text read differently than it looks (control, format,
- * separator, surrogate and private-use code points — zero width and bidi overrides included; fix
- * round 1, A1: also every space-like separator except the ordinary U+0020, and the known invisible
- * filler letters/symbols U+2800, U+3164, U+115F, U+1160, U+FFA0). Combining-mark floods ("Zalgo") and
- * strong-RTL letters reordering neutral neighbours remain possible within the length caps — both are
- * accepted, bounded by the caps, because real i18n text needs them.
+ * over its limits, and text that cannot be trusted to read as it looks. Two different rules apply on
+ * purpose here (fix round 2, B1+B2 — round 1's wording, "must contain at least one visible code
+ * point", got implemented as "any space separator anywhere is fatal", which is a different and
+ * stricter rule that broke ordinary German text such as "12 000", "z. B." or "§ 5"):
+ * <ol>
+ *   <li><b>Fatal anywhere in the string</b> — rejects the whole contract regardless of what else is
+ *       there, unchanged since round 1: control (Cc) and format (Cf, zero width, BOM, bidi overrides
+ *       included) characters, line/paragraph separators, lone surrogates, private-use code points.</li>
+ *   <li><b>Not visible, but merely excluded from counting</b> — legal anywhere in the string; a
+ *       string is valid only if, after trimming, at least one of its code points is neither in this
+ *       class nor an ordinary U+0020 space: every {@code SPACE_SEPARATOR} other than U+0020 (so a
+ *       non-breaking, figure or narrow no-break space no longer breaks a thousands separator or an
+ *       abbreviation), the known invisible filler letters/symbols (U+2800, U+3164, U+115F, U+1160,
+ *       U+FFA0), the non-Cf default-ignorable code points (U+034F, U+17B4–U+17B5, U+180B–U+180F,
+ *       U+FE00–U+FE0F, U+E0100–U+E01EF — a lone variation selector or vowel-shaping mark without a
+ *       base character; most of these are category Mn, not Cf, so plain {@code Character.getType}
+ *       classification alone does not catch them), and unassigned code points.</li>
+ * </ol>
  *
  * <p>No numbers exist in the contract: a KPI value is a string, so {@code NaN}, {@code Infinity} or
  * {@code 1e400} can never reach a widget — a number where a string belongs is simply a violation.
  *
+ * <p>Accepted as a residual risk, bounded by the length caps, because real i18n text needs them and
+ * they cannot be told apart from hostile use by code point alone: combining-mark floods ("Zalgo" —
+ * ordinary combining marks outside the specific default-ignorable ranges above count as visible), and
+ * a variation selector or strong-RTL letter attached to a visible base character (an emoji plus its
+ * presentation selector, e.g. {@code "✅️"}, stays legal because the emoji itself is visible).
+ *
  * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own JsonMapper
  * so Spring's Jackson customisation can never change what counts as valid. The mapper (fix round 1,
- * A3) is pinned explicitly rather than relying on Jackson defaults: duplicate keys and trailing
- * tokens are rejected, and stream-read constraints (nesting depth, string length) are capped so a
- * pathological payload throws a normal, caught exception instead of risking a {@link StackOverflowError}
- * that {@code catch (Exception e)} would not stop.
+ * A3) is pinned explicitly rather than relying on Jackson defaults: duplicate keys are rejected, and
+ * stream-read constraints (nesting depth, string length) are capped so a pathological payload throws
+ * a normal, caught exception instead of risking a {@link StackOverflowError} that
+ * {@code catch (Exception e)} would not stop. {@code FAIL_ON_TRAILING_TOKENS} cannot fire today —
+ * {@link DashboardWidgetMarker} hands {@link #parse} exactly one balanced-brace substring — it is
+ * kept as defence-in-depth in case a future caller feeds the mapper raw, unscanned text.
  */
 public final class DashboardWidgetResultParser {
 
@@ -74,13 +94,6 @@ public final class DashboardWidgetResultParser {
 
     private static final Set<String> RESULT_FIELDS = Set.of("title", "status", "kpis", "items", "summary");
     private static final Set<String> KPI_FIELDS = Set.of("label", "value", "trend");
-
-    /**
-     * Filler code points that are individually legal Unicode (not control/format/separator) but
-     * render as blank: HANGUL FILLER and its choseong/jungseong siblings, HALFWIDTH HANGUL FILLER,
-     * and BRAILLE PATTERN BLANK. See the class javadoc, A1.
-     */
-    private static final Set<Integer> INVISIBLE_FILLERS = Set.of(0x2800, 0x3164, 0x115F, 0x1160, 0xFFA0);
 
     /** VALID carries the result, MISSING means "no marker", INVALID means "marker, but not the contract". */
     public record ParseResult(ResultState state, Result result) {
@@ -245,7 +258,10 @@ public final class DashboardWidgetResultParser {
         }
     }
 
-    /** A contract string: trimmed, non-empty, within its cap and free of invisible/blank characters. */
+    /**
+     * A contract string: trimmed, non-empty, within its cap, free of fatal characters, and (fix
+     * round 2, B1+B2) with at least one visible code point remaining — see the class javadoc.
+     */
     private static String text(JsonNode node, int max, boolean required) {
         if (node == null || node.isNull()) {
             if (required) {
@@ -260,33 +276,12 @@ public final class DashboardWidgetResultParser {
         if (value.isEmpty() || value.length() > max) {
             throw new IllegalArgumentException("a text is empty or longer than " + max + " characters");
         }
-        if (value.codePoints().anyMatch(DashboardWidgetResultParser::isInvisible)) {
-            throw new IllegalArgumentException("a text holds control, invisible or blank-filler characters");
+        if (value.codePoints().anyMatch(DashboardWidgetTextRule::isFatal)) {
+            throw new IllegalArgumentException("a text holds a control, format or private-use character");
+        }
+        if (value.codePoints().noneMatch(DashboardWidgetTextRule::isVisible)) {
+            throw new IllegalArgumentException("a text has no visible content");
         }
         return value;
-    }
-
-    /**
-     * Control characters, invisible format characters (zero width, BOM, bidi overrides), line and
-     * paragraph separators, lone surrogates and private-use code points. Contract values are single
-     * lines that must read exactly as they look.
-     *
-     * <p>Fix round 1, A1: also every {@code SPACE_SEPARATOR} except the ordinary U+0020 (so a
-     * non-breaking, figure or narrow no-break space can no longer masquerade as real content), and a
-     * denylist of known invisible filler letters/symbols that are not classified as separators at all
-     * (HANGUL FILLER and its choseong/jungseong siblings, HALFWIDTH HANGUL FILLER, BRAILLE PATTERN
-     * BLANK) — without this, a field made only of these renders as an empty heading or row.
-     */
-    private static boolean isInvisible(int codePoint) {
-        if (codePoint == ' ') {
-            return false;
-        }
-        if (Character.isISOControl(codePoint) || INVISIBLE_FILLERS.contains(codePoint)) {
-            return true;
-        }
-        int type = Character.getType(codePoint);
-        return type == Character.CONTROL || type == Character.FORMAT || type == Character.LINE_SEPARATOR
-                || type == Character.PARAGRAPH_SEPARATOR || type == Character.SURROGATE
-                || type == Character.PRIVATE_USE || type == Character.SPACE_SEPARATOR;
     }
 }

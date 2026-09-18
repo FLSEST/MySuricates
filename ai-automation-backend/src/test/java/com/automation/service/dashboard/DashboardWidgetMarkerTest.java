@@ -162,6 +162,69 @@ class DashboardWidgetMarkerTest {
                 .isEqualTo(Scan.NONE);
     }
 
+    // --- B3 (fix round 2): ambiguity counting is unanchored ---
+
+    @Test
+    void an_unanchored_marker_elsewhere_on_a_line_still_counts_toward_ambiguity() {
+        Scan scan = DashboardWidgetMarker.scan(
+                "dashboard_widget: {\"status\":\"GREEN\"}\nErgebnis: dashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isTrue();
+        assertThat(scan.json()).isNull();
+    }
+
+    @Test
+    void a_bare_unanchored_mention_without_an_object_does_not_count_toward_ambiguity() {
+        // "Ergebnis: dashboard_widget:" here has no "{" or "[" after it, so it is not a real
+        // occurrence at all — the sole real (anchored) marker still wins cleanly.
+        Scan scan = DashboardWidgetMarker.scan(
+                "dashboard_widget: {\"status\":\"GREEN\"}\nErgebnis: dashboard_widget: wird noch ergaenzt");
+
+        assertThat(scan.ambiguous()).isFalse();
+        assertThat(scan.json()).isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
+    // --- B4 (fix round 2): an array after the marker is a real, broken occurrence ---
+
+    @Test
+    void a_marker_followed_by_an_array_is_found_but_has_no_json_object() {
+        Scan scan = DashboardWidgetMarker.scan("dashboard_widget: [{\"status\":\"GREEN\"}]");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isFalse();
+        assertThat(scan.json()).isNull();
+    }
+
+    @Test
+    void a_marker_followed_by_neither_brace_nor_bracket_is_still_not_found() {
+        assertThat(DashboardWidgetMarker.scan("dashboard_widget: status=GREEN")).isEqualTo(Scan.NONE);
+        assertThat(DashboardWidgetMarker.scan("dashboard_widget:\nstatus: GREEN")).isEqualTo(Scan.NONE);
+    }
+
+    // --- B5 (fix round 2): more markdown shapes ---
+
+    @Test
+    void a_plus_prefixed_list_item_is_tolerated() {
+        assertThat(DashboardWidgetMarker.scan("+ dashboard_widget: {\"status\":\"GREEN\"}").json())
+                .isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
+    @Test
+    void numbered_list_prefixes_up_to_two_digits_are_tolerated() {
+        assertThat(DashboardWidgetMarker.scan("1. dashboard_widget: {\"status\":\"GREEN\"}").json())
+                .isEqualTo("{\"status\":\"GREEN\"}");
+        assertThat(DashboardWidgetMarker.scan("12) dashboard_widget: {\"status\":\"GREEN\"}").json())
+                .isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
+    @Test
+    void a_fence_language_tag_glued_directly_to_the_json_is_tolerated() {
+        Scan scan = DashboardWidgetMarker.scan("dashboard_widget:\n```json{\"status\":\"GREEN\"}\n```");
+
+        assertThat(scan.json()).isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
     /** JSON string literal of `value`: quotes and backslashes escaped, everything non-ASCII as \\uXXXX. */
     private static String quote(String value) {
         StringBuilder out = new StringBuilder("\"");

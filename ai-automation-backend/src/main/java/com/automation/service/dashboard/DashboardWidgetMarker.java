@@ -11,37 +11,58 @@ import java.util.regex.Pattern;
  * {@code \{.*}} would scan all of it for every step. The scanner reads balanced braces from the
  * first {@code &#123;} after the marker and gives up after {@link #MAX_JSON_CHARS} characters.
  *
- * <p>Tolerant of common markdown shapes around the marker: leading indentation, a list item or
- * blockquote prefix ({@code -}, {@code *}, {@code >}), a heading, bold or backtick decoration, and a
- * fenced code block around the JSON — including one with a language tag ({@code ```json}).
+ * <p>Tolerant of common markdown shapes around the marker: leading indentation, a list item,
+ * blockquote or numbered-list prefix ({@code -}, {@code *}, {@code +}, {@code >}, {@code 1.},
+ * {@code 1)}, up to two digits), a heading, bold or backtick decoration, and a fenced code block
+ * around the JSON — including one with a language tag ({@code ```json}, glued directly to the JSON
+ * or followed by whitespace).
  *
- * <p><b>Two different rules on purpose (fix round 1, A2):</b> a marker keyword not followed by an
- * opening {@code {} at all does not count as a marker — a report that merely documents this feature
- * in prose (no object after the colon) must not raise a false "invalid result"; see {@link #scan}.
- * A <em>second</em> real marker occurrence within the <b>same</b> output, however, makes the whole
- * output ambiguous: quoted content (a log excerpt, a TODO text) that happens to contain marker
- * syntax before the report's own marker must never be able to silently pick the winning verdict —
- * that is a broken report, not data to choose from; see {@link Scan#ambiguous()}. Across several
- * step outputs of one run that rule does not apply: several markers on different steps are a normal
- * sequence, and {@link DashboardWidgetResultParser#parseRun} lets the last one win.
+ * <p><b>Three rules on purpose:</b>
+ * <ol>
+ *   <li>A marker keyword not followed by an opening {@code {} or {@code [} at all does not count as
+ *       a marker — a report that merely documents this feature in prose (no object after the colon)
+ *       must not raise a false "invalid result"; see {@link #scan}.</li>
+ *   <li>A marker followed by {@code [} (fix round 2, B4) is a real, broken occurrence — an array is
+ *       not this contract's shape, but it is clearly an attempt at one, so the workflow author should
+ *       see "invalid result", not silently "no result yet".</li>
+ *   <li>Ambiguity is decided by an <b>unanchored</b> occurrence count (fix round 2, B3): counting only
+ *       line-anchored markers, as round 1 did, missed a marker that does not start at a line's
+ *       beginning (a report writing its own conclusion as {@code "Ergebnis: dashboard_widget: ..."},
+ *       or an attacker's marker hidden mid-line in quoted content) — such a marker neither won nor
+ *       triggered ambiguity, so quoted content could still silently decide the result. More than one
+ *       real occurrence <em>anywhere</em> in the output — regardless of line position — now makes the
+ *       whole output ambiguous; see {@link Scan#ambiguous()}. The <b>anchored</b> pattern is still
+ *       used to pick the winner once the count confirms there is exactly one: a lone real occurrence
+ *       that itself is not line-anchored is therefore MISSING, not a winner, and not ambiguous either
+ *       — a report's own marker is expected to start its own line. Across several step outputs of one
+ *       run the ambiguity rule does not apply at all: several markers on different steps are a normal
+ *       sequence, and {@link DashboardWidgetResultParser#parseRun} lets the last one win.</li>
+ * </ol>
  */
 final class DashboardWidgetMarker {
 
     /** A valid payload is a few hundred bytes (every contract field is capped); nothing longer is read. */
     static final int MAX_JSON_CHARS = 8192;
 
-    // Anchored to the start of a line, after optional indentation and an optional list/blockquote
-    // prefix, and tolerant of markdown decoration around the word itself: headings, bold, backticks,
-    // "dashboard-widget" with a hyphen, any case.
-    private static final Pattern MARKER = Pattern.compile(
-            "^[ \\t]*(?:[-*>]\\s+)?(?:#{1,6}\\s+)?[*`]*dashboard[_-]widget[*`]*:",
+    // Anchored to the start of a line, after optional indentation and an optional list/blockquote/
+    // numbered prefix, and tolerant of markdown decoration around the word itself: headings, bold,
+    // backticks, "dashboard-widget" with a hyphen, any case. Used to pick the winner (see class
+    // javadoc) once the unanchored count below has confirmed there is exactly one real occurrence.
+    private static final Pattern ANCHORED_MARKER = Pattern.compile(
+            "^[ \\t]*(?:[-*>+]\\s+|\\d{1,2}[.)]\\s+)?(?:#{1,6}\\s+)?[*`]*dashboard[_-]widget[*`]*:",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
+
+    // Unanchored (fix round 2, B3): used only to count how many real marker occurrences exist
+    // anywhere in the output, regardless of line position — see the class javadoc.
+    private static final Pattern UNANCHORED_MARKER = Pattern.compile(
+            "dashboard[_-]widget\\s*:", Pattern.CASE_INSENSITIVE);
 
     /**
      * What one output holds. {@code found} without {@code json} means: there is a real marker
-     * (followed by {@code {}), but the object never closes within the cap — a broken result, not a
-     * missing one. {@code ambiguous} means a second real marker occurs in this output; {@code json}
-     * is then left null, because {@link DashboardWidgetResultParser} rejects it outright anyway.
+     * (followed by {@code {} or {@code [}), but either it is an array (never a valid contract shape)
+     * or the object never closes within the cap — a broken result, not a missing one. {@code
+     * ambiguous} means more than one real marker occurs anywhere in this output; {@code json} is then
+     * left null, because {@link DashboardWidgetResultParser} rejects it outright anyway.
      */
     record Scan(boolean found, String json, boolean ambiguous) {
         static final Scan NONE = new Scan(false, null, false);
@@ -52,35 +73,56 @@ final class DashboardWidgetMarker {
 
     /**
      * The marker state of this output. A marker occurrence only "counts" when — after skipping
-     * decoration — it is immediately followed by {@code {}; a bare mention of the keyword is skipped
-     * entirely, so it neither counts as found nor makes a later, real marker ambiguous. A second
-     * counting occurrence makes the whole output ambiguous (see the class javadoc).
+     * decoration — it is immediately followed by {@code {} or {@code [}; a bare mention of the
+     * keyword is skipped entirely. More than one counting occurrence anywhere makes the whole output
+     * ambiguous (see the class javadoc); otherwise the line-anchored occurrence, if any, wins.
      */
     static Scan scan(String output) {
         if (output == null || output.isBlank()) {
             return Scan.NONE;
         }
-        Matcher matcher = MARKER.matcher(output);
-        int firstObjectStart = -1;
+        if (countRealOccurrences(output) > 1) {
+            return new Scan(true, null, true);
+        }
+        Matcher matcher = ANCHORED_MARKER.matcher(output);
         while (matcher.find()) {
             int pos = skipDecoration(output, matcher.end());
-            if (pos >= output.length() || output.charAt(pos) != '{') {
+            if (pos >= output.length()) {
                 continue;
             }
-            if (firstObjectStart < 0) {
-                firstObjectStart = pos;
-            } else {
-                return new Scan(true, null, true);
+            char c = output.charAt(pos);
+            if (c == '{') {
+                return new Scan(true, readObject(output, pos), false);
+            }
+            if (c == '[') {
+                return new Scan(true, null, false);
             }
         }
-        if (firstObjectStart < 0) {
-            return Scan.NONE;
-        }
-        return new Scan(true, readObject(output, firstObjectStart), false);
+        return Scan.NONE;
     }
 
     /**
-     * Skips markdown decoration between the marker's colon and the JSON object: whitespace, bold
+     * How many real marker occurrences (a marker counts once it is followed, after decoration, by
+     * {@code {} or {@code [}) exist anywhere in the output — not only at a line's start (fix round 2,
+     * B3+B4). Short-circuits once a second one is found; the exact count above 1 is never needed.
+     */
+    private static int countRealOccurrences(String output) {
+        Matcher matcher = UNANCHORED_MARKER.matcher(output);
+        int count = 0;
+        while (matcher.find()) {
+            int pos = skipDecoration(output, matcher.end());
+            if (pos < output.length() && (output.charAt(pos) == '{' || output.charAt(pos) == '[')) {
+                count++;
+                if (count > 1) {
+                    return count;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Skips markdown decoration between the marker's colon and the JSON value: whitespace, bold
      * asterisks, and a fence's backticks together with an optional short language tag right after them
      * (e.g. {@code ```json}). A bare word not directly glued to a fence is left alone — the point is
      * to tolerate fence syntax, not to swallow prose.
@@ -113,14 +155,20 @@ final class DashboardWidgetMarker {
 
     /**
      * A fence's language tag: a short run of letters right after its backticks, itself followed by
-     * whitespace (e.g. {@code json}, {@code jsonc}). Returns {@code pos} unchanged for anything else.
+     * whitespace or (fix round 2, B5) directly by {@code {} — so {@code ```json{"status":"GREEN"}} on
+     * one line works, not only {@code ```json} followed by a line break. Returns {@code pos} unchanged
+     * for anything else.
      */
     private static int skipFenceLanguageTag(String text, int pos) {
         int end = pos;
         while (end < text.length() && Character.isLetter(text.charAt(end)) && end - pos < 12) {
             end++;
         }
-        if (end == pos || end == text.length() || !Character.isWhitespace(text.charAt(end))) {
+        if (end == pos || end == text.length()) {
+            return pos;
+        }
+        char next = text.charAt(end);
+        if (!Character.isWhitespace(next) && next != '{') {
             return pos;
         }
         return end;
