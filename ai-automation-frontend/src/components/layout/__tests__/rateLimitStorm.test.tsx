@@ -16,7 +16,7 @@
  *    wie im beobachteten Vorfall und die Query-Endpunkte sind messbar.
  */
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +26,7 @@ import { useSystemModules, isModuleDisabledError } from '../../../hooks/useModul
 import { useAssistantSuggestions } from '../../../hooks/useAssistant';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../../../api/client';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { useI18nStore } from '../../../i18n';
 
 const RETRY_AFTER_SECONDS = 5;
 
@@ -254,7 +255,9 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     await advance(2000);
 
     expect(mounts, `Kinder wurden ${mounts}× gemountet`).toBe(1);
-    expect(countsByPath()['/system/capabilities']).toBe(1);
+    // Höchstens eine Anfrage: seit b6feccbc liegt nach dem 429 auf /projects zusätzlich eine
+    // globale Kurzsperre an, die auch diesen ersten Aufruf abfangen darf.
+    expect(countsByPath()['/system/capabilities'] ?? 0).toBeLessThanOrEqual(1);
   });
 
   it('behält den gespeicherten Key, wenn die Prüfung 429 bekommt', async () => {
@@ -262,5 +265,51 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     await advance(2000);
 
     expect(useSettingsStore.getState().apiKey).toBe('stored-key');
+  });
+});
+
+describe('Key-Eingabe läuft über den Backoff (b6feccbc)', () => {
+  beforeEach(() => {
+    prepare();
+    useI18nStore.setState({ locale: 'de' });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = pathOf(input);
+      requests.push(path);
+      if (path === '/system/auth-status') return jsonResponse({ securityEnabled: true });
+      return rateLimitedResponse();
+    }));
+  });
+
+  afterEach(() => {
+    teardown();
+    useI18nStore.setState({ locale: 'en' });
+  });
+
+  async function submitKey(view: ReturnType<typeof render>, key: string) {
+    const input = view.container.querySelector('input[type="password"]')!;
+    fireEvent.change(input, { target: { value: key } });
+    const form = view.container.querySelector('form')!;
+    await act(async () => { fireEvent.submit(form); });
+    await advance(50);
+  }
+
+  it('fragt /projects im Sperrfenster nur einmal an und meldet das Rate-Limit', async () => {
+    const view = render(
+      <QueryClientProvider client={createAppQueryClient()}>
+        <MemoryRouter>
+          <ApiKeyGuard><div data-testid="page">page</div></ApiKeyGuard>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await advance(50);
+
+    await submitKey(view, 'typed-key-1');
+    expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
+    expect(view.container.textContent).toContain('Zu viele Anfragen');
+
+    // Zweiter Versuch im Sperrfenster: keine weitere Netzanfrage.
+    await submitKey(view, 'typed-key-2');
+    expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
+    expect(useSettingsStore.getState().apiKey).toBe('');
   });
 });
