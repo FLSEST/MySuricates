@@ -205,6 +205,30 @@ Dieselben Werte gehen als `FAKT`-Zeilen ins Faktenblatt des Workflows `mysuricat
 
 **Dashboard-Widget „API-Latenz":** `components/dashboard/ApiLatencyCard.tsx` (präsentational) + `ApiLatencyWidget` in `DashboardDataWidgets.tsx` (bindet `useRequestMetrics`), registriert unter der Id `api-latency` in `widgetRegistry.ts`. Zeigt die teuersten Routen nach p95 mit Aufrufzahl und SQL-Statements, darüber die Kachel **Wartezeit-Anteil**: der über die Aufrufzahl gewichtete Mittelwert von `waitShare` — gewichtet, weil eine einzelne langsame Anfrage sonst denselben Einfluss hätte wie neunhundert schnelle. Ab 50 % färbt sich die Kachel `danger` und sagt, dass die Ursache eher bei dem liegt, was die Connection hält, als bei den gelisteten Routen.
 
+**Tiefer bohren mit JFR:** Wenn Widget oder Watchdog eine heiße Route zeigen, die Kosten aber nicht erklären, liefert der Java Flight Recorder das Profil — im JDK eingebaut, kein async-profiler, kein Agent, kein Overhead im Normalbetrieb:
+
+```bash
+PID=$(cat ~/.local/state/autotrigger-dev/backend.pid)
+jcmd "$PID" JFR.start duration=60s filename=/tmp/hot.jfr settings=profile name=diag
+jcmd "$PID" JFR.check                      # laeuft die Aufnahme noch?
+jfr summary /tmp/hot.jfr                   # welche Ereignisse kamen zusammen
+jfr print --events jdk.ThreadPark /tmp/hot.jfr | head -60
+```
+
+**Wichtig für diese Plattform:** `jdk.ExecutionSample` (CPU) ist hier meist die falsche Spur. Bei `maximum-pool-size: 1` wird nicht gerechnet, sondern gewartet — das Ereignis dazu ist `jdk.ThreadPark` (Hikari parkt den Thread über `LockSupport`). Eine Probeaufnahme am Dev-Backend lieferte 22 CPU-Samples gegenüber 22 Park-Ereignissen mit zusammen 832 ms Wartezeit; die Wartezeit war das Ganze. Zweitens: **Last muss während der Aufnahme laufen.** Auf einer im Leerlauf stehenden Instanz enthält das Profil nichts — erst die Anfragen auslösen, die langsam sind, dann aufnehmen.
+
+Welches Werkzeug wann:
+
+| Symptom | Erstes Werkzeug |
+|---|---|
+| Eine Ansicht ist langsam | `Server-Timing`-Header im DevTools-Network-Tab |
+| Viele SQL-Statements | SQL-Zahl im Header bzw. `RequestCostRatchetTest` |
+| Hohe Wartezeit statt Arbeit | Wartezeit-Kachel im Dashboard, dann der Thread-Dump des Pool-Watchdogs |
+| Einzelne langsame Abfrage | `hibernate.log_slow_query` (>200 ms) im Backend-Log |
+| Alles langsam, CPU hoch | JFR `jdk.ExecutionSample` |
+| Alles langsam, CPU niedrig | JFR `jdk.ThreadPark` |
+| Verdacht auf Leck oder GC | JFR `jdk.GCPhasePause`, dazu `/actuator/metrics/jvm.memory.used` |
+
 **Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist. Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
 
 **Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.autotrigger/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
