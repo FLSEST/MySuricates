@@ -91,6 +91,17 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      Dateigrößen die kompilierten Klassen und gehören in keine themenbezogene `-Dtest`-Auswahl
      hinein. Ein am 2026-09-18 auf main aufgefallener Paketzyklus wurde deshalb erst beim
      Integrations-Checkpoint sichtbar, nicht schon im Feature-Branch.
+   - **Gezielter Lauf gegen eine Klasse mit `@Nested`-Tests:** `-Dtest='Klasse'` wählt in diesem
+     Repo (Surefire 3.5.4) auch die `@Nested`-Inneren-Klassen aus — verifiziert per gezielter
+     Fehlprobe in einer `@Nested`-Methode, die den Build zuverlässig scheitern ließ. **Trotzdem**
+     als Konvention `-Dtest='Klasse*'` verwenden (auch mit Wildcard, matcht ebenfalls alle
+     `@Nested`-Klassen und bleibt unabhängig von Surefire-Version/-Konfiguration verlässlich) —
+     und sich **nie** an der Summenzeile der äußeren Klasse allein orientieren: Der eigene
+     Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet grundsätzlich
+     `Tests run: 0`, weil die äußere Klasse selbst keine `@Test`-Methoden hat — das ist normal
+     und **kein** Hinweis auf einen leeren Lauf. Maßgeblich ist die abschließende
+     `Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code, nicht eine
+     einzelne Klassenzeile oder ein abgeschnittener `tail`.
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
 3. **Wenn Tests brechen** — Sofort fixen. NICHT committen mit kaputten Tests. Ursache untersuchen, nicht einfach Tests anpassen oder löschen.

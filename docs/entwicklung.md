@@ -179,6 +179,18 @@ neuer Zyklus zwischen `com.automation.event` und `com.automation.modules` musste
 main behoben werden, weil die gezielte Testauswahl des Implementers die drei Klassen nicht
 enthielt).
 
+**Gezielter Lauf gegen eine Klasse mit `@Nested`-Tests:** 73 Testklassen im Repo (Stand 2026-09-18,
+`grep -rl "@Nested" --include="*.java" . | grep -v .claude/worktrees | grep /src/test/ | wc -l`)
+nutzen `@Nested`. Konvention: `-Dtest='Klasse*'` statt `-Dtest='Klasse'` — die Wildcard-Form
+matcht garantiert auch alle `@Nested`-Inneren-Klassen und bleibt unabhängig von
+Surefire-Version/-Konfiguration verlässlich. **Warnung:** Egal welche Form man wählt — der
+Text-Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet immer
+`Tests run: 0` für die äußere Klasse selbst, weil dort keine eigenen `@Test`-Methoden liegen; das
+ist normal, nicht leer. Ein Lauf, dessen `@Nested`-Tests aus irgendeinem Grund wirklich nicht
+mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur diese eine Zeile oder
+einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
+`Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
+
 **Klassengrößen-Ratchet:** `architecture/SourceSizeRatchetTest` zählt die Zeilen aller Dateien unter `src/main/java` und schlägt fehl, sobald eine Datei über 300 Zeilen liegt, die nicht in der Allowlist des Tests steht — oder eine gelistete Datei über ihre eingetragene Obergrenze wächst. Die Liste kennt nur eine Richtung: Wer eine gelistete Klasse verkleinert, senkt ihre Obergrenze; fällt sie auf ≤300 Zeilen, fliegt der Eintrag raus. Neue Dateien über 300 Zeilen werden gesplittet, nicht eingetragen (Audit-TODO 1e248ab9). Keine externe Dependency, reiner JUnit-Test.
 
 **Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist. Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.

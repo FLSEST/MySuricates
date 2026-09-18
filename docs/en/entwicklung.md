@@ -178,6 +178,17 @@ not already on the feature branch (seen on 2026-09-18: a new cycle between `com.
 and `com.automation.modules` had to be fixed after the fact on main because the implementer's
 targeted test selection did not include the three classes).
 
+**Targeted run against a class with `@Nested` tests:** 73 test classes in the repo (as of
+2026-09-18, `grep -rl "@Nested" --include="*.java" . | grep -v .claude/worktrees | grep /src/test/ | wc -l`)
+use `@Nested`. Convention: use `-Dtest='Class*'` instead of `-Dtest='Class'` — the wildcard form is
+guaranteed to also match every `@Nested` inner class and stays reliable regardless of the Surefire
+version/configuration. **Warning:** whichever form you pick, the outer class's own text report
+(`target/surefire-reports/<Class>.txt`) always reports `Tests run: 0` for the outer class itself,
+because it has no `@Test` methods of its own — that is normal, not empty. A run whose `@Nested`
+tests genuinely did not execute for some other reason can still look "green" from that single line
+if you only check it, or a truncated `tail`. What actually matters is the final
+`Results: Tests run: N` line of the whole Maven run, or its exit code.
+
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
 **No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
