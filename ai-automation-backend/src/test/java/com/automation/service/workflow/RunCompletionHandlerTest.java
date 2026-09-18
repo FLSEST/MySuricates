@@ -257,4 +257,49 @@ class RunCompletionHandlerTest {
         assertThat(plain.getRunMetadata()).doesNotContainKeys(
                 DashboardWidgetResultParser.METADATA_KEY, DashboardWidgetResultParser.ERROR_METADATA_KEY);
     }
+
+    /**
+     * A dashboard-report block writes the contract into run metadata before the marker scan ever
+     * runs; a later step's marker must not be allowed to overwrite it (TODO f4231dc9 — a later AI
+     * step must not be able to overwrite a deliberately configured report by printing a marker,
+     * which would be prompt injection with a visible dashboard effect).
+     */
+    @Test
+    void aBlockWrittenReportWinsOverAMarkerInAnyStepOutput() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "dashboard_widget: {\"status\":\"RED\",\"title\":\"from marker\"}");
+        // What a dashboard-report block would have written during the run:
+        ctx.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
+                Map.of("status", "GREEN", "title", "from block"));
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
+        assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from block");
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.ERROR_METADATA_KEY);
+    }
+
+    @Test
+    void aBrokenLaterMarkerCannotInvalidateABlockWrittenReport() {
+        WorkflowRun run = run(RunStatus.RUNNING, "dashboard_widget: {\"status\":\"PINK\"}");
+        ctx.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY, Map.of("status", "GREEN"));
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.ERROR_METADATA_KEY);
+        assertThat(DashboardWidgetResultParser
+                .fromMetadata(ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY))
+                .result().status().name()).isEqualTo("GREEN");
+    }
+
+    @Test
+    void withoutABlockWrittenReportTheMarkerStillDecides() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "dashboard_widget: {\"status\":\"RED\",\"title\":\"from marker\"}");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+
+        Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
+        assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from marker");
+    }
 }

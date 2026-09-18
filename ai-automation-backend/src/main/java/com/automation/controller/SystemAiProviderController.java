@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.dto.response.SystemCapabilitiesResponse;
+import com.automation.executor.BlockTypeModules;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
@@ -62,6 +63,9 @@ public class SystemAiProviderController {
 
         List<SystemCapabilitiesResponse.BlockTypeCapabilityResponse> blockTypes = BlockTypesIndexSection.BLOCK_TYPES
                 .stream()
+                // A type whose module is off is not offered: the editor must not put a block into a
+                // workflow this instance refuses to run. Saving such a definition stays possible.
+                .filter(e -> BlockTypeModules.requiredFor(e.type()).map(moduleRegistry::isEnabled).orElse(true))
                 .map(e -> new SystemCapabilitiesResponse.BlockTypeCapabilityResponse(e.type(), e.summary()))
                 .toList();
 

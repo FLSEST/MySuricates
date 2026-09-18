@@ -106,19 +106,26 @@ public class RunCompletionHandler {
 
         // dashboard_widget marker: what a workflow result widget shows (spec E3). Parsed here, where
         // the steps are already in memory — the read path must never load step output blobs (pool=1).
-        // Derived outputs are skipped like above: a compression step copies its source's text.
-        DashboardWidgetResultParser.ParseResult widgetResult = DashboardWidgetResultParser.parseRun(
-                run.getSteps().stream()
-                        .filter(step -> step.getOutput() != null && !isDerivedOutput(step))
-                        .map(StepResult::getOutput)
-                        .toList());
-        if (widgetResult.state() == ResultState.VALID) {
-            context.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
-                    DashboardWidgetResultParser.toMetadata(widgetResult.result()));
-        } else if (widgetResult.state() == ResultState.INVALID) {
-            // A fixed token, never anything from the output: the widget says "invalid" instead of nothing.
-            context.setRunMetadata(DashboardWidgetResultParser.ERROR_METADATA_KEY, "INVALID");
-            log.info("Workflow {} reported a dashboard_widget marker that does not match the contract", workflowName);
+        // Derived outputs are skipped: a compression step copies its source's text.
+        //
+        // A dashboard-report block (TODO f4231dc9) has already written a validated contract into the
+        // run metadata. It wins, and the marker is not even looked at: the block is the deliberately
+        // configured path, while a marker line in a later AI output could otherwise overwrite the
+        // report a human configured — prompt injection with visible effect on the dashboard.
+        if (!context.getRunMetadata().containsKey(DashboardWidgetResultParser.METADATA_KEY)) {
+            DashboardWidgetResultParser.ParseResult widgetResult = DashboardWidgetResultParser.parseRun(
+                    run.getSteps().stream()
+                            .filter(step -> step.getOutput() != null && !isDerivedOutput(step))
+                            .map(StepResult::getOutput)
+                            .toList());
+            if (widgetResult.state() == ResultState.VALID) {
+                context.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
+                        DashboardWidgetResultParser.toMetadata(widgetResult.result()));
+            } else if (widgetResult.state() == ResultState.INVALID) {
+                // A fixed token, never anything from the output: the widget says "invalid" instead of nothing.
+                context.setRunMetadata(DashboardWidgetResultParser.ERROR_METADATA_KEY, "INVALID");
+                log.info("Workflow {} reported a dashboard_widget marker that does not match the contract", workflowName);
+            }
         }
 
         boolean failedChecks = run.getSteps().stream().anyMatch(step ->
