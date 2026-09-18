@@ -15,13 +15,26 @@ const DEFAULT_RETRY_AFTER_SECONDS = 10;
  */
 const GLOBAL_BACKOFF_SECONDS = 2;
 
+/**
+ * Endpoints the *global* lock must not touch. Their own path lock still applies — this only
+ * says that somebody else's 429 may not take them down with it:
+ *  - `/ws-ticket`: a blocked ticket costs the WebSocket one reconnect attempt and doubles
+ *    its exponential delay, so a 2 s lock turns into a much longer outage.
+ *  - `/system/auth-status`: the ApiKeyGuard renders nothing until this answers; blocking it
+ *    would show an empty app instead of the rate-limit hint.
+ */
+const GLOBAL_LOCK_EXEMPT = new Set(['/ws-ticket', '/system/auth-status']);
+
 /** Backoff deadlines (epoch ms) per endpoint pattern. */
 const rateLimitedUntil = new Map<string, number>();
 
 /** Deadline (epoch ms) of the short all-endpoints lock; 0 = none. */
 let globalRateLimitedUntil = 0;
 
-/** Listeners for backoff changes (banner, query defaults). */
+/** Fires when the last deadline passes, so the app can recover without a reload. */
+let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Listeners for backoff changes (banner, query recovery). */
 const backoffListeners = new Set<() => void>();
 
 const UUID_SEGMENT = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
@@ -41,13 +54,49 @@ function notifyBackoffListeners(): void {
   for (const listener of backoffListeners) listener();
 }
 
+/** Latest deadline (epoch ms) currently stored — expired entries included. */
+function latestDeadline(): number {
+  let latest = globalRateLimitedUntil;
+  for (const until of rateLimitedUntil.values()) if (until > latest) latest = until;
+  return latest;
+}
+
+/** Drops deadlines that have passed. Housekeeping only — the readers check the clock. */
+function pruneExpired(now: number): void {
+  for (const [key, until] of rateLimitedUntil) if (now >= until) rateLimitedUntil.delete(key);
+  if (globalRateLimitedUntil !== 0 && now >= globalRateLimitedUntil) globalRateLimitedUntil = 0;
+}
+
+/**
+ * Arms a single timer on the last deadline. Without it nothing recovers: `retry` is off for
+ * 429 and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar,
+ * layout, dashboard) would stay in their error state until a reload.
+ */
+function scheduleExpiry(now: number): void {
+  if (expiryTimer !== null) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
+  const latest = latestDeadline();
+  if (latest <= now) return;
+  expiryTimer = setTimeout(() => {
+    expiryTimer = null;
+    const at = Date.now();
+    pruneExpired(at);
+    notifyBackoffListeners();
+    scheduleExpiry(at);
+  }, latest - now);
+}
+
 /** Records a 429: locks the endpoint pattern plus, briefly, everything else. */
 function lockAfterRateLimit(path: string, retryAfterSeconds: number, now: number = Date.now()): void {
+  pruneExpired(now);
   if (retryAfterSeconds > 0) {
     rateLimitedUntil.set(backoffKey(path), now + retryAfterSeconds * 1000);
   }
   const globalUntil = now + Math.min(GLOBAL_BACKOFF_SECONDS, Math.max(retryAfterSeconds, 0)) * 1000;
   if (globalUntil > globalRateLimitedUntil) globalRateLimitedUntil = globalUntil;
+  scheduleExpiry(now);
   notifyBackoffListeners();
 }
 
@@ -68,29 +117,21 @@ export function parseRetryAfter(header: string | null | undefined, now: number =
 
 /**
  * Remaining lock time for a path in seconds (0 = free) — the later of the endpoint
- * pattern's own deadline and the short all-endpoints lock.
+ * pattern's own deadline and, unless the path is exempt, the short all-endpoints lock.
+ * Pure reader: expired deadlines are dropped by the expiry timer, not here.
  */
 export function rateLimitRemainingSeconds(path: string, now: number = Date.now()): number {
   const key = backoffKey(path);
-  const until = rateLimitedUntil.get(key);
-  if (until !== undefined && now >= until) rateLimitedUntil.delete(key);
-  const deadline = Math.max(until !== undefined && now < until ? until : 0, globalDeadline(now));
+  const own = rateLimitedUntil.get(key) ?? 0;
+  const global = GLOBAL_LOCK_EXEMPT.has(key) ? 0 : globalRateLimitedUntil;
+  const deadline = Math.max(own, global);
   return deadline > now ? Math.ceil((deadline - now) / 1000) : 0;
-}
-
-function globalDeadline(now: number): number {
-  if (globalRateLimitedUntil !== 0 && now >= globalRateLimitedUntil) globalRateLimitedUntil = 0;
-  return globalRateLimitedUntil;
 }
 
 /** Latest deadline (epoch ms) of any active backoff; 0 when nothing is locked. */
 export function rateLimitBackoffUntil(now: number = Date.now()): number {
-  let latest = globalDeadline(now);
-  for (const [key, until] of rateLimitedUntil) {
-    if (now >= until) rateLimitedUntil.delete(key);
-    else if (until > latest) latest = until;
-  }
-  return latest;
+  const latest = latestDeadline();
+  return latest > now ? latest : 0;
 }
 
 /** True while any endpoint is still in its 429 backoff window. */
@@ -99,8 +140,9 @@ export function isRateLimitBackoffActive(now: number = Date.now()): boolean {
 }
 
 /**
- * Notifies when a backoff starts. Expiry is not pushed (there is no timer here) — readers
- * that display the remaining time poll {@link rateLimitBackoffUntil} on their own tick.
+ * Notifies on every change of the backoff state — both when a lock starts and when the last
+ * deadline passes (an internal timer pushes that flank). Readers therefore need no tick of
+ * their own.
  */
 export function subscribeRateLimitBackoff(listener: () => void): () => void {
   backoffListeners.add(listener);
@@ -111,6 +153,10 @@ export function subscribeRateLimitBackoff(listener: () => void): () => void {
 export function resetRateLimitBackoff(): void {
   rateLimitedUntil.clear();
   globalRateLimitedUntil = 0;
+  if (expiryTimer !== null) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
   notifyBackoffListeners();
 }
 

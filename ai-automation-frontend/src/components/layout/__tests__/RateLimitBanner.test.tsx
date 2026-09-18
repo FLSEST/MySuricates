@@ -55,7 +55,8 @@ describe('RateLimitBanner (c168293d)', () => {
 
     const banner = view.getByRole('status');
     expect(banner.textContent).toContain('Zu viele Anfragen');
-    expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString());
+    // App-Sprache, nicht Browser-Locale.
+    expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('de-DE'));
   });
 
   it('nutzt Warn-Token statt fester Tailwind-Farben', async () => {
@@ -93,6 +94,19 @@ describe('RateLimitBanner (c168293d)', () => {
     const view = render(<RateLimitBanner />);
     await advance(0);
 
-    expect(view.getByRole('status').textContent).toContain('Too many requests');
+    const banner = view.getByRole('status');
+    expect(banner.textContent).toContain('Too many requests');
+    expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('en-US'));
+  });
+
+  it('verschwindet ohne eigenen Takt — der Client meldet den Ablauf', async () => {
+    await triggerBackoff();
+    const view = render(<RateLimitBanner />);
+    await advance(0);
+    expect(view.queryByRole('status')).not.toBeNull();
+
+    // Genau auf die Deadline: ohne die Ablauf-Flanke aus dem Client bliebe das Banner stehen.
+    await advance(5_000);
+    expect(view.queryByRole('status')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
-import type { DefaultOptions, Query } from '@tanstack/react-query';
-import { isRateLimitBackoffActive } from './client';
+import type { DefaultOptions, Query, QueryClient } from '@tanstack/react-query';
+import { isRateLimitBackoffActive, subscribeRateLimitBackoff } from './client';
 import { isModuleDisabledError } from '../hooks/useModules';
 
 /**
@@ -32,3 +32,22 @@ export const appQueryDefaults: DefaultOptions = {
     },
   },
 };
+
+/**
+ * Holt die App nach Ablauf der Sperre von selbst wieder ein (f3fb193f). `refetchOnMount` und
+ * `retryOnMount` greifen nur beim Mount — dauerhaft montierte Queries (Sidebar, Layout,
+ * Dashboard) blieben sonst bis zum Reload im Fehlerzustand, weil `retry` für 429 aus ist.
+ * Deshalb wird beim Übergang aktiv→inaktiv einmal alles Fehlgeschlagene invalidiert.
+ *
+ * Gibt die Abmeldung zurück (Tests; in der App läuft das Abo über die Lebenszeit der Seite).
+ */
+export function installRateLimitRecovery(queryClient: QueryClient): () => void {
+  let wasActive = isRateLimitBackoffActive();
+  return subscribeRateLimitBackoff(() => {
+    const active = isRateLimitBackoffActive();
+    if (wasActive && !active) {
+      queryClient.invalidateQueries({ predicate: (query) => query.state.status === 'error' });
+    }
+    wasActive = active;
+  });
+}

@@ -25,7 +25,7 @@ import { SecurityBanner } from '../SecurityBanner';
 import { useSystemModules } from '../../../hooks/useModules';
 import { useAssistantSuggestions } from '../../../hooks/useAssistant';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../../../api/client';
-import { appQueryDefaults } from '../../../api/queryDefaults';
+import { appQueryDefaults, installRateLimitRecovery } from '../../../api/queryDefaults';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { useI18nStore } from '../../../i18n';
 
@@ -69,9 +69,13 @@ function stubFetch(authStatus: 'rate-limited' | 'security-off') {
   }));
 }
 
-/** Query-Client mit genau den Defaults aus main.tsx (429 wird nicht wiederholt). */
+let recoveryDisposers: Array<() => void> = [];
+
+/** Query-Client genau wie in main.tsx: Defaults + Erholung nach Ablauf der Sperre. */
 function createAppQueryClient() {
-  return new QueryClient({ defaultOptions: appQueryDefaults });
+  const queryClient = new QueryClient({ defaultOptions: appQueryDefaults });
+  recoveryDisposers.push(installRateLimitRecovery(queryClient));
+  return queryClient;
 }
 
 function Page() {
@@ -111,6 +115,7 @@ async function advance(ms: number) {
 
 function prepare() {
   requests = [];
+  recoveryDisposers = [];
   resetRateLimitBackoff();
   resetAuthStatusCache();
   useSettingsStore.setState({ apiKey: '' });
@@ -118,6 +123,8 @@ function prepare() {
 }
 
 function teardown() {
+  for (const dispose of recoveryDisposers) dispose();
+  recoveryDisposers = [];
   vi.useRealTimers();
   vi.unstubAllGlobals();
   useSettingsStore.setState({ apiKey: '' });
@@ -159,9 +166,10 @@ describe('429 storm reproduction (d89b2cc1)', () => {
     await advance(2000);
     const before = countsByPath();
 
-    // Sperrzeit abwarten, dann neu mounten.
-    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
+    // Vor Ablauf abmelden: gemessen wird hier der Neuaufbau (Reload), nicht die Erholung
+    // montierter Queries — die hat ihren eigenen Test.
     view.unmount();
+    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
     queryClient.clear();
     resetAuthStatusCache(); // ein Reload würde den App-weiten Cache ebenfalls verlieren
     renderShell(queryClient);
@@ -244,9 +252,15 @@ describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
     await advance(2000);
 
     expect(mounts, `Kinder wurden ${mounts}× gemountet`).toBe(1);
-    // Höchstens eine Anfrage: seit b6feccbc liegt nach dem 429 auf /projects zusätzlich eine
-    // globale Kurzsperre an, die auch diesen ersten Aufruf abfangen darf.
-    expect(countsByPath()['/system/capabilities'] ?? 0).toBeLessThanOrEqual(1);
+    // Keine einzige Anfrage: der 429 auf /projects (Stored-Key-Prüfung) setzt seit b6feccbc
+    // die globale Kurzsperre, die Kinder mounten direkt danach — capabilities scheitert am
+    // Client, ohne ans Netz zu gehen.
+    expect(countsByPath()['/system/capabilities'] ?? 0).toBe(0);
+
+    // Nach Ablauf der /projects-Sperre holt die Erholung die Query genau einmal nach
+    // (f3fb193f) — ohne sie bliebe die montierte Seite bis zum Reload leer.
+    await advance(RETRY_AFTER_SECONDS * 1000 + 100);
+    expect(countsByPath()['/system/capabilities']).toBe(1);
   });
 
   it('behält den gespeicherten Key, wenn die Prüfung 429 bekommt', async () => {

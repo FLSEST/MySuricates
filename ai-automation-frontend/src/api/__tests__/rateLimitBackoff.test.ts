@@ -158,6 +158,58 @@ describe('Sperre je Endpoint-Muster (b6feccbc)', () => {
     await expect(api.get(`/executions/${UUID_A}/steps`)).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('setzt bei Retry-After: 0 überhaupt keine Sperre', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(429, { error: 'nope', timestamp: 'x' }, { 'Retry-After': '0' }));
+
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429, retryAfterSeconds: 0 });
+    expect(isRateLimitBackoffActive()).toBe(false);
+    expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(0);
+
+    // Weder der eigene Pfad noch ein fremder ist gesperrt.
+    await expect(api.get('/workflows')).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Ausnahmen von der globalen Kurzsperre (b6feccbc)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetRateLimitBackoff();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    fetchMock = vi.fn(async () => jsonResponse(429, { error: 'Rate limit exceeded', timestamp: 'x' }, { 'Retry-After': '5' }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    resetRateLimitBackoff();
+  });
+
+  it('lässt /ws-ticket und /system/auth-status trotz fremder 429 durch', async () => {
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Ein blockiertes Ticket kostet den WebSocket einen Reconnect-Versuch, ein blockierter
+    // auth-status lässt den ApiKeyGuard nichts rendern — beide dürfen hier nicht hängen.
+    await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
+    await expect(api.get('/system/auth-status')).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('sperrt die Ausnahme-Pfade nach ihrem eigenen 429 trotzdem', async () => {
+    await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
+    await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(rateLimitRemainingSeconds('/ws-ticket')).toBe(5);
+
+    await expect(api.get('/system/auth-status')).rejects.toMatchObject({ status: 429 });
+    await expect(api.get('/system/auth-status')).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('Rohe Aufrufe laufen über den Backoff (b6feccbc)', () => {
@@ -264,5 +316,18 @@ describe('Backoff-Zustand für UI und Query-Defaults (c168293d, f3fb193f)', () =
     vi.setSystemTime(NOW + 6_000);
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('meldet auch den Ablauf der letzten Sperre, ohne dass jemand pollt', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeRateLimitBackoff(listener);
+    await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
+    listener.mockClear();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(listener).toHaveBeenCalled();
+    expect(isRateLimitBackoffActive()).toBe(false);
+    unsubscribe();
   });
 });
