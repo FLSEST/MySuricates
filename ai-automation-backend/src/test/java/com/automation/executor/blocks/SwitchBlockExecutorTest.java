@@ -786,4 +786,48 @@ class SwitchBlockExecutorTest {
         assertThat(result.getOutput()).contains("Blocktyp 'compress' wird in switch nicht unterstützt");
         verifyNoInteractions(commandExecutor);
     }
+
+    @Test
+    void execute_nestedDocumentBlock_isRejectedNamingTheBlockWithoutAnyCall() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "document", "name", "report", "config", Map.of("command", "write it"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("document").contains("report");
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
+    void deserializeBlock_keepsTheNestedBlockName() {
+        BlockDefinition nested = executor.deserializeBlock(
+                Map.of("type", "simple", "name", "review", "config", Map.of("command", "check")));
+
+        assertThat(nested.getType()).isEqualTo("simple");
+        assertThat(nested.getName()).isEqualTo("review");
+        assertThat(nested.getConfig()).containsEntry("command", "check");
+    }
+
+    @Test
+    void execute_nestedNamedShellBlock_passesTheNameToTheStepBlock() {
+        StepResult shellResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
+        when(commandExecutor.executeStepAsShell(any(), any(), anyInt(), anyInt())).thenReturn(shellResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "shell", "name", "cleanup", "config", Map.of("command", "rm -rf tmp/"))))));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<BlockDefinition> captor = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(any(), captor.capture(), anyInt(), anyInt());
+        assertThat(captor.getValue().getName()).isEqualTo("cleanup");
+    }
 }

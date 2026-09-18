@@ -167,6 +167,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 : new HashMap<>();
         return BlockDefinition.builder()
                 .type(type)
+                .name(blockMap.get("name") instanceof String name ? name : null)
                 .config(blockConfig)
                 .build();
     }
@@ -179,9 +180,13 @@ public class SwitchBlockExecutor implements BlockExecutor {
         String type = nestedBlock.getType();
         if (type != null && !"shell".equals(type) && !"simple".equals(type)) {
             Instant now = Instant.now();
+            String label = nestedBlock.getName() != null && !nestedBlock.getName().isBlank()
+                    ? nestedBlock.getName() + " (" + type + ")"
+                    : type;
             return StepResult.builder().stepIndex(context.nextStepIndex()).status(StepStatus.FAILED)
-                    .input("switch: " + type)
-                    .output("Blocktyp '" + type + "' wird in switch nicht unterstützt — nur shell und simple (89dd9e34)")
+                    .input("switch: " + label)
+                    .output("Blocktyp '" + type + "' wird in switch nicht unterstützt — nur shell und simple"
+                            + " (Block: " + label + ", 89dd9e34)")
                     .startedAt(now).completedAt(now).durationMs(0L).build();
         }
         Map<String, Object> nestedConfig = nestedBlock.getConfig();
@@ -198,9 +203,12 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 : context.resolveTemplate((String) nestedConfig.get("command"));
 
         if (isShell) {
+            BlockDefinition shellBlock =
+                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context);
+            shellBlock.setName(nestedBlock.getName());
             return commandExecutor.executeStepAsShell(
                     context.getProjectPath(),
-                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context),
+                    shellBlock,
                     context.nextStepIndex(),
                     shellTimeout
             );
@@ -210,6 +218,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
                             .projectPath(context.getProjectPath())
                             .block(BlockDefinition.builder()
                                     .type("simple")
+                                    .name(nestedBlock.getName())
                                     .config(Map.of("command", command))
                                     .build())
                             .stepIndex(context.nextStepIndex())
