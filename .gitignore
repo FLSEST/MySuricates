@@ -66,6 +66,10 @@ ai-automation-backend/src/main/resources/docs/
 docs/public/generated/
 screenshots/raw/
 
+# Interne Planungsdokumente (Entwuerfe, Bestandsaufnahmen, Session-/TODO-Bezuege).
+# Entscheidung Flo 2026-09-16 (TODO 6e9e00e9): nicht veroeffentlichen, lokal behalten.
+docs/plans/
+
 # Sicherungsdateien jeder Art, auch mit Zeitstempel-Suffix. Vorher deckte nur
 # *.txt.bak ab, sodass eine Sicherung mit angehaengtem Zeitstempel durchfiel und
 # bei einem pauschalen 'git add' mitgegangen waere.

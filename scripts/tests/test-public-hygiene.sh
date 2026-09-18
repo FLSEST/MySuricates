@@ -71,6 +71,16 @@ check "--tracked meldet Verstoss (exit 1)"     '[ "$RC" -eq 1 ]'
 check "Gate nennt escape-link"                 'grep -q "escape-link" <<<"$OUT"'
 check "sub/ok-link bleibt unbeanstandet"       '! grep -q "ok-link" <<<"$OUT"'
 
+echo "8) docs/plans ist im echten Repository untrackt und ignoriert (TODO 6e9e00e9)"
+TRACKED_PLANS="$(cd "$REPO" && git ls-files docs/plans)"
+check "keine getrackten Dateien unter docs/plans" '[ -z "$TRACKED_PLANS" ]'
+check ".gitignore ignoriert docs/plans/"          'grep -qxF "docs/plans/" "$REPO/.gitignore"'
+
+echo "9) entrypoint.sh hat keinen persoenlichen APP_USER-Default (TODO 0cf6bd37)"
+ENTRYPOINT_DEFAULT="$(printf '%s' 'APP_USER="${APP_USER:-flo}"')"
+check "kein 'flo' als APP_USER-Default" \
+  '! grep -qF "$ENTRYPOINT_DEFAULT" "$REPO/ai-automation-backend/docker/entrypoint.sh"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
