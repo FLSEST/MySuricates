@@ -140,7 +140,7 @@ Workflow (1) → (N) WorkflowRun      // @OneToMany
 **Key fields:**
 ```java
 String instructions;    // Workflow-specific instructions (Monaco editor)
-String model;           // AI model (e.g. "claude-opus-4-6")
+String model;           // AI model -- CLI alias, e.g. "opus" / "sonnet" / "haiku"
 String templateId;      // Back-reference to template
 ```
 
@@ -194,7 +194,7 @@ const { data } = useQuery({
 
 **Path:** `ai-automation-frontend/src/types/index.ts`
 
-**Purpose:** Central TypeScript type definitions for the entire frontend application.
+**Purpose:** Central TypeScript type definitions for the entire frontend application. `BLOCK_TYPES` is the authoritative frontend list of block types -- `types/__tests__/blockTypes.test.ts` and its backend counterpart `BlockTypeListsGuardTest` keep it in sync with the executors.
 
 **Key types:**
 ```typescript
@@ -202,12 +202,18 @@ const { data } = useQuery({
 type ProjectType = 'CODE' | 'RESEARCH' | 'CONTENT' | 'BUSINESS' | 'PERSONAL';
 type ProjectStatus = 'STOPPED' | 'STARTING' | 'RUNNING' | 'ERROR';
 
-// Block types (11 variants)
-type BlockType = 'simple' | 'shell' | 'retry' | 'foreach' | 'while'
-  | 'conditional' | 'skill-capability' | 'approval' | 'agentic' | 'sub-workflow';
+// Block types (19 variants, source: BLOCK_TYPES)
+export const BLOCK_TYPES = [
+  'simple', 'shell', 'retry', 'foreach', 'while', 'conditional', 'switch',
+  'skill-capability', 'approval', 'agentic', 'sub-workflow', 'human-input',
+  'integration', 'document', 'todo-create', 'todo-update', 'todo-close',
+  'compress', 'compress-ai',
+] as const;
+export type BlockType = (typeof BLOCK_TYPES)[number];
 
 // Execution status
-type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+type RunStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_WITH_ERRORS'
+  | 'FAILED' | 'CANCELLED' | 'INTERRUPTED';
 type StepStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'SKIPPED' | 'WAITING_APPROVAL';
 
 // Core interfaces
@@ -251,7 +257,7 @@ export function useUpdateWorkflow() { ... }
 export function useDeleteWorkflow() { ... }
 ```
 
-This pattern is applied consistently across all 16 hook files.
+This pattern is applied consistently across all hook files under `src/hooks/` (as of 2026-09-18: 52 files).
 
 ---
 
