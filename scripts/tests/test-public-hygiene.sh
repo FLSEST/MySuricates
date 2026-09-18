@@ -76,6 +76,11 @@ TRACKED_PLANS="$(cd "$REPO" && git ls-files docs/plans)"
 check "keine getrackten Dateien unter docs/plans" '[ -z "$TRACKED_PLANS" ]'
 check ".gitignore ignoriert docs/plans/"          'grep -qxF "docs/plans/" "$REPO/.gitignore"'
 
+echo "9) entrypoint.sh hat keinen persoenlichen APP_USER-Default (TODO 0cf6bd37)"
+ENTRYPOINT_DEFAULT="$(printf '%s' 'APP_USER="${APP_USER:-flo}"')"
+check "kein 'flo' als APP_USER-Default" \
+  '! grep -qF "$ENTRYPOINT_DEFAULT" "$REPO/ai-automation-backend/docker/entrypoint.sh"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

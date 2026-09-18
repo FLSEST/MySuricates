@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-APP_USER="${APP_USER:-flo}"
+APP_USER="${APP_USER:-appuser}"
 
 # Fix Docker socket permissions if socket is mounted
 if [ -S /var/run/docker.sock ]; then
