@@ -66,6 +66,15 @@ print(re.sub(r'\{\{\s*([^{}]+?)\s*}}', substitute, config['command']))
 PY
 }
 
+report_prompt() {  # $1 = definition, $2 = zieldatei — Prompt des in metadata.audit.reportBlock genannten Blocks
+  python3 - "$1" <<'PY' > "$2"
+import json, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+report = definition['metadata']['audit']['reportBlock']
+print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report))
+PY
+}
+
 json_values() {  # liest key=wert-Paare (wert = datei) und baut das JSON fuer render()
   python3 - "$@" <<'PY'
 import json, sys
@@ -183,6 +192,9 @@ Backend: UP
 TXT
 : > "$TMP/empty.txt"
 
+report_prompt "$HEALTH" "$TMP/health-prompt.txt"
+report_prompt "$PERF" "$TMP/perf-prompt.txt"
+
 echo "1) Health-Check: Faktenblatt misst die Groessen deterministisch"
 printf '%s\n' "$FIX" > "$TMP/base.txt"
 VALUES="$(json_values execution_path="$TMP/base.txt" \
@@ -200,6 +212,8 @@ check "FAKT backend_tests_total: 7"          'grep -qx "FAKT backend_tests_total
 check "FAKT backend_tests_failures: 1"       'grep -qx "FAKT backend_tests_failures: 1" "$TMP/health-facts.out"'
 check "FAKT backend_tests_skipped: 1"        'grep -qx "FAKT backend_tests_skipped: 1" "$TMP/health-facts.out"'
 check "FAKT backend_test_classes_failed: 1"  'grep -qx "FAKT backend_test_classes_failed: 1" "$TMP/health-facts.out"'
+# 1.5 s + 0.5 s aus den beiden "Tests run:"-Zeilen; die 0.2 s der FAILURE-Einzelzeile zaehlen nicht mit.
+check "FAKT backend_tests_seconds: 2.0"      'grep -qx "FAKT backend_tests_seconds: 2.0" "$TMP/health-facts.out"'
 check "FAKT frontend_build_exit: 0"          'grep -qx "FAKT frontend_build_exit: 0" "$TMP/health-facts.out"'
 check "FAKT frontend_lint_exit: 1"           'grep -qx "FAKT frontend_lint_exit: 1" "$TMP/health-facts.out"'
 check "FAKT frontend_lint_errors: 1"         'grep -qx "FAKT frontend_lint_errors: 1" "$TMP/health-facts.out"'
@@ -230,7 +244,38 @@ check "ohne Messbloecke: Luecke benannt" \
   'grep -q "^NICHT GEMESSEN: backend_tests_exit (" "$TMP/health-facts-empty.out"'
 check "ohne Messbloecke: Plattenmessung bleibt" \
   'grep -qx "FAKT backend_sources: 4" "$TMP/health-facts-empty.out"'
+check "ohne Messbloecke: keine stille Null bei tsc" \
+  '! grep -q "^FAKT frontend_tsc_errors: " "$TMP/health-facts-empty.out" \
+     && grep -q "^NICHT GEMESSEN: frontend_tsc_errors (" "$TMP/health-facts-empty.out"'
 check "ohne Messbloecke laeuft ohne stderr" '[ ! -s "$TMP/health-facts-empty.err" ]'
+
+# Abgebrochener metrics-Block: seine erste Zeile beginnt ebenfalls mit "Backend: ", enthaelt aber
+# Quellzahlen statt eines Actuator-Status. Ein freies "tail -1" wuerde daraus einen Gesundheits-
+# status erfinden — hier muss eine Luecke stehen.
+printf '  CODE-METRIKEN\nBackend: 767 Sources, 723 Tests (94.3%%)\n' > "$TMP/metrics-abbruch.txt"
+ABBRUCH_VALUES="$(json_values execution_path="$TMP/base.txt" \
+  block.backend_tests.output="$TMP/tests-out.txt" \
+  block.frontend_build.output="$TMP/build-out.txt" \
+  block.frontend_lint.output="$TMP/lint-out.txt" \
+  block.metrics.output="$TMP/metrics-abbruch.txt")"
+render "$HEALTH" name:facts "$ABBRUCH_VALUES" > "$TMP/health-facts-abbruch.sh"
+bash "$TMP/health-facts-abbruch.sh" > "$TMP/health-facts-abbruch.out" 2>/dev/null
+check "abgebrochener metrics-Block: kein erfundener Status" \
+  '! grep -q "^FAKT backend_actuator_status: " "$TMP/health-facts-abbruch.out"'
+check "abgebrochener metrics-Block: Luecke benannt" \
+  'grep -q "^NICHT GEMESSEN: backend_actuator_status (" "$TMP/health-facts-abbruch.out"'
+check "abgebrochener metrics-Block: npm_audit ebenfalls Luecke" \
+  'grep -q "^NICHT GEMESSEN: npm_audit (" "$TMP/health-facts-abbruch.out"'
+printf 'Backend: DOWN\n' > "$TMP/metrics-down.txt"
+DOWN_VALUES="$(json_values execution_path="$TMP/base.txt" \
+  block.backend_tests.output="$TMP/tests-out.txt" \
+  block.frontend_build.output="$TMP/build-out.txt" \
+  block.frontend_lint.output="$TMP/lint-out.txt" \
+  block.metrics.output="$TMP/metrics-down.txt")"
+render "$HEALTH" name:facts "$DOWN_VALUES" > "$TMP/health-facts-down.sh"
+bash "$TMP/health-facts-down.sh" > "$TMP/health-facts-down.out" 2>/dev/null
+check "Statuswert DOWN wird uebernommen" \
+  'grep -qx "FAKT backend_actuator_status: DOWN" "$TMP/health-facts-down.out"'
 
 echo "3) Health-Check: Rohlogs nur gekuerzt (80 Zeilen je Block)"
 { echo "mvn test: exit 1 (Log: /nirgends, 200 Zeilen)"
@@ -260,22 +305,28 @@ run_health_gate "$TMP/health-facts.out"
 check "vollstaendiges Blatt: GREEN durchgereicht" 'grep -qx "gate_status: GREEN" "$TMP/health-gate.out"'
 check "vollstaendiges Blatt: project-health"      'grep -qx "gate_category: project-health" "$TMP/health-gate.out"'
 check "Gate laeuft ohne stderr"                   '[ ! -s "$TMP/health-gate.err" ]'
-grep -v '^FAKT backend_sources: ' "$TMP/health-facts.out" > "$TMP/health-facts-luecke.out"
-run_health_gate "$TMP/health-facts-luecke.out"
-check "fehlende Pflicht-FAKT-Zeile: RED"          'grep -qx "gate_status: RED" "$TMP/health-gate.out"'
-check "fehlende Pflicht-FAKT-Zeile: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/health-gate.out"'
-check "Grund nennt das fehlende Feld"             'grep "^gate_description:" "$TMP/health-gate.out" | grep -q "backend_sources"'
+# Je Pflichtfeld ein eigener RED-Lauf. Die Liste kommt aus der PFLICHT-FAKTEN-Zeile des
+# Faktenblatts; damit faellt auf, wenn die drei redundanten Listen (Echo im Messblock,
+# Schleife im Gate, Aufzaehlung im Report-Prompt) auseinanderdriften.
+mandatory_fields() {  # $1 = faktenblatt
+  sed -n 's/^PFLICHT-FAKTEN: //p' "$1" | tr ' ' '\n' | grep -v '^$'
+}
+HEALTH_FIELDS="$(mandatory_fields "$TMP/health-facts.out")"
+check "Health: Pflichtfeld-Liste nicht leer" '[ -n "$HEALTH_FIELDS" ]'
+for FIELD in $HEALTH_FIELDS; do
+  grep -v "^FAKT $FIELD: " "$TMP/health-facts.out" > "$TMP/health-facts-luecke.out"
+  run_health_gate "$TMP/health-facts-luecke.out"
+  check "ohne $FIELD: RED/audit-invalid mit Begruendung" \
+    'grep -qx "gate_status: RED" "$TMP/health-gate.out" \
+       && grep -qx "gate_category: audit-invalid" "$TMP/health-gate.out" \
+       && grep "^gate_description:" "$TMP/health-gate.out" | grep -q "$FIELD"'
+  check "Report-Prompt nennt Pflichtfeld $FIELD" 'grep -q "$FIELD" "$TMP/health-prompt.txt"'
+done
 run_health_gate "$TMP/empty.txt"
 check "ohne Faktenblatt: RED"                     'grep -qx "gate_status: RED" "$TMP/health-gate.out"'
 check "ohne Faktenblatt: audit-invalid"           'grep -qx "gate_category: audit-invalid" "$TMP/health-gate.out"'
 
 echo "5) Health-Check: Report-Prompt bindet die KI ans Faktenblatt"
-python3 - "$HEALTH" > "$TMP/health-prompt.txt" <<'PY'
-import json, sys
-definition = json.load(open(sys.argv[1], encoding='utf-8'))
-report = definition['metadata']['audit']['reportBlock']
-print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report))
-PY
 check "Prompt nutzt das Faktenblatt"      'grep -q "block.facts.output" "$TMP/health-prompt.txt"'
 check "Prompt verbietet eigenes Messen"   'grep -qi "miss und zaehle nichts selbst" "$TMP/health-prompt.txt"'
 check "Prompt kennt NICHT GEMESSEN"       'grep -q "NICHT GEMESSEN" "$TMP/health-prompt.txt"'
@@ -326,12 +377,6 @@ check "Grund nennt das fehlende Feld" \
   'grep "^gate_description:" "$TMP/perf-gate.out" | grep -q "repository_loop_count"'
 
 echo "8) Performance-Audit: Report-Prompt bindet die KI ans Faktenblatt"
-python3 - "$PERF" > "$TMP/perf-prompt.txt" <<'PY'
-import json, sys
-definition = json.load(open(sys.argv[1], encoding='utf-8'))
-report = definition['metadata']['audit']['reportBlock']
-print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == report))
-PY
 check "Prompt nutzt das Faktenblatt"    'grep -q "block.facts.output" "$TMP/perf-prompt.txt"'
 check "Prompt verbietet eigenes Messen" 'grep -qi "schaetze nichts selbst" "$TMP/perf-prompt.txt"'
 check "Prompt kennt NICHT GEMESSEN"     'grep -q "NICHT GEMESSEN" "$TMP/perf-prompt.txt"'
