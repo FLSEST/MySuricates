@@ -77,6 +77,35 @@ describe('gated module queries', () => {
     expect(chainRequests).toBe(0);
   });
 
+  // b13509f3: placeholderData greift in v5 nur bei status === 'pending'. Nach einem 429 galt
+  // deshalb jedes Modul wieder als „an" und Navigation/Widgets flackerten.
+  it('keep the cached module state when the request fails with 429', async () => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('core', ['chains'])));
+    server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(
+      { error: 'Rate limit exceeded', timestamp: 'x' },
+      { status: 429, headers: { 'Retry-After': '5' } },
+    )));
+
+    const { result } = renderHook(() => useSystemModules(), { wrapper: createWrapper() });
+    expect(result.current.data?.modules.find((m) => m.name === 'chains')!.enabled).toBe(false);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data?.modules.find((m) => m.name === 'chains')!.enabled).toBe(false);
+  });
+
+  it('still asks the server once when the cache seeded the query', async () => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('core', ['chains'])));
+    let requests = 0;
+    server.use(http.get('/api/v1/system/capabilities', () => {
+      requests += 1;
+      return HttpResponse.json({ routes: [], ...modulesFixture('research', []) });
+    }));
+
+    const { result } = renderHook(() => useSystemModules(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.data!.preset).toBe('research'));
+    expect(requests).toBe(1);
+  });
+
   it('remember the last known modules across reloads to avoid a first-request 404', async () => {
     serveModules(['chains']);
     const first = renderHook(() => useSystemModules(), { wrapper: createWrapper() });
