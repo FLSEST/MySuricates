@@ -90,6 +90,17 @@ check "fehlender Meldeweg erkannt (exit 1)" '[ "$RC" -eq 1 ]'
 OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "korrektes SECURITY.md akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
 
+echo "9) --tracked prueft den getrackten Bestand, nicht die Arbeitskopie"
+make_repo "$TMP/sec2"
+( cd "$TMP/sec2" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "nur auf Platte liegende SECURITY.md wird nicht akzeptiert (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md als nicht getrackt"                         'grep -qi "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec2" && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "einmal committete SECURITY.md wird akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

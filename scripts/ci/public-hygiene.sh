@@ -243,18 +243,33 @@ check_gitignore_leaks() {
 # ---------------------------------------------------------------------------
 check_security_md() {
   local f="$HYGIENE_SECURITY_FILE"
-  if [ ! -f "$f" ]; then
-    annotate "$f" 1 "Datei fehlt — kein dokumentierter Meldeweg fuer Sicherheitsluecken"
-    return
+  local content
+  if [ "$MODE" = "worktree" ]; then
+    # --worktree beschreibt bewusst auch Ungetracktes (siehe check_worktree_strays) — hier
+    # ist die Arbeitskopie die richtige Quelle.
+    if [ ! -f "$f" ]; then
+      annotate "$f" 1 "Datei fehlt — kein dokumentierter Meldeweg fuer Sicherheitsluecken"
+      return
+    fi
+    content="$(cat -- "$f" 2>/dev/null)"
+  else
+    # --tracked ist die Release-Frage: was landet im Repository. Eine Datei, die nur auf
+    # Platte liegt (noch nicht "git add"ed), zaehlt dafuer nicht — sonst meldet das Gate
+    # OK, obwohl SECURITY.md gar nicht getrackt ist.
+    if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      annotate "$f" 1 "ist nicht getrackt — kein dokumentierter Meldeweg fuer Sicherheitsluecken im Bestand"
+      return
+    fi
+    content="$(git show "HEAD:$f" 2>/dev/null)"
   fi
   local line
-  line="$(grep -nE "$HYGIENE_SECURITY_EMAIL_REGEX" "$f" 2>/dev/null | head -1 | cut -d: -f1)"
+  line="$(grep -nE "$HYGIENE_SECURITY_EMAIL_REGEX" <<<"$content" | head -1 | cut -d: -f1)"
   if [ -n "$line" ]; then
     annotate "$f" "$line" "enthaelt eine E-Mail-Adresse — Meldeweg soll GitHub Private Vulnerability Reporting sein, keine Mailadresse"
   fi
   local term found=0
   for term in "${HYGIENE_SECURITY_REQUIRED_TERMS[@]}"; do
-    if grep -qF -- "$term" "$f" 2>/dev/null; then
+    if grep -qiF -- "$term" <<<"$content"; then
       found=1
       break
     fi
