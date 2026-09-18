@@ -1,0 +1,90 @@
+{
+  "chains": {
+    "name": "Chains",
+    "description": "Verkettet mehrere Workflows zu einer Pipeline, die nacheinander läuft."
+  },
+  "assistant": {
+    "name": "Assistent",
+    "description": "Chat-Assistent und Seitenvorschläge, die Plattform-Objekte lesen und ändern können."
+  },
+  "learning": {
+    "name": "Insights & Learning",
+    "description": "Auswertungen zu Runs, Empfehlungen und Statistiken je Block-Typ."
+  },
+  "memory": {
+    "name": "Workflow-Memory",
+    "description": "Wissen aus abgeschlossenen Runs wird gesammelt und in spätere Runs eingespeist."
+  },
+  "audit": {
+    "name": "Audit Center",
+    "description": "Befunde aus Audit-Workflows mit Berichten und Übernahme in TODOs."
+  },
+  "bpmn": {
+    "name": "BPMN-Export/-Import",
+    "description": "Exportiert Workflows als BPMN und liest MySuricates-BPMN-Exporte wieder ein."
+  },
+  "integrations": {
+    "name": "Integrationen",
+    "description": "Externe Dienste (GitHub, Jira, Trello, Google, Confluence, Taskwarrior) per OAuth, dazu Integrations-Blöcke, TODO-Tracker-Export und Kalender."
+  },
+  "webhooks": {
+    "name": "Webhooks",
+    "description": "Eingehende Webhook-Trigger, die Workflows von außen starten."
+  },
+  "remote-access": {
+    "name": "Fernzugriff",
+    "description": "Zugriff auf diese Instanz aus der Ferne über Tailscale."
+  },
+  "terminal": {
+    "name": "Run-Terminal",
+    "description": "Interaktives Terminal in den Container eines Runs über WebSocket."
+  },
+  "staging": {
+    "name": "Stable- & Test-Instanzen",
+    "description": "Stable- und Test-Instanz in Docker, samt Abgleich der Definitionen zwischen den Instanzen."
+  },
+  "conversion": {
+    "name": "Run → Workflow-Konvertierung",
+    "description": "Macht aus einem abgeschlossenen Run einen wiederverwendbaren Workflow."
+  },
+  "dialog-import": {
+    "name": "Dialog-Import",
+    "description": "Importiert einen Chat-Dialog und wandelt ihn in einen Workflow um."
+  },
+  "onboarding-profiles": {
+    "name": "Onboarding-Profile",
+    "description": "Onboarding-Profile für Projekte."
+  },
+  "skills": {
+    "name": "Skills",
+    "description": "Skill-Pakete und der Block-Typ skill-capability."
+  },
+  "debug": {
+    "name": "Workflow-Debugger",
+    "description": "Führt einen Workflow Schritt für Schritt aus, zum Nachvollziehen."
+  },
+  "factory": {
+    "name": "Workflow-Factory",
+    "description": "Erzeugt Workflows aus einer Beschreibung und repariert fehlgeschlagene selbsttätig."
+  },
+  "wishes": {
+    "name": "Wünsche",
+    "description": "Zerlegt frei formulierte Ziele in Workflows und Chains."
+  },
+  "provenance": {
+    "name": "Definitions-Hash & Run-Herkunft",
+    "description": "Jeder Run speichert einen SHA-256-Hash der Workflow-Definition, deren Version und die Auslösequelle."
+  },
+  "sealing": {
+    "name": "Versiegelte Workflows",
+    "description": "Versiegelte Definitionen lehnen Änderungen ab und starten nicht, wenn sie verändert wurden."
+  },
+  "require-sealed-for-unattended": {
+    "name": "Unbeaufsichtigt nur versiegelt",
+    "description": "Unbeaufsichtigte Runs (Schedules, Webhooks, Trigger, Auto-Reparatur, Wünsche und die davon gestarteten Chains oder Sub-Workflows) starten nur versiegelte Workflows."
+  },
+  "webhook-signatures": {
+    "name": "Webhook-Signaturen (HMAC)",
+    "description": "Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
+  }
+}

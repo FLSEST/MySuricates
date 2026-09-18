@@ -4,12 +4,14 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { ConfigSnippet } from '../components/settings/ConfigSnippet';
 import { useModuleInfo, useSystemModules } from '../hooks/useModules';
 import { useT } from '../i18n';
+import { useModuleName } from '../i18n/modules';
 import { envSnippet, yamlSnippet } from '../utils/moduleSnippets';
 import type { ModuleName } from '../types';
 
 /** Shown instead of a page whose module the backend was started without. */
 export function ModuleDisabled({ module }: { module: ModuleName }) {
   const t = useT();
+  const moduleName = useModuleName();
   const info = useModuleInfo(module);
   const { data } = useSystemModules();
   const property = info?.property ?? `automation.modules.${module}`;
@@ -19,7 +21,7 @@ export function ModuleDisabled({ module }: { module: ModuleName }) {
   return (
     <EmptyState
       icon={<PackageX className="w-8 h-8 text-text-tertiary" />}
-      title={t.modules.disabledPageTitle.replace('{name}', t.modules.names[module])}
+      title={t.modules.disabledPageTitle.replace('{name}', moduleName(module))}
       description={t.modules.disabledPageText}
       action={
         <div className="text-left space-y-3 max-w-md">
