@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import { BLOCK_TYPES, type BlockType, type StepResult } from '../../types';
 import { stepBlockName, stepBlockType, stepKind, type StepKind } from './stepMetadata';
+import { useStepAnchor } from './stepAnchors';
 
 const ICON = 'w-3 h-3';
 
@@ -66,9 +67,10 @@ function isBlockType(type: string): type is BlockType {
 /** Card root with a left stripe coloured by the step kind (AI / deterministic / human). */
 export function StepCardFrame({ step, children }: { step: StepResult; children: ReactNode }) {
   const kind = stepKind(step);
+  const anchor = useStepAnchor();
   return (
     <div
-      id={`step-${step.stepIndex}`}
+      id={anchor(step.stepIndex)}
       className={`flex gap-3 py-3 pl-3 border-l-2 ${KIND_STYLES[kind].stripe}`}
       data-step-kind={kind}
     >
