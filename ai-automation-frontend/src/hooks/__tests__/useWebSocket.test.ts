@@ -6,6 +6,10 @@ import { type ReactNode, createElement } from 'react';
 // Capture STOMP callbacks for manual message injection
 let onConnectCb: (() => void) | null = null;
 let subscribeCb: ((msg: { body: string }) => void) | null = null;
+// beforeConnect + webSocketFactory build the handshake URL — the ticket tests drive them directly
+let beforeConnectCb: (() => Promise<void>) | null = null;
+let webSocketFactoryCb: (() => unknown) | null = null;
+let lastWsUrl: string | null = null;
 const mockDeactivate = vi.fn();
 const mockActivate = vi.fn();
 
@@ -13,6 +17,8 @@ vi.mock('@stomp/stompjs', () => {
   class MockClient {
     constructor(config: Record<string, unknown>) {
       onConnectCb = config.onConnect as () => void;
+      beforeConnectCb = config.beforeConnect as (() => Promise<void>) | null;
+      webSocketFactoryCb = config.webSocketFactory as (() => unknown) | null;
     }
     activate = mockActivate.mockImplementation(() => {
       if (onConnectCb) onConnectCb();
@@ -26,14 +32,29 @@ vi.mock('@stomp/stompjs', () => {
   return { Client: MockClient };
 });
 
+// Class (not arrow fn) so `new SockJS(url)` works and the URL is captured
 vi.mock('sockjs-client', () => ({
-  default: vi.fn(),
+  default: class MockSockJS {
+    constructor(url: string) {
+      lastWsUrl = url;
+    }
+  },
 }));
 
 const mockApiGet = vi.fn();
+const mockFetchWsTicket = vi.fn();
 vi.mock('../../api/client', () => ({
-  api: { get: (...args: unknown[]) => mockApiGet(...args) },
+  api: {
+    get: (...args: unknown[]) => mockApiGet(...args),
+    fetchWsTicket: (...args: unknown[]) => mockFetchWsTicket(...args),
+  },
 }));
+
+/** Runs the handshake the way stompjs does: beforeConnect, then webSocketFactory. */
+async function openSocket() {
+  await beforeConnectCb?.();
+  webSocketFactoryCb?.();
+}
 
 import { useExecutionWebSocket } from '../useWebSocket';
 
@@ -64,10 +85,52 @@ describe('useExecutionWebSocket', () => {
   beforeEach(() => {
     onConnectCb = null;
     subscribeCb = null;
+    beforeConnectCb = null;
+    webSocketFactoryCb = null;
+    lastWsUrl = null;
     mockActivate.mockClear();
     mockDeactivate.mockClear();
     mockApiGet.mockReset();
     mockApiGet.mockResolvedValue({ runId: 'run-1', bufferId: null, available: false, firstSeq: 0, lastSeq: -1, skipped: 0, lines: [] });
+    mockFetchWsTicket.mockReset();
+    let ticketCount = 0;
+    mockFetchWsTicket.mockImplementation(() => Promise.resolve(`ticket-${++ticketCount}`));
+  });
+
+  // --- Handshake authentication (ticket instead of API key) ---
+
+  it('fetches a ticket before connecting and puts it in the handshake URL', async () => {
+    renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(beforeConnectCb).not.toBeNull());
+
+    await act(async () => { await openSocket(); });
+
+    expect(mockFetchWsTicket).toHaveBeenCalledTimes(1);
+    expect(lastWsUrl).toContain('/ws?ticket=ticket-1');
+    expect(lastWsUrl).not.toContain('apiKey=');
+  });
+
+  it('fetches a fresh ticket on every reconnect', async () => {
+    renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(beforeConnectCb).not.toBeNull());
+
+    await act(async () => { await openSocket(); });
+    await act(async () => { await openSocket(); });
+
+    expect(mockFetchWsTicket).toHaveBeenCalledTimes(2);
+    expect(lastWsUrl).toContain('ticket=ticket-2');
+  });
+
+  it('does not put a stale ticket in the URL when the ticket call fails', async () => {
+    mockFetchWsTicket.mockRejectedValue(new Error('403'));
+    renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(beforeConnectCb).not.toBeNull());
+
+    // The handshake must still be attempted (and be refused) instead of throwing — stompjs
+    // then schedules the next reconnect, which fetches a new ticket.
+    await act(async () => { await openSocket(); });
+
+    expect(lastWsUrl).toBe(`${window.location.origin}/ws?ticket=`);
   });
 
   // --- Connection lifecycle ---

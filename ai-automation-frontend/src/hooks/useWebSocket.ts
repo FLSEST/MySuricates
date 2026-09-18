@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { api } from '../api/client';
-import { useSettingsStore } from '../stores/settingsStore';
 import type { AgenticState, PendingHumanInput } from '../types';
 import type { WsMessage, ForEachState, PendingApproval, LiveLine, LiveLogSnapshot } from '../types/websocket';
 import {
@@ -75,11 +74,17 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       appendEntries(entries);
     };
 
-    const apiKey = useSettingsStore.getState().apiKey;
-    const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
+    // Der API-Key darf nicht in die Handshake-URL (Browser-History, Proxy-Logs): stompjs wartet
+    // vor JEDEM Verbindungsversuch — auch vor jedem Reconnect — auf beforeConnect, dort holen wir
+    // ein frisches Einmal-Ticket. Schlägt das fehl, geht der Handshake ohne Ticket raus, wird
+    // abgelehnt und stompjs plant den nächsten Versuch (statt einer offenen Promise-Ablehnung).
+    let wsTicket = '';
 
     const client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
+      beforeConnect: async () => {
+        wsTicket = await api.fetchWsTicket().catch(() => '');
+      },
+      webSocketFactory: () => new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`),
       reconnectDelay: 5000,
       onConnect: () => {
         setConnected(true);

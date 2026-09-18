@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { useSettingsStore } from '../stores/settingsStore';
+import { api } from '../api/client';
 
 export interface AssistantStatus {
   type: 'assistant_status';
@@ -41,11 +41,15 @@ export function useAssistantWebSocket(
     // Reuse existing client if connected
     if (clientRef.current?.connected) return;
 
-    const apiKey = useSettingsStore.getState().apiKey;
-    const wsUrl = `${window.location.origin}/ws${apiKey ? `?apiKey=${apiKey}` : ''}`;
+    // Kein API-Key in der Handshake-URL: stompjs wartet vor jedem Verbindungsversuch (auch vor
+    // jedem Reconnect) auf beforeConnect — dort holen wir ein frisches Einmal-Ticket.
+    let wsTicket = '';
 
     const client = new Client({
-      webSocketFactory: () => new SockJS(wsUrl),
+      beforeConnect: async () => {
+        wsTicket = await api.fetchWsTicket().catch(() => '');
+      },
+      webSocketFactory: () => new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`),
       reconnectDelay: 5000,
       onConnect: () => setConnected(true),
       onDisconnect: () => setConnected(false),

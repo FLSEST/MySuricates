@@ -5,7 +5,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import { useThemeAppearance } from '../../stores/themeStore';
-import { useSettingsStore } from '../../stores/settingsStore';
+import { api } from '../../api/client';
 import { useT } from '../../i18n';
 import { RefreshCw } from 'lucide-react';
 import { Button, Badge } from '../ui';
@@ -77,12 +77,24 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
 
   // Opens the socket for the current runId; the caller is responsible for the 'connecting' status
   // (initial/reset state on mount, explicit set in handleReconnect).
-  const connect = useCallback(() => {
+  // Ein rohes Browser-WebSocket kann beim Handshake keine Header senden — statt des API-Keys
+  // (der so in History und Proxy-Logs landen würde) holt jeder Verbindungsversuch ein frisches
+  // Einmal-Ticket.
+  const connect = useCallback(async () => {
+    if (!termRef.current) return;
+
+    let ticket: string;
+    try {
+      ticket = await api.fetchWsTicket();
+    } catch {
+      setStatus('error');
+      return;
+    }
+    // Während des Ticket-Abrufs kann das Terminal längst unmountet sein (cleanup nullt termRef).
     if (!termRef.current) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiKey = useSettingsStore.getState().apiKey;
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${runId}${apiKey ? `?apiKey=${encodeURIComponent(apiKey)}` : ''}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal/${runId}?ticket=${encodeURIComponent(ticket)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -144,8 +156,8 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
       }
     });
 
-    // Connect WebSocket
-    connect();
+    // Connect WebSocket (asynchron: holt zuerst ein Handshake-Ticket)
+    void connect();
 
     // Handle resize
     const observer = new ResizeObserver(() => {
@@ -177,7 +189,7 @@ export function TerminalPanel({ runId }: TerminalPanelProps) {
     wsRef.current?.close();
     termRef.current?.clear();
     setStatus('connecting');
-    connect();
+    void connect();
   };
 
   const statusConfig: Record<ConnectionStatus, { variant: 'success' | 'warning' | 'danger' | 'default'; label: string }> = {
