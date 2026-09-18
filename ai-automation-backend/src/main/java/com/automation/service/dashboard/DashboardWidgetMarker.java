@@ -1,5 +1,7 @@
 package com.automation.service.dashboard;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -15,42 +17,45 @@ import java.util.regex.Pattern;
  * blockquote or numbered-list prefix ({@code -}, {@code *}, {@code +}, {@code >}, {@code 1.},
  * {@code 1)}, up to two digits), a heading, bold or backtick decoration, and a fenced code block
  * around the JSON — including one with a language tag ({@code ```json}, glued directly to the JSON
- * or followed by whitespace).
+ * or followed by whitespace). Round 3 dropped tolerance for whitespace before the colon itself
+ * (round 1/2 briefly accepted {@code dashboard_widget : {...}}; the shared {@link #MARKER_KEYWORD}
+ * requires the colon right after the word) — both patterns agree on this, so it is a firm rule, not
+ * a gap.
  *
- * <p><b>Three rules on purpose:</b>
- * <ol>
- *   <li>A marker keyword not followed by an opening {@code {} or {@code [} at all does not count as
- *       a marker — a report that merely documents this feature in prose (no object after the colon)
- *       must not raise a false "invalid result"; see {@link #scan}.</li>
- *   <li>A marker followed by {@code [} (fix round 2, B4) is a real, broken occurrence — an array is
- *       not this contract's shape, but it is clearly an attempt at one, so the workflow author should
- *       see "invalid result", not silently "no result yet".</li>
- *   <li>Ambiguity is decided by an <b>unanchored</b> occurrence count (fix round 2, B3): counting only
- *       line-anchored markers, as round 1 did, missed a marker that does not start at a line's
- *       beginning (a report writing its own conclusion as {@code "Ergebnis: dashboard_widget: ..."},
- *       or an attacker's marker hidden mid-line in quoted content) — such a marker neither won nor
- *       triggered ambiguity, so quoted content could still silently decide the result. More than one
- *       real occurrence <em>anywhere</em> in the output — regardless of line position — now makes the
- *       whole output ambiguous; see {@link Scan#ambiguous()}. The <b>anchored</b> pattern is still
- *       used to pick the winner once the count confirms there is exactly one: a lone real occurrence
- *       that itself is not line-anchored is therefore MISSING, not a winner, and not ambiguous either
- *       — a report's own marker is expected to start its own line. Across several step outputs of one
- *       run the ambiguity rule does not apply at all: several markers on different steps are a normal
- *       sequence, and {@link DashboardWidgetResultParser#parseRun} lets the last one win.</li>
- * </ol>
+ * <p><b>Fix round 4, R1 (structural — the actual fix for two prior regressions):</b> rounds 2 and 3
+ * each wrote "is this occurrence real" as separate, hand-copied logic in the winner loop and in the
+ * occurrence counter, and each time the two copies quietly diverged: round 2's counter pattern lacked
+ * the winner pattern's decoration group (a decorated marker counted for zero, round 3, C1); round 3's
+ * counter alone gained a blank-line check that the winner loop never had, and — because the winner
+ * loop stayed fully tolerant of blank lines while the counter's check applied indiscriminately to
+ * <em>anchored</em> occurrences too — a line-anchored marker whose value sits after a blank line got
+ * silently under-counted, hiding real ambiguity (the round-3 fix's own regression, closed here).
  *
- * <p><b>Fix round 3, C1 (regression from round 2):</b> the anchored and unanchored patterns are built
- * from one shared {@link #MARKER_KEYWORD} sub-expression so they can never drift apart on what counts
- * as "the keyword" again — round 2's unanchored pattern lacked the anchored one's {@code [*`]*}
- * decoration group, so a marker written as {@code **dashboard_widget**:} counted as zero occurrences
- * for ambiguity while still winning the anchored search, reopening the hijack this class exists to
- * close.
+ * <p>There is now exactly one predicate, {@link #realValueStart}, and both the winner loop in
+ * {@link #scan} and {@link #countRealOccurrences} call it with no acceptance logic of their own.
+ * Finding <em>candidates</em> still uses two patterns — {@link #ANCHORED_MARKER} (line-anchored,
+ * decoration around the word) to pick the winner, {@link #UNANCHORED_MARKER} (the same
+ * {@link #MARKER_KEYWORD}, anywhere) to enumerate everything the counter must consider — because
+ * anchored candidates are a subset of unanchored ones; that split is fine as long as what counts as a
+ * <em>real</em> occurrence, once a candidate is found, is identical code either way.
  *
- * <p><b>Fix round 3, C2:</b> the ambiguity counter (unlike the winner search) stops at a blank line
- * while deciding whether an occurrence is real — a prose mention of the feature, followed several
- * paragraphs later by an unrelated example object, must not be miscounted as a real occurrence just
- * because {@code skipDecoration} would otherwise happily walk across any number of blank lines to
- * reach it.
+ * <p>The rule {@link #realValueStart} implements: an occurrence is real when it is line-anchored, or
+ * when its value starts on the very same line as the keyword. A line-anchored marker is always real,
+ * however many lines — blank or not — separate it from its value (so {@code dashboard_widget:} then
+ * a blank line then a fenced {@code ```json} block keeps working). An <em>unanchored</em> marker
+ * (mid-line, e.g. hidden in quoted content or written as {@code "Ergebnis: dashboard_widget: ..."})
+ * is real only if its value follows immediately, without crossing a line terminator — a bare prose
+ * mention such as {@code "Siehe dashboard_widget:"}, whose value (if any) is several lines away, is
+ * never counted as a real occurrence. Both the winner search and the ambiguity counter apply this
+ * rule identically: a marker followed by neither {@code {} nor {@code [} at all is not a marker (a
+ * prose mention must not raise a false "invalid result"); a marker followed by {@code [} (round 2,
+ * B4) is real but never a valid contract shape (an array is clearly an attempt at one, so the
+ * workflow author should see "invalid result", not silently "no result yet"). More than one real
+ * occurrence <em>anywhere</em> in the output makes the whole output ambiguous — see
+ * {@link Scan#ambiguous()} — regardless of line position, because quoted/injected content must never
+ * be able to silently out-vote the report's own verdict. Across several step outputs of one run the
+ * ambiguity rule does not apply at all: several markers on different steps are a normal sequence, and
+ * {@link DashboardWidgetResultParser#parseRun} lets the last one win.
  */
 final class DashboardWidgetMarker {
 
@@ -61,26 +66,21 @@ final class DashboardWidgetMarker {
      * The marker keyword itself: tolerant of bold/backtick decoration touching the word on either
      * side and the hyphenated spelling, any case. The single source of truth for "what is the
      * keyword" — {@link #ANCHORED_MARKER} and {@link #UNANCHORED_MARKER} are both built from this one
-     * sub-expression (fix round 3, C1) so they cannot silently drift apart on what counts as a marker.
+     * sub-expression so they cannot silently drift apart on what counts as a marker.
      */
     private static final String MARKER_KEYWORD = "[*`]*dashboard[_-]widget[*`]*:";
 
     // Anchored to the start of a line, after optional indentation and an optional list/blockquote/
-    // numbered prefix, and a heading. Used to pick the winner (see class javadoc) once the unanchored
-    // count below has confirmed there is exactly one real occurrence.
+    // numbered prefix, and a heading. Finds winner candidates (see class javadoc); every match is by
+    // definition "line-anchored" for realValueStart's purposes.
     private static final Pattern ANCHORED_MARKER = Pattern.compile(
             "^[ \\t]*(?:[-*>+]\\s+|\\d{1,2}[.)]\\s+)?(?:#{1,6}\\s+)?" + MARKER_KEYWORD,
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
-    // Unanchored (fix round 2, B3): used only to count how many real marker occurrences exist
-    // anywhere in the output, regardless of line position — see the class javadoc.
+    // Unanchored: finds every candidate the ambiguity counter must consider, anywhere in the output —
+    // see the class javadoc.
     private static final Pattern UNANCHORED_MARKER = Pattern.compile(
             MARKER_KEYWORD, Pattern.CASE_INSENSITIVE);
-
-    // A blank line: a line break, optional horizontal whitespace, another line break (fix round 3,
-    // C2) — used only by the ambiguity counter to stop crediting a marker with a value that is
-    // actually several paragraphs away.
-    private static final Pattern BLANK_LINE = Pattern.compile("\\r?\\n[ \\t]*\\r?\\n");
 
     /**
      * What one output holds. {@code found} without {@code json} means: there is a real marker
@@ -97,54 +97,57 @@ final class DashboardWidgetMarker {
     }
 
     /**
-     * The marker state of this output. A marker occurrence only "counts" when — after skipping
-     * decoration — it is immediately followed by {@code {} or {@code [}; a bare mention of the
-     * keyword is skipped entirely. More than one counting occurrence anywhere makes the whole output
+     * The marker state of this output. More than one real occurrence anywhere makes the whole output
      * ambiguous (see the class javadoc); otherwise the line-anchored occurrence, if any, wins.
      */
     static Scan scan(String output) {
         if (output == null || output.isBlank()) {
             return Scan.NONE;
         }
-        if (countRealOccurrences(output) > 1) {
+        List<Integer> anchoredEnds = anchoredKeywordEnds(output);
+        if (countRealOccurrences(output, anchoredEnds) > 1) {
             return new Scan(true, null, true);
         }
-        Matcher matcher = ANCHORED_MARKER.matcher(output);
-        while (matcher.find()) {
-            int pos = skipDecoration(output, matcher.end());
-            if (pos >= output.length()) {
+        for (int keywordEnd : anchoredEnds) {
+            int valueStart = realValueStart(output, keywordEnd, true);
+            if (valueStart < 0) {
                 continue;
             }
-            char c = output.charAt(pos);
-            if (c == '{') {
-                return new Scan(true, readObject(output, pos), false);
+            if (output.charAt(valueStart) == '{') {
+                return new Scan(true, readObject(output, valueStart), false);
             }
-            if (c == '[') {
-                return new Scan(true, null, false);
-            }
+            return new Scan(true, null, false); // '['
         }
         return Scan.NONE;
     }
 
+    /** Every line-anchored marker keyword's end position (right after its colon), in text order. */
+    private static List<Integer> anchoredKeywordEnds(String output) {
+        List<Integer> ends = new ArrayList<>();
+        Matcher matcher = ANCHORED_MARKER.matcher(output);
+        while (matcher.find()) {
+            ends.add(matcher.end());
+        }
+        return ends;
+    }
+
     /**
-     * How many real marker occurrences (a marker counts once it is followed, after decoration, by
-     * {@code {} or {@code [}) exist anywhere in the output — not only at a line's start (fix round 2,
-     * B3+B4). Short-circuits once a second one is found; the exact count above 1 is never needed.
-     *
-     * <p>Fix round 3, C2: unlike the winner search, a candidate here is only real if nothing between
-     * the marker and its value crosses a blank line — otherwise a bare prose mention of the feature,
-     * followed several paragraphs later by an unrelated example object, would count as a real
-     * occurrence merely because {@link #skipDecoration} tolerates walking across blank lines (needed
-     * for the winner search, e.g. a marker line followed by a fenced JSON block).
+     * How many real marker occurrences exist anywhere in the output — not only at a line's start (fix
+     * round 2, B3+B4) — using the single acceptance rule in {@link #realValueStart} (fix round 4,
+     * R1). Package-private, not private: the differential test (R2) calls this directly to pin the
+     * invariant that whenever {@link #scan} returns a winner, this count is exactly 1.
      */
-    private static int countRealOccurrences(String output) {
+    static int countRealOccurrences(String output) {
+        return countRealOccurrences(output, anchoredKeywordEnds(output));
+    }
+
+    private static int countRealOccurrences(String output, List<Integer> anchoredEnds) {
         Matcher matcher = UNANCHORED_MARKER.matcher(output);
         int count = 0;
         while (matcher.find()) {
-            int start = matcher.end();
-            int pos = skipDecoration(output, start);
-            if (pos < output.length() && (output.charAt(pos) == '{' || output.charAt(pos) == '[')
-                    && !BLANK_LINE.matcher(output).region(start, pos).find()) {
+            int keywordEnd = matcher.end();
+            boolean anchored = anchoredEnds.contains(keywordEnd);
+            if (realValueStart(output, keywordEnd, anchored) >= 0) {
                 count++;
                 if (count > 1) {
                     return count;
@@ -152,6 +155,43 @@ final class DashboardWidgetMarker {
             }
         }
         return count;
+    }
+
+    /**
+     * THE single acceptance rule (fix round 4, R1): where a marker's value starts after
+     * {@code keywordEnd} (the position right after the matched keyword's colon), or -1 when this
+     * occurrence is not real. Used by both {@link #scan}'s winner loop and
+     * {@link #countRealOccurrences} — neither has any acceptance logic of its own.
+     *
+     * <p>Skips decoration, then requires an opening {@code {} or {@code [} right there. When the
+     * occurrence is <b>not</b> line-anchored, the decoration walk may not cross a line terminator at
+     * all — its value must start on the very same line, or it does not count. A line-anchored
+     * occurrence is always real regardless of how many lines (blank or not) the decoration walk
+     * crosses, exactly as before.
+     */
+    private static int realValueStart(String output, int keywordEnd, boolean anchored) {
+        int pos = skipDecoration(output, keywordEnd);
+        if (pos >= output.length()) {
+            return -1;
+        }
+        char c = output.charAt(pos);
+        if (c != '{' && c != '[') {
+            return -1;
+        }
+        if (!anchored && containsLineBreak(output, keywordEnd, pos)) {
+            return -1;
+        }
+        return pos;
+    }
+
+    private static boolean containsLineBreak(String text, int start, int end) {
+        for (int i = start; i < end; i++) {
+            char c = text.charAt(i);
+            if (c == '\n' || c == '\r') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

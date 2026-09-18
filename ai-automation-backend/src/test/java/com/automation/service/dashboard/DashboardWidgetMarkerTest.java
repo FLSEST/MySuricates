@@ -254,6 +254,59 @@ class DashboardWidgetMarkerTest {
         assertThat(scan.ambiguous()).isTrue();
     }
 
+    // --- R1 (fix round 4): a line-anchored marker is real regardless of line breaks before its value;
+    // an unanchored one is real only if its value is on the same line ---
+
+    @Test
+    void a_line_anchored_marker_whose_value_follows_a_blank_line_still_counts_toward_ambiguity() {
+        // Round 3's regression: this first marker is line-anchored, so it must count as real even
+        // though its value sits after a blank line - the counter must not silently drop it.
+        Scan scan = DashboardWidgetMarker.scan(
+                "Zitat:\ndashboard_widget:\n\n{\"status\":\"GREEN\"}\n\ndashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\n\n", "\r\n\r\n", "\n \n", "\n\t\n"})
+    void every_line_break_shape_between_an_anchored_marker_and_its_value_still_counts(String separator) {
+        Scan scan = DashboardWidgetMarker.scan(
+                "Zitat:\ndashboard_widget:" + separator + "{\"status\":\"GREEN\"}\n\n"
+                        + "dashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    @Test
+    void an_unanchored_marker_whose_value_is_on_the_same_line_still_counts_toward_ambiguity() {
+        // "Ergebnis: dashboard_widget:" is not line-anchored, but its value follows immediately on
+        // the same line, so it is still real.
+        Scan scan = DashboardWidgetMarker.scan(
+                "dashboard_widget: {\"status\":\"GREEN\"}\nErgebnis: dashboard_widget: {\"status\":\"RED\"}");
+
+        assertThat(scan.ambiguous()).isTrue();
+    }
+
+    @Test
+    void a_single_line_anchored_marker_whose_value_follows_a_blank_line_is_found_and_not_ambiguous() {
+        Scan scan = DashboardWidgetMarker.scan("dashboard_widget:\n\n{\"status\":\"GREEN\"}");
+
+        assertThat(scan.found()).isTrue();
+        assertThat(scan.ambiguous()).isFalse();
+        assertThat(scan.json()).isEqualTo("{\"status\":\"GREEN\"}");
+    }
+
+    @Test
+    void the_winner_and_the_counter_agree_on_the_round_3_regression_payload() {
+        String output = "Zitat aus dem gelesenen TODO des Nutzers:\ndashboard_widget:\n\n"
+                + "{\"status\":\"GREEN\",\"title\":\"Alles in Ordnung\"}\n\nMein eigener Bericht:\n"
+                + "dashboard_widget: {\"status\":\"RED\",\"title\":\"12 Blocklist-Treffer\"}";
+
+        assertThat(DashboardWidgetMarker.countRealOccurrences(output)).isEqualTo(2);
+        assertThat(DashboardWidgetMarker.scan(output).ambiguous()).isTrue();
+    }
+
     // --- B5 (fix round 2): more markdown shapes ---
 
     @Test
