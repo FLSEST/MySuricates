@@ -2,6 +2,8 @@ package com.automation.executor.compress;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -12,8 +14,15 @@ import java.util.regex.PatternSyntaxException;
 public final class RegexGuard {
 
     static final int MAX_MATCH_CHARS = 10_000;
+    /** Cap of the compile cache; reaching it clears the cache instead of growing without bound. */
+    static final int MAX_CACHED_PATTERNS = 500;
+
+    /** Compiled patterns by flags + regex: a stage compiles the same regex in validate() and in apply(). */
+    private static final Map<String, Pattern> COMPILED = new ConcurrentHashMap<>();
 
     private final long deadlineNanos;
+    /** Shared by every CharSequence this guard hands to a matcher, so short lines add up to a check too. */
+    private final int[] calls = new int[1];
 
     private RegexGuard(long deadlineNanos) {
         this.deadlineNanos = deadlineNanos;
@@ -23,9 +32,16 @@ public final class RegexGuard {
         return new RegexGuard(System.nanoTime() + budget.toNanos());
     }
 
+    /** Compiles — or returns the already compiled {@link Pattern}; patterns are immutable and thread-safe. */
     public static Pattern compile(String regex, int flags, String where) {
+        String key = flags + "|" + regex;   // flags are digits, so the first | always delimits them
+        Pattern cached = COMPILED.get(key);
+        if (cached != null) return cached;
         try {
-            return Pattern.compile(regex, flags);
+            Pattern compiled = Pattern.compile(regex, flags);
+            if (COMPILED.size() >= MAX_CACHED_PATTERNS) COMPILED.clear();
+            COMPILED.put(key, compiled);
+            return compiled;
         } catch (PatternSyntaxException e) {
             throw new CompressionException(where + ": ungültiger regulärer Ausdruck '" + regex + "' (" + e.getDescription() + ")");
         }
@@ -34,7 +50,7 @@ public final class RegexGuard {
     public boolean find(Pattern pattern, String line) {
         String head = head(line);
         try {
-            return pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).find();
+            return pattern.matcher(sequence(head)).find();
         } catch (StackOverflowError e) {
             throw tooDeep(line);
         }
@@ -43,7 +59,7 @@ public final class RegexGuard {
     public boolean matches(Pattern pattern, String line) {
         String head = head(line);
         try {
-            return pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).matches();
+            return pattern.matcher(sequence(head)).matches();
         } catch (StackOverflowError e) {
             throw tooDeep(line);
         }
@@ -60,11 +76,17 @@ public final class RegexGuard {
         String head = head(line);
         String replaced;
         try {
-            replaced = pattern.matcher(new DeadlineCharSequence(head, deadlineNanos)).replaceAll(replacement);
+            replaced = pattern.matcher(sequence(head)).replaceAll(replacement);
         } catch (StackOverflowError e) {
             throw tooDeep(line);
         }
         return line.length() > head.length() ? replaced + line.substring(head.length()) : replaced;
+    }
+
+    /** Counts the call itself too, so even lines that never reach {@code charAt} (empty ones) run into a check. */
+    private DeadlineCharSequence sequence(String text) {
+        if ((++calls[0] & 0x3FF) == 0) checkDeadline();
+        return new DeadlineCharSequence(text, deadlineNanos, calls);
     }
 
     public void checkDeadline() {
@@ -91,18 +113,16 @@ public final class RegexGuard {
 
     /**
      * Checks the deadline every 1,024 {@code charAt} calls — not by index, so backtracking on short lines or
-     * near a line end is caught too. Sub-sequences share the parent's call counter.
+     * near a line end is caught too. Sub-sequences and every later line of the same guard share the call
+     * counter, so an input of very many short lines also reaches a check inside the stage, not only between
+     * stages (each line alone would never get to 1,024 calls).
      */
     private static final class DeadlineCharSequence implements CharSequence {
         private final String text;
         private final long deadline;
         private final int[] calls;
 
-        DeadlineCharSequence(String text, long deadline) {
-            this(text, deadline, new int[1]);
-        }
-
-        private DeadlineCharSequence(String text, long deadline, int[] calls) {
+        DeadlineCharSequence(String text, long deadline, int[] calls) {
             this.text = text;
             this.deadline = deadline;
             this.calls = calls;

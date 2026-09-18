@@ -2,12 +2,14 @@ import { Shrink } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
 import type { StepResult } from '../../types';
 import { compressionFacts } from './stepMetadata';
+import { useStepAnchor } from './stepAnchors';
 
 /** Makes a compression unmistakable in the run view: size change, source link, capped flag, stage table. */
 export function CompressionPanel({ step }: { step: StepResult }) {
   const t = useT().workflows.compression;
   const locale = useI18nStore((s) => s.locale) === 'de' ? 'de-DE' : 'en-US';
   const facts = compressionFacts(step);
+  const anchor = useStepAnchor();
   if (!facts) return null;
   const fmt = (n: number) => n.toLocaleString(locale);
   const change = facts.inChars > 0 ? Math.round(Math.abs(1 - facts.outChars / facts.inChars) * 1000) / 10 : 0;
@@ -22,7 +24,7 @@ export function CompressionPanel({ step }: { step: StepResult }) {
           {t.badge.replace('{in}', fmt(facts.inChars)).replace('{out}', fmt(facts.outChars)).replace('{percent}', percent)}
         </span>
         {src && src.stepIndex !== null && (
-          <a href={`#step-${src.stepIndex}`} className="text-accent hover:underline">
+          <a href={`#${anchor(src.stepIndex)}`} className="text-accent hover:underline">
             {t.source}: {src.block ?? `#${src.stepIndex + 1}`} ({src.status ?? '?'}{src.exitCode !== null ? ` · exit ${src.exitCode}` : ''})
           </a>
         )}

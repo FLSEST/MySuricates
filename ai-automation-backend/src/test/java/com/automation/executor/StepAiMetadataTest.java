@@ -105,6 +105,19 @@ class StepAiMetadataTest {
     }
 
     @Test
+    void aiRequest_noTools_omitsTheEmptyAllowedToolsEntry() {
+        HostExecutionRequest request = HostExecutionRequest.builder()
+                .projectPath("/p")
+                .command("task")
+                .allowedTools(com.automation.service.ai.AiProvider.NO_TOOLS)
+                .build();
+
+        Map<String, Object> aiRequest = StepAiMetadata.aiRequest(request, "CLAUDE");
+
+        assertThat(aiRequest).containsExactly(Map.entry("provider", "CLAUDE"));
+    }
+
+    @Test
     void aiRequest_withoutRequest_omitsBlankValues() {
         assertThat(StepAiMetadata.aiRequest("CODEX", " ", null))
                 .containsExactly(Map.entry("provider", "CODEX"));

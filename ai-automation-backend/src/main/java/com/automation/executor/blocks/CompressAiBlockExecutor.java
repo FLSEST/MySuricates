@@ -107,7 +107,9 @@ public class CompressAiBlockExecutor implements BlockExecutor {
         } catch (CompressionException e) {
             result = failed(stepIndex, started, config, e.getMessage(), aiMetadata);
         } catch (RuntimeException e) {
-            result = failed(stepIndex, started, config, e.getClass().getSimpleName() + ": " + e.getMessage(), aiMetadata);
+            result = failed(stepIndex, started, config, e.getMessage() == null || e.getMessage().isBlank()
+                    ? e.getClass().getSimpleName()
+                    : e.getClass().getSimpleName() + ": " + e.getMessage(), aiMetadata);
         }
         return result;
     }
@@ -125,13 +127,15 @@ public class CompressAiBlockExecutor implements BlockExecutor {
         return prefix + TextTruncateStage.truncate(output, MAX_AI_ERROR_CHARS, TextTruncateStage.Keep.TAIL);
     }
 
+    /** {@code error} may be null (an exception without a message) — the step must still say something readable. */
     private static StepResult failed(int stepIndex, Instant started, Map<String, Object> config, String error,
                                      Map<String, Object> aiMetadata) {
+        String message = error == null || error.isBlank() ? "unbekannter Fehler" : error;
         Map<String, Object> metadata = new HashMap<>(aiMetadata);
         metadata.put("derivedOutput", true);
-        metadata.put("error", error);
+        metadata.put("error", message);
         return finished(stepIndex, started, "compress-ai: " + config.get("source"),
-                "Komprimierung fehlgeschlagen: " + error, StepStatus.FAILED, metadata);
+                "Komprimierung fehlgeschlagen: " + message, StepStatus.FAILED, metadata);
     }
 
     private static StepResult finished(int stepIndex, Instant started, String input, String output, StepStatus status,

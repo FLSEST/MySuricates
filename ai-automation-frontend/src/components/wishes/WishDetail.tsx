@@ -14,6 +14,7 @@ import { ExecutionLogsPanel } from './ExecutionLogsPanel';
 import { IterationDiffSection } from './IterationDiffSection';
 import { CrystallizeButton } from './CrystallizeButton';
 import { ExecutionStepCard } from '../workflow/ExecutionStepCard';
+import { StepAnchorScope } from '../workflow/stepAnchors';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useWorkflowRuns } from '../../hooks/useWorkflows';
 
@@ -342,9 +343,12 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
             <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
               {t.wishes.executionResults}
             </h3>
-            {generatedRuns.content.find(run => run.id === wish.currentRunId)?.steps.map(step => (
-              <ExecutionStepCard key={step.id} step={step} />
-            ))}
+            {/* Run-scoped anchors: the page may show the steps of more than one run, `step-N` alone would collide. */}
+            <StepAnchorScope value={wish.currentRunId ?? ''}>
+              {generatedRuns.content.find(run => run.id === wish.currentRunId)?.steps.map(step => (
+                <ExecutionStepCard key={step.id} step={step} />
+              ))}
+            </StepAnchorScope>
           </div>
         </Card>
       ) : null}
