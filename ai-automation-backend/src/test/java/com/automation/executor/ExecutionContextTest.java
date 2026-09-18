@@ -617,6 +617,79 @@ class ExecutionContextTest {
         assertThat(context.hasUntrustedInput()).isFalse();
     }
 
+    // ── Platform data in an AI prompt taints that block's output (TODO 22e6bec8) ──
+
+    @Test
+    void platformVariable_inAPrompt_taintsTheOutputOfThatBlock() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        assertThat(context.resolvePromptTemplate("Bewerte: {{ previous_report }}"))
+                .isEqualTo("Bewerte: x; id");
+        context.recordOutput("analyse", "a | b");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false))
+                .isEqualTo("echo 'a | b'");
+        assertThat(context.resolveShellTemplate("echo {{ block.analyse.output }}", false))
+                .isEqualTo("echo 'a | b'");
+    }
+
+    @Test
+    void promptWithoutPlatformData_leavesTheRecordedOutputRaw() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+        context.setVariable("topic", "release");
+
+        context.resolvePromptTemplate("Bewerte: {{ topic }}");
+        context.recordOutput("analyse", "a | b");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false)).isEqualTo("echo a | b");
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    @Test
+    void platformVariable_inAPromptWithoutAnyRecordedOutput_leavesTheRunClean() {
+        context.setUntrustedPlatformVariable("previous_report", "x; id");
+
+        context.resolvePromptTemplate("Bewerte: {{ previous_report }}");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.exportTaint()).isEmpty();
+    }
+
+    /** The flag belongs to the block that used it: an output recorded before the prompt stays raw. */
+    @Test
+    void platformPrompt_taintsOnlyTheOutputsRecordedAfterIt() {
+        context.setUntrustedPlatformVariable("previous_report", "report");
+        context.recordOutput("early", "e | f");
+
+        context.resolvePromptTemplate("Bewerte: {{ previous_report }}");
+        context.recordOutput("late", "a | b");
+
+        assertThat(context.resolveShellTemplate("{{ block.early.output }} {{ block.late.output }}", false))
+                .isEqualTo("e | f 'a | b'");
+    }
+
+    /** Sub-workflow hand-over and resume carry the tainted output via {@code __untrusted_outputs}. */
+    @Test
+    void exportTaint_afterAPlatformPrompt_carriesTheTaintedOutput() {
+        context.setUntrustedPlatformVariable("open_todos", "todos");
+        context.resolvePromptTemplate("Fasse zusammen: {{ open_todos }}");
+
+        context.recordOutput("analyse", "a | b");
+
+        assertThat(context.exportTaint())
+                .containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                        java.util.List.of("analyse", ExecutionContext.PREVIOUS_OUTPUT_NAME));
+    }
+
+    @Test
+    void resolvePromptTemplate_neverEscapes_andReportsOnlyPlatformData() {
+        context.setUntrustedPlatformVariable("previous_report", "a'b");
+        context.setUntrustedVariable("payload", "c'd");
+
+        assertThat(context.resolvePromptTemplate("{{ previous_report }} {{ payload }}")).isEqualTo("a'b c'd");
+    }
+
     // ── replaceValue: value changes, trust label stays ──────────────────────────
 
     @Test

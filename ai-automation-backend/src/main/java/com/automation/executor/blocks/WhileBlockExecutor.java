@@ -57,7 +57,7 @@ public class WhileBlockExecutor implements BlockExecutor {
             if (conditionCommand != null) {
                 String resolvedCondition = isShell
                         ? context.resolveShellTemplate(conditionCommand, escapeVariables)
-                        : context.resolveTemplate(conditionCommand);
+                        : context.resolvePromptTemplate(conditionCommand);
                 if (isShell) {
                     // In shell mode, use exit code: 0 = true (continue), non-zero = false (stop)
                     int exitCode = commandExecutor.executeShellCommandOnHost(
@@ -89,7 +89,7 @@ public class WhileBlockExecutor implements BlockExecutor {
 
             String resolvedCommand = isShell
                     ? context.resolveShellTemplate(command, escapeVariables)
-                    : context.resolveTemplate(command);
+                    : context.resolvePromptTemplate(command);
             StepResult stepResult;
             if (isShell) {
                 stepResult = commandExecutor.executeStepAsShell(

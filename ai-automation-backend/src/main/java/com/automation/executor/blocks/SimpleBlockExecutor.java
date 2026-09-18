@@ -27,7 +27,7 @@ public class SimpleBlockExecutor implements BlockExecutor {
             throw new WorkflowExecutionException("Simple block requires a 'command' in config");
         }
 
-        String command = context.resolveTemplate(rawCommand.toString());
+        String command = context.resolvePromptTemplate(rawCommand.toString());
         Map<String, Object> config = block.getConfig();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()

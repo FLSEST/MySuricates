@@ -264,4 +264,46 @@ class SimpleBlockExecutorTest {
         assertThat(captor.getValue().providerId()).isEqualTo("CLAUDE");
         assertThat(captor.getValue().model()).isEqualTo("opus");
     }
+
+    /**
+     * TODO 22e6bec8: platform data in the prompt marks this block's output untrusted, so the shell
+     * block that consumes {{ previous_output }} gets it single-quoted. {@code recordOutput} stands in
+     * for {@code BlockStepRunner}, which records every block's result right after execution.
+     */
+    @Test
+    void execute_platformDataInThePrompt_taintsTheRecordedOutput() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(
+                StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("a | b").build());
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "Bewerte: {{ previous_report }}")))
+                .build();
+
+        executor.execute(block, context);
+        context.recordOutput("analyse", "a | b");
+
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false))
+                .isEqualTo("echo 'a | b'");
+    }
+
+    @Test
+    void execute_promptWithoutPlatformData_leavesTheRecordedOutputRaw() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(
+                StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("a | b").build());
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("simple")
+                .config(new HashMap<>(Map.of("command", "Fasse den Stand zusammen")))
+                .build();
+
+        executor.execute(block, context);
+        context.recordOutput("analyse", "a | b");
+
+        assertThat(context.hasUntrustedInput()).isFalse();
+        assertThat(context.resolveShellTemplate("echo {{ previous_output }}", false))
+                .isEqualTo("echo a | b");
+    }
 }

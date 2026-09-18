@@ -35,7 +35,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         String condition = isShell
                 ? context.resolveShellTemplate((String) config.get("condition"), escapeVariables)
-                : context.resolveTemplate((String) config.get("condition"));
+                : context.resolvePromptTemplate((String) config.get("condition"));
         String thenCommand = (String) config.get("then_command");
         String elseCommand = (String) config.get("else_command");
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
@@ -78,7 +78,7 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         if (commandToExecute != null) {
             String resolved = isShell
                     ? context.resolveShellTemplate(commandToExecute, escapeVariables)
-                    : context.resolveTemplate(commandToExecute);
+                    : context.resolvePromptTemplate(commandToExecute);
             StepResult stepResult;
             if (isShell) {
                 stepResult = commandExecutor.executeStepAsShell(
