@@ -43,6 +43,30 @@ class LogWebSocketHandlerTest {
         handler = new LogWebSocketHandler(messagingTemplate, runRepository);
     }
 
+    /**
+     * TODO a47e0d0f: this class is not a raw {@code WebSocketHandler} and needs no entry in
+     * {@code RawWebSocketConfig} — it reacts to STOMP session events published for every
+     * subscription on the {@code /ws} endpoint, which {@code WebSocketConfig} registers with
+     * {@code WebSocketAuthInterceptor} already applied at the handshake (pinned by
+     * {@code WebSocketConfigTest#should_addAuthInterceptor_when_registeringStompEndpoints}). Pins
+     * the two annotations that make that wiring work, so removing either fails loudly here instead
+     * of quietly stopping the initial-status-on-subscribe feature.
+     */
+    @Test
+    void should_beWiredAsStompSessionEventListener_notARawWebSocketHandler() throws NoSuchMethodException {
+        assertThat(LogWebSocketHandler.class.isAnnotationPresent(org.springframework.stereotype.Component.class))
+                .as("must be a Spring bean for its @EventListener methods to be picked up")
+                .isTrue();
+        assertThat(LogWebSocketHandler.class.getMethod("handleSubscribe", SessionSubscribeEvent.class)
+                .isAnnotationPresent(org.springframework.context.event.EventListener.class))
+                .as("handleSubscribe must react to Spring's STOMP session events")
+                .isTrue();
+        assertThat(LogWebSocketHandler.class.getMethod("handleDisconnect", SessionDisconnectEvent.class)
+                .isAnnotationPresent(org.springframework.context.event.EventListener.class))
+                .as("handleDisconnect must react to Spring's STOMP session events")
+                .isTrue();
+    }
+
     @Test
     void broadcastLogMessage_sendsToCorrectTopic() {
         Map<String, Object> logData = Map.of("type", "log", "message", "step completed");
