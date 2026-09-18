@@ -640,11 +640,13 @@ Stufen: text.normalize (−4.102 Zeichen) · lines.filter (−8.914 Zeilen) · t
 
 Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Logtext. Gate- und TODO-Marker in Komprimierungs-Ausgaben werden beim Run-Abschluss **nicht** ausgewertet — maßgeblich bleibt der Originalschritt.
 
+Als `source` taugt jeder Name, der sich auch als `{{ block.<name>.output }}` auflösen lässt — Top-Level-Blöcke und benannte `switch`-Case-Blöcke (2718c20e). Die Kopfzeile zeigt dann Status, Exit-Code und Dauer des Case-Schritts, nicht die des ganzen `switch`. Verschachtelte Blöcke ohne Namen (`foreach`-, `while`-Durchläufe) bewegen nur `previous_output`; dort ist `"previous"` die passende Quelle.
+
 **`compress`** (Regeln, 0 Tokens):
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `source` | string | **erforderlich** | Blockname eines früheren Top-Level-Blocks oder `"previous"` |
+| `source` | string | **erforderlich** | Blockname eines früheren Blocks (auch eines benannten `switch`-Case-Blocks) oder `"previous"` |
 | `stages` | Liste | **erforderlich** | Stufen `{ "op": …, … }`, laufen der Reihe nach |
 | `max_chars` | int | 20000 | harte Obergrenze inkl. Kopfzeilen; darüber wird head/tail gekürzt |
 | `timeout_seconds` | int | 30 | Zeitbudget (schützt vor aufwendigen Regex) |

@@ -100,6 +100,11 @@ public class SwitchBlockExecutor implements BlockExecutor {
                 // top-level block; unnamed ones only move previous_output. In a tainted run the case
                 // output is shell-escaped downstream, same as in WhileBlockExecutor (12a3b244).
                 context.recordOutput(nestedBlock.getName(), blockResult.getOutput());
+                // …and usable as the source of a compression block, with the case step's own facts
+                // (status, exit code, duration) in the header — a name that resolves as a placeholder
+                // must not be rejected as an unknown source (2718c20e). The switch's own step is
+                // recorded afterwards by BlockStepRunner, so "previous" still means the switch.
+                context.getSourceSteps().record(nestedBlock.getName(), blockResult);
             }
             if (blockResult.getStatus() == StepStatus.FAILED) {
                 anyFailed = true;

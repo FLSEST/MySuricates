@@ -879,6 +879,54 @@ class SwitchBlockExecutorTest {
         assertThat(context.resolveTemplate("{{ block.review.output }}")).isEqualTo("reviewed");
     }
 
+    /**
+     * 2718c20e: a name that resolves as {{ block.&lt;name&gt;.output }} must also work as the
+     * {@code source} of a compression block — with the case step's own facts in the header.
+     */
+    @Test
+    void execute_namedCaseBlock_isRegisteredAsCompressionSource() {
+        StepResult caseResult = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)
+                .output("kaputt").durationMs(2_000L).metadata(Map.of("blockType", "shell", "exitCode", 1)).build();
+        when(commandExecutor.executeStepAsShell(any(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(caseResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "shell", "name", "scan", "config", Map.of("command", "pruefe"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        var source = context.getSourceSteps().find("scan").orElseThrow();
+        assertThat(source.blockName()).isEqualTo("scan");
+        assertThat(source.status()).isEqualTo(StepStatus.FAILED);
+        assertThat(source.exitCode()).isEqualTo(1);
+        assertThat(source.blockType()).isEqualTo("shell");
+    }
+
+    /** End-to-end: switch case output → compress with the case name as source (2718c20e). */
+    @Test
+    void execute_namedCaseBlock_canBeCompressedByAFollowingCompressBlock() {
+        StepResult caseResult = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED)
+                .output(("Zeile A\n").repeat(5) + "Zeile B\n").durationMs(1_000L).build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(caseResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks",
+                List.of(Map.of("type", "simple", "name", "befund", "config", Map.of("command", "analysiere"))))));
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        StepResult compressed = new CompressBlockExecutor().execute(
+                BlockDefinition.builder().type("compress").name("befund_kompakt")
+                        .config(Map.of("source", "befund", "stages", List.of(Map.of("op", "lines.dedupe", "count", true))))
+                        .build(),
+                context);
+
+        assertThat(compressed.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(compressed.getOutput()).contains("## befund").contains("5× Zeile A").contains("Zeile B");
+    }
+
     @Test
     void execute_namedBlocksInTheDefaultBranch_areRecordedTooAndKeepTheirOwnOutput() {
         StepResult first = StepResult.builder()

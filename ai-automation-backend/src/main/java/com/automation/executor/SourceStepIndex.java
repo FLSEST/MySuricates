@@ -9,9 +9,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Name → facts of the finished top-level steps of a run, for compression sources. Written by
- * {@code BlockStepRunner} next to {@code recordOutput} and rebuilt on resume. A name recorded twice
- * is ambiguous (duplicate block names in one workflow).
+ * Name → facts of the finished steps of a run, for compression sources. Written by
+ * {@code BlockStepRunner} next to {@code recordOutput} and rebuilt on resume. Nested steps are in
+ * here exactly as far as their output is addressable as {{ block.&lt;name&gt;.output }}: a named
+ * switch case block records itself too (2718c20e), so a name a user can write as a placeholder is
+ * never rejected as an unknown compression source. A name recorded twice is ambiguous (duplicate
+ * block names in one workflow).
  */
 public final class SourceStepIndex {
 
