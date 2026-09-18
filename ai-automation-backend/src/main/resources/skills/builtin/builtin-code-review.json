@@ -1,0 +1,83 @@
+{
+  "id" : "builtin-code-review",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "name" : "Code Review",
+  "icon" : "🔍",
+  "description" : "Automated code review that identifies bugs, style issues, and suggests improvements.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "review_code",
+      "description" : "Perform a comprehensive code review on the provided source code",
+      "inputSchema" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "language" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "issues" : {
+            "type" : "array"
+          },
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "suggest_fixes",
+      "description" : "Generate fix suggestions for identified code issues",
+      "inputSchema" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "issues" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "fixes" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "lint",
+      "description" : "Analyze code for style issues, anti-patterns, and best practice violations",
+      "handlerClass" : "com.automation.skills.handlers.code.LintHandler",
+      "inputSchema" : {
+        "code" : "string",
+        "language" : "string"
+      },
+      "outputSchema" : {
+        "issues" : "array"
+      }
+    },
+    {
+      "name" : "security_scan",
+      "description" : "Identify security vulnerabilities (OWASP Top 10, injection, XSS)",
+      "handlerClass" : "com.automation.skills.handlers.code.SecurityScanHandler",
+      "inputSchema" : {
+        "code" : "string"
+      },
+      "outputSchema" : {
+        "vulnerabilities" : "array"
+      }
+    }
+  ]
+}

@@ -27,7 +27,7 @@ JSON-Objekt das einen einzelnen Schritt in einem Workflow beschreibt. Besteht au
 Interface das jeder Block-Typ implementieren muss. Definiert `execute(BlockDefinition, ExecutionContext)` und `supports(String type)`.
 
 **Built-in Skills**
-16 vordefinierte Skills die beim Start automatisch geseedet werden (z.B. `builtin-code-review`, `builtin-test-generator`). Definiert in `BuiltInSkills.java` (Reihenfolge) und `BuiltIn<Kategorie>Skills.java` (Inhalte).
+19 vordefinierte Skills die beim Start automatisch geseedet werden (z.B. `builtin-code-review`, `builtin-test-generator`). Definiert als Ressourcen unter `src/main/resources/skills/builtin/<id>.json` (Metadaten inkl. `sortOrder`) + `<id>.md` (Prompt), geladen von `BuiltInSkillLoader`.
 
 **Built-in Templates**
 28 vordefinierte Workflow-Vorlagen die beim Start geseedet werden. Definiert in `BuiltInTemplates.java`. Koennen nicht geloescht werden.

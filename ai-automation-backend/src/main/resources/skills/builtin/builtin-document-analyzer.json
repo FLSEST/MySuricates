@@ -1,0 +1,55 @@
+{
+  "id" : "builtin-document-analyzer",
+  "sortOrder" : 7,
+  "version" : "1.0.0",
+  "name" : "Document Analyzer",
+  "icon" : "📄",
+  "description" : "Analyze documents for quality, grammar, facts, and structure.",
+  "category" : "DOCUMENT",
+  "capabilities" : [
+    {
+      "name" : "ocr",
+      "description" : "Extract text from images",
+      "handlerClass" : "com.automation.skills.handlers.document.OCRHandler",
+      "inputSchema" : {
+        "image" : "string"
+      },
+      "outputSchema" : {
+        "text" : "string"
+      }
+    },
+    {
+      "name" : "fact_check",
+      "description" : "Verify facts against sources",
+      "handlerClass" : "com.automation.skills.handlers.document.FactCheckHandler",
+      "inputSchema" : {
+        "text" : "string"
+      },
+      "outputSchema" : {
+        "results" : "array"
+      }
+    },
+    {
+      "name" : "grammar_check",
+      "description" : "Check grammar and spelling",
+      "handlerClass" : "com.automation.skills.handlers.document.GrammarCheckHandler",
+      "inputSchema" : {
+        "text" : "string"
+      },
+      "outputSchema" : {
+        "corrections" : "array"
+      }
+    },
+    {
+      "name" : "summarize",
+      "description" : "Create document summaries",
+      "inputSchema" : {
+        "length" : "integer",
+        "text" : "string"
+      },
+      "outputSchema" : {
+        "summary" : "string"
+      }
+    }
+  ]
+}

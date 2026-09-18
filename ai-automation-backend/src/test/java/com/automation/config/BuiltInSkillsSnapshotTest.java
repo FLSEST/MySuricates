@@ -29,9 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * einschleppt) und vergleicht sie byte-genau mit
  * {@code src/test/resources/skills/builtin-snapshot.json}.
  *
- * <p>Der Snapshot wird aus den heutigen Java-Definitionen ({@code config/BuiltIn*Skills})
- * erzeugt. Wird die Quelle spaeter ausgelagert, bleibt der Snapshot unveraendert — genau das
- * belegt, dass Prompt-Texte und Metadaten die Auslagerung byte-genau ueberlebt haben.
+ * <p>Der Snapshot wurde aus den fruehreren Java-Definitionen ({@code config/BuiltIn*Skills})
+ * erzeugt. Seit der Auslagerung nach {@code classpath:skills/builtin/*.json} + {@code *.md}
+ * speist ihn {@link BuiltInSkillLoader} — dass der Snapshot dabei unveraendert blieb, belegt
+ * die byte-genaue Prompt- und Metadaten-Fidelitaet.
  *
  * <p>Snapshot bewusst neu schreiben (nur bei einer gewollten inhaltlichen Aenderung):
  * {@code ./mvnw test -Dtest=BuiltInSkillsSnapshotTest -Dskills.snapshot.write=true}
@@ -42,7 +43,7 @@ class BuiltInSkillsSnapshotTest {
 
     /** Einzige Quelle der Skills — bei einem Umbau nur hier umstellen. */
     private static List<Skill> builtInSkills() {
-        return BuiltInSkills.getAll();
+        return new BuiltInSkillLoader(new ObjectMapper()).loadAll();
     }
 
     @Test

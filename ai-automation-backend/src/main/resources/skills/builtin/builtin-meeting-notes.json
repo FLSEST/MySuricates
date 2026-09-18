@@ -1,0 +1,54 @@
+{
+  "id" : "builtin-meeting-notes",
+  "sortOrder" : 15,
+  "version" : "1.0.0",
+  "name" : "Meeting Notes Processor",
+  "icon" : "🗒️",
+  "description" : "Processes meeting notes to extract action items, decisions, and summaries.",
+  "category" : "BUSINESS",
+  "capabilities" : [
+    {
+      "name" : "process_meeting_notes",
+      "description" : "Process raw meeting notes into structured format",
+      "inputSchema" : {
+        "properties" : {
+          "notes" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "decisions" : {
+            "type" : "array"
+          },
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "extract_action_items",
+      "description" : "Extract action items with assignees and deadlines",
+      "inputSchema" : {
+        "properties" : {
+          "notes" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "actionItems" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

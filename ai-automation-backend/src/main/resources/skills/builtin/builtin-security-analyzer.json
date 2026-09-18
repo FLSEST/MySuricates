@@ -1,0 +1,71 @@
+{
+  "id" : "builtin-security-analyzer",
+  "sortOrder" : 3,
+  "version" : "1.0.0",
+  "name" : "Security Analyzer",
+  "icon" : "🛡️",
+  "description" : "Scans code and dependencies for security vulnerabilities and leaked secrets.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "scan_vulnerabilities",
+      "description" : "Scan source code for security vulnerabilities",
+      "inputSchema" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "vulnerabilities" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "check_secrets",
+      "description" : "Detect hardcoded secrets and credentials in code",
+      "inputSchema" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "secrets" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "audit_dependencies",
+      "description" : "Audit project dependencies for known vulnerabilities",
+      "inputSchema" : {
+        "properties" : {
+          "dependencies" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "advisories" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

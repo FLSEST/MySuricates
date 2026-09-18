@@ -1,0 +1,58 @@
+{
+  "id" : "builtin-grammar-style",
+  "sortOrder" : 4,
+  "version" : "1.0.0",
+  "name" : "Grammar & Style Editor",
+  "icon" : "✏️",
+  "description" : "Checks grammar, spelling, and writing style for professional documents.",
+  "category" : "DOCUMENT",
+  "capabilities" : [
+    {
+      "name" : "check_grammar",
+      "description" : "Check text for grammar, spelling, and punctuation errors",
+      "handlerClass" : "com.automation.skills.handlers.document.GrammarCheckHandler",
+      "inputSchema" : {
+        "properties" : {
+          "language" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "corrections" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "improve_style",
+      "description" : "Suggest style improvements for better readability",
+      "inputSchema" : {
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "readabilityScore" : {
+            "type" : "number"
+          },
+          "suggestions" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id" : "builtin-dup-b",
+  "sortOrder" : 1,
+  "version" : "1.0.0",
+  "name" : "Duplikat b",
+  "icon" : "🔁",
+  "description" : "Testfall: zwei Skills mit demselben sortOrder.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "noop",
+      "description" : "Tut nichts."
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "id" : "builtin-spec-architect",
+  "sortOrder" : 17,
+  "version" : "1.0.0",
+  "name" : "Spec Architect",
+  "icon" : "🏛️",
+  "description" : "Reads a SaaS-Factory spec.md, researches a fitting tech stack, and decomposes the build plan into ordered features.",
+  "category" : "BUSINESS",
+  "capabilities" : [
+    {
+      "name" : "research_stack",
+      "description" : "Recommend a tech stack for a given spec, with reasoning",
+      "inputSchema" : {
+        "properties" : {
+          "available_recipes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "spec" : {
+            "description" : "Parsed spec frontmatter + body summary",
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "reasoning" : {
+            "type" : "string"
+          },
+          "stack" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "propose_stack",
+      "description" : "Pick a concrete stack object given hints, type, and constraints",
+      "inputSchema" : {
+        "properties" : {
+          "constraints" : {
+            "type" : "object"
+          },
+          "stack_hint" : {
+            "type" : "object"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "auth" : {
+            "type" : "string"
+          },
+          "db" : {
+            "type" : "string"
+          },
+          "framework" : {
+            "type" : "string"
+          },
+          "recipe" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "decompose_features",
+      "description" : "Order features by dependency, attach snippet hints and complexity",
+      "inputSchema" : {
+        "properties" : {
+          "features" : {
+            "type" : "array"
+          },
+          "stack" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "feature_order" : {
+            "type" : "array"
+          },
+          "per_feature" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

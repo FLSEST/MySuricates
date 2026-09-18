@@ -1,0 +1,83 @@
+{
+  "id" : "builtin-social-media",
+  "sortOrder" : 12,
+  "version" : "1.0.0",
+  "name" : "Social Media Creator",
+  "icon" : "📱",
+  "description" : "Creates platform-optimized social media posts with hashtag suggestions.",
+  "category" : "CONTENT",
+  "capabilities" : [
+    {
+      "name" : "create_post",
+      "description" : "Create a social media post for a specific platform",
+      "inputSchema" : {
+        "properties" : {
+          "platform" : {
+            "type" : "string"
+          },
+          "topic" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "hashtags" : {
+            "type" : "array"
+          },
+          "post" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "suggest_hashtags",
+      "description" : "Suggest relevant hashtags for content",
+      "inputSchema" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "platform" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "hashtags" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "adapt_for_platform",
+      "description" : "Adapt existing content for a different social media platform",
+      "inputSchema" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "targetPlatform" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "adapted" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

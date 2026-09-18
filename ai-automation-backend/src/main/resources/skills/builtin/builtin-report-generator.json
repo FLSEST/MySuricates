@@ -1,0 +1,54 @@
+{
+  "id" : "builtin-report-generator",
+  "sortOrder" : 9,
+  "version" : "1.0.0",
+  "name" : "Report Generator",
+  "icon" : "📄",
+  "description" : "Creates formatted reports and visualization specifications from data.",
+  "category" : "DATA",
+  "capabilities" : [
+    {
+      "name" : "generate_report",
+      "description" : "Generate a formatted report from analysis results",
+      "inputSchema" : {
+        "properties" : {
+          "data" : {
+            "type" : "object"
+          },
+          "template" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "report" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "create_visualization_spec",
+      "description" : "Create chart/visualization specifications from data",
+      "inputSchema" : {
+        "properties" : {
+          "data" : {
+            "type" : "object"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "charts" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

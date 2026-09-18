@@ -1,0 +1,78 @@
+{
+  "id" : "builtin-research-assistant",
+  "sortOrder" : 13,
+  "version" : "1.0.0",
+  "name" : "Research Assistant",
+  "icon" : "🔬",
+  "description" : "Researches topics, analyzes sources, and identifies knowledge gaps.",
+  "category" : "RESEARCH",
+  "capabilities" : [
+    {
+      "name" : "research_topic",
+      "description" : "Research a topic and compile structured findings",
+      "async" : true,
+      "inputSchema" : {
+        "properties" : {
+          "depth" : {
+            "type" : "string"
+          },
+          "topic" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "findings" : {
+            "type" : "array"
+          },
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "analyze_sources",
+      "description" : "Analyze and evaluate research sources for credibility",
+      "inputSchema" : {
+        "properties" : {
+          "sources" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "evaluations" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    {
+      "name" : "identify_gaps",
+      "description" : "Identify knowledge gaps in research coverage",
+      "inputSchema" : {
+        "properties" : {
+          "research" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "gaps" : {
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}
