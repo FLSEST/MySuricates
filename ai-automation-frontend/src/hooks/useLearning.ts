@@ -1,8 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { DashboardData, PlatformStats } from '../types';
 
-export function useDashboard(days = 30, projectId?: string) {
+interface DashboardQueryOptions {
+  /** Keep the previous result on screen while another time range or project loads (`isPlaceholderData`). */
+  keepPreviousData?: boolean;
+}
+
+export function useDashboard(days = 30, projectId?: string, options: DashboardQueryOptions = {}) {
   const params = new URLSearchParams();
   if (days !== 30) params.set('days', String(days));
   if (projectId) params.set('projectId', projectId);
@@ -12,6 +17,7 @@ export function useDashboard(days = 30, projectId?: string) {
     queryFn: () => api.get<DashboardData>(`/learning/dashboard${qs ? `?${qs}` : ''}`),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
   });
 }
 

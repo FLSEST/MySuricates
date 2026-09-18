@@ -86,13 +86,14 @@ export function SuccessRateStat() {
 
 export function TotalCostStat() {
   const t = useT();
-  const { data: stats, isLoading, days } = useDashboardData();
+  // The range of the numbers on screen: while another filter loads, the previous result is still shown.
+  const { data: stats, isLoading, dataDays } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
   const cost = stats?.totalCostUsd30d;
   return (
     <StatCard
       icon={<Coins className="w-4 h-4 text-warning" />}
-      label={t.dashboard.totalCostDays.replace('{days}', () => String(days))}
+      label={t.dashboard.totalCostDays.replace('{days}', () => String(dataDays))}
       value={!stats ? '-' : cost != null && cost > 0
         ? `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`
         : '$0.00'}

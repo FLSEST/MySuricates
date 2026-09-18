@@ -4,6 +4,7 @@ import { Button } from '../components/ui';
 import { DashboardGrid, HiddenWidgetsBar } from '../components/dashboard/DashboardGrid';
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
+import { useDashboardData } from '../components/dashboard/dashboardDataContext';
 import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFilterBar';
 import { DashboardViewTabs } from '../components/dashboard/DashboardViewTabs';
 import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
@@ -53,6 +54,7 @@ function DashboardPage() {
   const [editMode, setEditMode] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const sync = useDashboardLayoutSync();
+  const { isPlaceholderData } = useDashboardData();
   useDashboardViewParam();
   // While a version is restored, adopted or saved (`busy`), the layout can change underneath: no edits.
   const locked = sync.busy;
@@ -139,13 +141,20 @@ function DashboardPage() {
         />
       )}
 
-      <DashboardGrid
-        widgets={layout.visible}
-        editMode={editMode}
-        disabled={locked}
-        onMove={layout.move}
-        onHide={(instanceId) => layout.setHidden(instanceId, true)}
-      />
+      {/* Dimmed while the widgets still show the previous view's or filter's data. */}
+      <div
+        data-testid="dashboard-widgets"
+        aria-busy={isPlaceholderData || undefined}
+        className={`transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}
+      >
+        <DashboardGrid
+          widgets={layout.visible}
+          editMode={editMode}
+          disabled={locked}
+          onMove={layout.move}
+          onHide={(instanceId) => layout.setHidden(instanceId, true)}
+        />
+      </div>
 
       <LayoutHistoryDialog
         open={historyOpen}
