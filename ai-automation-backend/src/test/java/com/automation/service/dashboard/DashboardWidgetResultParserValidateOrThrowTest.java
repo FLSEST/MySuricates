@@ -243,4 +243,102 @@ class DashboardWidgetResultParserValidateOrThrowTest {
 
         assertThat(result.kpis()).containsExactly(new Result.Kpi("a", "b", Result.Trend.UP));
     }
+
+    @Test
+    void also_rejects_a_pathologically_nested_candidate_at_100_000_levels() {
+        Object nested = deeplyNested(100_000, SECRET);
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(nested))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget")
+                .hasMessageNotContaining(SECRET);
+    }
+
+    @Test
+    void rejects_a_self_referential_candidate_instead_of_looping_or_crashing() {
+        Map<String, Object> self = new LinkedHashMap<>();
+        self.put("status", "GREEN");
+        self.put("nested", self);
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(self))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget");
+    }
+
+    // --- Fix round 2, H1: the write-then-read round trip normalizes NaN/Infinity/byte[] into an
+    // accepted string instead of the pre-round-1 "must be a string" rejection. Ordinary Boolean/
+    // Integer/Double/BigDecimal candidates were never affected (verified against 2.18.5: they already
+    // round-trip to a non-textual node) and need no test here. ---
+
+    @Test
+    void rejects_a_title_that_is_nan_instead_of_accepting_the_string_nan() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("title", Double.NaN);
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget")
+                .hasMessageNotContaining("NaN");
+    }
+
+    @Test
+    void rejects_a_kpi_value_that_is_infinity_instead_of_accepting_the_string_infinity() {
+        Map<String, Object> candidate = minimal();
+        Map<String, Object> kpiWithInfinity = new LinkedHashMap<>();
+        kpiWithInfinity.put("label", "a");
+        kpiWithInfinity.put("value", Double.POSITIVE_INFINITY);
+        candidate.put("kpis", List.of(kpiWithInfinity));
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget")
+                .hasMessageNotContaining("Infinity");
+    }
+
+    @Test
+    void rejects_a_title_that_is_a_byte_array_instead_of_accepting_its_base64_encoding() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("title", new byte[] {65, 66, 67}); // would base64-encode to the accepted string "QUJD"
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget")
+                .hasMessageNotContaining("QUJD");
+    }
+
+    // --- Fix round 2, H2: the field path's read-side string-length budget used to be the marker
+    // scan's 8192-char budget, so an oversized field value hit a generic "could not be read" instead of
+    // the contract's own, field-naming rejection — and {{ previous_report }} routinely exceeds 8192. ---
+
+    @Test
+    void names_summary_for_an_oversized_value_instead_of_a_generic_read_error() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("summary", "x".repeat(9_000)); // over the marker scan's old 8192 budget
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("summary")
+                .hasMessageNotContaining("could not be read");
+    }
+
+    @Test
+    void names_the_indexed_item_for_an_oversized_element_instead_of_a_generic_read_error() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("items", List.of("ok", "y".repeat(9_000)));
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("items[2]")
+                .hasMessageNotContaining("could not be read");
+    }
+
+    @Test
+    void still_rejects_an_absurdly_large_value_as_unreadable() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("summary", "z".repeat(3_000_000)); // past even the field path's own generous budget
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget");
+    }
 }

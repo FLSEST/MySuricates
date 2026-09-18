@@ -47,15 +47,19 @@ import java.util.Set;
  * a variation selector or strong-RTL letter attached to a visible base character (an emoji plus its
  * presentation selector, e.g. {@code "✅️"}, stays legal because the emoji itself is visible).
  *
- * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own mapper
- * ({@link DashboardWidgetJson}) so Spring's Jackson customisation can never change what counts as
- * valid. The mapper (fix round 1, A3; write side hardened fix round 1 of this task) is pinned
- * explicitly rather than relying on Jackson defaults: duplicate keys are rejected, and both stream-read
- * and stream-write constraints (nesting depth, string length) are capped so a pathological payload
- * throws a normal, caught exception instead of risking a {@link StackOverflowError} that
- * {@code catch (Exception e)} would not stop. {@code FAIL_ON_TRAILING_TOKENS} cannot fire today —
- * {@link DashboardWidgetMarker} hands {@link #parse} exactly one balanced-brace substring — it is
- * kept as defence-in-depth in case a future caller feeds the mapper raw, unscanned text.
+ * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own mapper setup
+ * ({@link DashboardWidgetJson} — two mappers behind methods, never a field, since this task's fix
+ * round 2, H3) so Spring's Jackson customisation can never change what counts as valid. Pinned
+ * explicitly rather than relying on Jackson defaults (checked against the project's pinned Jackson
+ * 2.18.5): duplicate keys are rejected, and both stream-read and stream-write constraints (nesting
+ * depth, string length) are capped so a pathological payload throws a normal, caught exception instead
+ * of risking a {@link StackOverflowError} that {@code catch (Exception e)} would not stop —
+ * {@code writeValueAsString} itself stays uncapped in size (this task's fix round 2, H3): a single very
+ * large value is fully serialized before the contract's own per-field cap rejects it, a deliberate,
+ * documented limit rather than a gap, since the caller's Java object already held that data in memory
+ * before conversion began. {@code FAIL_ON_TRAILING_TOKENS} cannot fire today — {@link
+ * DashboardWidgetMarker} hands {@link #parse} exactly one balanced-brace substring — it is kept as
+ * defence-in-depth in case a future caller feeds the mapper raw, unscanned text.
  */
 public final class DashboardWidgetResultParser {
 
@@ -119,7 +123,7 @@ public final class DashboardWidgetResultParser {
             return ParseResult.INVALID;
         }
         try {
-            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.MAPPER.readTree(scan.json())));
+            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.markerTreeOf(scan.json())));
         } catch (Exception e) {
             return ParseResult.INVALID;
         }
@@ -131,7 +135,7 @@ public final class DashboardWidgetResultParser {
             return ParseResult.MISSING;
         }
         try {
-            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.treeOf(stored)));
+            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.fieldTreeOf(stored)));
         } catch (Exception e) {
             return ParseResult.INVALID;
         }
@@ -174,7 +178,7 @@ public final class DashboardWidgetResultParser {
      * Messages name the offending field and never echo its value.
      */
     public static Result validateOrThrow(Object candidate) {
-        return validate(DashboardWidgetJson.treeOf(candidate));
+        return validate(DashboardWidgetJson.fieldTreeOf(candidate));
     }
 
     /** Throws IllegalArgumentException for anything outside the contract; messages never echo values. */
