@@ -913,7 +913,12 @@ globale Sperre nimmt dem Sturm die Spitze, ohne die beiden Auswege zu verschlie�
 ohne Reload: Ein Timer auf der letzten Frist (`scheduleExpiry`) meldet das Ablaufen, und
 `installRateLimitRecovery` invalidiert beim Übergang aktiv → inaktiv **einmal alle Queries im
 Fehlerzustand** — `retry` ist für 429 aus und `refetchOnMount` greift nur beim Mount, dauerhaft
-montierte Queries (Sidebar, Layout, Dashboard) blieben sonst bis zum Reload rot.
+montierte Queries blieben sonst bis zum Reload rot. Erfasst wird dabei genau das, was wirklich auf
+`error` steht. Queries mit `initialData` (`useSystemModules`, `useBlockTypes`) stehen auch nach
+einem 429 weiter auf `success` und werden von der Erholung deshalb nie angefasst — gewollt: der
+zuletzt bekannte Modul- bzw. Blocktyp-Stand soll stehen bleiben, statt Navigation und Widgets
+flackern zu lassen (b13509f3). Ihren Serverstand holen sie beim nächsten Mount nach, weil
+`initialDataUpdatedAt: 0` den geseedeten Stand sofort stale macht.
 
 **Leeres `?ticket=` im Handshake ist der Client-Fallback.** Fällt `POST /ws-ticket` in eine Sperre
 (oder scheitert sonst), setzt `useWebSocket` in `beforeConnect` `wsTicket = ''` und der Handshake

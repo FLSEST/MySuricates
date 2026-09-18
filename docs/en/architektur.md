@@ -871,8 +871,12 @@ and each pattern collects its own 429 until its `Retry-After` lock is in place. 
 takes the peak off the storm without closing the two ways out. Recovery needs no reload: a timer on
 the last deadline (`scheduleExpiry`) reports the expiry, and `installRateLimitRecovery` invalidates
 **every query in an error state once** on the active → inactive transition — `retry` is off for 429
-and `refetchOnMount` only fires on a mount, so permanently mounted queries (sidebar, layout,
-dashboard) would otherwise stay red until a reload.
+and `refetchOnMount` only fires on a mount, so permanently mounted queries would otherwise stay red
+until a reload. What it picks up is exactly what really is in `error`. Queries with `initialData`
+(`useSystemModules`, `useBlockTypes`) stay on `success` even after a 429 and are therefore never
+touched by the recovery — deliberately: the last known module and block-type state should stay put
+instead of making navigation and widgets flicker (b13509f3). They pick the server state up on their
+next mount, because `initialDataUpdatedAt: 0` makes the seeded state stale at once.
 
 **An empty `?ticket=` in the handshake is the client fallback.** If `POST /ws-ticket` runs into a
 lock (or fails otherwise), `useWebSocket` sets `wsTicket = ''` in `beforeConnect` and the handshake
