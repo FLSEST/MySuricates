@@ -88,6 +88,23 @@ describe('BpmnDiagramView Datenfluss', () => {
     expect(screen.getByText('Output: tests')).toBeInTheDocument();
   });
 
+  it('bricht lange Datenobjekt-Namen um und kürzt sie wie Task-Labels', () => {
+    useI18nStore.setState({ locale: 'de' });
+    const langer = DATA_FLOW_XML.replace(
+      'name="Ausgabe: tests"',
+      'name="Ausgabe: Vollstaendiger Integrationstestlauf inklusive Abdeckungsbericht und Fehleranalyse"',
+    );
+    const { container } = render(<BpmnDiagramView xml={langer} />);
+    const gruppe = container.querySelector('path[data-bpmn="data-object"]')!.parentElement!;
+    const tspans = Array.from(gruppe.querySelectorAll('tspan'));
+    expect(tspans.length).toBeGreaterThan(1);
+    expect(tspans.length).toBeLessThanOrEqual(3);
+    expect(tspans.some((t) => t.textContent?.endsWith('…'))).toBe(true);
+    // voller Name bleibt im Tooltip der Gruppe
+    const titles = Array.from(container.querySelectorAll('title')).map((t) => t.textContent);
+    expect(titles.some((t) => t?.includes('Abdeckungsbericht und Fehleranalyse'))).toBe(true);
+  });
+
   it('macht das Datenobjekt nicht anklickbar', () => {
     const onSelectBlock = vi.fn();
     const { container } = render(<BpmnDiagramView xml={DATA_FLOW_XML} onSelectBlock={onSelectBlock} />);

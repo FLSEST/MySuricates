@@ -52,6 +52,10 @@ final class WorkflowFixtures {
                 workflow("Leer", List.of()),
                 linear(),
                 dataFlow(),
+                // step_N_output: 0-basiert, ohne Wrapper-Block davor ⇒ Kante zum ersten Block
+                workflow("StepIndex", List.of(
+                        block("shell", "erst", Map.of("command", "mvn test")),
+                        block("simple", "dann", Map.of("command", "Fasse zusammen:\n{{ step_0_output }}")))),
                 workflow("Cond", List.of(block("conditional", null, Map.of(
                         "condition", "Fehler?", "then_command", "Analysiere", "else_command", "Weiter",
                         "execution_mode", "shell")))),

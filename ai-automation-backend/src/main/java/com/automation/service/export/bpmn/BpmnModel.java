@@ -12,7 +12,11 @@ class BpmnModel {
     String processName;
     final List<Node> nodes = new ArrayList<>();
     final List<Edge> edges = new ArrayList<>();
-    /** Datenfluss: je erzeugendem Block ein Datenobjekt (Reihenfolge = Blockreihenfolge). */
+    /**
+     * Datenfluss: je erzeugendem Block ein Datenobjekt. Reihenfolge = die der ersten Verwendung in
+     * der nach (Ziel, Quelle) sortierten Referenzliste des {@code DataFlowReferenceScanner},
+     * nicht die Blockreihenfolge.
+     */
     final List<DataObject> dataObjects = new ArrayList<>();
     /** Alle Datenassoziationen in Renderreihenfolge — nur für die Diagramm-Kanten (DI). */
     final List<DataAssociation> dataAssociations = new ArrayList<>();

@@ -167,6 +167,8 @@ function parseBpmn(xml: string): Diagram | null {
 const LABEL_FONT_PX = 12;
 const CHAR_PX = LABEL_FONT_PX * 0.55; // grobe Mittelwert-Breite eines Zeichens bei 12px
 const MAX_LINES = 3;
+/** Zeilenbreite der Datenobjekt-Beschriftung — sie steht unter dem schmalen 36px-Symbol. */
+const DATA_LABEL_W = 130;
 
 /**
  * Bricht einen Namen so um, dass jede Zeile in die Box-Innenbreite passt.
@@ -314,9 +316,12 @@ function ShapeSvg({ s, status, maps }: { s: Shape; status?: RunStatus; maps: Bpm
       // BPMN-Datenobjekt: Rechteck mit umgeknickter Ecke, Beschriftung darunter
       const fold = 10;
       const right = s.x + s.w;
+      // Die Beschriftung steht unter dem (schmalen) Symbol und darf breiter sein als dieses;
+      // der volle Name bleibt im Tooltip der Gruppe erhalten.
+      const lines = wrapLabel(label, DATA_LABEL_W);
       return (
         <g>
-          <title>{maps.tip.dataObjectReference ?? s.kind}</title>
+          <title>{`${maps.tip.dataObjectReference ?? s.kind}${s.name ? ` — ${label}` : ''}`}</title>
           <path
             data-bpmn="data-object"
             d={`M ${s.x} ${s.y} H ${right - fold} L ${right} ${s.y + fold} V ${s.y + s.h} H ${s.x} Z`}
@@ -324,7 +329,11 @@ function ShapeSvg({ s, status, maps }: { s: Shape; status?: RunStatus; maps: Bpm
           <path d={`M ${right - fold} ${s.y} V ${s.y + fold} H ${right}`}
             fill="none" className="stroke-border-strong" strokeWidth={1.4} strokeLinejoin="round" />
           {s.name && (
-            <text x={cx} y={s.y + s.h + 14} textAnchor="middle" className="fill-text-secondary text-[11px]">{label}</text>
+            <text x={cx} y={s.y + s.h + 14} textAnchor="middle" className="fill-text-secondary text-[11px]">
+              {lines.map((line, i) => (
+                <tspan key={i} x={cx} dy={i === 0 ? 0 : 12}>{line}</tspan>
+              ))}
+            </text>
           )}
         </g>
       );

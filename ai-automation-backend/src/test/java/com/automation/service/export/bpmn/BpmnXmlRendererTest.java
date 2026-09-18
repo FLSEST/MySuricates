@@ -25,7 +25,7 @@ class BpmnXmlRendererTest {
 
     private static final Set<String> FLOW_NODE_NAMES = Set.of(
             "startEvent", "endEvent", "task", "serviceTask", "scriptTask", "userTask",
-            "exclusiveGateway", "subProcess", "callActivity");
+            "exclusiveGateway", "subProcess", "callActivity", "dataObjectReference");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -156,6 +156,17 @@ class BpmnXmlRendererTest {
             if ("sequenceFlow".equals(child.getLocalName())) {
                 referenced.add(child.getAttribute("sourceRef"));
                 referenced.add(child.getAttribute("targetRef"));
+            }
+            // Datenobjekte hängen nicht am Kontrollfluss, sondern an Datenassoziationen —
+            // deren Enden stehen als Kind-Elemente, nicht als Attribute.
+            if ("dataInputAssociation".equals(child.getLocalName())
+                    || "dataOutputAssociation".equals(child.getLocalName())) {
+                NodeList refs = child.getChildNodes();
+                for (int r = 0; r < refs.getLength(); r++) {
+                    if (refs.item(r) instanceof Element end) {
+                        referenced.add(end.getTextContent().strip());
+                    }
+                }
             }
             collect(child, nodeIds, referenced);
         }
