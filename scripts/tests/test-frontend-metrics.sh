@@ -33,12 +33,15 @@ fi
 
 # ---------------------------------------------------------------------------
 # Fixture: ein Mini-Frontend mit bekannten Zahlen.
-#   a.ts (4 Zeilen)  -> b.ts        \ wechselseitig: Zyklus A -> B -> A
-#   b.ts (4 Zeilen)  -> a.ts        /
-#   deep/c.tsx (6 Zeilen) -> ../a, ../lib (Barrel), '@/a' (tsconfig-Alias), 'react' (extern),
-#                            './fehlt' (unaufloesbar), './style.css' (Asset)
-#   lib/index.ts (3 Zeilen) reexportiert a  -> export-from erzeugt eine Kante
-#   leer.ts (0 Zeilen)
+#   a.ts (4 Zeilen)  -> b.ts        \ wechselseitig, beides Wert-Importe:
+#   b.ts (4 Zeilen)  -> a.ts        /  das ist der EINE echte Zyklus
+#   t1.ts (2) <-> t2.ts (2)   nur `import type` — darf KEINEN Zyklus ergeben, tsc loescht es
+#   mixed.ts (4) -> t1 (nur { type T1 }: Typkante), -> a ({ type A, useB }: Wertkante)
+#   deep/c.tsx (12) -> ../a (mehrzeilig), ../lib (Barrel), '@/a' (tsconfig-Alias),
+#                      'react' (extern), './fehlt' (unaufloesbar), './style.css' (Asset),
+#                      import('../lazy') (dynamisch)
+#   lib/index.ts (3) reexportiert a  -> export-from erzeugt eine Kante
+#   lazy.ts (1), leer.ts (0 Zeilen)
 #   a.test.ts, __tests__/x.ts, vite-env.d.ts zaehlen nicht mit
 # ---------------------------------------------------------------------------
 FE="$TMP/fixture/ai-automation-frontend"
@@ -47,6 +50,10 @@ make_fixture() {
   mkdir -p "$FE/src/deep" "$FE/src/lib" "$FE/src/__tests__"
   printf "import { b } from './b';\nexport const a = 1;\nexport type A = typeof a;\nexport const useB = () => b;\n" > "$FE/src/a.ts"
   printf "import { a } from './a';\nexport const b = 2;\nexport type B = typeof b;\nexport const useA = () => a;\n" > "$FE/src/b.ts"
+  printf "import type { T2 } from './t2';\nexport type T1 = { t?: T2 };\n" > "$FE/src/t1.ts"
+  printf "import type { T1 } from './t1';\nexport type T2 = { t?: T1 };\n" > "$FE/src/t2.ts"
+  printf "import { type T1 } from './t1';\nimport { type A, useB } from './a';\nexport const m = useB;\nexport type M = T1 | A;\n" > "$FE/src/mixed.ts"
+  printf "export const lazy = 1;\n" > "$FE/src/lazy.ts"
   cat > "$FE/src/deep/c.tsx" <<'EOF'
 import {
   a,
@@ -58,7 +65,8 @@ import React from 'react';
 import missing from './fehlt';
 import './style.css';
 import styles from './style.css';
-export const C = () => [a, useB, all, alias, React, missing, styles];
+const Lazy = () => import('../lazy');
+export const C = () => [a, useB, all, alias, React, missing, styles, Lazy];
 EOF
   printf "export { a } from '../a';\nexport const all = 1;\nexport type All = typeof all;\n" > "$FE/src/lib/index.ts"
   printf 'body { color: red; }\n' > "$FE/src/deep/style.css"
@@ -77,7 +85,7 @@ check "Ausgabe nicht leer" '[ -s "$TMP/fix1.txt" ]'
 for s in packages cycles sizes churn coupling summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/fix1.txt'"
 done
-check "modules=5 (Testdateien und *.d.ts zaehlen nicht)" 'grep -qx "modules=5" "$TMP/fix1.txt"'
+check "modules=9 (Testdateien und *.d.ts zaehlen nicht)" 'grep -qx "modules=9" "$TMP/fix1.txt"'
 check "test_files=2"                                     'grep -qx "test_files=2" "$TMP/fix1.txt"'
 check "scan=ok in ## run"                                'grep -qx "scan=ok" "$TMP/fix1.txt"'
 check "scan= steht nicht in ## summary" \
@@ -85,10 +93,10 @@ check "scan= steht nicht in ## summary" \
 
 echo "2) Fixture: bekannte Zeilenzahlen"
 check "a.ts hat 4 Zeilen"          "grep -qx '4${TAB}a.ts' '$TMP/fix1.txt'"
-check "deep/c.tsx hat 11 Zeilen"   "grep -qx '11${TAB}deep/c.tsx' '$TMP/fix1.txt'"
+check "deep/c.tsx hat 12 Zeilen"   "grep -qx '12${TAB}deep/c.tsx' '$TMP/fix1.txt'"
 check "leere Datei mit 0 Zeilen"   "grep -qx '0${TAB}leer.ts' '$TMP/fix1.txt'"
-check "max_file_lines=11"          'grep -qx "max_file_lines=11" "$TMP/fix1.txt"'
-check "Verzeichnissumme deep=11"   "grep -qx '11${TAB}1${TAB}deep' '$TMP/fix1.txt'"
+check "max_file_lines=12"          'grep -qx "max_file_lines=12" "$TMP/fix1.txt"'
+check "Verzeichnissumme deep=12"   "grep -qx '12${TAB}1${TAB}deep' '$TMP/fix1.txt'"
 
 echo "3) Fixture: bekannter Zyklus A -> B -> A"
 check "cycles=1"                  'grep -qx "cycles=1" "$TMP/fix1.txt"'
@@ -96,6 +104,27 @@ check "cycle_pairs=1"             'grep -qx "cycle_pairs=1" "$TMP/fix1.txt"'
 check "cycles_state=ok"           'grep -qx "cycles_state=ok" "$TMP/fix1.txt"'
 check "Zyklus nennt a.ts und b.ts" "grep -qx 'cycle${TAB}2${TAB}a.ts,b.ts' '$TMP/fix1.txt'"
 check "Paar nennt a.ts und b.ts"   "grep -qx 'pair${TAB}a.ts${TAB}b.ts' '$TMP/fix1.txt'"
+
+echo "3a) Fixture: Typkanten sind keine Laufzeitkanten (kein Scheinzyklus)"
+check "type_edges=3"     'grep -qx "type_edges=3" "$TMP/fix1.txt"'
+check "runtime_edges=6"  'grep -qx "runtime_edges=6" "$TMP/fix1.txt"'
+check "edges=10 (alle Arten)" 'grep -qx "edges=10" "$TMP/fix1.txt"'
+check "der reine import-type-Zyklus t1<->t2 wird NICHT als Zyklus gemeldet" \
+  "! grep -q 't1\.ts' <<<\"\$(sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fix1.txt')\""
+check "t1 <-> t2 taucht trotzdem als Verzeichniskopplung/Kante auf" \
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^t1\.ts${TAB}[0-9]+${TAB}[0-9]+\$'"
+check "gemischter Spezifizierer { type A, useB } bleibt Laufzeitkante (mixed.ts -> a.ts)" \
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^mixed\.ts${TAB}2${TAB}0\$'"
+
+echo "3b) Fixture: dynamische Importe"
+check "dynamic_imports=1" 'grep -qx "dynamic_imports=1" "$TMP/fix1.txt"'
+check "dynamic_edges=1"   'grep -qx "dynamic_edges=1" "$TMP/fix1.txt"'
+check "dynamischer Import zaehlt als Verzeichniskante deep -> (src)" \
+  "grep -qx 'deep${TAB}(src)${TAB}2' '$TMP/fix1.txt'"
+check "lazy.ts hat einen eingehenden Import"  \
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^lazy\.ts${TAB}0${TAB}1\$'"
+check "dynamischer Import ist weder external noch unresolved" \
+  'grep -qx "external_imports=1" "$TMP/fix1.txt" && grep -qx "unresolved_imports=1" "$TMP/fix1.txt"'
 
 echo "4) Fixture: Aufloesung von Importen"
 check "mehrzeiliger Import wird gesehen (deep/c.tsx -> a.ts)" \
@@ -111,6 +140,15 @@ check "fehlender relativer Import wird gemeldet" 'grep -qx "unresolved_imports=1
 check "unresolved landet in error="              'grep -qE "^error=.*unresolved_imports" "$TMP/fix1.txt"'
 check "Seiteneffekt-Import erzeugt keine Kante (nur 1 Asset)" \
   'grep -qx "asset_imports=1" "$TMP/fix1.txt"'
+
+echo "4a) Relativer Aufrufpfad findet arch_cycles.py trotzdem"
+# Der Aufruf im Pool-Workflow lautet `bash scripts/public-readiness/frontend-metrics.sh "$BASE"`.
+# Wird SCRIPT_DIR erst nach dem cd in die gemessene Wurzel aufgeloest, zeigt der relative
+# Pfad ins Leere und die Zyklen gelten still als nicht gemessen.
+( cd "$REPO" && bash scripts/public-readiness/frontend-metrics.sh "$TMP/fixture" ) \
+  > "$TMP/relpath.txt" 2>/dev/null
+check "relativer Skriptpfad: cycles_state=ok" 'grep -qx "cycles_state=ok" "$TMP/relpath.txt"'
+check "relativer Skriptpfad: Zyklus gefunden" "grep -qx 'pair${TAB}a.ts${TAB}b.ts' '$TMP/relpath.txt'"
 
 echo "5) Zwei Laeufe liefern identische Messung (Determinismus)"
 bash "$SCRIPT" "$TMP/fixture" > "$TMP/fix2.txt" 2> "$TMP/fix2.err"; RC=$?
@@ -155,6 +193,17 @@ check "scan=ok"                       'grep -qx "scan=ok" "$TMP/real.txt"'
 check "modules>0"                     'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^modules=[1-9][0-9]*\$"'
 check "edges>0"                       'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^edges=[1-9][0-9]*\$"'
 check "keine unaufloesbaren Importe"  'grep -qx "unresolved_imports=0" "$TMP/real.txt"'
+check "Typkanten werden getrennt ausgewiesen" \
+  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^type_edges=[1-9][0-9]*\$"'
+check "dynamische Importe werden gefunden (Router-Lazy-Loading)" \
+  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^dynamic_imports=[1-9][0-9]*\$"'
+check "edges = runtime + type + dynamic" 'python3 - "$TMP/real.txt" <<'"'"'PY'"'"'
+import re, sys
+text = open(sys.argv[1]).read()
+def value(key):
+    return int(re.search(r"(?m)^%s=(\d+)$" % key, text).group(1))
+assert value("edges") == value("runtime_edges") + value("type_edges") + value("dynamic_edges")
+PY'
 check "sizes liefert Zeilen/Pfad-Paare" \
   "sed -n '/^## sizes\$/,/^## churn\$/p' '$TMP/real.txt' | grep -qE '^[0-9]+${TAB}[a-z].*\.tsx?\$'"
 check "coupling liefert Verzeichnis-Kennzahlen" \

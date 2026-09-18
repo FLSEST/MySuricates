@@ -5,15 +5,20 @@
 # Schwesterskript von arch-metrics.sh: gleiche Abschnittsnamen, gleiche Lesart, andere
 # Messgrundlage. jdeps deckt nur die JVM ab; hier wird der Quelltext gelesen.
 #
-#   ## packages  Verzeichnisabhaengigkeiten, aus den Modulkanten aggregiert
-#   ## cycles    Import-Zyklen auf MODULEBENE (Datei) ueber arch_cycles.py — im Frontend
-#                beissen genau die (Temporal Dead Zone bei zirkulaeren ES-Modulen), nicht
-#                die auf Verzeichnisebene
+#   ## packages  Verzeichnisabhaengigkeiten, aus ALLEN Modulkanten aggregiert
+#   ## cycles    Import-Zyklen auf MODULEBENE (Datei) ueber arch_cycles.py, nur aus den
+#                statischen Laufzeitkanten — im Frontend beissen genau die (Temporal Dead
+#                Zone bei zirkulaeren ES-Modulen), nicht die auf Verzeichnisebene
 #   ## sizes     Zeilen je Datei (Top 30) und je Verzeichnis (Top 15), plus Schwellenzaehler
 #   ## churn     geaenderte Frontend-Quelldateien der letzten 90 Tage aus git log
 #   ## coupling  ein-/ausgehende Abhaengigkeiten je Verzeichnis und je Modul
 #   ## summary   Kennzahlen als key=value
 #   ## run       Laufzeit-Zustand (scan=, aliases=) — bewusst NICHT deterministisch
+#
+# ACHTUNG, zwei verschiedene Grundgesamtheiten: ## sizes, ## packages, ## cycles und
+# ## coupling messen den Produktionscode OHNE Testdateien; ## churn zaehlt jede Datei unter
+# ai-automation-frontend/src, also MIT Tests (git log kennt die Filter nicht). Eine Datei aus
+# ## churn muss deshalb nicht in ## sizes stehen.
 #
 # Gemessen wird der Produktionscode unter ai-automation-frontend/src: *.ts und *.tsx ohne
 # Testdateien (*.test.*, *.spec.*, __tests__/, __mocks__/, src/test/) und ohne *.d.ts —
@@ -21,13 +26,31 @@
 # ausgeschlossenen Testdateien steht als test_files in ## summary, damit der Ausschluss
 # sichtbar bleibt statt zu verschwinden.
 #
-# Kanten kommen aus `import … from '…'` und `export … from '…'` (beides erzeugt eine echte
-# Abhaengigkeit, Barrel-Dateien bestehen nur daraus), mehrzeilige Import-Listen eingeschlossen.
-# Reine Seiteneffekt-Importe (`import './x.css'`) haben kein from und sind keine Modulkante.
+# Kanten kommen aus `import … from '…'`, `export … from '…'` (beides erzeugt eine echte
+# Abhaengigkeit, Barrel-Dateien bestehen nur daraus) und `import('…')`, mehrzeilige
+# Import-Listen eingeschlossen. Reine Seiteneffekt-Importe (`import './x.css'`) haben kein
+# from und sind keine Modulkante.
+#
+# Jede Kante traegt eine Art, denn nicht jede Abhaengigkeit existiert zur Laufzeit:
+#   runtime  statischer Wert-Import — bindet beim Laden, kann einen TDZ-Zyklus bauen
+#   type     `import type` / `export type` / nur `{ type X }`-Spezifizierer — tsc loescht
+#            das restlos; ein Zyklus aus Typkanten ist keiner. Zaehler: type_edges
+#   dynamic  `import('…')` (Router-Lazy-Loading) — aufgeschoben, deshalb ebenfalls kein
+#            TDZ-Zyklus, aber eine echte Bundling-Abhaengigkeit. Zaehler: dynamic_edges,
+#            dynamic_imports (Aufrufe)
+# Trifft dasselbe Modulpaar in mehreren Formen zu, gewinnt die staerkste Bindung.
+# ## packages und ## coupling zaehlen ALLE Arten, ## cycles nur runtime.
+#
 # Relative Angaben werden auf Modulpfade aufgeloest (.ts/.tsx/index.ts/index.tsx), Aliase aus
 # tsconfig.json (compilerOptions.paths) beachtet. Alles, was ausserhalb von src landet oder
 # ein Paket ist, zaehlt als external; ein relativer Pfad ohne Datei als unresolved — beide
 # stehen in ## summary, damit eine kaputte Aufloesung nicht als Kantenfreiheit durchgeht.
+#
+# Bekannte Grenze: ein nicht-literaler Spezifizierer (`import(variable)`, aus Strings
+# zusammengesetzte Pfade) wird nicht erfasst — er hat keinen Pfad, den man ohne Bundler
+# aufloesen koennte. Im heutigen Frontend kommt das nicht vor; sollte es auftreten, fehlt die
+# Kante lautlos. Gleiches gilt fuer `require()` und fuer Importe in Kommentaren/Strings, die
+# zufaellig in Spalte 0 beginnen.
 #
 # Fehlerpfade werden als "NICHT GEMESSEN" ausgewiesen, nie als sauberes Ergebnis.
 #
@@ -42,6 +65,11 @@
 set -uo pipefail
 export LC_ALL=C
 
+# Vor dem cd aufloesen: wurde das Skript ueber einen relativen Pfad aufgerufen, zeigt
+# dirname "$0" nach dem Wechsel in die gemessene Wurzel ins Leere — arch_cycles.py waere
+# dann nicht auffindbar und die Zyklen still "nicht gemessen".
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 ROOT_ARG="${1:-.}"
 if [ ! -d "$ROOT_ARG" ]; then
   echo "frontend-metrics: Verzeichnis nicht gefunden: $ROOT_ARG" >&2
@@ -51,7 +79,6 @@ cd "$ROOT_ARG" || exit 2
 ROOT="$(pwd -P)"
 FRONTEND="$ROOT/ai-automation-frontend"
 SRC="$FRONTEND/src"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
 ERRORS=""
@@ -60,6 +87,7 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 : > "$TMP/scan.tsv"
 : > "$TMP/modules.tsv"
 : > "$TMP/edges.tsv"
+: > "$TMP/runtime-edges.tsv"
 : > "$TMP/diredges.tsv"
 : > "$TMP/cycles.tsv"
 : > "$TMP/churn.tsv"
@@ -67,10 +95,11 @@ note_error() { ERRORS="${ERRORS:+$ERRORS,}$1"; }
 # ---------------------------------------------------------------------------
 # Quelltext-Scan: ein python3-Aufruf liefert alle Rohdaten als TSV mit Typspalte.
 #   module<TAB>pfad<TAB>zeilen<TAB>verzeichnis
-#   edge<TAB>von-modul<TAB>nach-modul          (dedupliziert)
-#   external<TAB>von-modul<TAB>spezifizierer   (Paket oder ausserhalb von src)
-#   asset<TAB>von-modul<TAB>spezifizierer      (aufgeloest, aber kein ts/tsx-Modul)
-#   unresolved<TAB>von-modul<TAB>spezifizierer (relativ, zeigt auf nichts)
+#   edge<TAB>von-modul<TAB>nach-modul<TAB>art  (dedupliziert; art = runtime|dynamic|type)
+#   external<TAB>von-modul<TAB>spezifizierer<TAB>art   (Paket oder ausserhalb von src)
+#   asset<TAB>von-modul<TAB>spezifizierer<TAB>art      (aufgeloest, aber kein ts/tsx-Modul)
+#   unresolved<TAB>von-modul<TAB>spezifizierer<TAB>art (relativ, zeigt auf nichts)
+#   dyncall<TAB>von-modul<TAB>spezifizierer    (je dynamischer import()-Aufruf)
 #   alias<TAB>praefix<TAB>ziel
 #   testfile<TAB>pfad
 #   note<TAB>marke                             (z. B. vite_alias_unparsed)
@@ -98,10 +127,32 @@ TEST_FILE = re.compile(r"\.(test|spec)\.[jt]sx?$")
 
 # Anker am Zeilenanfang, Mittelteil ohne Semikolon (so endet ein Seiteneffekt-Import
 # nicht am from der naechsten Anweisung) und ueber Zeilen hinweg, damit mehrzeilige
-# Import-Listen mitgezaehlt werden.
-SPEC = r"""^%s\s(?:[^;'"]|'[^']*'|"[^"]*")*?from\s*['"]([^'"]+)['"]"""
+# Import-Listen mitgezaehlt werden. Gruppe 1 ist die Klausel (fuer die Typerkennung),
+# Gruppe 2 der Spezifizierer.
+SPEC = r"""^%s(\s(?:[^;'"]|'[^']*'|"[^"]*")*?)from\s*['"]([^'"]+)['"]"""
 IMPORT_RE = re.compile(SPEC % "import", re.M)
 EXPORT_RE = re.compile(SPEC % "export", re.M)
+# Dynamischer Import: `import('…')`, auch hinter await/lazy() und mitten in der Zeile.
+# Kollidiert nicht mit den statischen Mustern oben — dort folgt auf `import` ein
+# Leerzeichen, hier eine Klammer.
+DYNAMIC_RE = re.compile(r"""import\s*\(\s*['"]([^'"]+)['"]\s*\)""")
+
+# Eine Kante je (von, nach); trifft dasselbe Paar in mehreren Formen zu, gewinnt die
+# staerkste Bindung: statisch zur Laufzeit > dynamisch (aufgeschoben) > nur Typ (geloescht).
+EDGE_RANK = {"runtime": 3, "dynamic": 2, "type": 1}
+
+
+def type_only(clause):
+    """True, wenn die Klausel zur Laufzeit nichts bindet — tsc loescht sie restlos."""
+    text = " ".join(clause.split())
+    if text == "type" or text.startswith("type "):
+        return True  # import type X / import type { … } / export type { … }
+    if text.startswith("{") and text.endswith("}"):
+        inner = text[1:-1].strip()
+        if not inner:
+            return True
+        return all(part.strip().startswith("type ") for part in inner.split(",") if part.strip())
+    return False
 
 out = []
 
@@ -196,23 +247,34 @@ def resolve(origin, spec):
     return ("unresolved", spec)
 
 
-edges = set()
+edges = {}
+
+
+def record(origin, spec, kind):
+    resolved, target = resolve(origin, spec)
+    if resolved != "module":
+        emit(resolved, origin, target, kind)
+        return
+    if target == origin:
+        return
+    previous = edges.get((origin, target))
+    if previous is None or EDGE_RANK[kind] > EDGE_RANK[previous]:
+        edges[(origin, target)] = kind
+
+
 for rel in sorted(MODULES):
     text = read(MODULES[rel])
     lines = len(text.splitlines())
     directory = os.path.dirname(rel) or "(src)"
     emit("module", rel, lines, directory)
-    specs = IMPORT_RE.findall(text) + EXPORT_RE.findall(text)
-    for spec in specs:
-        kind, target = resolve(rel, spec)
-        if kind == "module":
-            if target != rel:
-                edges.add((rel, target))
-        else:
-            emit(kind, rel, target)
+    for clause, spec in IMPORT_RE.findall(text) + EXPORT_RE.findall(text):
+        record(rel, spec, "type" if type_only(clause) else "runtime")
+    for spec in DYNAMIC_RE.findall(text):
+        emit("dyncall", rel, spec)
+        record(rel, spec, "dynamic")
 
-for source, target in sorted(edges):
-    emit("edge", source, target)
+for (source, target) in sorted(edges):
+    emit("edge", source, target, edges[(source, target)])
 
 sys.stdout.write("\n".join(out) + ("\n" if out else ""))
 PY
@@ -230,10 +292,13 @@ fi
 
 awk -F'\t' '$1=="module" { print $3 "\t" $2 "\t" $4 }' "$TMP/scan.tsv" \
   | sort -k1,1rn -k2,2 > "$TMP/modules.tsv"
-awk -F'\t' '$1=="edge" { print $2 "\t" $3 }' "$TMP/scan.tsv" | sort > "$TMP/edges.tsv"
+awk -F'\t' '$1=="edge" { print $2 "\t" $3 "\t" $4 }' "$TMP/scan.tsv" | sort > "$TMP/edges.tsv"
+# Zyklengraph: nur statische Laufzeitkanten. Typkanten loescht tsc, dynamische Importe sind
+# aufgeschoben — beide koennen die Temporal Dead Zone nicht ausloesen, um die es hier geht.
+awk -F'\t' '$3=="runtime" { print $1 "\t" $2 }' "$TMP/edges.tsv" > "$TMP/runtime-edges.tsv"
 
-# Verzeichniskanten: Modulkanten auf ihr Verzeichnis aggregiert, Selbstkanten fallen weg
-# (gleiche Lesart wie ## packages in arch-metrics.sh).
+# Verzeichniskanten: alle Modulkanten (auch Typ- und dynamische) auf ihr Verzeichnis
+# aggregiert, Selbstkanten fallen weg — gleiche Lesart wie ## packages in arch-metrics.sh.
 awk -F'\t' '$1=="module" { dir[$2]=$4 }
             $1=="edge"   { from=dir[$2]; to=dir[$3];
                            if (from != "" && to != "" && from != to) print from "\t" to }' \
@@ -243,8 +308,8 @@ awk -F'\t' '$1=="module" { dir[$2]=$4 }
 # Zyklen: ein Fehlschlag der Erkennung darf nicht als "keine Zyklen" durchgehen — das waere
 # falsch-gruen in genau der Dimension, fuer die das Faktenblatt gebaut wurde.
 CYCLES_STATE="no_edges"
-if [ -s "$TMP/edges.tsv" ]; then
-  if python3 "$SCRIPT_DIR/arch_cycles.py" < "$TMP/edges.tsv" > "$TMP/cycles.tsv" 2>"$TMP/cycles.err"; then
+if [ -s "$TMP/runtime-edges.tsv" ]; then
+  if python3 "$SCRIPT_DIR/arch_cycles.py" < "$TMP/runtime-edges.tsv" > "$TMP/cycles.tsv" 2>"$TMP/cycles.err"; then
     CYCLES_STATE="ok"
   else
     CYCLES_STATE="failed"
@@ -272,6 +337,10 @@ CHURN_FILES=$(wc -l < "$TMP/churn.tsv" | tr -d ' ')
 
 MODULES=$(wc -l < "$TMP/modules.tsv" | tr -d ' ')
 EDGES=$(wc -l < "$TMP/edges.tsv" | tr -d ' ')
+count_edge_kind() { awk -F'\t' -v k="$1" '$3==k' "$TMP/edges.tsv" | wc -l | tr -d ' '; }
+RUNTIME_EDGES=$(count_edge_kind runtime)
+TYPE_EDGES=$(count_edge_kind type)
+DYNAMIC_EDGES=$(count_edge_kind dynamic)
 DIR_EDGES=$(wc -l < "$TMP/diredges.tsv" | tr -d ' ')
 FILES_OVER_300=$(awk -F'\t' '$1 > 300' "$TMP/modules.tsv" | wc -l | tr -d ' ')
 FILES_OVER_500=$(awk -F'\t' '$1 > 500' "$TMP/modules.tsv" | wc -l | tr -d ' ')
@@ -280,6 +349,7 @@ count_kind() { awk -F'\t' -v k="$1" '$1==k' "$TMP/scan.tsv" | wc -l | tr -d ' ';
 EXTERNAL=$(count_kind external)
 ASSETS=$(count_kind asset)
 UNRESOLVED=$(count_kind unresolved)
+DYNAMIC_IMPORTS=$(count_kind dyncall)
 TEST_FILES=$(count_kind testfile)
 ALIASES=$(count_kind alias)
 CYCLES=$(grep -c '^cycle' "$TMP/cycles.tsv" 2>/dev/null); CYCLES=${CYCLES:-0}
@@ -296,7 +366,7 @@ NOTES=$(awk -F'\t' '$1=="note" { print $2 }' "$TMP/scan.tsv" | sort -u | tr '\n'
 # ---------------------------------------------------------------------------
 printf '## packages\n'
 printf '# Verzeichnisabhaengigkeiten unter ai-automation-frontend/src, ohne Selbstkanten\n'
-printf '# von\tnach\tanzahl (aggregierte Modulkanten)\n'
+printf '# von\tnach\tanzahl (aggregierte Modulkanten, alle Arten: runtime+type+dynamic)\n'
 if [ -s "$TMP/diredges.tsv" ]; then
   cat "$TMP/diredges.tsv"
 elif [ "$SCAN_STATE" = "ok" ]; then
@@ -307,6 +377,8 @@ fi
 
 printf '\n## cycles\n'
 printf '# Import-Zyklen auf Modulebene (Datei), erkannt von arch_cycles.py\n'
+printf '# NUR statische Laufzeitkanten: Typkanten loescht tsc, dynamische Importe sind\n'
+printf '# aufgeschoben — beide koennen keinen TDZ-Zyklus bauen (siehe type_edges/dynamic_edges)\n'
 printf '# cycle\tgroesse\tmodule   |   pair\ta\tb (wechselseitiger Import)\n'
 if [ -s "$TMP/cycles.tsv" ]; then
   cat "$TMP/cycles.tsv"
@@ -337,6 +409,8 @@ fi
 
 printf '\n## churn\n'
 printf '# geaenderte Dateien unter ai-automation-frontend/src der letzten 90 Tage, Top 30\n'
+printf '# andere Grundgesamtheit als ## sizes: git log kennt keine Testfilter, hier sind\n'
+printf '# Testdateien enthalten\n'
 printf '# aenderungen\tdatei\n'
 if [ -s "$TMP/churn.tsv" ]; then
   head -30 "$TMP/churn.tsv"
@@ -345,7 +419,8 @@ else
 fi
 
 printf '\n## coupling\n'
-printf '# je Verzeichnis: ausgehende/eingehende Verzeichnisse und Modulkanten, Top 15 nach ausgehend\n'
+printf '# je Verzeichnis: ausgehende/eingehende Verzeichnisse und Modulkanten (alle Arten),\n'
+printf '# Top 15 nach ausgehend\n'
 printf '# verzeichnis\tausgehend\teingehend\tausgehende_kanten\teingehende_kanten\n'
 if [ -s "$TMP/diredges.tsv" ]; then
   awk -F'\t' '{ out_dir[$1]++; out_w[$1]+=$3; in_dir[$2]++; in_w[$2]+=$3; seen[$1]=1; seen[$2]=1 }
@@ -368,6 +443,10 @@ printf '\n## summary\n'
 printf 'modules=%s\n' "$MODULES"
 printf 'directories=%s\n' "$DIRECTORIES"
 printf 'edges=%s\n' "$EDGES"
+printf 'runtime_edges=%s\n' "$RUNTIME_EDGES"
+printf 'type_edges=%s\n' "$TYPE_EDGES"
+printf 'dynamic_edges=%s\n' "$DYNAMIC_EDGES"
+printf 'dynamic_imports=%s\n' "$DYNAMIC_IMPORTS"
 printf 'dir_edges=%s\n' "$DIR_EDGES"
 printf 'cycles=%s\n' "$CYCLES"
 printf 'cycle_pairs=%s\n' "$PAIRS"
