@@ -2,12 +2,7 @@ package com.automation.service.dashboard;
 
 import com.automation.dto.response.DashboardWorkflowResultResponse.Result;
 import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.StreamReadConstraints;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -52,11 +47,12 @@ import java.util.Set;
  * a variation selector or strong-RTL letter attached to a visible base character (an emoji plus its
  * presentation selector, e.g. {@code "✅️"}, stays legal because the emoji itself is visible).
  *
- * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own JsonMapper
- * so Spring's Jackson customisation can never change what counts as valid. The mapper (fix round 1,
- * A3) is pinned explicitly rather than relying on Jackson defaults: duplicate keys are rejected, and
- * stream-read constraints (nesting depth, string length) are capped so a pathological payload throws
- * a normal, caught exception instead of risking a {@link StackOverflowError} that
+ * <p>Stateless utility, like {@code GateStatusOutputParser}: no Spring bean, and its own mapper
+ * ({@link DashboardWidgetJson}) so Spring's Jackson customisation can never change what counts as
+ * valid. The mapper (fix round 1, A3; write side hardened fix round 1 of this task) is pinned
+ * explicitly rather than relying on Jackson defaults: duplicate keys are rejected, and both stream-read
+ * and stream-write constraints (nesting depth, string length) are capped so a pathological payload
+ * throws a normal, caught exception instead of risking a {@link StackOverflowError} that
  * {@code catch (Exception e)} would not stop. {@code FAIL_ON_TRAILING_TOKENS} cannot fire today —
  * {@link DashboardWidgetMarker} hands {@link #parse} exactly one balanced-brace substring — it is
  * kept as defence-in-depth in case a future caller feeds the mapper raw, unscanned text.
@@ -78,19 +74,6 @@ public final class DashboardWidgetResultParser {
     static final int MAX_ITEMS = 10;
     static final int MAX_ITEM = 200;
     static final int MAX_SUMMARY = 500;
-
-    /** Deep enough for any legitimate contract (2 levels); far short of any real recursion risk. */
-    private static final int MAX_NESTING_DEPTH = 32;
-
-    private static final JsonMapper MAPPER = JsonMapper.builder(JsonFactory.builder()
-                    .streamReadConstraints(StreamReadConstraints.builder()
-                            .maxNestingDepth(MAX_NESTING_DEPTH)
-                            .maxStringLength(DashboardWidgetMarker.MAX_JSON_CHARS)
-                            .build())
-                    .build())
-            .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
 
     private static final Set<String> RESULT_FIELDS = Set.of("title", "status", "kpis", "items", "summary");
     private static final Set<String> KPI_FIELDS = Set.of("label", "value", "trend");
@@ -136,7 +119,7 @@ public final class DashboardWidgetResultParser {
             return ParseResult.INVALID;
         }
         try {
-            return new ParseResult(ResultState.VALID, validate(MAPPER.readTree(scan.json())));
+            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.MAPPER.readTree(scan.json())));
         } catch (Exception e) {
             return ParseResult.INVALID;
         }
@@ -148,7 +131,7 @@ public final class DashboardWidgetResultParser {
             return ParseResult.MISSING;
         }
         try {
-            return new ParseResult(ResultState.VALID, validate(MAPPER.valueToTree(stored)));
+            return new ParseResult(ResultState.VALID, validate(DashboardWidgetJson.treeOf(stored)));
         } catch (Exception e) {
             return ParseResult.INVALID;
         }
@@ -191,7 +174,7 @@ public final class DashboardWidgetResultParser {
      * Messages name the offending field and never echo its value.
      */
     public static Result validateOrThrow(Object candidate) {
-        return validate(MAPPER.valueToTree(candidate));
+        return validate(DashboardWidgetJson.treeOf(candidate));
     }
 
     /** Throws IllegalArgumentException for anything outside the contract; messages never echo values. */

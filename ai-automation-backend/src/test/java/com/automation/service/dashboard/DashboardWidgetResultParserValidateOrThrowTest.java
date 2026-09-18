@@ -1,6 +1,7 @@
 package com.automation.service.dashboard;
 
 import com.automation.dto.response.DashboardWorkflowResultResponse.Result;
+import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -198,5 +199,48 @@ class DashboardWidgetResultParserValidateOrThrowTest {
 
         assertThat(metadata).containsOnlyKeys("status", "title", "kpis");
         assertThat(DashboardWidgetResultParser.fromMetadata(metadata).result()).isEqualTo(result);
+    }
+
+    // --- Fix round 1: MAPPER.valueToTree ignored StreamWriteConstraints (TokenBuffer has no nesting
+    // guard), so a pathologically deep candidate threw an uncaught StackOverflowError instead of the
+    // documented IllegalArgumentException. Both entry points must now stay inside the contract. ---
+
+    private static Object deeplyNested(int depth, Object leafValue) {
+        Map<String, Object> deepest = new LinkedHashMap<>();
+        Map<String, Object> root = deepest;
+        for (int i = 1; i < depth; i++) {
+            Map<String, Object> next = new LinkedHashMap<>();
+            deepest.put("nested", next);
+            deepest = next;
+        }
+        deepest.put("leaf", leafValue);
+        return root;
+    }
+
+    @Test
+    void rejects_a_pathologically_nested_candidate_without_a_stack_overflow() {
+        Object nested = deeplyNested(10_000, SECRET);
+
+        assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(nested))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("dashboard_widget")
+                .hasMessageNotContaining(SECRET);
+    }
+
+    @Test
+    void fromMetadata_reads_the_same_pathologically_nested_value_as_invalid_not_a_crash() {
+        Object nested = deeplyNested(10_000, SECRET);
+
+        assertThat(DashboardWidgetResultParser.fromMetadata(nested).state()).isEqualTo(ResultState.INVALID);
+    }
+
+    @Test
+    void keeps_a_normally_nested_candidate_valid_after_the_depth_guard() {
+        Map<String, Object> candidate = minimal();
+        candidate.put("kpis", List.of(kpi("a", "b", "UP")));
+
+        Result result = DashboardWidgetResultParser.validateOrThrow(candidate);
+
+        assertThat(result.kpis()).containsExactly(new Result.Kpi("a", "b", Result.Trend.UP));
     }
 }
