@@ -1007,4 +1007,26 @@ class SwitchBlockExecutorTest {
         verify(commandExecutor).executeStepAsShell(any(), captor.capture(), anyInt(), anyInt());
         assertThat(captor.getValue().getName()).isEqualTo("cleanup");
     }
+
+    /**
+     * TODO 22e6bec8: the nested AI form counts too — platform data in a nested {@code simple}
+     * block's prompt taints the output the switch records for that case.
+     */
+    @Test
+    void execute_platformDataInANestedPrompt_taintsTheRecordedCaseOutput() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(
+                StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("a | b").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "A");
+        config.put("cases", List.of(Map.of("value", "A", "blocks", List.of(Map.of(
+                "type", "simple", "name", "analyse",
+                "config", Map.of("command", "Bewerte: {{ previous_report }}"))))));
+
+        executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(context.resolveShellTemplate("echo {{ block.analyse.output }}", false))
+                .isEqualTo("echo 'a | b'");
+    }
 }

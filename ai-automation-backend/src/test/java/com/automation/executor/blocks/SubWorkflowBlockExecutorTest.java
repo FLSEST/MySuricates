@@ -332,4 +332,32 @@ class SubWorkflowBlockExecutorTest {
         assertThat(captor.getValue()).doesNotContainKeys(
                 ExecutionContext.UNTRUSTED_KEYS_VARIABLE, ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE);
     }
+
+    /** TODO 22e6bec8: an output tainted by platform data in an AI prompt reaches the child too. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_outputTaintedByAPlatformPrompt_reachesTheChild() {
+        context.setUntrustedPlatformVariable("previous_report", "letzter Bericht");
+        context.resolvePromptTemplate("Bewerte: {{ previous_report }}");
+        context.recordOutput("analyse", "a | b");
+
+        Workflow subWorkflow = Workflow.builder().id("sub-wf-1").name("Sub Workflow").build();
+        when(workflowService.findById("sub-wf-1")).thenReturn(subWorkflow);
+        WorkflowRun subRun = WorkflowRun.builder()
+                .id("sub-run-1").workflow(subWorkflow).status(RunStatus.COMPLETED).build();
+        when(workflowExecutor.execute(eq(subWorkflow), any(Map.class), eq(TriggerSource.SUB_WORKFLOW))).thenReturn(subRun);
+        when(runRepository.findById("sub-run-1")).thenReturn(Optional.of(subRun));
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("sub-workflow")
+                .config(new HashMap<>(Map.of("workflow_id", "sub-wf-1")))
+                .build();
+
+        executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(workflowExecutor).execute(eq(subWorkflow), captor.capture(), eq(TriggerSource.SUB_WORKFLOW));
+        assertThat(captor.getValue()).containsEntry(ExecutionContext.UNTRUSTED_OUTPUTS_VARIABLE,
+                List.of("analyse", ExecutionContext.PREVIOUS_OUTPUT_NAME));
+    }
 }

@@ -173,14 +173,34 @@ Executes a shell command on the host or inside a Docker container.
 > `shell_escape_variables`. The reason: `previous_report` is the output of an earlier run (which may
 > have processed a webhook payload), and `open_todos` contains titles from imported issues. So write
 > these placeholders **unquoted** (`REPORT={{ previous_report }}`, not `REPORT="{{ previous_report }}"`).
-> Nothing changes in AI prompts (they are never escaped). The two variables do **not** trigger taint
-> propagation: block outputs of an otherwise clean run stay raw as before.
+> In AI prompts the value is still substituted raw (prompts are never escaped).
 >
-> **Consequence for forwarded values:** writing `previous_report`/`open_todos` into a block output or
-> into an `items_command` (e.g. `items_command: "echo {{ previous_report }}"`) loses the quoting for
-> the follow-up placeholders: the call itself is quoted, but the resulting `{{ previous_output }}`,
-> `{{ block.<name>.output }}` and `foreach` items count as trusted in an otherwise clean run and are
-> substituted raw. Set `"shell_escape_variables": true` explicitly on such follow-up blocks.
+> **Both placeholders do trigger taint propagation — on two paths:**
+>
+> 1. **Substitution into a shell field colours the whole run.** As soon as `{{ previous_report }}` or
+>    `{{ open_todos }}` really lands in `command`, `items_command`, `condition`, … of a shell block,
+>    **from that point on** every block output of the run (`{{ previous_output }}`,
+>    `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach` items) is single-quoted too —
+>    exactly as in a webhook-triggered run.
+> 2. **An AI prompt colours that block's output — and from it, the run.** If platform data was in the
+>    prompt of an AI block (`simple`, `agentic`, `skill-capability` plus the non-shell branches of
+>    `foreach`/`while`/`conditional`/`retry`/`switch`), its output counts as untrusted: a following
+>    shell block receives it single-quoted. Once that output is recorded the run is coloured, sticky
+>    just as in case 1 — every **further** block output and the variables derived from it
+>    (`{{ step_N_output }}`, `foreach` items, `document` extracts) are quoted from then on too, and
+>    the taint is passed to sub-workflows and to a resume via `exportTaint()`. The prompt alone
+>    colours nothing: if no output is recorded, the run stays clean.
+>
+> A run that does not use the two placeholders at all is unchanged: block outputs are substituted raw
+> as before.
+>
+> **The safe form for follow-up blocks:** set `"shell_escape_variables": true` and pull the
+> **unquoted** placeholder into a variable via `set --` — `set -- {{ previous_output }}`, then
+> `ANSWER="${1:-}"`. This behaves identically in coloured and in clean runs and is the form the
+> shipped definitions use (the `PlatformPromptQuotingGateTest` gate enforces it there).
+>
+> Full trust model (three trust classes, reserved context keys, known limits):
+> [architektur.md → trust classes for context values](architektur.md#workflow-hardening-optional).
 
 ```json
 {
@@ -639,6 +659,15 @@ Status and exit code come from the stored step data, never from the log text. Ga
 JSON stages need JSON as input and must come before text stages.
 
 **`compress-ai`** (one tool-less AI call): `source` (required), `instruction` (plain text, placeholders are **not** resolved), `max_chars` (default 4000, minimum 500), `model`, `effort`, `timeout_seconds`. Runs in a fresh, private working directory per call (no project `CLAUDE.md`, no MCP servers, no plugin hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Because of `--setting-sources local`, user-level Claude settings (e.g. `env` or `apiKeyHelper` in `~/.claude/settings.json`) are **not** applied to this call. Only provider `CLAUDE`; a different `provider` fails — if the workflow runs on another provider, set `"provider": "CLAUDE"` on the block. Inputs above the `compress-ai-max-input-chars` setting (default 60,000) fail without making the call — put a `compress` block before it instead.
+
+> **Limit — `--bare` would isolate more, but is unusable (TODO edb38a38):** the Claude CLI has a
+> minimal mode `--bare` that additionally skips hooks, LSP, plugin sync, auto-memory and `CLAUDE.md`
+> discovery. It is still not used here, because per `claude --help` `--bare` also skips **keychain
+> reads**: "Anthropic auth is strictly `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth
+> and keychain are never read)". On a host signed in via OAuth, as is usual, the call therefore
+> aborts — verified on the dev host: `claude -p --bare "Antworte mit OK"` → `Not logged in · Please
+> run /login` (exit code 1), while `claude -p --setting-sources local "Antworte mit OK"` → `OK`.
+> `--bare` would thus only be possible for instances that run purely on `ANTHROPIC_API_KEY`.
 
 ```json
 [

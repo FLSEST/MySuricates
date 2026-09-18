@@ -207,7 +207,7 @@ public class SwitchBlockExecutor implements BlockExecutor {
         boolean escapeVariables = Boolean.TRUE.equals(nestedConfig.get("shell_escape_variables"));
         String command = isShell
                 ? context.resolveShellTemplate((String) nestedConfig.get("command"), escapeVariables)
-                : context.resolveTemplate((String) nestedConfig.get("command"));
+                : context.resolvePromptTemplate((String) nestedConfig.get("command"));
 
         if (isShell) {
             BlockDefinition shellBlock =

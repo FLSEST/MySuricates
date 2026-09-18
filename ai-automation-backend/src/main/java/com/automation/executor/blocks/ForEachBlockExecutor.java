@@ -101,7 +101,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
             else context.setVariable(variableName, item);
             String resolvedCommand = isShell
                     ? context.resolveShellTemplate(command, escapeVariables)
-                    : context.resolveTemplate(command);
+                    : context.resolvePromptTemplate(command);
 
             StepResult itemResult;
             if (isShell) {

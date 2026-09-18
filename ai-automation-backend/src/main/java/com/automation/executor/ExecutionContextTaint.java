@@ -20,6 +20,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * carrying external untrusted input: block outputs and derived variables (foreach items,
  * {@code step_N_output}) are escaped too, so platform bytes cannot re-enter a command line raw.
  *
+ * <p><b>Platform data in an AI prompt colours that block's output, not the run.</b> The laundering
+ * path platform data → AI prompt → shell block used to bypass the quoting entirely: the prompt path
+ * reported nothing and {@link ExecutionContext#recordOutput} filed the answer as untrusted-free.
+ * Since TODO 22e6bec8 {@link TemplateResolver#resolvePrompt} reports its substitutions too
+ * ({@link #substitutedIntoPrompt}); the flag is consumed by the next recorded output
+ * ({@link #consumePlatformPrompt}), which is therefore escaped in later shell command lines. The run
+ * itself stays clean until an output is really recorded — a prompt alone changes nothing.
+ *
  * <p>The flag itself is exported as {@link ExecutionContext#PLATFORM_IN_SHELL_VARIABLE} (TODO
  * cadfc423), so a segment resumed before any output was recorded starts tainted instead of clean —
  * {@code ExecutionContextFactory} re-raises it via {@link ExecutionContext#markPlatformUsedInShell()}.
@@ -29,6 +37,7 @@ final class ExecutionContextTaint {
     private final VariableTrust variables = new VariableTrust();
     private final OutputTaint outputs = new OutputTaint();
     private final AtomicBoolean platformUsedInShell = new AtomicBoolean(false);
+    private final AtomicBoolean platformInPrompt = new AtomicBoolean(false);
 
     /** Back to trusted — the value now comes from the platform itself (workflow default, system value). */
     void markTrusted(String name) {
@@ -95,5 +104,31 @@ final class ExecutionContextTaint {
      */
     void substitutedIntoShell(String key) {
         if (variables.isPlatform(key)) platformUsedInShell.set(true);
+    }
+
+    /**
+     * Callback from {@link TemplateResolver#resolvePrompt}: this placeholder key was substituted into
+     * an AI prompt. Platform data here does <em>not</em> taint the run — a prompt is no command line —
+     * it only marks the output of the block that consumed it (TODO 22e6bec8).
+     */
+    void substitutedIntoPrompt(String key) {
+        if (variables.isPlatform(key)) platformInPrompt.set(true);
+    }
+
+    /**
+     * Reads and clears the prompt flag: the block that is recording its result now is the one whose
+     * prompt carried platform data, so its output is recorded as untrusted. Clearing keeps the flag
+     * scoped to that block — a later block with a clean prompt records a clean output again (unless
+     * the run is tainted by then, which is sticky by design).
+     *
+     * <p>Deliberately <em>not</em> exported, unlike {@link ExecutionContext#PLATFORM_IN_SHELL_VARIABLE}:
+     * {@link com.automation.service.workflow.ResumePlan} resumes after the last COMPLETED step, so a
+     * block whose prompt set this flag but whose output was never recorded is executed again from the
+     * top — it resolves its prompt once more and raises the flag again. Should the resume semantics
+     * ever change (picking up <em>inside</em> a block, replaying a recorded output), this is where
+     * under-colouring would appear, and the flag needs an export like the shell one.
+     */
+    boolean consumePlatformPrompt() {
+        return platformInPrompt.getAndSet(false);
     }
 }

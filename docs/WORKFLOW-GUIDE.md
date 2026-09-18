@@ -174,16 +174,37 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > unabhängig vom Trigger und von `shell_escape_variables`. Grund: `previous_report` ist der Output
 > eines früheren Runs (der eine Webhook-Payload verarbeitet haben kann), `open_todos` enthält
 > Titel aus importierten Issues. Diese Platzhalter also **unquoted** schreiben
-> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts ändert
-> sich nichts (dort wird nie escaped). Die beiden Variablen lösen **keine** Taint-Propagation aus:
-> Block-Ausgaben eines sonst sauberen Runs bleiben roh wie bisher.
+> (`REPORT={{ previous_report }}`, nicht `REPORT="{{ previous_report }}"`). In KI-Prompts wird der
+> Wert weiterhin roh eingesetzt (dort wird nie escaped).
 >
-> **Folge für weitergereichte Werte:** Wer `previous_report`/`open_todos` in eine Block-Ausgabe
-> oder in ein `items_command` schreibt (z. B. `items_command: "echo {{ previous_report }}"`),
-> verliert das Quoting für die Folge-Platzhalter: der Aufruf selbst ist gequotet, aber die daraus
-> entstehenden `{{ previous_output }}`, `{{ block.<name>.output }}` und `foreach`-Items gelten in
-> einem sonst sauberen Run als vertrauenswürdig und werden roh eingesetzt. In solchen
-> Folge-Blöcken deshalb explizit `"shell_escape_variables": true` setzen.
+> **Beide Platzhalter lösen Taint-Propagation aus — auf zwei Wegen:**
+>
+> 1. **Substitution in ein Shell-Feld färbt den ganzen Lauf.** Sobald `{{ previous_report }}` oder
+>    `{{ open_todos }}` wirklich in `command`, `items_command`, `condition`, … eines Shell-Blocks
+>    eingesetzt wird, werden **ab diesem Punkt** auch alle Block-Ausgaben des Laufs
+>    (`{{ previous_output }}`, `{{ block.<name>.output }}`, `{{ step_N_output }}`, `foreach`-Items)
+>    single-quoted — genau wie in einem webhook-getriggerten Lauf.
+> 2. **Ein KI-Prompt färbt die Ausgabe dieses Blocks — und ab ihr den Lauf.** Standen
+>    Plattform-Daten im Prompt eines KI-Blocks (`simple`, `agentic`, `skill-capability` sowie die
+>    Nicht-Shell-Zweige von `foreach`/`while`/`conditional`/`retry`/`switch`), gilt dessen Ausgabe
+>    als nicht vertrauenswürdig: Ein folgender Shell-Block bekommt sie single-quoted. Sobald diese
+>    Ausgabe verbucht ist, ist der Lauf gefärbt, und zwar klebrig wie in Fall 1 — auch alle
+>    **weiteren** Block-Ausgaben und die daraus abgeleiteten Variablen (`{{ step_N_output }}`,
+>    `foreach`-Items, `document`-Extrakte) werden ab da gequotet, und der Taint wird über
+>    `exportTaint()` an Sub-Workflows und an ein Resume weitergereicht. Der Prompt allein färbt
+>    nichts: Wird keine Ausgabe verbucht, bleibt der Lauf sauber.
+>
+> Ein Lauf, der die beiden Platzhalter überhaupt nicht verwendet, bleibt unverändert: Block-Ausgaben
+> werden roh eingesetzt wie bisher.
+>
+> **Sichere Form für Folge-Blöcke:** `"shell_escape_variables": true` setzen und den Platzhalter
+> **unquoted** über `set --` in eine Variable holen —
+> `set -- {{ previous_output }}` und danach `ANTWORT="${1:-}"`. Das funktioniert in gefärbten wie in
+> sauberen Läufen gleich und ist die Form, die die ausgelieferten Definitionen verwenden (das
+> Gate `PlatformPromptQuotingGateTest` erzwingt sie dort).
+>
+> Vollständiges Trust-Modell (drei Vertrauensklassen, reservierte Kontextschlüssel, bekannte
+> Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md#workflow-härtung-optional).
 
 ```json
 {
@@ -645,6 +666,16 @@ Status und Exit-Code stammen aus den gespeicherten Schrittdaten, nie aus dem Log
 JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
 
 **`compress-ai`** (ein KI-Aufruf ohne Werkzeuge): `source` (erforderlich), `instruction` (reiner Text, Platzhalter werden **nicht** aufgelöst), `max_chars` (Default 4.000, Minimum 500), `model`, `effort`, `timeout_seconds`. Läuft in einem frischen, privaten Arbeitsverzeichnis je Aufruf (kein Projekt-`CLAUDE.md`, keine MCP-Server, keine Plugin-Hooks — `--tools ""`, `--strict-mcp-config`, `--setting-sources local`). Wegen `--setting-sources local` gelten Claude-Einstellungen auf Benutzerebene (z. B. `env` oder `apiKeyHelper` in `~/.claude/settings.json`) für diesen Aufruf **nicht**. Nur Provider `CLAUDE`; ein abweichender `provider` schlägt fehl — läuft der Workflow mit einem anderen Provider, im Block `"provider": "CLAUDE"` setzen. Eingaben über der Einstellung `compress-ai-max-input-chars` (Default 60.000) scheitern ohne Aufruf — davor einen `compress`-Block setzen.
+
+> **Grenze — `--bare` ist die stärkere Isolation, aber nicht nutzbar (TODO edb38a38):** Die Claude-CLI
+> kennt mit `--bare` einen Minimalmodus, der zusätzlich Hooks, LSP, Plugin-Sync, Auto-Memory und die
+> `CLAUDE.md`-Erkennung abschaltet. Er kommt hier trotzdem nicht zum Einsatz, weil `--bare` laut
+> `claude --help` auch die **Keychain-Leseoperationen** überspringt: „Anthropic auth is strictly
+> `ANTHROPIC_API_KEY` or `apiKeyHelper` via `--settings` (OAuth and keychain are never read)". Auf
+> einem Host, der wie üblich per OAuth angemeldet ist, bricht der Aufruf deshalb ab — auf dem
+> Dev-Host geprüft: `claude -p --bare "Antworte mit OK"` → `Not logged in · Please run /login`
+> (Exit-Code 1), während `claude -p --setting-sources local "Antworte mit OK"` → `OK` liefert.
+> `--bare` wäre also nur für Instanzen möglich, die ausschließlich mit `ANTHROPIC_API_KEY` arbeiten.
 
 ```json
 [

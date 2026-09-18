@@ -36,7 +36,7 @@ public class RetryBlockExecutor implements BlockExecutor {
         String rawCommand = (String) config.get("command");
         String command = isShell
                 ? context.resolveShellTemplate(rawCommand, escapeVariables)
-                : context.resolveTemplate(rawCommand);
+                : context.resolvePromptTemplate(rawCommand);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
