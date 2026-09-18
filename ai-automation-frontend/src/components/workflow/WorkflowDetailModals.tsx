@@ -2,6 +2,7 @@ import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
+import { DashboardReportFields } from './DashboardReportFields';
 import type { BlockDraft } from './blockEdit';
 import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
 import { useT } from '../../i18n';
@@ -287,6 +288,12 @@ export function WorkflowDetailModals({
               ]}
             />
           )}
+          <DashboardReportFields
+            blockType={newBlock.type}
+            configJson={newBlock.config}
+            onConfigChange={(config) => setNewBlock({ ...newBlock, config })}
+            idSuffix="-new-block"
+          />
           <BlockAiOverrideFields
             blockType={newBlock.type}
             configJson={newBlock.config}
@@ -391,6 +398,12 @@ export function WorkflowDetailModals({
               ]}
             />
           )}
+          <DashboardReportFields
+            blockType={editBlock.type}
+            configJson={editBlock.config}
+            onConfigChange={(config) => setEditBlock({ ...editBlock, config })}
+            idSuffix="-edit-block"
+          />
           <BlockAiOverrideFields
             blockType={editBlock.type}
             configJson={editBlock.config}
