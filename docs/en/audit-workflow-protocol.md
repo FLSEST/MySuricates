@@ -103,6 +103,7 @@ Converted audits in `workflow-pool/`:
 | Workflow | Measurement | Self-test |
 |---|---|---|
 | Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, lines, churn) | `scripts/tests/test-arch-metrics.sh` |
+| Architecture review (frontend) | block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (source imports, lines, module cycles) | `scripts/tests/test-frontend-metrics.sh` |
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (actuator, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
