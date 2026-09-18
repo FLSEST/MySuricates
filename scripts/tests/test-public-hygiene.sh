@@ -81,6 +81,36 @@ ENTRYPOINT_DEFAULT="$(printf '%s' 'APP_USER="${APP_USER:-flo}"')"
 check "kein 'flo' als APP_USER-Default" \
   '! grep -qF "$ENTRYPOINT_DEFAULT" "$REPO/ai-automation-backend/docker/entrypoint.sh"'
 
+echo "10) SECURITY.md fehlt, enthaelt eine Mailadresse, oder nennt keinen Meldeweg"
+make_repo "$TMP/sec"
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlendes SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md"                 'grep -q "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'Contact: security@example.com\n\nSee Security Advisories.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Mailadresse in SECURITY.md erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt die Mailadresse"                  'grep -qi "Mail" <<<"$OUT"'
+
+( cd "$TMP/sec" && printf 'No contact info, no reporting path here.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec2 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "fehlender Meldeweg erkannt (exit 1)" '[ "$RC" -eq 1 ]'
+
+( cd "$TMP/sec" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md && $GIT add SECURITY.md && $GIT commit -q -m sec3 )
+OUT=$(cd "$TMP/sec" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "korrektes SECURITY.md akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "11) --tracked prueft den getrackten Bestand, nicht die Arbeitskopie"
+make_repo "$TMP/sec2"
+( cd "$TMP/sec2" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "nur auf Platte liegende SECURITY.md wird nicht akzeptiert (exit 1)" '[ "$RC" -eq 1 ]'
+check "Gate nennt SECURITY.md als nicht getrackt"                         'grep -qi "SECURITY.md" <<<"$OUT"'
+
+( cd "$TMP/sec2" && $GIT add SECURITY.md && $GIT commit -q -m sec )
+OUT=$(cd "$TMP/sec2" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "einmal committete SECURITY.md wird akzeptiert (exit 0)" '[ "$RC" -eq 0 ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
