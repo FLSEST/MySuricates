@@ -1065,6 +1065,8 @@ export interface Todo {
   source: TodoSource;
   sourceAgent: string | null;
   sessionId: string | null;
+  /** UUID der Agenten-Konversation (`claude --resume <uuid>`) — nicht die Shell-Session. */
+  agentSessionRef: string | null;
   workflowRunId: string | null;
   referenceType: string | null;
   referenceId: string | null;

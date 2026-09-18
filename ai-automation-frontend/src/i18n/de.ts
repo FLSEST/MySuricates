@@ -1690,6 +1690,8 @@ export const de: TranslationKeys = {
     collapseTodos: 'Todos einklappen',
   },
   todos: {
+    resumeSession: 'Agenten-Sitzung fortsetzen — Befehl kopieren',
+    resumeCopied: 'Befehl kopiert',
     title: 'Todos',
     subtitle: 'Aufgaben und Erkenntnisse projektübergreifend verwalten',
     create: 'Neues Todo',

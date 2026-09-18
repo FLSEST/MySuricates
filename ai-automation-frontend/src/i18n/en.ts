@@ -1693,6 +1693,8 @@ export const en = {
     collapseTodos: 'Collapse todos',
   },
   todos: {
+    resumeSession: 'Resume the agent session — copy the command',
+    resumeCopied: 'Command copied',
     title: 'Todos',
     subtitle: 'Track tasks and findings across projects',
     create: 'New Todo',

@@ -2,7 +2,7 @@
 
 # MySuricates
 
-A research project exploring how far software development can be carried out in a controlled way with AI agents — and a working system in which this can be observed.
+A research project exploring how far software development can be carried out in a controlled way with AI agents — and a running system in which this can be observed.
 
 MySuricates is a local workflow platform: workflows consist of blocks that are either deterministic (shell, branch, loop) or invoke an AI. From this mixture, a control loop has emerged that produces findings about its own codebase, turns them into TODOs, triggers fix workflows, and then checks the result again. The code was created largely in AI sessions, part of it through this control loop itself.
 
@@ -14,7 +14,7 @@ Four mechanisms were built to investigate one question each. Built here means: t
 
 | Question | Mechanism in the code |
 |---|---|
-| Can a system identify and address its own need for improvement without anyone giving it the initial push? | **Self-improvement loop**: audit workflow → gate assessment → automatically generated TODO → `TodoTrigger` starts a fix workflow → verification. Three layers prevent the loop from chasing itself. |
+| Can a system identify and work through its own need for improvement without anyone giving it the initial push? | **Self-improvement loop**: audit workflow → gate assessment → automatically generated TODO → `TodoTrigger` starts a fix workflow → verification. Three layers prevent the loop from chasing itself. |
 | What does an agent need to know about a project, and where does that knowledge come from if nobody writes it down? | **Workflow memory**: knowledge is extracted from completed runs and injected as context before the next run. |
 | How do you retain control over an agent that plans several steps by itself? | **Agentic blocks** separate Reason and Act and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
 | Can the quality of an AI output be evaluated mechanically instead of by reading it? | **Gates**: blocks output `gate_status: GREEN\|YELLOW\|RED`. RED creates a high-priority TODO, YELLOW a medium-priority one. The assessment lives in the workflow, not in the platform. |
@@ -28,7 +28,7 @@ As of 2026-09-19, commit count and lines from the working tree on that day (line
 | | |
 |---|---|
 | Started | 2026-02-15, around 1,550 commits, one author |
-| Backend | Java 21 / Spring Boot 3.4, around 67,000 lines, 45 REST controllers, 74 Flyway migrations |
+| Backend | Java 21 / Spring Boot 3.4, around 67,000 lines, 45 REST controllers, 75 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 66,000 lines |
 | Tests | Backend 8,767 (0 failures, 1 skipped), Frontend 1,013 — run from 2026-09-18 |
 | Building blocks | 19 block types, 66 workflow templates, 19 built-in skills, 7 integration providers |
@@ -74,25 +74,25 @@ Execution happens **on the host**: shell blocks through the user's shell, AI blo
 
 ## Quickstart
 
-> New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
+> New machine (Linux), possibly without Java/Node/Docker? → **[docs/en/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
 > walks you through the setup step by step. Short version: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
-# 1. Repository klonen
+# 1. Clone the repository
 git clone <repository-url> autotrigger
 cd autotrigger
 
-# 2. Backend bauen und starten
+# 2. Build and start the backend
 cd ai-automation-backend
 mvn clean package -DskipTests
 java -jar target/ai-automation-backend-*.jar
 
-# 3. Frontend installieren und starten (neues Terminal)
+# 3. Install and start the frontend (new terminal)
 cd ai-automation-frontend
 npm install
 npm run dev
 
-# 4. Oeffnen
+# 4. Open
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:9090/api/v1
 ```

@@ -55,6 +55,7 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
             Todo created = todoService.create(new CreateTodoRequest(
                     title, description, Todo.Status.OPEN, priority, tags,
                     projectId, null, source, sourceAgent, null,
+                    null,   // agentSessionRef: ein Workflow-Block hat keine Agenten-Konversation
                     context.getWorkflowRunId(), null, null, null));
 
             String variableName = String.valueOf(config.getOrDefault("variable_name", "todo_id"));

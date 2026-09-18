@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
+import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench, Terminal } from 'lucide-react';
 import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { ProviderIcon } from '../shared/ProviderIcon';
@@ -83,6 +83,26 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
                   {todo.sourceAgent || t.todos.sources[todo.source]}
                 </span>
               </Badge>
+            )}
+
+            {/* Agenten-Sitzung: Resume-Befehl kopierbar statt als Fliesstext in der Beschreibung.
+                Vorher hing die Rueckverfolgbarkeit daran, dass ein Agent `claude --resume <uuid>`
+                freiwillig hineinschrieb — prompt-enforced, und entsprechend luckenhaft
+                (TODO 3497533c). */}
+            {todo.agentSessionRef && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void navigator.clipboard?.writeText(`claude --resume ${todo.agentSessionRef}`);
+                }}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-ai-subtle text-ai font-mono hover:bg-ai/20 transition-colors"
+                title={`${t.todos.resumeSession}: claude --resume ${todo.agentSessionRef}`}
+                data-testid="resume-session"
+              >
+                <Terminal className="w-2.5 h-2.5" />
+                {todo.agentSessionRef.slice(0, 8)}
+              </button>
             )}
 
             {/* Run link */}
