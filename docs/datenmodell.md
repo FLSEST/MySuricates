@@ -1240,6 +1240,13 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V64 | `V64__add_writes_to_capabilities.sql` | `writes` in capabilities (+ Backfill write-fähiger Built-in-Capabilities) |
 | V65 | `V65__add_catch_up_on_resume_to_schedules.sql` | `catch_up_on_resume` in scheduled_workflows (Per-Schedule-Policy bei System-Resume) |
 | V66 | `V66__add_todo_export_link.sql` | `exported_provider`, `exported_ref`, `exported_url` in todos (Export-Link zu externen Systemen) |
+| V67 | `V67__add_effort_to_workflows.sql` | `effort` in workflows (Reasoning-Effort low/medium/high/xhigh, nullable) |
+| V68 | `V68__create_audit_center.sql` | audit_reports-, audit_findings-, audit_finding_occurrences- und audit_finding_todos-Tabellen + Indizes (Audit Center) |
+| V69 | `V69__audit_finding_disposition_evidence.sql` | `disposition_evidence`, `disposition_at` in audit_findings (Beweis-Snapshot und Zeitpunkt einer Risiko-Akzeptanz) |
+| V70 | `V70__workflow_definition_hash.sql` | `definition_hash` in workflow_versions und workflow_runs, `definition_version_id`, `trigger_source` in workflow_runs (Run-Provenienz) |
+| V71 | `V71__workflow_sealing.sql` | `sealed`, `sealed_hash`, `sealed_at` in workflows (Workflow-Versiegelung) |
+| V72 | `V72__webhook_signing_secret.sql` | `signing_secret_enc` in webhook_triggers (verschlüsseltes HMAC-Signatur-Secret) |
+| V73 | `V73__dashboard_layout_versions.sql` | dashboard_layout_versions-Tabelle + Index (versionierte Dashboard-Layout-Snapshots) |
 
 ## SQLite-Besonderheiten
 

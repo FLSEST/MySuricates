@@ -136,7 +136,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 | `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker Socket Pfad |
 
 > **Warum manche Variablen nicht in `application.yml` stehen:** Die `automation.*`-Konfiguration wird
-> ueber `@ConfigurationProperties` gebunden. Spring bindet dabei jede Property zusaetzlich direkt aus
+> über `@ConfigurationProperties` gebunden. Spring bindet dabei jede Property zusätzlich direkt aus
 > der passenden Umgebungsvariablen — `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` setzt also
 > `automation.host-claude.max-tokens`, auch wenn dort kein `${...}`-Platzhalter steht.
 > Umgebungsvariablen haben dabei Vorrang vor den Werten aus `application.yml`.
@@ -379,133 +379,133 @@ verwirft). Das ist kein Ticket-Bug. Prüfen: Antwortet der Proxy auf den `/ws/**
 
 ## Vertrauensmodell und Netzwerk-Exposition
 
-MySuricates ist fuer den **lokalen Betrieb durch eine vertrauenswuerdige Person** gebaut. Es ist kein
-gehaertetes Mehrbenutzersystem und sollte nicht unveraendert oeffentlich erreichbar betrieben werden.
+MySuricates ist für den **lokalen Betrieb durch eine vertrauenswürdige Person** gebaut. Es ist kein
+gehärtetes Mehrbenutzersystem und sollte nicht unverändert öffentlich erreichbar betrieben werden.
 Dieser Abschnitt beschreibt das bestehende Modell, damit vor dem Start klar ist, was erreichbar ist.
 
 ### Was ein Workflow darf
 
-Shell-Bloecke und KI-Aufrufe laufen standardmaessig **auf dem Host mit den Rechten des startenden
-Benutzers** — nicht in einem Container. Container-Ausfuehrung ist opt-in pro Shell-Block
+Shell-Blöcke und KI-Aufrufe laufen standardmäßig **auf dem Host mit den Rechten des startenden
+Benutzers** — nicht in einem Container. Container-Ausführung ist opt-in pro Shell-Block
 (`container_image`). Ein Workflow kann damit alles, was der Benutzer kann: Dateien lesen und
 schreiben, Prozesse starten, ins Netz gehen.
 
 Die Claude CLI wird ausserdem mit `automation.cli.skip-permissions` = **`true`** aufgerufen
 (`AUTOMATION_CLI_SKIP_PERMISSIONS`). Sie fragt also nicht vor Werkzeugnutzung nach. Ausnahme: wird
-einem Aufruf eine Werkzeug-Whitelist mitgegeben, entfaellt das Flag und die CLI erzwingt die Liste —
-so arbeiten `skill-capability`-Bloecke ohne `allow_writes` nur lesend.
+einem Aufruf eine Werkzeug-Whitelist mitgegeben, entfällt das Flag und die CLI erzwingt die Liste —
+so arbeiten `skill-capability`-Blöcke ohne `allow_writes` nur lesend.
 
-### Drei Vertrauensklassen fuer Kontextwerte
+### Drei Vertrauensklassen für Kontextwerte
 
 Nicht jeder Wert, den ein Workflow in einen Shell-Befehl einsetzt, kommt aus der Definition. Jede
-Kontextvariable traegt deshalb eine von drei Klassen; sie entscheidet, ob der Wert roh in die
+Kontextvariable trägt deshalb eine von drei Klassen; sie entscheidet, ob der Wert roh in die
 Kommandozeile geht oder in POSIX-Single-Quotes gepackt wird.
 
-| Klasse | Woher der Wert kommt | In Shell-Bloecken | In KI-Prompts | Faerbt den Run |
+| Klasse | Woher der Wert kommt | In Shell-Blöcken | In KI-Prompts | Färbt den Run |
 |---|---|---|---|---|
 | **trusted** | Workflow-Defaults, Systemwerte (`project_path`, `workflow_run_id`), blockinterne Werte, Antworten aus `approval`/`human-input` | roh eingesetzt | roh | nein |
-| **untrusted extern** | Webhook-Nutzlast und alles, was daraus abgeleitet ist (Blockausgaben, `step_N_output`, foreach-Items) — auch ueber Resume und Sub-Workflows hinweg | immer single-quoted | roh | ja, ab dem Setzen |
+| **untrusted extern** | Webhook-Nutzlast und alles, was daraus abgeleitet ist (Blockausgaben, `step_N_output`, foreach-Items) — auch über Resume und Sub-Workflows hinweg | immer single-quoted | roh | ja, ab dem Setzen |
 | **Plattform-Daten** | `previous_report` und `open_todos`, die in **jeden** Run injiziert werden | immer single-quoted | roh | erst, wenn der Platzhalter wirklich in einem Shell-Befehl steht |
 
-„Faerbt den Run" heisst: Ab diesem Moment werden auch alle Folgeausgaben des Runs gequotet, denn ein
-Block kann fremde Bytes in seine Ausgabe holen, ohne einen Platzhalter zu nennen. Die Faerbung ist
-klebrig und ueberlebt Resume und Sub-Workflow-Uebergabe. Plattform-Daten faerben bewusst erst bei
-Nutzung: Sie stecken in jedem Run, eine Faerbung beim Injizieren wuerde jeden Run faerben und die
-Bedeutung der Ausgabe-Platzhalter in den mitgelieferten Templates aendern.
+„Färbt den Run" heisst: Ab diesem Moment werden auch alle Folgeausgaben des Runs gequotet, denn ein
+Block kann fremde Bytes in seine Ausgabe holen, ohne einen Platzhalter zu nennen. Die Färbung ist
+klebrig und überlebt Resume und Sub-Workflow-Uebergabe. Plattform-Daten färben bewusst erst bei
+Nutzung: Sie stecken in jedem Run, eine Färbung beim Injizieren würde jeden Run färben und die
+Bedeutung der Ausgabe-Platzhalter in den mitgelieferten Templates ändern.
 
-Bewusst **nicht** escaped werden Antworten aus `approval`- und `human-input`-Bloecken: Sie kommen
-ueber die API-Key-geschuetzte Schnittstelle von der Person, der die Instanz gehoert. Und setzt ein
-Workflow eine Variable selbst (`setVariable`), gilt sie wieder als vertrauenswuerdig — der Wert
+Bewusst **nicht** escaped werden Antworten aus `approval`- und `human-input`-Blöcken: Sie kommen
+über die API-Key-geschützte Schnittstelle von der Person, der die Instanz gehört. Und setzt ein
+Workflow eine Variable selbst (`setVariable`), gilt sie wieder als vertrauenswürdig — der Wert
 stammt dann aus der Definition, nicht vom Aufrufer.
 
 Grenzen, die man kennen sollte:
 
 - **In KI-Prompts wird nichts escaped.** Ein Prompt ist keine Kommandozeile; gegen Prompt-Injection
   hilft das Modell nicht.
-- **Der Weg ueber einen KI-Block waescht die Faerbung ab.** Stehen Plattform-Daten in einem
-  `simple`- oder `agentic`-Prompt, faerbt das den Run nicht; die KI-Antwort gilt als ungefaerbt; ein
+- **Der Weg über einen KI-Block wäscht die Färbung ab.** Stehen Plattform-Daten in einem
+  `simple`- oder `agentic`-Prompt, färbt das den Run nicht; die KI-Antwort gilt als ungefärbt; ein
   folgender Shell-Block setzt `{{ previous_output }}` dann **roh** ein. In den mitgelieferten
   Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows, ein Built-in-Template) und ist nur
-  deshalb unauffaellig, weil dort alle Folge-Shell-Bloecke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
+  deshalb unauffällig, weil dort alle Folge-Shell-Blöcke `"shell_escape_variables": true` gesetzt haben. **Setze in eigenen Workflows in
   jedem Shell-Block, der die Ausgabe eines KI-Blocks weiterverarbeitet,
-  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschuetzt.
-- **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefaerbten Wert
-  in eine Datei schreibt und diese spaeter ausfuehrt, liegt ausserhalb dessen, was sich quoten laesst.
+  `"shell_escape_variables": true`** — ohne dieses Opt-in ist der Pfad ungeschützt.
+- **Selbst geschriebene Dateien sieht das Quoting nicht.** Ein Shell-Block, der einen gefärbten Wert
+  in eine Datei schreibt und diese später ausführt, liegt ausserhalb dessen, was sich quoten lässt.
 
-Technische Fassung mit Klassennamen und reservierten Kontextschluesseln:
-[Workflow-Haertung](architektur.md#workflow-härtung-optional).
+Technische Fassung mit Klassennamen und reservierten Kontextschlüsseln:
+[Workflow-Härtung](architektur.md#workflow-härtung-optional).
 
 ### Wo gelauscht wird
 
 Weder Backend noch Frontend binden auf Loopback. `server.address` ist nirgends gesetzt, das Backend
-lauscht also auf allen Interfaces; Vite laeuft mit `host: true`. Der Compose-Dienst veroeffentlicht
-`9090:9090` ohne Host-IP-Praefix, also auf allen Adressen — und Dockers Portfreigabe umgeht dabei
-die ueblichen Host-Firewall-Regeln.
+lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Der Compose-Dienst veröffentlicht
+`9090:9090` ohne Host-IP-Präfix, also auf allen Adressen — und Dockers Portfreigabe umgeht dabei
+die üblichen Host-Firewall-Regeln.
 
 CORS erlaubt per Default neben `localhost` auch Tailscale-Muster (`100.*` und `*.tail*.ts.net`).
 **CORS ist keine Zugriffskontrolle** — es steuert nur, welche Herkunft ein Browser akzeptiert, und
-haelt niemanden von einem direkten Aufruf ab. Ein vorhandener Tailscale-Zugang macht die Anwendung
+hält niemanden von einem direkten Aufruf ab. Ein vorhandener Tailscale-Zugang macht die Anwendung
 nicht zu einem abgesicherten System.
 
 ### Was ohne API-Key erreichbar ist
 
-Authentifiziert wird ueber den Header `X-API-Key`, und zwar fuer `/api/**` und `/actuator/**`.
+Authentifiziert wird über den Header `X-API-Key`, und zwar für `/api/**` und `/actuator/**`.
 Ausgenommen sind:
 
 | Pfad | Zweck |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
-| `/actuator/health` | Healthcheck fuer Docker |
-| `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprueft) |
+| `/actuator/health` | Healthcheck für Docker |
+| `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprüft) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
-| `/api/v1/integrations/*/callback` | OAuth-Rueckleitungen |
+| `/api/v1/integrations/*/callback` | OAuth-Rückleitungen |
 
 Alles ausserhalb von `/api/**` und `/actuator/**` ist ebenfalls offen (`anyRequest().permitAll()`) —
 das betrifft das ausgelieferte Frontend und jeden nicht gemappten Pfad.
 
 **Wichtig:** Ist kein API-Key gesetzt oder `automation.security.enabled=false`, gilt *jede* Anfrage
-als authentifiziert. Ein leerer Schluessel schaltet die Authentifizierung also vollstaendig ab, statt
-sie zu verschaerfen.
+als authentifiziert. Ein leerer Schlüssel schaltet die Authentifizierung also vollständig ab, statt
+sie zu verschärfen.
 
 ### Webhooks
 
-Der Trigger-Endpunkt wird allein durch ein Token im Pfad geschuetzt (32 Zufallsbytes aus
-`SecureRandom`). Es gibt keine Signaturpruefung und keinen Replay-Schutz. Als Gegengewicht gilt ein
-fest verdrahtetes Limit von 10 Anfragen pro Minute und IP — unabhaengig vom globalen Rate-Limit-
+Der Trigger-Endpunkt wird allein durch ein Token im Pfad geschützt (32 Zufallsbytes aus
+`SecureRandom`). Es gibt keine Signaturprüfung und keinen Replay-Schutz. Als Gegengewicht gilt ein
+fest verdrahtetes Limit von 10 Anfragen pro Minute und IP — unabhängig vom globalen Rate-Limit-
 Schalter —, die Nutzlast ist auf 50 Felder begrenzt, und alle vom Aufrufer stammenden Werte werden
-als nicht vertrauenswuerdig markiert und in Shell-Bloecken immer escaped.
+als nicht vertrauenswürdig markiert und in Shell-Blöcken immer escaped.
 
 ### Docker-Rechte — zwei getrennte Ebenen
 
 Die beiden werden leicht verwechselt:
 
-1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (Default `false`) ist ein serverseitiger Schalter dafuer,
+1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (Default `false`) ist ein serverseitiger Schalter dafür,
    ob ein Shell-Block mit `mount_docker_socket: true` den Socket in einen **erzeugten Agent-Container**
    bekommt. Wird es verweigert, landet ein SECURITY-Eintrag im Activity-Log.
 2. **Die ausgelieferte `docker-compose.yml`** mountet den Host-Docker-Socket dagegen direkt in den
-   **Backend-Container** (`/var/run/docker.sock`). Das ist unabhaengig von Punkt 1 und gibt der
-   Anwendung volle Kontrolle ueber Docker auf dem Host.
+   **Backend-Container** (`/var/run/docker.sock`). Das ist unabhängig von Punkt 1 und gibt der
+   Anwendung volle Kontrolle über Docker auf dem Host.
 
 ### Container-Image-Allowlist
 
 `AUTOMATION_ALLOWED_CONTAINER_IMAGES` (Default leer = jedes Image erlaubt, einmaliges INFO beim
-Start) schraenkt ein, welches `container_image` ein Shell-Block anfordern darf. Die Pruefung sitzt
+Start) schränkt ein, welches `container_image` ein Shell-Block anfordern darf. Die Prüfung sitzt
 zentral in `ContainerShellService.execute` — beide Aufrufer (`ShellBlockExecutor`,
 `CommandExecutorService`) laufen automatisch mit. Ein nicht gelistetes Image scheitert mit
 Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt einfach zu starten. Ein Eintrag
-matcht per Gleichheit, als Registry-/Namespace-Praefix (endet mit `/`), oder — ohne Tag — gegen
-jeden Tag des Images. Ein Image, das mit `-` beginnt, wird immer abgelehnt (unabhaengig von der
-Allowlist) — `docker run` wuerde es sonst als Flag lesen. Analoges Muster zu
+matcht per Gleichheit, als Registry-/Namespace-Präfix (endet mit `/`), oder — ohne Tag — gegen
+jeden Tag des Images. Ein Image, das mit `-` beginnt, wird immer abgelehnt (unabhängig von der
+Allowlist) — `docker run` würde es sonst als Flag lesen. Analoges Muster zu
 `AUTOMATION_ALLOWED_MOUNT_PREFIXES`.
 
 ### Daraus folgt
 
-- Nur in einem Netz betreiben, dem du vertraust; fuer Fernzugriff ein VPN davorsetzen statt den Port zu oeffnen.
-- Einen eigenen API-Key setzen und pruefen, dass er nicht leer ist.
-- Den Docker-Socket-Mount aus der Compose-Datei nehmen, wenn keine Container-Bloecke gebraucht werden.
-- In Produktivumgebungen `AUTOMATION_ALLOWED_CONTAINER_IMAGES` auf die tatsaechlich benoetigten
+- Nur in einem Netz betreiben, dem du vertraust; für Fernzugriff ein VPN davorsetzen statt den Port zu öffnen.
+- Einen eigenen API-Key setzen und prüfen, dass er nicht leer ist.
+- Den Docker-Socket-Mount aus der Compose-Datei nehmen, wenn keine Container-Blöcke gebraucht werden.
+- In Produktivumgebungen `AUTOMATION_ALLOWED_CONTAINER_IMAGES` auf die tatsächlich benötigten
   Images setzen, statt auf dem leeren Default (= alle Images erlaubt) zu bleiben.
-- Keine Workflows aus fremder Quelle ungelesen ausfuehren — sie laufen mit deinen Rechten.
+- Keine Workflows aus fremder Quelle ungelesen ausführen — sie laufen mit deinen Rechten.
 
 ## Drei-Umgebungs-Setup
 
