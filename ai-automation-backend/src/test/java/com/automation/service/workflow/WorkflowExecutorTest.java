@@ -131,29 +131,7 @@ class WorkflowExecutorTest {
         lenient().when(systemIdentity.getVersion()).thenReturn("0.2.3");
 
         registry = new WorkflowExecutionRegistry();
-        workflowExecutor = new WorkflowExecutor(
-                List.of(simpleBlockExecutor),
-                containerService,
-                commandExecutorService,
-                runRepository,
-                stepResultRepository,
-                skillRepository,
-                broadcaster,
-                virtualThreadExecutor,
-                new DynamicSemaphore(10),
-                new ExecutionContextFactory(workflowVersionService, runRepository, systemIdentity,
-                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
-                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
-                activityLogService,
-                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
-                registry,
-                new BlockSkillContext(commandExecutorService),
-                new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
-                new RunFinalizer(runRepository, broadcaster, eventPublisher),
-                runWorkspaceService,
-                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
-        );
+        workflowExecutor = newExecutor(List.of(simpleBlockExecutor));
 
         testProject = Project.builder()
                 .id("proj-1")
@@ -186,6 +164,34 @@ class WorkflowExecutorTest {
                     .id("run-1").workflow(testWorkflow).status(RunStatus.RUNNING).startedAt(java.time.Instant.now()).build();
             return Optional.of(run);
         });
+    }
+
+
+    /** The executor under test; a test that needs a real block executor passes its own list. */
+    private WorkflowExecutor newExecutor(List<BlockExecutor> blockExecutors) {
+        return new WorkflowExecutor(
+                blockExecutors,
+                containerService,
+                commandExecutorService,
+                runRepository,
+                stepResultRepository,
+                skillRepository,
+                broadcaster,
+                virtualThreadExecutor,
+                new DynamicSemaphore(10),
+                new ExecutionContextFactory(workflowVersionService, runRepository, systemIdentity,
+                        new WorkflowContextDataService(runRepository, stepResultRepository, todoRepository),
+                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
+                activityLogService,
+                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
+                registry,
+                new BlockSkillContext(commandExecutorService),
+                new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
+                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
+                new RunFinalizer(runRepository, broadcaster, eventPublisher),
+                runWorkspaceService,
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
+        );
     }
 
     @org.junit.jupiter.api.AfterEach
@@ -759,6 +765,46 @@ class WorkflowExecutorTest {
         assertThat(previousOutputSeenByBlock).containsExactly("first-output");   // seed from the last completed step
         assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(broadcaster).broadcastRunStatus("run-1", RunStatus.RUNNING);
+    }
+
+    /**
+     * End-to-end over the executor (not only {@link ResumeOutputSeeder}): after a resume, a compress block
+     * finds its source among the seeded outputs and uses the persisted step facts for its header.
+     */
+    @Test
+    void resumeFromStep_compressBlock_usesTheSeededSourceOutputAndItsStoredFacts() {
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder().type("simple").name("backend_tests")
+                        .config(new HashMap<>(Map.of("command", "mvn test"))).build(),
+                BlockDefinition.builder().type("compress").name("backend_kompakt")
+                        .config(new HashMap<>(Map.of("source", "backend_tests",
+                                "stages", List.of(Map.of("op", "lines.dedupe", "count", true))))).build())));
+        WorkflowExecutor executor = newExecutor(List.of(simpleBlockExecutor,
+                new com.automation.executor.blocks.CompressBlockExecutor()));
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        WorkflowRun running = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.RUNNING).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted)).thenReturn(Optional.of(running));
+        StepResult done = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("LOG\nLOG\nFEHLER")
+                .durationMs(12_000L)
+                .metadata(new HashMap<>(Map.of("blockType", "shell", "blockName", "backend_tests", "exitCode", 1)))
+                .build();
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
+
+        executor.resumeFromStep("run-1");
+
+        ArgumentCaptor<StepResult> saved = ArgumentCaptor.forClass(StepResult.class);
+        verify(stepResultRepository, atLeastOnce()).save(saved.capture());
+        StepResult compressed = saved.getAllValues().stream()
+                .filter(s -> s.getMetadata() != null && Boolean.TRUE.equals(s.getMetadata().get("derivedOutput")))
+                .reduce((first, second) -> second).orElseThrow();
+        assertThat(compressed.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(compressed.getOutput())
+                .startsWith("## backend_tests — COMPLETED · exit 1 · 12 s · 14 → 13 Zeichen")
+                .endsWith("\n\n2× LOG\nFEHLER");
+        verify(simpleBlockExecutor, never()).execute(any(BlockDefinition.class), any(ExecutionContext.class));
+        assertThat(captureLastSavedRun().getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
     @Test

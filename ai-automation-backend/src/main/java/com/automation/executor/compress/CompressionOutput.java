@@ -33,9 +33,11 @@ public final class CompressionOutput {
             throw new CompressionException("'max_chars' = " + CompressionNumbers.fmt(maxChars)
                     + " reicht nicht für Kopfzeilen und mindestens " + MIN_BODY_CHARS + " Zeichen Inhalt");
         }
-        String cut = TextTruncateStage.truncate(body, budget, TextTruncateStage.Keep.HEAD_TAIL);
-        String finalDetail = detailLine + " · Obergrenze (" + CompressionNumbers.chars(body.length() - cut.length()) + ")";
-        return new Assembled(header(src, in, cut.length()) + "\n" + finalDetail + "\n\n" + cut, in, cut.length(), true);
+        // The note names the same number as the notice inside the body: the omitted content characters.
+        TextTruncateStage.Cut cut = TextTruncateStage.cut(body, budget, TextTruncateStage.Keep.HEAD_TAIL);
+        String finalDetail = detailLine + " · Obergrenze (" + CompressionNumbers.chars(cut.omitted()) + ")";
+        return new Assembled(header(src, in, cut.text().length()) + "\n" + finalDetail + "\n\n" + cut.text(),
+                in, cut.text().length(), true);
     }
 
     /**

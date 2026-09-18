@@ -127,6 +127,37 @@ class CompressBlockExecutorTest {
         assertThat(((Map<?, ?>) r.getMetadata().get("compression")).get("capped")).isEqualTo(true);
     }
 
+    /** Header note and the notice inside the body must name one and the same number of cut characters. */
+    @Test
+    void cap_headerAndBodyNameTheSameCutNumber() {
+        ExecutionContext ctx = contextWithShellSource("big", StepStatus.COMPLETED, 0, "x".repeat(10_000));
+
+        StepResult r = executor.execute(block(Map.of("source", "big",
+                "stages", List.of(Map.of("op", "text.normalize")), "max_chars", 1000)), ctx);
+
+        java.util.regex.Matcher header = java.util.regex.Pattern
+                .compile("Obergrenze \\(−([\\d.]+) Zeichen\\)").matcher(r.getOutput());
+        java.util.regex.Matcher body = java.util.regex.Pattern
+                .compile("\\[… ([\\d.]+) Zeichen ausgelassen …]").matcher(r.getOutput());
+        assertThat(header.find()).isTrue();
+        assertThat(body.find()).isTrue();
+        assertThat(header.group(1)).isEqualTo(body.group(1));
+    }
+
+    @Test
+    void skippedSource_isNamedInTheHeader() {
+        ExecutionContext ctx = contextWithShellSource("backend_tests", StepStatus.SKIPPED, null, "nicht gelaufen");
+
+        StepResult r = executor.execute(block(Map.of("source", "backend_tests",
+                "stages", List.of(Map.of("op", "text.normalize")))), ctx);
+
+        assertThat(r.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(r.getOutput()).startsWith("## backend_tests — SKIPPED · 312 s · 14 → 14 Zeichen");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> compression = (Map<String, Object>) r.getMetadata().get("compression");
+        assertThat(((Map<?, ?>) compression.get("source")).get("status")).isEqualTo("SKIPPED");
+    }
+
     @Test
     void maxCharsTooSmallForHeader_isConfigError() {
         ExecutionContext ctx = contextWithShellSource("big", StepStatus.COMPLETED, 0, "x".repeat(10_000));

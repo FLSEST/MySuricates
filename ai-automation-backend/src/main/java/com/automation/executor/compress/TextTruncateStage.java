@@ -44,9 +44,18 @@ public final class TextTruncateStage implements CompressionStage {
         };
     }
 
+    /** A cut text and how many characters of the original it left out — the number its notice names. */
+    public record Cut(String text, int omitted) {
+    }
+
     /** Result length is at most {@code budget} (for budgets above the notice length), notice included. */
     public static String truncate(String text, int budget, Keep keep) {
-        if (text.length() <= budget) return text;
+        return cut(text, budget, keep).text();
+    }
+
+    /** Like {@link #truncate}, but also reports the number of omitted characters (0 when nothing was cut). */
+    public static Cut cut(String text, int budget, Keep keep) {
+        if (text.length() <= budget) return new Cut(text, 0);
         int available = Math.max(0, budget - notice(text.length()).length());
         String head = "";
         String tail = "";
@@ -59,7 +68,8 @@ public final class TextTruncateStage implements CompressionStage {
                 tail = tailPart(text, available - headBudget);
             }
         }
-        return head + notice(text.length() - head.length() - tail.length()) + tail;
+        int omitted = text.length() - head.length() - tail.length();
+        return new Cut(head + notice(omitted) + tail, omitted);
     }
 
     static String notice(long omitted) {
