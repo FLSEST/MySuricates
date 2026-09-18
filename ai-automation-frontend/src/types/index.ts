@@ -1407,6 +1407,7 @@ export interface DialogWorkflowSuggestion {
 // ── Modules (startup configuration, read-only) ──────────
 
 export type FeatureModuleName =
+  | 'dashboard-report'
   | 'chains' | 'assistant' | 'learning' | 'memory' | 'audit' | 'bpmn'
   | 'integrations' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
   | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';
@@ -1417,7 +1418,7 @@ export type HardeningModuleName =
 export type ModuleName = FeatureModuleName | HardeningModuleName;
 
 export type ModulePreset = 'core' | 'research' | 'full';
-export type ModuleTier = 'research' | 'advanced' | 'hardening';
+export type ModuleTier = 'standard' | 'research' | 'advanced' | 'hardening';
 export type ModuleMaturity = 'stable' | 'experimental' | 'legacy';
 export type ModuleRisk = 'credentials' | 'network' | 'host-access';
 

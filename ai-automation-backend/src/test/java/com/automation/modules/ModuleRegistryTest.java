@@ -17,12 +17,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ModuleRegistryTest {
 
     @Test
-    void defaultPresetIsCoreWithOnlyProvenanceOn() {
+    void defaultPresetIsCoreWithStandardModulesAndProvenanceOn() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of(), Map.of());
 
         assertThat(registry.preset()).isEqualTo(ModulePreset.CORE);
         assertThat(Arrays.stream(ModuleCatalog.values()).filter(registry::isEnabled))
-                .containsExactly(ModuleCatalog.PROVENANCE);
+                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.PROVENANCE);
     }
 
     @Test
@@ -161,7 +161,7 @@ class ModuleRegistryTest {
     void summaryListsPresetAndEnabledModules() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("chains", "true"), Map.of());
 
-        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[chains, provenance]");
+        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, chains, provenance]");
     }
 
     // --- automation.modules.ui-editable ---------------------------------------------
@@ -246,7 +246,7 @@ class ModuleRegistryTest {
         ModuleRegistry registry = editable(Map.of());
         registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true));
 
-        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[chains, provenance]");
+        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, chains, provenance]");
     }
 
     @Test
@@ -254,5 +254,37 @@ class ModuleRegistryTest {
         ModuleRegistry registry = ModuleRegistry.allEnabled();
 
         assertThat(registry.describe()).allMatch(ModuleRegistry.ModuleStatus::enabled);
+    }
+
+    @Test
+    void standardTierIsOnInEveryPreset() {
+        for (ModulePreset preset : ModulePreset.values()) {
+            ModuleRegistry registry = ModuleRegistry.of(Map.of("preset", preset.key()), Map.of());
+            for (ModuleCatalog module : ModuleCatalog.values()) {
+                if (module.tier() == ModuleTier.STANDARD) {
+                    assertThat(registry.isEnabled(module))
+                            .as("%s under preset %s", module.key(), preset.key())
+                            .isTrue();
+                }
+            }
+        }
+    }
+
+    @Test
+    void aStandardModuleCanStillBeSwitchedOff() {
+        ModuleRegistry registry = ModuleRegistry.of(
+                Map.of("preset", "core", "dashboard-report", "false"), Map.of());
+
+        assertThat(registry.isEnabled(ModuleCatalog.DASHBOARD_REPORT)).isFalse();
+        assertThat(registry.status(ModuleCatalog.DASHBOARD_REPORT).configured()).isFalse();
+    }
+
+    @Test
+    void dashboardReportIsAStandardFeatureModuleWithoutRisksOrRequirements() {
+        assertThat(ModuleCatalog.DASHBOARD_REPORT.kind()).isEqualTo(ModuleKind.FEATURE);
+        assertThat(ModuleCatalog.DASHBOARD_REPORT.tier()).isEqualTo(ModuleTier.STANDARD);
+        assertThat(ModuleCatalog.DASHBOARD_REPORT.risks()).isEmpty();
+        assertThat(ModuleCatalog.DASHBOARD_REPORT.requires()).isEmpty();
+        assertThat(ModuleCatalog.DASHBOARD_REPORT.property()).isEqualTo("automation.modules.dashboard-report");
     }
 }

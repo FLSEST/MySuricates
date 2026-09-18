@@ -2094,6 +2094,7 @@ export const de: TranslationKeys = {
     yaml: 'config/application.yml',
     env: 'Umgebungsvariable',
     tier: {
+      standard: 'Standard',
       research: 'Forschung',
       advanced: 'Erweitert',
       hardening: 'Härtung',

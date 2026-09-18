@@ -15,6 +15,7 @@ import static com.automation.modules.ModuleRisk.NETWORK;
 import static com.automation.modules.ModuleTier.ADVANCED;
 import static com.automation.modules.ModuleTier.HARDENING;
 import static com.automation.modules.ModuleTier.RESEARCH;
+import static com.automation.modules.ModuleTier.STANDARD;
 
 /**
  * Single source of truth for every optional module and hardening switch.
@@ -24,6 +25,11 @@ import static com.automation.modules.ModuleTier.RESEARCH;
  * so a leaked API key cannot re-enable network, credential or host-access features.
  */
 public enum ModuleCatalog {
+
+    // ── Standard: on in every preset, switchable off ─────────────────────────
+    DASHBOARD_REPORT("dashboard-report", STANDARD, STABLE, true, Set.of(), List.of(),
+            "Dashboard report block: a workflow fills the dashboard result contract from block "
+                    + "config instead of emitting a marker, plus the editor's AI proposal for those fields."),
 
     // ── Research ─────────────────────────────────────────────────────────────
     CHAINS("chains", RESEARCH, STABLE, false, Set.of(), List.of(),
@@ -115,7 +121,11 @@ public enum ModuleCatalog {
         return maturity;
     }
 
-    /** Default when neither a preset nor an override decides. Only meaningful for hardening flags. */
+    /**
+     * Default when neither a preset nor an override decides. For feature modules the preset decides,
+     * so this flag only documents intent there — a {@link ModuleTier#STANDARD} module carries
+     * {@code true} because every preset enables it. For hardening flags it is the actual default.
+     */
     public boolean defaultEnabled() {
         return defaultEnabled;
     }

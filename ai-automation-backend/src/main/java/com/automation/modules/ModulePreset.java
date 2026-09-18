@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 
 /** Startup preset for {@link ModuleKind#FEATURE} modules ({@code automation.modules.preset}). */
 public enum ModulePreset {
-    /** Core only: workflows, runs, projects, TODOs, schedules. Public default. */
+    /** Core plus every {@link ModuleTier#STANDARD} module. Public default. */
     CORE,
     /** Core plus {@link ModuleTier#RESEARCH} modules. */
     RESEARCH,
@@ -15,8 +15,8 @@ public enum ModulePreset {
 
     boolean enables(ModuleCatalog module) {
         return switch (this) {
-            case CORE -> false;
-            case RESEARCH -> module.tier() == ModuleTier.RESEARCH;
+            case CORE -> module.tier() == ModuleTier.STANDARD;
+            case RESEARCH -> module.tier() == ModuleTier.STANDARD || module.tier() == ModuleTier.RESEARCH;
             case FULL -> true;
         };
     }

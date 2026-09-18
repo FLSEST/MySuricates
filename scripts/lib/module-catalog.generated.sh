@@ -15,6 +15,7 @@ MODULE_CATALOG_LANGS=(
 )
 
 MODULE_CATALOG_KEYS=(
+  dashboard-report
   chains
   assistant
   learning
@@ -40,6 +41,7 @@ MODULE_CATALOG_KEYS=(
 )
 
 MODULE_CATALOG_FEATURE_KEYS=(
+  dashboard-report
   chains
   assistant
   learning
@@ -68,6 +70,7 @@ MODULE_CATALOG_HARDENING_KEYS=(
 )
 
 declare -gA MODULE_CATALOG_TIER=(
+  [dashboard-report]="standard"
   [chains]="research"
   [assistant]="research"
   [learning]="research"
@@ -93,6 +96,7 @@ declare -gA MODULE_CATALOG_TIER=(
 )
 
 declare -gA MODULE_CATALOG_MATURITY=(
+  [dashboard-report]="stable"
   [chains]="stable"
   [assistant]="experimental"
   [learning]="experimental"
@@ -118,6 +122,7 @@ declare -gA MODULE_CATALOG_MATURITY=(
 )
 
 declare -gA MODULE_CATALOG_DEFAULT=(
+  [dashboard-report]="true"
   [chains]="false"
   [assistant]="false"
   [learning]="false"
@@ -143,6 +148,7 @@ declare -gA MODULE_CATALOG_DEFAULT=(
 )
 
 declare -gA MODULE_CATALOG_PROPERTY=(
+  [dashboard-report]="automation.modules.dashboard-report"
   [chains]="automation.modules.chains"
   [assistant]="automation.modules.assistant"
   [learning]="automation.modules.learning"
@@ -168,6 +174,7 @@ declare -gA MODULE_CATALOG_PROPERTY=(
 )
 
 declare -gA MODULE_CATALOG_RISKS=(
+  [dashboard-report]=""
   [chains]=""
   [assistant]=""
   [learning]=""
@@ -193,6 +200,7 @@ declare -gA MODULE_CATALOG_RISKS=(
 )
 
 declare -gA MODULE_CATALOG_REQUIRES=(
+  [dashboard-report]=""
   [chains]=""
   [assistant]=""
   [learning]=""
@@ -219,6 +227,7 @@ declare -gA MODULE_CATALOG_REQUIRES=(
 
 declare -gA MODULE_TEXT_NAME=(
   # de
+  [de:dashboard-report]="Dashboard-Bericht"
   [de:chains]="Chains"
   [de:assistant]="Assistent"
   [de:learning]="Insights & Learning"
@@ -242,6 +251,7 @@ declare -gA MODULE_TEXT_NAME=(
   [de:require-sealed-for-unattended]="Unbeaufsichtigt nur versiegelt"
   [de:webhook-signatures]="Webhook-Signaturen (HMAC)"
   # en
+  [en:dashboard-report]="Dashboard report"
   [en:chains]="Chains"
   [en:assistant]="Assistant"
   [en:learning]="Insights & learning"
@@ -268,6 +278,7 @@ declare -gA MODULE_TEXT_NAME=(
 
 declare -gA MODULE_TEXT_DESC=(
   # de
+  [de:dashboard-report]="Block-Typ, mit dem ein Workflow das Dashboard-Ergebnis aus Config-Feldern füllt, plus der KI-Vorschlag für diese Felder im Editor."
   [de:chains]="Verkettet mehrere Workflows zu einer Pipeline, die nacheinander läuft."
   [de:assistant]="Chat-Assistent und Seitenvorschläge, die Plattform-Objekte lesen und ändern können."
   [de:learning]="Auswertungen zu Runs, Empfehlungen und Statistiken je Block-Typ."
@@ -291,6 +302,7 @@ declare -gA MODULE_TEXT_DESC=(
   [de:require-sealed-for-unattended]="Unbeaufsichtigte Runs (Schedules, Webhooks, Trigger, Auto-Reparatur, Wünsche und die davon gestarteten Chains oder Sub-Workflows) starten nur versiegelte Workflows."
   [de:webhook-signatures]="Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
   # en
+  [en:dashboard-report]="Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
   [en:chains]="Chains several workflows into a pipeline that runs one after another."
   [en:assistant]="Chat assistant and page suggestions that can read and edit platform objects."
   [en:learning]="Run insights, recommendations and statistics per block type."

@@ -1,4 +1,8 @@
 {
+  "dashboard-report": {
+    "name": "Dashboard report",
+    "description": "Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
+  },
   "chains": {
     "name": "Chains",
     "description": "Chains several workflows into a pipeline that runs one after another."

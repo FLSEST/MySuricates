@@ -16,6 +16,8 @@ automation:
     preset: core
     # Modules cannot be switched in the settings — only here, followed by a restart.
     ui-editable: false
+    # Standard module (on by default). Off here, because "minimal" means nothing optional at all.
+    dashboard-report: false
   hardening:
     # No definition hash or version id on runs (the trigger source is still recorded).
     provenance: false

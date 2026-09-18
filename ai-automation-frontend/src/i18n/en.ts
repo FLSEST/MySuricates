@@ -2097,6 +2097,7 @@ export const en = {
     yaml: 'config/application.yml',
     env: 'Environment variable',
     tier: {
+      standard: 'Standard',
       research: 'Research',
       advanced: 'Advanced',
       hardening: 'Hardening',

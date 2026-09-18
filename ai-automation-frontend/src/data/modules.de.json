@@ -1,4 +1,8 @@
 {
+  "dashboard-report": {
+    "name": "Dashboard-Bericht",
+    "description": "Block-Typ, mit dem ein Workflow das Dashboard-Ergebnis aus Config-Feldern füllt, plus der KI-Vorschlag für diese Felder im Editor."
+  },
   "chains": {
     "name": "Chains",
     "description": "Verkettet mehrere Workflows zu einer Pipeline, die nacheinander läuft."
