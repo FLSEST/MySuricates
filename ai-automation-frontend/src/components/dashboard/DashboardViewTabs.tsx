@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, LayoutTemplate, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../ui';
 import { useT } from '../../i18n';
 import { selectActiveView, useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { LAYOUT_LIMITS, type DashboardView } from './dashboardLayout';
+import { templateWidgets } from './dashboardWidgets';
+import { DASHBOARD_TEMPLATES } from './dashboardTemplates';
+import { DashboardMenu } from './DashboardMenu';
 import { DashboardViewEditStrip } from './DashboardViewEditStrip';
 import { DashboardViewTabList } from './DashboardViewTabList';
+import { DASHBOARD_WIDGETS } from './widgetRegistry';
 
 interface DashboardViewTabsProps {
   editMode: boolean;
@@ -15,8 +19,8 @@ interface DashboardViewTabsProps {
 
 /**
  * The views above the widget grid, one per view (spec E4): a tab list for switching, and in edit
- * mode a sortable list with rename, duplicate, delete and "add view". Names are user text and only
- * ever rendered as React text.
+ * mode a sortable list with rename, duplicate, delete, "add view" and "add view from template".
+ * Names are user text and only ever rendered as React text.
  */
 export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps) {
   const t = useT();
@@ -41,6 +45,10 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
 
   const atLimit = views.length >= LAYOUT_LIMITS.views;
   const limitHint = t.dashboard.views.limitReached.replace('{max}', () => String(LAYOUT_LIMITS.views));
+  const addFromTemplate = (templateId: string) => {
+    const template = DASHBOARD_TEMPLATES.find((candidate) => candidate.id === templateId);
+    if (template) addView(template.name(t), templateWidgets(template.widgetIds, DASHBOARD_WIDGETS));
+  };
   const confirmRemove = (view: DashboardView) => {
     if (window.confirm(t.dashboard.views.removeConfirm.replace('{name}', () => labelOf(view)))) removeView(view.id);
   };
@@ -89,6 +97,14 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
             onClick={() => confirmRemove(activeView)}
             aria-label={t.dashboard.views.remove}
             title={views.length < 2 ? t.dashboard.views.lastView : t.dashboard.views.remove}
+          />
+          <DashboardMenu
+            variant="button"
+            label={t.dashboard.templates.add}
+            icon={<LayoutTemplate className="h-3.5 w-3.5" />}
+            items={DASHBOARD_TEMPLATES.map((template) => ({ id: template.id, label: template.name(t) }))}
+            disabled={disabled || atLimit}
+            onSelect={addFromTemplate}
           />
           <Button
             variant="secondary"

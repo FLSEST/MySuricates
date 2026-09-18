@@ -192,4 +192,33 @@ describe('DashboardViewTabs', () => {
       Element.prototype.scrollIntoView = original;
     }
   });
+
+  it('adds a view from a template: named after it, shown, with the template’s widgets', () => {
+    render(<DashboardViewTabs editMode disabled={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add view from template' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Operations', 'Cost & models', 'Quality', 'Planning']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Planning' }));
+
+    const created = layout().views[1];
+    expect(created?.name).toBe('Planning');
+    expect(layout().activeViewId).toBe(created?.id);
+    expect(created?.widgets.filter((w) => !w.hidden).map((w) => w.instanceId)).toEqual(['stat-planned-today', 'stat-planned-week', 'upcoming-schedules']);
+    expect(created?.widgets.some((w) => w.instanceId === 'recent-runs' && w.hidden)).toBe(true);
+    expect(editNames()).toEqual(['Overview', 'Planning']);
+    expect(useDashboardSyncStore.getState().dirty).toBe(true);
+  });
+
+  it('offers no template while locked or at the view limit', () => {
+    const { unmount } = render(<DashboardViewTabs editMode disabled />);
+    expect(screen.getByRole('button', { name: 'Add view from template' })).toBeDisabled();
+    unmount();
+
+    useDashboardLayoutStore.setState({
+      activeViewId: 'v0',
+      views: Array.from({ length: LAYOUT_LIMITS.views }, (_, i) => view(`v${i}`, `View ${i}`)),
+    });
+    render(<DashboardViewTabs editMode disabled={false} />);
+    expect(screen.getByRole('button', { name: 'Add view from template' })).toBeDisabled();
+  });
 });

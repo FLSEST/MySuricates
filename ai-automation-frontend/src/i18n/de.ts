@@ -257,6 +257,13 @@ export const de: TranslationKeys = {
       lastView: 'Die letzte Ansicht lässt sich nicht löschen',
       move: 'Ansicht verschieben',
     },
+    templates: {
+      add: 'Ansicht aus Vorlage',
+      operations: 'Betrieb',
+      costs: 'Kosten & Modelle',
+      quality: 'Qualität',
+      planning: 'Planung',
+    },
     catalog: {
       open: 'Widget hinzufügen',
       title: 'Widget hinzufügen',

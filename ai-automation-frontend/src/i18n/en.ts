@@ -255,6 +255,13 @@ export const en = {
       lastView: 'The last view cannot be deleted',
       move: 'Move view',
     },
+    templates: {
+      add: 'Add view from template',
+      operations: 'Operations',
+      costs: 'Cost & models',
+      quality: 'Quality',
+      planning: 'Planning',
+    },
     catalog: {
       open: 'Add widget',
       title: 'Add widget',
