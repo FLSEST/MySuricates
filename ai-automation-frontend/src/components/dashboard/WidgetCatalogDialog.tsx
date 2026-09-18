@@ -35,14 +35,19 @@ export function WidgetCatalogDialog({
 }: WidgetCatalogDialogProps) {
   const t = useT();
   const [configuringId, setConfiguringId] = useState<string | null>(null);
+  const [wasOpen, setWasOpen] = useState(open);
 
-  const close = () => {
-    setConfiguringId(null);
-    onClose();
-  };
+  // The caller can also close the dialog itself (e.g. leaving edit mode) without going through
+  // onClose, so reset here rather than only in a click handler — otherwise the entry reopens
+  // with its form still expanded. Adjusted during render (not an effect) to avoid an extra paint
+  // with the stale form still visible; see https://react.dev/learn/you-might-not-need-an-effect.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setConfiguringId(null);
+  }
 
   return (
-    <Modal open={open} onClose={close} title={t.dashboard.catalog.title} size="lg">
+    <Modal open={open} onClose={onClose} title={t.dashboard.catalog.title} size="lg">
       <div className="space-y-5">
         {!canAppend && (
           <p role="status" className="text-xs text-warning">

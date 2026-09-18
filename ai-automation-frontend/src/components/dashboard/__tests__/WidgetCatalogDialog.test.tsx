@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { useI18nStore } from '../../../i18n';
 import type { ResolvedWidget } from '../../../hooks/useDashboardLayout';
 import type { DashboardWidgetDef, WidgetConfigFormProps } from '../widgetDefinition';
@@ -32,21 +32,26 @@ const resolved = (widget: DashboardWidgetDef, instanceId = widget.id): ResolvedW
 function renderCatalog(props: Partial<Parameters<typeof WidgetCatalogDialog>[0]> = {}) {
   const onAdd = vi.fn();
   const onShow = vi.fn();
-  render(
-    <WidgetCatalogDialog
-      open
-      onClose={vi.fn()}
-      available={[runs, todos, gates, note, link]}
-      visible={[resolved(runs), resolved(note, 'note-1')]}
-      hidden={[resolved(todos)]}
-      canAppend
-      disabled={false}
-      onAdd={onAdd}
-      onShow={onShow}
-      {...props}
-    />,
-  );
-  return { onAdd, onShow, dialog: screen.getByRole('dialog') };
+  const fullProps: ComponentProps<typeof WidgetCatalogDialog> = {
+    open: true,
+    onClose: vi.fn(),
+    available: [runs, todos, gates, note, link],
+    visible: [resolved(runs), resolved(note, 'note-1')],
+    hidden: [resolved(todos)],
+    canAppend: true,
+    disabled: false,
+    onAdd,
+    onShow,
+    ...props,
+  };
+  const { rerender } = render(<WidgetCatalogDialog {...fullProps} />);
+  return {
+    onAdd,
+    onShow,
+    dialog: screen.getByRole('dialog'),
+    /** Re-renders with the same props, overriding just what's passed (e.g. `open`). */
+    rerenderWith: (next: Partial<ComponentProps<typeof WidgetCatalogDialog>>) => rerender(<WidgetCatalogDialog {...fullProps} {...next} />),
+  };
 }
 
 beforeEach(() => {
@@ -122,5 +127,19 @@ describe('WidgetCatalogDialog', () => {
     for (const name of ['Show: Todos', 'Add: Quality Gates', 'Add: Note', 'Add: Link']) {
       expect(within(dialog).getByRole('button', { name })).toBeDisabled();
     }
+  });
+
+  it('does not keep a widget mid-configuration open across a close and reopen', () => {
+    // The caller (Dashboard.tsx) can close the dialog by flipping `open` to false directly,
+    // without going through onClose (e.g. leaving edit mode) — configuringId must not survive that.
+    const { dialog, rerenderWith } = renderCatalog();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add: Note' }));
+    expect(within(dialog).getByRole('textbox', { name: 'Note text' })).toBeInTheDocument();
+
+    rerenderWith({ open: false });
+    rerenderWith({ open: true });
+
+    expect(screen.queryByRole('textbox', { name: 'Note text' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Add: Note' })).toBeEnabled();
   });
 });
