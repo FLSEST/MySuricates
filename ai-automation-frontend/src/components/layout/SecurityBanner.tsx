@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useT } from '../../i18n';
+import { fetchAuthStatus } from '../../api/client';
 
 export function SecurityBanner() {
   const t = useT();
   const [securityDisabled, setSecurityDisabled] = useState(false);
 
   useEffect(() => {
-    fetch('/api/v1/system/auth-status')
-      .then((res) => res.json())
+    // Shared, cached call — the ApiKeyGuard asks for the same thing (d89b2cc1).
+    fetchAuthStatus()
       .then((data) => {
         if (data.securityEnabled === false) {
           setSecurityDisabled(true);

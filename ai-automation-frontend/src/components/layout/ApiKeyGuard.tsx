@@ -3,44 +3,57 @@ import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { MeerkatIcon } from './Sidebar';
+import { api, fetchAuthStatus } from '../../api/client';
 
 export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const t = useT();
   const { apiKey, setApiKey } = useSettingsStore();
   const [securityEnabled, setSecurityEnabled] = useState<boolean | null>(null);
-  const [validatingStored, setValidatingStored] = useState(false);
+  // Becomes true once the stored key has been checked (or there is nothing to check).
+  // Deliberately never goes back to false: the children mount once and stay mounted —
+  // a guard that re-hides the app makes every child query refetch (d89b2cc1).
+  const [storedKeyChecked, setStoredKeyChecked] = useState(false);
   const [inputKey, setInputKey] = useState('');
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/v1/system/auth-status')
-      .then((res) => res.json())
-      .then((data) => setSecurityEnabled(data.securityEnabled === true))
-      .catch(() => setSecurityEnabled(false));
+    let cancelled = false;
+    fetchAuthStatus()
+      .then((data) => { if (!cancelled) setSecurityEnabled(data.securityEnabled === true); })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // A rate-limited answer says nothing about the security setting — assuming "off"
+        // here would hand out the app without a key. Stay undecided (render nothing) and
+        // let a reload ask again once the backoff window is over (d89b2cc1).
+        if ((err as { status?: number } | null)?.status === 429) return;
+        setSecurityEnabled(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // Validate stored API key on load
   useEffect(() => {
-    if (securityEnabled && apiKey) {
-      setValidatingStored(true);
-      fetch('/api/v1/projects', {
-        headers: { 'X-API-Key': apiKey },
-      })
-        .then((res) => {
-          if (res.status === 401 || res.status === 403) {
-            setApiKey('');
-          }
-        })
-        .catch(() => {
-          // Network error — don't clear key
-        })
-        .finally(() => setValidatingStored(false));
+    if (securityEnabled === null) return;
+    if (!securityEnabled || !apiKey) {
+      setStoredKeyChecked(true);
+      return;
     }
+    let cancelled = false;
+    api.get('/projects')
+      .catch((err: unknown) => {
+        const status = (err as { status?: number } | null)?.status;
+        // Only an explicit rejection clears the key — a network error or a 429 must not.
+        if (status === 401 || status === 403) setApiKey('');
+      })
+      .finally(() => {
+        if (!cancelled) setStoredKeyChecked(true);
+      });
+    return () => { cancelled = true; };
   }, [securityEnabled, apiKey, setApiKey]);
 
-  // Still loading auth status or validating stored key
-  if (securityEnabled === null || validatingStored) return null;
+  // Still loading auth status or validating the stored key
+  if (securityEnabled === null || !storedKeyChecked) return null;
 
   // Security disabled or API key already set (and validated) — pass through
   if (!securityEnabled || apiKey) return <>{children}</>;
