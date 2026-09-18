@@ -27,6 +27,10 @@ ai-automation-frontend/node_modules/
 ai-automation-frontend/dist/
 ai-automation-frontend/tsconfig.tsbuildinfo
 ai-automation-frontend/cypress/screenshots/
+# Arbeitsnotiz vom 2026-03-09, seither veraltet ("164 Tests in 14 Specs",
+# tatsaechlich 19 Specs) und keine veroeffentlichte Doku. Entscheidung Flo
+# 2026-09-18 (TODO af7e5d22): untracken.
+ai-automation-frontend/cypress/TODO-TESTS.md
 ai-automation-frontend/playwright/results/
 # Showcase-Aufnahmen: 27,6 MiB, von nichts im Repo referenziert. Sie liegen lokal
 # weiter, gehoeren aber nicht in den getrackten Baum (Entscheidung 2026-09-12).
