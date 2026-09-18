@@ -116,6 +116,21 @@ class PoolExportSanitizerTest {
     }
 
     @Test
+    void dropsListElementsThatAreExactlyAUuid() {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("skillIds", List.of(UUID_A, "builtin-fact-checker"));
+
+        PoolExportSanitizer sanitizer = new PoolExportSanitizer();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) sanitizer.scrub(node);
+
+        @SuppressWarnings("unchecked")
+        List<Object> skillIds = (List<Object>) result.get("skillIds");
+        assertThat(skillIds).containsExactly("builtin-fact-checker");
+        assertThat(sanitizer.removedPaths()).contains("skillIds[0]");
+    }
+
+    @Test
     void leavesCleanContentUntouched() {
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("name", Map.of("en", "Health Check"));

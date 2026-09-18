@@ -3050,7 +3050,7 @@ Der Export schreibt keine Instanz-Bindungen mit: `projectId`, `workflowId`, `run
 }
 ```
 
-**Response:** `201` mit `ExportToPoolResponse` (`poolId`, `filename`)
+**Response:** `201` mit `ExportToPoolResponse` (`poolId`, `filename`, `sanitizedPaths`). `sanitizedPaths` nennt die bereinigten Stellen mit Pfad — bei einem `sub-workflow`-Block steht dort `blocks[N].config.workflowId`, und der Eintrag ist erst nach dem Nachtragen dieser Referenz installierbar.
 
 ---
 

@@ -122,7 +122,7 @@ class WorkflowPoolControllerTest {
     @Test
     void exportToPool_passesScopeQueryParamThrough() throws Exception {
         when(poolService.exportToPool(eq("wf-1"), any(), eq("repo")))
-                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json"));
+                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json", List.of()));
 
         mockMvc.perform(post("/api/v1/pool/export/wf-1?scope=repo")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +134,7 @@ class WorkflowPoolControllerTest {
     @Test
     void exportToPool_withoutScopeParam_passesNull() throws Exception {
         when(poolService.exportToPool(eq("wf-1"), any(), eq((String) null)))
-                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json"));
+                .thenReturn(new ExportToPoolResponse("build-gate", "build-gate.json", List.of()));
 
         mockMvc.perform(post("/api/v1/pool/export/wf-1")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -123,12 +123,18 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 
 ### What the gate cannot check
 
-Two criteria remain a reading task and belong to the release step (section 4):
+Three criteria remain a reading task and belong to the release step (section 4):
 
 - **No prompt tailored to a person.** `CONTEXT-PII` catches the key in `defaultContext`, not a
   phrasing inside the prompt itself.
 - **No dependency on scripts outside the repository.** `PATH-ABS` and `PATH-HOME` catch the
   obvious case; a tool that only happens to be on one machine's `PATH` is invisible to the gate.
+- **No call to our own REST API from inside the definition.** A prompt instructing the AI to
+  `POST /api/v1/todos` via curl with an `X-API-Key` (possibly telling it to read the key from
+  `app_settings`) breaks the house rule "workflow blocks call neither the REST API nor the DB",
+  and in a published definition it doubles as instructions for extracting credentials. The
+  block types `todo-create`, `todo-update` and `todo-close` exist for this. The gate cannot tell
+  an example request body from an instruction.
 
 ## 4. How entries come about and are maintained
 
@@ -145,7 +151,14 @@ definition. The export no longer writes **any instance bindings**
 - factory-internal metadata (`factoryGenerated`, `factoryTopic`, `factoryCategory`) is dropped
   as before.
 
-What was removed is logged as a warning — the export cleans up, it does not quietly truncate.
+What was removed is logged as a warning **and returned**: `ExportToPoolResponse` lists the
+cleaned-up spots by path in `sanitizedPaths` (e.g. `blocks[0].config.workflowId`). The export
+cleans up, it does not quietly truncate.
+
+**Important for `sub-workflow` blocks:** their `config.workflowId` points at a workflow of the
+exporting instance and therefore falls under the rule. After the export, a workflow with a
+`sub-workflow` block is **not an installable pool entry** until the `workflowId` has been filled
+in by hand or replaced with a context variable — `sanitizedPaths` names the exact spot.
 
 ### Release step before the commit
 

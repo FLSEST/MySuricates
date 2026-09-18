@@ -79,8 +79,15 @@ public class PoolExportSanitizer {
         if (node instanceof List<?> list) {
             List<Object> out = new ArrayList<>(list.size());
             for (int i = 0; i < list.size(); i++) {
-                Object value = scrub(path + "[" + i + "]", list.get(i));
-                out.add(value == DROP ? null : value);
+                String childPath = path + "[" + i + "]";
+                Object value = scrub(childPath, list.get(i));
+                // Ein Element, das nur eine UUID ist (z. B. in skillIds), fällt ganz weg —
+                // ein null an seiner Stelle wäre für den Leser ein kaputter Eintrag.
+                if (value == DROP) {
+                    removedPaths.add(childPath);
+                    continue;
+                }
+                out.add(value);
             }
             return out;
         }

@@ -68,7 +68,8 @@ public class PoolExportWriter {
         String filename = target.getFileName().toString();
         log.info("Exported workflow '{}' ({}) to pool: {}",
                 workflow.getName(), workflow.getId(), filename);
-        return new ExportToPoolResponse(filename.replace(".json", ""), filename);
+        return new ExportToPoolResponse(
+                filename.replace(".json", ""), filename, sanitizer.removedPaths());
     }
 
     /** Kanonische Feldreihenfolge — so lesen sich alle Pool-Dateien gleich. */

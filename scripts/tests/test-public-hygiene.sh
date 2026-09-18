@@ -189,16 +189,37 @@ write_pool unknown-blocktype <<'JSON'
  "blocks": [{"type": "magic", "config": {}}]}
 JSON
 
+# Ein Block ohne "config" ist gueltiges JSON und laeuft im Backend (config ist optional).
+write_pool blocktype-ohne-config <<'JSON'
+{"name": {"de": "Ohne Config", "en": "No config"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "alchemy"}]}
+JSON
+
 write_pool nested-blocktype <<'JSON'
 {"name": {"de": "Verschachtelt", "en": "Nested"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
- "blocks": [{"type": "foreach", "config": {"blocks": [{"type": "sorcery", "config": {}}]}}]}
+ "blocks": [{"type": "foreach", "config": {"blocks": [{"type": "sorcery", "config": {}},
+                                                      {"type": "wizardry"}]}}]}
 JSON
 
 write_pool portable-repo-dep <<'JSON'
 {"name": {"de": "Portabel?", "en": "Portable?"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
  "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh"}}]}
+JSON
+
+# UUIDs schreibt nicht jeder Erzeuger klein — der Sanitizer im Backend prueft beide Schreibweisen.
+write_pool uppercase-uuid <<'JSON'
+{"name": {"de": "Grossbuchstaben", "en": "Uppercase"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "echo 3F2504E0-4F89-11D3-9A0C-0305E82C3301"}}]}
+JSON
+
+write_pool dot-home-path <<'JSON'
+{"name": {"de": "Punktverzeichnis", "en": "Dot directory"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls ~/.mysuricates/quarantine"}}]}
 JSON
 
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
@@ -214,8 +235,12 @@ check "leere tags erkannt"                     'grep -q "empty-tags.*TAGS" <<<"$
 check "leere description erkannt"              'grep -q "empty-desc.*DESCRIPTION" <<<"$OUT"'
 check "description als String erkannt"         'grep -q "string-desc.*DESCRIPTION" <<<"$OUT"'
 check "unbekannter Blocktyp erkannt"           'grep -q "unknown-blocktype.*BLOCK-TYPE" <<<"$OUT"'
-check "unbekannter Blocktyp verschachtelt"     'grep -q "nested-blocktype.*BLOCK-TYPE" <<<"$OUT"'
+check "unbekannter Blocktyp verschachtelt"     'grep -q "nested-blocktype.*BLOCK-TYPE.*sorcery" <<<"$OUT"'
+check "verschachtelt und ohne config"          'grep -q "nested-blocktype.*BLOCK-TYPE.*wizardry" <<<"$OUT"'
+check "unbekannter Blocktyp ohne config"       'grep -q "blocktype-ohne-config.*BLOCK-TYPE.*alchemy" <<<"$OUT"'
 check "portable mit scripts/-Pfad erkannt"     'grep -q "portable-repo-dep.*REPO-DEP" <<<"$OUT"'
+check "UUID in Grossbuchstaben erkannt"        'grep -q "uppercase-uuid.*UUID" <<<"$OUT"'
+check "Tilde-Pfad auf Punktverzeichnis erkannt" 'grep -q "dot-home-path.*PATH-HOME" <<<"$OUT"'
 
 echo "13) Die Blocktyp-Liste des Gates deckt sich mit der Registry im Backend"
 REGISTRY="$REPO/ai-automation-backend/src/main/java/com/automation/service/assistant/context/BlockTypesIndexSection.java"

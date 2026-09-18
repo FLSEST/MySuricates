@@ -1335,6 +1335,11 @@ export interface ExportToPoolRequest {
 export interface ExportToPoolResponse {
   poolId: string;
   filename: string;
+  /**
+   * Stellen, die der Export als Instanz-Bindung entfernt hat (z. B. die `workflowId` eines
+   * sub-workflow-Blocks). Leer, wenn nichts zu bereinigen war.
+   */
+  sanitizedPaths: string[];
 }
 
 // ── Chain Templates ──────────────────────────────────────

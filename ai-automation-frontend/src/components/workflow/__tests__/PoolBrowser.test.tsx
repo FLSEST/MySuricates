@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { PoolBrowser } from '../PoolBrowser';
 import { usePoolWorkflows } from '../../../hooks/usePool';
 import { useI18nStore } from '../../../i18n';
+import { de } from '../../../i18n/de';
+import { en } from '../../../i18n/en';
 import type { PoolWorkflowEntry } from '../../../types';
 
 vi.mock('../../../hooks/usePool', () => ({
@@ -58,13 +60,25 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByTestId('pool-scope-readme')).toHaveTextContent('portable');
   });
 
-  it('zeigt das englische Label, wenn die Sprache Englisch ist', () => {
+  it('nutzt den deutschen Hinweistext, wenn die Sprache Deutsch ist', () => {
+    mockEntries([entry({ scope: 'repo' })]);
+
+    render(<PoolBrowser onSelect={() => {}} />);
+
+    expect(screen.getByTestId('pool-scope-build-gate')).toHaveAttribute('title', de.pool.scopeRepoHint);
+  });
+
+  it('nutzt den englischen Hinweistext, wenn die Sprache Englisch ist', () => {
     useI18nStore.setState({ locale: 'en' });
     mockEntries([entry({ scope: 'repo' })]);
 
     render(<PoolBrowser onSelect={() => {}} />);
 
-    expect(screen.getByTestId('pool-scope-build-gate')).toHaveTextContent('repo');
+    const badge = screen.getByTestId('pool-scope-build-gate');
+    expect(badge).toHaveAttribute('title', en.pool.scopeRepoHint);
+    expect(badge).not.toHaveAttribute('title', de.pool.scopeRepoHint);
+    // Das Label selbst ist bewusst sprachneutral — 'repo' steht so auch in der Definition.
+    expect(badge).toHaveTextContent('repo');
   });
 
   it('zeigt kein Badge, wenn der Eintrag keinen scope deklariert', () => {

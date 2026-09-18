@@ -3,6 +3,7 @@ package com.automation.service.pool;
 import com.automation.config.WorkflowPoolConfig;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
+import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
@@ -320,6 +321,32 @@ class WorkflowPoolServiceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> ctx = (Map<String, Object>) json.get("defaultContext");
         assertThat(ctx).containsEntry("project_path", "{{ project_path }}").doesNotContainKey("workflowId");
+    }
+
+    @Test
+    void exportToPool_reportsSanitizedPathsInTheResponse() throws Exception {
+        // sub-workflow trägt die Referenz auf einen anderen Workflow in der Config. Sie ist
+        // instanzgebunden und fällt weg — der Aufrufer muss erfahren, dass der Eintrag so
+        // nicht installierbar ist.
+        stubWorkflow(Workflow.builder()
+                .id("wf-1").name("Build Gate")
+                .blocks(List.of(BlockDefinition.builder()
+                        .type("sub-workflow")
+                        .config(new LinkedHashMap<>(Map.of(
+                                "workflowId", "77777777-6666-5555-4444-333333333333")))
+                        .build()))
+                .build());
+
+        ExportToPoolResponse response = poolService.exportToPool("wf-1", null, "portable");
+
+        assertThat(response.sanitizedPaths()).containsExactly("blocks[0].config.workflowId");
+    }
+
+    @Test
+    void exportToPool_reportsNothingForACleanWorkflow() throws Exception {
+        stubWorkflow(Workflow.builder().id("wf-1").name("Build Gate").build());
+
+        assertThat(poolService.exportToPool("wf-1", null, "portable").sanitizedPaths()).isEmpty();
     }
 
     @Test

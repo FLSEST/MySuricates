@@ -3018,7 +3018,7 @@ Install a pool workflow into a project.
 
 Export an existing workflow to the pool.
 
-**Query parameter:** `scope` = `repo` | `portable` (optional, default `portable`) — pool metadata separating repo-bound from portable entries. An unknown value yields `400`. Rule set: [workflow-pool-curation.md](workflow-pool-curation.md).
+**Query parameter:** `scope` = `repo` | `portable` (optional, default `portable`) — pool metadata separating repo-bound from portable entries. An unknown value yields `400`. Rule set: [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
 The export writes no instance bindings: `projectId`, `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` with a concrete value and UUID values are dropped; a UUID inside a text is replaced with `REDACTED-UUID`.
 
@@ -3036,7 +3036,7 @@ The export writes no instance bindings: `projectId`, `workflowId`, `runId`, `sch
 }
 ```
 
-**Response:** `201` with `ExportToPoolResponse` (`poolId`, `filename`)
+**Response:** `201` with `ExportToPoolResponse` (`poolId`, `filename`, `sanitizedPaths`). `sanitizedPaths` names the cleaned-up spots by path — for a `sub-workflow` block it holds `blocks[N].config.workflowId`, and the entry is only installable once that reference has been filled in.
 
 ---
 

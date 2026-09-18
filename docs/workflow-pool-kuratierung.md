@@ -123,13 +123,20 @@ Registry verglichen — driftet eine der beiden, fällt es dort auf.
 
 ### Was das Gate nicht prüfen kann
 
-Zwei Kriterien bleiben eine Lesefrage und gehören in die Freigabe (Abschnitt 4):
+Drei Kriterien bleiben eine Lesefrage und gehören in die Freigabe (Abschnitt 4):
 
 - **Kein auf eine Person zugeschnittener Prompt.** `CONTEXT-PII` erwischt den Schlüssel im
   `defaultContext`, nicht eine Formulierung im Prompt selbst.
 - **Keine Abhängigkeit auf Skripte außerhalb des Repositories.** `PATH-ABS` und `PATH-HOME`
   erwischen den offensichtlichen Fall; ein Werkzeug, das nur auf einem bestimmten Rechner
   im `PATH` liegt, sieht das Gate nicht.
+- **Kein Aufruf der eigenen REST-API aus der Definition heraus.** Ein Prompt, der die KI
+  anweist, `POST /api/v1/todos` per curl mit `X-API-Key` aufzurufen (womöglich mit dem
+  Hinweis, den Key aus `app_settings` zu holen), verstößt gegen die Hausregel „Workflow-Blöcke
+  rufen weder REST-API noch DB auf“ und ist in einer mitveröffentlichten Definition zusätzlich
+  eine Anleitung zum Auslesen von Zugangsdaten. Dafür gibt es die Blocktypen `todo-create`,
+  `todo-update` und `todo-close`. Das Gate sieht den Unterschied zwischen einem Beispiel-Body
+  und einer Handlungsanweisung nicht.
 
 ## 4. Wie Einträge entstehen und gepflegt werden
 
@@ -147,8 +154,15 @@ Pool-Definition. Der Export schreibt **keine Instanz-Bindungen** mehr mit
 - fabrikinterne Metadaten (`factoryGenerated`, `factoryTopic`, `factoryCategory`) fallen wie
   bisher weg.
 
-Was entfernt wurde, steht als Warnung im Log — der Export ist eine Bereinigung, keine stille
-Beschneidung.
+Was entfernt wurde, steht als Warnung im Log **und in der Antwort**: `ExportToPoolResponse`
+führt die bereinigten Stellen mit Pfad in `sanitizedPaths` auf (z. B.
+`blocks[0].config.workflowId`). Der Export ist eine Bereinigung, keine stille Beschneidung.
+
+**Wichtig bei `sub-workflow`-Blöcken:** Deren `config.workflowId` zeigt auf einen Workflow der
+exportierenden Instanz und fällt damit unter die Regel. Ein Workflow mit `sub-workflow`-Block
+ist nach dem Export deshalb **kein installierbarer Pool-Eintrag**, solange die `workflowId`
+nicht von Hand nachgetragen oder durch eine Kontextvariable ersetzt wurde — `sanitizedPaths`
+nennt genau die Stelle.
 
 ### Freigabe vor dem Commit
 

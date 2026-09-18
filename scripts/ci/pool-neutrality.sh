@@ -66,7 +66,8 @@ scan_file() {
   m=$(grep -noE '(^|[^A-Za-z0-9])[A-Z]:\\\\[A-Za-z]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-WIN" "Windows-Pfad: ${m#*:}"
 
-  m=$(grep -noE '~/[a-zA-Z]' "$f" | head -1) \
+  # Punkt mit drin: ~/.mysuricates ist genauso ein Home-Pfad wie ~/projekt.
+  m=$(grep -noE '~/[A-Za-z.]' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-HOME" "Home-relativer Pfad: ${m#*:}"
 
   m=$(grep -noE '(192\.168\.[0-9]|10\.[0-9]+\.[0-9]+\.[0-9]|172\.(1[6-9]|2[0-9]|3[01])\.[0-9])' "$f" | head -1) \
@@ -75,7 +76,8 @@ scan_file() {
   m=$(grep -noE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "EMAIL" "Mailadresse: ${m#*:}"
 
-  m=$(grep -noE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$f" | head -1) \
+  # Beide Schreibweisen, wie der Sanitizer im Backend (PoolExportSanitizer).
+  m=$(grep -noE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' "$f" | head -1) \
     && [ -n "$m" ] && report "$f" "UUID" "Instanz-UUID: ${m#*:}"
 
   # Fest verdrahtete Werkzeugpfade — /usr/bin/env ist der portable Shebang und zählt nicht.
@@ -198,16 +200,27 @@ def walk_keys(node, path, out):
         for i, item in enumerate(node):
             walk_keys(item, f"{path}[{i}]", out)
 
+# Config-Schluessel, unter denen wieder Bloecke stehen (foreach, while, conditional,
+# switch, retry). 'cases' enthaelt Objekte, die selbst 'blocks' tragen — die Rekursion
+# laeuft dort ueber den naechsten Schritt hinein.
+BLOCK_CONTAINER_KEYS = {'blocks', 'branch_true', 'branch_false', 'block', 'body', 'then', 'else'}
+
 def collect_types(node, out, is_block=False):
+    """Blocktypen einsammeln.
+
+    is_block gilt fuer Werte, die unter einem Blockschluessel stehen — dort ist jedes
+    Objekt ein Block, auch ohne 'config' (das Feld ist optional). Anderswo im Baum zaehlt
+    ein Objekt nur mit 'type' UND 'config' als Block: sonst wuerde ein Konfigurationswert
+    wie {"type": "pdf"} als Blocktyp gezaehlt.
+    """
     if isinstance(node, dict):
-        if is_block or ('config' in node and isinstance(node.get('type'), str)):
-            if isinstance(node.get('type'), str):
-                out.append(node['type'])
-        for value in node.values():
-            collect_types(value, out)
+        if isinstance(node.get('type'), str) and (is_block or 'config' in node):
+            out.append(node['type'])
+        for key, value in node.items():
+            collect_types(value, out, key in BLOCK_CONTAINER_KEYS)
     elif isinstance(node, list):
         for item in node:
-            collect_types(item, out)
+            collect_types(item, out, is_block)
 
 for path in sys.argv[1:]:
     try:
