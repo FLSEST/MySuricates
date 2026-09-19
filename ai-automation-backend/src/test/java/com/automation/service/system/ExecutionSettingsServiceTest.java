@@ -645,4 +645,27 @@ class ExecutionSettingsServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("dashboard-report-assist-enabled");
     }
+
+    /**
+     * Ein Applier ohne Grenzen in BOUNDS ist tot: {@code validateAndApply} loest den Schluessel
+     * zuerst ueber {@code resolve} auf, das fuer unbekannte Schluessel wirft. Genau so waren die
+     * sieben {@code request-metrics-*}-Einstellungen unerreichbar (TODO fc0994d6) — dieser
+     * Waechter faengt den naechsten Fall beim Anlegen.
+     */
+    @Test
+    void jederApplierHatGrenzenUndIstDamitErreichbar() {
+        assertThat(service.applierKeys())
+                .allSatisfy(key -> assertThat(ExecutionSettingKeys.BOUNDS)
+                        .as("Applier '%s' ohne Eintrag in BOUNDS — ueber die API nicht erreichbar", key)
+                        .containsKey(key));
+    }
+
+    /** Und umgekehrt: eine Grenze ohne Applier verspricht eine Wirkung, die niemand ausfuehrt. */
+    @Test
+    void jederGrenzwertHatEinenApplier() {
+        assertThat(ExecutionSettingKeys.BOUNDS.keySet())
+                .allSatisfy(key -> assertThat(service.applierKeys())
+                        .as("Grenzwert '%s' ohne Applier — der Wert wird gespeichert, wirkt aber nicht", key)
+                        .contains(key));
+    }
 }

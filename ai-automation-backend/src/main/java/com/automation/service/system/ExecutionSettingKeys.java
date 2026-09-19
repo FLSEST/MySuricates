@@ -89,7 +89,16 @@ final class ExecutionSettingKeys {
             Map.entry("model-catalog-ttl-seconds",         Bound.whole(30, 86400)),
             Map.entry("compress-ai-max-input-chars",       Bound.whole(1000, 400000)),
             Map.entry("todo-similarity-keyword-threshold", Bound.fraction(0.05, 0.9)),
-            Map.entry("dashboard-report-assist-enabled", Bound.whole(0, 1))
+            Map.entry("dashboard-report-assist-enabled", Bound.whole(0, 1)),
+            // Messkette (TODO fc0994d6): die Applier gab es schon, die Grenzen fehlten — damit
+            // war keiner der sieben Schluessel ueber die oeffentliche API erreichbar.
+            Map.entry("request-metrics-enabled",                Bound.whole(0, 1)),
+            Map.entry("request-metrics-retention-days",         Bound.whole(0, 730)),
+            Map.entry("request-metrics-slow-request-ms",        Bound.whole(0, 600000)),
+            Map.entry("request-metrics-drift-detection-enabled", Bound.whole(0, 1)),
+            Map.entry("request-metrics-drift-factor",           Bound.fraction(1.1, 100.0)),
+            Map.entry("request-metrics-drift-min-calls",        Bound.whole(1, 100000)),
+            Map.entry("request-metrics-baseline-days",          Bound.whole(1, 365))
     );
 
     // Frontend sends camelCase keys, backend uses kebab-case internally
@@ -125,7 +134,14 @@ final class ExecutionSettingKeys {
             Map.entry("modelCatalogTtlSeconds",          "model-catalog-ttl-seconds"),
             Map.entry("compressAiMaxInputChars",         "compress-ai-max-input-chars"),
             Map.entry("todoSimilarityKeywordThreshold",  "todo-similarity-keyword-threshold"),
-            Map.entry("dashboardReportAssistEnabled",    "dashboard-report-assist-enabled")
+            Map.entry("dashboardReportAssistEnabled",    "dashboard-report-assist-enabled"),
+            Map.entry("requestMetricsEnabled",                "request-metrics-enabled"),
+            Map.entry("requestMetricsRetentionDays",          "request-metrics-retention-days"),
+            Map.entry("requestMetricsSlowRequestMs",          "request-metrics-slow-request-ms"),
+            Map.entry("requestMetricsDriftDetectionEnabled",  "request-metrics-drift-detection-enabled"),
+            Map.entry("requestMetricsDriftFactor",            "request-metrics-drift-factor"),
+            Map.entry("requestMetricsDriftMinCalls",          "request-metrics-drift-min-calls"),
+            Map.entry("requestMetricsBaselineDays",           "request-metrics-baseline-days")
     );
 
     /**

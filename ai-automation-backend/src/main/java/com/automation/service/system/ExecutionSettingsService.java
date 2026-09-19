@@ -30,6 +30,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -67,6 +68,16 @@ public class ExecutionSettingsService {
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
+
+    /**
+     * Nur für den Wächter-Test (TODO fc0994d6): Ein Applier ohne Eintrag in
+     * {@link ExecutionSettingKeys#BOUNDS} ist über die öffentliche API unerreichbar, weil
+     * {@code validateAndApply} zuerst {@code resolve(key)} ruft — die sieben
+     * {@code request-metrics-*}-Schlüssel waren so monatelang tote Registrierungen.
+     */
+    Set<String> applierKeys() {
+        return appliers.keySet();
+    }
 
     public ExecutionSettingsService(
             AppSettingsRepository appSettingsRepository,

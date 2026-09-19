@@ -2119,6 +2119,24 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält
 | `wish-workflow-wait-minutes` | 1–120 |
 | `wish-default-shell-timeout-seconds` | 30–3600 |
 | `wish-default-agentic-total-timeout-seconds` | 60–86400 |
+| `run-retention-days` | 0–730 |
+| `run-retention-max-per-night` | 10–5000 |
+| `dashboard-layout-retention-count` | 1–1000 |
+| `model-catalog-ttl-seconds` | 30–86400 |
+| `compress-ai-max-input-chars` | 1000–400000 |
+| `todo-similarity-keyword-threshold` | 0.05–0.9 |
+| `dashboard-report-assist-enabled` | 0–1 |
+| `request-metrics-enabled` | 0–1 |
+| `request-metrics-retention-days` | 0–730 |
+| `request-metrics-slow-request-ms` | 0–600000 |
+| `request-metrics-drift-detection-enabled` | 0–1 |
+| `request-metrics-drift-factor` | 1.1–100.0 |
+| `request-metrics-drift-min-calls` | 1–100000 |
+| `request-metrics-baseline-days` | 1–365 |
+
+Die Liste ist der Stand von `ExecutionSettingKeys.BOUNDS`. Ein Schlüssel ohne Grenzen dort ist
+über diesen Endpunkt **nicht** erreichbar, auch wenn ein Applier existiert — zwei Wächter-Tests
+in `ExecutionSettingsServiceTest` halten beide Seiten deckungsgleich (TODO fc0994d6).
 
 **Response:** `Map<String, Object>` mit aktuellen Einstellungen
 
