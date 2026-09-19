@@ -113,7 +113,7 @@ class AuditFingerprintDriftIntegrationTest {
 
     private void ingest(String subject, Instant completedAt) {
         String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":["
-                + "{\"ruleKey\":\"shell.injection\",\"subject\":\"" + subject + "\",\"severity\":\"HIGH\","
+                + "{\"ruleKey\":\"sec.injection.shell\",\"subject\":\"" + subject + "\",\"severity\":\"HIGH\","
                 + "\"title\":\"Shell-Aufruf ohne Escaping\",\"evidence\":\"" + subject + ": 3 Fundstellen\"}"
                 + "]} -->\n# Security Report";
         WorkflowRun run = WorkflowRun.builder().workflow(workflow).workflowName(workflow.getName())

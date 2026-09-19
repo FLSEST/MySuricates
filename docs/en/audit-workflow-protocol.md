@@ -72,8 +72,16 @@ When a prompt fixes the `ruleKey`s its model must use, they are listed in
 `ai-automation-backend/src/main/resources/audit/rule-keys.json` under their `auditKey`. Ingestion
 then normalizes spelling drift (lower case, `_` → `-`, plural before `-count`:
 `god-classes-count` → `god-class-count`). A key that still does not match is ingested anyway — with
-a warning in the activity log, once per run and key. An `auditKey` without a catalogue entry is not
-checked; its prompt assigns keys freely.
+**discarded — and the whole report with it** (TODO `f57945e2`): it is recorded as INVALID, no
+findings are created, and none are marked RESOLVED. A line in the activity log names the unknown
+keys and the permitted ones. An `auditKey` without a catalogue entry is not checked; its prompt
+assigns keys freely.
+
+Why so strict: an envelope whose keys have drifted uniformly carries the *right number* of findings
+and therefore passes the counting gate block. Ingesting it anyway creates a set of fresh identities
+and resolves the entire previous generation — you get just as many repeat findings and start over on
+the real ones. The earlier mark on the finding (`unknownRuleKey`, V75) was the intermediate step
+while there was no harder consequence; it is no longer set.
 
 ### Evidence check: `evidence` must name a measurement of this run
 

@@ -1,7 +1,6 @@
 package com.automation.service.audit;
 
 import com.automation.entity.*;
-import com.automation.event.TodoCreatedEvent;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.*;
@@ -10,7 +9,6 @@ import com.automation.service.audit.AuditResultParser.ParseResult;
 import com.automation.service.audit.AuditResultParser.ParsedFinding;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +21,6 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 public class AuditIngestionService {
-    static final String REFERENCE_TYPE = "audit_finding";
-    static final String SOURCE_AGENT = "audit-center";
-
     private final WorkflowRunRepository runRepository;
     private final AuditReportRepository reportRepository;
     private final AuditFindingRepository findingRepository;
@@ -36,7 +31,7 @@ public class AuditIngestionService {
     private final AuditAcceptancePolicy acceptancePolicy;
     private final AuditRuleKeyCatalog ruleKeyCatalog;
     private final ActivityLogService activityLog;
-    private final ApplicationEventPublisher eventPublisher;
+    private final ManagedTodoWriter managedTodoWriter;
 
     @Transactional
     public void ingest(WorkflowRunCompletedEvent event) {
@@ -55,11 +50,13 @@ public class AuditIngestionService {
         String output = reportStep != null ? reportStep.getOutput() : "";
         ParseResult parsed = parser.parse(output);
         boolean successful = run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS;
+        String ruleKeyError = parsed.valid() ? unknownRuleKeyError(config.key(), parsed.findings()) : null;
         String error = !successful ? "Run ended with status " + run.getStatus()
                 : reportStep == null ? "Configured report block '" + config.reportBlock() + "' was not persisted"
                 : reportStep.getStatus() != StepStatus.COMPLETED ? "Report block did not complete"
-                : parsed.error();
-        boolean valid = successful && reportStep != null && reportStep.getStatus() == StepStatus.COMPLETED && parsed.valid();
+                : parsed.error() != null ? parsed.error() : ruleKeyError;
+        boolean valid = successful && reportStep != null && reportStep.getStatus() == StepStatus.COMPLETED
+                && parsed.valid() && ruleKeyError == null;
 
         AuditReport report = reportRepository.save(AuditReport.builder()
                 .projectId(event.getProjectId())
@@ -174,7 +171,7 @@ public class AuditIngestionService {
             if ((item.severity() == AuditSeverity.CRITICAL || item.severity() == AuditSeverity.HIGH)
                     && finding.getStatus() == AuditFindingStatus.OPEN
                     && !finding.isUnverifiedEvidence()) {
-                ensureManagedTodo(finding, report);
+                managedTodoWriter.ensure(finding, report);
             }
         }
 
@@ -187,7 +184,7 @@ public class AuditIngestionService {
                 touched.add(findingRepository.save(finding));
             }
         }
-        reconcileManagedTodos(touched);
+        managedTodoWriter.reconcile(touched);
     }
 
     /**
@@ -209,56 +206,36 @@ public class AuditIngestionService {
         return resolution;
     }
 
-    private Todo ensureManagedTodo(AuditFinding finding, AuditReport report) {
-        Optional<AuditFindingTodo> existing = findingTodoRepository.findByFindingId(finding.getId()).stream()
-                .filter(AuditFindingTodo::isManaged).findFirst();
-        if (existing.isPresent()) {
-            Todo linkedTodo = todoRepository.findById(existing.get().getTodoId()).orElse(null);
-            if (linkedTodo != null) return linkedTodo;
-            findingTodoRepository.delete(existing.get());
+    /**
+     * Ein ruleKey außerhalb des Katalogs macht den <b>ganzen</b> Report ungültig — sofern es für
+     * dieses Audit überhaupt einen Katalog gibt (TODO f57945e2).
+     *
+     * <p>Zuvor wurde ein unbekannter Key nur als WARN gemeldet und das Finding trotzdem
+     * übernommen. Das ist bei einem Snapshot-Audit die teuerste Art, nachsichtig zu sein: Ein
+     * Envelope, dessen Keys einheitlich gedriftet sind, trägt die richtige <i>Anzahl</i> Findings
+     * und passiert damit den zählenden Gate-Block — die Ingestion legt aber lauter neue Identitäten
+     * an und schließt die komplette Vorgängergeneration als RESOLVED. Ergebnis: ebenso viele
+     * Wiedergänger, und die Arbeit an den echten Befunden beginnt von vorn.
+     *
+     * <p>Audits ohne Katalogeintrag bleiben unberührt — ihre Prompts vergeben die Keys frei.
+     *
+     * @return die Fehlermeldung, oder {@code null}, wenn alle Keys bekannt sind
+     */
+    private String unknownRuleKeyError(String auditKey, List<ParsedFinding> findings) {
+        if (!ruleKeyCatalog.isChecked(auditKey)) {
+            return null;
         }
-        Todo todo = todoRepository.save(Todo.builder()
-                .title(finding.getTitle())
-                .description(buildTodoDescription(finding, report))
-                .status(Todo.Status.OPEN)
-                .priority(Todo.Priority.valueOf(finding.getSeverity().name()))
-                .tags(TodoMapper.listToJson(List.of("audit", "audit:" + finding.getAuditKey(), "auto:workflow")))
-                .projectId(finding.getProjectId()).source(Todo.Source.WORKFLOW).sourceAgent(SOURCE_AGENT)
-                .workflowRunId(report.getWorkflowRunId()).referenceType(REFERENCE_TYPE).referenceId(finding.getId())
-                .build());
-        findingTodoRepository.save(AuditFindingTodo.builder()
-                .findingId(finding.getId()).todoId(todo.getId()).managed(true).build());
-        eventPublisher.publishEvent(new TodoCreatedEvent(this, todo));
-        return todo;
-    }
-
-    private void reconcileManagedTodos(List<AuditFinding> touched) {
-        List<String> ids = touched.stream().map(AuditFinding::getId).distinct().toList();
-        if (ids.isEmpty()) return;
-        for (AuditFindingTodo link : findingTodoRepository.findByFindingIdIn(ids)) {
-            if (!link.isManaged()) continue;
-            Todo todo = todoRepository.findById(link.getTodoId()).orElse(null);
-            if (todo == null) continue;
-            List<AuditFinding> linked = findingTodoRepository.findByTodoId(todo.getId()).stream()
-                    .map(l -> findingRepository.findById(l.getFindingId()).orElse(null))
-                    .filter(Objects::nonNull).toList();
-            boolean allTerminal = !linked.isEmpty() && linked.stream().allMatch(f -> f.getStatus().isTerminal());
-            if (allTerminal && todo.getStatus() != Todo.Status.DONE) {
-                todo.setStatus(Todo.Status.DONE);
-                todoRepository.save(todo);
-            } else if (!allTerminal && todo.getStatus() == Todo.Status.DONE) {
-                todo.setStatus(Todo.Status.OPEN);
-                todo.setWorkflowRunId(linked.stream().map(AuditFinding::getLastSeenRunId).filter(Objects::nonNull).findFirst().orElse(null));
-                todoRepository.save(todo);
+        Set<String> unknown = new LinkedHashSet<>();
+        for (ParsedFinding item : findings) {
+            if (ruleKeyCatalog.resolve(auditKey, item.ruleKey()).unknown()) {
+                unknown.add(item.ruleKey());
             }
         }
-    }
-
-    private static String buildTodoDescription(AuditFinding finding, AuditReport report) {
-        String detail = finding.getDescription() != null ? finding.getDescription() : "Audit finding requires remediation.";
-        return detail + "\n\nEvidence: " + (finding.getEvidence() != null ? finding.getEvidence() : "not provided")
-                + "\n\n[Audit finding](/reports?finding=" + finding.getId() + ")"
-                + " · [Evidence run](/workflows/" + report.getWorkflowId() + "/run/" + report.getWorkflowRunId() + ")";
+        if (unknown.isEmpty()) {
+            return null;
+        }
+        return "Unbekannte ruleKeys für Audit '" + auditKey + "': " + unknown
+                + " — erlaubt sind " + ruleKeyCatalog.allowedKeys(auditKey);
     }
 
     /**

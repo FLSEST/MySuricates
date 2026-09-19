@@ -71,8 +71,17 @@ Gibt ein Prompt seinem Modell feste `ruleKey`s vor, stehen sie in
 `ai-automation-backend/src/main/resources/audit/rule-keys.json` unter ihrem `auditKey`. Die
 Ingestion normalisiert dann Schreibweisen-Drift (Kleinschreibung, `_` → `-`, Plural vor `-count`:
 `god-classes-count` → `god-class-count`). Ein Key, der auch danach nicht im Katalog steht, wird
-trotzdem übernommen — mit einer Warnung im Activity-Log, einmal je Run und Key. Ein `auditKey`
-ohne Katalogeintrag wird nicht geprüft; sein Prompt vergibt die Keys frei.
+**verworfen — und mit ihm der ganze Report** (TODO `f57945e2`): Er wird als INVALID
+historisiert, es entstehen keine Findings, und keines wird auf RESOLVED gesetzt. Eine Zeile im
+Activity-Log nennt die unbekannten Keys und die erlaubten. Ein `auditKey` ohne Katalogeintrag
+wird nicht geprüft; sein Prompt vergibt die Keys frei.
+
+Warum so hart: Ein Envelope, dessen Keys einheitlich gedriftet sind, trägt die *richtige Anzahl*
+Findings und passiert damit den zählenden Gate-Block. Übernimmt die Ingestion ihn trotzdem, legt
+sie lauter neue Identitäten an und schließt die komplette Vorgängergeneration als RESOLVED — man
+bekommt ebenso viele Wiedergänger und fängt bei den echten Befunden von vorn an. Die frühere
+Markierung am Finding (`unknownRuleKey`, V75) war die Zwischenstufe, solange es keine härtere
+Konsequenz gab; sie wird nicht mehr neu gesetzt.
 
 ### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
 

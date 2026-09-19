@@ -113,7 +113,7 @@ public class AuditFindingMerger {
     /** Sonst zeigen der Deep-Link {@code /reports?finding=…} und {@code todo_reference_id} ins Leere. */
     private void repointTodoReference(AuditFinding target, AuditFinding duplicate, String todoId) {
         todoRepository.findById(todoId).ifPresent(todo -> {
-            if (AuditIngestionService.REFERENCE_TYPE.equals(todo.getReferenceType())
+            if (ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
                     && duplicate.getId().equals(todo.getReferenceId())) {
                 todo.setReferenceId(target.getId());
             }

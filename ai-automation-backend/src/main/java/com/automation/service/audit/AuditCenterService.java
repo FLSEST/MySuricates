@@ -139,8 +139,8 @@ public class AuditCenterService {
                     .priority(Todo.Priority.valueOf(finding.getSeverity().name()))
                     .tags(TodoMapper.listToJson(List.of("audit", "audit:" + finding.getAuditKey(), "auto:workflow")))
                     .projectId(finding.getProjectId()).source(Todo.Source.WORKFLOW)
-                    .sourceAgent(AuditIngestionService.SOURCE_AGENT).workflowRunId(finding.getLastSeenRunId())
-                    .referenceType(AuditIngestionService.REFERENCE_TYPE).referenceId(finding.getId()).build());
+                    .sourceAgent(ManagedTodoWriter.SOURCE_AGENT).workflowRunId(finding.getLastSeenRunId())
+                    .referenceType(ManagedTodoWriter.REFERENCE_TYPE).referenceId(finding.getId()).build());
             findingTodoRepository.save(AuditFindingTodo.builder()
                     .findingId(findingId).todoId(todo.getId()).managed(true).build());
             eventPublisher.publishEvent(new TodoCreatedEvent(this, todo));
@@ -172,7 +172,7 @@ public class AuditCenterService {
     /** Sonst zeigt {@code todo.referenceId} (Deep-Link {@code /reports?finding=…}) auf ein Finding, das nicht mehr verknuepft ist. */
     private void clearAuditReference(String findingId, String todoId) {
         todoRepository.findById(todoId).ifPresent(todo -> {
-            if (AuditIngestionService.REFERENCE_TYPE.equals(todo.getReferenceType())
+            if (ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
                     && findingId.equals(todo.getReferenceId())) {
                 todo.setReferenceType(null);
                 todo.setReferenceId(null);

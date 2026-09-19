@@ -72,6 +72,13 @@ public class AuditFinding {
      * entsteht ein Wiedergaenger statt eines Wiedersehens. Die Ingestion setzt das Flag bei jedem
      * Ingest neu — auch zurueck auf {@code false}, sobald der Katalog den Key kennt (TODO ffa6d846).
      */
+    /**
+     * <b>Historisch.</b> Seit TODO f57945e2 wird ein Report mit unbekanntem {@code ruleKey}
+     * komplett verworfen, sofern für sein Audit ein Katalog existiert — und nur dann kann ein Key
+     * überhaupt als unbekannt gelten. Neue Findings mit diesem Flag entstehen also nicht mehr; das
+     * Feld trägt weiter die Markierungen aus der Zeit, als ein gedrifteter Key übernommen und nur
+     * angezeigt wurde (V75, TODO ffa6d846). Das Audit Center zeigt sie unverändert an.
+     */
     @Column(name = "unknown_rule_key", nullable = false)
     @Builder.Default
     private boolean unknownRuleKey = false;

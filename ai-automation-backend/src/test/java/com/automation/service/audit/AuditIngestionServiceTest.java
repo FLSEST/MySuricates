@@ -54,13 +54,13 @@ class AuditIngestionServiceTest {
         service = new AuditIngestionService(runRepository, reportRepository, findingRepository, occurrenceRepository,
                 findingTodoRepository, todoRepository, new AuditResultParser(new ObjectMapper()),
                 new AuditAcceptancePolicy(), new AuditRuleKeyCatalog(new ObjectMapper()), activityLog,
-                eventPublisher);
+                new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher));
         when(reportRepository.save(any())).thenAnswer(inv -> {
             AuditReport report = inv.getArgument(0);
             if (report.getId() == null) report.setId("rep-" + UUID.randomUUID());
             return report;
         });
-        when(findingRepository.save(any())).thenAnswer(inv -> {
+        lenient().when(findingRepository.save(any())).thenAnswer(inv -> {
             AuditFinding finding = inv.getArgument(0);
             if (finding.getId() == null) finding.setId("f-" + UUID.randomUUID());
             return finding;
@@ -186,16 +186,16 @@ class AuditIngestionServiceTest {
         verifyNoInteractions(activityLog);
     }
 
-    /** Ein unbekannter Key bleibt erhalten — verworfen wird nichts, gemeldet schon. */
+    /** Der verworfene Report nennt den Grund im Activity-Log, nicht nur im Server-Log. */
     @Test
-    void unknownRuleKey_isIngestedAndReportedToTheActivityLog() {
+    void unknownRuleKey_isReportedToTheActivityLog() {
         stubCoverageRun("run-1", "coverage.mystery");
 
         service.ingest(event("run-1", COVERAGE_KEY));
 
-        assertThat(savedFinding().getRuleKey()).isEqualTo("coverage.mystery");
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
-        verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), message.capture(), anyString(), eq("run-1"));
+        verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), message.capture(),
+                anyString(), eq("run-1"), anyString());
         assertThat(message.getValue()).contains("coverage.mystery").contains(COVERAGE_KEY);
     }
 
@@ -206,24 +206,27 @@ class AuditIngestionServiceTest {
 
         service.ingest(event("run-1", COVERAGE_KEY));
 
-        verify(activityLog, times(2)).warn(any(), anyString(), anyString(), anyString());
+        // Beide unbekannten Keys stehen in EINER Meldung des verworfenen Reports — je Run eine.
+        verify(activityLog).warn(any(), contains("coverage.mystery"), anyString(), anyString(), anyString());
     }
 
     /**
-     * Das Flag am Finding (TODO ffa6d846): Im Audit Center war einem Finding bisher nicht
-     * anzusehen, dass seine Regel-Identitaet ungeprueft ist — die Meldung stand nur im
-     * Activity-Log, also genau dort, wo niemand nachsieht, der ein Finding beurteilt.
+     * Frueher wurde ein Finding mit unbekanntem Key uebernommen und am Finding markiert
+     * (TODO ffa6d846). Seit f57945e2 faellt der <b>ganze Report</b> aus: Ein gedrifteter Key macht
+     * den Fingerprint unzuverlaessig, und ein Snapshot mit unzuverlaessigen Identitaeten loest die
+     * Vorgaengergeneration auf, statt sie wiederzuerkennen. Die Markierung war die Zwischenstufe,
+     * solange es keine haertere Konsequenz gab.
      */
     @Test
-    void unknownRuleKey_marksTheFinding() {
+    void unknownRuleKey_verwirftDenGanzenReport() {
         stubCoverageRun("run-1", "coverage.mystery");
 
         service.ingest(event("run-1", COVERAGE_KEY));
 
-        assertThat(savedFinding().isUnknownRuleKey())
-                .as("ein Key ausserhalb des Katalogs macht den Fingerprint unzuverlaessig — das muss"
-                        + " am Finding sichtbar sein, nicht nur im Log")
-                .isTrue();
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
+        verify(findingRepository, never()).save(any());
     }
 
     /** Ein bekannter Key markiert nicht — auch nicht der auf den Katalog normalisierte. */
@@ -283,7 +286,8 @@ class AuditIngestionServiceTest {
     /** Coverage-Run ohne Annahme darueber, ob es das Finding schon gibt — das stubt der Aufrufer. */
     private void stubCoverageRun(String runId, String... ruleKeys) {
         stubCoverageRunEnvelope(runId, ruleKeys);
-        when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
+        // lenient: Ein verworfener Report (unbekannter ruleKey) kommt gar nicht bis zur Suche.
+        lenient().when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(eq(PROJECT), eq(COVERAGE_KEY), anyString()))
                 .thenReturn(Optional.empty());
     }
 
@@ -301,7 +305,7 @@ class AuditIngestionServiceTest {
         WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage Audit").build())
                 .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
-        when(findingRepository.findByProjectIdAndAuditKey(PROJECT, COVERAGE_KEY)).thenReturn(List.of());
+        lenient().when(findingRepository.findByProjectIdAndAuditKey(PROJECT, COVERAGE_KEY)).thenReturn(List.of());
     }
 
     @Test
@@ -365,5 +369,71 @@ class AuditIngestionServiceTest {
         verify(findingRepository, atLeastOnce()).save(saved.capture());
         assertThat(saved.getAllValues().getFirst().isUnverifiedEvidence()).isFalse();
         verify(todoRepository).save(any());
+    }
+
+    /** Ein Run mit frei waehlbarem ruleKey — fuer die Katalogpruefung. */
+    private void stubRunWithRuleKey(String runId, String ruleKey) {
+        String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\""
+                + ruleKey + "\",\"subject\":\"Big.java\",\"severity\":\"HIGH\",\"title\":\"t\","
+                + "\"evidence\":\"e\"}]} -->\n# Report";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output(envelope)
+                .metadata(new HashMap<>(Map.of("blockName", "report"))).build();
+        WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Coverage").build())
+                .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
+        when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
+        lenient().when(findingRepository.findByProjectIdAndAuditKeyAndFingerprint(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        // HIGH erzeugt ein verwaltetes TODO — nur im gueltigen Fall, deshalb lenient.
+        lenient().when(todoRepository.save(any())).thenAnswer(inv -> {
+            Todo todo = inv.getArgument(0);
+            if (todo.getId() == null) todo.setId("todo-" + UUID.randomUUID());
+            return todo;
+        });
+    }
+
+    /**
+     * Gedriftete ruleKeys tragen die richtige <i>Anzahl</i> Findings und passieren deshalb den
+     * zaehlenden Gate-Block. Die Ingestion legte daraufhin lauter neue Identitaeten an und schloss
+     * die Vorgaengergeneration als RESOLVED — ebenso viele Wiedergaenger (TODO f57945e2).
+     */
+    @Test
+    void unbekannterRuleKeyMachtDenGanzenReportUngueltig() {
+        stubRunWithRuleKey("run-1", "test-coverage.voellig-erfunden");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
+        assertThat(report.getValue().getIngestionError())
+                .contains("test-coverage.voellig-erfunden").contains("test-coverage.untested-class");
+        verify(findingRepository, never()).save(any());
+        verify(todoRepository, never()).save(any());
+    }
+
+    /** Ein Key aus dem Katalog laeuft unveraendert durch. */
+    @Test
+    void bekannterRuleKeyBleibtGueltig() {
+        stubRunWithRuleKey("run-1", "test-coverage.untested-class");
+
+        service.ingest(event("run-1", COVERAGE_KEY));
+
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
+        verify(findingRepository, atLeastOnce()).save(any());
+    }
+
+    /** Ein Audit ohne Katalogeintrag vergibt seine Keys frei — unveraendertes Verhalten. */
+    @Test
+    void ohneKatalogBleibtDerReportGueltig() {
+        stubRunWithRuleKey("run-1", "was.auch.immer");
+
+        service.ingest(event("run-1", AUDIT_KEY));
+
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
+        verify(findingRepository, atLeastOnce()).save(any());
     }
 }
