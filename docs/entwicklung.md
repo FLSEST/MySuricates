@@ -24,7 +24,21 @@ neuen Rechner siehe **[GETTING-STARTED.md](GETTING-STARTED.md)** (inkl. `scripts
 scripts/start-autotrigger-dev.sh            # start
 scripts/start-autotrigger-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start
 scripts/start-autotrigger-dev.sh stop
+
+# Betriebsart: Host (Default) oder Container — dieselben Kommandos (TODO a1236a64)
+scripts/start-autotrigger-dev.sh start --container
+AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # dauerhaft
 ```
+
+**Host oder Container?** Der Host-Weg ist der Default und unverändert. `--container` startet das
+Backend stattdessen per `docker compose` aus `ai-automation-backend/docker-compose.dev-container.yml`
+(Image `Dockerfile.stable`, also mit Node — die Dev-`docker-compose.yml` baut aus einem
+JRE-Alpine-Image **ohne** Node, dort läuft keine KI-CLI). Die Provider-Zugänge mountet der Starter
+zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen, sagt er das.
+Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
+`AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,
+`AUTOTRIGGER_DEV_COMPOSE_PROJECT`, `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` —
+damit eine Probeinstanz neben der echten laufen kann.
 
 > **Nicht** `mvn spring-boot:run` verwenden — der Befehl ist **absichtlich blockiert**: Das Backend
 > bricht beim Start aus `target/classes` mit einer Meldung ab (`RuntimeClasspathGuard`), siehe
