@@ -168,6 +168,8 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - **Memory-Tab:** Workflow-Memory-Einträge anzeigen, aktivieren, löschen, neu extrahieren
 - **Instructions-Tab:** Workflow-spezifische Agent-Instructions im Monaco-Editor bearbeiten
 - **Gate-Status:** Anzeige des letzten Gate-Status im Run-Verlauf
+- **Dashboard-Bericht-Formular:** Für Blöcke vom Typ `dashboard-report` zeigt der Block-Editor (Hinzufügen und Bearbeiten) statt roher JSON-Bearbeitung ein Formular für Status, Titel, Zusammenfassung, Kennzahlen und Einträge (`DashboardReportFields.tsx`, Modell in `dashboardReport.ts`). Grenzen und Statuswerte kommen aus dem einen Vertragsspiegel `components/dashboard/workflowWidgetContract.ts`; Warnungen sind Hinweise, geprüft wird im Backend. Werte mit `{{ … }}` werden nicht auf Länge geprüft.
+- **KI-Vorschlag:** `DashboardReportAssist.tsx` bietet „Vorschlag aus dem letzten Run" an, wenn Modul, Einstellung und Anbieter `CLAUDE` vorhanden sind (`useDashboardReportAssist.ts`). Der Vorschlag erscheint als Textknoten in einem Prüf-Bereich und wird erst nach „Übernehmen" in die Config geschrieben. Guard: `components/workflow/__tests__/dashboardReportMarkupGuard.test.ts`. Die drei Abschalter wirken unterschiedlich: Ist das Modul aus, wird der Block-Typ im Editor gar nicht angeboten. Ist die Einstellung aus, bleibt der Block funktionsfähig, nur der Knopf „Vorschlag" erscheint nicht. Ist kein Anbieter verfügbar, wird der Knopf auch nicht angeboten — dabei testet die Verfügbarkeitsprüfung derzeit nur, ob der Anbieter registriert ist, nicht ob die CLI auf dem Host tatsächlich nutzbar ist.
 
 ### Settings (`/settings`)
 
@@ -175,7 +177,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Aussehen (eigene, einklappbare Sektion): Theme-Auswahl (18 Themes nach bekannten Paletten, gruppiert Dunkel/Hell), eigene Farben pro Theme
 - Sicherheit: API-Key-Eingabe (maskiert)
 - Remote-Access: Tailscale-Status + Enable/Disable
-- Ausführung: Claude-Concurrency, Reserved-for-Interactive, Timeouts
+- Ausführung: Claude-Concurrency, Reserved-for-Interactive, Timeouts, Schalter für den KI-Vorschlag der Dashboard-Berichte
 - Benachrichtigungen: Notification-Konfigurationen
 - Backups: Datenbank-Backup-Liste
 - Wishes: Wish-Einstellungen

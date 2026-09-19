@@ -61,7 +61,7 @@ Access in block configs with `{{ filepath }}` or `{{ language }}`.
 
 ## 2. Block Type Reference
 
-MySuricates supports 19 block types. Each block has a `type` and a `config` map.
+MySuricates supports 20 block types. Each block has a `type` and a `config` map.
 
 **Unknown block types are refused at save time** (HTTP 400; the message names the type and the allowed ones). The check runs against the executor registry (`BlockTypeRegistry` — all registered `BlockExecutor` beans) and recurses into nested blocks (`switch` `cases[].blocks` and `default`). A missing or blank `type` counts as unknown. It applies to every write path alike: UI, REST API, import, pool install, seeder and factory. A typo like `"shel"` therefore fails immediately instead of mid-run.
 
@@ -684,6 +684,46 @@ JSON stages need JSON as input and must come before text stages.
 ```
 
 **Not allowed:** nested inside a `switch` block (rejected).
+
+---
+
+### `dashboard-report` — report the dashboard result without a marker
+
+Fills the **dashboard result** of this run directly from block config — the same fields, the same bounds and the same validation as the marker `dashboard_widget:` (see api-referenz.md), but **without a marker line and without text search**. Deterministic: no AI call, no shell, 0 tokens.
+
+Module: `dashboard-report` (standard on, can be switched off). When off, the block is refused and the type is not offered in the editor.
+
+| Config Key | Type | Default | Description |
+|---|---|---|---|
+| `status` | string | **required** | `GREEN`, `YELLOW` or `RED` (templatable) |
+| `title` | string | – | Title, ≤ 80 characters |
+| `summary` | string | – | Summary, ≤ 500 characters |
+| `kpis` | list of objects | – | ≤ 6 × `{ label (≤ 40), value (≤ 40, string), trend? (UP/DOWN/FLAT) }` |
+| `items` | list of strings | – | ≤ 10 entries, each ≤ 200 characters |
+
+```json
+{ "type": "dashboard-report", "name": "report", "config": {
+  "status": "{{ gate_status }}",
+  "title": "Nightly QA",
+  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }],
+  "items": ["{{ finding_1 }}"],
+  "summary": "{{ block.analyse.output }}"
+} }
+```
+
+**Rules:**
+
+- All values are templatable. A placeholder that evaluates to empty at runtime causes that field to be omitted (for `status` it is an error). A KPI object is omitted only if **all** its values are empty; a half-filled one causes the block to fail.
+- A placeholder that **could not be resolved** (unknown variable — the resolver leaves it literally) **causes the block to fail** and names the field. Better a red step than `{{ hunt_count }}` as a KPI on the dashboard.
+- Any breach of the contract (too long, unknown field in a KPI, number instead of string, invisible characters) causes the step to be **FAILED**; the message names the field (`kpis[2].value`), never the value.
+- Unknown keys at the top level are ignored (legitimate platform keys like `timeout_seconds` live there); unknown keys **inside** a KPI object are rejected.
+- Step output contains only counts, never contract values.
+
+**Precedence over the marker:** Once a `dashboard-report` block has written a result, the marker `dashboard_widget:` is not evaluated in **any** step output. The block is the explicitly configured way; without this rule, a marker line in a later AI step's output could overwrite the report. Two `dashboard-report` blocks in one workflow: the one executed last wins.
+
+**In the editor** the block shows a form instead of raw JSON editing, with an optional button "Suggestion from last run" (one AI call; Settings → Execution, requires provider `CLAUDE`). The suggestion is shown and only written to config after "Apply".
+
+**When to use**: whenever a workflow needs to report a dashboard result. Use the marker only when values first arise in AI text and no variable exists for them.
 
 ---
 

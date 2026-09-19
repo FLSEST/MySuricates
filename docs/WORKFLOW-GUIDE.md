@@ -61,7 +61,7 @@ Zugriff in Block-Configs mit `{{ filepath }}` oder `{{ language }}`.
 
 ## 2. Block-Typ-Referenz
 
-MySuricates unterstützt 19 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
+MySuricates unterstützt 20 Block-Typen. Jeder Block hat einen `type` und eine `config`-Map.
 
 **Unbekannte Block-Typen werden beim Speichern abgelehnt** (HTTP 400, Fehlermeldung nennt den Typ und die erlaubten Typen). Geprüft wird gegen die Executor-Registry (`BlockTypeRegistry` — alle registrierten `BlockExecutor`-Beans), rekursiv auch in verschachtelten Blöcken (`switch`-`cases[].blocks` und `default`). Ein fehlender oder leerer `type` zählt dabei als unbekannt. Das gilt für jeden Schreibweg gleichermassen: UI, REST-API, Import, Pool-Installation, Seeder und Factory. Ein Tippfehler wie `"shel"` scheitert damit sofort und nicht erst mitten im Run.
 
@@ -692,6 +692,46 @@ JSON-Stufen brauchen JSON als Eingabe und müssen vor Textstufen stehen.
 ```
 
 **Nicht erlaubt:** als verschachtelter Block in `switch` (wird abgelehnt).
+
+---
+
+### `dashboard-report` — Dashboard-Ergebnis ohne Marker melden
+
+Füllt das **Dashboard-Ergebnis** dieses Runs direkt aus der Block-Config — dieselben Felder, dieselben Grenzen und dieselbe Prüfung wie der Marker `dashboard_widget:` (siehe api-referenz.md), aber **ohne Markerzeile und ohne Textsuche**. Deterministisch: kein KI-Aufruf, keine Shell, 0 Tokens.
+
+Modul: `dashboard-report` (Standard an, abschaltbar). Ist es aus, verweigert der Block und der Typ wird im Editor nicht angeboten.
+
+| Config-Schlüssel | Typ | Default | Beschreibung |
+|---|---|---|---|
+| `status` | string | **erforderlich** | `GREEN`, `YELLOW` oder `RED` (Template-fähig) |
+| `title` | string | – | Titel, ≤ 80 Zeichen |
+| `summary` | string | – | Zusammenfassung, ≤ 500 Zeichen |
+| `kpis` | Liste von Objekten | – | ≤ 6 × `{ label (≤ 40), value (≤ 40, String), trend? (UP/DOWN/FLAT) }` |
+| `items` | Liste von Strings | – | ≤ 10 Einträge, je ≤ 200 Zeichen |
+
+```json
+{ "type": "dashboard-report", "name": "report", "config": {
+  "status": "{{ gate_status }}",
+  "title": "Nightly QA",
+  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }],
+  "items": ["{{ finding_1 }}"],
+  "summary": "{{ block.analyse.output }}"
+} }
+```
+
+**Regeln:**
+
+- Alle Werte sind Template-fähig. Ein Platzhalter, der zur Laufzeit **leer** ist, lässt das Feld entfallen (bei `status` ist das ein Fehler). Ein KPI-Objekt entfällt nur, wenn **alle** seine Werte leer sind; ein halb gefülltes lässt den Block scheitern.
+- Ein Platzhalter, der **nicht aufgelöst** werden konnte (unbekannte Variable — der Resolver lässt ihn wörtlich stehen), **lässt den Block scheitern** und nennt das Feld. Lieber ein roter Schritt als `{{ hunt_count }}` als Kennzahl auf dem Dashboard.
+- Jeder Verstoß gegen den Vertrag (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt **FAILED** werden; die Meldung nennt das Feld (`kpis[2].value`), nie den Wert.
+- Unbekannte Schlüssel auf oberster Ebene werden ignoriert (dort stehen legitim Plattform-Schlüssel wie `timeout_seconds`); unbekannte Schlüssel **innerhalb** eines KPI-Objekts werden abgelehnt.
+- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte.
+
+**Vorrang vor dem Marker:** Hat ein `dashboard-report`-Block ein Ergebnis geschrieben, wird der Marker `dashboard_widget:` in **keiner** Schritt-Ausgabe mehr ausgewertet. Der Block ist der bewusst konfigurierte Weg; ohne diese Regel könnte eine Markerzeile in der Ausgabe eines späteren KI-Schritts den Bericht überschreiben. Zwei `dashboard-report`-Blöcke in einem Workflow: der zuletzt ausgeführte gewinnt.
+
+**Im Editor** hat der Block ein Formular statt roher JSON-Bearbeitung, mit einem optionalen Knopf „Vorschlag aus dem letzten Run" (ein KI-Aufruf; Einstellungen → Ausführung, braucht den Anbieter `CLAUDE`). Der Vorschlag wird angezeigt und erst nach „Übernehmen" in die Config geschrieben.
+
+**Wann verwenden**: immer dann, wenn ein Workflow ein Dashboard-Ergebnis melden soll. Den Marker nur noch, wenn die Werte erst im Text einer KI entstehen und es keine Variable dafür gibt.
 
 ---
 

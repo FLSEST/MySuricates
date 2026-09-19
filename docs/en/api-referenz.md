@@ -2387,6 +2387,8 @@ For each queried workflow: the **latest run** and the validated result — **wit
 
 ### The `dashboard_widget:` marker in a workflow
 
+> **Precedence:** Once a `dashboard-report` block of the run has written a validated result, the marker is not evaluated — not even a broken marker sets `dashboard_widget_error`. The block is the deliberately configured way, the marker is opportunistic.
+
 A workflow reports its dashboard result like `gate_status:` as a marker line in the block output; the JSON may span multiple lines:
 
 ```
@@ -2417,6 +2419,29 @@ Contract (validated at run end and written to run metadata, re-validated on read
 ### WebSocket `/topic/dashboard/runs`
 
 After a run ends and is saved: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Only ids and status — the dashboard then reloads its workflow widgets.
+
+### `POST /api/v1/dashboard/report-assist`
+
+AI suggestion for the fields of a `dashboard-report` block, derived from the workflow's **last run**. A single tool-less AI call (provider `CLAUDE`, no model flag); the response is validated in the backend against the same contract as a marker. Raw response and run output never leave the server.
+
+Module `dashboard-report`; the setting `dashboard-report-assist-enabled` (see `/system/execution-config`) must also be `1`.
+
+**Body:** `{ "workflowId": "wf-a1" }`
+
+**Response:**
+
+```json
+{ "runId": "run-1", "runCompletedAt": "2026-09-18T08:02:00Z", "provider": "CLAUDE",
+  "proposal": { "title": "Nightly QA", "status": "YELLOW",
+                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
+                "items": ["3 Hunts without route"], "summary": "One finding." } }
+```
+
+- **400**: `workflowId` missing or empty.
+- **404**: Module off (`MODULE_DISABLED`) or workflow unknown/soft-deleted.
+- **409**: setting off, provider `CLAUDE` not available, no run or no output in the last run, AI does not answer or answer does not match contract. The message is fixed — it never contains part of the response.
+
+The suggestion never contains placeholders: it describes **one** run. For persistent KPIs enter `{{ variable }}` in the block.
 
 ---
 

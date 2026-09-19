@@ -153,6 +153,7 @@ Response: 201 Created
 | `todo-create` | `description`, `title`, `priority?`, `tags?`, `project_id?`, `source?`, `source_agent?`, `variable_name?` | TODO anlegen (`variable_name` default `todo_id`) |
 | `todo-update` | `description`, `id`, `title?`, `description?`, `priority?`, `tags?` | TODO ändern |
 | `todo-close` | `description`, `id` | TODO auf DONE setzen |
+| `dashboard-report` | `status` (erforderlich), `title`, `summary`, `kpis`, `items` | Dashboard-Ergebnis des Runs aus Config-Feldern, ohne Marker; Modul `dashboard-report` |
 
 Mit `?` markierte Felder sind optional. `on_failure` (`stop` \| `continue`, default `stop`) gilt für **jeden** Blocktyp.
 `effort` (`low` \| `medium` \| `high` \| `xhigh`) gilt für jeden Block, der die AI aufruft, und überschreibt die Workflow-Einstellung.

@@ -68,10 +68,11 @@ automation:
 
 Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_HARDENING_<NAME>` (dashes as `_`, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true`). The stable and test profiles use `full`; `scripts/setup.sh` writes the chosen preset to `ai-automation-backend/config/application.yml`. Templates "minimal" and "maximal": `ai-automation-backend/config-examples/`, explained in [deployment.md](deployment.md#configurations-minimal-and-maximal). `scripts/setup.sh --lang de|en` only chooses the display language of the module texts in the terminal (default: the `$LANG` prefix, else `en`) — it never changes the outcome (which modules are active).
 
-**Catalog** (single source: `modules/ModuleCatalog`, 18 feature modules + 4 hardening switches = 22 keys):
+**Catalog** (single source: `modules/ModuleCatalog`, 19 feature modules + 4 hardening switches = 23 keys):
 
 | Tier | Modules | Maturity |
 |---|---|---|
+| `standard` (all presets) | `dashboard-report` | stable |
 | `research` | `chains`, `assistant`, `learning` (analytics endpoints; dashboard data stays core), `memory`, `audit`, `bpmn` | chains stable, others experimental |
 | `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |

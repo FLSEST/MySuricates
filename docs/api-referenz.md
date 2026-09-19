@@ -2395,6 +2395,8 @@ Je angefragtem Workflow der **letzte Run** und das geprüfte Ergebnis — **ohne
 
 ### Marker `dashboard_widget:` im Workflow
 
+> **Vorrang:** Hat ein `dashboard-report`-Block des Runs bereits ein geprüftes Ergebnis geschrieben, wird der Marker gar nicht ausgewertet — auch ein kaputter Marker setzt dann kein `dashboard_widget_error`. Der Block ist der bewusst konfigurierte Weg, der Marker der opportunistische.
+
 Ein Workflow meldet sein Dashboard-Ergebnis wie `gate_status:` als Markerzeile in der Blockausgabe; das JSON darf über mehrere Zeilen gehen:
 
 ```
@@ -2425,6 +2427,29 @@ Vertrag (beim Run-Ende geprüft und in die Run-Metadaten geschrieben, beim Lesen
 ### WebSocket `/topic/dashboard/runs`
 
 Nach dem Speichern eines beendeten Runs: `{"type":"run_completed","runId":"run-1","workflowId":"wf-a1","status":"COMPLETED"}`. Nur IDs und Status — das Dashboard lädt daraufhin seine Workflow-Widgets neu.
+
+### `POST /api/v1/dashboard/report-assist`
+
+KI-Vorschlag für die Felder eines `dashboard-report`-Blocks, abgeleitet aus dem **letzten Run** des Workflows. Ein einziger werkzeugloser KI-Aufruf (Anbieter `CLAUDE`, kein Modell-Flag); die Antwort wird im Backend gegen denselben Vertrag geprüft wie ein Marker. Roh-Antwort und Run-Ausgabe verlassen den Server nie.
+
+Modul `dashboard-report`; zusätzlich muss die Einstellung `dashboard-report-assist-enabled` (siehe `/system/execution-config`) auf `1` stehen.
+
+**Body:** `{ "workflowId": "wf-a1" }`
+
+**Response:**
+
+```json
+{ "runId": "run-1", "runCompletedAt": "2026-09-18T08:02:00Z", "provider": "CLAUDE",
+  "proposal": { "title": "Nightly QA", "status": "YELLOW",
+                "kpis": [{ "label": "Hunts", "value": "1361", "trend": "UP" }],
+                "items": ["3 Hunts ohne Route"], "summary": "Ein Befund." } }
+```
+
+- **400**: `workflowId` fehlt oder ist leer.
+- **404**: Modul aus (`MODULE_DISABLED`) oder Workflow unbekannt/soft-gelöscht.
+- **409**: Einstellung aus, Anbieter `CLAUDE` nicht verfügbar, kein Run oder keine Ausgabe im letzten Run, KI antwortet nicht oder nicht vertragskonform. Die Meldung ist fest — sie enthält nie einen Teil der Antwort.
+
+Der Vorschlag enthält nie Platzhalter: er beschreibt **einen** Run. Für dauerhafte Kennzahlen im Block `{{ variable }}` eintragen.
 
 ---
 
