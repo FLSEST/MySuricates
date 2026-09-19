@@ -1024,6 +1024,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V74 | Daily aggregate of the measured request cost per route (`request_metrics_daily`) |
 | V75 | Marker for findings whose ruleKey is outside the catalog (`unknown_rule_key`) |
 | V76 | Agent session provenance on the todo (`agent_session_ref`) |
+| V77 | Evidence check on the audit finding (`unverified_evidence`) |
 
 ## Architecture Gates
 
@@ -1068,7 +1069,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 76 Flyway migrations (V1–V76)
+│           └── db/migration/          ← 77 Flyway migrations (V1–V77)
 │
 └── ai-automation-frontend/
     ├── package.json

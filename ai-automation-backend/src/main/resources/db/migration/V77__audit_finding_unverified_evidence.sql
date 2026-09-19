@@ -1,0 +1,16 @@
+-- Kennzeichnet ein Finding, dessen Beleg in keiner Messung dieses Laufs vorkommt (TODO a94b56a0).
+--
+-- Der Audit-Prompt bindet jedes Finding an eine Belegzeile ("Jedes Finding nennt in evidence die
+-- FAKT- oder TREFFER-Zeile, auf der es beruht"). Geprueft hat das niemand: Die Ingestion uebernahm
+-- jedes Finding unveraendert, auch mit erfundenem oder aus dem letzten Report recyceltem Beleg.
+-- Dokumentierter Fall: TODO 3ca988e1 ("extractKnowledge haelt DB-Connection waehrend KI-Call",
+-- HIGH) berief sich auf eine Timeout-Zahl und ein fremdes Ticket; der Code trug laengst das
+-- richtige Muster. Das falsche Finding hat ein HIGH-TODO erzeugt und Arbeitszeit gekostet.
+--
+-- Ab jetzt prueft EvidenceVerification deterministisch gegen das Faktenblatt des Runs. Ein
+-- unbelegtes Finding wird gespeichert und sichtbar markiert, aber es erzeugt kein verwaltetes
+-- TODO mehr -- verworfen wird nichts, damit ein Fehlalarm der Pruefung nichts verschluckt.
+--
+-- Vorbelegung 0 wie bei unknown_rule_key (V75): Bestehende Findings bleiben unmarkiert, der
+-- naechste Ingest setzt das Flag ohnehin neu -- in beide Richtungen.
+ALTER TABLE audit_findings ADD COLUMN unverified_evidence INTEGER NOT NULL DEFAULT 0;

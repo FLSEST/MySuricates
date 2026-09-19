@@ -320,4 +320,50 @@ class AuditIngestionServiceTest {
         assertThat(finding.getDispositionNote()).isEqualTo("Bewusst gross");
         verify(todoRepository).save(any());
     }
+
+    /** Run mit Faktenblatt-Block: Beleg-Pruefung greift (TODO a94b56a0). */
+    private void stubRunWithFactSheet(String runId, String evidence) {
+        String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"size.class\","
+                + "\"subject\":\"Big.java\",\"severity\":\"HIGH\",\"title\":\"Big.java ist zu gross\","
+                + "\"evidence\":\"" + evidence + "\"}]} -->\n# Report";
+        StepResult facts = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
+                .output("## FAKTENBLATT\nFAKT files_over_300: 19\n")
+                .metadata(new HashMap<>(Map.of("blockName", "messung"))).build();
+        StepResult report = StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output(envelope)
+                .metadata(new HashMap<>(Map.of("blockName", "report"))).build();
+        WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Health Audit").build())
+                .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(facts, report))).build();
+        when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
+        // findingRepository.save ist in setUp gestubt; findBy... liefert per Mockito-Default leer.
+    }
+
+    @Test
+    void findingOhneBelegImFaktenblattWirdMarkiertUndErzeugtKeinTodo() {
+        stubRunWithFactSheet("run-1", "TODO 5594f26c, FAKT aus_dem_letzten_report: 7");
+
+        service.ingest(event("run-1"));
+
+        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
+        verify(findingRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues().getFirst().isUnverifiedEvidence()).isTrue();
+        verify(todoRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(TodoCreatedEvent.class));
+    }
+
+    @Test
+    void findingMitBelegAusDemFaktenblattLaeuftWieBisher() {
+        stubRunWithFactSheet("run-1", "FAKT files_over_300: 19");
+        when(todoRepository.save(any())).thenAnswer(inv -> {
+            Todo todo = inv.getArgument(0);
+            todo.setId("todo-1");
+            return todo;
+        });
+
+        service.ingest(event("run-1"));
+
+        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
+        verify(findingRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues().getFirst().isUnverifiedEvidence()).isFalse();
+        verify(todoRepository).save(any());
+    }
 }

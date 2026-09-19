@@ -1250,6 +1250,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V74 | `V74__request_metrics_daily.sql` | request_metrics_daily table (daily close of the request cost per route: calls, p50/p95, wait share, SQL statements, response bytes) |
 | V75 | `V75__audit_finding_unknown_rule_key.sql` | unknown_rule_key in audit_findings (finding whose ruleKey is outside the catalog, default 0) |
 | V76 | `V76__todo_agent_session_ref.sql` | agent_session_ref in todos + index (agent conversation; one-time backfill of the `--resume` UUIDs from the descriptions) |
+| V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (evidence names no measurement of the run; such findings create no managed todo) |
 
 ## SQLite Specifics
 

@@ -1250,6 +1250,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V74 | `V74__request_metrics_daily.sql` | request_metrics_daily-Tabelle (Tagesabschluss der Request-Kosten je Route: Aufrufe, p50/p95, Wartezeit-Anteil, SQL-Statements, Antwort-Bytes) |
 | V75 | `V75__audit_finding_unknown_rule_key.sql` | unknown_rule_key in audit_findings (Finding mit ruleKey ausserhalb des Katalogs, Vorbelegung 0) |
 | V76 | `V76__todo_agent_session_ref.sql` | agent_session_ref in todos + Index (Konversation der Agenten-Sitzung; Einmal-Uebernahme der `--resume`-UUIDs aus den Beschreibungen) |
+| V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (Beleg nennt keinen Messwert des Laufs; solche Findings erzeugen kein verwaltetes TODO) |
 
 ## SQLite-Besonderheiten
 

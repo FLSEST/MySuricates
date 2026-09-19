@@ -84,10 +84,16 @@ public class AuditIngestionService {
             return;
         }
 
-        ingestSnapshot(event, report, parsed.findings());
+        // Die Messwerte dieses Laufs — Vergleichsbasis fuer die Belegpruefung (TODO a94b56a0).
+        // Hier gelesen, wo die Steps ohnehin geladen sind; die Leseseite darf keine Step-Blobs holen.
+        Set<String> factNames = EvidenceVerification.factNames(
+                run.getSteps().stream().map(StepResult::getOutput).toList());
+
+        ingestSnapshot(event, report, parsed.findings(), factNames);
     }
 
-    private void ingestSnapshot(WorkflowRunCompletedEvent event, AuditReport report, List<ParsedFinding> parsedFindings) {
+    private void ingestSnapshot(WorkflowRunCompletedEvent event, AuditReport report,
+                                List<ParsedFinding> parsedFindings, Set<String> factNames) {
         Instant observedAt = report.getGeneratedAt();
         Set<String> seenFingerprints = new HashSet<>();
         Set<String> reportedRuleKeys = new HashSet<>();
@@ -127,6 +133,15 @@ public class AuditIngestionService {
             // Bei jedem Ingest neu gesetzt, in beide Richtungen: ergaenzt der Katalog den Key,
             // faellt die Markierung beim naechsten Lauf von selbst weg (TODO ffa6d846).
             finding.setUnknownRuleKey(resolution.unknown());
+            // Ebenso bei jedem Ingest neu: nennt der Beleg einen Messwert dieses Laufs? (a94b56a0)
+            boolean unverified = !EvidenceVerification.isSupported(item.evidence(), factNames);
+            if (unverified && !finding.isUnverifiedEvidence()) {
+                activityLog.warn(ActivityLog.LogCategory.EXECUTION,
+                        "Audit-Finding ohne Beleg im Faktenblatt: " + item.title()
+                                + " (" + report.getAuditKey() + ") — kein verwaltetes TODO",
+                        "AuditIngestionService", event.getRunId(), event.getWorkflowId());
+            }
+            finding.setUnverifiedEvidence(unverified);
             finding.setSeverity(item.severity());
             finding.setTitle(item.title());
             finding.setDescription(item.description());
@@ -147,8 +162,11 @@ public class AuditIngestionService {
             }
             // Nur offene Findings bekommen ein verwaltetes TODO: akzeptierte/verworfene Risiken und
             // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
+            // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
+            // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
             if ((item.severity() == AuditSeverity.CRITICAL || item.severity() == AuditSeverity.HIGH)
-                    && finding.getStatus() == AuditFindingStatus.OPEN) {
+                    && finding.getStatus() == AuditFindingStatus.OPEN
+                    && !finding.isUnverifiedEvidence()) {
                 ensureManagedTodo(finding, report);
             }
         }

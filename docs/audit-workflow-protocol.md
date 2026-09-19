@@ -60,6 +60,23 @@ Ingestion normalisiert dann Schreibweisen-Drift (Kleinschreibung, `_` → `-`, P
 trotzdem übernommen — mit einer Warnung im Activity-Log, einmal je Run und Key. Ein `auditKey`
 ohne Katalogeintrag wird nicht geprüft; sein Prompt vergibt die Keys frei.
 
+### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
+
+Der Prompt verlangt zu jedem Finding eine Belegzeile — geprüft hat das lange niemand, und ein
+Finding mit erfundenem oder aus dem letzten Report recyceltem Beleg wurde unverändert zu einem
+TODO (TODO `a94b56a0`). Seit V77 hält `EvidenceVerification` beim Ingest jedes `evidence` gegen
+das Faktenblatt des Runs: gesammelt werden die Namen aller `FAKT <name>:`- und
+`TREFFER <name>:`-Zeilen, und wer keinen davon nennt, wird als `unverifiedEvidence` markiert.
+
+Ein so markiertes Finding wird **gespeichert und bleibt sichtbar** — verworfen wird nichts, damit
+ein Fehlalarm der Prüfung keinen echten Befund verschluckt. Es erzeugt aber **kein verwaltetes
+TODO** mehr, auch bei `severity: HIGH` nicht, und eine Zeile im Activity-Log nennt es beim Namen.
+Wie `unknownRuleKey` wird die Markierung bei jedem Ingest neu gesetzt, auch zurück.
+
+Die Grenze: Geprüft wird die **Herkunft** des Belegs, nicht seine Tragfähigkeit. Wer eine echte
+FAKT-Zeile zitiert und daraus etwas über eine ganz andere Stelle folgert, kommt weiterhin durch.
+Ein Run ohne Faktenblatt wird nicht geprüft — kein Faktenblatt ist kein Verdacht.
+
 ## Faktenblatt-Muster: die Shell misst, die KI interpretiert
 
 Ein Audit-Workflow lässt die KI **nicht** selbst zählen. Ein Shell-Block vor dem

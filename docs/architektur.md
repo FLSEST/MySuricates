@@ -1078,6 +1078,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V74 | Tagesaggregat der gemessenen Request-Kosten je Route (`request_metrics_daily`) |
 | V75 | Kennzeichen fuer Findings mit ruleKey ausserhalb des Katalogs (`unknown_rule_key`) |
 | V76 | Agenten-Sitzungsherkunft am TODO (`agent_session_ref`) |
+| V77 | Beleg-Pruefung am Audit-Finding (`unverified_evidence`) |
 
 ## Architektur-Gates
 
@@ -1122,7 +1123,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 76 Flyway-Migrationen (V1–V76)
+│           └── db/migration/          ← 77 Flyway-Migrationen (V1–V77)
 │
 └── ai-automation-frontend/
     ├── package.json

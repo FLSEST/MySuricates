@@ -75,6 +75,17 @@ public class AuditFinding {
     @Column(name = "unknown_rule_key", nullable = false)
     @Builder.Default
     private boolean unknownRuleKey = false;
+    /**
+     * Gesetzt, wenn die {@code evidence} dieses Findings keinen Messwert des Laufs nennt, aus dem
+     * es stammt — erfundener oder aus einem frueheren Report recycelter Beleg.
+     *
+     * <p>Solche Findings werden gespeichert und bleiben sichtbar, erzeugen aber <b>kein</b>
+     * verwaltetes TODO: Der Prompt verlangt einen Beleg, geprueft hat ihn bis dahin niemand
+     * (TODO a94b56a0). Wie {@link #unknownRuleKey} bei jedem Ingest neu gesetzt, auch zurueck.
+     */
+    @Column(name = "unverified_evidence", nullable = false)
+    @Builder.Default
+    private boolean unverifiedEvidence = false;
     @Column(name = "resolved_at")
     private Instant resolvedAt;
     @Column(name = "disposition_note", columnDefinition = "text")
