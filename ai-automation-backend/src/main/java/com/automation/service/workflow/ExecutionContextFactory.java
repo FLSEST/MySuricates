@@ -165,8 +165,13 @@ public class ExecutionContextFactory {
         contextDataService.injectPlatformData(context, workflowId, project.getId());
 
         // Set instruction prefix and model from workflow
-        String instructionPrefix = agentInstructionsService.buildInstructionPrefix(
-                instructions, seed.userPreferences());
+        // Der Standardweg ruft weiter die einparametrige Methode: Ein Workflow ohne Opt-in soll
+        // nicht nur denselben Prompt bekommen, sondern denselben AUFRUF ausloesen. Sonst haengt
+        // jeder vorhandene Test und Aufrufer an einer Signatur, die sich seinetwegen geaendert hat
+        // -- genau daran sind beim ersten Versuch 74 Tests in WorkflowExecutorTest gescheitert.
+        String instructionPrefix = seed.userPreferences()
+                ? agentInstructionsService.buildInstructionPrefix(instructions, true)
+                : agentInstructionsService.buildInstructionPrefix(instructions);
         if (!instructionPrefix.isBlank()) {
             context.setInstructionPrefix(instructionPrefix);
         }

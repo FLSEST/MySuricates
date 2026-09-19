@@ -36,7 +36,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class AuditFingerprintMigrationJobTest {
 
-    private static final String AUDIT_KEY = "mysuricates.security";
+    /**
+     * Erfundener auditKey ohne Katalogeintrag. Hier geht es um die Fingerprint-Migration, nicht um
+     * das ruleKey-Vokabular; mit einem echten Schluessel reisst jedes ergaenzte Vokabular diese
+     * Tests mit (seit TODO a17e2d19 haben alle sechs ausgelieferten Audits einen Katalog -- vorher
+     * stand hier mysuricates.security).
+     */
+    private static final String AUDIT_KEY = "test.audit-ohne-katalog";
     private static final String RULE_KEY = "shell.injection";
     /** Das einzige Audit mit ruleKey-Katalog (siehe {@code audit/rule-keys.json}). */
     private static final String COVERAGE_AUDIT_KEY = "mysuricates.test-coverage";
