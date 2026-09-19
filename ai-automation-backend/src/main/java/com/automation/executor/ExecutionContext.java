@@ -2,6 +2,7 @@ package com.automation.executor;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.util.ProcessTracking;
+import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -80,11 +81,10 @@ public class ExecutionContext {
 
     @Builder.Default private final AtomicBoolean cancelled = new AtomicBoolean(false);
 
-    @Builder.Default private final AtomicReference<CompletableFuture<String>> pendingApproval = new AtomicReference<>();
-
-    @Builder.Default private final AtomicReference<ApprovalRequest> currentApprovalRequest = new AtomicReference<>();
-
-    @Builder.Default private final Map<String, String> approvalMemory = new ConcurrentHashMap<>();
+    /** Offene Zusage, laufende Frage und gemerkte Antworten. Nur über die Methoden unten — ein
+     * generierter Getter würde den Zustand am Gate vorbei erreichbar machen. Siehe {@link ApprovalGate}. */
+    @Getter(AccessLevel.NONE)
+    @Builder.Default private final ApprovalGate approvals = new ApprovalGate();
 
     @Builder.Default private final Map<String, Object> runMetadata = new ConcurrentHashMap<>();
 
@@ -251,12 +251,7 @@ public class ExecutionContext {
         cancelled.set(true);
         // Kill any running process (shell block, Claude CLI, etc.)
         activeProcess.cancel();
-        // Cancel any pending approval
-        CompletableFuture<String> future = pendingApproval.getAndSet(null);
-        if (future != null) {
-            future.completeExceptionally(new java.util.concurrent.CancellationException("Execution cancelled"));
-        }
-        currentApprovalRequest.set(null);
+        approvals.cancel();
     }
 
     public void registerProcess(Process process) {
@@ -275,26 +270,14 @@ public class ExecutionContext {
         };
     }
 
-    public CompletableFuture<String> requestApproval(ApprovalRequest request) {
-        CompletableFuture<String> future = new CompletableFuture<>();
-        currentApprovalRequest.set(request);
-        pendingApproval.set(future);
-        return future;
-    }
+    /** Die Frage, auf die dieser Lauf gerade wartet — {@code null} im Ref, wenn keine offen ist. */
+    public AtomicReference<ApprovalRequest> getCurrentApprovalRequest() { return approvals.currentRequest(); }
 
-    public void resolveApproval(String answer) {
-        CompletableFuture<String> future = pendingApproval.getAndSet(null);
-        currentApprovalRequest.set(null);
-        if (future != null) {
-            future.complete(answer);
-        }
-    }
+    public CompletableFuture<String> requestApproval(ApprovalRequest request) { return approvals.request(request); }
 
-    public void rememberApproval(String question, String answer) {
-        approvalMemory.put(question, answer);
-    }
+    public void resolveApproval(String answer) { approvals.resolve(answer); }
 
-    public String getRememberedApproval(String question) {
-        return approvalMemory.get(question);
-    }
+    public void rememberApproval(String question, String answer) { approvals.remember(question, answer); }
+
+    public String getRememberedApproval(String question) { return approvals.remembered(question); }
 }
