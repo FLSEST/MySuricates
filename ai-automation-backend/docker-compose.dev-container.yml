@@ -1,0 +1,46 @@
+# Dev-Backend im Container statt auf dem Host (TODO a1236a64).
+#
+# Wird ueber `scripts/start-autotrigger-dev.sh --container` benutzt, nicht direkt. Der Starter
+# erzeugt daneben eine Override-Datei mit genau den Provider-Mounts, die auf diesem Rechner
+# existieren — deshalb steht hier keiner davon fest verdrahtet.
+#
+# Warum nicht docker-compose.yml? Die baut aus docker/Dockerfile.backend, einem reinen
+# JRE-Alpine-Image **ohne Node**. Claude, Codex und Pi sind Node- bzw. native CLIs; in diesem
+# Image kann keine davon laufen. docker/Dockerfile.stable ist Ubuntu-basiert und bringt
+# `nodejs npm` mit — deshalb baut diese Datei daraus, wie es Test und Stable auch tun.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.stable
+    image: ai-automation-backend-dev-container
+    container_name: ${AUTOTRIGGER_DEV_CONTAINER_NAME:-autotrigger-dev-container}
+    ports:
+      - "${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}:9090"
+    volumes:
+      - dev-container-data:/app/data
+      # Der Docker-Socket: Shell-Bloecke mit container_image starten selbst Container.
+      # Gibt dem Backend volle Kontrolle ueber das Host-Docker — dasselbe Zugestaendnis wie
+      # in docker-compose.yml und der Test-Instanz.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Projektverzeichnisse: ohne sie sieht ein Workflow die Projekte nicht, auf die er
+      # laut Projektpfad zugreifen soll.
+      - ${AUTOTRIGGER_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}:${AUTOTRIGGER_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}
+    environment:
+      - AUTOMATION_DB_PATH=/app/data/automation.db
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AUTOMATION_SECURITY_ENABLED=true
+      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
+      # Dev laeuft mit allen Modulen — wie die Host-Instanz (config/application.yml: preset full).
+      - AUTOMATION_MODULES_PRESET=${AUTOTRIGGER_DEV_PRESET:-full}
+      - HOME=${HOME}
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/api/v1/system/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  dev-container-data:

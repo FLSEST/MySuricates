@@ -4,6 +4,7 @@
 #   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
 #   scripts/start-autotrigger-dev.sh stop                                # nur Backend
 #   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
+#   scripts/start-autotrigger-dev.sh [start|stop|restart] --container     # Backend im Docker-Container
 #
 # Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
 # ${STATE_DIR}/runtime/current.jar. Grund: Eine JVM mit -cp target/classes liest Klassen lebenslang lazy
@@ -17,6 +18,9 @@ SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 COMMAND="start"
+# Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
+# Der Host-Weg bleibt unveraendert; der Container-Weg ist additiv (TODO a1236a64).
+RUNTIME_MODE="${AUTOTRIGGER_DEV_RUNTIME:-host}"
 SHOW_KEY=0
 FORCE=0
 REBUILD=0
@@ -26,6 +30,8 @@ for arg in "$@"; do
     --show-key) SHOW_KEY=1 ;;   # API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen)
     --force) FORCE=1 ;;         # restart trotz laufender Workflow-Runs
     --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
+    --container) RUNTIME_MODE=container ;;  # Backend im Container statt als java -jar (TODO a1236a64)
+    --host) RUNTIME_MODE=host ;;
     -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # andere Argumente ignorieren
   esac
@@ -295,6 +301,79 @@ build_backend_jar() {
 # Backend / Frontend
 # ---------------------------------------------------------------------------
 
+# ── Container-Betrieb (--container) ──────────────────────────────────────────────
+# Additiv zum Host-Weg: dieselben Kommandos, nur startet statt `java -jar` ein
+# `docker compose`. Der Vite-Dev-Server bleibt davon unberuehrt — er proxied nach
+# :9090, unabhaengig davon, wer dort antwortet (TODO a1236a64).
+
+COMPOSE_FILE="${BACKEND_DIR}/docker-compose.dev-container.yml"
+COMPOSE_OVERRIDE="${STATE_DIR}/dev-container.override.yml"
+COMPOSE_PROJECT="${AUTOTRIGGER_DEV_COMPOSE_PROJECT:-autotrigger-dev}"
+
+compose_cmd() {
+  docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
+}
+
+# Schreibt die Override-Datei mit genau den Provider-Mounts, die es auf DIESEM Rechner gibt.
+# Fest in die Compose-Datei geschrieben wuerden sie den Start auf jedem Rechner scheitern
+# lassen, der einen Provider nicht installiert hat — und eine Linux-Pfadannahme festschreiben.
+write_compose_override() {
+  local mounts=() p
+  # Claude: Binary-Symlink, Versionsverzeichnis, Anmeldung.
+  for p in "${HOME}/.local/bin" "${HOME}/.local/share/claude"; do
+    [[ -e "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
+  done
+  [[ -f "${HOME}/.claude.json" ]] && mounts+=("      - ${HOME}/.claude.json:${HOME}/.claude.json:ro")
+  [[ -d "${HOME}/.claude" ]] && mounts+=("      - ${HOME}/.claude:${HOME}/.claude")
+  # Codex und Pi sind npm-Pakete AUSSERHALB von $HOME — genau deshalb laufen sie im
+  # Test-Container nicht, der nur $HOME-Pfade mountet. Beide brauchen Paket und Anmeldung.
+  local node_modules="${AUTOTRIGGER_DEV_NODE_MODULES:-/usr/lib/node_modules}"
+  for p in "${node_modules}/@openai/codex" "${node_modules}/@earendil-works/pi-coding-agent"; do
+    [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
+  done
+  for p in "/usr/bin/codex" "/usr/bin/pi"; do
+    [[ -e "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
+  done
+  for p in "${HOME}/.codex" "${HOME}/.pi"; do
+    [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}")
+  done
+
+  {
+    echo "# Erzeugt von start-autotrigger-dev.sh --container. Nicht von Hand aendern."
+    echo "services:"
+    echo "  backend:"
+    echo "    volumes:"
+    if [[ "${#mounts[@]}" -eq 0 ]]; then
+      echo "      []"
+    else
+      printf '%s\n' "${mounts[@]}"
+    fi
+  } > "${COMPOSE_OVERRIDE}"
+
+  echo "Provider-Mounts: ${#mounts[@]} (${COMPOSE_OVERRIDE})"
+  if [[ "${#mounts[@]}" -eq 0 ]]; then
+    echo "  Kein Provider-Zugang gefunden — KI-Bloecke werden im Container scheitern." >&2
+  fi
+}
+
+start_backend_container() {
+  require_command docker
+  if endpoint_is_ready "${BACKEND_READY_URL}"; then
+    echo "Auf :${BACKEND_PORT} antwortet bereits ein Backend — erst stoppen." >&2
+    return 1
+  fi
+  write_compose_override
+  echo "Starte Backend im Container (docker compose up -d) ..."
+  compose_cmd up -d --build
+}
+
+stop_backend_container() {
+  require_command docker
+  [[ -f "${COMPOSE_OVERRIDE}" ]] || write_compose_override
+  echo "Stoppe Backend-Container (docker compose down) ..."
+  compose_cmd down
+}
+
 start_backend() {
   discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
 
@@ -443,26 +522,41 @@ main() {
   echo "Autotrigger Dev Starter (${COMMAND})"
   echo "Repo: ${REPO_ROOT}"
 
+  echo "Betriebsart: ${RUNTIME_MODE}"
+
   case "${COMMAND}" in
     stop)
-      stop_backend
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then stop_backend_container; else stop_backend; fi
       ;;
     restart)
-      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
       refuse_restart_if_runs_active
-      stop_backend
-      build_backend_jar
-      start_backend
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        stop_backend_container
+        start_backend_container
+      else
+        if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+        stop_backend
+        build_backend_jar
+        start_backend
+      fi
       local ok=0
       if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 120; then ok=1; fi
       print_logs_hint
       [[ "${ok}" -eq 1 ]] || exit 1
-      echo "Backend neu gestartet aus $(readlink -f "${CURRENT_JAR}")."
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        echo "Backend neu gestartet im Container (${COMPOSE_PROJECT})."
+      else
+        echo "Backend neu gestartet aus $(readlink -f "${CURRENT_JAR}")."
+      fi
       ;;
     start)
-      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
       require_command npm
-      start_backend
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        start_backend_container
+      else
+        if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+        start_backend
+      fi
       start_frontend
       local backend_ok=0 frontend_ok=0
       if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 120; then backend_ok=1; fi
