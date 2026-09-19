@@ -729,7 +729,7 @@ Modul: `dashboard-report` (Standard an, abschaltbar). Ist es aus, verweigert der
 
 **Vorrang vor dem Marker:** Hat ein `dashboard-report`-Block ein Ergebnis geschrieben, wird der Marker `dashboard_widget:` in **keiner** Schritt-Ausgabe mehr ausgewertet. Der Block ist der bewusst konfigurierte Weg; ohne diese Regel könnte eine Markerzeile in der Ausgabe eines späteren KI-Schritts den Bericht überschreiben. Zwei `dashboard-report`-Blöcke in einem Workflow: der zuletzt ausgeführte gewinnt.
 
-**Im Editor** hat der Block ein Formular statt roher JSON-Bearbeitung, mit einem optionalen Knopf „Vorschlag aus dem letzten Run" (ein KI-Aufruf; Einstellungen → Ausführung, braucht den Anbieter `CLAUDE`). Der Vorschlag wird angezeigt und erst nach „Übernehmen" in die Config geschrieben.
+**Im Editor** hat der Block zusätzlich zur JSON-Bearbeitung ein Formular, mit einem optionalen Knopf „Vorschlag aus dem letzten Run" (ein KI-Aufruf; Einstellungen → Ausführung, braucht den Anbieter `CLAUDE`). Der Vorschlag wird angezeigt und erst nach „Übernehmen" in die Config geschrieben.
 
 **Wann verwenden**: immer dann, wenn ein Workflow ein Dashboard-Ergebnis melden soll. Den Marker nur noch, wenn die Werte erst im Text einer KI entstehen und es keine Variable dafür gibt.
 

@@ -2449,7 +2449,7 @@ Modul `dashboard-report`; zusätzlich muss die Einstellung `dashboard-report-ass
 - **404**: Modul aus (`MODULE_DISABLED`) oder Workflow unbekannt/soft-gelöscht.
 - **409**: Einstellung aus, Anbieter `CLAUDE` nicht verfügbar, kein Run oder keine Ausgabe im letzten Run, KI antwortet nicht oder nicht vertragskonform. Die Meldung ist fest — sie enthält nie einen Teil der Antwort.
 
-Der Vorschlag enthält nie Platzhalter: er beschreibt **einen** Run. Für dauerhafte Kennzahlen im Block `{{ variable }}` eintragen.
+Der Vorschlag beschreibt normalerweise nur einen Lauf, ohne Variablen. Für dauerhafte Kennzahlen im Block `{{ variable }}` eintragen.
 
 ---
 
