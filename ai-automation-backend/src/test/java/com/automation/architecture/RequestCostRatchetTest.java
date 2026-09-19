@@ -4,6 +4,7 @@ import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
 import com.automation.entity.RunStatus;
+import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
@@ -12,6 +13,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
+import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -97,6 +99,14 @@ class RequestCostRatchetTest {
      *       so its size grows with step output, unbounded (TODO a05c9504).</li>
      *   <li>{@code /search}: also one {@code select workflow_runs} per hit — the batched run-count
      *       query of {@code 1e465a9e} covers the list endpoint but not search (TODO 13d1e2a2).</li>
+     *   <li>{@code /schedules}: 33 of the 91 statements measured on 2026-09-19 remain. 60 of them
+     *       were two run queries per schedule in {@code ScheduleMapper} and are gone (TODO
+     *       172a6a67). What is left is one {@code select workflows} per schedule: the
+     *       {@code ScheduledWorkflow.workflow} association is EAGER and {@code findAll()} does not
+     *       fetch it along. Batching that needs an answer to the soft-delete question first —
+     *       {@code Workflow} carries {@code @SQLRestriction} and the association has no
+     *       {@code @NotFound}, so a schedule pointing at a deleted workflow is its own topic
+     *       (TODO c9ec9844).</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
@@ -105,7 +115,8 @@ class RequestCostRatchetTest {
             "/api/v1/workflows", new Cost(32, 26_000),
             "/api/v1/executions", new Cost(5, 3_200_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
-            "/api/v1/search?q=Workflow", new Cost(51, 18_000)));
+            "/api/v1/search?q=Workflow", new Cost(51, 18_000),
+            "/api/v1/schedules", new Cost(33, 20_000)));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -113,6 +124,7 @@ class RequestCostRatchetTest {
     @Autowired private WorkflowRunRepository runRepository;
     @Autowired private StepResultRepository stepResultRepository;
     @Autowired private TodoRepository todoRepository;
+    @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @PersistenceContext private EntityManager entityManager;
 
     @BeforeEach
@@ -160,6 +172,21 @@ class RequestCostRatchetTest {
                             .build());
                 }
             }
+        }
+
+        // Ein Zeitplan je Workflow: Die Route /schedules laedt ueber ScheduledWorkflow.workflow
+        // (EAGER) und Workflow.project (EAGER); eine Query je Zeile zeigt sich damit als
+        // Vielfaches von 30 (TODO 172a6a67).
+        for (Workflow workflow : workflows) {
+            scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
+                    .workflow(workflow)
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
+                    .cronExpression("0 0 6 * * MON")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
+                    .enabled(true)
+                    .description("Seeded for the request cost ratchet")
+                    .inputContext(Map.of())
+                    .build());
         }
 
         for (int t = 0; t < TODOS; t++) {

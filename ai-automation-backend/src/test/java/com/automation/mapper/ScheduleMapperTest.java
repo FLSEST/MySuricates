@@ -11,9 +11,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -142,10 +147,10 @@ class ScheduleMapperTest {
         ScheduledWorkflow s2 = ScheduledWorkflow.builder()
                 .id("s-2").workflow(wf).targetType(ScheduledWorkflow.TargetType.WORKFLOW)
                 .cronExpression("* *").scheduleType(ScheduledWorkflow.ScheduleType.CRON).build();
-        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1")).thenReturn(List.of());
-        when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2")).thenReturn(List.of());
-        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-1")).thenReturn(List.of());
-        when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-2")).thenReturn(List.of());
+        // Die Liste loest den Status seit TODO 172a6a67 gebuendelt auf — zwei Abfragen fuer alle
+        // Zeitplaene statt zwei je Zeitplan. Deshalb hier die Batch-Methoden stubben.
+        when(workflowRunRepository.findStatusesByScheduleIds(List.of("s-1", "s-2"))).thenReturn(List.of());
+        when(chainRunRepository.findStatusesByScheduleIds(List.of("s-1", "s-2"))).thenReturn(List.of());
 
         List<ScheduledWorkflowResponse> result = mapper.toResponseList(List.of(s1, s2));
 
@@ -166,4 +171,107 @@ class ScheduleMapperTest {
 
         assertThat(response.conflictBehavior()).isEqualTo("SKIP");
     }
+
+    /**
+     * Die Listen-Variante loest den letzten Run-Status gebuendelt auf (TODO 172a6a67).
+     *
+     * <p>Vorher rief {@code toResponse} je Zeitplan zwei Repository-Methoden und lud dafuer
+     * dessen komplette Run-Liste, um nur den ersten Status zu behalten: 60 Abfragen bei 30
+     * Zeitplaenen, gemessen als 91 von 33 Statements auf {@code GET /api/v1/schedules}.
+     */
+    @Nested
+    class ListeMitGebuendelterStatusAufloesung {
+
+        private ScheduledWorkflow schedule(String id) {
+            return ScheduledWorkflow.builder()
+                    .id(id)
+                    .workflow(Workflow.builder().id("wf-" + id).name("W " + id).build())
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
+                    .cronExpression("0 0 6 * * MON")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
+                    .build();
+        }
+
+        @Test
+        void zweiAbfragenFuerAlleZeitplaene_nichtZweiJeZeitplan() {
+            when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1", "s2", "s3")))
+                    .thenReturn(List.<Object[]>of(
+                            new Object[]{"s1", RunStatus.COMPLETED, Instant.parse("2026-09-02T10:00:00Z")},
+                            new Object[]{"s2", RunStatus.FAILED, Instant.parse("2026-09-02T09:00:00Z")}));
+            when(chainRunRepository.findStatusesByScheduleIds(List.of("s1", "s2", "s3")))
+                    .thenReturn(List.of());
+
+            List<ScheduledWorkflowResponse> responses = mapper.toResponseList(
+                    List.of(schedule("s1"), schedule("s2"), schedule("s3")));
+
+            assertThat(responses).extracting(ScheduledWorkflowResponse::lastRunStatus)
+                    .containsExactly(RunStatus.COMPLETED, RunStatus.FAILED, null);
+            // Die Einzelauflösung darf in der Liste nicht mehr vorkommen.
+            verify(workflowRunRepository, never()).findByTriggeredByScheduleIdOrderByStartedAtDesc(anyString());
+            verify(chainRunRepository, never()).findByTriggeredByScheduleIdOrderByStartedAtDesc(anyString());
+        }
+
+        /** Die Abfrage liefert absteigend nach Startzeit — der erste Treffer je Zeitplan gewinnt. */
+        @Test
+        void derJuengsteRunGewinnt() {
+            when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1")))
+                    .thenReturn(List.<Object[]>of(
+                            new Object[]{"s1", RunStatus.RUNNING, Instant.parse("2026-09-03T10:00:00Z")},
+                            new Object[]{"s1", RunStatus.FAILED, Instant.parse("2026-09-01T10:00:00Z")}));
+            when(chainRunRepository.findStatusesByScheduleIds(List.of("s1"))).thenReturn(List.of());
+
+            assertThat(mapper.toResponseList(List.of(schedule("s1"))))
+                    .singleElement()
+                    .extracting(ScheduledWorkflowResponse::lastRunStatus)
+                    .isEqualTo(RunStatus.RUNNING);
+        }
+
+        /** Ohne Workflow-Run zaehlt der Ketten-Run — dieselbe Rangfolge wie in der Einzelauflösung. */
+        @Test
+        void ohneWorkflowRunZaehltDerKettenRun() {
+            when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1"))).thenReturn(List.of());
+            when(chainRunRepository.findStatusesByScheduleIds(List.of("s1")))
+                    .thenReturn(List.<Object[]>of(new Object[]{"s1", RunStatus.COMPLETED,
+                            Instant.parse("2026-09-02T10:00:00Z")}));
+
+            assertThat(mapper.toResponseList(List.of(schedule("s1"))))
+                    .singleElement()
+                    .extracting(ScheduledWorkflowResponse::lastRunStatus)
+                    .isEqualTo(RunStatus.COMPLETED);
+        }
+
+        /** Ein Workflow-Run hat Vorrang, auch wenn ein Ketten-Run juenger ist. */
+        @Test
+        void workflowRunHatVorrangVorKettenRun() {
+            when(workflowRunRepository.findStatusesByScheduleIds(List.of("s1")))
+                    .thenReturn(List.<Object[]>of(new Object[]{"s1", RunStatus.FAILED,
+                            Instant.parse("2026-09-01T10:00:00Z")}));
+            when(chainRunRepository.findStatusesByScheduleIds(List.of("s1")))
+                    .thenReturn(List.<Object[]>of(new Object[]{"s1", RunStatus.COMPLETED,
+                            Instant.parse("2026-09-05T10:00:00Z")}));
+
+            assertThat(mapper.toResponseList(List.of(schedule("s1"))))
+                    .singleElement()
+                    .extracting(ScheduledWorkflowResponse::lastRunStatus)
+                    .isEqualTo(RunStatus.FAILED);
+        }
+
+        /** Leere Liste fragt gar nicht — sonst liefe ein IN () gegen die Datenbank. */
+        @Test
+        void leereListeFragtNicht() {
+            assertThat(mapper.toResponseList(List.of())).isEmpty();
+            verifyNoInteractions(workflowRunRepository, chainRunRepository);
+        }
+
+        /** Die Detail-Route behaelt die Einzelauflösung — dort sind zwei Abfragen zwei Abfragen. */
+        @Test
+        void einzelneAntwortLoestWeiterEinzelnAuf() {
+            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s1"))
+                    .thenReturn(List.of(WorkflowRun.builder().status(RunStatus.COMPLETED).build()));
+
+            assertThat(mapper.toResponse(schedule("s1")).lastRunStatus())
+                    .isEqualTo(RunStatus.COMPLETED);
+        }
+    }
+
 }

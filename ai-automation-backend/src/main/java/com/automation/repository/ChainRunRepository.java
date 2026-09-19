@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -36,6 +37,12 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
     List<ChainRun> findByStatus(RunStatus status);
 
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
+
+    /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIds}, fuer Ketten-Runs (TODO 172a6a67). */
+    @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM ChainRun r "
+           + "WHERE r.triggeredByScheduleId IN :scheduleIds "
+           + "ORDER BY r.startedAt DESC")
+    List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
 
     @Query("SELECT cr FROM ChainRun cr LEFT JOIN cr.chain c " +
            "WHERE (:status IS NULL OR cr.status = :status) " +

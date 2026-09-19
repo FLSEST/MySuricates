@@ -157,6 +157,22 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     List<WorkflowRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 
+    /**
+     * Status und Startzeit aller Runs, die von einem der genannten Zeitplaene ausgeloest wurden —
+     * absteigend, damit der erste Treffer je Zeitplan der juengste ist.
+     *
+     * <p>Ersetzt eine Abfrage je Zeitplan im {@code ScheduleMapper}: Der las fuer jeden Zeitplan
+     * dessen komplette Run-Liste und verwarf alles ausser dem ersten Status. Bei 30 Zeitplaenen
+     * waren das 30 Abfragen und 30 vollstaendig materialisierte Run-Listen, nur um 30 Enum-Werte
+     * zu bekommen (TODO 172a6a67).
+     *
+     * <p>Projektion statt Entities: Es werden drei Spalten gelesen, keine Run-Objekte gebaut.
+     */
+    @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM WorkflowRun r "
+           + "WHERE r.triggeredByScheduleId IN :scheduleIds "
+           + "ORDER BY r.startedAt DESC")
+    List<Object[]> findStatusesByScheduleIds(@Param("scheduleIds") Collection<String> scheduleIds);
+
     @Query("SELECT wr FROM WorkflowRun wr LEFT JOIN wr.workflow w " +
            "WHERE (:status IS NULL OR wr.status = :status) " +
            "AND (:workflowId IS NULL OR w.id = :workflowId) " +
