@@ -286,7 +286,7 @@ export const de: TranslationKeys = {
       duration: 'Dauer',
       gate: 'Quality Gate',
       latestFailed: 'Der neueste Run ist fehlgeschlagen.',
-      aiGenerated: 'KI-generiert',
+      reportedByRun: 'Vom Run gemeldet',
       noResult: 'Kein gültiges Dashboard-Ergebnis',
       resultMissing: 'Der letzte Run hat kein Dashboard-Ergebnis gemeldet.',
       resultInvalid: 'Das Dashboard-Ergebnis des letzten Runs passte nicht zum Vertrag.',

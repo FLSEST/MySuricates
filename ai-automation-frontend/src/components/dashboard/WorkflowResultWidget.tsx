@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Minus, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, ClipboardList, Minus } from 'lucide-react';
 import { Card } from '../ui';
 import { useT, useI18nStore } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
@@ -69,12 +69,19 @@ export function WorkflowResultWidget({ config }: WidgetProps) {
             <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[result.status]}`} aria-hidden="true" />
             {result.title ?? name}
           </p>
-          <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-ai">
-            <Sparkles className="h-3 w-3 shrink-0" />
-            {texts.aiGenerated}
+          {/*
+            Provenance, not authorship: the contract reaches us the same way whether a run's own
+            `dashboard-report` block wrote it (deterministic, no AI call) or an AI step printed the
+            marker. The response carries no source field — adding one would widen a deliberately
+            closed contract — so the label says only what is certain, and stays neutral: the `ai`
+            token would claim an AI was involved.
+          */}
+          <p className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wide text-secondary">
+            <ClipboardList className="h-3 w-3 shrink-0" />
+            {texts.reportedByRun}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-ai-subtle px-2 py-0.5 text-[10px] font-medium text-ai">
+        <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-[10px] font-medium text-secondary">
           {result.status}
         </span>
       </div>

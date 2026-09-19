@@ -284,7 +284,7 @@ export const en = {
       duration: 'Duration',
       gate: 'Quality gate',
       latestFailed: 'The latest run failed.',
-      aiGenerated: 'AI-generated',
+      reportedByRun: 'Reported by the run',
       noResult: 'No valid dashboard result',
       resultMissing: 'The last run did not report a dashboard result.',
       resultInvalid: 'The last run’s dashboard result did not match the contract.',

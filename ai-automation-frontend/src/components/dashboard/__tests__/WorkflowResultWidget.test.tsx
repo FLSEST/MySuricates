@@ -70,8 +70,19 @@ describe('WorkflowResultWidget', () => {
     expect(screen.getByText('1361')).toBeInTheDocument();
     expect(screen.getByText('3 Hunts ohne Route')).toBeInTheDocument();
     expect(screen.getByText('Zwei Befunde, keiner blockierend.')).toBeInTheDocument();
-    expect(screen.getByText('AI-generated')).toBeInTheDocument();
     expect(screen.getByLabelText('rising')).toBeInTheDocument();
+  });
+
+  /**
+   * The same contract arrives from an AI step's marker and from a run's own deterministic
+   * `dashboard-report` block, and the response does not say which. So the line may claim only
+   * provenance — never that an AI wrote it.
+   */
+  it('labels the result by where it came from, not by who wrote it', () => {
+    render(ENTRY);
+
+    expect(screen.getByText('Reported by the run')).toBeInTheDocument();
+    expect(screen.queryByText(/AI-generated/i)).not.toBeInTheDocument();
   });
 
   it('renders hostile-looking content as literal text, never as markup', () => {
