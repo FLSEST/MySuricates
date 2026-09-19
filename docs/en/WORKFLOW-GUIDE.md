@@ -721,7 +721,7 @@ Module: `dashboard-report` (standard on, can be switched off). When off, the blo
 
 **Precedence over the marker:** Once a `dashboard-report` block has written a result, the marker `dashboard_widget:` is not evaluated in **any** step output. The block is the explicitly configured way; without this rule, a marker line in a later AI step's output could overwrite the report. Two `dashboard-report` blocks in one workflow: the one executed last wins.
 
-**In the editor** the block shows a form instead of raw JSON editing, with an optional button "Suggestion from last run" (one AI call; Settings → Execution, requires provider `CLAUDE`). The suggestion is shown and only written to config after "Apply".
+**In the editor** the block shows a form in addition to raw JSON editing, with an optional button "Suggestion from last run" (one AI call; Settings → Execution, requires provider `CLAUDE`). The suggestion is shown and only written to config after "Apply".
 
 **When to use**: whenever a workflow needs to report a dashboard result. Use the marker only when values first arise in AI text and no variable exists for them.
 
