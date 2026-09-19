@@ -30,10 +30,14 @@ public final class DashboardReportAssistPrompt {
 
     /**
      * A {@code <quelle>} or {@code </quelle>} tag <b>inside</b> the run's own text — it can hold
-     * anything a workflow ever printed, including a copy of this very frame.
+     * anything a workflow ever printed, including a copy of this very frame. Whitespace is allowed
+     * anywhere a reader would still see the same tag, and it is Unicode whitespace: a no-break space
+     * or a line separator between the brackets reads like a delimiter to a model, and matching only
+     * ASCII here would let {@code <&#92;u00A0/quelle>} through unchanged.
      */
     private static final Pattern SECTION_DELIMITER =
-            Pattern.compile("<(/?\\s*quelle\\s*)>", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("<(\\s*/?\\s*quelle\\s*)>",
+                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private DashboardReportAssistPrompt() {
     }

@@ -12,7 +12,7 @@
 
 automation:
   modules:
-    # core = no optional module (research = + research modules, full = all)
+    # core = standard modules only (research = + research modules, full = all)
     preset: core
     # Modules cannot be switched in the settings — only here, followed by a restart.
     ui-editable: false

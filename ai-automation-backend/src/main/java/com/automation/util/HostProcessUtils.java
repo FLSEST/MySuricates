@@ -68,9 +68,13 @@ public class HostProcessUtils {
     }
 
     /**
-     * Whether {@code command} resolves to an executable file on this JVM's {@code PATH} — the same
-     * lookup {@link ProcessBuilder} does for a bare command name (it searches the parent's PATH, not
-     * the child environment's), so {@code false} means the process could not be started at all.
+     * Whether {@code command} resolves to an executable file on this JVM's {@code PATH} — the lookup
+     * {@link ProcessBuilder} does for a bare command name (it searches the parent's PATH, not the
+     * child environment's), so {@code false} means the process could not be started at all.
+     *
+     * <p>One difference, and it only ever errs towards "not installed": a relative or empty PATH
+     * entry is resolved against this JVM's working directory, while the real start resolves it
+     * against the child's. Absolute entries — everything a normal PATH holds — are unaffected.</p>
      *
      * <p>No process is started, no file is read: a handful of {@code stat} calls. Nothing is cached
      * here either — a caller on a request path caches the answer itself (the model catalog does, per
