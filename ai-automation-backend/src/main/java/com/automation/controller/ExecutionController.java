@@ -7,6 +7,7 @@ import com.automation.service.todo.PendingTodoApprovalService;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
 import com.automation.service.workflow.RunDeletionService;
@@ -32,7 +33,7 @@ public class ExecutionController {
     private final RunLiveLogService runLiveLogService;
 
     @GetMapping
-    public PageResponse<WorkflowRunResponse> listExecutions(
+    public PageResponse<WorkflowRunListItemResponse> listExecutions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String status,

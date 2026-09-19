@@ -702,7 +702,11 @@ List all executions (paginated, filterable).
 | `projectId` | String | Filter by project |
 | `search` | String | Full-text search |
 
-**Response:** `PageResponse<WorkflowRunResponse>`
+**Response:** `PageResponse<WorkflowRunListItemResponse>` — **without steps.** Instead of the
+steps, a list row carries `stepCount`, `lastStepStatus` and `lastStepPreview` (the last step's
+output, truncated to 500 characters). Why: the list used to carry every `step_results.output`
+(TEXT) — 3,061,816 bytes measured for 60 runs, 51,716 afterwards. If you need the steps, fetch the
+run individually via `GET /api/v1/executions/{id}`; the detail route still returns everything.
 
 ### `GET /api/v1/executions/{id}`
 

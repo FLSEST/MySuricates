@@ -1,6 +1,7 @@
 package com.automation.mapper;
 
 import com.automation.dto.response.WorkflowResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.dto.response.StepResultResponse;
 import com.automation.entity.StepResult;
@@ -122,16 +123,71 @@ public abstract class WorkflowMapper {
      * Schnappschuss des Runs, dann der Workflow, sonst "(deleted)".
      */
     public List<WorkflowRunResponse> toRunResponseListWithOwners(List<WorkflowRun> runs) {
+        return toRunResponseList(runs, ownersFor(runs));
+    }
+
+    /** Workflow- und Projektnamen aller Runs aus EINER Query (TODO 9db34f3b). */
+    private Map<String, RunOwner> ownersFor(List<WorkflowRun> runs) {
         Set<String> workflowIds = runs.stream()
                 .map(this::safeWorkflowId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<String, RunOwner> owners = workflowIds.isEmpty()
+        return workflowIds.isEmpty()
                 ? Map.of()
                 : workflowRepository.findRunOwnerData(workflowIds).stream().collect(Collectors.toMap(
                         row -> (String) row[0],
                         row -> new RunOwner((String) row[1], (String) row[2], (String) row[3])));
-        return toRunResponseList(runs, owners);
+    }
+
+    // --- Lean list variant: no steps in the response (TODO a05c9504) ---
+
+    /**
+     * Run-Liste fuer Listen-Routen: wie {@link #toRunResponseListWithOwners}, aber ohne die
+     * Schritte.
+     *
+     * <p>Die Listen-Route trug jeden {@code step_results.output} (TEXT) in die Antwort — gemessen
+     * 3 061 816 Bytes bei 60 Runs. Statt der Schritte liefert sie jetzt deren Anzahl und die
+     * gekuerzte Ausgabe des letzten; den Volltext hat die Detail-Route.
+     */
+    public List<WorkflowRunListItemResponse> toRunListItemsWithOwners(List<WorkflowRun> runs) {
+        Map<String, RunOwner> owners = ownersFor(runs);
+        return runs.stream().map(run -> toRunListItem(run, owners)).toList();
+    }
+
+    private WorkflowRunListItemResponse toRunListItem(WorkflowRun run, Map<String, RunOwner> owners) {
+        List<StepResult> steps = run.getSteps() == null ? List.of() : run.getSteps();
+        StepResult last = steps.isEmpty() ? null : steps.get(steps.size() - 1);
+        return new WorkflowRunListItemResponse(
+                run.getId(),
+                safeWorkflowId(run),
+                batchedWorkflowName(run, owners),
+                ownerOf(run, owners).projectName(),
+                ownerOf(run, owners).projectPath(),
+                run.getStatus(),
+                run.getStartedAt(),
+                run.getCompletedAt(),
+                run.getDurationMs(),
+                run.getUserRating(),
+                run.getError(),
+                run.getMetadata(),
+                run.getInputContext(),
+                run.getTriggeredByScheduleId(),
+                run.getDefinitionHash(),
+                run.getDefinitionVersionId(),
+                run.getTriggerSource(),
+                steps.size(),
+                last == null ? null : last.getStatus(),
+                preview(last == null ? null : last.getOutput()));
+    }
+
+    /** Gekuerzte Vorschau; {@code null} bleibt {@code null}, damit "kein Wert" nicht wie "leer" aussieht. */
+    private static String preview(String output) {
+        if (output == null) {
+            return null;
+        }
+        return output.length() <= WorkflowRunListItemResponse.PREVIEW_LENGTH
+                ? output
+                : output.substring(0, WorkflowRunListItemResponse.PREVIEW_LENGTH) + " […]";
     }
 
     protected RunOwner ownerOf(WorkflowRun run, Map<String, RunOwner> owners) {

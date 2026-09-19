@@ -13,7 +13,7 @@ import { useAllChainRuns } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useT, useI18nStore } from '../i18n';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
-import type { WorkflowRun, ChainRun } from '../types';
+import type { WorkflowRunListItem, ChainRun } from '../types';
 
 type ViewMode = 'workflows' | 'chains';
 
@@ -111,13 +111,13 @@ export function Runs() {
     {
       key: 'status',
       header: t.common.status,
-      render: (r: WorkflowRun) => <StatusBadge status={r.status} />,
+      render: (r: WorkflowRunListItem) => <StatusBadge status={r.status} />,
       width: '120px',
     },
     {
       key: 'workflow',
       header: t.common.workflow,
-      render: (r: WorkflowRun) => (
+      render: (r: WorkflowRunListItem) => (
         <div className="min-w-0">
           <span className="font-medium text-text block truncate">{r.workflowName}</span>
           {r.projectName && (
@@ -129,20 +129,20 @@ export function Runs() {
     {
       key: 'steps',
       header: t.workflows.execution.steps,
-      render: (r: WorkflowRun) => (
-        <span className="text-text-secondary">{r.steps?.length ?? 0}</span>
+      render: (r: WorkflowRunListItem) => (
+        <span className="text-text-secondary">{r.stepCount}</span>
       ),
       width: '80px',
     },
     {
       key: 'result',
       header: t.runs.result,
-      render: (r: WorkflowRun) => <RunResultText run={r} />,
+      render: (r: WorkflowRunListItem) => <RunResultText run={r} />,
     },
     {
       key: 'duration',
       header: t.runs.duration,
-      render: (r: WorkflowRun) => (
+      render: (r: WorkflowRunListItem) => (
         <span className="text-text-secondary font-mono text-xs">
           {formatDuration(r.durationMs)}
         </span>
@@ -152,7 +152,7 @@ export function Runs() {
     {
       key: 'date',
       header: t.runs.date,
-      render: (r: WorkflowRun) => (
+      render: (r: WorkflowRunListItem) => (
         <span className="text-text-secondary text-xs">
           {r.startedAt ? formatDateTime(r.startedAt, locale) : '-'}
         </span>
@@ -162,7 +162,7 @@ export function Runs() {
     {
       key: 'actions',
       header: '',
-      render: (r: WorkflowRun) => <DeleteRunButton run={r} t={t} />,
+      render: (r: WorkflowRunListItem) => <DeleteRunButton run={r} t={t} />,
       width: '48px',
     },
   ];
@@ -289,7 +289,7 @@ export function Runs() {
 /** Aktive Läufe lehnt das Backend mit 409 ab — der Knopf bleibt hier gleich gesperrt. */
 const AKTIVE_STATUS = ['RUNNING', 'PENDING', 'PAUSED'];
 
-function DeleteRunButton({ run, t }: { run: WorkflowRun; t: ReturnType<typeof useT> }) {
+function DeleteRunButton({ run, t }: { run: WorkflowRunListItem; t: ReturnType<typeof useT> }) {
   const deleteRun = useDeleteRun();
   const aktiv = AKTIVE_STATUS.includes(run.status);
 
@@ -311,10 +311,11 @@ function DeleteRunButton({ run, t }: { run: WorkflowRun; t: ReturnType<typeof us
   );
 }
 
-function RunResultText({ run }: { run: WorkflowRun }) {
-  const lastStep = run.steps?.[run.steps.length - 1];
-  const isError = !!run.error?.message || !!lastStep?.error;
-  const text = run.error?.message || lastStep?.error || lastStep?.output || '-';
+function RunResultText({ run }: { run: WorkflowRunListItem }) {
+  // Die Liste liefert keine Schritte mehr, sondern die gekuerzte Ausgabe des letzten
+  // (MySuricates-TODO a05c9504) — der Volltext steht in der Run-Detailansicht.
+  const isError = !!run.error?.message;
+  const text = run.error?.message || run.lastStepPreview || '-';
 
   if (text === '-') return <span className="text-text-secondary">-</span>;
 

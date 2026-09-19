@@ -9,6 +9,7 @@ import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.dto.response.ExportWorkflowResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.dto.response.WorkflowVersionResponse;
 import com.automation.entity.ChangeSource;

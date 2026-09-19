@@ -1,6 +1,7 @@
 package com.automation.service.execution;
 
 import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
@@ -49,9 +50,15 @@ public class ExecutionQueryService {
      * OSIV ist deaktiviert — Lazy-Associations (workflow, steps) dürfen nur hier geladen werden.
      */
     @Transactional(readOnly = true)
-    public PageResponse<WorkflowRunResponse> listExecutionResponses(int page, int size, String status,
-                                                                    String workflowId, String projectId, String search) {
-        return toPageResponse(listExecutions(page, size, status, workflowId, projectId, search));
+    public PageResponse<WorkflowRunListItemResponse> listExecutionResponses(int page, int size, String status,
+                                                                            String workflowId, String projectId, String search) {
+        Page<WorkflowRun> result = listExecutions(page, size, status, workflowId, projectId, search);
+        return new PageResponse<>(
+                workflowMapper.toRunListItemsWithOwners(result.getContent()),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages());
     }
 
     @Transactional(readOnly = true)
@@ -79,6 +86,14 @@ public class ExecutionQueryService {
         return runRepository.existsByWorkflowIdAndStatus(workflowId, RunStatus.FAILED);
     }
 
+    /**
+     * Antwort MIT Schritten — fuer {@code /workflows/{id}/runs}.
+     *
+     * <p>Diese Route behaelt die Schritte bewusst: {@code WishDetail.tsx} rendert daraus die
+     * vollstaendigen Schritt-Karten des aktuellen Runs. Ihr Wachstumsproblem bleibt damit bestehen
+     * und ist als eigenes Ticket erfasst (TODO 7fd9f654) — die gemessene und behobene Route ist
+     * {@code /executions} (TODO a05c9504).
+     */
     private PageResponse<WorkflowRunResponse> toPageResponse(Page<WorkflowRun> result) {
         return new PageResponse<>(
                 workflowMapper.toRunResponseListWithOwners(result.getContent()),

@@ -95,8 +95,13 @@ class RequestCostRatchetTest {
      *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: one
      *       {@code select containers} per workflow — the project's container association is
      *       resolved row by row (TODO 13d1e2a2).</li>
-     *   <li>{@code /executions}: the list response carries every step's full {@code output} TEXT,
-     *       so its size grows with step output, unbounded (TODO a05c9504).</li>
+     *   <li>{@code /executions}: fixed. The list response dropped from 3 061 816 to 51 716 bytes
+     *       when the route stopped serialising every step (TODO a05c9504) — it now answers with
+     *       {@code WorkflowRunListItemResponse}, which carries the step count and the last step's
+     *       truncated output instead of the steps themselves. What is left is run metadata and
+     *       input context; the size no longer grows with step output. The read side still fetches
+     *       the step rows (the count and the last output come from them) — a projection would
+     *       avoid that too, see TODO 7fd9f654.</li>
      *   <li>{@code /search}: also one {@code select workflow_runs} per hit — the batched run-count
      *       query of {@code 1e465a9e} covers the list endpoint but not search (TODO 13d1e2a2).</li>
      *   <li>{@code /schedules}: 33 of the 91 statements measured on 2026-09-19 remain. 60 of them
@@ -113,7 +118,7 @@ class RequestCostRatchetTest {
             "/api/v1/todos", new Cost(2, 32_000),
             "/api/v1/projects", new Cost(4, 1_200),
             "/api/v1/workflows", new Cost(32, 26_000),
-            "/api/v1/executions", new Cost(5, 3_200_000),
+            "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
             "/api/v1/search?q=Workflow", new Cost(51, 18_000),
             "/api/v1/schedules", new Cost(33, 20_000)));

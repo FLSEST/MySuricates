@@ -2,6 +2,7 @@ package com.automation.mapper;
 
 import com.automation.dto.response.StepResultResponse;
 import com.automation.dto.response.WorkflowResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.*;
 import org.junit.jupiter.api.Nested;
@@ -207,4 +208,77 @@ class WorkflowMapperTest extends WorkflowMapper {
             assertThat(batchedWorkflowName(run, Map.of())).isEqualTo("(deleted)");
         }
     }
+
+    /**
+     * Die schlanke Listen-Antwort (TODO a05c9504).
+     *
+     * <p>Die Listen-Route trug jeden Step-Output mit: 3 061 816 Bytes bei 60 Runs, nach der
+     * Umstellung 51 716. Statt der Schritte kommen ihre Anzahl und die gekuerzte Ausgabe des
+     * letzten. Die Runs hier haben bewusst keinen Workflow — dann braucht {@code ownersFor} keine
+     * Repository-Abfrage, und dieser Test bleibt ein Unit-Test.
+     */
+    @Nested
+    class SchlankeListenAntwort {
+
+        private WorkflowRun runWithSteps(String... outputs) {
+            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
+            for (int i = 0; i < outputs.length; i++) {
+                run.getSteps().add(StepResult.builder()
+                        .stepIndex(i)
+                        .status(i == outputs.length - 1 ? StepStatus.FAILED : StepStatus.COMPLETED)
+                        .output(outputs[i])
+                        .build());
+            }
+            return run;
+        }
+
+        @Test
+        void traegtAnzahlUndDenLetztenSchritt_nichtDieSchritteSelbst() {
+            var items = toRunListItemsWithOwners(List.of(runWithSteps("erster", "zweiter", "dritter")));
+
+            assertThat(items).singleElement().satisfies(item -> {
+                assertThat(item.stepCount()).isEqualTo(3);
+                assertThat(item.lastStepStatus()).isEqualTo(StepStatus.FAILED);
+                assertThat(item.lastStepPreview()).isEqualTo("dritter");
+            });
+        }
+
+        @Test
+        void langeAusgabeWirdGekuerzt_damitDieListeNichtWiederWaechst() {
+            String huge = "x".repeat(20_000);
+
+            var item = toRunListItemsWithOwners(List.of(runWithSteps(huge))).get(0);
+
+            assertThat(item.lastStepPreview())
+                    .hasSize(WorkflowRunListItemResponse.PREVIEW_LENGTH + " […]".length())
+                    .endsWith(" […]");
+        }
+
+        @Test
+        void kurzeAusgabeBleibtVollstaendig_ohneKuerzungsmarke() {
+            var item = toRunListItemsWithOwners(List.of(runWithSteps("kurz"))).get(0);
+
+            assertThat(item.lastStepPreview()).isEqualTo("kurz");
+        }
+
+        /** Kein Wert bleibt null — sonst sieht "nichts ausgegeben" wie "leer ausgegeben" aus. */
+        @Test
+        void ausgabeNull_bleibtNull() {
+            var item = toRunListItemsWithOwners(List.of(runWithSteps((String) null))).get(0);
+
+            assertThat(item.lastStepPreview()).isNull();
+            assertThat(item.stepCount()).isEqualTo(1);
+        }
+
+        @Test
+        void runOhneSchritte_zaehltNullUndLaesstDenLetztenLeer() {
+            var item = toRunListItemsWithOwners(List.of(
+                    WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build())).get(0);
+
+            assertThat(item.stepCount()).isZero();
+            assertThat(item.lastStepStatus()).isNull();
+            assertThat(item.lastStepPreview()).isNull();
+        }
+    }
+
 }

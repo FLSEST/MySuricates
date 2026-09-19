@@ -341,6 +341,21 @@ export interface WorkflowRun {
   triggerSource?: TriggerSource | null;
 }
 
+/**
+ * Eine Run-Zeile aus einer Listen-Route (`/executions`, `/workflows/{id}/runs`) — ohne die Schritte.
+ *
+ * Die Liste trug vorher jeden Step-Output mit: 3 MB Antwort bei 60 Runs, gemessen vom
+ * RequestCostRatchetTest (MySuricates-TODO a05c9504). Statt der Schritte kommen jetzt ihre Anzahl
+ * und die gekürzte Ausgabe des letzten. Wer den Volltext braucht, lädt den Run einzeln —
+ * `/executions/{id}` liefert weiter alles.
+ */
+export interface WorkflowRunListItem extends Omit<WorkflowRun, 'steps'> {
+  stepCount: number;
+  lastStepStatus: StepStatus | null;
+  /** Auf 500 Zeichen gekürzt; der Volltext steht in der Detail-Route. */
+  lastStepPreview: string | null;
+}
+
 export type TriggerSource =
   | 'MANUAL' | 'RETRY' | 'RESUME' | 'TODO_RESOLUTION' | 'ASSISTANT'
   | 'SCHEDULE' | 'WEBHOOK' | 'TODO_TRIGGER' | 'COMPLETION_TRIGGER' | 'AUTO_REPAIR' | 'WISH'

@@ -1,7 +1,7 @@
-import type { WorkflowRun, RunStatus } from '../types';
+import type { RunStatus, WorkflowRunListItem } from '../types';
 
 /** Most-recent (by startedAt) run status per workflowId. Pure function. */
-export function latestRunStatusMap(runs: WorkflowRun[]): Map<string, RunStatus> {
+export function latestRunStatusMap(runs: WorkflowRunListItem[]): Map<string, RunStatus> {
   const latest = new Map<string, { status: RunStatus; startedAt: string }>();
   for (const r of runs) {
     const prev = latest.get(r.workflowId);

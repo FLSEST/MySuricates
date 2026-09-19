@@ -9,7 +9,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../components/simple/kit';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime, formatDuration } from '../utils/formatTime';
-import type { WorkflowRun } from '../types';
+import type { WorkflowRunListItem } from '../types';
 
 export function SimpleRuns() {
   const t = useT();
@@ -44,7 +44,7 @@ export function SimpleRuns() {
         <EmptyState title={t.simple.runs.empty} description={t.simple.runs.emptyHint} />
       ) : (
         <div className="space-y-2">
-          {ordered.map((run: WorkflowRun) => {
+          {ordered.map((run: WorkflowRunListItem) => {
             const isFailed = run.status === 'FAILED';
             return (
               <SimpleRow key={run.id} color={AREA_COLORS.results}>

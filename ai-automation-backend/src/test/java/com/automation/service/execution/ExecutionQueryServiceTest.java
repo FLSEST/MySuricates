@@ -1,6 +1,7 @@
 package com.automation.service.execution;
 
 import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
@@ -48,6 +49,17 @@ class ExecutionQueryServiceTest {
         return new WorkflowRunResponse(
                 id, "wf-1", "Test", null, null, RunStatus.COMPLETED, List.of(),
                 null, null, null, null, null, Map.of(), Map.of(), null);
+    }
+
+    /**
+     * Listen-Routen antworten seit TODO a05c9504 ohne Schritte — stattdessen Anzahl und die
+     * gekuerzte Ausgabe des letzten Schritts.
+     */
+    private static WorkflowRunListItemResponse sampleListItem(String id) {
+        return new WorkflowRunListItemResponse(
+                id, "wf-1", "Test", null, null, RunStatus.COMPLETED,
+                null, null, null, null, null, Map.of(), Map.of(), null, null, null, null,
+                0, null, null);
     }
 
     // --- listExecutions: no filters ---
@@ -227,9 +239,9 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(0, 10), 1);
         when(runRepository.findFiltered(isNull(), isNull(), isNull(), isNull(), any(Pageable.class))).thenReturn(page);
-        when(workflowMapper.toRunResponseListWithOwners(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+        when(workflowMapper.toRunListItemsWithOwners(List.of(run))).thenReturn(List.of(sampleListItem("run-1")));
 
-        PageResponse<WorkflowRunResponse> result = service.listExecutionResponses(0, 10, null, null, null, null);
+        PageResponse<WorkflowRunListItemResponse> result = service.listExecutionResponses(0, 10, null, null, null, null);
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.content().get(0).id()).isEqualTo("run-1");
@@ -269,6 +281,8 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(1, 20), 21);
         when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20))).thenReturn(page);
+        // /workflows/{id}/runs behaelt die Schritte (WishDetail.tsx rendert sie) — schlank ist nur
+        // /executions, die gemessene Route (TODO a05c9504).
         when(workflowMapper.toRunResponseListWithOwners(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
 
         PageResponse<WorkflowRunResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);

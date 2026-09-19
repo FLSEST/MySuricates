@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.PageResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
 import com.automation.exception.GlobalExceptionHandler;
@@ -69,7 +70,11 @@ class ExecutionControllerTest {
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
-    private static PageResponse<WorkflowRunResponse> emptyPage(int page, int size) {
+    /**
+     * Listen-Routen antworten seit TODO a05c9504 mit {@link WorkflowRunListItemResponse} — ohne
+     * Schritte. Die Detail-Route liefert weiter {@link WorkflowRunResponse} mit allem.
+     */
+    private static PageResponse<WorkflowRunListItemResponse> emptyPage(int page, int size) {
         return new PageResponse<>(List.of(), page, size, 0L, 0);
     }
 

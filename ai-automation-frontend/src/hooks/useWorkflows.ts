@@ -3,7 +3,7 @@ import { api, apiErrorMessage, fetchWorkflowBpmn, importWorkflowBpmn } from '../
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { downloadJSON } from '../utils/downloadFile';
-import type { Workflow, WorkflowRun, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
+import type { Workflow, WorkflowRun, WorkflowRunListItem, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
 import { TERMINAL_RUN_STATUSES } from '../types';
 import { useModuleEnabled } from './useModules';
 
@@ -122,7 +122,7 @@ export function useAllRuns(params?: { status?: string; workflowId?: string; proj
       if (params?.workflowId) searchParams.set('workflowId', params.workflowId);
       if (params?.projectId) searchParams.set('projectId', params.projectId);
       if (params?.search) searchParams.set('search', params.search);
-      return api.get<PageResponse<WorkflowRun>>(`/executions?${searchParams.toString()}`);
+      return api.get<PageResponse<WorkflowRunListItem>>(`/executions?${searchParams.toString()}`);
     },
     refetchInterval: (query) => {
       const data = query.state.data;

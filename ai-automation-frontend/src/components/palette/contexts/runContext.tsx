@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useAllRuns, useRetryExecution } from '../../../hooks/useWorkflows';
 import { useT } from '../../../i18n';
 import { runStatusBadge } from '../../../utils/statusBadge';
-import type { WorkflowRun } from '../../../types';
+import type { WorkflowRun, WorkflowRunListItem } from '../../../types';
 import { parsePaletteQuery } from '../queryParser';
 import type { PaletteContextHandle, PaletteItem } from './types';
 
-function toItem(run: WorkflowRun): PaletteItem {
+function toItem(run: WorkflowRunListItem): PaletteItem {
   return {
     id: run.id,
     title: run.workflowName,
