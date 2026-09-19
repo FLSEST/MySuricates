@@ -75,4 +75,58 @@ class AuditResultParserTest {
         assertThat(result.valid()).isFalse();
         assertThat(result.markdown()).isEqualTo("# Normal workflow output");
     }
+
+    private static String envelope(String extraField, int findingCount) {
+        StringBuilder findings = new StringBuilder();
+        for (int i = 0; i < findingCount; i++) {
+            if (i > 0) findings.append(",");
+            findings.append("{\"ruleKey\":\"size.class\",\"subject\":\"C").append(i)
+                    .append(".java\",\"severity\":\"LOW\",\"title\":\"t").append(i).append("\"}");
+        }
+        return "<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true" + extraField
+                + ",\"findings\":[" + findings + "]}\n-->";
+    }
+
+    /** Ein gekuerzter Snapshot loeste zuvor alle nicht gelieferten Findings auf (TODO e39379a9). */
+    @Test
+    void rejectsEnvelopeThatDeliversFewerFindingsThanPromised() {
+        var result = parser.parse(envelope(",\"expectedFindings\":5", 2));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.error()).contains("expectedFindings says 5").contains("carries 2");
+        assertThat(result.findings()).isEmpty();
+    }
+
+    @Test
+    void acceptsEnvelopeWhosePromiseMatches() {
+        var result = parser.parse(envelope(",\"expectedFindings\":2", 2));
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.findings()).hasSize(2);
+    }
+
+    @Test
+    void rejectsNonNumericPromise() {
+        var result = parser.parse(envelope(",\"expectedFindings\":\"viele\"", 2));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.error()).contains("expectedFindings must be a number");
+    }
+
+    /** Rueckwaertskompatibel: ohne das Feld bleibt alles wie bisher. */
+    @Test
+    void envelopeWithoutPromiseStaysValid() {
+        var result = parser.parse(envelope("", 2));
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.findings()).hasSize(2);
+    }
+
+    @Test
+    void leererSnapshotMitNullVersprechenIstGueltig() {
+        var result = parser.parse(envelope(",\"expectedFindings\":0", 0));
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.findings()).isEmpty();
+    }
 }

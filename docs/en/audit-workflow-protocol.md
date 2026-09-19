@@ -53,6 +53,19 @@ JSON envelope:
 Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
+### Optional: `expectedFindings`
+
+An audit whose measurement block knows the target count (such as `ERWARTETE FINDINGS` in the test
+coverage audit) may write it into the envelope as `"expectedFindings": <N>` next to
+`snapshotComplete`. If it does not match the number of findings delivered, the **entire report is
+discarded**: it is recorded as INVALID, no findings are created, and — crucially — none are marked
+RESOLVED.
+
+That is the point: a truncated envelope with `snapshotComplete: true` used to resolve every finding
+it left out — exactly the failure the snapshot mode is meant to prevent. The workflow's gate block
+does report it as RED, but ingestion carried on regardless; a report without a consequence is not a
+safeguard. If the field is absent, behaviour is unchanged (TODO `e39379a9`).
+
 ### ruleKey catalogue
 
 When a prompt fixes the `ruleKey`s its model must use, they are listed in
@@ -61,6 +74,23 @@ then normalizes spelling drift (lower case, `_` → `-`, plural before `-count`:
 `god-classes-count` → `god-class-count`). A key that still does not match is ingested anyway — with
 a warning in the activity log, once per run and key. An `auditKey` without a catalogue entry is not
 checked; its prompt assigns keys freely.
+
+### Evidence check: `evidence` must name a measurement of this run
+
+The prompt requires a supporting line for every finding — for a long time nobody verified it, and a
+finding with an invented or recycled reference became a todo unchanged (TODO `a94b56a0`). Since V77
+`EvidenceVerification` holds every `evidence` against the run's fact sheet at ingestion time: it
+collects the names of all `FAKT <name>:` and `TREFFER <name>:` lines, and anything naming none of
+them is marked `unverifiedEvidence`.
+
+Such a finding is **stored and stays visible** — nothing is discarded, so a false alarm of the check
+cannot swallow a real result. But it no longer creates a managed todo, not even at `severity: HIGH`,
+and a line in the activity log names it. Like `unknownRuleKey` the mark is set afresh on every
+ingestion, in both directions.
+
+The limit: what is checked is the **origin** of the reference, not whether it carries the
+conclusion. Quoting a real FAKT line and inferring something about an entirely different place still
+passes. A run without a fact sheet is not checked — no fact sheet is no suspicion.
 
 ## Fact Sheet Pattern: the shell measures, the AI interprets
 

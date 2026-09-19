@@ -51,6 +51,20 @@ JSON-Envelope:
 Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
+### Optional: `expectedFindings`
+
+Ein Audit, dessen Messblock die Soll-Zahl kennt (etwa `ERWARTETE FINDINGS` in der
+Test-Abdeckung), kann sie als `"expectedFindings": <N>` neben `snapshotComplete` in den Envelope
+schreiben. Stimmt sie nicht mit der Zahl der gelieferten Findings überein, wird der **ganze
+Report verworfen**: Er wird als INVALID historisiert, es entstehen keine Findings, und vor allem
+wird keines auf RESOLVED gesetzt.
+
+Das ist der Punkt: Ein gekürzter Envelope mit `snapshotComplete: true` hat zuvor alle nicht
+gelieferten Findings aufgelöst — genau das Fehlerbild, das der Snapshot-Modus verhindern soll.
+Der Gate-Block im Workflow meldet das zwar als RED, aber die Ingestion lief davon unbeeindruckt
+weiter; eine Meldung ohne Konsequenz ist keine Absicherung. Fehlt das Feld, bleibt das Verhalten
+unverändert (TODO `e39379a9`).
+
 ### ruleKey-Katalog
 
 Gibt ein Prompt seinem Modell feste `ruleKey`s vor, stehen sie in

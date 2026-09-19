@@ -81,6 +81,13 @@ public class AuditIngestionService {
 
         if (!valid) {
             log.warn("Stored invalid audit report for run {}: {}", event.getRunId(), error);
+            // Sichtbar machen, nicht nur ins Log: Ein ungueltiger Report laesst den kompletten
+            // Snapshot aus — kein Finding wird angelegt, keines auf RESOLVED gesetzt. Wer den
+            // Audit erwartet hat, soll sehen, warum nichts passiert ist (TODO e39379a9).
+            activityLog.warn(ActivityLog.LogCategory.EXECUTION,
+                    "Audit-Report verworfen (" + config.key() + "): " + firstNonBlank(error, "ungueltiger Snapshot")
+                            + " — keine Findings uebernommen, keine aufgeloest",
+                    "AuditIngestionService", event.getRunId(), event.getWorkflowId());
             return;
         }
 
@@ -282,16 +289,4 @@ public class AuditIngestionService {
         return Arrays.stream(values).filter(v -> v != null && !v.isBlank()).findFirst().orElse(null);
     }
 
-    record AuditConfig(String key, String category, String reportBlock, int schemaVersion) {
-        static AuditConfig from(Map<String, Object> metadata) {
-            Object value = metadata.get("audit");
-            if (!(value instanceof Map<?, ?> map) || !Boolean.TRUE.equals(map.get("enabled"))) return null;
-            String key = asString(map.get("key"));
-            String category = asString(map.get("category"));
-            String reportBlock = asString(map.get("reportBlock"));
-            int version = map.get("schemaVersion") instanceof Number n ? n.intValue() : 1;
-            if (key == null || category == null || reportBlock == null || version != 1) return null;
-            return new AuditConfig(key, category, reportBlock, version);
-        }
-    }
 }

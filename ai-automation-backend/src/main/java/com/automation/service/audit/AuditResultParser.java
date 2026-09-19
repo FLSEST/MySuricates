@@ -60,6 +60,21 @@ public class AuditResultParser {
                 findings.add(new ParsedFinding(ruleKey, subject, severity, title,
                         optionalText(node, "description"), optionalText(node, "evidence"), List.copyOf(tags)));
             }
+            // Optionales Vollstaendigkeits-Versprechen (TODO e39379a9): Nennt der Envelope eine
+            // erwartete Zahl, muss sie stimmen. Der Gate-Block prueft das im Workflow und meldet
+            // RED — die Ingestion lief davon unbeeindruckt weiter und hat bei einem gekuerzten
+            // Snapshot alle nicht gelieferten Findings auf RESOLVED gesetzt: genau das Fehlerbild,
+            // das der Snapshot-Modus verhindern soll. Fehlt das Feld, bleibt alles wie bisher.
+            JsonNode expected = root.get("expectedFindings");
+            if (expected != null && !expected.isNull()) {
+                if (!expected.isInt() && !expected.canConvertToInt()) {
+                    return ParseResult.invalid(markdown, "expectedFindings must be a number");
+                }
+                if (expected.asInt() != findings.size()) {
+                    return ParseResult.invalid(markdown, "expectedFindings says " + expected.asInt()
+                            + ", envelope carries " + findings.size());
+                }
+            }
             return new ParseResult(true, null, markdown, List.copyOf(findings));
         } catch (Exception ex) {
             return ParseResult.invalid(markdown, ex.getMessage());
