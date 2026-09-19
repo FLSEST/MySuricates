@@ -1,5 +1,7 @@
 import { Sparkles, Loader2 } from 'lucide-react';
-import { useT } from '../../i18n';
+import { useT, useI18nStore } from '../../i18n';
+import { apiErrorMessage } from '../../api/client';
+import { formatDateTime } from '../../utils/formatTime';
 import {
   useDashboardReportAssist, useDashboardReportAssistAvailable,
 } from '../../hooks/useDashboardReportAssist';
@@ -20,6 +22,7 @@ interface DashboardReportAssistProps {
  */
 export function DashboardReportAssist({ workflowId, onApply }: DashboardReportAssistProps) {
   const t = useT().workflows.dashboardReport.assist;
+  const locale = useI18nStore((s) => s.locale);
   const available = useDashboardReportAssistAvailable();
   const assist = useDashboardReportAssist();
 
@@ -47,19 +50,36 @@ export function DashboardReportAssist({ workflowId, onApply }: DashboardReportAs
       </div>
       <p className="text-xs text-text-tertiary">{t.hint}</p>
 
-      {proposal && (
+      {assist.isError && (
+        <p data-testid="dashboard-report-assist-error" className="text-xs text-danger break-words">
+          {apiErrorMessage(assist.error, t.failed)}
+        </p>
+      )}
+
+      {proposal && assist.data && (
         <div
           data-testid="dashboard-report-assist-proposal"
           className="space-y-1 rounded-md border border-card-border bg-surface p-2 text-xs text-text-secondary"
         >
-          <p className="font-medium text-text">{proposal.status}{proposal.title ? ` · ${proposal.title}` : ''}</p>
+          <p className="font-medium text-text break-words">{proposal.status}{proposal.title ? ` · ${proposal.title}` : ''}</p>
+          <p
+            data-testid="dashboard-report-assist-source"
+            className="text-[11px] text-text-tertiary break-words"
+          >
+            {t.source
+              .replace('{provider}', assist.data.provider || '-')
+              .replace('{runId}', assist.data.runId)
+              .replace('{completedAt}', assist.data.runCompletedAt
+                ? formatDateTime(assist.data.runCompletedAt, locale)
+                : '-')}
+          </p>
           {proposal.kpis.map((kpi, index) => (
-            <p key={`kpi-${index}`}>{kpi.label}: {kpi.value}{kpi.trend ? ` (${kpi.trend})` : ''}</p>
+            <p key={`kpi-${index}`} className="break-words">{kpi.label}: {kpi.value}{kpi.trend ? ` (${kpi.trend})` : ''}</p>
           ))}
           {proposal.items.map((item, index) => (
-            <p key={`item-${index}`}>• {item}</p>
+            <p key={`item-${index}`} className="break-words">• {item}</p>
           ))}
-          {proposal.summary && <p>{proposal.summary}</p>}
+          {proposal.summary && <p className="break-words">{proposal.summary}</p>}
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"

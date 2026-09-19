@@ -7,7 +7,9 @@ import { describe, it, expect } from 'vitest';
  * is that guard for the editor's report files, which live outside the dashboard folder.
  */
 const SOURCES = import.meta.glob<string>(
-  ['../dashboardReport.ts', '../DashboardReport*.tsx', '../../../hooks/useDashboardReportAssist.ts'],
+  // Recursive (`**`) so a future report file placed in a subfolder is still caught silently —
+  // a flat `../DashboardReport*.tsx` would stop covering it without failing anything.
+  ['../dashboardReport.ts', '../**/DashboardReport*.tsx', '../../../hooks/useDashboardReportAssist.ts'],
   { query: '?raw', import: 'default', eager: true },
 );
 

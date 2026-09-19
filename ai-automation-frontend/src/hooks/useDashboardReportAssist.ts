@@ -5,6 +5,7 @@ import { useAiProviders, useExecutionConfig } from './useSystem';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { parseWorkflowResult, type WorkflowResult } from '../components/dashboard/workflowWidgetContract';
+import type { ApiError } from '../types';
 
 /**
  * The editor's AI proposal for a dashboard-report block. The backend already validated the contract
@@ -46,7 +47,13 @@ export function useDashboardReportAssist() {
       const raw = await api.post<RawProposal>('/dashboard/report-assist', { workflowId });
       const proposal = parseWorkflowResult(raw.proposal);
       if (!proposal || typeof raw.runId !== 'string') {
-        throw new Error(t.workflows.dashboardReport.assist.invalid);
+        // Shaped like a real API error (not a bare Error), so apiErrorMessage's `'error' in err`
+        // check picks up the specific text below — a plain `new Error(...)` has no `.error` field
+        // and apiErrorMessage would silently fall back to the generic "failed" message instead.
+        throw {
+          error: t.workflows.dashboardReport.assist.invalid,
+          timestamp: new Date().toISOString(),
+        } satisfies ApiError;
       }
       return {
         runId: raw.runId,

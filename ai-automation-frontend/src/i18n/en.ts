@@ -550,6 +550,7 @@ export const en = {
         heading: 'AI proposal',
         run: 'Propose from the last run',
         hint: 'One AI call reads the last run\'s output and proposes values. Nothing is applied until you confirm it. Proposals hold fixed values — use placeholders for KPIs that should keep updating.',
+        source: 'Source: {provider} · run {runId} · {completedAt}',
         apply: 'Apply',
         discard: 'Discard',
         invalid: 'The proposal did not match the contract and was discarded.',

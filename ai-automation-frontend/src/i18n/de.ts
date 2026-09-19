@@ -552,6 +552,7 @@ export const de: TranslationKeys = {
         heading: 'KI-Vorschlag',
         run: 'Vorschlag aus dem letzten Run',
         hint: 'Ein KI-Aufruf liest die Ausgabe des letzten Runs und schlägt Werte vor. Nichts wird übernommen, bevor du es bestätigst. Vorschläge enthalten feste Werte — für dauerhafte Kennzahlen Platzhalter eintragen.',
+        source: 'Quelle: {provider} · Run {runId} · {completedAt}',
         apply: 'Übernehmen',
         discard: 'Verwerfen',
         invalid: 'Der Vorschlag passte nicht zum Vertrag und wurde verworfen.',
