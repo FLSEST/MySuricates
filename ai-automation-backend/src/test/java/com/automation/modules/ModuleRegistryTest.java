@@ -9,6 +9,7 @@ import com.automation.exception.ErrorCode;
 import com.automation.exception.ModuleChangeException;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,8 +26,9 @@ class ModuleRegistryTest {
                 .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.PROVENANCE);
     }
 
+    /** "Only" as in: of the tiers the preset adds — the STANDARD tier is on here as in every preset. */
     @Test
-    void researchPresetEnablesResearchTierOnly() {
+    void researchPresetAddsTheResearchTierButNoAdvancedModule() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("preset", "research"), Map.of());
 
         assertThat(registry.isEnabled(ModuleCatalog.CHAINS)).isTrue();
@@ -268,6 +270,26 @@ class ModuleRegistryTest {
                 }
             }
         }
+    }
+
+    /**
+     * The invariant the STANDARD tier owes the public {@code core} preset: it is on everywhere, so a
+     * module of this tier must be as harmless as the core itself. Written as a rule over the whole
+     * catalog, not as an assertion about today's only member — the danger is a <em>future</em>
+     * module that quietly ships network, credential or host access to every instance, including the
+     * ones that deliberately chose the smallest surface. Such a module belongs in ADVANCED.
+     */
+    @Test
+    void everyStandardTierModuleCarriesNoRisk() {
+        List<ModuleCatalog> standard = Arrays.stream(ModuleCatalog.values())
+                .filter(module -> module.tier() == ModuleTier.STANDARD)
+                .toList();
+
+        assertThat(standard).as("no STANDARD module left — then this rule guards nothing").isNotEmpty();
+        assertThat(standard).allSatisfy(module -> assertThat(module.risks())
+                .as("module '%s' has tier STANDARD, so it runs in the public core preset; a module "
+                        + "with NETWORK, CREDENTIALS or HOST_ACCESS risk must be ADVANCED instead", module.key())
+                .isEmpty());
     }
 
     @Test

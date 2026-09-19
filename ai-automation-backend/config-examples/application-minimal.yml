@@ -7,8 +7,8 @@
 # Core (always on): workflows, runs, projects, TODOs with TodoTrigger, schedules, activity log/DLQ,
 # gates, workflow pool, templates, docs, settings.
 #
-# Difference to the public default: only provenance (definition hash on every run) is off here;
-# the default has it on.
+# Difference to the public default: the two things the default leaves on are off here — the standard
+# module dashboard-report and provenance (definition hash on every run). The preset is the same one.
 
 automation:
   modules:

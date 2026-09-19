@@ -57,13 +57,17 @@ module_text_desc() {
 
 # Lists the feature modules a preset adds over the previous one, one "  Name — description" per
 # line. $1 = preset, $2 = language. Display only — the catalog itself stays the backend's job.
+# One tier per preset, so every feature module is named exactly once: the standard tier is already
+# on under core (that is what the tier means), research adds the research tier, full the advanced
+# one — listing standard under full would credit it to the wrong preset.
 module_preset_modules() {
   local preset="${1:-}" lang="${2:-en}" key tier
   for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
     tier="${MODULE_CATALOG_TIER[$key]:-}"
     case "$preset" in
+      core)     if [ "$tier" != "standard" ]; then continue; fi ;;
       research) if [ "$tier" != "research" ]; then continue; fi ;;
-      full)     if [ "$tier" = "research" ]; then continue; fi ;;
+      full)     if [ "$tier" != "advanced" ]; then continue; fi ;;
       *)        continue ;;
     esac
     printf '         %s — %s\n' "$(module_text_name "$key" "$lang")" "$(module_text_desc "$key" "$lang")"
@@ -252,13 +256,13 @@ module_preset_update() {
 module_preset_msg() {
   case "${1:-en}:${2:-}" in
     de:question) printf '%s' "Welche Module soll diese Instanz beim Start aktivieren?" ;;
-    de:core)     printf '%s' "nur der Plattform-Kern — kleinste Oberfläche und Angriffsfläche" ;;
+    de:core)     printf '%s' "kleinste Oberfläche und Angriffsfläche — Kern plus die Standardmodule:" ;;
     de:research) printf '%s' "Kern plus die Forschungsmodule:" ;;
     de:full)     printf '%s' "research plus die erweiterten Module:" ;;
     de:later)    printf '%s' "Später änderbar: ai-automation-backend/config/application.yml bearbeiten, Backend neu starten." ;;
     de:choice)   printf '%s' "Auswahl [1-3, Enter = %s]: " ;;
     *:question)  printf '%s' "Which modules should this instance enable at startup?" ;;
-    *:core)      printf '%s' "the platform core only — smallest surface and attack surface" ;;
+    *:core)      printf '%s' "smallest surface and attack surface — the core plus the standard modules:" ;;
     *:research)  printf '%s' "core plus the research modules:" ;;
     *:full)      printf '%s' "research plus the advanced modules:" ;;
     *:later)     printf '%s' "Change it later: edit ai-automation-backend/config/application.yml and restart the backend." ;;
@@ -274,6 +278,7 @@ module_preset_prompt() {
   {
     echo "  $(module_preset_msg "$lang" question)"
     echo "    1) core      $(module_preset_msg "$lang" core)"
+    module_preset_modules core "$lang"
     echo "    2) research  $(module_preset_msg "$lang" research)"
     module_preset_modules research "$lang"
     echo "    3) full      $(module_preset_msg "$lang" full)"
