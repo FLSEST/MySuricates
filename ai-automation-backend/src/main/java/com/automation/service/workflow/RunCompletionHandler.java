@@ -2,6 +2,7 @@ package com.automation.service.workflow;
 
 import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
@@ -10,6 +11,7 @@ import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
 import com.automation.service.dlq.DeadLetterService;
+import com.automation.service.todo.GateExpectation;
 import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.todo.TodoOutputParser;
 import lombok.RequiredArgsConstructor;
@@ -34,12 +36,18 @@ import java.util.Map;
 @Slf4j
 public class RunCompletionHandler {
 
+    /** Kategorie und Text für ein bestelltes, aber ausgebliebenes Gate-Urteil (TODO 63ecc124). */
+    public static final String GATE_MISSING_CATEGORY = "gate-missing";
+    static final String GATE_MISSING_DESCRIPTION =
+            "Die Definition bestellt ein Gate-Urteil, der Lauf hat keines geliefert";
+
     private final TemplateVerificationService templateVerificationService;
     private final ActivityLogService activityLogService;
     private final DeadLetterService deadLetterService;
 
     public void complete(WorkflowRun run, ExecutionContext context, String workflowId,
-                         String workflowName, String templateId, String projectId) {
+                         String workflowName, String templateId, String projectId,
+                         List<BlockDefinition> blocks) {
         // Parse gate_status markers from ALL blocks — highest severity wins.
         // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
         GateStatus highestGate = null;
@@ -135,7 +143,24 @@ public class RunCompletionHandler {
             run.setStatus(failedChecks ? RunStatus.COMPLETED_WITH_ERRORS : RunStatus.COMPLETED);
         }
 
-        if (run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS) {
+        boolean runSucceeded = run.getStatus() == RunStatus.COMPLETED
+                || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS;
+
+        // Bestelltes, aber ausgebliebenes Urteil ist kein Erfolg (TODO 63ecc124): ein Prüf-Workflow,
+        // dessen KI-Schritt still fehlschlägt, läuft technisch durch und wäre sonst von einem
+        // Workflow ohne Gate nicht zu unterscheiden. Nur bei erfolgreichem Lauf — ein FAILED trägt
+        // über den Laufstatus bereits sein eigenes Urteil.
+        if (highestGate == null && runSucceeded && GateExpectation.isExpected(blocks)) {
+            highestGate = GateStatus.YELLOW;
+            gateCategory = GATE_MISSING_CATEGORY;
+            gateDescription = GATE_MISSING_DESCRIPTION;
+            context.setRunMetadata("gate_status", highestGate.name());
+            context.setRunMetadata("gate_category", gateCategory);
+            context.setRunMetadata("gate_description", gateDescription);
+            log.warn("Workflow {} orders a gate verdict but delivered none (run {})", workflowName, run.getId());
+        }
+
+        if (runSucceeded) {
             // Record template verification if workflow was created from a template
             if (!failedChecks && templateId != null && !templateId.isBlank()) {
                 try {

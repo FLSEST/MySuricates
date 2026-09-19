@@ -3,11 +3,13 @@ package com.automation.service.todo;
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.event.WorkflowRunCompletedEvent;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 @Component
+@Slf4j
 public class GateStatusResolver {
 
     public record GateResult(GateStatus status, String category, String description) {}
@@ -31,12 +33,26 @@ public class GateStatusResolver {
                         ? String.valueOf(meta.get("gate_description"))
                         : null;
                 return new GateResult(status, category, description);
-            } catch (IllegalArgumentException ignored) {
-                // Invalid gate_status value — fall through to derivation
+            } catch (IllegalArgumentException invalid) {
+                // Ein unlesbarer Wert ist ein Befund, kein Nichts (TODO 63ecc124): vorher fiel er
+                // stumm auf die Ableitung durch und wurde bei COMPLETED zu GREEN. Jetzt bleibt er
+                // sichtbar. Ein aus dem Laufstatus ohnehin strengeres Urteil (FAILED -> RED) behält
+                // aber Vorrang — der unlesbare Wert darf ein Urteil nur verschärfen, nie mildern.
+                log.warn("Run {} reported an unreadable gate_status '{}'", event.getRunId(), explicitGate);
+                GateResult derived = deriveFromRunStatus(event);
+                if (derived != null && derived.status() == GateStatus.GREEN) {
+                    return new GateResult(GateStatus.YELLOW, "gate-invalid",
+                            "Unlesbares Gate-Urteil: " + explicitGate);
+                }
+                return derived;
             }
         }
 
         // 2. Derive from RunStatus
+        return deriveFromRunStatus(event);
+    }
+
+    private GateResult deriveFromRunStatus(WorkflowRunCompletedEvent event) {
         return switch (event.getStatus()) {
             case FAILED -> new GateResult(GateStatus.RED, "execution-failure",
                     extractErrorMessage(event.getError()));

@@ -1,6 +1,7 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
@@ -58,7 +59,7 @@ class RunCompletionHandlerTest {
     void complete_runningRun_becomesCompleted_andLogsInfo() {
         WorkflowRun run = run(RunStatus.RUNNING, "plain output");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(activityLogService).info(eq(LogCategory.EXECUTION), contains("completed"),
@@ -73,7 +74,7 @@ class RunCompletionHandlerTest {
         run.getSteps().getFirst().setStatus(StepStatus.FAILED);
         run.getSteps().getFirst().setMetadata(Map.of("checkedCommand", true, "exitCode", 7));
 
-        handler.complete(run, ctx, "wf-1", "Demo", "template-1", "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", "template-1", "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
         assertThat(ctx.getRunMetadata()).containsEntry("gate_status", "RED");
@@ -88,7 +89,7 @@ class RunCompletionHandlerTest {
                 "gate_status: RED\ngate_category: security\ngate_description: leaked key",
                 "gate_status: YELLOW\ngate_category: lint");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(ctx.getRunMetadata())
                 .containsEntry("gate_status", "RED")
@@ -107,7 +108,7 @@ class RunCompletionHandlerTest {
     void complete_yellowGate_logsWarning_butRunIsCompleted() {
         WorkflowRun run = run(RunStatus.RUNNING, "gate_status: YELLOW\ngate_category: lint");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(activityLogService).warn(eq(LogCategory.EXECUTION), contains("with warnings"),
@@ -121,7 +122,7 @@ class RunCompletionHandlerTest {
                 "todo_item: Fix login | HIGH | backend,bug | Login breaks on Safari",
                 "todo_item: Tidy docs | LOW | documentation");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         List<Map<String, Object>> items = (List<Map<String, Object>>) ctx.getRunMetadata().get("todo_items");
         assertThat(items).hasSize(2);
@@ -136,7 +137,7 @@ class RunCompletionHandlerTest {
         doThrow(new RuntimeException("boom")).when(templateVerificationService)
                 .recordSuccessfulRun("wf-1", "tpl-1", "proj-1", "run-1");
 
-        assertThatCode(() -> handler.complete(run, ctx, "wf-1", "Demo", "tpl-1", "proj-1"))
+        assertThatCode(() -> handler.complete(run, ctx, "wf-1", "Demo", "tpl-1", "proj-1", List.of()))
                 .doesNotThrowAnyException();
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
@@ -147,7 +148,7 @@ class RunCompletionHandlerTest {
     void complete_blankTemplateId_doesNotRecordVerification() {
         WorkflowRun run = run(RunStatus.RUNNING, "ok");
 
-        handler.complete(run, ctx, "wf-1", "Demo", "   ", "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", "   ", "proj-1", List.of());
 
         verifyNoInteractions(templateVerificationService);
     }
@@ -156,7 +157,7 @@ class RunCompletionHandlerTest {
     void complete_failedRun_logsError_andRecordsDeadLetter() {
         WorkflowRun run = run(RunStatus.FAILED, "boom");
 
-        handler.complete(run, ctx, "wf-1", "Demo", "tpl-1", "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", "tpl-1", "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
         verify(activityLogService).error(eq(LogCategory.EXECUTION), contains("failed"),
@@ -170,7 +171,7 @@ class RunCompletionHandlerTest {
         WorkflowRun run = run(RunStatus.FAILED, "boom");
         doThrow(new RuntimeException("dlq down")).when(deadLetterService).recordFailure(run);
 
-        assertThatCode(() -> handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1"))
+        assertThatCode(() -> handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of()))
                 .doesNotThrowAnyException();
     }
 
@@ -178,7 +179,7 @@ class RunCompletionHandlerTest {
     void complete_cancelledRun_isLeftUntouched() {
         WorkflowRun run = run(RunStatus.CANCELLED, "partial");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.CANCELLED);
         verifyNoInteractions(deadLetterService, templateVerificationService, activityLogService);
@@ -192,7 +193,7 @@ class RunCompletionHandlerTest {
                 "## backend_tests — FAILED\n\ngate_status: RED\ngate_category: tests\ntodo_item: Fix A | HIGH | bug | desc");
         run.getSteps().get(1).setMetadata(Map.of("derivedOutput", true));
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
         assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(1);
@@ -208,7 +209,7 @@ class RunCompletionHandlerTest {
                 "gate_status: RED\ngate_category: child\ntodo_item: Child finding | HIGH | bug | child desc");
         run.getSteps().get(1).setMetadata(Map.of("derivedOutput", true, "subRunId", "child-run-1"));
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
         assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(1);
@@ -224,7 +225,7 @@ class RunCompletionHandlerTest {
                 "dashboard_widget: {\"status\":\"GREEN\",\"title\":\"early\"}",
                 "dashboard_widget: {\"status\":\"RED\",\"title\":\"final\",\"items\":[\"<b>text</b>\"]}");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.ERROR_METADATA_KEY);
         assertThat(ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY))
@@ -235,7 +236,7 @@ class RunCompletionHandlerTest {
     void marksABrokenMarkerAsInvalidWithoutEchoingTheOutput() {
         WorkflowRun run = run(RunStatus.RUNNING, "dashboard_widget: {\"status\":\"PINK\",\"secret\":\"key-1\"}");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.METADATA_KEY);
         assertThat(ctx.getRunMetadata().get(DashboardWidgetResultParser.ERROR_METADATA_KEY)).isEqualTo("INVALID");
@@ -247,13 +248,13 @@ class RunCompletionHandlerTest {
                 "dashboard_widget: {\"status\":\"GREEN\"}", "dashboard_widget: {\"status\":\"RED\"}");
         compressed.getSteps().get(1).setMetadata(Map.of("derivedOutput", true));
 
-        handler.complete(compressed, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(compressed, ctx, "wf-1", "Demo", null, "proj-1", List.of());
         assertThat(DashboardWidgetResultParser.fromMetadata(
                 ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY)).result().status().name())
                 .isEqualTo("GREEN");
 
         ExecutionContext plain = ExecutionContext.builder().workflowRunId("run-2").build();
-        handler.complete(run(RunStatus.RUNNING, "nothing to report"), plain, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run(RunStatus.RUNNING, "nothing to report"), plain, "wf-1", "Demo", null, "proj-1", List.of());
         assertThat(plain.getRunMetadata()).doesNotContainKeys(
                 DashboardWidgetResultParser.METADATA_KEY, DashboardWidgetResultParser.ERROR_METADATA_KEY);
     }
@@ -272,7 +273,7 @@ class RunCompletionHandlerTest {
         ctx.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY,
                 Map.of("status", "GREEN", "title", "from block"));
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from block");
@@ -284,7 +285,7 @@ class RunCompletionHandlerTest {
         WorkflowRun run = run(RunStatus.RUNNING, "dashboard_widget: {\"status\":\"PINK\"}");
         ctx.setRunMetadata(DashboardWidgetResultParser.METADATA_KEY, Map.of("status", "GREEN"));
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.ERROR_METADATA_KEY);
         assertThat(DashboardWidgetResultParser
@@ -297,9 +298,66 @@ class RunCompletionHandlerTest {
         WorkflowRun run = run(RunStatus.RUNNING,
                 "dashboard_widget: {\"status\":\"RED\",\"title\":\"from marker\"}");
 
-        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1");
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result().title()).isEqualTo("from marker");
+    }
+
+    /** Ein Block, dessen Prompt ein Gate-Urteil bestellt (TODO 63ecc124). */
+    private static List<BlockDefinition> blocksOrderingAGate() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("simple");
+        block.setConfig(Map.of("prompt", "Pruefe den Stand und schliesse mit gate_status: GREEN|YELLOW|RED"));
+        return List.of(block);
+    }
+
+    @Test
+    void bestelltesAberAusgebliebenesUrteilWirdGelb() {
+        WorkflowRun run = run(RunStatus.RUNNING, "Ich habe alles geprueft, sieht gut aus.");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", blocksOrderingAGate());
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_status", "YELLOW")
+                .containsEntry("gate_category", RunCompletionHandler.GATE_MISSING_CATEGORY);
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), contains("warnings"),
+                eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
+    }
+
+    @Test
+    void geliefertesUrteilSchlaegtDieErwartung() {
+        WorkflowRun run = run(RunStatus.RUNNING, "gate_status: GREEN\ngate_category: tests");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", blocksOrderingAGate());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_status", "GREEN")
+                .containsEntry("gate_category", "tests");
+    }
+
+    @Test
+    void ohneBestellungBleibtEinLaufOhneUrteilUnberuehrt() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("shell");
+        block.setConfig(Map.of("command", "echo fertig"));
+        WorkflowRun run = run(RunStatus.RUNNING, "fertig");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of(block));
+
+        assertThat(ctx.getRunMetadata()).doesNotContainKey("gate_status");
+        verify(activityLogService).info(eq(LogCategory.EXECUTION), contains("completed"),
+                eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
+    }
+
+    /** Ein gescheiterter Lauf trägt sein Urteil über den Laufstatus — nicht zusätzlich gelb färben. */
+    @Test
+    void gescheiterterLaufBekommtKeinGateMissing() {
+        WorkflowRun run = run(RunStatus.FAILED, "abgebrochen");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", blocksOrderingAGate());
+
+        assertThat(ctx.getRunMetadata()).doesNotContainKey("gate_status");
     }
 }

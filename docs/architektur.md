@@ -404,6 +404,18 @@ gate_description: <beschreibung>
 - `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED)
 - Gate-Status wird in `WorkflowRun.metadata` gespeichert (`gate_status`, `gate_category`, `gate_description`)
 
+**Ausbleibendes Urteil ist kein Erfolg** (TODO 63ecc124). Gates bleiben freiwillig — aber ein
+Workflow, der eines *bestellt*, muss eines liefern. `GateExpectation` sucht dafür in den
+Block-Configs (verschachtelte eingeschlossen) nach demselben `gate_status`-Schlüssel, den der
+Parser aus der Ausgabe liest: steht er in der Definition, erwartet der Lauf ein Urteil. Fehlt es
+danach, setzt `RunCompletionHandler` **YELLOW** mit Kategorie `gate-missing` statt stillschweigend
+GREEN — nur bei erfolgreichem Lauf, ein `FAILED` trägt sein Urteil schon über den Laufstatus.
+Kein Workflow-Feld, keine Migration: Wer keinen Marker bestellt, merkt nichts davon.
+Ein **unlesbarer** `gate_status` fällt ebenfalls nicht mehr stumm durch (`GateStatusResolver`):
+Er wird geloggt und zu YELLOW `gate-invalid` — verschärfen darf er, mildern nie (ein `FAILED`
+bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlägt, war zuvor von
+einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
+
 **Gate → Run-Status-Mapping:**
 - **YELLOW → `COMPLETED_WITH_ERRORS`:** Run wird mit diesem Status beendet statt `COMPLETED`
 - **RED → `COMPLETED`:** RED-Gates ändern den Run-Status nicht — `AutoTodoService` erstellt stattdessen ein TODO

@@ -256,7 +256,7 @@ public class WorkflowExecutor {
                 }
             }
 
-            completionHandler.complete(run, context, workflowId, workflowName, templateId, project.getId());
+            completionHandler.complete(run, context, workflowId, workflowName, templateId, project.getId(), blocks);
 
         } catch (java.util.concurrent.CancellationException e) {
             if (run != null) run.setStatus(RunStatus.CANCELLED);

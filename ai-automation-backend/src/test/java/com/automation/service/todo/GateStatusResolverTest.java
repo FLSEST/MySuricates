@@ -107,6 +107,7 @@ class GateStatusResolverTest {
         assertThat(result).isNull();
     }
 
+    /** Ein unlesbarer Wert darf ein strengeres Urteil aus dem Laufstatus nicht mildern. */
     @Test
     void resolve_invalidExplicitGate_fallsBackToDerivation() {
         WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED,
@@ -117,6 +118,24 @@ class GateStatusResolverTest {
         assertThat(result).isNotNull();
         assertThat(result.status()).isEqualTo(GateStatus.RED);
         assertThat(result.category()).isEqualTo("execution-failure");
+    }
+
+    /**
+     * Zuvor fiel ein unlesbarer Wert bei einem durchgelaufenen Run stumm auf GREEN durch — ein
+     * still fehlgeschlagener Prüf-Schritt war damit von einem Erfolg nicht zu unterscheiden
+     * (TODO 63ecc124).
+     */
+    @Test
+    void resolve_invalidExplicitGate_onCompletedRun_isYellowInsteadOfGreen() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "GRUEN"));
+
+        GateResult result = resolver.resolve(event);
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(GateStatus.YELLOW);
+        assertThat(result.category()).isEqualTo("gate-invalid");
+        assertThat(result.description()).contains("GRUEN");
     }
 
     @Test
