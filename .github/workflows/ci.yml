@@ -32,6 +32,8 @@ jobs:
         run: bash scripts/public-readiness/doc-facts-check.sh
       - name: Doku-Zahlen-Gate Selbsttest
         run: bash scripts/tests/test-doc-facts-check.sh
+      - name: Konzeptseiten-Gate Selbsttest
+        run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
       - name: Audit-Fakten Selbsttest
         run: bash scripts/tests/test-audit-facts.sh
       - name: Coverage-Snapshot Selbsttest

@@ -1,0 +1,140 @@
+[
+  {
+    "slug": "gates",
+    "title_de": "Gates: ein maschinenlesbares Urteil",
+    "title_en": "Gates: a machine-readable verdict",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusResolver.java",
+      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java",
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/RunCompletionHandler.java"
+    ],
+    "metrics": [
+      "steps_shell",
+      "retained_runs"
+    ],
+    "notes": "Unterscheide technische Run-Status und fachliche Gate-Marker. Fehlender oder ungueltiger Marker kann aktuell aus COMPLETED zu GREEN abgeleitet werden: keine Vollstaendigkeitsgarantie. Ampel allein beweist keine Qualitaet; deterministische Pruefung und Beleg erforderlich.",
+    "diagram_de": "flowchart LR\n  A[\"Blockausgabe\"] --> B[\"Marker lesen\"]\n  B --> C[\"Schwerstes Urteil\"]\n  C --> D[\"GREEN / YELLOW / RED\"]\n  D --> E[\"Bericht und Folgeaktion\"]",
+    "diagram_en": "flowchart LR\n  A[\"Block output\"] --> B[\"Read markers\"]\n  B --> C[\"Most severe verdict\"]\n  C --> D[\"GREEN / YELLOW / RED\"]\n  D --> E[\"Report and follow-up\"]"
+  },
+  {
+    "slug": "selbstverbesserung",
+    "title_de": "Der Selbstverbesserungs-Kreislauf",
+    "title_en": "The self-improvement loop",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/RunCompletionHandler.java",
+      "ai-automation-backend/src/main/java/com/automation/service/trigger/TodoTriggerService.java",
+      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusResolver.java"
+    ],
+    "metrics": [
+      "todos_without_resolution_state",
+      "activeTodoTriggers"
+    ],
+    "notes": "Audit-Befund, TODO, regelbasierter Fix-Run und erneute Pruefung sind getrennte Schritte. Automatische Trigger sind konfigurationsabhaengig. Ein DONE oder technisch erfolgreicher Fix ist kein fachlicher Nachweis. resolutionState ist optionaler manueller Resolve-Pfad, sein Fehlen belegt KEINE unterbrochene Verifikationskette.",
+    "diagram_de": "flowchart LR\n  A[\"Pruefen\"] --> B[\"Befund / TODO\"]\n  B --> C[\"Trigger oder Mensch\"]\n  C --> D[\"Fix ausfuehren\"]\n  D --> E[\"Erneut pruefen\"]\n  E --> A",
+    "diagram_en": "flowchart LR\n  A[\"Check\"] --> B[\"Finding / TODO\"]\n  B --> C[\"Trigger or person\"]\n  C --> D[\"Execute fix\"]\n  D --> E[\"Verify again\"]\n  E --> A"
+  },
+  {
+    "slug": "persistenz-herkunft",
+    "title_de": "Persistenz und Herkunft",
+    "title_en": "Persistence and provenance",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowVersionService.java",
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/WorkflowDefinitionHasher.java",
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java"
+    ],
+    "metrics": [
+      "retained_runs",
+      "ai_todos_with_session"
+    ],
+    "notes": "Run, Schritte, Versionssnapshot, Hash und triggerSource helfen Rekonstruktion. provenance ist schaltbar; Altdaten koennen fehlen. DefinitionHash ist kein Herkunftsnachweis einer importierten Datei und kein kompletter Umgebungs-/Daten-Snapshot. Retention begrenzt Geschichte; Session-ID garantiert kein fortsetzbares KI-Transkript.",
+    "diagram_de": "flowchart LR\n  A[\"Definitionsaenderung\"] --> B[\"Version und Hash\"]\n  B --> C[\"Run mit Ausloeser\"]\n  C --> D[\"Schritte und Ergebnisse\"]\n  D --> E[\"Nachvollziehen\"]",
+    "diagram_en": "flowchart LR\n  A[\"Definition change\"] --> B[\"Version and hash\"]\n  B --> C[\"Run with trigger\"]\n  C --> D[\"Steps and results\"]\n  D --> E[\"Reconstruct\"]"
+  },
+  {
+    "slug": "agentische-budgets",
+    "title_de": "Agentische Bloecke mit Budgets",
+    "title_en": "Agentic blocks with budgets",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/executor/blocks/AgenticBlockExecutor.java",
+      "ai-automation-backend/src/main/java/com/automation/executor/blocks/AgenticStopRules.java",
+      "ai-automation-backend/src/main/java/com/automation/executor/blocks/AgenticTokenTracker.java"
+    ],
+    "metrics": [
+      "steps_agentic",
+      "steps_shell"
+    ],
+    "notes": "Reason/Act, Iterationen, Zeit, kumulierte Token und Wiederholungen. Tokenmessung anbieterabhaengig; Pruefung nach Aufruf kann Budget ueberschreiten. Nicht als Sandbox oder harte Euro-Kostenobergrenze darstellen. Agentische Bloecke fuer offene Aufgaben, shell fuer deterministische Arbeit.",
+    "diagram_de": "flowchart LR\n  A[\"Ziel\"] --> B[\"Reason\"]\n  B --> C[\"Act\"]\n  C --> D[\"Beobachten und Budgets pruefen\"]\n  D -->|weiter| B\n  D -->|fertig oder Grenze| E[\"Ende\"]",
+    "diagram_en": "flowchart LR\n  A[\"Goal\"] --> B[\"Reason\"]\n  B --> C[\"Act\"]\n  C --> D[\"Observe and check budgets\"]\n  D -->|continue| B\n  D -->|done or limit| E[\"Stop\"]"
+  },
+  {
+    "slug": "zugaenge",
+    "title_de": "Zugaenge: Zeitplan, Ereignis, Plugin und UI",
+    "title_en": "Entry points: schedules, events, plugins and UI",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/entity/TriggerSource.java",
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java",
+      "ai-automation-backend/src/main/java/com/automation/controller/WorkflowController.java"
+    ],
+    "metrics": [
+      "activeSchedules",
+      "totalSchedules",
+      "activeWebhooks",
+      "activeTodoTriggers",
+      "activeCompletionTriggers"
+    ],
+    "notes": "Verschiedene Ausloeser fuehren zum gleichen WorkflowExecutor/RunAdmission. Externes Session-Plugin nutzt REST; kein dynamisches Plattform-Plugin-System behaupten. Ein API-Key, lokaler Einbenutzerbetrieb; unbeaufsichtigte Starts sind konfigurationsabhaengig. Aktivierte Trigger messen Konfiguration, nicht Nutzung. Keine allgemeine exactly-once-Garantie.",
+    "diagram_de": "flowchart LR\n  A[\"Zeitplan\"] --> E[\"Zulassungspruefung\"]\n  B[\"Ereignis\"] --> E\n  C[\"Plugin / REST\"] --> E\n  D[\"UI\"] --> E\n  E --> F[\"Workflow-Run\"]",
+    "diagram_en": "flowchart LR\n  A[\"Schedule\"] --> E[\"Admission check\"]\n  B[\"Event\"] --> E\n  C[\"Plugin / REST\"] --> E\n  D[\"UI\"] --> E\n  E --> F[\"Workflow run\"]"
+  },
+  {
+    "slug": "messen-vor-bewerten",
+    "title_de": "Deterministisch messen vor KI-Bewertung",
+    "title_en": "Measure deterministically before AI assessment",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java",
+      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java"
+    ],
+    "metrics": [
+      "steps_shell",
+      "steps_simple",
+      "workflows_never_run"
+    ],
+    "notes": "Trenne Fakten sammeln, KI einordnen und Ergebnis pruefen. shell braucht keine Modelltoken, aber Zeit/Ressourcen; Shell ist mit veraenderten Daten/Umgebung nicht automatisch reproduzierbar. Messskriptabdeckung und Datenqualitaet begrenzen Aussage. Befunde und Prozentanteile sind keine nachgewiesene Kosteneinsparung. foreach nicht pauschal deterministisch zaehlen.",
+    "diagram_de": "flowchart LR\n  A[\"Daten / Code\"] --> B[\"Messskript\"]\n  B --> C[\"Faktenblatt\"]\n  C --> D[\"KI-Einordnung\"]\n  D --> E[\"Deterministisches Gate\"]\n  E --> F[\"Bericht\"]",
+    "diagram_en": "flowchart LR\n  A[\"Data / code\"] --> B[\"Measurement script\"]\n  B --> C[\"Fact sheet\"]\n  C --> D[\"AI assessment\"]\n  D --> E[\"Deterministic gate\"]\n  E --> F[\"Report\"]"
+  },
+  {
+    "slug": "workflow-memory",
+    "title_de": "Workflow-Memory",
+    "title_en": "Workflow memory",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/service/memory/WorkflowMemoryService.java",
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/ExecutionContextFactory.java"
+    ],
+    "metrics": [
+      "activeMemoryEntries",
+      "workflows"
+    ],
+    "notes": "Extraktion aus Runs, Versionen/aktive Memory, Einschleusen in Folgeaufrufe. Lies Aktivierungs-/Autoextraktionsverhalten aus Code genau. Memory ist KI-Zusammenfassung, keine gepruefte Wahrheit; falsche/veraltete Inhalte koennen sich fortpflanzen. Promptumfang und Extraktion kosten Ressourcen. Lokale Speicherung bedeutet nicht, dass KI-Aufrufe lokal bleiben.",
+    "diagram_de": "flowchart LR\n  A[\"Vergangene Runs\"] --> B[\"Wissen extrahieren\"]\n  B --> C[\"Memory-Version\"]\n  C --> D[\"Aktive Memory\"]\n  D --> E[\"Kontext des naechsten Runs\"]",
+    "diagram_en": "flowchart LR\n  A[\"Past runs\"] --> B[\"Extract knowledge\"]\n  B --> C[\"Memory version\"]\n  C --> D[\"Active memory\"]\n  D --> E[\"Context of the next run\"]"
+  },
+  {
+    "slug": "haertung",
+    "title_de": "Haertung: Siegel, Zulassung und Taint",
+    "title_en": "Hardening: seals, admission and taint",
+    "sources": [
+      "ai-automation-backend/src/main/java/com/automation/service/workflow/RunAdmission.java",
+      "ai-automation-backend/src/main/java/com/automation/executor/OutputTaint.java",
+      "ai-automation-backend/src/main/java/com/automation/executor/ExecutionContextTaint.java"
+    ],
+    "metrics": [
+      "workflows_sealed",
+      "workflows"
+    ],
+    "notes": "Siegel schuetzt vorhandene Definition, RunAdmission prueft vor Run, require-sealed-for-unattended optional, Taint markiert fremde Inhalte und Shell-Quoting. Kein vollstaendiger Prompt-Injection-Schutz, keine Prozess-Sandbox, keine Vertrauensgarantie importierter Definitionen. Default core+provenance, andere Schalter opt-in; bestehende Siegel gelten auch bei ausgeschaltetem Schalter. Keine operative Konfiguration aus Quellcode-Defaults ableiten.",
+    "diagram_de": "flowchart LR\n  A[\"Definition + Ausloeser\"] --> B[\"Siegel / Zulassung\"]\n  B --> C[\"Run\"]\n  D[\"Fremde Inhalte\"] --> E[\"Taint-Markierung\"]\n  E --> C\n  C --> F[\"Shell-Platzhalter quoten\"]",
+    "diagram_en": "flowchart LR\n  A[\"Definition + trigger\"] --> B[\"Seal / admission\"]\n  B --> C[\"Run\"]\n  D[\"External content\"] --> E[\"Taint marking\"]\n  E --> C\n  C --> F[\"Quote shell placeholders\"]"
+  }
+]

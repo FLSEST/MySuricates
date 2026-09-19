@@ -1,0 +1,80 @@
+{
+  "name": {
+    "de": "MySuricates Konzeptseiten je Mechanismus",
+    "en": "MySuricates concept pages by mechanism"
+  },
+  "description": {
+    "de": "Erzeugt acht kurze Konzeptseiten aus aktuellen anonymen Betriebszahlen und Codebelegen. Ein KI-Aufruf je Mechanismus, feste Mermaid-Diagramme und deterministisches Gate. Benötigt dieses Repository und einen vorher erhobenen Fakten-Snapshot.",
+    "en": "Generates eight concise concept pages from current anonymous operational counts and code evidence. One AI call per mechanism, fixed Mermaid diagrams and a deterministic gate. Requires this repository and a previously collected facts snapshot."
+  },
+  "icon": "📖",
+  "category": "DOCUMENTATION",
+  "scope": "repo",
+  "tags": [
+    "documentation",
+    "concepts",
+    "foreach",
+    "gate"
+  ],
+  "provider": "PI",
+  "model": "openai-codex/gpt-5.5",
+  "effort": "medium",
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "instructions": "Erzeuge belegte Dokumentation im ausdrücklich angegebenen Arbeitsverzeichnis. Dies ist ein kontrollierter Dokumentationsauftrag; keine Commits oder Plattformänderungen. Jeder Aufruf schreibt ausschließlich seinen angegebenen Entwurf. Betriebsdaten werden vor dem Run über REST erhoben; Workflow-Blöcke greifen weder auf REST noch auf die DB zu.",
+  "defaultContext": {
+    "concept_root": ".",
+    "concept_facts": "docs/konzepte/betriebsdaten.json",
+    "concept_output": "/tmp/mysuricates-concept-pages"
+  },
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "faktenpakete",
+      "config": {
+        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" prepare --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}\"",
+        "timeout_seconds": 120
+      }
+    },
+    {
+      "type": "foreach",
+      "name": "konzepttexte",
+      "config": {
+        "items_source": "list",
+        "items": [
+          "gates",
+          "selbstverbesserung",
+          "persistenz-herkunft",
+          "agentische-budgets",
+          "zugaenge",
+          "messen-vor-bewerten",
+          "workflow-memory",
+          "haertung"
+        ],
+        "variable_name": "concept",
+        "execution_mode": "ai",
+        "continue_on_error": false,
+        "timeout_seconds": 600,
+        "command": "Arbeitsanker ist das bereits IN_PROGRESS gesetzte TODO des aufrufenden Operators. Erzeuge genau EINE deutsche Konzeptseite zum Mechanismus {{ concept }}.\nLies zuerst {{ concept_output }}/{{ workflow_run_id }}/packets/{{ concept }}.txt. Die Codebelege stammen aus {{ concept_root }}, NICHT aus deinem aktuellen Arbeitsverzeichnis. Bei Bedarf dort gezielt weiterlesen.\n\nSchreibe 180 bis 280 deutsche Wörter ausschließlich nach {{ concept_output }}/{{ workflow_run_id }}/drafts/{{ concept }}.md.\nGenau diese drei Überschriften, in dieser Reihenfolge:\n## Wofür taugt das?\n## Vorteile\n## Nachteile und Kosten\n\nZielgruppe: technisch interessierte Leser ohne Projektwissen, die den Mechanismus übernehmen könnten. Erkläre den Ablauf, einen konkreten sinnvollen Einsatz, Nutzen und tatsächliche Grenzen/Kosten. Nüchtern, lesbar, kein Marketing. Behauptungen müssen im Faktenpaket oder Code belegt sein.\nDer letzte Abschnitt muss mindestens einen passenden Betriebsbefund einordnen. Zahlen stehen später zusätzlich in einer deterministischen Tabelle; verwechsle Bestand, 30-Tage-Stichprobe, technische Run-Erfolge und nachgewiesenen fachlichen Nutzen nicht. Historische Zahlen aus dem ursprünglichen Ticket nicht verwenden. Fehlende Daten ausdrücklich als fehlend benennen.\nKeine H1-Überschrift, keine Mermaid-/Codeblöcke, keine Links, keine Metakommentare: Diagramm, Messwerte und Quellenlinks ergänzt das Skript. Keine privaten Namen, Pfade, IDs, Zugangsdaten oder externen Produktvergleiche.\nKeine weiteren Dateien ändern, keine API-/DB-Aufrufe, keine TODO-Änderungen, kein git add/commit/push. Die übergeordnete Sitzung übernimmt Tracking und Review.\nVerwende dein Schreibwerkzeug, prüfe danach, dass die Datei existiert, und antworte kurz mit dem Dateinamen.",
+        "provider": "PI",
+        "model": "openai-codex/gpt-5.5"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "seiten-zusammensetzen",
+      "config": {
+        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" assemble --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}\"",
+        "timeout_seconds": 120
+      }
+    },
+    {
+      "type": "shell",
+      "name": "gate",
+      "config": {
+        "command": "set -euo pipefail\npython3 \"{{ concept_root }}/scripts/concepts/pages.py\" check --root \"{{ concept_root }}\" --facts \"{{ concept_facts }}\" --work \"{{ concept_output }}/{{ workflow_run_id }}/de\"",
+        "timeout_seconds": 120
+      }
+    }
+  ]
+}
