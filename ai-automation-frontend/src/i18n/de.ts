@@ -673,6 +673,8 @@ export const de: TranslationKeys = {
     bpmnImported: 'Workflow aus BPMN importiert',
     bpmnImportFailed: 'BPMN-Import fehlgeschlagen',
     selectProjectForImport: 'Projekt für den importierten Workflow',
+    bpmnImportTrustHint:
+      'Der Inhalt der Datei wird unverändert als Workflow-Definition übernommen. Geprüft wird nur das Format, nicht die Herkunft — importiere daher nur Dateien, deren Quelle du kennst.',
     bpmnExportFailed: 'BPMN-Export fehlgeschlagen',
     diagramTab: 'Diagramm',
     diagramLoadFailed: 'Diagramm konnte nicht geladen werden',

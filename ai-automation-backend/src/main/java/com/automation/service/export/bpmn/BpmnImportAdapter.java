@@ -19,8 +19,16 @@ import static com.automation.service.export.bpmn.BpmnXmlRenderer.NS_MYSURICATES;
 
 /**
  * Liest einen von MySuricates exportierten BPMN-Prozess zurück in eine Block-Liste (Roundtrip).
- * Deterministisch, JDK-DOM, kein AI-Call. Fremde BPMN (ohne {@code mysuricates}-Erweiterung)
- * wird abgelehnt — nichts wird angelegt.
+ * Deterministisch, JDK-DOM, kein AI-Call. BPMN ohne {@code mysuricates}-Erweiterung wird
+ * abgelehnt — nichts wird angelegt.
+ *
+ * <p><b>Kein Echtheitsnachweis.</b> Was hier geprüft wird, ist das <i>Format</i>: trägt die Datei
+ * die {@code mysuricates}-Erweiterung, aus der sich Blöcke lesen lassen? Woher sie stammt, sagt
+ * das nicht — {@code exporter="MySuricates"} und der Namespace sind frei schreibbare Attribute,
+ * und der mitgelieferte {@code blockConfig}-Inhalt wird als Definition übernommen. Wer eine
+ * BPMN-Datei importiert, übernimmt deren Inhalt also genauso in Verantwortung wie bei einem
+ * JSON-Import. Eine belastbare Herkunft bräuchte Prüfsumme oder Signatur über den Export
+ * (TODO b18939a6); bis dahin ist die Prüfung bewusst nur ein Formatfilter.
  *
  * <p>Prinzip: Je Block schreibt der Export genau ein {@code blockConfig}-tragendes Element als
  * direktes Kind von {@code <process>}, in Blockreihenfolge. Verschachtelte Switch-Cases stecken
@@ -36,7 +44,7 @@ public class BpmnImportAdapter implements ProcessFormatImporter {
     static final int MAX_CHARS = 2 * 1024 * 1024;
 
     static final String MSG_FOREIGN =
-            "Diese BPMN stammt nicht aus MySuricates (keine mysuricates:blockConfig-Erweiterung) — Fremd-Import folgt in einer späteren Version";
+            "Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung — daraus lässt sich kein Workflow lesen; Import fremder BPMN folgt in einer späteren Version";
     static final String MSG_NO_PROCESS = "Keine Prozess-Definition gefunden";
     static final String MSG_INVALID_XML = "Ungültiges BPMN-XML";
     static final String MSG_TOO_LARGE = "BPMN-Datei zu groß (max. " + (MAX_CHARS / 1024) + " KB)";
@@ -76,9 +84,9 @@ public class BpmnImportAdapter implements ProcessFormatImporter {
             blocks.add(block);
         }
 
-        // Leerer Prozess (nur Start→Ende) ist gültig, sofern die Datei erkennbar von uns stammt;
-        // ohne Herkunftsmarker UND ohne blockConfig ist es Fremd-BPMN.
-        if (blocks.isEmpty() && !isMySuricatesExport(definitions)) {
+        // Leerer Prozess (nur Start→Ende) ist gültig, sofern die Datei das Format kennzeichnet;
+        // ohne Formatmerkmal UND ohne blockConfig ist nichts zu lesen.
+        if (blocks.isEmpty() && !hasMySuricatesFormatHint(definitions)) {
             throw new BpmnImportException(MSG_FOREIGN);
         }
         String name = process.getAttribute("name");
@@ -99,7 +107,12 @@ public class BpmnImportAdapter implements ProcessFormatImporter {
         return ext == null ? null : BpmnDom.firstChild(ext, NS_MYSURICATES, "blockConfig");
     }
 
-    private static boolean isMySuricatesExport(Element definitions) {
+    /**
+     * Formatmerkmal, kein Herkunftsbeleg: beide Attribute kann jeder in eine beliebige Datei
+     * schreiben. Dient nur dazu, einen leeren Export (Start→Ende ohne Block) von fremder BPMN
+     * zu unterscheiden, aus der sich ohnehin nichts lesen ließe.
+     */
+    private static boolean hasMySuricatesFormatHint(Element definitions) {
         return "MySuricates".equals(definitions.getAttribute("exporter"))
                 || NS_MYSURICATES.equals(definitions.getAttribute("xmlns:mysuricates"));
     }

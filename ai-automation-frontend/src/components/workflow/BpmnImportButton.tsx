@@ -52,6 +52,7 @@ export function BpmnImportButton() {
         icon={<FileUp className="w-4 h-4" />}
         onClick={() => fileRef.current?.click()}
         loading={importBpmn.isPending && pendingXml === null}
+        title={t.workflows.bpmnImportTrustHint}
       >
         {t.workflows.importBpmn}
       </Button>
@@ -89,6 +90,7 @@ export function BpmnImportButton() {
           onChange={(e) => setProjectId(e.target.value)}
           options={(projects ?? []).map((p) => ({ value: p.id, label: p.name }))}
         />
+        <p className="mt-3 text-xs text-secondary">{t.workflows.bpmnImportTrustHint}</p>
       </Modal>
     </>
   );

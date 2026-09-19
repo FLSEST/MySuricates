@@ -39,16 +39,16 @@ describe('BpmnImportButton', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Workflow aus BPMN importiert');
   });
 
-  it('zeigt die Backend-Meldung bei Fremd-BPMN (400) woertlich im Toast und navigiert nicht', async () => {
+  it('zeigt die Backend-Meldung bei BPMN ohne Erweiterung (400) woertlich im Toast und navigiert nicht', async () => {
     mutate.mockImplementation((_vars, opts) =>
-      opts.onError({ code: 'INVALID_ARGUMENT', error: 'Diese BPMN stammt nicht aus MySuricates' }),
+      opts.onError({ code: 'INVALID_ARGUMENT', error: 'Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung' }),
     );
     const { container } = render(<BpmnImportButton />);
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [new File(['<definitions/>'], 'fremd.bpmn')] } });
 
     await waitFor(() => expect(toastError).toHaveBeenCalled());
-    expect(toastError.mock.calls[0][0]).toBe('BPMN-Import fehlgeschlagen: Diese BPMN stammt nicht aus MySuricates');
+    expect(toastError.mock.calls[0][0]).toBe('BPMN-Import fehlgeschlagen: Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung');
     expect(navigate).not.toHaveBeenCalled();
   });
 });

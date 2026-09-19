@@ -228,7 +228,7 @@ These use non-obvious paths — always use these, never guess:
 | Get workflow version | GET | `/api/v1/workflows/{id}/versions/{versionId}` |
 | Restore workflow version | POST | `/api/v1/workflows/{id}/versions/{versionId}/restore` |
 | Export workflow as BPMN | GET | `/api/v1/workflows/{id}/export/bpmn` |
-| Import workflow from BPMN | POST | `/api/v1/workflows/import/bpmn?projectId={uuid}` — body: BPMN-XML (`Content-Type: application/xml`), nur MySuricates-Exporte |
+| Import workflow from BPMN | POST | `/api/v1/workflows/import/bpmn?projectId={uuid}` — body: BPMN-XML (`Content-Type: application/xml`); liest nur `mysuricates:blockConfig` (Formatfilter, **kein** Herkunftsbeleg — siehe AGENTS.md) |
 
 See [AGENTS.md](AGENTS.md) for a complete REST API reference (workflow/chain CRUD, test instance).
 

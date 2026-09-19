@@ -24,7 +24,23 @@ class BpmnImportAdapterTest {
                 </definitions>""".formatted(NS);
         assertThatThrownBy(() -> importer.importFrom(fremd))
                 .isInstanceOf(BpmnImportException.class)
-                .hasMessageContaining("stammt nicht aus MySuricates");
+                .hasMessageContaining("keine mysuricates:blockConfig-Erweiterung");
+    }
+
+    /**
+     * Das Formatmerkmal ist kein Herkunftsbeleg: Eine fremde Datei, die {@code exporter} und
+     * Namespace einfach mitschreibt, wird angenommen. Dieser Test hält den Ist-Zustand fest,
+     * damit die Doku ihn nicht überzeichnet — eine echte Herkunftsprüfung bräuchte eine
+     * Prüfsumme über den Export (TODO b18939a6).
+     */
+    @Test
+    void gefaelschtesFormatmerkmalWirdNichtErkannt() {
+        String gefaelscht = """
+                <definitions xmlns="%s" xmlns:mysuricates="%s" exporter="MySuricates">
+                  <process id="p" name="Fremd mit Marker"><startEvent id="s"/><endEvent id="e"/></process>
+                </definitions>""".formatted(NS, NS_MS);
+        ImportedWorkflow imported = importer.importFrom(gefaelscht);
+        assertThat(imported.name()).isEqualTo("Fremd mit Marker");
     }
 
     @Test

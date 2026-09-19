@@ -82,13 +82,13 @@ class WorkflowImportControllerTest {
     @Test
     void fremdBpmnLiefert400MitMeldungUndLegtNichtsAn() throws Exception {
         when(bpmnImportAdapter.importFrom(anyString()))
-                .thenThrow(new BpmnImportException("Diese BPMN stammt nicht aus MySuricates"));
+                .thenThrow(new BpmnImportException("Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung"));
 
         mockMvc.perform(post("/api/v1/workflows/import/bpmn").param("projectId", "proj-1")
                         .contentType(MediaType.APPLICATION_XML).content("<definitions/>"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
-                .andExpect(jsonPath("$.error").value("Diese BPMN stammt nicht aus MySuricates"));
+                .andExpect(jsonPath("$.error").value("Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung"));
 
         verify(workflowService, never()).create(any(), eq(ChangeSource.BPMN_IMPORT));
     }

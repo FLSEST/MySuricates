@@ -671,6 +671,8 @@ export const en = {
     bpmnImported: 'Workflow imported from BPMN',
     bpmnImportFailed: 'BPMN import failed',
     selectProjectForImport: 'Project for the imported workflow',
+    bpmnImportTrustHint:
+      'The file content is taken over unchanged as the workflow definition. Only the format is checked, not the origin — so import files from sources you know.',
     bpmnExportFailed: 'BPMN export failed',
     diagramTab: 'Diagram',
     diagramLoadFailed: 'Could not load diagram',
