@@ -577,7 +577,7 @@ Blöcke können über das `skillIds`-Feld eigene Skills mitbringen, die additiv 
 ## Model Selection
 
 - `workflow.model`-Feld: CLI-Alias (`opus`, `sonnet`, `haiku`, `fable` — immer das neueste Modell) oder konkrete ID (`claude-opus-5`); pi `<backend>/<model>`, codex Slug
-- Vorschlagsliste: `GET /api/v1/system/ai-providers/{id}/models` — `ModelCatalogService` mit einer `ModelCatalogSource` je Provider (Claude: Aliase, PI: `pi --offline --list-models`, CODEX: `~/.codex/models_cache.json` bzw. `codex debug models --bundled`), TTL-Cache (Setting `model-catalog-ttl-seconds`), `POST .../models/refresh`
+- Vorschlagsliste: `GET /api/v1/system/ai-providers/{id}/models` — `ModelCatalogService` mit einer `ModelCatalogSource` je Provider (Claude: Aliase, sofern das Programm `claude` auf dem `PATH` liegt — sonst `available: false`; PI: `pi --offline --list-models`, CODEX: `~/.codex/models_cache.json` bzw. `codex debug models --bundled`), TTL-Cache (Setting `model-catalog-ttl-seconds`), `POST .../models/refresh`
 - Wird via `--model`-Flag an die Claude CLI auf dem Host übergeben
 - REASON und ACT eines Agentic-Laufs verwenden dasselbe Workflow-Modell (`ReasoningRequest.model` bzw. `ActionRequest.model`); ohne konfiguriertes Modell fällt der Provider auf seinen Default zurück
 

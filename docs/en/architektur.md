@@ -538,7 +538,7 @@ Blocks can bring their own skills via the `skillIds` field, which apply additive
 ## Model Selection
 
 - `workflow.model` field: CLI alias (`opus`, `sonnet`, `haiku`, `fable` — always the newest model) or a concrete id (`claude-opus-5`); pi `<backend>/<model>`, codex slug
-- Suggestions: `GET /api/v1/system/ai-providers/{id}/models` — `ModelCatalogService` with one `ModelCatalogSource` per provider (Claude: aliases, PI: `pi --offline --list-models`, CODEX: `~/.codex/models_cache.json` or `codex debug models --bundled`), TTL cache (setting `model-catalog-ttl-seconds`), `POST .../models/refresh`
+- Suggestions: `GET /api/v1/system/ai-providers/{id}/models` — `ModelCatalogService` with one `ModelCatalogSource` per provider (Claude: aliases, as long as the `claude` program is on the `PATH` — otherwise `available: false`; PI: `pi --offline --list-models`, CODEX: `~/.codex/models_cache.json` or `codex debug models --bundled`), TTL cache (setting `model-catalog-ttl-seconds`), `POST .../models/refresh`
 - Passed via `--model` flag to the Claude CLI on the host
 - The agentic REASON phase uses the locally configured default model
 

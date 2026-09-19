@@ -11,7 +11,9 @@ public interface AiProvider {
 
     /**
      * Sentinel for {@code allowedTools}: the call gets no built-in tools at all (Claude: {@code --tools ""}).
-     * Only compress-ai uses it, and only with the Claude provider.
+     * Two callers use it, both only with the Claude provider: the {@code compress-ai} block and the
+     * {@code dashboard-report} editor assist. An empty list would mean "no restriction", so this must
+     * stay a list holding one empty string — see {@code ClaudeToolFlags}.
      */
     List<String> NO_TOOLS = List.of("");
 

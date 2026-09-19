@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { modulesFixture } from '../../test/modules';
 import { useDashboardReportAssist, useDashboardReportAssistAvailable } from '../useDashboardReportAssist';
-import { useAiProviders, useExecutionConfig } from '../useSystem';
+import { useExecutionConfig, useProviderModels } from '../useSystem';
 import { useModuleInfo } from '../useModules';
 import { apiErrorMessage } from '../../api/client';
 import { getTranslations, useI18nStore } from '../../i18n';
@@ -133,14 +133,14 @@ describe('useDashboardReportAssist', () => {
  */
 function useProbe() {
   const available = useDashboardReportAssistAvailable();
-  const providers = useAiProviders();
+  const claudeModels = useProviderModels('CLAUDE');
   const config = useExecutionConfig();
   const moduleInfo = useModuleInfo('dashboard-report');
-  return { available, ready: providers.isSuccess && config.isSuccess && moduleInfo !== undefined };
+  return { available, ready: claudeModels.isSuccess && config.isSuccess && moduleInfo !== undefined };
 }
 
 describe('useDashboardReportAssistAvailable', () => {
-  it('is true once the module, the setting and the CLAUDE provider are all on', async () => {
+  it('is true once the module, the setting and a usable Claude CLI are all there', async () => {
     const { result } = renderHook(() => useProbe(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.available).toBe(true);
@@ -166,9 +166,17 @@ describe('useDashboardReportAssistAvailable', () => {
     expect(result.current.available).toBe(false);
   });
 
-  it('is false when no CLAUDE provider is connected', async () => {
-    server.use(http.get(`${BASE}/system/ai-providers`, () =>
-      HttpResponse.json({ providers: ['CODEX'], default: 'CODEX' })));
+  /**
+   * The host's answer, not the bean list: `/system/ai-providers` still lists CLAUDE on an instance
+   * without the CLI (it names Spring beans), so the button hides on the model catalog's
+   * `available`, which for CLAUDE says whether the `claude` program exists on this host.
+   */
+  it('is false when this host has no usable Claude CLI', async () => {
+    server.use(http.get(`${BASE}/system/ai-providers/:id/models`, ({ params }) =>
+      HttpResponse.json({
+        providerId: String(params.id).toUpperCase(), available: false, source: 'static-aliases',
+        fetchedAt: null, reason: 'claude is not installed on this host (not found on PATH)', models: [],
+      })));
     const { result } = renderHook(() => useProbe(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.available).toBe(false);

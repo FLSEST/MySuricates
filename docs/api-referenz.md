@@ -2447,7 +2447,7 @@ Modul `dashboard-report`; zusätzlich muss die Einstellung `dashboard-report-ass
 
 - **400**: `workflowId` fehlt oder ist leer.
 - **404**: Modul aus (`MODULE_DISABLED`) oder Workflow unbekannt/soft-gelöscht.
-- **409**: Einstellung aus, Anbieter `CLAUDE` nicht verfügbar, kein Run oder keine Ausgabe im letzten Run, KI antwortet nicht oder nicht vertragskonform. Die Meldung ist fest — sie enthält nie einen Teil der Antwort.
+- **409**: Einstellung aus, Claude-CLI auf diesem Host nicht verfügbar (geprüft über den Modellkatalog des Anbieters `CLAUDE`), kein Run oder keine Ausgabe im letzten Run, KI antwortet nicht oder nicht vertragskonform. Die Meldung ist fest — sie enthält nie einen Teil der Antwort.
 
 Der Vorschlag beschreibt normalerweise nur einen Lauf, ohne Variablen. Für dauerhafte Kennzahlen im Block `{{ variable }}` eintragen.
 

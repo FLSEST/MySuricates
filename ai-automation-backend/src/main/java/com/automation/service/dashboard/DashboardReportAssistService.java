@@ -12,7 +12,7 @@ import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.ai.AiProvider;
-import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +44,16 @@ import java.util.Map;
  * the rule that two markers in one answer are ambiguous and rejected, so a marker quoted out of the
  * source cannot pose as the proposal. Refusals carry a fixed message: no CLI error text, no run
  * output, no fragment of the answer.
+ *
+ * <p><b>"No AI connected ⇒ nothing is offered" asks the host, not the bean list.</b> Whether the
+ * provider is registered as a Spring bean says nothing: {@code ClaudeAiProvider} is an
+ * unconditional component, so that condition is true on an instance without any Claude CLI. The
+ * question is asked of {@link ModelCatalogService} instead — the path the settings UI already uses
+ * to find out what a provider offers here. For {@code CLAUDE} it answers from a PATH lookup, so no
+ * process is started on this request path and the single SQLite connection is never touched; the
+ * catalog's TTL cache absorbs repeated asks, and a negative answer is re-checked within a minute.
+ * An installed but unauthenticated CLI cannot be told apart without spending a call — that case
+ * fails later, with the fixed "the AI did not answer" message.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,7 +73,7 @@ public class DashboardReportAssistService {
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepRepository;
     private final CommandExecutorService commandExecutor;
-    private final AiProviderRegistry providers;
+    private final ModelCatalogService modelCatalog;
     private final DashboardReportAssistConfig config;
 
     public DashboardReportAssistResponse propose(String workflowId) {
@@ -74,9 +84,10 @@ public class DashboardReportAssistService {
             throw new IllegalStateException("Der KI-Vorschlag für Dashboard-Berichte ist abgeschaltet "
                     + "(Einstellungen → Ausführung).");
         }
-        if (!providers.getAvailableProviderIds().contains(PROVIDER)) {
+        if (!modelCatalog.getCatalog(PROVIDER, false).available()) {
+            // The reason can name a path or a CLI message — the caller only learns that it is off.
             throw new IllegalStateException("Der KI-Vorschlag braucht den Anbieter " + PROVIDER
-                    + "; auf dieser Instanz ist er nicht verfügbar.");
+                    + "; auf diesem Host ist dessen CLI nicht verfügbar.");
         }
         if (workflowRepository.findIdAndNameByIdIn(List.of(workflowId)).isEmpty()) {
             throw new ResourceNotFoundException("Workflow", workflowId);

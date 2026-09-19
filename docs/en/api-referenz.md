@@ -2439,7 +2439,7 @@ Module `dashboard-report`; the setting `dashboard-report-assist-enabled` (see `/
 
 - **400**: `workflowId` missing or empty.
 - **404**: Module off (`MODULE_DISABLED`) or workflow unknown/soft-deleted.
-- **409**: setting off, provider `CLAUDE` not available, no run or no output in the last run, AI does not answer or answer does not match contract. The message is fixed — it never contains part of the response.
+- **409**: setting off, no Claude CLI on this host (checked via the `CLAUDE` provider's model catalog), no run or no output in the last run, AI does not answer or answer does not match contract. The message is fixed — it never contains part of the response.
 
 The suggestion typically describes only one run, with no variables. For persistent KPIs enter `{{ variable }}` in the block.
 
