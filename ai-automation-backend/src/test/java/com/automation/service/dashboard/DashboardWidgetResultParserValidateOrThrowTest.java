@@ -277,7 +277,7 @@ class DashboardWidgetResultParserValidateOrThrowTest {
 
         assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dashboard_widget")
+                .hasMessage("dashboard_widget could not be read") // documented exception: no field named
                 .hasMessageNotContaining("NaN");
     }
 
@@ -291,7 +291,7 @@ class DashboardWidgetResultParserValidateOrThrowTest {
 
         assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dashboard_widget")
+                .hasMessage("dashboard_widget could not be read") // documented exception: no field named
                 .hasMessageNotContaining("Infinity");
     }
 
@@ -302,7 +302,7 @@ class DashboardWidgetResultParserValidateOrThrowTest {
 
         assertThatThrownBy(() -> DashboardWidgetResultParser.validateOrThrow(candidate))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("dashboard_widget")
+                .hasMessage("dashboard_widget could not be read") // documented exception: no field named
                 .hasMessageNotContaining("QUJD");
     }
 

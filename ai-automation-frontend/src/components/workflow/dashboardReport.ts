@@ -165,7 +165,11 @@ export function reportWarnings(form: ReportForm): ReportWarning[] {
     const at = `kpis[${index + 1}]`;
     const label = kpi.label.trim();
     const value = kpi.value.trim();
-    if ((label === '') !== (value === '')) warnings.push({ field: at, rule: 'kpiIncomplete' });
+    // A row nobody has touched yet is dropped at run time and stays silent. Once any of the three
+    // fields carries something — a trend alone counts — label and value are both required, and the
+    // backend says so ('kpis[n].label is required') rather than dropping the row.
+    const started = label !== '' || value !== '' || kpi.trend !== '';
+    if (started && (label === '' || value === '')) warnings.push({ field: at, rule: 'kpiIncomplete' });
     checkLength(`${at}.label`, kpi.label, WORKFLOW_RESULT_CAPS.kpiText);
     checkLength(`${at}.value`, kpi.value, WORKFLOW_RESULT_CAPS.kpiText);
   });

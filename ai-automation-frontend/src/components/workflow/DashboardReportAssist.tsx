@@ -66,12 +66,14 @@ export function DashboardReportAssist({ workflowId, onApply }: DashboardReportAs
             data-testid="dashboard-report-assist-source"
             className="text-[11px] text-text-tertiary break-words"
           >
+            {/* Function replacers: a '$' in a value (runId, provider) would otherwise be read as a
+                replacement pattern like $& — house convention, see DashboardReportFields. */}
             {t.source
-              .replace('{provider}', assist.data.provider || '-')
-              .replace('{runId}', assist.data.runId)
-              .replace('{completedAt}', assist.data.runCompletedAt
+              .replace('{provider}', () => assist.data?.provider || '-')
+              .replace('{runId}', () => assist.data?.runId ?? '-')
+              .replace('{completedAt}', () => (assist.data?.runCompletedAt
                 ? formatDateTime(assist.data.runCompletedAt, locale)
-                : '-')}
+                : '-'))}
           </p>
           {proposal.kpis.map((kpi, index) => (
             <p key={`kpi-${index}`} className="break-words">{kpi.label}: {kpi.value}{kpi.trend ? ` (${kpi.trend})` : ''}</p>

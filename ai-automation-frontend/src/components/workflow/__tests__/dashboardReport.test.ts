@@ -100,6 +100,16 @@ describe('dashboardReport form model', () => {
       ...EMPTY_REPORT_FORM, status: 'GREEN', kpis: [{ label: 'a', value: '', trend: '' }],
     })).toEqual([{ field: 'kpis[1]', rule: 'kpiIncomplete' }]);
 
+    // A trend alone is a started row: the backend refuses it with 'kpis[1].label is required'.
+    expect(reportWarnings({
+      ...EMPTY_REPORT_FORM, status: 'GREEN', kpis: [{ label: '', value: '', trend: 'UP' }],
+    })).toEqual([{ field: 'kpis[1]', rule: 'kpiIncomplete' }]);
+
+    // A row nobody has filled in yet is dropped at run time — no warning while it is still empty.
+    expect(reportWarnings({
+      ...EMPTY_REPORT_FORM, status: 'GREEN', kpis: [{ label: '', value: '', trend: '' }],
+    })).toEqual([]);
+
     expect(reportWarnings({
       ...EMPTY_REPORT_FORM, status: 'GREEN',
       kpis: [{ label: 'x'.repeat(WORKFLOW_RESULT_CAPS.kpiText + 1), value: 'v', trend: '' }],

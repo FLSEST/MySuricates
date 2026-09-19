@@ -72,6 +72,7 @@ export function DashboardReportFields({
           <div className="grid gap-3 sm:grid-cols-2">
             <Select
               data-testid="dashboard-report-status"
+              aria-label={t.status}
               label={t.status}
               value={isKnownStatus ? status : CUSTOM_STATUS}
               onChange={(e) => patch({ status: e.target.value === CUSTOM_STATUS ? '' : e.target.value })}

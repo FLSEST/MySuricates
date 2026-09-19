@@ -175,7 +175,17 @@ public final class DashboardWidgetResultParser {
      * The same check for a caller that already holds the contract as fields instead of as marker text
      * (the {@code dashboard-report} block, and the editor assist after {@link #parse}): the private
      * {@link #validate} of the marker path, only with the exception passed on instead of swallowed.
-     * Messages name the offending field and never echo its value.
+     * Messages name the offending field and never echo its value — with one documented exception.
+     *
+     * <p><b>The exception:</b> a candidate value that cannot be turned into bounded JSON at all never
+     * reaches {@link #validate}, so no field can be named; it is rejected one step earlier, by
+     * {@link DashboardWidgetJson#fieldTreeOf}, with the general {@code "dashboard_widget could not be
+     * read"}. That covers {@code NaN}/{@code Infinity}, a {@code byte[]}, a string beyond the field
+     * mapper's budget and nesting beyond its depth — each of them a rejection either way, only with a
+     * coarser message. Naming the field there would mean writing the validator's path logic a second
+     * time, and via the block the case is practically unreachable anyway: persisted block config
+     * arrives as strings through {@code JsonMapConverter}, and the assist hands on strings the parser
+     * has already accepted. Pinned by {@code DashboardWidgetResultParserValidateOrThrowTest}.
      */
     public static Result validateOrThrow(Object candidate) {
         return validate(DashboardWidgetJson.fieldTreeOf(candidate));

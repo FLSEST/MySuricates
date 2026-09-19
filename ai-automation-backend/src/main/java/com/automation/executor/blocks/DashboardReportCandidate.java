@@ -151,12 +151,12 @@ final class DashboardReportCandidate {
     /**
      * {@code kpis} or {@code items}: not a list at all is passed through unchanged for the parser to
      * reject ("{@code <field>} must be an array…", its own rule, not duplicated here); a list is
-     * resolved entry by entry. A KPI entry that is not an object (including a bare {@code null}) is
-     * passed through unchanged too, for the same reason — dropping it would silently accept an input
-     * the marker path rejects. Only an entry that resolved to genuinely nothing (a blank string item,
-     * or a KPI object whose every value resolved to nothing — the editor's still-empty row) is left
-     * out, exactly like any other optional field; its original config position is not recorded either,
-     * since nothing about it reaches the parser to be misnumbered.
+     * resolved entry by entry. A KPI entry that is not an object, and a bare {@code null} in either
+     * list, are passed through unchanged too, for the same reason — dropping one would silently
+     * accept an input the marker path rejects. Only an entry that resolved to genuinely nothing (a
+     * blank string item, or a KPI object whose every value resolved to nothing — the editor's
+     * still-empty row) is left out, exactly like any other optional field; its original config
+     * position is not recorded either, since nothing about it reaches the parser to be misnumbered.
      *
      * @return the original 1-based config position of each entry that made it into the candidate, in
      *         the same order — {@link #renumber}'s lookup table for this field
@@ -180,12 +180,11 @@ final class DashboardReportCandidate {
             if (kpi && entry instanceof Map<?, ?> map) {
                 value = kpiFields(context, map, at);
                 keep = value != null; // drop only a fully-blank KPI row (the editor's still-empty one)
-            } else if (kpi) {
-                value = entry; // not an object at all, including a bare null — the parser rejects it, never silently dropped
+            } else if (kpi || entry == null) {
+                // Not an object at all, and a bare null in either list: the parser rejects it
+                // ("items[n] is required"), so dropping it here would accept what the marker path refuses.
+                value = entry;
                 keep = true;
-            } else if (entry == null) {
-                value = null;
-                keep = false; // a null items entry stays silently absent, unchanged from before
             } else {
                 value = resolvedOrPassThrough(context, entry, at);
                 keep = value != null; // a string that resolved to nothing is dropped; anything else always survives

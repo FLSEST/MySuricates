@@ -317,6 +317,26 @@ class DashboardReportCandidateTest {
     }
 
     /**
+     * The same rule for {@code items}: a bare {@code null} entry used to be dropped silently here
+     * while the marker path rejected the very same input ({@code {"items":[null]}} → "items[1] is
+     * required"). Whether an entry survives must never decide the outcome — see
+     * {@link DashboardReportBlockExecutorTest#a_null_item_entry_fails_via_the_shared_validator}.
+     */
+    @Test
+    void a_null_items_entry_is_passed_through_unchanged_not_dropped() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        List<Object> items = new ArrayList<>();
+        items.add("a finding");
+        items.add(null);
+        config.put("items", items);
+
+        Map<String, Object> candidate = DashboardReportCandidate.build(context(), config);
+
+        assertThat(candidate.get("items")).isEqualTo(java.util.Arrays.asList("a finding", null));
+    }
+
+    /**
      * I3 (regression): dropping a blank row shifts every later survivor's position in the list the
      * validator sees. {@link DashboardReportCandidate#buildTracked} records each survivor's original,
      * author-facing config position so a validator message can be translated back — see

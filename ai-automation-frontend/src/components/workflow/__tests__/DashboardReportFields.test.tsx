@@ -129,6 +129,28 @@ describe('DashboardReportFields', () => {
     expect(warnings).toHaveTextContent('title');
   });
 
+  /**
+   * `Input`/`Select` do not link their label to the field, so every field of this form carries its
+   * own aria-label — the status select was the one that did not, and a screen reader announced it
+   * as an unnamed combo box.
+   */
+  it('gives every field an accessible name', () => {
+    render(
+      <DashboardReportFields
+        blockType="dashboard-report"
+        configJson={config({ status: 'GREEN', kpis: [{ label: 'Hunts', value: '1361' }], items: ['x'] })}
+        onConfigChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText('Status')).toBe(screen.getByTestId('dashboard-report-status'));
+    for (const field of ['dashboard-report-title', 'dashboard-report-summary',
+      'dashboard-report-kpi-label-0', 'dashboard-report-kpi-value-0',
+      'dashboard-report-kpi-trend-0', 'dashboard-report-item-0']) {
+      expect(screen.getByTestId(field), field).toHaveAccessibleName();
+    }
+  });
+
   it('says so instead of guessing when the config is not valid JSON', () => {
     render(
       <DashboardReportFields blockType="dashboard-report" configJson="{oops" onConfigChange={() => {}} />,

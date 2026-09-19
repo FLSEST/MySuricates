@@ -281,6 +281,27 @@ class DashboardReportBlockExecutorTest {
 
     // ---- Fix round 2 --------------------------------------------------------------------------
 
+    /**
+     * The marker path rejects {@code {"items":[null]}} ("items[1] is required"); the block used to
+     * drop such an entry and succeed. Same input, same verdict — on the author's own numbering.
+     */
+    @Test
+    void a_null_item_entry_fails_via_the_shared_validator() {
+        ExecutionContext ctx = context();
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("status", "GREEN");
+        List<Object> items = new ArrayList<>();
+        items.add("a finding");
+        items.add(null);
+        config.put("items", items);
+
+        StepResult step = executor.execute(block(config), ctx);
+
+        assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(step.getOutput()).contains("items[2]");
+        assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.METADATA_KEY);
+    }
+
     /** I2 (regression): the marker path rejects a bare null kpi entry — the block must still fail too. */
     @Test
     void a_null_kpi_entry_fails_via_the_shared_validator() {
