@@ -126,17 +126,6 @@ class WorkflowAnalyzerTest {
     }
 
     @Test
-    void gateAuftragOhneFormatvorgabeIstEinBefund() {
-        var ohne = List.of(block("simple", "pruefung", Map.of("prompt",
-                "Bewerte den Stand und nenne einen gate_status.")));
-        var mit = List.of(block("simple", "pruefung", Map.of("prompt",
-                "Bewerte den Stand. Schreibe gate_status: GREEN auf eine eigene Zeile.")));
-
-        assertThat(rules(ohne, null)).contains("gate-order-without-format");
-        assertThat(rules(mit, null)).doesNotContain("gate-order-without-format");
-    }
-
-    @Test
     void datierteModellIdIstEinBefund() {
         var blocks = List.of(block("simple", "a", Map.of(
                 "prompt", "Fasse zusammen", "model", "claude-opus-4-6")));
@@ -161,7 +150,7 @@ class WorkflowAnalyzerTest {
                 block("shell", "messung", Map.of("command",
                         "set -euo pipefail\ncd {{ project_path }}\nls docs")),
                 block("simple", "report", Map.of("prompt",
-                        "Werte {{ block.messung.output }} aus. Schliesse mit gate_status: GREEN auf eigener Zeile.",
+                        "Werte {{ block.messung.output }} aus und fasse zusammen.",
                         "model", "opus")));
 
         assertThat(analyzer.analyze(blocks, null)).isEmpty();

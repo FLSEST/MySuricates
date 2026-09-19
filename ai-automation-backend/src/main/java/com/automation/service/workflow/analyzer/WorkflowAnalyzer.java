@@ -27,7 +27,6 @@ import java.util.List;
  *   <li>{@code absolute-home-path} — Pfad mit Klarnamen unter {@code /home/…}</li>
  *   <li>{@code missing-strict-mode} — Shell-Block ohne {@code set -euo pipefail}</li>
  *   <li>{@code duplicated-instructions} — Block-Prompt wiederholt {@code workflow.instructions}</li>
- *   <li>{@code gate-order-without-format} — Gate-Auftrag ohne Formatvorgabe</li>
  *   <li>{@code dated-model-id} — datierte Modell-ID statt Alias</li>
  * </ul>
  *
@@ -37,6 +36,16 @@ import java.util.List;
  * keine Messung) und zu knappe Timeouts (braucht Laufzeitdaten aus {@code step_results}). Eine
  * Regel, die raten muss, erzeugt Rauschen — und ein Prüfwerkzeug, dem man nicht glaubt, wird
  * abgeschaltet.
+ *
+ * <p><b>Eine vierte Regel ist daran gescheitert</b> und wieder entfernt worden (TODO 8e5d13a9):
+ * {@code gate-order-without-format} sollte Prompts finden, die einen {@code gate_status}-Marker
+ * bestellen, ohne zu sagen, dass er am Zeilenanfang stehen muss. Der Bestandslauf ergab 22 Treffer
+ * in 15 ausgelieferten Definitionen — und bei der Durchsicht war <b>kein einziger</b> echt: 18 waren
+ * Shell-Blöcke, die den Marker selbst schreiben ({@code echo "gate_status: GREEN"}), die übrigen
+ * Prompts <i>erwähnten</i> ihn bloß. Einer sagte sogar ausdrücklich „Gib KEINEN gate_status aus".
+ * Die Unterscheidung zwischen „bestellt einen Marker" und „redet über Marker" verlangt
+ * Textverständnis, nicht Mustersuche. Wer sie wieder aufnimmt, braucht dafür einen anderen Weg —
+ * etwa ein Feld in der Definition, das den Gate-Auftrag ausdrücklich macht.
  */
 @Service
 public class WorkflowAnalyzer {

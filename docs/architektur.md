@@ -243,7 +243,7 @@ com.automation
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills, Optimize, Similar, Repair, Versions |
-| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` und `/analyze` — deterministische Baufehler-Prüfung einer Definition bzw. des Bestands. Meldet nur, greift in keinen Schreibweg ein (182bd224) |
+| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` und `/analyze` — deterministische Baufehler-Prüfung einer Definition bzw. des Bestands (sieben Regeln). Meldet nur, greift in keinen Schreibweg ein (182bd224) |
 | `WorkflowImportController` | `/api/v1/workflows/import` | BPMN-Import (`POST /bpmn?projectId=…`, Body = BPMN-XML) → neuer Workflow (201); BPMN ohne `mysuricates`-Erweiterung/kaputtes XML/zu groß → 400. Der Marker sagt nur, dass sich Blöcke lesen lassen, nicht woher die Datei stammt |
 | `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
