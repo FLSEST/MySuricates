@@ -227,6 +227,8 @@ These use non-obvious paths — always use these, never guess:
 | List workflow versions | GET | `/api/v1/workflows/{id}/versions?page=0&size=20` |
 | Get workflow version | GET | `/api/v1/workflows/{id}/versions/{versionId}` |
 | Restore workflow version | POST | `/api/v1/workflows/{id}/versions/{versionId}/restore` |
+| Analyze workflow definition | GET | `/api/v1/workflows/{id}/analyze` — deterministische Baufehler-Pruefung, meldet nur |
+| Analyze all definitions | GET | `/api/v1/workflows/analyze?minSeverity=HIGH` — Bestandslauf, verdichtet |
 | Export workflow as BPMN | GET | `/api/v1/workflows/{id}/export/bpmn` |
 | Import workflow from BPMN | POST | `/api/v1/workflows/import/bpmn?projectId={uuid}` — body: BPMN-XML (`Content-Type: application/xml`); liest nur `mysuricates:blockConfig` (Formatfilter, **kein** Herkunftsbeleg — siehe AGENTS.md) |
 

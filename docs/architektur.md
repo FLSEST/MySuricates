@@ -160,7 +160,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 46 Controller)
+Controller (REST API, 47 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -179,7 +179,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          46 REST-Controller
+├── controller/          47 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -237,12 +237,13 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 46 REST-Controller
+### Alle 47 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills, Optimize, Similar, Repair, Versions |
+| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` und `/analyze` — deterministische Baufehler-Prüfung einer Definition bzw. des Bestands. Meldet nur, greift in keinen Schreibweg ein (182bd224) |
 | `WorkflowImportController` | `/api/v1/workflows/import` | BPMN-Import (`POST /bpmn?projectId=…`, Body = BPMN-XML) → neuer Workflow (201); BPMN ohne `mysuricates`-Erweiterung/kaputtes XML/zu groß → 400. Der Marker sagt nur, dass sich Blöcke lesen lassen, nicht woher die Datei stammt |
 | `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |

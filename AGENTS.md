@@ -347,6 +347,20 @@ GET /api/v1/projects
 # Workflows eines Projekts
 GET /api/v1/workflows?projectId=<uuid>
 
+# Definition auf bekannte Baufehler pruefen (deterministisch, kein KI-Aufruf)
+GET /api/v1/workflows/{id}/analyze
+# → {"workflowId","workflowName","findingCount","bySeverity",
+#     "findings":[{"rule","severity","blockIndex","blockName","detail"}]}
+# Regeln: unknown-block-reference, chain-only-placeholder, unwired-output (nur KI-Bloecke),
+#         absolute-home-path, missing-strict-mode, duplicated-instructions,
+#         gate-order-without-format, dated-model-id
+# Der Analyzer meldet nur — er blockiert keinen Schreibweg und veraendert nichts.
+
+# Bestandslauf ueber alle Definitionen in aktiven Projekten
+GET /api/v1/workflows/analyze?minSeverity=HIGH
+# → {"workflowsChecked","workflowsAffected","findingsTotal","byRule","workflows":[…]}
+# Verdichtet: je Workflow nur Zahlen. Die vollen Befunde holt man je Workflow.
+
 # Workflow als BPMN 2.0 XML exportieren
 GET /api/v1/workflows/{id}/export/bpmn
 # → File-Download (.bpmn, Camunda-Modeler-kompatibel)
