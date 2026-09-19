@@ -311,6 +311,12 @@ COMPOSE_OVERRIDE="${STATE_DIR}/dev-container.override.yml"
 COMPOSE_PROJECT="${AUTOTRIGGER_DEV_COMPOSE_PROJECT:-autotrigger-dev}"
 
 compose_cmd() {
+  # Das Image legt einen Benutzer mit den Host-IDs an (Dockerfile.stable), damit die
+  # gemounteten Anmeldungen lesbar bleiben. $UID/$GID sind in Bash nicht exportiert,
+  # deshalb hier ausdruecklich aus id(1) — ohne sie scheitert der Build im useradd.
+  AUTOTRIGGER_DEV_HOST_USER="${AUTOTRIGGER_DEV_HOST_USER:-$(id -un)}" \
+  AUTOTRIGGER_DEV_HOST_UID="${AUTOTRIGGER_DEV_HOST_UID:-$(id -u)}" \
+  AUTOTRIGGER_DEV_HOST_GID="${AUTOTRIGGER_DEV_HOST_GID:-$(id -g)}" \
   docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
 }
 
@@ -330,9 +336,6 @@ write_compose_override() {
   local node_modules="${AUTOTRIGGER_DEV_NODE_MODULES:-/usr/lib/node_modules}"
   for p in "${node_modules}/@openai/codex" "${node_modules}/@earendil-works/pi-coding-agent"; do
     [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
-  done
-  for p in "/usr/bin/codex" "/usr/bin/pi"; do
-    [[ -e "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
   done
   for p in "${HOME}/.codex" "${HOME}/.pi"; do
     [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}")

@@ -9,9 +9,23 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       curl git gosu \
       python3 jq \
-      nodejs npm \
       wget unzip ca-certificates gnupg && \
     rm -rf /var/lib/apt/lists/*
+
+# Node aus dem NodeSource-Repo statt aus Ubuntu jammy: dessen `nodejs`-Paket ist v12.22 und damit
+# zu alt fuer zwei der drei KI-CLIs — codex verlangt >=16, pi >=20.6, beide sind ES-Module und
+# scheitern unter v12 im Modul-Loader. Genau daran lag es, dass Claude im Container lief und Codex
+# und Pi nicht (TODO a1236a64). Die JVM-Anwendung selbst benutzt Node nicht.
+ARG NODE_MAJOR=22
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+      | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    chmod a+r /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" \
+      > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/* && \
+    node --version
 
 # Docker CE CLI so the backend can spawn ephemeral per-block containers via
 # ContainerShellService (container_image in shell/retry/foreach/while/switch blocks).
@@ -23,6 +37,16 @@ RUN install -m 0755 -d /etc/apt/keyrings && \
       > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y --no-install-recommends docker-ce-cli && \
     rm -rf /var/lib/apt/lists/*
+
+# Startdateien von codex und pi verlinken, statt sie als Datei zu mounten. Docker loest einen
+# Symlink beim Bind-Mount auf — `/usr/bin/codex` laege dann als echte Datei unter /usr/bin, und
+# Node suchte seine Abhaengigkeiten relativ dazu statt im Paketverzeichnis. Genau daran scheiterten
+# beide ("Missing optional dependency @openai/codex-linux-x64", "Cannot find package 'undici'"),
+# obwohl die Pakete gemountet waren. Zeigt der Link ins Leere, ist der Provider eben nicht
+# verfuegbar — das schadet nicht (TODO a1236a64).
+ARG NODE_MODULES_DIR=/usr/lib/node_modules
+RUN ln -sf ${NODE_MODULES_DIR}/@openai/codex/bin/codex.js /usr/local/bin/codex && \
+    ln -sf ${NODE_MODULES_DIR}/@earendil-works/pi-coding-agent/dist/cli.js /usr/local/bin/pi
 
 RUN groupadd -g ${HOST_GID} ${HOST_USER} && \
     useradd -u ${HOST_UID} -g ${HOST_USER} -m -d ${HOST_HOME} -s /bin/bash ${HOST_USER}

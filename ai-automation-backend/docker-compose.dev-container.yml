@@ -13,6 +13,14 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.stable
+      # Das Image legt einen Benutzer mit den IDs des Hosts an, damit die gemounteten
+      # Anmeldungen unter $HOME lesbar bleiben. Ohne diese Args scheitert der Build im
+      # `useradd` — der Starter setzt sie deshalb aus id(1).
+      args:
+        HOST_USER: ${AUTOTRIGGER_DEV_HOST_USER:-${USER}}
+        HOST_UID: ${AUTOTRIGGER_DEV_HOST_UID:-1000}
+        HOST_GID: ${AUTOTRIGGER_DEV_HOST_GID:-1000}
+        HOST_HOME: ${HOME}
     image: ai-automation-backend-dev-container
     container_name: ${AUTOTRIGGER_DEV_CONTAINER_NAME:-autotrigger-dev-container}
     ports:
