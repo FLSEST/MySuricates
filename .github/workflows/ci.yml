@@ -14,7 +14,12 @@ jobs:
     name: Public Hygiene
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0, weil doc-facts-check.sh die Commit-Zahl der README-Kopftabelle gegen
+      # `git rev-list --count HEAD` haelt. Im flachen Standard-Checkout zaehlt das nur die
+      # geholte Tiefe (1) — das Gate ueberspringt die Zahl dann hoerbar, prueft sie also nie.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Run public-hygiene gate
         run: bash scripts/ci/public-hygiene.sh --tracked
       - name: Hygiene-Gate Selbsttest (Worktrees, fehlende Regeldatei)

@@ -375,6 +375,28 @@ check "passende Commit-Zahl und datierte Testzahl: exit 0" '[ "$RC" -eq 0 ]'
 check "README.de.md ohne Befund" '! grep -q "README.de.md" <<<"$OUT"'
 rm "$FAKE/README.de.md"
 
+# Der Fall, der am 2026-09-19 die CI rot faerbte: im flachen Klon zaehlt
+# `git rev-list --count HEAD` nur die geholte Tiefe. Das Gate verglich die README-Angabe
+# gegen diese 1 und meldete Drift — eine Zahl, die es nicht gemessen hatte.
+echo "11b) Flacher Klon: die Commit-Zahl wird uebersprungen, nicht falsch gemeldet"
+SHALLOW="$TMP/shallow"
+git clone -q --depth 1 "file://$FAKE" "$SHALLOW"
+cat > "$SHALLOW/README.de.md" <<'MD_EOF'
+# MySuricates
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 40 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 — Lauf vom 2026-09-18 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$SHALLOW" 2>&1); RC=$?
+check "der Klon ist wirklich flach" \
+  '[ "$(git -C "$SHALLOW" rev-parse --is-shallow-repository)" = true ]'
+check "exit 0 statt Fehlbefund"        '[ "$RC" -eq 0 ]'
+check "Meldung nennt den flachen Klon" 'grep -q "flacher Klon" <<<"$OUT"'
+check "Meldung nennt die Abhilfe"      'grep -q "fetch-depth: 0" <<<"$OUT"'
+check "keine erfundene Commit-Drift"   '! grep -q "commits sagt" <<<"$OUT"'
+rm -rf "$SHALLOW"
+
 echo "12) Onboarding-Fakten: Versionen, verbotene Muster, nicht existierende Dateien"
 mkdir -p "$FAKE/docs/onboarding"
 cat > "$FAKE/docs/onboarding/README.md" <<'MD_EOF'

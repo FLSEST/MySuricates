@@ -97,9 +97,21 @@ fact_providers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("integration-providers: $JAVA_SRC fehlt"); echo 0; return; }
   grep -rl 'implements IntegrationProvider' "$JAVA_SRC" 2>/dev/null | wc -l | tr -d ' '
 }
-# Commit-Zahl der README-Kopftabelle. Kein Git-Repo (Fixture, entpacktes Archiv) ist kein
-# Fehler — dann wird die Zahl nachweislich uebersprungen statt still durchgewunken.
+# Commit-Zahl der README-Kopftabelle. Zwei Faelle sind keine Messung und werden deshalb
+# nachweislich uebersprungen statt still durchgewunken:
+#
+#   1. Kein Git-Repo (Fixture, entpacktes Archiv) — git antwortet nicht.
+#   2. Flacher Klon — git antwortet mit der geholten Tiefe statt mit der Wahrheit, also mit
+#      einer plausibel aussehenden falschen Zahl. Das ist der gefaehrlichere Fall: Am
+#      2026-09-19 checkte der Public-Hygiene-Job ohne `fetch-depth: 0` aus, `rev-list` zaehlte
+#      1, und das Gate meldete "commits sagt 1550, Code 1" — ein Fehlbefund, der die CI rot
+#      faerbte und nichts ueber die Doku aussagte. Ein Gate, das eine Zahl nicht messen kann,
+#      darf keine nennen.
+fact_commits_shallow() {
+  [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]
+}
 fact_commits() {
+  fact_commits_shallow && return
   git -C "$ROOT" rev-list --count HEAD 2>/dev/null | tr -d ' '
 }
 
@@ -166,6 +178,10 @@ COMMITS_NOTE=""
 if [ -n "$COMMITS" ] && [ "$COMMITS" != "0" ]; then
   COMMITS_JSON=",\"commits\":$COMMITS"
   COMMITS_NOTE=", Commits $COMMITS"
+elif fact_commits_shallow; then
+  echo "doc-facts-check: uebersprungen — flacher Klon unter $ROOT (rev-list zaehlt dort nur die" \
+       "geholte Tiefe, nicht die Historie): die Commit-Zahl der README-Kopftabelle wird nicht" \
+       "geprueft. Damit sie geprueft wird: actions/checkout mit 'fetch-depth: 0'." >&2
 else
   echo "doc-facts-check: uebersprungen — kein Git-Repository (oder kein Commit) unter $ROOT:" \
        "die Commit-Zahl der README-Kopftabelle wird nicht geprueft." >&2
