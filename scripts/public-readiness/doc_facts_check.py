@@ -162,7 +162,10 @@ def span_is_declared_excerpt(line, match, expected):
 #   grob, aber vom Auftrag so gewollt — die eine Formulierung in
 #   docs/onboarding/ARCHITECTURE.md ist der ganze Anwendungsfall.
 # ---------------------------------------------------------------------------
-TABLE_MIGRATION_ROW = re.compile(r"^\|\s*`?V(\d+)`?\s*\|")
+# Eine Zeile darf eine Nummer ODER eine Spanne tragen: docs/architektur.md fasst zwei
+# Migrationen zu "| V28–V29 | Wishes + Wish-Reference-Workflow-IDs |" zusammen. Ohne die
+# Spanne haelt die Vollstaendigkeitspruefung das fuer ein Loch (sie tat es beim ersten Lauf).
+TABLE_MIGRATION_ROW = re.compile(rf"^\|\s*`?V(\d+)`?(?:\s*{DASH}\s*`?V(\d+)`?)?\s*\|")
 
 # Kopftabelle von README.de.md: "rund 1 420 Commits" — der Text sagt "rund",
 # deshalb mit Toleranz. Tausendertrenner koennen Leer-, Schmal- oder Punktzeichen sein.
@@ -193,22 +196,26 @@ VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
 VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
 
 # ---------------------------------------------------------------------------
-# Onboarding-Paket (docs/onboarding, docs/en/onboarding)
+# Verbotene Muster, fehlende Dateien, undatierte Testzahlen: gelten ueberall
 #
-# Das Paket wurde am 2026-09-18 von Hand gegen den Code geprueft (TODO 8c75f1dd);
-# die Regeln von damals stehen hier, damit die Zahlen nicht wieder ungeprueft
-# altern. Warum nur das Onboarding — die beiden Regelarten haben verschiedene
-# Gruende:
+# Die drei Regeln kamen am 2026-09-18 mit der Handpruefung des Onboarding-Pakets
+# (TODO 8c75f1dd) und galten zunaechst nur dort — nicht aus einem inhaltlichen
+# Grund, sondern weil je eine Fundstelle ausserhalb erst umformuliert werden
+# musste. Seit TODO c9c9f3eb ist das erledigt und die Regeln laufen ueber alle
+# geprueften Dateien:
 #
-# - Kommando-Muster (mvn spring-boot:run) sind anderswo legitim: docs/entwicklung.md
-#   nennt den Befehl als erklaerten Gegen-Hinweis im Fliesstext, ohne Blockquote.
-#   Eine Ausweitung braucht erst eine Umformulierung dort.
-# - Dateinamen-Muster waeren ueberall falsch — docs/architektur.md nennt
-#   tailwind.config.ts in einem Verzeichnisbaum, obwohl es die Datei nicht gibt.
-#   Die Regel ist hier trotzdem nicht ausgeweitet: das ist ein eigenes TODO,
-#   zusammen mit der Korrektur der Fundstelle.
+# - Kommando-Muster: docs/entwicklung.md nannte `mvn spring-boot:run` als
+#   Gegen-Hinweis im Fliesstext; der Hinweis steht jetzt als Blockquote und ist
+#   damit von der Regel ausgenommen (check_forbidden_patterns laesst "> " durch).
+# - Dateinamen-Muster: die Nennung von tailwind.config.ts in docs/architektur.md
+#   ist entfallen. Die verbliebenen Tailwind-Stellen sprechen von
+#   `tailwind.config.js`/`.*` und sagen ausdruecklich, dass es die Datei NICHT
+#   gibt — ein anderer Name, den die Regel nicht trifft.
+# - Testzahl-Datierung: die undatierten Testzahlen in docs/ wurden datiert.
+#
+# Wer eine dieser Muster-Arten legitim braucht, schreibt sie als Blockquote
+# (Kommandos) oder setzt den IGNORE_MARKER in die Zeile.
 # ---------------------------------------------------------------------------
-ONBOARDING_PREFIXES = ("docs/onboarding/", "docs/en/onboarding/")
 
 # Verbotene Muster. Blockquote-Zeilen sind ausgenommen: dort steht das Muster
 # als Warnung ("Nicht `mvn spring-boot:run` verwenden"), nicht als Anleitung.
@@ -217,9 +224,14 @@ FORBIDDEN_PATTERNS = [
      "mvn spring-boot:run — der RuntimeClasspathGuard bricht den Start ab"),
     (re.compile(r"React Router v[1-6]\b"),
      "veraltete React-Router-Version (package.json fuehrt v7)"),
-    # Dauerhaft gueltig: Modell-IDs mit Datumsstand veralten von selbst, in der
-    # Doku gelten die Aliase opus/sonnet/haiku/fable.
-    (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d"),
+    # Dauerhaft gueltig: Modell-IDs mit Versions- oder Datumsstand veralten von
+    # selbst, in der Doku gelten die Aliase opus/sonnet/haiku/fable.
+    #
+    # Mindestens ZWEI Zahlengruppen verlangt: `claude-opus-4-6` und
+    # `claude-haiku-4-5-20251001` veralten, `claude-opus-5` nicht — eine
+    # einsegmentige ID ist laut CLAUDE.md eine erlaubte konkrete Angabe, und
+    # docs/architektur.md nennt sie genau so als Beispiel.
+    (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d+-\d"),
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
 ]
 
@@ -229,26 +241,62 @@ def digits(text):
     return int(re.sub(r"\D", "", text))
 
 
-def check_migration_table(rel, lines, expected, findings):
+def check_migration_table(rel, lines, expected, numbers, findings):
     if expected is None:
         return
     current = re.compile(rf"\bV{expected}\b")
     best = best_no = best_line = None
+    seen = {}
     names_current_outside = False
     for no, line in enumerate(lines, 1):
         if IGNORE_MARKER in line:
             continue
         match = TABLE_MIGRATION_ROW.match(line.lstrip())
         if match:
-            said = int(match.group(1))
+            first = int(match.group(1))
+            last = int(match.group(2)) if match.group(2) else first
+            for said in range(first, max(first, last) + 1):
+                seen.setdefault(said, no)
+            said = max(first, last)
             if best is None or said > best:
                 best, best_no, best_line = said, no, line
         elif current.search(line):
             names_current_outside = True
+    if best == expected:
+        check_migration_table_complete(rel, seen, best, best_no, numbers, findings)
     if best is None or best == expected or names_current_outside:
         return
     findings.append(f"DRIFT {rel}:{best_no} migration-table sagt {best}, Code {expected}"
                     f" | {best_line.strip()[:120]}")
+
+
+def check_migration_table_complete(rel, seen, best, best_no, numbers, findings):
+    """Keine Luecke zwischen der kleinsten und der groessten gelisteten Nummer.
+
+    Die Pruefung auf die HOECHSTE Nummer allein hat eine blinde Stelle, und sie ist beim
+    Nachtragen von V75 (TODO ffa6d846) aufgefallen: Ein fehlerhafter Einschub hat die
+    V74-Zeile zerschnitten, die Tabelle sprang von V73 auf V75 — und das Gate blieb gruen,
+    weil die Hoechstnummer stimmte. Eine Tabelle mit Loch ist als Nachschlagewerk aber genau
+    dort falsch, wo jemand nachsieht.
+
+    Geprueft wird nur, wenn die Tabelle bis zur aktuellen Hoechstnummer reicht — dann
+    behauptet sie Vollstaendigkeit, und ein Loch ist ein Befund. Bleibt sie darunter, meldet
+    das schon die Standpruefung, und ein ausgewiesener Auszug (docs/onboarding) soll nicht
+    zusaetzlich wegen fehlender Zeilen anschlagen. Die Spanne beginnt bei der kleinsten
+    gelisteten Nummer: Eine Tabelle, die bewusst erst bei V20 anfaengt, ist kein Befund.
+
+    Verglichen wird gegen die WIRKLICH vorhandenen Migrationsdateien (migration-numbers),
+    nicht gegen eine durchgezaehlte Reihe. Sonst waere eine nie existierende Nummer ein
+    Fehlalarm — Migrationsnummern koennen uebersprungen werden.
+    """
+    if best is None or not numbers:
+        return
+    missing = [n for n in numbers if min(seen) <= n <= best and n not in seen]
+    if not missing:
+        return
+    shown = ", ".join(f"V{n}" for n in missing[:8]) + ("…" if len(missing) > 8 else "")
+    findings.append(f"DRIFT {rel}:{best_no} migration-table-luecke: {len(missing)} Zeile(n)"
+                    f" fehlen zwischen V{min(seen)} und V{best} ({shown})")
 
 
 def check_readme_head(rel, no, line, facts, findings):
@@ -298,8 +346,35 @@ def check_absent_files(rel, no, line, absent, findings):
                             f" Repository nicht | {line.strip()[:120]}")
 
 
-def check_test_claim_dated(rel, no, line, findings):
-    if TEST_CLAIM.search(line.strip()) and not ISO_DATE.search(line):
+def sentence_continues(line):
+    """Laeuft der Satz dieser Zeile in die naechste weiter?
+
+    Zwei Belege, beide aus der echten Doku:
+    - eine offene Klammer (die Quellen- und Standangabe steht darin:
+      "73 test classes in the repo (as of\\n2026-09-18, `grep ...`)");
+    - oder die Zeile endet ohne Satzzeichen, also mitten im Satz.
+
+    Ohne diese Pruefung wuerde eine beliebige datierte Nachbarzeile eine
+    undatierte Testzahl stumm stellen — genau das hat der Fixture-Fall
+    "Unter src/test/java liegen 715 Testklassen." aufgedeckt: Der Satz ist mit
+    dem Punkt zu Ende, das Datum der Folgezeile gehoert zu einer anderen Aussage.
+    """
+    stripped = line.rstrip()
+    if stripped.count("(") > stripped.count(")"):
+        return True
+    return bool(stripped) and stripped[-1] not in ".!?|"
+
+
+def check_test_claim_dated(rel, no, line, next_line, findings):
+    """Testzahl braucht ein Datum — auch eines, das hinter dem Umbruch steht.
+
+    Die Doku bricht Zeilen bei ~100 Zeichen um; die Datierung landet dabei
+    regelmaessig in der Folgezeile. Sie ist dann vorhanden, nur nicht in
+    derselben Zeile — deshalb zaehlt sie mit, aber nur wenn der Satz dort
+    tatsaechlich weiterlaeuft (siehe sentence_continues).
+    """
+    dated_next = sentence_continues(line) and ISO_DATE.search(next_line or "")
+    if TEST_CLAIM.search(line.strip()) and not ISO_DATE.search(line) and not dated_next:
         findings.append(f"DRIFT {rel}:{no} testzahl-ohne-datum: Testzahlen nur mit Datum"
                         f" (z. B. 'Stand 2026-09-18') | {line.strip()[:120]}")
 
@@ -311,7 +386,6 @@ def scan(root, rel, facts, findings):
             lines = fh.readlines()
     except OSError:
         return
-    is_onboarding = rel.startswith(ONBOARDING_PREFIXES)
     for no, line in enumerate(lines, 1):
         # Codebloecke werden bewusst MIT geprueft: die Verzeichnisbaeume in
         # docs/architektur.md ("├── controller/   43 REST-Controller") stehen in
@@ -338,12 +412,12 @@ def scan(root, rel, facts, findings):
         check_version_row(rel, no, line, facts.get("versions"), findings)
         if rel == README_SOURCE:
             check_readme_head(rel, no, line, facts, findings)
-        if is_onboarding:
-            check_forbidden_patterns(rel, no, line, findings)
-            check_absent_files(rel, no, line, facts.get("absent-files"), findings)
-        if is_onboarding or rel == README_SOURCE:
-            check_test_claim_dated(rel, no, line, findings)
-    check_migration_table(rel, lines, facts.get("migration-max"), findings)
+        check_forbidden_patterns(rel, no, line, findings)
+        check_absent_files(rel, no, line, facts.get("absent-files"), findings)
+        check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
+                              findings)
+    check_migration_table(rel, lines, facts.get("migration-max"),
+                          facts.get("migration-numbers"), findings)
     return
 
 

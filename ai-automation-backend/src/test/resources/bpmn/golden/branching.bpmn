@@ -14,7 +14,7 @@
     </scriptTask>
     <exclusiveGateway default="flow_2" id="b_1_split" name="{{ gate }}">
       <extensionElements>
-        <mysuricates:blockConfig name="verteiler" type="switch">{"default":[{"type":"shell","name":"notiz","config":{"command":"echo 'alles gruen'"}}],"expression":"{{ gate }}","cases":[{"value":"RED","blocks":[{"type":"simple","name":"analyse","config":{"command":"Analysiere den Fehlschlag:\n{{ block.tests.output }}"}}]}]}</mysuricates:blockConfig>
+        <mysuricates:blockConfig name="verteiler" type="switch">{"expression":"{{ gate }}","cases":[{"value":"RED","blocks":[{"type":"simple","name":"analyse","config":{"command":"Analysiere den Fehlschlag:\n{{ block.tests.output }}"}}]}],"default":[{"type":"shell","name":"notiz","config":{"command":"echo 'alles gruen'"}}]}</mysuricates:blockConfig>
       </extensionElements>
     </exclusiveGateway>
     <serviceTask id="b_1_c0_0_analyse" name="analyse">

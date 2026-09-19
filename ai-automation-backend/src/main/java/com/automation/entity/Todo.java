@@ -63,6 +63,20 @@ public class Todo {
     @Column(name = "session_id")
     private String sessionId;
 
+    /**
+     * Konversation der Agenten-Sitzung, aus der dieses TODO stammt — die UUID hinter
+     * {@code claude --resume}.
+     *
+     * <p>Nicht dasselbe wie {@link #sessionId}: das traegt die Shell-Session
+     * ({@code $SHELL_SESSION_ID}) und reicht nicht, um eine Sitzung wiederherzustellen. Vorher
+     * stand der Resume-Befehl nur im Fliesstext der Beschreibung, weil ein Agent ihn dort
+     * hinschrieb — prompt-enforced statt backend-enforced, und entsprechend luckenhaft
+     * (63 % der Claude-Code-TODOs, Messung 2026-09-16). V76 traegt die vorhandenen Werte
+     * einmalig aus den Beschreibungen nach (TODO 3497533c).
+     */
+    @Column(name = "agent_session_ref")
+    private String agentSessionRef;
+
     @Column(name = "workflow_run_id")
     private String workflowRunId;
 

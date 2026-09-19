@@ -187,6 +187,7 @@ function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]
 }
 
 function Findings({ findings, requestedFinding, workflowId, locale }: { findings: AuditFinding[]; requestedFinding: string | null; workflowId: string; locale: string }) {
+  const t = useT();
   const update = useUpdateAuditFinding();
   const createTodo = useCreateAuditTodo();
   const linkTodo = useLinkAuditTodo();
@@ -205,6 +206,11 @@ function Findings({ findings, requestedFinding, workflowId, locale }: { findings
             <Disposition finding={finding} locale={locale} />
             <div className="flex items-center gap-3 mt-3 text-xs text-text-tertiary flex-wrap">
               <span>{finding.ruleKey} · {finding.subject}</span>
+              {finding.unknownRuleKey && <span
+                className="inline-flex items-center gap-1 text-warning border border-warning/40 rounded px-1.5 py-0.5"
+                title={t.auditCenter.unknownRuleKeyHint} data-testid="unknown-rule-key">
+                <AlertTriangle className="w-3 h-3" /> {t.auditCenter.unknownRuleKey}
+              </span>}
               <span>{finding.occurrenceCount}× gesehen</span>
               {finding.regressionCount > 0 && <span className="text-danger">{finding.regressionCount} Regression(en)</span>}
               <Link className="text-accent hover:underline" to={`/workflows/${workflowId}/run/${finding.lastSeenRunId}`}>Evidenz-Run</Link>

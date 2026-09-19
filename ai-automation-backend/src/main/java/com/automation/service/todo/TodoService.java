@@ -26,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * CRUD + status changes; resolution in {@link TodoResolutionService}, response assembly in
@@ -79,6 +82,7 @@ public class TodoService {
                 .source(request.source() != null ? request.source() : Todo.Source.USER)
                 .sourceAgent(request.sourceAgent())
                 .sessionId(request.sessionId())
+                .agentSessionRef(normalizeSessionRef(request.agentSessionRef()))
                 .workflowRunId(request.workflowRunId())
                 .referenceType(request.referenceType())
                 .referenceId(request.referenceId())
@@ -111,6 +115,9 @@ public class TodoService {
         }
         if (request.referenceType() != null) todo.setReferenceType(request.referenceType());
         if (request.referenceId() != null) todo.setReferenceId(request.referenceId());
+        if (request.agentSessionRef() != null) {
+            todo.setAgentSessionRef(normalizeSessionRef(request.agentSessionRef()));
+        }
         if (request.dueDate() != null) {
             todo.setDueDate(request.dueDate().isBlank() ? null : Instant.parse(request.dueDate()));
         }
@@ -185,6 +192,27 @@ public class TodoService {
      * clear {@link ResourceNotFoundException} instead of the raw SQLite error. Mirrors
      * {@link #validateLinkedWorkflowId(String)} for the {@code project_id → projects(id)} FK.
      */
+    /**
+     * Nimmt die UUID einer Agenten-Sitzung an — auch wenn ein ganzer Resume-Befehl kommt.
+     *
+     * <p>Ein Agent schickt erfahrungsgemaess das, was er auch in die Beschreibung schreibt:
+     * {@code claude --resume 4fde1b91-…} oder die UUID in Backticks. Beides hier zu akzeptieren
+     * kostet drei Zeilen und verhindert, dass das Feld mit Befehlstext statt einer Kennung
+     * gefuellt wird — ein Feld, das man erst reinigen muss, ist so unzuverlaessig wie die
+     * Fliesstext-Konvention, die es ersetzt (TODO 3497533c). Was nicht wie eine UUID aussieht,
+     * wird verworfen, nicht halb uebernommen.
+     */
+    static String normalizeSessionRef(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        Matcher matcher = SESSION_REF.matcher(raw);
+        return matcher.find() ? matcher.group().toLowerCase(Locale.ROOT) : null;
+    }
+
+    private static final Pattern SESSION_REF = Pattern.compile(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+
     private String resolveProjectId(String projectId) {
         if (projectId == null) {
             return null;

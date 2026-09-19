@@ -107,7 +107,7 @@ Workflows accumulate knowledge across runs:
 
 | Baustein | Status |
 |----------|--------|
-| Block-basierte Workflows (19 Block-Typen) | Done |
+| Block-basierte Workflows (20 Block-Typen) | Done |
 | Docker-Container-Execution | Done |
 | Agentic Blocks (Reason → Act → Observe) | Done |
 | Workflow Chains (sequentielle Komposition) | Done |

@@ -166,7 +166,13 @@ git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.
   && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
 
 # Blockausgaben der Messbloecke, wie der Health-Check sie liefert
+# Der dreizeilige Gate-Header steht seit 52826011 VOR der Ausgabe jedes Blocks mit
+# checked_command (CheckedCommandGate). Er gehoert damit in die Fixture: Das Faktenblatt
+# darf ihn nicht in seinen Rohlog-Anhang weiterechoen (TODO c0cf21db).
 cat > "$TMP/tests-out.txt" <<TXT
+gate_status: YELLOW
+gate_category: backend-test-failure
+gate_description: 1 Test fehlgeschlagen
 mvn test: exit 0 (Log: $TMP/backend.log, 120 Zeilen)
 Surefire: 7 Tests, 1 Failures, 0 Errors, 1 Skipped
 TXT
@@ -235,6 +241,21 @@ check "FAKT frontend_lint_errors: 1"         'grep -qx "FAKT frontend_lint_error
 check "FAKT frontend_lint_warnings: 3"       'grep -qx "FAKT frontend_lint_warnings: 3" "$TMP/health-facts.out"'
 check "FAKT backend_sources: 4"              'grep -qx "FAKT backend_sources: 4" "$TMP/health-facts.out"'
 check "FAKT files_over_300: 1"               'grep -qx "FAKT files_over_300: 1" "$TMP/health-facts.out"'
+
+# TODO c0cf21db: RunCompletionHandler parst jeden Step, der kein derivedOutput ist. Echot das
+# Faktenblatt fremde Gate-Marker weiter, bekommt der facts-Step einen zweiten Gate-Eintrag mit
+# FREMDER Kategorie im gate_summary — das Run-Verdikt kippt nicht, aber die Trend-Auswertung
+# zaehlt falsch. Der Marker ueberlebt jedes tail, deshalb wird er vor dem tail herausgefiltert.
+check "Faktenblatt echot keinen fremden gate_status" \
+  '! grep -qE "^gate_status:" "$TMP/health-facts.out"'
+check "Faktenblatt echot keine fremde gate_category" \
+  '! grep -qE "^gate_category:" "$TMP/health-facts.out"'
+check "Faktenblatt echot keine fremde gate_description" \
+  '! grep -qE "^gate_description:" "$TMP/health-facts.out"'
+check "der Rohlog-Anhang bleibt trotzdem vorhanden" \
+  'grep -q "^## ROHLOG backend_tests" "$TMP/health-facts.out"'
+check "und traegt weiter die echten Logzeilen" \
+  'grep -q "Surefire: 7 Tests" "$TMP/health-facts.out"'
 check "FAKT frontend_bundle_js_bytes: 4096"  'grep -qx "FAKT frontend_bundle_js_bytes: 4096" "$TMP/health-facts.out"'
 check "FAKT backend_actuator_status: UP"     'grep -qx "FAKT backend_actuator_status: UP" "$TMP/health-facts.out"'
 check "FAKT npm_audit gemessen"              'grep -q "^FAKT npm_audit: .*vulnerabilities" "$TMP/health-facts.out"'

@@ -64,6 +64,17 @@ public class AuditFinding {
     @Column(name = "regression_count", nullable = false)
     @Builder.Default
     private int regressionCount = 0;
+    /**
+     * Liegt der {@code ruleKey} ausserhalb des Katalogs ({@code audit/rule-keys.json})?
+     *
+     * <p>Dann ist die Regel-Identitaet dieses Findings ungeprueft: Sein Fingerprint haengt an einer
+     * Schreibweise, die kein Katalog bestaetigt, und beim naechsten Lauf mit anderer Schreibweise
+     * entsteht ein Wiedergaenger statt eines Wiedersehens. Die Ingestion setzt das Flag bei jedem
+     * Ingest neu — auch zurueck auf {@code false}, sobald der Katalog den Key kennt (TODO ffa6d846).
+     */
+    @Column(name = "unknown_rule_key", nullable = false)
+    @Builder.Default
+    private boolean unknownRuleKey = false;
     @Column(name = "resolved_at")
     private Instant resolvedAt;
     @Column(name = "disposition_note", columnDefinition = "text")

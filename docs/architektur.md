@@ -160,7 +160,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 43 Controller)
+Controller (REST API, 46 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -179,7 +179,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          43 REST-Controller
+├── controller/          46 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -226,7 +226,7 @@ com.automation
 ├── repository/          Spring Data Repositories
 ├── mapper/              MapStruct-Mapper (Entity ↔ DTO)
 ├── executor/            Workflow-Ausführungs-Engine
-│   └── blocks/          19 Block-Executors + Agentic-Hilfsklassen (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
+│   └── blocks/          20 Block-Executors + Agentic-Hilfsklassen (AgenticBlockConfig, AgenticPlan, AgenticSafetyGuard, AgenticTokenTracker, AgenticPromptBuilder, AgenticEventBroadcaster, AgenticApprovalGate, AgenticActionRunner, AgenticStopRules)
 ├── concurrency/         DynamicSemaphore
 ├── config/              Konfigurationsklassen, Seeder (Skill, Template, OnboardingProfile)
 ├── security/            ApiKeyAuthFilter, RateLimitFilter, ActivityLogSizeLimitFilter, WebhookRateLimiter, WebSocketAuthInterceptor, WebSocketTicketService
@@ -237,7 +237,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 43 REST-Controller
+### Alle 46 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -282,6 +282,9 @@ com.automation
 | `SystemAccessController` | `/api/v1/system` | Zugriffs-Oberfläche: Remote Access (Tailscale) Enable/Disable/Status, lokales Dateisystem (Browse, Open-Path, Integration-Snippet) |
 | `SystemMaintenanceController` | `/api/v1/system` | Wartung: Auto-Repair, VACUUM, Datenbank-Backups (Liste, Erstellen, Download) |
 | `DashboardLayoutController` | `/api/v1/dashboard/layouts` | Versionsverlauf des Dashboard-Layouts (Core-Feature, kein Modul-Gate) |
+| `DashboardWorkflowController` | `/api/v1/dashboard/workflow-results` | Liefert die Ergebnisse aller Workflow-Widgets einer Ansicht in **einer** Anfrage (Marker `dashboard_widget`), damit das Dashboard nicht je Widget lädt |
+| `DashboardReportAssistController` | `/api/v1/dashboard/report-assist` | Schlaegt im Editor per KI eine `dashboard-report`-Konfiguration aus einem vorhandenen Run vor (Modul `dashboard-report`; `POST`, weil der Aufruf Token kostet und kein Browser ihn vorladen darf) |
+| `SystemRequestMetricsController` | `/api/v1/system/request-metrics` | Gemessene Kosten je Route: laufende Momentaufnahme (`GET`) und Tageswerte (`GET /daily`, optional je Route) |
 | `WorkflowSealController` | `/api/v1/workflows/{id}` | Siegeln/Entsiegeln eines Workflows (nur bei `automation.hardening.sealing=true`; bestehende Siegel bleiben auch bei ausgeschaltetem Schalter wirksam) |
 | `WebSocketTicketController` | `/api/v1/ws-ticket` | Vergibt kurzlebige Einmal-Tickets für den WebSocket-Handshake (kein Modul-Gate, gewöhnliches API-Rate-Limit gilt) |
 
@@ -543,6 +546,16 @@ Zweistufige Instruction-Injektion via Claude CLI `--append-system-prompt` / `--s
 
 1. **Basis-Instructions** (`src/main/resources/agent-instructions.md`) — geladen beim Start durch `AgentInstructionsService`, gelten für alle Workflows
 2. **Workflow-spezifische Instructions** (`workflow.instructions`) — pro Workflow, im UI editierbar (Monaco-Editor)
+
+3. **Arbeitspräferenzen** (opt-in) — nur wenn ein Workflow sie über `metadata.userPreferences: true`
+   anfordert. `UserPreferencesService` rendert dann genau drei Laufzeit-Settings in einen Abschnitt
+   `## Arbeitspräferenzen`: `user-pref-language`, `user-pref-style`, `user-pref-stack`
+   (Antwortsprache, Antwortstil, Tech-Stack). Mehr ist nicht möglich: Die Schlüsselliste steht im
+   Code, ein weiterer Schlüssel ist eine bewusste Änderung. **Keine Namen, Kontaktdaten,
+   Lebensläufe oder Berufsprofile** — Entscheidung vom 2026-09-15. Ist nichts gesetzt oder fehlt
+   das Flag, ist der Prompt byte-identisch zum Stand ohne die Funktion; ein Prüf- oder
+   Messworkflow soll nur von den Fakten abhängen. Werte pflegbar über
+   `PUT /api/v1/system/settings/{key}`.
 
 Injektionspfade:
 - **Block-Ausführung:** Instructions via `--append-system-prompt` auf Host Claude CLI (`HostClaudeService.executeAction()`)
@@ -1050,6 +1063,9 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V71 | Workflow-Versiegelung: `sealed`, `sealed_hash`, `sealed_at` auf Workflows |
 | V72 | Verschlüsseltes HMAC-Signatur-Secret auf Webhook-Triggern |
 | V73 | Versionierte Dashboard-Layout-Snapshots (`dashboard_layout_versions`) |
+| V74 | Tagesaggregat der gemessenen Request-Kosten je Route (`request_metrics_daily`) |
+| V75 | Kennzeichen fuer Findings mit ruleKey ausserhalb des Katalogs (`unknown_rule_key`) |
+| V76 | Agenten-Sitzungsherkunft am TODO (`agent_session_ref`) |
 
 ## Architektur-Gates
 
@@ -1094,7 +1110,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 73 Flyway-Migrationen (V1–V73)
+│           └── db/migration/          ← 76 Flyway-Migrationen (V1–V76)
 │
 └── ai-automation-frontend/
     ├── package.json

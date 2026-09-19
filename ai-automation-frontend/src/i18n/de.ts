@@ -1713,6 +1713,8 @@ export const de: TranslationKeys = {
     reviewDue: 'Wiedervorlage am',
     evidenceSnapshot: 'Beweis-Snapshot bei Akzeptanz',
     dispositionNote: 'Dispositions-Notiz',
+    unknownRuleKey: 'Regel nicht im Katalog',
+    unknownRuleKeyHint: 'Dieser ruleKey steht nicht in audit/rule-keys.json. Die Regel-Identität ist damit ungeprüft: Schreibt der nächste Lauf sie anders, entsteht ein neues Finding statt eines Wiedersehens.',
   },
   cockpit: {
     title: 'Cockpit',
@@ -1736,6 +1738,8 @@ export const de: TranslationKeys = {
     collapseTodos: 'Todos einklappen',
   },
   todos: {
+    resumeSession: 'Agenten-Sitzung fortsetzen — Befehl kopieren',
+    resumeCopied: 'Befehl kopiert',
     title: 'Todos',
     subtitle: 'Aufgaben und Erkenntnisse projektübergreifend verwalten',
     create: 'Neues Todo',

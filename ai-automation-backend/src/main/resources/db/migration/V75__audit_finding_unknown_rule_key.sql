@@ -1,0 +1,11 @@
+-- Kennzeichnet ein Finding, dessen ruleKey ausserhalb des Katalogs liegt (TODO ffa6d846).
+--
+-- Seit 8fc9a401 meldet die Ingestion einen unbekannten, nicht normalisierbaren ruleKey einmal
+-- je Run und Key ins Activity-Log. Im Audit Center war einem Finding aber nicht anzusehen, dass
+-- seine Regel-Identitaet ungeprueft ist -- und genau solche Findings erzeugen Wiedergaenger,
+-- weil ihr Fingerprint an einer gedrifteten Schreibweise haengt.
+--
+-- Vorbelegung 0: Bestehende Findings bleiben unmarkiert. Der naechste Ingest setzt das Flag
+-- ohnehin neu -- richtig herum in beide Richtungen, also auch zurueck auf 0, sobald der
+-- Katalog den Key kennt.
+ALTER TABLE audit_findings ADD COLUMN unknown_rule_key INTEGER NOT NULL DEFAULT 0;

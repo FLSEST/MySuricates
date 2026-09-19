@@ -203,6 +203,13 @@ Führt einen Shell-Befehl auf dem Host oder innerhalb eines Docker-Containers au
 > sauberen Läufen gleich und ist die Form, die die ausgelieferten Definitionen verwenden (das
 > Gate `PlatformPromptQuotingGateTest` erzwingt sie dort).
 >
+> **Bestand prüfen statt raten:** `scripts/lib/shell_placeholder_audit.py <definitionen.json>`
+> ordnet jeden Output-Platzhalter in Shell-Feldern nach seiner syntaktischen Rolle ein
+> (gequotet · Heredoc-Inhalt · `set --` · Zuweisung · Wortauftrennung) und meldet nur, was
+> wirklich eine Änderung braucht. Die Datei ist die Antwort von `GET /api/v1/workflows` oder
+> eine Pool-Definition — das Skript ruft selbst nichts ab. Exit 1 = Befund.
+> Heredoc-Inhalte dürfen dabei **nicht** escaped werden, sonst landen Anführungszeichen im Text.
+>
 > Vollständiges Trust-Modell (drei Vertrauensklassen, reservierte Kontextschlüssel, bekannte
 > Grenzen): [architektur.md → Vertrauensklassen der Kontextwerte](architektur.md#workflow-härtung-optional).
 

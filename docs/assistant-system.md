@@ -307,7 +307,7 @@ Alle implementieren `AssistantContextSection` mit `append(StringBuilder sb, bool
 5. **SkillsIndexSection** — Max 20 Einträge, Desc: 80 Zeichen
 6. **IntegrationsIndexSection** — Alle Provider mit Connected/Disconnected-Status
 7. **ChainsIndexSection** — Max 15 Einträge, Desc: 80 Zeichen
-8. **BlockTypesIndexSection** — 19 Block-Typen (statische Liste; deckungsgleich mit den 19 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`)
+8. **BlockTypesIndexSection** — 20 Block-Typen (statische Liste; deckungsgleich mit den 20 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`)
 9. **FailedWorkflowsContextSection** — Kaputte Workflows via `WorkflowDebugService`, Error: 160 Zeichen
 
 ### Zusätzlich auf **OVERVIEW**-Seiten

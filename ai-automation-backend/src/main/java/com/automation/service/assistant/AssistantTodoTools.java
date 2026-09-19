@@ -50,7 +50,9 @@ public class AssistantTodoTools {
 
             var request = new CreateTodoRequest(
                     title, description, Todo.Status.OPEN, priority, tags,
-                    projectId, null, Todo.Source.AI, "assistant", null, null, null, null, null
+                    projectId, null, Todo.Source.AI, "assistant", null,
+                    null,   // agentSessionRef: der Assistent laeuft nicht in einer CLI-Sitzung
+                    null, null, null, null
             );
             Todo created = todoService.create(request);
             String tagStr = tags.isEmpty() ? "" : ", Tags: " + String.join(", ", tags);

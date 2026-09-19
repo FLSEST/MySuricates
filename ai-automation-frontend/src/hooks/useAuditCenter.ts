@@ -69,6 +69,8 @@ export interface AuditFinding {
   dispositionNote: string | null;
   dispositionEvidence: string | null;
   dispositionAt: string | null;
+  /** ruleKey ausserhalb von audit/rule-keys.json — die Regel-Identitaet ist ungeprueft. */
+  unknownRuleKey: boolean;
   todos: Array<{ id: string; title: string; status: string; managed: boolean }>;
 }
 

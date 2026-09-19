@@ -47,7 +47,20 @@ public class ExecutionContextFactory {
     public record ContextSeed(String runId, String workflowId, String workflowName, Project project,
                               String containerId, Map<String, Object> inputContext, String instructions,
                               String model, String provider, String effort, String resumePreviousOutput,
-                              String definitionHash, TriggerSource triggerSource) {}
+                              String definitionHash, TriggerSource triggerSource,
+                              /** metadata.userPreferences des Workflows (TODO d49fbde0). */
+                              boolean userPreferences) {
+
+        /** Kurzform ohne Arbeitspräferenzen — der Weg fuer alles, was sie nicht anfordert. */
+        public ContextSeed(String runId, String workflowId, String workflowName, Project project,
+                           String containerId, Map<String, Object> inputContext, String instructions,
+                           String model, String provider, String effort, String resumePreviousOutput,
+                           String definitionHash, TriggerSource triggerSource) {
+            this(runId, workflowId, workflowName, project, containerId, inputContext, instructions,
+                    model, provider, effort, resumePreviousOutput, definitionHash, triggerSource,
+                    false);
+        }
+    }
 
     public ExecutionContext create(ContextSeed seed) {
         String runId = seed.runId();
@@ -152,7 +165,13 @@ public class ExecutionContextFactory {
         contextDataService.injectPlatformData(context, workflowId, project.getId());
 
         // Set instruction prefix and model from workflow
-        String instructionPrefix = agentInstructionsService.buildInstructionPrefix(instructions);
+        // Der Standardweg ruft weiter die einparametrige Methode: Ein Workflow ohne Opt-in soll
+        // nicht nur denselben Prompt bekommen, sondern denselben AUFRUF ausloesen. Sonst haengt
+        // jeder vorhandene Test und Aufrufer an einer Signatur, die sich seinetwegen geaendert hat
+        // -- genau daran sind beim ersten Versuch 74 Tests in WorkflowExecutorTest gescheitert.
+        String instructionPrefix = seed.userPreferences()
+                ? agentInstructionsService.buildInstructionPrefix(instructions, true)
+                : agentInstructionsService.buildInstructionPrefix(instructions);
         if (!instructionPrefix.isBlank()) {
             context.setInstructionPrefix(instructionPrefix);
         }

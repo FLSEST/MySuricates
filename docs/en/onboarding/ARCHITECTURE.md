@@ -65,7 +65,7 @@ Controller → Service → Repository → Entity (JPA/SQLite)
 | `exception/` | Custom exceptions + global error handler |
 | `util/` | JSON converters, helper functions |
 
-### Controller Overview (selection from 43 REST controllers)
+### Controller Overview (selection from 46 REST controllers)
 
 The table below lists the central controllers. The full list is in [../api-referenz.md](../api-referenz.md); re-measure the count with `find ai-automation-backend/src/main/java -name '*Controller.java' | wc -l`.
 
@@ -175,9 +175,9 @@ Todo (independent)
 ActivityLog (independent)
 ```
 
-### Database Migrations (Flyway, currently V1-V73)
+### Database Migrations (Flyway, currently V1-V76)
 
-The table below describes the base schema (V1-V19). V20-V73 mostly add columns and indexes to these tables plus a few new tables; the full list is under `src/main/resources/db/migration/`.
+The table below describes the base schema (V1-V19). V20-V76 mostly add columns and indexes to these tables plus a few new tables; the full list is under `src/main/resources/db/migration/`.
 
 | Migration | Table | Description |
 |---|---|---|

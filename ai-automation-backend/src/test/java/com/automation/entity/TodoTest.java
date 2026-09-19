@@ -140,12 +140,16 @@ class TodoTest {
                     Todo.Status.DONE, Todo.Priority.CRITICAL,
                     "tag", "pid", "wfid",
                     Todo.Source.WORKFLOW, "agent", "sid",
+                    "4fde1b91-2cce-4ab2-b7d0-fd2a138f9322",
                     "run", "rt", "rid", "ep", "er", "eu", "rel",
                     now, 5, "lastFix",
                     Todo.ResolutionState.SUCCEEDED,
                     now, now
             );
             assertThat(todo.getId()).isEqualTo("id-1");
+            assertThat(todo.getAgentSessionRef())
+                    .as("agentSessionRef traegt die Agenten-Konversation, nicht die Shell-Session")
+                    .isEqualTo("4fde1b91-2cce-4ab2-b7d0-fd2a138f9322");
             assertThat(todo.getTitle()).isEqualTo("title");
             assertThat(todo.getDescription()).isEqualTo("desc");
             assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);

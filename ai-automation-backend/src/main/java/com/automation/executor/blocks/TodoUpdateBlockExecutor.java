@@ -47,7 +47,9 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
                             ? TodoBlockSupport.parsePriority(config.get("priority"), null)
                             : null,
                     TodoBlockSupport.parseTags(config.get("tags")),
-                    null, null, null, null, null);
+                    null, null, null, null,
+                    null,   // agentSessionRef: ein Workflow-Block hat keine Agenten-Konversation
+                    null);
 
             Todo updated = todoService.update(id, request);
 

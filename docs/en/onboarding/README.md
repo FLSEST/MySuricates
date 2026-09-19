@@ -18,7 +18,7 @@ MySuricates is an **AI-driven workflow automation platform** with a visual inter
 
 | Feature | Description |
 |---|---|
-| **Visual Workflow Editor** | Drag-and-drop block editor with 19 block types (full list and configuration: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md)) |
+| **Visual Workflow Editor** | Drag-and-drop block editor with 20 block types (full list and configuration: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md)) |
 | **AI Integration** | Claude CLI is executed directly on the host for intelligent decisions and code generation |
 | **Docker-based Execution** | Isolated containers (Python, Node.js, Go) for secure skill execution |
 | **Skill System** | 19 built-in skills + custom skills for reusable automation building blocks |

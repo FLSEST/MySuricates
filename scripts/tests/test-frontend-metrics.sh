@@ -36,7 +36,9 @@ fi
 #   a.ts (4 Zeilen)  -> b.ts        \ wechselseitig, beides Wert-Importe:
 #   b.ts (4 Zeilen)  -> a.ts        /  das ist der EINE echte Zyklus
 #   t1.ts (2) <-> t2.ts (2)   nur `import type` — darf KEINEN Zyklus ergeben, tsc loescht es
-#   mixed.ts (4) -> t1 (nur { type T1 }: Typkante), -> a ({ type A, useB }: Wertkante)
+#   mixed.ts (7) -> t1 (nur { type T1 }: Typkante), -> a ({ type A, useB }: Wertkante),
+#                  -> t2 (Typ-Query import('./t2').T2), -> lib (typeof import('./lib')),
+#                  -> lazy (import('./lazy').then(…) — Promise-Methode, also echt dynamisch)
 #   deep/c.tsx (12) -> ../a (mehrzeilig), ../lib (Barrel), '@/a' (tsconfig-Alias),
 #                      'react' (extern), './fehlt' (unaufloesbar), './style.css' (Asset),
 #                      import('../lazy') (dynamisch)
@@ -52,7 +54,19 @@ make_fixture() {
   printf "import { a } from './a';\nexport const b = 2;\nexport type B = typeof b;\nexport const useA = () => a;\n" > "$FE/src/b.ts"
   printf "import type { T2 } from './t2';\nexport type T1 = { t?: T2 };\n" > "$FE/src/t1.ts"
   printf "import type { T1 } from './t1';\nexport type T2 = { t?: T1 };\n" > "$FE/src/t2.ts"
-  printf "import { type T1 } from './t1';\nimport { type A, useB } from './a';\nexport const m = useB;\nexport type M = T1 | A;\n" > "$FE/src/mixed.ts"
+  # mixed.ts traegt zusaetzlich die drei Formen aus TODO 26b3da40:
+  #   Zeile 5: `import('./t2').T2`         -> Typ-Query, Typkante nach t2
+  #   Zeile 6: `typeof import('./lib')`    -> Typ-Query, Typkante nach lib
+  #   Zeile 7: `import('./lazy').then(…)`  -> Promise-Methode, also echt dynamisch
+  cat > "$FE/src/mixed.ts" <<'EOF'
+import { type T1 } from './t1';
+import { type A, useB } from './a';
+export const m = useB;
+export type M = T1 | A;
+export type QueriedT2 = import('./t2').T2;
+export type LibModule = typeof import('./lib');
+export const load = () => import('./lazy').then((mod) => mod.lazy);
+EOF
   printf "export const lazy = 1;\n" > "$FE/src/lazy.ts"
   cat > "$FE/src/deep/c.tsx" <<'EOF'
 import {
@@ -106,23 +120,54 @@ check "Zyklus nennt a.ts und b.ts" "grep -qx 'cycle${TAB}2${TAB}a.ts,b.ts' '$TMP
 check "Paar nennt a.ts und b.ts"   "grep -qx 'pair${TAB}a.ts${TAB}b.ts' '$TMP/fix1.txt'"
 
 echo "3a) Fixture: Typkanten sind keine Laufzeitkanten (kein Scheinzyklus)"
-check "type_edges=3"     'grep -qx "type_edges=3" "$TMP/fix1.txt"'
+check "type_edges=5"     'grep -qx "type_edges=5" "$TMP/fix1.txt"'
 check "runtime_edges=6"  'grep -qx "runtime_edges=6" "$TMP/fix1.txt"'
-check "edges=10 (alle Arten)" 'grep -qx "edges=10" "$TMP/fix1.txt"'
+check "edges=13 (alle Arten)" 'grep -qx "edges=13" "$TMP/fix1.txt"'
 check "der reine import-type-Zyklus t1<->t2 wird NICHT als Zyklus gemeldet" \
   "! grep -q 't1\.ts' <<<\"\$(sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fix1.txt')\""
 check "t1 <-> t2 taucht trotzdem als Verzeichniskopplung/Kante auf" \
   "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^t1\.ts${TAB}[0-9]+${TAB}[0-9]+\$'"
 check "gemischter Spezifizierer { type A, useB } bleibt Laufzeitkante (mixed.ts -> a.ts)" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^mixed\.ts${TAB}2${TAB}0\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^mixed\.ts${TAB}5${TAB}0\$'"
 
 echo "3b) Fixture: dynamische Importe"
-check "dynamic_imports=1" 'grep -qx "dynamic_imports=1" "$TMP/fix1.txt"'
-check "dynamic_edges=1"   'grep -qx "dynamic_edges=1" "$TMP/fix1.txt"'
+check "dynamic_imports=2" 'grep -qx "dynamic_imports=2" "$TMP/fix1.txt"'
+check "dynamic_edges=2"   'grep -qx "dynamic_edges=2" "$TMP/fix1.txt"'
 check "dynamischer Import zaehlt als Verzeichniskante deep -> (src)" \
   "grep -qx 'deep${TAB}(src)${TAB}2' '$TMP/fix1.txt'"
-check "lazy.ts hat einen eingehenden Import"  \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^lazy\.ts${TAB}0${TAB}1\$'"
+check "lazy.ts hat zwei eingehende Importe (deep/c.tsx direkt, mixed.ts via .then)"  \
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^lazy\.ts${TAB}0${TAB}2\$'"
+# Die Einordnung selbst ist in der Fixture oben schon gepinnt (type_edges=5 gegen
+# dynamic_edges=2; waeren die beiden Typ-Queries dynamisch gezaehlt, stuende dort 3 zu 4).
+# Weil die einzelnen edge-Saetze nur in der Zwischendatei stehen und nicht im Faktenblatt,
+# belegt eine eigene Mini-Fixture die drei Formen einzeln und ohne Nebenkanten.
+echo "3c) Typ-Query gegen echten dynamischen Import (TODO 26b3da40)"
+type_query_case() {   # $1 = Inhalt von q.ts, danach: $TMP/tq.txt
+  rm -rf "$TMP/tq"
+  mkdir -p "$TMP/tq/ai-automation-frontend/src"
+  printf 'export const ziel = 1;\nexport type Ziel = typeof ziel;\n' \
+    > "$TMP/tq/ai-automation-frontend/src/ziel.ts"
+  printf '%s\n' "$1" > "$TMP/tq/ai-automation-frontend/src/q.ts"
+  bash "$SCRIPT" "$TMP/tq" > "$TMP/tq.txt" 2>/dev/null
+}
+
+type_query_case "export type Q = import('./ziel').Ziel;"
+check "import('./ziel').Ziel -> Typkante, nicht dynamisch" \
+  'grep -qx "type_edges=1" "$TMP/tq.txt" && grep -qx "dynamic_edges=0" "$TMP/tq.txt" \
+     && grep -qx "dynamic_imports=0" "$TMP/tq.txt"'
+
+type_query_case "export type Q = typeof import('./ziel');"
+check "typeof import('./ziel') -> Typkante, nicht dynamisch" \
+  'grep -qx "type_edges=1" "$TMP/tq.txt" && grep -qx "dynamic_edges=0" "$TMP/tq.txt"'
+
+type_query_case "export const q = () => import('./ziel').then((m) => m.ziel);"
+check "import('./ziel').then(…) bleibt dynamisch (Promise-Methode, keine Typ-Query)" \
+  'grep -qx "dynamic_edges=1" "$TMP/tq.txt" && grep -qx "dynamic_imports=1" "$TMP/tq.txt" \
+     && grep -qx "type_edges=0" "$TMP/tq.txt"'
+
+type_query_case "export const q = async () => (await import('./ziel')).ziel;"
+check "(await import('./ziel')).ziel bleibt dynamisch" \
+  'grep -qx "dynamic_edges=1" "$TMP/tq.txt" && grep -qx "type_edges=0" "$TMP/tq.txt"'
 check "dynamischer Import ist weder external noch unresolved" \
   'grep -qx "external_imports=1" "$TMP/fix1.txt" && grep -qx "unresolved_imports=1" "$TMP/fix1.txt"'
 

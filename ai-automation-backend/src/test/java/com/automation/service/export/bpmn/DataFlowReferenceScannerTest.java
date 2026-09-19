@@ -146,12 +146,18 @@ class DataFlowReferenceScannerTest {
     @Test
     void previousOutputAlsDirekterConfigWertBleibtEineTopLevelReferenz() {
         // then_command/else_command sind eigene Config-Werte des conditional-Blocks, keine
-        // verschachtelte Blockliste — previous_output meint dort den Block davor.
+        // verschachtelte Blockliste — previous_output meint dort den Block davor. Genau das haelt
+        // dieser Test fest: die QUELLE bleibt der Top-Level-Block 0.
+        //
+        // Das ZIEL ist seit TODO 7557b928 der Zweig-Task (_then), nicht mehr der conditional-Block
+        // selbst: Am Gateway erlaubt BPMN keine Datenassoziation, dort fiel die Kante weg.
         assertThat(scan(
                 block("shell", "tests", Map.of("command", "mvn test")),
                 block("conditional", "pruefung", Map.of(
                         "condition", "x", "then_command", "Analysiere {{ previous_output }}", "else_command", "y"))))
-                .containsExactly(new DataFlowReferenceScanner.Reference(0, 1));
+                .containsExactly(new DataFlowReferenceScanner.Reference(
+                        DataFlowReferenceScanner.Endpoint.topLevel(0),
+                        new DataFlowReferenceScanner.Endpoint(1, "_then")));
     }
 
     @Test

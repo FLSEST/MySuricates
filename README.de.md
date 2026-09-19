@@ -34,17 +34,17 @@ die wiederkehrende Lehre.
 
 ## Was da steht
 
-Stand 2026-09-18, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
+Stand 2026-09-19, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
 `wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-18 in einem
 isolierten Worktree:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, rund 1 420 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 64 000 Zeilen, 43 REST-Controller, 73 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 61 000 Zeilen |
+| Entstanden seit | 2026-02-15, rund 1 550 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.4, rund 67 000 Zeilen, 46 REST-Controller, 76 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 66 000 Zeilen |
 | Tests | Backend 8 767 (0 Fehler, 1 uebersprungen), Frontend 1 013 — Lauf vom 2026-09-18 |
-| Bausteine | 19 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
+| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
 sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein CI-Lauf
@@ -148,6 +148,7 @@ erwartet einen selbst gesetzten API-Schluessel.
 | [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
 | [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
 | [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
+| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
 | [Vision](docs/vision.md) | Produktvision und Roadmap |
 
 Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.

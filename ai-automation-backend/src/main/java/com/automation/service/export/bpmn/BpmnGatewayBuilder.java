@@ -18,6 +18,17 @@ final class BpmnGatewayBuilder {
     /** Callback into the chain builder for nested case bodies (switch cases[].blocks / default). */
     interface ChainBuilder {
         BpmnSegment buildChain(List<BlockDefinition> blocks, String idPrefix);
+
+        /**
+         * Traegt einen Knoten als Endpunkt fuer Datenassoziationen ein.
+         *
+         * <p>Blöcke tun das beim Bauen selbst. Die Zweig-Tasks eines {@code conditional} sind aber
+         * keine Blöcke, sondern Kommandos aus der Config ({@code then_command}/{@code else_command})
+         * — ohne diese Eintragung landet eine Referenz aus einem Zweig beim conditional-Block
+         * selbst, also am Gateway, und BPMN erlaubt dort keine Datenassoziation: sie wurde verworfen
+         * (TODO 7557b928).
+         */
+        void registerActivity(String idBase, String nodeId);
     }
 
     private final BpmnNodeFactory f;
@@ -46,6 +57,7 @@ final class BpmnGatewayBuilder {
         BpmnModel.Node thenTask = f.commandTask(idBase + "_then", str(c, "then_command"), shellMode);
         f.place(thenTask, GW + GAP, ROW_STEP);
         seg.nodes.add(thenTask);
+        chains.registerActivity(idBase + "_then", thenTask.id);
         seg.edges.add(f.edge(split.id, thenTask.id, "ja"));
         seg.edges.add(f.edge(thenTask.id, merge.id, null));
 
@@ -58,6 +70,7 @@ final class BpmnGatewayBuilder {
             BpmnModel.Node elseTask = f.commandTask(idBase + "_else", elseCommand, shellMode);
             f.place(elseTask, GW + GAP, 2 * ROW_STEP);
             seg.nodes.add(elseTask);
+            chains.registerActivity(idBase + "_else", elseTask.id);
             BpmnModel.Edge elseEdge = f.edge(split.id, elseTask.id, "nein");
             seg.edges.add(elseEdge);
             seg.edges.add(f.edge(elseTask.id, merge.id, null));

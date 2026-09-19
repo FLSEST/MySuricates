@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -106,8 +107,11 @@ final class DataFlowReferenceScanner {
             Endpoint self = Endpoint.topLevel(target);
             DataFlowConfigStrings texts = DataFlowConfigStrings.of(block.getConfig());
             for (String text : texts.direct()) {
+                // Ein Zweig-Kommando eines conditional endet an SEINEM Task, nicht am Gateway --
+                // dort erlaubt BPMN keine Datenassoziation, die Kante fiel weg (TODO 7557b928).
+                Endpoint endpoint = conditionalBranchEndpoint(block, text, target).orElse(self);
                 for (String key : PlaceholderSyntax.keysIn(text)) {
-                    add(found, sourceOf(key, target, byName, blocks), self);
+                    add(found, sourceOf(key, target, byName, blocks), endpoint);
                 }
             }
             List<BpmnBranchBlocks.Branch> branches = BpmnBranchBlocks.of(block);
@@ -130,6 +134,39 @@ final class DataFlowReferenceScanner {
                 .thenComparing(r -> r.source().branchPath()));
         return List.copyOf(sorted);
     }
+
+    /**
+     * Endet dieser Config-Text am Zweig-Task eines {@code conditional}?
+     *
+     * <p>{@code conditional} traegt seine Zweige als Kommandos, nicht als Blöcke
+     * ({@code then_command}/{@code else_command}), und der Export macht daraus die Tasks
+     * {@code _then} und {@code _else}. Eine Referenz darin gehoert an diesen Task; ohne die
+     * Unterscheidung landete sie beim conditional-Block selbst, also am Gateway, und wurde
+     * verworfen (TODO 7557b928). Andere direkte Werte des Blocks — vor allem {@code condition} —
+     * bleiben beim Block und damit weiter ohne Assoziation: Das ist die Notationsgrenze, keine
+     * Luecke.
+     *
+     * <p>Die Ebenen-Semantik bleibt die des Blocks: Ein Zweig-Kommando ist ein direkter
+     * Config-Wert, also zaehlen dort auch {@code previous_output} und {@code step_N_output} —
+     * anders als in den verschachtelten Blocklisten eines Switch.
+     */
+    private static Optional<Endpoint> conditionalBranchEndpoint(BlockDefinition block, String text,
+                                                                int target) {
+        if (!"conditional".equals(block.getType()) || block.getConfig() == null) {
+            return Optional.empty();
+        }
+        for (Map.Entry<String, String> branch : CONDITIONAL_BRANCHES.entrySet()) {
+            Object command = block.getConfig().get(branch.getKey());
+            if (command instanceof String s && !s.isBlank() && s.equals(text)) {
+                return Optional.of(new Endpoint(target, branch.getValue()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Config-Schluessel des Zweig-Kommandos -> Id-Suffix seines Tasks (siehe BpmnGatewayBuilder). */
+    private static final Map<String, String> CONDITIONAL_BRANCHES =
+            Map.of("then_command", "_then", "else_command", "_else");
 
     /**
      * Zweig-Blöcke eines Switch: jede Referenz endet am Task des Zweig-Blocks. Innerhalb eines

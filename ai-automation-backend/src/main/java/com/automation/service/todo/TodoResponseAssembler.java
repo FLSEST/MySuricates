@@ -69,6 +69,7 @@ public class TodoResponseAssembler {
                 base.projectId(), projectName,
                 base.linkedWorkflowId(), linkedWorkflowName,
                 base.source(), base.sourceAgent(), base.sessionId(),
+                base.agentSessionRef(),
                 base.workflowRunId(),
                 base.referenceType(), base.referenceId(),
                 base.exportedProvider(), base.exportedRef(), base.exportedUrl(),

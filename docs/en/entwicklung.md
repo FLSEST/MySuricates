@@ -24,9 +24,10 @@ scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build
 scripts/start-autotrigger-dev.sh stop
 ```
 
-`mvn spring-boot:run` is **deliberately blocked**: the backend aborts at startup from `target/classes`
-with a message (`RuntimeClasspathGuard`), see [Builds next to the running dev backend](#builds-next-to-the-running-dev-backend).
-Escape hatch for special cases: `-Dautomation.runtime.allow-classes-dir=true`.
+> Do **not** use `mvn spring-boot:run` — the command is **deliberately blocked**: the backend aborts
+> at startup from `target/classes` with a message (`RuntimeClasspathGuard`), see
+> [Builds next to the running dev backend](#builds-next-to-the-running-dev-backend).
+> Escape hatch for special cases: `-Dautomation.runtime.allow-classes-dir=true`.
 
 The backend automatically creates `data/automation.db` on first start and runs Flyway migrations.
 
@@ -495,13 +496,13 @@ The backend uses three annotation processors that must be correctly ordered in t
 
 ### Backend Structure
 
-The backend comprises **43 REST controllers** and **19 block types**:
+The backend comprises **46 REST controllers** and **20 block types**:
 
-**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
+**Controllers:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
 
-**Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`
+**Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
-**Flyway migrations:** V1–V73 (SQLite)
+**Flyway migrations:** V1–V76 (SQLite)
 
 ### Gate Status System
 

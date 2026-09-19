@@ -57,9 +57,11 @@ curl -X POST http://localhost:9090/api/v1/todos \
 - **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
 - **Tags**: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`, `feature`, `bug`, `testing`, `documentation`, `workflow-execution`, `container-execution`, `staging`
 
-### Claude-Code-Session-ID in TODO-Description speichern
+### Claude-Code-Session-ID mitgeben
 
-Das `sessionId`-Feld im TODO enthält die Shell-Session-ID (`$SHELL_SESSION_ID`) — **nicht** die Claude-Code-Konversations-ID. Damit eine Session später via `claude --resume` wiederhergestellt werden kann, muss die Claude-Code-Session-ID in der **Description** gespeichert werden.
+Das `sessionId`-Feld im TODO enthält die Shell-Session-ID (`$SHELL_SESSION_ID`) — **nicht** die Claude-Code-Konversations-ID. Für die Konversation gibt es seit V76 das eigene Feld **`agentSessionRef`** (`POST`/`PUT /api/v1/todos`): dort gehört die UUID hinein, mit der `claude --resume <uuid>` funktioniert. Der Server nimmt auch den ganzen Befehl an und holt die UUID heraus; was keine UUID ist, wird verworfen statt halb gespeichert.
+
+`/mysuricates:new-todo` füllt das Feld selbst. Wer die API direkt anspricht, gibt es mit an — und schreibt den Resume-Befehl **zusätzlich** in die Description, solange Instanzen im Umlauf sind, die das Feld nicht kennen (unbekannte Felder ignoriert die API).
 
 **Session-ID auslesen:**
 ```bash

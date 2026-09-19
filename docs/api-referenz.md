@@ -2642,6 +2642,7 @@ Neues TODO erstellen.
   "source": "AI",
   "sourceAgent": "claude-code",
   "sessionId": "shell-session-id",
+  "agentSessionRef": "4fde1b91-2cce-4ab2-b7d0-fd2a138f9322",
   "workflowRunId": null,
   "referenceType": null,
   "referenceId": null,
@@ -2661,6 +2662,7 @@ Neues TODO erstellen.
 | `source` | Enum | Nein |
 | `sourceAgent` | String | Nein |
 | `sessionId` | String | Nein |
+| `agentSessionRef` | String | Nein — UUID der Agenten-Konversation (`claude --resume <uuid>`). Ein ganzer Befehl wird angenommen, die UUID daraus übernommen; was keine UUID ist, wird verworfen. |
 | `workflowRunId` | String | Nein |
 | `referenceType` | String | Nein |
 | `referenceId` | String | Nein |
@@ -2668,7 +2670,7 @@ Neues TODO erstellen.
 
 **Response:** `201` mit `TodoResponse`
 
-**TodoResponse-Felder:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
+**TodoResponse-Felder:** `id`, `title`, `description`, `status`, `priority`, `tags`, `projectId`, `projectName`, `linkedWorkflowId`, `linkedWorkflowName`, `source`, `sourceAgent`, `sessionId`, `agentSessionRef`, `workflowRunId`, `referenceType`, `referenceId`, `exportedProvider`, `exportedRef`, `exportedUrl`, `fixAttempts`, `lastFixRunId`, `resolutionState` (`IDLE`, `RUNNING`, `FAILED`, `SUCCEEDED`), `dueDate`, `createdAt`, `updatedAt`
 
 ### `GET /api/v1/todos/{id}`
 
