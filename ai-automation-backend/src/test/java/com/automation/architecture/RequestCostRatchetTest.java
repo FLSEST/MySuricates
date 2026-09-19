@@ -102,8 +102,10 @@ class RequestCostRatchetTest {
      *       input context; the size no longer grows with step output. The read side still fetches
      *       the step rows (the count and the last output come from them) — a projection would
      *       avoid that too, see TODO 7fd9f654.</li>
-     *   <li>{@code /search}: also one {@code select workflow_runs} per hit — the batched run-count
-     *       query of {@code 1e465a9e} covers the list endpoint but not search (TODO 13d1e2a2).</li>
+     *   <li>{@code /search}: the per-hit {@code select workflow_runs} is gone — search now uses the
+     *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). What is
+     *       left is the same {@code select containers} per workflow as {@code /workflows}, which is
+     *       the half of that ticket still open.</li>
      *   <li>{@code /schedules}: 33 of the 91 statements measured on 2026-09-19 remain. 60 of them
      *       were two run queries per schedule in {@code ScheduleMapper} and are gone (TODO
      *       172a6a67). What is left is one {@code select workflows} per schedule: the
@@ -120,7 +122,7 @@ class RequestCostRatchetTest {
             "/api/v1/workflows", new Cost(32, 26_000),
             "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
-            "/api/v1/search?q=Workflow", new Cost(51, 18_000),
+            "/api/v1/search?q=Workflow", new Cost(32, 18_000),
             "/api/v1/schedules", new Cost(33, 20_000)));
 
     @Autowired private MockMvc mockMvc;

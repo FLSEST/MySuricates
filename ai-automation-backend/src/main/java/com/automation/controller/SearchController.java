@@ -85,13 +85,17 @@ public class SearchController {
 
     private List<WorkflowResponse> rankWorkflows(String query, int limit) {
         String q = query.toLowerCase(Locale.ROOT).trim();
-        return workflowService.findAll().stream()
+        List<Workflow> ranked = workflowService.findAll().stream()
                 .map(w -> new Scored(w, scoreWorkflow(w, q)))
                 .filter(s -> s.score > 0)
                 .sorted((a, b) -> Double.compare(b.score, a.score))
                 .limit(limit)
-                .map(s -> workflowMapper.toResponse(s.workflow))
+                .map(s -> s.workflow)
                 .toList();
+        // Gebuendelt mappen, nicht je Treffer: Der Einzelpfad loest die Run-Zahl pro Workflow
+        // auf und ergab bei 20 Treffern 20 zusaetzliche select workflow_runs. /workflows nutzt
+        // die gebuendelte Variante seit 1e465a9e, die Suche war aussen vor (TODO 13d1e2a2).
+        return workflowMapper.toResponseListWithRunCounts(ranked);
     }
 
     private static double scoreWorkflow(Workflow w, String q) {

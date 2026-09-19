@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -68,9 +69,11 @@ class SearchControllerTest {
     void search_returnsWorkflows_whenQueryMatches() throws Exception {
         Workflow w1 = Workflow.builder().id("w-1").name("Build Pipeline").description("ci/cd").build();
         when(workflowService.findAll()).thenReturn(List.of(w1));
-        when(workflowMapper.toResponse(any(Workflow.class))).thenAnswer(inv -> {
-            Workflow w = inv.getArgument(0);
-            return minimalResponse(w.getId(), w.getName());
+        // Die Suche mappt seit TODO 13d1e2a2 gebuendelt (eine GROUP-BY-Abfrage fuer die
+        // Run-Zahlen statt einer je Treffer) — deshalb hier die Listen-Variante stubben.
+        when(workflowMapper.toResponseListWithRunCounts(anyList())).thenAnswer(inv -> {
+            List<Workflow> workflows = inv.getArgument(0);
+            return workflows.stream().map(w -> minimalResponse(w.getId(), w.getName())).toList();
         });
 
         mockMvc.perform(get("/api/v1/search").param("q", "build"))
