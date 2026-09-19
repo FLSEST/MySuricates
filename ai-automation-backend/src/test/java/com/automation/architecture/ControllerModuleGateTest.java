@@ -52,6 +52,10 @@ class ControllerModuleGateTest {
             // endpoint that authenticates them is core, even though the terminal itself is a module.
             "WebSocketTicketController",
             "WorkflowController",
+            // Wie schlechte Workflows gefunden werden — dasselbe Argument wie bei den
+            // Request-Metriken: ein Diagnosewerkzeug darf nicht mit einem Feature-Modul
+            // verschwinden. Er meldet nur und greift in keinen Schreibweg ein (182bd224).
+            "WorkflowAnalyzerController",
             "WorkflowPoolController",
             "WorkflowTemplateController");
 

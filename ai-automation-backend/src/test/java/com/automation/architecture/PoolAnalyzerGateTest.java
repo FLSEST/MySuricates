@@ -1,0 +1,143 @@
+package com.automation.architecture;
+
+import com.automation.entity.BlockDefinition;
+import com.automation.service.workflow.analyzer.AnalyzerFinding;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Was MySuricates ausliefert, darf die eigenen Baufehler nicht enthalten (TODO 182bd224).
+ *
+ * <p>Geprüft werden die Definitionen unter {@code workflow-pool/} und die Built-in-Templates mit
+ * demselben deterministischen Regelsatz, den der REST-Endpunkt auf Abruf anwendet. Der Analyzer
+ * misst, er bewertet nicht — deshalb ist dieser Test ein Gate und keine Empfehlung.
+ *
+ * <p>Die Schwelle steht bei {@code HIGH}: Ein Verweis auf einen Block, den es nicht gibt, und ein
+ * Pfad mit Klarnamen sind Fehler, die auf einem fremden Rechner sofort auffallen. Leichtere
+ * Befunde werden gezählt und ausgegeben, brechen den Build aber nicht — sonst wäre der Test beim
+ * ersten Lauf rot und würde stillgelegt statt beachtet.
+ */
+class PoolAnalyzerGateTest {
+
+    private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void ausgelieferteDefinitionenTragenKeineSchwerenBaufehler() throws IOException {
+        List<String> severe = new ArrayList<>();
+        Map<String, Integer> byRule = new TreeMap<>();
+        int checked = 0;
+
+        for (Path file : definitionFiles()) {
+            JsonNode root = objectMapper.readTree(Files.readString(file));
+            List<BlockDefinition> blocks = blocksOf(root);
+            if (blocks.isEmpty()) continue;
+            checked++;
+
+            String instructions = root.path("instructions").isTextual()
+                    ? root.path("instructions").asText() : null;
+            for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions)) {
+                byRule.merge(finding.rule(), 1, Integer::sum);
+                if (finding.severity() == AnalyzerFinding.Severity.HIGH) {
+                    severe.add(file.getFileName() + " [Block " + finding.blockIndex() + "] "
+                            + finding.rule() + ": " + finding.detail());
+                }
+            }
+        }
+
+        assertThat(checked).as("keine Definitionen mit Blöcken gefunden").isPositive();
+        System.out.println("Analyzer über " + checked + " ausgelieferte Definitionen: " + byRule);
+        assertThat(severe).as("schwere Baufehler in ausgelieferten Definitionen").isEmpty();
+    }
+
+    /** Die Blöcke einer Pool- oder Template-Datei; beide Formate führen sie unter {@code blocks}. */
+    private List<BlockDefinition> blocksOf(JsonNode root) {
+        JsonNode blocks = root.path("blocks");
+        if (!blocks.isArray()) {
+            blocks = root.path("definition").path("blocks");
+        }
+        List<BlockDefinition> out = new ArrayList<>();
+        if (!blocks.isArray()) return out;
+        for (JsonNode node : blocks) {
+            BlockDefinition block = new BlockDefinition();
+            block.setType(node.path("type").asText(null));
+            block.setName(node.path("name").isTextual() ? node.path("name").asText() : null);
+            block.setConfig(configOf(node.path("config")));
+            out.add(block);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> configOf(JsonNode config) {
+        if (!config.isObject()) return new HashMap<>();
+        return objectMapper.convertValue(config, Map.class);
+    }
+
+    /**
+     * Was wirklich ausgeliefert wird: Built-in-Templates liegen im JAR, sind also immer dabei.
+     * Aus {@code workflow-pool/} zählen nur die <b>versionierten</b> Dateien — dort liegen daneben
+     * lokale Arbeitskopien, die nie veröffentlicht werden (22 von 45 sind getrackt). Ein Gate, das
+     * sie mitprüft, meldet Fehler an Dateien, die niemand bekommt.
+     */
+    private static List<Path> definitionFiles() throws IOException {
+        List<Path> files = new ArrayList<>();
+        Path builtin = firstExistingOrNull(
+                Paths.get("src/main/resources/templates/builtin"),
+                Paths.get("ai-automation-backend/src/main/resources/templates/builtin"));
+        if (builtin != null) files.addAll(jsonFiles(builtin));
+        Path pool = firstExistingOrNull(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
+        if (pool != null) files.addAll(trackedJsonFiles(pool));
+        assertThat(files).as("keine Definitionen gefunden ab " + Paths.get("").toAbsolutePath()).isNotEmpty();
+        return files;
+    }
+
+    /** Die versionierten JSON-Dateien eines Verzeichnisses; ohne git bleibt die Liste leer. */
+    private static List<Path> trackedJsonFiles(Path dir) throws IOException {
+        try {
+            Process process = new ProcessBuilder("git", "ls-files", "--", ".")
+                    .directory(dir.toFile()).redirectErrorStream(true).start();
+            List<Path> tracked = new ArrayList<>();
+            try (var reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.endsWith(".json")) tracked.add(dir.resolve(line.strip()));
+                }
+            }
+            process.waitFor();
+            return tracked.stream().filter(Files::isRegularFile).sorted().toList();
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return List.of();
+        }
+    }
+
+    private static List<Path> jsonFiles(Path dir) throws IOException {
+        try (Stream<Path> stream = Files.list(dir)) {
+            return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
+        }
+    }
+
+    private static Path firstExistingOrNull(Path... candidates) {
+        for (Path candidate : candidates) {
+            if (Files.isDirectory(candidate)) return candidate;
+        }
+        return null;
+    }
+}
