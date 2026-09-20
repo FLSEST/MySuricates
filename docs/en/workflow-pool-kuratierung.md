@@ -16,7 +16,7 @@ Two mechanisms exist side by side, and they answer different questions.
 
 | | Built-in templates | Workflow pool |
 |---|---|---|
-| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (66) | `workflow-pool/*.json` (20 tracked) |
+| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (66) | `workflow-pool/*.json` |
 | Way into an instance | `WorkflowTemplateSeeder` seeds them into the database at startup, comparing semver | manual: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Visible as | a template in the catalogue, present in every instance | an entry in the pool browser, a workflow only after a deliberate install |
 | Updates | the seeder pulls in a higher version | none; an installed workflow is a copy and lives on by itself |
@@ -56,32 +56,22 @@ field, not a comment:
 `scope` is **pool metadata**, not a field of the workflow definition: an installed workflow
 does not carry it on, and the database does not know it.
 
-### Today's inventory
+### Where the inventory lives
 
-13 `repo`, 7 `portable`:
+It is deliberately **not** listed here. A list inside the document ages with every export —
+and this one already had: it said 13 `repo` and 7 `portable` and was out of date a few
+entries later.
 
-| Entry | scope | Name |
-|---|---|---|
-| `code-review-pipeline` | portable | Code Review Pipeline |
-| `master-commit-sanity-check` | repo | Master Commit Sanity Check |
-| `mocking-gap-audit` | portable | Mocking Gap Audit |
-| `mysuricates-architektur-review` | repo | Architecture review MySuricates |
-| `mysuricates-build-gate` | repo | MySuricates Build Gate |
-| `mysuricates-health-check` | repo | MySuricates health check |
-| `mysuricates-i18n-sync` | repo | Check and fix i18n sync |
-| `mysuricates-performance-audit` | repo | Performance audit MySuricates |
-| `mysuricates-release-readiness` | repo | Release readiness MySuricates |
-| `mysuricates-security-audit` | repo | Security audit MySuricates |
-| `mysuricates-test-coverage` | repo | Check test coverage MySuricates |
-| `mysuricates-test-sync` | repo | Write a test (TODO-driven) |
-| `project-health-check` | portable | Project health check |
-| `project-junk-cleanup` | portable | Project Junk Cleanup |
-| `public-readiness-behauptungen` | repo | Public Readiness — Claims |
-| `public-readiness-evidenz` | repo | Public Readiness — Evidence |
-| `public-readiness-todos` | portable | Public Readiness — Reviewed TODO Proposal |
-| `readme-generator` | portable | README generator |
-| `release-readiness-report` | portable | Release Readiness Report |
-| `system-performance-analysis` | repo | System performance analysis |
+The directory itself gives the reliable answer, because every definition carries its `scope`
+as a field:
+
+```bash
+grep -h '"scope"' workflow-pool/*.json | tr -d ' ",' | sort | uniq -c  # the split
+grep -l '"scope": "portable"' workflow-pool/*.json                     # the portable ones
+```
+
+`bash scripts/ci/pool-neutrality.sh` prints the checked total at the end, and the pool
+browser shows the `scope` badge next to each version.
 
 ## 3. Criteria per entry — the gate's rule set
 
