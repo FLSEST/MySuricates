@@ -32,6 +32,8 @@ jobs:
         run: bash scripts/public-readiness/doc-facts-check.sh
       - name: Doku-Zahlen-Gate Selbsttest
         run: bash scripts/tests/test-doc-facts-check.sh
+      - name: Doku-Readiness-Gate Selbsttest
+        run: bash scripts/tests/test-docs-check.sh
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
       # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
