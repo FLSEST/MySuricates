@@ -44,9 +44,16 @@ public class ProjectService {
         this.readOnlyTransactionTemplate.setReadOnly(true);
     }
 
+    /**
+     * Die Liste fuer {@code GET /api/v1/projects} — mit mitgeholtem Container.
+     *
+     * <p>Bewusst nicht {@code findByArchivedAtIsNull()}: Die nullable
+     * {@code @OneToOne(mappedBy = "project")} wuerde sonst je Projekt eine eigene Abfrage kosten
+     * (TODO 6d0ab09f).
+     */
     @Transactional(readOnly = true)
     public List<Project> findAll() {
-        return projectRepository.findByArchivedAtIsNull();
+        return projectRepository.findActiveWithContainer();
     }
 
     @Transactional(readOnly = true)

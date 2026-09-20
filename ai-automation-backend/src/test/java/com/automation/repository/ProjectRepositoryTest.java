@@ -1,8 +1,12 @@
 package com.automation.repository;
 
+import com.automation.entity.Container;
+import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +26,12 @@ class ProjectRepositoryTest {
 
     @Autowired
     private ProjectRepository repository;
+
+    @Autowired
+    private ContainerRepository containerRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private Project project(String name, String path, ProjectStatus status) {
         return Project.builder()
@@ -244,5 +254,72 @@ class ProjectRepositoryTest {
         boolean exists = repository.existsByPath("/tmp/proj-mu-del");
 
         assertThat(exists).isFalse();
+    }
+
+    // --- findActiveWithContainer ---
+
+    /** Gleiche Auswahl wie findByArchivedAtIsNull — der Join darf nichts filtern. */
+    @Test
+    void findActiveWithContainer_returnsOnlyNonArchivedProjects() {
+        Project live = repository.save(project("Join Live", "/tmp/proj-join-live", ProjectStatus.RUNNING));
+        repository.save(archivedProject("Join Archived", "/tmp/proj-join-archived"));
+
+        List<Project> result = repository.findActiveWithContainer();
+
+        assertThat(result).extracting(Project::getId).contains(live.getId());
+        assertThat(result).allMatch(p -> p.getArchivedAt() == null);
+    }
+
+    /**
+     * {@code LEFT}, nicht {@code INNER}: Die meisten Projekte haben keinen Container, und die
+     * duerfen der Liste nicht fehlen.
+     */
+    @Test
+    void findActiveWithContainer_keepsProjectsWithoutContainer() {
+        Project bare = repository.save(project("Join Bare", "/tmp/proj-join-bare", ProjectStatus.STOPPED));
+
+        List<Project> result = repository.findActiveWithContainer();
+
+        assertThat(result).extracting(Project::getId).contains(bare.getId());
+        assertThat(result).filteredOn(p -> p.getId().equals(bare.getId()))
+                .allSatisfy(p -> assertThat(p.getContainer()).isNull());
+    }
+
+    /** Und der Container kommt mitgeholt zurueck, sonst waere der Join sinnlos. */
+    @Test
+    void findActiveWithContainer_fetchesTheContainer() {
+        Project withContainer = repository.save(
+                project("Join Container", "/tmp/proj-join-container", ProjectStatus.RUNNING));
+        containerRepository.save(Container.builder()
+                .project(withContainer)
+                .dockerContainerId("docker-join-container")
+                .imageName("automation/test:latest")
+                .status(ContainerStatus.RUNNING)
+                .build());
+
+        // Ohne das Leeren des Persistenzkontexts liefert die Abfrage die bereits verwaltete
+        // Project-Instanz zurueck, deren container-Feld noch null ist — der Join waere dann
+        // gar nicht gemessen.
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Project> result = repository.findActiveWithContainer();
+
+        assertThat(result).filteredOn(p -> p.getId().equals(withContainer.getId()))
+                .isNotEmpty()
+                .allSatisfy(p -> assertThat(p.getContainer().getDockerContainerId())
+                        .isEqualTo("docker-join-container"));
+    }
+
+    /** Ein Projekt darf nicht doppelt erscheinen, nur weil gejoint wird. */
+    @Test
+    void findActiveWithContainer_returnsEachProjectOnce() {
+        Project saved = repository.save(project("Join Once", "/tmp/proj-join-once", ProjectStatus.STOPPED));
+
+        List<Project> result = repository.findActiveWithContainer();
+
+        assertThat(result).extracting(Project::getId)
+                .filteredOn(id -> id.equals(saved.getId()))
+                .hasSize(1);
     }
 }

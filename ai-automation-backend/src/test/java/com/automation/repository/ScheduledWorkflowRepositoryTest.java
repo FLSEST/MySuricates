@@ -312,4 +312,61 @@ class ScheduledWorkflowRepositoryTest {
         assertThat(result).extracting(ScheduledWorkflow::getId)
                 .contains(atFrom.getId(), atTo.getId());
     }
+
+    // --- findAllWithTargets ---
+
+    /**
+     * Der Join darf nichts verschlucken: Ein Zeitplan ohne Workflow (Ketten-Ziel) und einer ohne
+     * Kette (Workflow-Ziel) muessen beide in der Liste stehen — {@code LEFT}, nicht {@code INNER}.
+     */
+    @Test
+    void findAllWithTargets_returnsWorkflowAndChainSchedules() {
+        Project project = saveProject("Project N");
+        Workflow workflow = saveWorkflow("Workflow N", project);
+        WorkflowChain chain = saveChain("Chain N");
+
+        ScheduledWorkflow forWorkflow = repository.save(schedule(workflow, true, Instant.now()));
+        ScheduledWorkflow forChain = repository.save(chainSchedule(chain, true, Instant.now()));
+
+        List<ScheduledWorkflow> result = repository.findAllWithTargets();
+
+        assertThat(result).extracting(ScheduledWorkflow::getId)
+                .contains(forWorkflow.getId(), forChain.getId());
+    }
+
+    /** Die Ziele kommen mitgeholt zurueck, sonst waere der Join sinnlos. */
+    @Test
+    void findAllWithTargets_fetchesWorkflowProjectAndChain() {
+        Project project = saveProject("Project O");
+        Workflow workflow = saveWorkflow("Workflow O", project);
+        WorkflowChain chain = saveChain("Chain O");
+        repository.save(schedule(workflow, true, Instant.now()));
+        repository.save(chainSchedule(chain, true, Instant.now()));
+
+        List<ScheduledWorkflow> result = repository.findAllWithTargets();
+
+        assertThat(result)
+                .filteredOn(s -> s.getWorkflow() != null && s.getWorkflow().getId().equals(workflow.getId()))
+                .allSatisfy(s -> {
+                    assertThat(s.getWorkflow().getName()).isEqualTo("Workflow O");
+                    assertThat(s.getWorkflow().getProject().getName()).isEqualTo("Project O");
+                });
+        assertThat(result)
+                .filteredOn(s -> s.getChain() != null && s.getChain().getId().equals(chain.getId()))
+                .allSatisfy(s -> assertThat(s.getChain().getName()).isEqualTo("Chain O"));
+    }
+
+    /** Ein Zeitplan darf nicht doppelt erscheinen, nur weil mehrere Assoziationen gejoint werden. */
+    @Test
+    void findAllWithTargets_returnsEachScheduleOnce() {
+        Project project = saveProject("Project P");
+        Workflow workflow = saveWorkflow("Workflow P", project);
+        ScheduledWorkflow saved = repository.save(schedule(workflow, true, Instant.now()));
+
+        List<ScheduledWorkflow> result = repository.findAllWithTargets();
+
+        assertThat(result).extracting(ScheduledWorkflow::getId)
+                .filteredOn(id -> id.equals(saved.getId()))
+                .hasSize(1);
+    }
 }

@@ -67,14 +67,19 @@ class ProjectServiceTest {
                 .build();
     }
 
+    /**
+     * Die Liste laeuft ueber {@code findActiveWithContainer()}: Nur die Join-Fetch-Variante holt
+     * den Container mit, statt ihn je Projekt nachzuladen (TODO 6d0ab09f).
+     */
     @Test
     void findAll_returnsAllProjects() {
-        when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of(testProject));
+        when(projectRepository.findActiveWithContainer()).thenReturn(List.of(testProject));
 
         List<Project> result = projectService.findAll();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("Test Project");
+        verify(projectRepository, never()).findByArchivedAtIsNull();
     }
 
     @Test

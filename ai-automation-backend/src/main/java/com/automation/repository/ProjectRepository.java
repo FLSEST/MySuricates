@@ -3,6 +3,7 @@ package com.automation.repository;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,6 +13,20 @@ import java.util.Optional;
 public interface ProjectRepository extends JpaRepository<Project, String> {
 
     List<Project> findByArchivedAtIsNull();
+
+    /**
+     * Die nicht archivierten Projekte samt Container — die Liste hinter
+     * {@code GET /api/v1/projects}.
+     *
+     * <p>{@code Project.container} ist eine nullable {@code @OneToOne(mappedBy = "project")}. Eine
+     * solche Assoziation kann Hibernate nicht als Proxy anlegen (ob es eine Zeile gibt, weiss erst
+     * die Abfrage), also loest sie {@code findByArchivedAtIsNull()} je materialisiertem Projekt
+     * einzeln auf. Bei drei Projekten faellt das nicht auf, auf der Dev-Datenbank waren es
+     * 37 Statements fuer eine Liste (TODO 6d0ab09f). Der Join holt den Container mit; die Zahl der
+     * Abfragen bleibt konstant, unabhaengig von der Zahl der Projekte.
+     */
+    @Query("SELECT p FROM Project p LEFT JOIN FETCH p.container WHERE p.archivedAt IS NULL")
+    List<Project> findActiveWithContainer();
 
     List<Project> findByArchivedAtIsNotNull();
 
