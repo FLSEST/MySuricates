@@ -1,48 +1,164 @@
 <!DOCTYPE html>
+<!-- Erzeugt aus docs/logging-monitoring-diagrams.md von scripts/docs-diagrams.py — nicht von Hand bearbeiten. -->
 <html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Logging & Monitoring</title>
+  <title>AutoPilot — Logging &amp; Monitoring</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
-    :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#e6edf3; --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --orange:#d29922; --red:#f85149; }
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
-    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.5rem 2rem;text-align:center;}
-    header h1{font-size:1.8rem;font-weight:600;} header p{color:var(--text-muted);margin-top:0.3rem;}
-    nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0.8rem 2rem;display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:100;}
-    nav a{color:var(--accent);text-decoration:none;padding:0.4rem 1rem;border-radius:6px;font-size:0.9rem;transition:background 0.2s;}
-    nav a:hover{background:rgba(88,166,255,0.1);}
-    main{max-width:1200px;margin:0 auto;padding:2rem;}
-    section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;margin-bottom:2rem;}
-    section h2{font-size:1.4rem;margin-bottom:0.5rem;color:var(--accent);} section h2 span{font-size:0.85rem;color:var(--text-muted);font-weight:400;margin-left:0.5rem;}
-    section>p{color:var(--text-muted);margin-bottom:1.5rem;font-size:0.95rem;}
-    .mermaid{display:flex;justify-content:center;margin:1rem 0;} .mermaid svg{max-width:100%;height:auto;}
-    table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:0.9rem;}
-    th,td{padding:0.6rem 1rem;text-align:left;border-bottom:1px solid var(--border);} th{color:var(--text-muted);font-weight:600;font-size:0.8rem;text-transform:uppercase;}
-    td code{background:rgba(88,166,255,0.1);color:var(--accent);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.85rem;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;} @media(max-width:800px){.grid{grid-template-columns:1fr;}}
-    .card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem;}
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.8rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    section > ul { color: var(--text); line-height: 1.6; padding-left: 1.2rem; margin-bottom: 1.5rem; }
+    section > p a, .card a { color: var(--accent); }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .card h3 { font-size: 1rem; margin-top: 0; margin-bottom: 0.5rem; }
+    .card p, .card li { font-size: 0.85rem; color: var(--text-muted); }
+    .card ul { padding-left: 1.1rem; }
+    .card code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .tree {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .tree .dir { color: var(--accent); font-weight: 600; }
+    .tree .comment { color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>AutoPilot — Logging & Monitoring</h1>
+  <h1>AutoPilot — Logging &amp; Monitoring</h1>
   <p>WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header</p>
 </header>
 
 <nav>
-  <a href="#ws">WebSocket Logs</a>
-  <a href="#activity">ActivityLog</a>
-  <a href="#health">Health & Info</a>
-  <a href="#ratelimit">Rate Limit Header</a>
+  <a href="#websocket-log-pipeline">WebSocket Log Pipeline</a>
+  <a href="#activitylogservice">ActivityLogService</a>
+  <a href="#health-info">Health &amp; Info</a>
+  <a href="#rate-limit-header">Rate Limit Header</a>
 </nav>
 
 <main>
 
-<section id="ws">
+<section id="websocket-log-pipeline">
   <h2>WebSocket Log Pipeline <span>/topic/executions/{runId}/logs</span></h2>
   <pre class="mermaid">
 sequenceDiagram
@@ -51,20 +167,20 @@ sequenceDiagram
     participant ST as STOMP Broker
     participant UI as React (useExecutionWebSocket)
 
-    BE->>SMT: convertAndSend(topic, payload)
-    SMT->>ST: dispatch
-    ST-->>UI: message (step logs, status, approvals, agentic events)
-    UI->>UI: update LogViewer / Status
+    BE-&gt;&gt;SMT: convertAndSend(topic, payload)
+    SMT-&gt;&gt;ST: dispatch
+    ST--&gt;&gt;UI: message (step logs, status, approvals, agentic events)
+    UI-&gt;&gt;UI: update LogViewer / Status
   </pre>
   <p>Payloads: StepResult (input/output/duration/status), Status-Events, approval_required/approval_resolved, agentic_* Events.</p>
 </section>
 
-<section id="activity">
+<section id="activitylogservice">
   <h2>ActivityLogService <span>LogCategory</span></h2>
   <pre class="mermaid">
 flowchart LR
-    SVC["Services"] --> ALS["ActivityLogService"]
-    ALS --> DB["activity_log (SQLite)"]
+    SVC["Services"] --&gt; ALS["ActivityLogService"]
+    ALS --&gt; DB["activity_log (SQLite)"]
   </pre>
   <table>
     <thead><tr><th>Kategorie</th><th>Beispiele</th></tr></thead>
@@ -76,8 +192,8 @@ flowchart LR
   </table>
 </section>
 
-<section id="health">
-  <h2>Health & Info <span>/api/v1/system</span></h2>
+<section id="health-info">
+  <h2>Health &amp; Info <span>/api/v1/system</span></h2>
   <div class="grid">
     <div class="card">
       <h3>Health</h3>
@@ -92,7 +208,7 @@ flowchart LR
   </div>
 </section>
 
-<section id="ratelimit">
+<section id="rate-limit-header">
   <h2>Rate Limit Header <span>Filter</span></h2>
   <p>Bei aktivem RateLimitFilter werden verbleibende Requests im Header geliefert.</p>
   <table>

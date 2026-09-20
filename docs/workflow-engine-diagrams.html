@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Erzeugt aus docs/workflow-engine-diagrams.md von scripts/docs-diagrams.py — nicht von Hand bearbeiten. -->
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -68,7 +69,10 @@
       color: var(--accent);
     }
     section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.8rem; }
     section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    section > ul { color: var(--text); line-height: 1.6; padding-left: 1.2rem; margin-bottom: 1.5rem; }
+    section > p a, .card a { color: var(--accent); }
     .mermaid {
       display: flex;
       justify-content: center;
@@ -94,7 +98,7 @@
       border-radius: 4px;
       font-size: 0.85rem;
     }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
     @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
     .card {
       background: var(--bg);
@@ -102,8 +106,16 @@
       border-radius: 8px;
       padding: 1.2rem;
     }
-    .card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
-    .card p { font-size: 0.85rem; color: var(--text-muted); }
+    .card h3 { font-size: 1rem; margin-top: 0; margin-bottom: 0.5rem; }
+    .card p, .card li { font-size: 0.85rem; color: var(--text-muted); }
+    .card ul { padding-left: 1.1rem; }
+    .card code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
     .tree {
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 0.85rem;
@@ -113,9 +125,10 @@
       border-radius: 8px;
       border: 1px solid var(--border);
       overflow-x: auto;
+      margin: 1rem 0;
     }
     .tree .dir { color: var(--accent); font-weight: 600; }
-    .tree .file { color: var(--text); }
+    .tree .comment { color: var(--text-muted); }
     .badge {
       display: inline-block;
       padding: 0.15rem 0.5rem;
@@ -123,10 +136,10 @@
       font-size: 0.75rem;
       font-weight: 600;
     }
-    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
     .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
     .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
-    .badge-orange { background: rgba(210,153,34,0.15); color: var(--orange); }
   </style>
 </head>
 <body>
@@ -137,20 +150,20 @@
 </header>
 
 <nav>
-  <a href="#overview">Uebersicht</a>
-  <a href="#exec-standard">Standard-Flow</a>
-  <a href="#exec-shell">Shell-Flow</a>
-  <a href="#agentic">Agentic Loop</a>
-  <a href="#control">Control Flow</a>
-  <a href="#providers">Provider</a>
-  <a href="#blocks">Block-Matrix</a>
-  <a href="#config">Konfig</a>
-  <a href="#files">Dateien</a>
+  <a href="#systemuebersicht">Systemuebersicht</a>
+  <a href="#ausfuehrung-standard-ki-gestuetzt">Ausfuehrung (Standard, KI-gestuetzt)</a>
+  <a href="#ausfuehrung-ohne-ki">Ausfuehrung (ohne KI)</a>
+  <a href="#agentic-loop">Agentic Loop</a>
+  <a href="#control-flow">Control Flow</a>
+  <a href="#provider-ausfuehrungsmodi">Provider &amp; Ausfuehrungsmodi</a>
+  <a href="#block-matrix">Block-Matrix</a>
+  <a href="#konfiguration">Konfiguration</a>
+  <a href="#dateistruktur">Dateistruktur</a>
 </nav>
 
 <main>
 
-<section id="overview">
+<section id="systemuebersicht">
   <h2>Systemuebersicht <span>High-Level</span></h2>
   <p>Alle Workflows laufen ueber den WorkflowExecutor. Er orchestriert BlockExecutors, Container-Start, Skill-Kontext und WebSocket-Logs.</p>
   <pre class="mermaid">
@@ -173,16 +186,16 @@ flowchart LR
         HOST["Host (Fallback)"]
     end
 
-    UI -->|"POST /workflows/{id}/execute"| WE
-    WE -->|"blocks"| BE
-    BE -->|"claude"| CES
-    BE -->|"shell"| SCS
-    CES -->|"CLI"| CON
-    SCS --> CON
-    CES -.fallback.-> HOST
-    SCS -.fallback.-> HOST
-    WE --> WS
-    WS --> UI
+    UI --&gt;|"POST /workflows/{id}/execute"| WE
+    WE --&gt;|"blocks"| BE
+    BE --&gt;|"claude"| CES
+    BE --&gt;|"shell"| SCS
+    CES --&gt;|"CLI"| CON
+    SCS --&gt; CON
+    CES -.fallback.-&gt; HOST
+    SCS -.fallback.-&gt; HOST
+    WE --&gt; WS
+    WS --&gt; UI
 
     style Browser fill:#1a1f2e,stroke:#30363d,color:#e6edf3
     style Backend fill:#1a1f2e,stroke:#30363d,color:#e6edf3
@@ -190,7 +203,7 @@ flowchart LR
   </pre>
 </section>
 
-<section id="exec-standard">
+<section id="ausfuehrung-standard-ki-gestuetzt">
   <h2>Ausfuehrung (Standard, KI-gestuetzt) <span>Reason/Act</span></h2>
   <p>Default: Befehle gehen an Claude-CLI (Host/Container). Instruction-Prefix + Model kommen aus dem Workflow.</p>
   <pre class="mermaid">
@@ -202,25 +215,25 @@ sequenceDiagram
     participant CLI as Claude CLI
     participant WS as WebSocket
 
-    UI->>WE: POST /workflows/{id}/execute
-    WE->>WE: create WorkflowRun (RUNNING)
-    WE->>WE: ensureContainerRunning()
-    WE->>BE: for block in blocks
-    BE->>CES: executeStepOnHost/Container(command, model, instructions)
-    CES->>CLI: claude -p "<command>"
-    CLI-->>CES: output + exitCode + usage
-    CES-->>BE: StepResult (status by exitCode)
-    BE-->>WE: add StepResult, set previous_output
-    WE->>WS: broadcast step log
-    alt step failed & on_failure=stop
-        WE->>WE: mark RUN FAILED
+    UI-&gt;&gt;WE: POST /workflows/{id}/execute
+    WE-&gt;&gt;WE: create WorkflowRun (RUNNING)
+    WE-&gt;&gt;WE: ensureContainerRunning()
+    WE-&gt;&gt;BE: for block in blocks
+    BE-&gt;&gt;CES: executeStepOnHost/Container(command, model, instructions)
+    CES-&gt;&gt;CLI: claude -p "&lt;command&gt;"
+    CLI--&gt;&gt;CES: output + exitCode + usage
+    CES--&gt;&gt;BE: StepResult (status by exitCode)
+    BE--&gt;&gt;WE: add StepResult, set previous_output
+    WE-&gt;&gt;WS: broadcast step log
+    alt step failed &amp; on_failure=stop
+        WE-&gt;&gt;WE: mark RUN FAILED
     end
-    WE->>WE: mark RUN COMPLETED/FAILED
-    WE->>WS: final status event
+    WE-&gt;&gt;WE: mark RUN COMPLETED/FAILED
+    WE-&gt;&gt;WS: final status event
   </pre>
 </section>
 
-<section id="exec-shell">
+<section id="ausfuehrung-ohne-ki">
   <h2>Ausfuehrung (ohne KI) <span>Shell-Pfade</span></h2>
   <p>Shell-Mode nutzt keine Modelle, keine Instruktions-Prefixe, bewertet nur Exit-Code.</p>
   <pre class="mermaid">
@@ -230,25 +243,32 @@ sequenceDiagram
     participant SH as Shell
     participant WE as WorkflowExecutor
 
-    BE->>SCS: execute(command, workDir, timeout)
-    SCS->>SH: run command
-    SH-->>SCS: output + exitCode
-    SCS-->>BE: StepResult (status by exitCode)
-    BE-->>WE: add StepResult
+    BE-&gt;&gt;SCS: execute(command, workDir, timeout)
+    SCS-&gt;&gt;SH: run command
+    SH--&gt;&gt;SCS: output + exitCode
+    SCS--&gt;&gt;BE: StepResult (status by exitCode)
+    BE--&gt;&gt;WE: add StepResult
   </pre>
   <div class="grid">
     <div class="card">
       <h3>Wann Shell?</h3>
-      <p>&#x2022; Blocktyp <code>shell</code><br/>&#x2022; <code>execution_mode=shell</code> bei foreach/while/retry</p>
+      <ul>
+        <li>Blocktyp <code>shell</code></li>
+        <li><code>execution_mode=shell</code> bei foreach/while/retry</li>
+      </ul>
     </div>
     <div class="card">
       <h3>Unterschiede</h3>
-      <p>&#x2022; Kein Model / kein Prompt-Limit<br/>&#x2022; Deterministisch durch Exit-Code<br/>&#x2022; Kein Token-Metadata</p>
+      <ul>
+        <li>Kein Model / kein Prompt-Limit</li>
+        <li>Deterministisch durch Exit-Code</li>
+        <li>Kein Token-Metadata</li>
+      </ul>
     </div>
   </div>
 </section>
 
-<section id="agentic">
+<section id="agentic-loop">
   <h2>Agentic Loop <span>Reason–Act–Observe</span></h2>
   <p>Mehrstufige KI-Planung mit Token-/Zeit-Budgets, Wiederholungs-Stopp und optionalem Approval.</p>
   <pre class="mermaid">
@@ -259,43 +279,43 @@ sequenceDiagram
     participant CES as CommandExecutorService (ACT)
     participant CLI2 as claude -p (action)
 
-    AG->>HC: buildConversationPrompt + reasonStructured()
-    HC->>CLI: stream-json
-    CLI-->>HC: structured reasoning
-    HC-->>AG: RATIONALE + ACTION
+    AG-&gt;&gt;HC: buildConversationPrompt + reasonStructured()
+    HC-&gt;&gt;CLI: stream-json
+    CLI--&gt;&gt;HC: structured reasoning
+    HC--&gt;&gt;AG: RATIONALE + ACTION
     alt ACTION empty
-        AG->>AG: ask for clearer action
+        AG-&gt;&gt;AG: ask for clearer action
     else ACTION present
-        AG->>CES: executeCommandOnHost(action, model, sysPrompt)
-        CES->>CLI2: run action
-        CLI2-->>CES: output + exitCode + usage
-        CES-->>AG: result
+        AG-&gt;&gt;CES: executeCommandOnHost(action, model, sysPrompt)
+        CES-&gt;&gt;CLI2: run action
+        CLI2--&gt;&gt;CES: output + exitCode + usage
+        CES--&gt;&gt;AG: result
     end
-    AG->>AG: record iteration, token budget, repetition check
-    AG->>AG: stop if goal ACHIEVED/IMPOSSIBLE/timeout/repeat/token
+    AG-&gt;&gt;AG: record iteration, token budget, repetition check
+    AG-&gt;&gt;AG: stop if goal ACHIEVED/IMPOSSIBLE/timeout/repeat/token
   </pre>
 </section>
 
-<section id="control">
-  <h2>Control Flow <span>Conditional & Approval</span></h2>
+<section id="control-flow">
+  <h2>Control Flow <span>Conditional &amp; Approval</span></h2>
   <p>Branching und User-Gates innerhalb eines Runs.</p>
   <pre class="mermaid">
 flowchart LR
-    A["conditional block<br/>condition -> Claude TRUE/FALSE"] -->|then| T["run then_command (simple)"]
-    A -->|else| E["run else_command (simple)"]
+    A["conditional block<br/>condition -&gt; Claude TRUE/FALSE"] --&gt;|then| T["run then_command (simple)"]
+    A --&gt;|else| E["run else_command (simple)"]
     subgraph Approval
-        Q["approval block<br/>question + options"] --> MEM["remember 'Yes always' per run"]
-        Q --> OUTC["answer stored as variable"]
-        Q --> DEC{"on_no"}
-        DEC -->|fail| FAIL["Step FAILED"]
-        DEC -->|skip| SKIP["Step SKIPPED"]
-        DEC -->|continue| CONT["Step COMPLETED"]
+        Q["approval block<br/>question + options"] --&gt; MEM["remember 'Yes always' per run"]
+        Q --&gt; OUTC["answer stored as variable"]
+        Q --&gt; DEC{"on_no"}
+        DEC --&gt;|fail| FAIL["Step FAILED"]
+        DEC --&gt;|skip| SKIP["Step SKIPPED"]
+        DEC --&gt;|continue| CONT["Step COMPLETED"]
     end
   </pre>
 </section>
 
-<section id="providers">
-  <h2>Provider & Ausfuehrungsmodi <span>KI vs. Kein KI</span></h2>
+<section id="provider-ausfuehrungsmodi">
+  <h2>Provider &amp; Ausfuehrungsmodi <span>KI vs. Kein KI</span></h2>
   <table>
     <thead><tr><th>Merkmal</th><th>KI (Claude)</th><th>Ohne KI (Shell)</th></tr></thead>
     <tbody>
@@ -308,7 +328,7 @@ flowchart LR
   </table>
 </section>
 
-<section id="blocks">
+<section id="block-matrix">
   <h2>Block-Matrix <span>Typ → Exec-Modus</span></h2>
   <table>
     <thead><tr><th>Block</th><th>Default</th><th>Optionen</th><th>Stop on failure</th></tr></thead>
@@ -321,13 +341,13 @@ flowchart LR
       <tr><td><code>conditional</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Branch-spezifisch</td></tr>
       <tr><td><code>approval</code></td><td>-</td><td><code>mode</code>=ask/auto, <code>on_no</code>=fail/skip/continue</td><td>on_no=fail</td></tr>
       <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code>, <code>timeout_seconds</code></td><td>Ja</td></tr>
-      <tr><td><code>sub-workflow</code></td><td>depends</td><td>Tiefe<=5, Timeout 30 min</td><td>Ja bei Timeout/Zyklus</td></tr>
+      <tr><td><code>sub-workflow</code></td><td>depends</td><td>Tiefe&lt;=5, Timeout 30 min</td><td>Ja bei Timeout/Zyklus</td></tr>
       <tr><td><code>agentic</code></td><td>claude</td><td>Budget, Iterationen, Approval, <code>timeout_seconds</code></td><td>Ja bei Stoppgründen</td></tr>
     </tbody>
   </table>
 </section>
 
-<section id="config">
+<section id="konfiguration">
   <h2>Konfiguration <span>application.yml (relevant)</span></h2>
   <div class="grid">
     <div class="card">
@@ -345,9 +365,9 @@ flowchart LR
   </div>
 </section>
 
-<section id="files">
+<section id="dateistruktur">
   <h2>Dateistruktur <span>Kernklassen</span></h2>
-  <div class="tree">
+  <pre class="tree">
 <span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
 ├── <span class="dir">executor/</span>
 │   ├── ExecutionContext.java
@@ -362,7 +382,7 @@ flowchart LR
 │   └── CliSessionManager.java
 └── <span class="dir">service/ai/</span>
     └── HostClaudeService.java
-  </div>
+  </pre>
 </section>
 
 </main>

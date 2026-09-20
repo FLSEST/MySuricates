@@ -34,6 +34,13 @@ jobs:
         run: bash scripts/tests/test-doc-facts-check.sh
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
+      # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
+      # Gate faellt eine von Hand geaenderte HTML-Datei erst auf, wenn jemand die
+      # Markdown-Quelle anfasst und die Aenderung wieder ueberschreibt.
+      - name: Diagramm-Seiten gegen die Markdown-Quelle pruefen
+        run: python3 scripts/docs-diagrams.py --check
+      - name: Diagramm-Gate Selbsttest
+        run: python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
       - name: Audit-Fakten Selbsttest
         run: bash scripts/tests/test-audit-facts.sh
       - name: Coverage-Snapshot Selbsttest
