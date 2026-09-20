@@ -389,6 +389,8 @@ Executes a command for each item in a list.
 
 **Note**: `items_command` is always executed as a shell command (regardless of `execution_mode`), since it only collects the iteration targets.
 
+**Empty item lists**: Empty and whitespace-only lines are discarded — in the `items_command` output as well as in inline `items`. An empty output therefore yields **zero** iterations (the block completes with metadata `totalItems: 0`) instead of one iteration with an empty item. An empty list is thus the clean way to skip a loop.
+
 **When to use**: Processing multiple files, repos, or items with the same operation.
 
 ---
