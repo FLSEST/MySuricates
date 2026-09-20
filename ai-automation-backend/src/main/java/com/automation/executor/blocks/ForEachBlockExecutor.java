@@ -60,13 +60,13 @@ public class ForEachBlockExecutor implements BlockExecutor {
             // items_command always runs as shell — it collects iteration targets, not AI work
             String output = commandExecutor.executeShellCommandOnHost(
                     context.getProjectPath(), itemsCommand, shellTimeout).output();
-            items = Arrays.asList(output.split("\n"));
+            items = splitIntoItems(output);
         } else {
             Object rawItems = config.get("items");
             if (rawItems instanceof List<?> list) {
-                items = list.stream().map(Object::toString).toList();
+                items = list.stream().map(Object::toString).filter(item -> !item.isBlank()).toList();
             } else if (rawItems instanceof String s) {
-                items = Arrays.asList(s.split("\n"));
+                items = splitIntoItems(s);
             } else {
                 items = List.of();
             }
@@ -172,6 +172,15 @@ public class ForEachBlockExecutor implements BlockExecutor {
         );
 
         return aggregateResult;
+    }
+
+    /**
+     * Splits newline-separated item sources into items. Blank lines never become an iteration —
+     * an empty command output means zero items, not one empty item (which would cost an AI call).
+     */
+    private static List<String> splitIntoItems(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        return Arrays.stream(raw.split("\n")).filter(line -> !line.isBlank()).toList();
     }
 
     @Override

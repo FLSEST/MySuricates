@@ -401,6 +401,8 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 
 **Hinweis**: `items_command` wird immer als Shell-Befehl ausgeführt (unabhängig von `execution_mode`), da es nur die Iterations-Ziele sammelt.
 
+**Leere Item-Listen**: Leere und reine Whitespace-Zeilen werden verworfen — in der `items_command`-Ausgabe wie in inline `items`. Eine leere Ausgabe ergibt damit **null** Iterationen (Block endet COMPLETED, Metadaten `totalItems: 0`) statt einer Iteration mit leerem Item. Eine leere Liste ist also der saubere Weg, eine Schleife zu überspringen.
+
 **Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Blöcke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` lässt dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.

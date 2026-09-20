@@ -195,7 +195,136 @@ class ForEachBlockExecutorTest {
         StepResult result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 0);
+        assertThat(result.getMetadata().get("items")).isEqualTo(List.of());
         verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_itemsCommand_emptyOutput_iteratesZeroTimes() {
+        // Leere items_command-Ausgabe = null Items, nicht ein leeres Item (das waere ein KI-Call umsonst)
+        when(commandExecutor.executeShellCommandOnHost("/test/project", "cat topics.txt", 300))
+                .thenReturn(new CliSession.CommandResult("", 0));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "command");
+        config.put("items_command", "cat topics.txt");
+        config.put("command", "schreibe ueber {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 0);
+        assertThat((List<Map<String, Object>>) result.getMetadata().get("items")).isEmpty();
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+        verify(commandExecutor, never()).executeStepAsShell(any(), any(), anyInt(), anyInt());
+        verify(broadcaster, never()).broadcastLogMessage(eq("run-1"), eq("foreach_item_started"), any());
+    }
+
+    @Test
+    void execute_itemsCommand_whitespaceOnlyOutput_iteratesZeroTimes() {
+        when(commandExecutor.executeShellCommandOnHost("/test/project", "list-topics", 300))
+                .thenReturn(new CliSession.CommandResult("\n  \n\n", 0));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "command");
+        config.put("items_command", "list-topics");
+        config.put("command", "process {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 0);
+        verify(commandExecutor, never()).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_itemsCommand_blankLinesAreDropped() {
+        // Leerzeilen zwischendrin und am Ende sind keine Items
+        when(commandExecutor.executeShellCommandOnHost("/test/project", "ls", 300))
+                .thenReturn(new CliSession.CommandResult("a.txt\n\n   \nb.txt\n", 0));
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "command");
+        config.put("items_command", "ls");
+        config.put("command", "lint {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 2);
+        List<Map<String, Object>> items = (List<Map<String, Object>>) result.getMetadata().get("items");
+        assertThat(items).extracting(item -> item.get("item")).containsExactly("a.txt", "b.txt");
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_stringItems_blankLinesAreDropped() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", "alpha\n\nbeta\n");
+        config.put("command", "process {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 2);
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void execute_listItems_blankEntriesAreDropped() {
+        StepResult stepResult = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(stepResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items_source", "list");
+        config.put("items", List.of("alpha", "", "  ", "beta"));
+        config.put("command", "process {{ item }}");
+
+        BlockDefinition block = BlockDefinition.builder()
+                .type("foreach")
+                .config(config)
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("totalItems", 2);
+        verify(commandExecutor, times(2)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test
