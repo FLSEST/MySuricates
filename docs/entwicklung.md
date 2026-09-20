@@ -444,8 +444,9 @@ gequotetes Argument**.
   - Oder bewusst ohne Quoting arbeiten: den Folgebefehl so umbauen, dass ein einzelnes gequotetes
     Argument ausreicht (z. B. das Argument in Anführungszeichen erwarten, statt es selbst
     aufzuteilen).
-  - In den ausgelieferten Definitionen ist ein Built-in betroffen (`saas-continuous-improve.json`);
-    der Folgeblock dort ist ein KI-Prompt, für den sich am Verhalten nichts ändert.
+  - Welche der ausgelieferten Definitionen Plattform-Daten überhaupt in ein Shell-Feld einsetzen,
+    verschiebt sich mit jedem neuen Pool-Eintrag; eine feste Zahl steht hier deshalb nicht. Dass
+    sie dabei die sichere, unquotete Form verwenden, hält `TemplateHygieneGateTest` fest.
 
 **Seit 2026-09-18 (TODO 22e6bec8): Die Ausgabe eines KI-Blocks mit Plattform-Daten im Prompt wird
 gefärbt.** Wer `{{ previous_report }}` oder `{{ open_todos }}` im Prompt eines KI-Blocks verwendet

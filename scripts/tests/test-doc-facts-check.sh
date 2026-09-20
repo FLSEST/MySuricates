@@ -490,6 +490,69 @@ check "abgeschlossener Satz wird von datierter Nachbarzeile nicht gedeckt" \
   'grep -qE "^DRIFT docs/regeln.md:2 testzahl-ohne-datum" <<<"$OUT"'
 rm "$FAKE/docs/regeln.md"
 
+echo "15) Feste Zahlen ueber die ausgelieferten Definitionen (TODO 4846ccca)"
+# Zeile 2-4 sind die Formulierungen, die wirklich in docs/architektur.md standen
+# (DE und EN, zeitweise mit unterschiedlichen Zahlen). Zeile 5-8 sind die
+# Gegenproben: der Verweis aufs Gate, eine Gesamtzahl mit eigener Pruefung,
+# "einmal" als gewoehnliches Wort und eine Zahl ohne Auslieferungs-Bezug.
+cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
+# Zahlen
+In den mitgelieferten Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows).
+It occurs eight times in the bundled definitions (one built-in template).
+In den ausgelieferten Definitionen ist ein Built-in betroffen (`saas-continuous-improve.json`).
+In den ausgelieferten Definitionen haelt `PlatformPromptQuotingGateTest` fest, wer betroffen ist.
+Es gibt 6 Built-in-Templates, die beim Start eingespielt werden.
+Der Endpunkt zeigt das Secret in den ausgelieferten Definitionen genau einmal an.
+Diese Form kommt achtmal vor.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Zahl-Regel: exit 1"           '[ "$RC" -eq 1 ]'
+check "'achtmal' gemeldet" \
+  'grep -qE "^DRIFT docs/zahlen.md:2 zahl-ueber-ausgelieferte-definitionen" <<<"$OUT"'
+check "englisches 'eight times' gemeldet" \
+  'grep -qE "^DRIFT docs/zahlen.md:3 zahl-ueber-ausgelieferte-definitionen" <<<"$OUT"'
+check "'ein Built-in' gemeldet" \
+  'grep -qE "^DRIFT docs/zahlen.md:4 zahl-ueber-ausgelieferte-definitionen" <<<"$OUT"'
+check "Meldung nennt das Gate"       'grep -q "PlatformPromptQuotingGateTest" <<<"$OUT"'
+check "Gate-Verweis bleibt frei"     '! grep -q "zahlen.md:5" <<<"$OUT"'
+check "Gesamtzahl der Templates bleibt frei" '! grep -q "zahlen.md:6" <<<"$OUT"'
+check "'einmal' ist keine Bestandsangabe"    '! grep -q "zahlen.md:7" <<<"$OUT"'
+check "Zahl ohne Auslieferungs-Bezug bleibt frei" '! grep -q "zahlen.md:8" <<<"$OUT"'
+
+# Umbruch: Die Doku bricht bei ~100 Zeichen um — Zahl und Bezug landen dann in
+# verschiedenen Zeilen. Gemeldet wird an der Zeile mit der Zahl, und nur einmal.
+cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
+# Zahlen
+In den ausgelieferten Definitionen kommt diese Form
+sechsmal vor, alle Folge-Shell-Bloecke setzen das Opt-in.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Zahl hinter dem Zeilenumbruch gemeldet" \
+  'grep -qE "^DRIFT docs/zahlen.md:3 zahl-ueber-ausgelieferte-definitionen" <<<"$OUT"'
+check "kein Doppelbefund fuer denselben Satz" \
+  '[ "$(grep -c "zahl-ueber-ausgelieferte-definitionen" <<<"$OUT")" -eq 1 ]'
+
+# Der Umbruch mitten im Bezug ist der echte Fall: docs/deployment.md brach genau
+# zwischen "mitgelieferten" und "Definitionen" um. Das Fenster muss in
+# Lesereihenfolge zusammengesetzt werden, sonst findet es die Wendung nie.
+cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
+# Zahlen
+Ein folgender Shell-Block setzt den Platzhalter roh ein. In den mitgelieferten
+Definitionen kommt diese Form achtmal vor (sieben Pool-Workflows) und faellt nicht auf.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Bezug ueber den Umbruch hinweg erkannt" \
+  'grep -qE "^DRIFT docs/zahlen.md:3 zahl-ueber-ausgelieferte-definitionen.*achtmal" <<<"$OUT"'
+
+# Escape-Hatch: eine bewusst historische Zahl (docs/belege.md) bleibt moeglich.
+cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
+# Zahlen
+In den ausgelieferten Definitionen kam diese Form achtmal vor. <!-- doc-facts-check: ignore -->
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "IGNORE_MARKER nimmt die Zeile aus" '! grep -q "zahlen.md" <<<"$OUT"'
+rm "$FAKE/docs/zahlen.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

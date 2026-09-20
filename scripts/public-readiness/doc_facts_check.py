@@ -235,6 +235,46 @@ FORBIDDEN_PATTERNS = [
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
 ]
 
+# ---------------------------------------------------------------------------
+# Feste Zahlen ueber die ausgelieferten Definitionen (TODO 4846ccca)
+#
+# docs/architektur.md schrieb: "In den mitgelieferten Definitionen kommt diese Form
+# achtmal vor (sieben Pool-Workflows, ein Built-in-Template)". Die Zahl war schon beim
+# Schreiben falsch, wurde nachgezaehlt und korrigiert (sechsmal, kein Built-in) — und
+# waere mit dem naechsten Pool-Eintrag wieder falsch gewesen. Die DE- und die
+# EN-Fassung widersprachen sich dabei zeitweise sogar gegenseitig.
+#
+# Nachzaehlen tut in der Doku niemand; die Gates tun es bei jedem Lauf
+# (PlatformPromptQuotingGateTest zaehlt seine Kandidaten selbst und schlaegt fehl,
+# wenn es keine mehr findet; TemplateHygieneGateTest prueft die Quoting-Form). In die
+# Prosa gehoert deshalb der Verweis auf das pruefende Gate, nicht die Zahl.
+#
+# Eng gefasst wie alle Muster hier: Es braucht BEIDES — eine Zahl, die ein Vorkommen
+# zaehlt ("achtmal", "eight times", "sieben Pool-Workflows", "ein Built-in"), UND im
+# Umfeld von einer Zeile (die Doku bricht bei ~100 Zeichen um) die Rede von den
+# ausgelieferten Definitionen. Gesamtzahlen wie "66 Built-in-Templates" treffen die
+# Regel nicht: Ihr Satz spricht nicht von den ausgelieferten Definitionen, und sie haben
+# mit `templates` ohnehin ihre eigene, gegen den Code gemessene Pruefung.
+#
+# "einmal"/"once" zaehlt absichtlich nicht mit — das ist im Deutschen ein gewoehnliches
+# Wort ("zeigt es genau einmal") und keine Bestandsangabe.
+# ---------------------------------------------------------------------------
+_NUMBER_WORDS = (r"zwei|drei|vier|fuenf|fünf|sechs|sieben|acht|neun|zehn"
+                 r"|two|three|four|five|six|seven|eight|nine|ten")
+_COUNTS = rf"\d+|ein|eine|einem|einen|one|{_NUMBER_WORDS}"
+
+# Umfeld, in dem eine Zahl eine Bestandsangabe ueber die Auslieferung waere.
+SHIPPED_DEFINITIONS = re.compile(
+    r"(?:aus|mit)gelieferten\s+(?:Definitionen|Templates)"
+    r"|(?:shipped|bundled)\s+(?:definitions|templates)", re.IGNORECASE)
+
+# Die Zahl selbst: als Vorkommens-Adverb oder unmittelbar vor der gezaehlten Sache.
+DEFINITION_COUNT = re.compile(
+    rf"\b(?:\d+|{_NUMBER_WORDS})\s*mal\b"
+    rf"|\b(?:\d+|{_NUMBER_WORDS})\s+times\b"
+    rf"|\b(?:{_COUNTS})\s+(?:Pool-(?:Workflows?|Definitionen)|pool\s+workflows?"
+    rf"|built-?ins?|built-?in[- ]templates?)\b", re.IGNORECASE)
+
 
 def digits(text):
     """"1 420" / "1.420" -> 1420."""
@@ -339,6 +379,36 @@ def check_forbidden_patterns(rel, no, line, findings):
                             f" | {line.strip()[:120]}")
 
 
+def check_definition_count(rel, no, lines, findings):
+    """Feste Vorkommens-Zahl ueber die ausgelieferten Definitionen (siehe oben).
+
+    Gemeldet wird an der Zeile, in der die Zahl steht; die Nachbarzeilen liefern nur
+    den Beleg, dass von der Auslieferung die Rede ist — und zwar nur, wenn der Satz
+    dort wirklich weiterlaeuft (sentence_continues, dieselbe Pruefung wie bei der
+    Testzahl-Datierung). Ohne diese Bedingung wuerde jede beliebige Nachbarzeile, die
+    das Wort "ausgelieferte Definitionen" enthaelt, die naechste Zahl einfaerben —
+    zum Beispiel die Gesamtzahl der Built-in-Templates im Satz darunter.
+    """
+    line = lines[no - 1]
+    match = DEFINITION_COUNT.search(line)
+    if not match:
+        return
+    # In Lesereihenfolge zusammensetzen: "mitgelieferten" am Zeilenende und
+    # "Definitionen" am Anfang der naechsten Zeile ist genau der Fall, den die
+    # Fensterpruefung fangen soll — umgekehrt zusammengesetzt faende sie ihn nie.
+    previous = lines[no - 2] if no >= 2 else ""
+    window = [previous] if sentence_continues(previous) else []
+    window.append(line)
+    if sentence_continues(line):
+        window.append(lines[no] if no < len(lines) else "")
+    if not SHIPPED_DEFINITIONS.search(" ".join(window)):
+        return
+    findings.append(f"DRIFT {rel}:{no} zahl-ueber-ausgelieferte-definitionen:"
+                    f" '{match.group(0).strip()}' altert mit jedem Pool-Eintrag — statt der Zahl"
+                    f" das pruefende Gate nennen (PlatformPromptQuotingGateTest,"
+                    f" TemplateHygieneGateTest) | {line.strip()[:120]}")
+
+
 def check_absent_files(rel, no, line, absent, findings):
     for name in absent or ():
         if name in line:
@@ -413,6 +483,7 @@ def scan(root, rel, facts, findings):
         if rel == README_SOURCE:
             check_readme_head(rel, no, line, facts, findings)
         check_forbidden_patterns(rel, no, line, findings)
+        check_definition_count(rel, no, lines, findings)
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
         check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
                               findings)
