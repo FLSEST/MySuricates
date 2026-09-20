@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Erzeugt aus docs/frontend-flow-diagrams.md von scripts/docs-diagrams.py — nicht von Hand bearbeiten. -->
 <html lang="de">
 <head>
   <meta charset="UTF-8">
@@ -6,24 +7,139 @@
   <title>AutoPilot — Frontend Flow</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
-    :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#e6edf3; --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; }
-    *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
-    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.5rem 2rem;text-align:center;}
-    header h1{font-size:1.8rem;font-weight:600;} header p{color:var(--text-muted);margin-top:0.3rem;}
-    nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0.8rem 2rem;display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;position:sticky;top:0;z-index:100;}
-    nav a{color:var(--accent);text-decoration:none;padding:0.4rem 1rem;border-radius:6px;font-size:0.9rem;transition:background 0.2s;}
-    nav a:hover{background:rgba(88,166,255,0.1);}
-    main{max-width:1200px;margin:0 auto;padding:2rem;}
-    section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;margin-bottom:2rem;}
-    section h2{font-size:1.4rem;margin-bottom:0.5rem;color:var(--accent);} section h2 span{font-size:0.85rem;color:var(--text-muted);font-weight:400;margin-left:0.5rem;}
-    section>p{color:var(--text-muted);margin-bottom:1.5rem;font-size:0.95rem;}
-    .mermaid{display:flex;justify-content:center;margin:1rem 0;} .mermaid svg{max-width:100%;height:auto;}
-    table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:0.9rem;}
-    th,td{padding:0.6rem 1rem;text-align:left;border-bottom:1px solid var(--border);} th{color:var(--text-muted);font-weight:600;font-size:0.8rem;text-transform:uppercase;}
-    td code{background:rgba(88,166,255,0.1);color:var(--accent);padding:0.15rem 0.4rem;border-radius:4px;font-size:0.85rem;}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;} @media(max-width:800px){.grid{grid-template-columns:1fr;}}
-    .card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:1.2rem;}
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.8rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    section > ul { color: var(--text); line-height: 1.6; padding-left: 1.2rem; margin-bottom: 1.5rem; }
+    section > p a, .card a { color: var(--accent); }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .card h3 { font-size: 1rem; margin-top: 0; margin-bottom: 0.5rem; }
+    .card p, .card li { font-size: 0.85rem; color: var(--text-muted); }
+    .card ul { padding-left: 1.1rem; }
+    .card code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .tree {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .tree .dir { color: var(--accent); font-weight: 600; }
+    .tree .comment { color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
   </style>
 </head>
 <body>
@@ -35,10 +151,10 @@
 
 <nav>
   <a href="#routing">Routing</a>
-  <a href="#dataflow">Datenfluss</a>
-  <a href="#queries">Queries & Mutations</a>
-  <a href="#stores">Zustand</a>
-  <a href="#logs">Live-Logs</a>
+  <a href="#datenfluss">Datenfluss</a>
+  <a href="#queries-mutations">Queries &amp; Mutations</a>
+  <a href="#zustand">Zustand</a>
+  <a href="#live-logs">Live-Logs</a>
 </nav>
 
 <main>
@@ -48,18 +164,18 @@
   <p>React Router mit Layout (Sidebar + Header) und 10 Hauptseiten.</p>
   <pre class="mermaid">
 flowchart LR
-    APP["App.tsx Router"] --> DASH["/ Dashboard"]
-    APP --> PROJ["/projects + /projects/:id"]
-    APP --> WF["/workflows + /workflows/:id"]
-    APP --> RUN["/workflows/:id/run/:runId"]
-    APP --> SK["/skills"]
-    APP --> SCH["/schedules"]
-    APP --> WH["/webhooks"]
-    APP --> ST["/settings"]
+    APP["App.tsx Router"] --&gt; DASH["/ Dashboard"]
+    APP --&gt; PROJ["/projects + /projects/:id"]
+    APP --&gt; WF["/workflows + /workflows/:id"]
+    APP --&gt; RUN["/workflows/:id/run/:runId"]
+    APP --&gt; SK["/skills"]
+    APP --&gt; SCH["/schedules"]
+    APP --&gt; WH["/webhooks"]
+    APP --&gt; ST["/settings"]
   </pre>
 </section>
 
-<section id="dataflow">
+<section id="datenfluss">
   <h2>Datenfluss <span>Client → API</span></h2>
   <p>Fetches laufen ueber Vite-Proxy <code>/api</code> an das Backend; WebSocket unter <code>/ws</code>.</p>
   <pre class="mermaid">
@@ -69,17 +185,17 @@ sequenceDiagram
     participant API as fetch /api/v1/...
     participant CACHE as Query Cache
 
-    UI->>HOOK: useQuery/useMutation
-    HOOK->>CACHE: return cached data (if present)
-    HOOK->>API: HTTP request
-    API-->>HOOK: JSON DTO
-    HOOK-->>CACHE: set + update
-    CACHE-->>UI: re-render with fresh data
+    UI-&gt;&gt;HOOK: useQuery/useMutation
+    HOOK-&gt;&gt;CACHE: return cached data (if present)
+    HOOK-&gt;&gt;API: HTTP request
+    API--&gt;&gt;HOOK: JSON DTO
+    HOOK--&gt;&gt;CACHE: set + update
+    CACHE--&gt;&gt;UI: re-render with fresh data
   </pre>
 </section>
 
-<section id="queries">
-  <h2>Queries & Mutations <span>Invalidierung</span></h2>
+<section id="queries-mutations">
+  <h2>Queries &amp; Mutations <span>Invalidierung</span></h2>
   <table>
     <thead><tr><th>Ressource</th><th>Query Hook</th><th>Mutationen</th><th>Invalidiert</th></tr></thead>
     <tbody>
@@ -93,7 +209,7 @@ sequenceDiagram
   </table>
 </section>
 
-<section id="stores">
+<section id="zustand">
   <h2>Zustand <span>Zustand Stores</span></h2>
   <div class="grid">
     <div class="card">
@@ -112,7 +228,7 @@ sequenceDiagram
   </div>
 </section>
 
-<section id="logs">
+<section id="live-logs">
   <h2>Live-Logs <span>WebSocket /ws</span></h2>
   <p>Ausführungs-Logs kommen via STOMP auf <code>/topic/executions/{runId}/logs</code>.</p>
   <pre class="mermaid">
@@ -122,12 +238,12 @@ sequenceDiagram
     participant ST as STOMP Broker (:9090)
     participant BE as WorkflowExecutor
 
-    UI->>WS: subscribe(runId)
-    WS->>ST: CONNECT /ws
-    ST-->>WS: CONNECTED
-    ST-->>WS: messages (step logs, status, approvals)
-    WS-->>UI: append logs, update status
-    BE->>ST: convertAndSend("/topic/executions/{runId}/logs", payload)
+    UI-&gt;&gt;WS: subscribe(runId)
+    WS-&gt;&gt;ST: CONNECT /ws
+    ST--&gt;&gt;WS: CONNECTED
+    ST--&gt;&gt;WS: messages (step logs, status, approvals)
+    WS--&gt;&gt;UI: append logs, update status
+    BE-&gt;&gt;ST: convertAndSend("/topic/executions/{runId}/logs", payload)
   </pre>
 </section>
 

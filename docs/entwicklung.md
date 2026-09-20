@@ -627,6 +627,29 @@ Kein Bypass per Reflex. `git commit --no-verify` existiert, aber ein Treffer ist
 ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehört. Erst schauen,
 was gestaged ist.
 
+## Diagramm-Seiten
+
+Die Diagramm-Dokumente unter `docs/` gibt es zweimal: als Markdown (`<name>-diagrams.md`) und als
+HTML (`<name>-diagrams.html`). **Quelle ist die Markdown-Datei** — GitHub rendert ```mermaid-Zäune
+nativ, HTML-Dateien im Repository dagegen gar nicht. Die HTML-Fassung ist für GitHub Pages gedacht
+und wird erzeugt, ebenso das Verzeichnis [docs/diagramme.md](diagramme.md):
+
+```bash
+python3 scripts/docs-diagrams.py            # HTML + Verzeichnis neu erzeugen
+python3 scripts/docs-diagrams.py --check    # meldet Drift, Exit-Code 1
+python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
+```
+
+Erzeugt heisst: vollständig, nicht nur die Diagramme. Prosa, Tabellen, Karten und Dateibäume der
+HTML-Seite stammen aus derselben Markdown-Datei, sonst wäre der Rest der Seite eine zweite, von Hand
+gepflegte Fassung. Eine HTML-Datei von Hand zu ändern hat deshalb keinen Bestand — der nächste Lauf
+überschreibt sie, und `--check` meldet es vorher in der CI.
+
+Die HTML-Hülle (Farben, Layout, Mermaid-Einbindung) steht als Vorlage im Skript, für alle Seiten
+dieselbe. Welche Markdown-Mittel die Vorlage kennt, steht im Kopfkommentar von
+`scripts/docs-diagrams.py`; gebraucht werden Überschriften, Absätze, Listen, Tabellen, Codezäune
+und die üblichen Inline-Auszeichnungen.
+
 ## Abhängigkeits-Meldungen (Frontend)
 
 `npm audit` im Frontend meldet nach den Updates vom 2026-09-12 **0 Schwachstellen**.

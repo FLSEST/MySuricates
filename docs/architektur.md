@@ -1,5 +1,8 @@
 # Architektur
 
+> Die Abläufe dieser Seite gibt es auch als Diagramme: [docs/diagramme.md](diagramme.md)
+> — Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment.
+
 ## Systemübersicht
 
 ```

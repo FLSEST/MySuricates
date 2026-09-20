@@ -139,6 +139,7 @@ erwartet einen selbst gesetzten API-Schluessel.
 |---|---|
 | [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
 | [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
+| [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment) |
 | [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
 | [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
 | [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
