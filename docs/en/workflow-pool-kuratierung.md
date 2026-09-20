@@ -104,15 +104,19 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 
 ### The block type registry
 
-`BLOCK-TYPE` checks against these 19 types. The source is
-`BlockTypesIndexSection.BLOCK_TYPES` in the backend, itself pinned against the existing
-`BlockExecutor` classes (`BlockTypeListsGuardTest`). The copy in
-`scripts/lib/hygiene-rules.sh` is compared against the registry by
-`scripts/tests/test-public-hygiene.sh` — if either drifts, that test says so.
+The source is `BlockTypesIndexSection.BLOCK_TYPES` in the backend, itself pinned against the
+existing `BlockExecutor` classes (`BlockTypeListsGuardTest`). For the scripts the list is
+**generated** from it — `scripts/lib/block-types.generated.sh`, written by
+`BlockTypesGateListTest`. No hand maintains it, so it cannot drift.
 
-`agentic`, `approval`, `compress`, `compress-ai`, `conditional`, `document`, `foreach`,
-`human-input`, `integration`, `retry`, `shell`, `simple`, `skill-capability`,
-`sub-workflow`, `switch`, `todo-close`, `todo-create`, `todo-update`, `while`
+The current list therefore does not live here; it comes from the file:
+
+```bash
+. scripts/lib/block-types.generated.sh && printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]}"
+```
+
+An enumeration at this point would be a third copy — and was one: it said 19 types and did not
+know about `dashboard-report` once that was added.
 
 ### Own REST API, credentials, database — and why the patterns are two-stage
 

@@ -104,15 +104,19 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 
 ### Die Blocktyp-Registry
 
-`BLOCK-TYPE` prüft gegen diese 19 Typen. Quelle ist
-`BlockTypesIndexSection.BLOCK_TYPES` im Backend, das selbst gegen die vorhandenen
-`BlockExecutor`-Klassen gepinnt ist (`BlockTypeListsGuardTest`). Die Kopie in
-`scripts/lib/hygiene-rules.sh` wird von `scripts/tests/test-public-hygiene.sh` gegen die
-Registry verglichen — driftet eine der beiden, fällt es dort auf.
+Quelle ist `BlockTypesIndexSection.BLOCK_TYPES` im Backend, das selbst gegen die vorhandenen
+`BlockExecutor`-Klassen gepinnt ist (`BlockTypeListsGuardTest`). Für die Skripte wird die Liste
+daraus **erzeugt** — `scripts/lib/block-types.generated.sh`, geschrieben von
+`BlockTypesGateListTest`. Eine Hand pflegt sie nicht, also driftet sie auch nicht.
 
-`agentic`, `approval`, `compress`, `compress-ai`, `conditional`, `document`, `foreach`,
-`human-input`, `integration`, `retry`, `shell`, `simple`, `skill-capability`,
-`sub-workflow`, `switch`, `todo-close`, `todo-create`, `todo-update`, `while`
+Die aktuelle Liste steht deshalb nicht hier, sondern kommt aus der Datei:
+
+```bash
+. scripts/lib/block-types.generated.sh && printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]}"
+```
+
+Eine Aufzählung an dieser Stelle wäre eine dritte Kopie — und war es: Sie nannte 19 Typen und
+kannte `dashboard-report` nicht mehr, als der hinzukam.
 
 ### Eigene REST-API, Zugangsdaten, Datenbank — und warum die Muster zweistufig sind
 
