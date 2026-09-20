@@ -1,5 +1,6 @@
 package com.automation.service.workflow;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
@@ -8,12 +9,14 @@ import com.automation.executor.ExecutionContext;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.metrics.RequestMetricsFactSheet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +33,14 @@ public class WorkflowContextDataService {
     private final StepResultRepository stepResultRepository;
     private final TodoRepository todoRepository;
     private final RequestMetricsFactSheet requestMetricsFactSheet;
+    private final ActivityLogService activityLogService;
+
+    /**
+     * What a failed injection writes into the context instead of leaving the variable absent.
+     * Same shape as the audit fact format's gap line ({@code docs/audit-workflow-protocol.md}):
+     * a missing value has to be stated, not left blank and not left out.
+     */
+    static final String GAP_FORMAT = "NICHT GEMESSEN: %s (nicht verfügbar: %s)";
 
     /**
      * Injects platform data into the execution context so workflows don't need
@@ -44,19 +55,66 @@ public class WorkflowContextDataService {
      * {@link com.automation.service.ai.HostCodexService}. Templates that need it
      * use {@code curl -H "X-API-Key: $AUTOMATION_API_KEY"} from the agent's Bash
      * tool — the resolved value never enters the prompt or persisted output.
+     *
+     * <p><b>No shared catch.</b> Every injection carries its own error path: one that fails
+     * neither costs the other two nor leaves its own variable absent — it states the gap
+     * ({@link #GAP_FORMAT}) and says so out loud in the activity log. A shared
+     * {@code catch (Exception)} around all three hid exactly this for months: {@code request_metrics}
+     * was never set, six tests stayed green because the two variables set before it still looked
+     * right, and a gate block reading the empty value passed as GREEN. TODO 62d186b8,
+     * {@code docs/belege.md} → „Sechs grüne Tests über einer Variable, die nie gesetzt wurde".
      */
     public void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
+        // Untrusted: both carry foreign text — an earlier run's output (which may have processed a
+        // webhook payload) and TODO titles from imports. In shell blocks they are always quoted;
+        // in prompts nothing changes. See ExecutionContext#setUntrustedPlatformVariable.
+        inject(context, workflowId, "previous_report", () -> loadPreviousReport(workflowId));
+        inject(context, workflowId, "open_todos", () -> loadOpenTodos(projectId));
+        // Measured request costs in the audit fact format — the only sanctioned way for a
+        // shell block to see them, since it must not call the REST API (CLAUDE.md).
+        inject(context, workflowId, "request_metrics", this::renderRequestMetrics);
+    }
+
+    /**
+     * Injects one platform variable and keeps its failure to itself.
+     *
+     * <p>Two separate guards on purpose: a loader that throws still gets its variable set — to the
+     * stated gap — and a failure while <i>setting</i> it is at least loud. Neither one reaches the
+     * next injection.
+     */
+    private void inject(ExecutionContext context, String workflowId, String name, Supplier<String> loader) {
+        String value;
         try {
-            // Untrusted: both carry foreign text — an earlier run's output (which may have processed a
-            // webhook payload) and TODO titles from imports. In shell blocks they are always quoted;
-            // in prompts nothing changes. See ExecutionContext#setUntrustedPlatformVariable.
-            context.setUntrustedPlatformVariable("previous_report", loadPreviousReport(workflowId));
-            context.setUntrustedPlatformVariable("open_todos", loadOpenTodos(projectId));
-            // Measured request costs in the audit fact format — the only sanctioned way for a
-            // shell block to see them, since it must not call the REST API (CLAUDE.md).
-            context.setUntrustedPlatformVariable("request_metrics", renderRequestMetrics());
+            value = loader.get();
         } catch (Exception e) {
-            log.warn("Failed to inject platform data: {}", e.getMessage());
+            reportGap(context, workflowId, name, e);
+            value = GAP_FORMAT.formatted(name, e.getClass().getSimpleName());
+        }
+        try {
+            context.setUntrustedPlatformVariable(name, value);
+        } catch (Exception e) {
+            // Nothing left that could still set it — but it must not fail quietly, and it must
+            // not take the remaining variables with it.
+            reportGap(context, workflowId, name, e);
+        }
+    }
+
+    /**
+     * A gap in the injected platform data is an operational fact, not a debug detail: it goes into
+     * the activity log with the run id, so it is visible where the run is. Its own try/catch —
+     * a failing log write must not become the failure that eats the next injection.
+     */
+    private void reportGap(ExecutionContext context, String workflowId, String name, Exception cause) {
+        String runId = context != null ? context.getWorkflowRunId() : null;
+        log.warn("Platform variable '{}' could not be injected (run {}): {}", name, runId, cause.toString());
+        try {
+            activityLogService.warn(LogCategory.EXECUTION,
+                    "Kontextvariable '%s' konnte nicht gesetzt werden — der Workflow sieht die Lücke statt des Werts: %s"
+                            .formatted(name, cause.toString()),
+                    "WorkflowContextDataService", runId, workflowId);
+        } catch (Exception loggingFailure) {
+            log.warn("Could not record the platform-data gap for '{}' in the activity log: {}",
+                    name, loggingFailure.toString());
         }
     }
 
@@ -68,23 +126,15 @@ public class WorkflowContextDataService {
      * ({@code docs/audit-workflow-protocol.md}). An empty value would reach the gate block as an
      * empty measurement and pass as GREEN, which is the failure mode the format exists to prevent.
      *
-     * <p>Its own try/catch, not the outer one: there, a failure of this measurement would be
-     * indistinguishable from a failure of the two loaders before it, and the variable would be
-     * absent instead of explicitly empty — the shell block would then see the raw placeholder.
-     * TODO 843be7a5.
+     * <p>A throwing fact sheet needs no catch here: {@link #inject} turns it into the same
+     * {@code NICHT GEMESSEN} line and logs it. TODO 843be7a5, TODO 62d186b8.
      */
     private String renderRequestMetrics() {
-        try {
-            String rendered = requestMetricsFactSheet.render();
-            if (rendered == null || rendered.isBlank()) {
-                return "NICHT GEMESSEN: request_metrics (Faktenblatt leer)";
-            }
-            return rendered;
-        } catch (Exception e) {
-            log.warn("Failed to render request metrics fact sheet: {}", e.getMessage());
-            return "NICHT GEMESSEN: request_metrics (Messung nicht verfügbar: %s)"
-                    .formatted(e.getClass().getSimpleName());
+        String rendered = requestMetricsFactSheet.render();
+        if (rendered == null || rendered.isBlank()) {
+            return "NICHT GEMESSEN: request_metrics (Faktenblatt leer)";
         }
+        return rendered;
     }
 
     /**

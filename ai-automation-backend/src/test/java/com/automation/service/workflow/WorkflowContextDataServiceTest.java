@@ -1,5 +1,6 @@
 package com.automation.service.workflow;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
@@ -9,9 +10,11 @@ import com.automation.executor.ExecutionContext;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.metrics.RequestMetricsFactSheet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,8 +22,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +41,7 @@ class WorkflowContextDataServiceTest {
     @Mock private StepResultRepository stepResultRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private RequestMetricsFactSheet requestMetricsFactSheet;
+    @Mock private ActivityLogService activityLogService;
 
     @InjectMocks private WorkflowContextDataService service;
 
@@ -329,6 +341,106 @@ class WorkflowContextDataServiceTest {
 
         assertThat(ctx.getVariable("previous_report")).isEqualTo("(kein vorheriger Report vorhanden)");
         assertThat(ctx.getVariable("open_todos")).isEqualTo("(keine offenen TODOs)");
+    }
+
+    // --- injectPlatformData: jede Injektion mit eigenem Fehlerpfad (TODO 62d186b8) ------
+    //
+    // Der gemeinsame catch(Exception) um alle drei Injektionen hat den Ausfall von
+    // request_metrics monatelang verdeckt: die Variable blieb abwesend, der Shell-Block sah
+    // den rohen Platzhalter, und ein Gate-Block wertete den leeren Wert als GREEN. Die drei
+    // Tests hier halten fest, dass kein Ausfall mehr einen anderen mitreisst -- und dass die
+    // ausgefallene Variable dasteht statt zu fehlen.
+
+    /** Die beiden je anderen Lader liefern ihre Platzhalter -- jeder Ausfall muss sie unberuehrt lassen. */
+    private void assertUntouched(ExecutionContext ctx, String... names) {
+        for (String name : names) {
+            assertThat((String) ctx.getVariable(name))
+                    .as("%s darf den Ausfall der anderen Injektion nicht mitbezahlen", name)
+                    .isNotBlank()
+                    .doesNotStartWith("NICHT GEMESSEN: " + name);
+        }
+    }
+
+    @Test
+    void injectPlatformData_previousReportLoaderThrows_statesTheGapInsteadOfDroppingTheVariable() {
+        WorkflowContextDataService spied = spy(service);
+        doThrow(new IllegalStateException("kaputt")).when(spied).loadPreviousReport("wf-1");
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 12");
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+
+        spied.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat((String) ctx.getVariable("previous_report"))
+                .as("faellt der Lader aus, muss die Luecke dastehen -- sonst sieht der Block den rohen Platzhalter")
+                .startsWith("NICHT GEMESSEN: previous_report")
+                .contains("IllegalStateException");
+        assertUntouched(ctx, "open_todos", "request_metrics");
+    }
+
+    @Test
+    void injectPlatformData_openTodosLoaderThrows_statesTheGapInsteadOfDroppingTheVariable() {
+        WorkflowContextDataService spied = spy(service);
+        doThrow(new IllegalStateException("kaputt")).when(spied).loadOpenTodos("proj-1");
+        doReturn("frueherer Report").when(spied).loadPreviousReport("wf-1");
+        when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 12");
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+
+        spied.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat((String) ctx.getVariable("open_todos"))
+                .startsWith("NICHT GEMESSEN: open_todos")
+                .contains("IllegalStateException");
+        assertUntouched(ctx, "previous_report", "request_metrics");
+    }
+
+    @Test
+    void injectPlatformData_gapIsReportedToTheActivityLogWithTheRunId() {
+        when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
+
+        injectWithoutHistory();
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), message.capture(),
+                eq("WorkflowContextDataService"), eq("run-1"), eq("wf-1"));
+        assertThat(message.getValue())
+                .as("die Luecke gehoert sichtbar an den Lauf, nicht nur ins Server-Log")
+                .contains("request_metrics")
+                .contains("IllegalStateException");
+    }
+
+    @Test
+    void injectPlatformData_failingAssignment_doesNotCostTheOtherTwoVariables() {
+        // Selbst wenn das Setzen selbst scheitert, duerfen die beiden anderen Injektionen laufen.
+        ExecutionContext ctx = mock(ExecutionContext.class);
+        doThrow(new IllegalStateException("kaputt"))
+                .when(ctx).setUntrustedPlatformVariable(eq("previous_report"), any());
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 12");
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        verify(ctx).setUntrustedPlatformVariable("open_todos", "(keine offenen TODOs)");
+        verify(ctx).setUntrustedPlatformVariable("request_metrics", "FAKT request_metrics_routes_measured: 12");
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), anyString(),
+                eq("WorkflowContextDataService"), any(), eq("wf-1"));
+    }
+
+    @Test
+    void injectPlatformData_failingActivityLog_doesNotCostTheOtherTwoVariables() {
+        // Das Melden der Luecke darf nicht zu der Ausnahme werden, die die naechste Injektion frisst.
+        when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
+        doThrow(new RuntimeException("activity log down")).when(activityLogService)
+                .warn(any(), anyString(), anyString(), any(), any());
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+
+        assertThatCode(() -> service.injectPlatformData(ctx, "wf-1", "proj-1")).doesNotThrowAnyException();
+
+        assertThat((String) ctx.getVariable("request_metrics")).startsWith("NICHT GEMESSEN: request_metrics");
+        assertUntouched(ctx, "previous_report", "open_todos");
     }
 
     @Test
