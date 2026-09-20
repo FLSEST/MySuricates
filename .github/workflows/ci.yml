@@ -34,6 +34,10 @@ jobs:
         run: bash scripts/tests/test-doc-facts-check.sh
       - name: Doku-Readiness-Gate Selbsttest
         run: bash scripts/tests/test-docs-check.sh
+      - name: Doku-Verweise und DE/EN-Gleichstand pruefen
+        run: python3 scripts/public-readiness/docs_parity_check.py
+      - name: Doku-Verweis-Gate Selbsttest
+        run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
       # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
