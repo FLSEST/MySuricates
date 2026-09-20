@@ -89,13 +89,19 @@ class SchedulerServiceTest {
                 .build();
     }
 
+    /**
+     * Die Liste laeuft ueber {@code findAllWithTargets()}, nicht ueber {@code findAll()}: Nur die
+     * Join-Fetch-Variante holt Workflow und Kette mit, statt sie je Zeile nachzuladen
+     * (TODO c9ec9844).
+     */
     @Test
     void findAll_returnsAll() {
-        when(scheduledRepository.findAll()).thenReturn(List.of(testScheduled));
+        when(scheduledRepository.findAllWithTargets()).thenReturn(List.of(testScheduled));
 
         List<ScheduledWorkflow> result = schedulerService.findAll();
 
         assertThat(result).hasSize(1);
+        verify(scheduledRepository, never()).findAll();
     }
 
     @Test

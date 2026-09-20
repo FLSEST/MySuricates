@@ -45,9 +45,15 @@ public class SchedulerService {
     private final Clock clock;
     private final ScheduleDefinitionParser definitionParser;
 
+    /**
+     * Die Liste fuer {@code GET /api/v1/schedules} — mit mitgeholten Zielen.
+     *
+     * <p>Bewusst nicht {@code findAll()}: Das wuerde die {@code EAGER}-Assoziationen je Zeile
+     * einzeln nachladen (TODO c9ec9844).
+     */
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findAll() {
-        return scheduledRepository.findAll();
+        return scheduledRepository.findAllWithTargets();
     }
 
     @Transactional(readOnly = true)

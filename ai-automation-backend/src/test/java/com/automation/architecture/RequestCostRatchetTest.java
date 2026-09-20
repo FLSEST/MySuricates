@@ -106,14 +106,15 @@ class RequestCostRatchetTest {
      *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). What is
      *       left is the same {@code select containers} per workflow as {@code /workflows}, which is
      *       the half of that ticket still open.</li>
-     *   <li>{@code /schedules}: 33 of the 91 statements measured on 2026-09-19 remain. 60 of them
-     *       were two run queries per schedule in {@code ScheduleMapper} and are gone (TODO
-     *       172a6a67). What is left is one {@code select workflows} per schedule: the
-     *       {@code ScheduledWorkflow.workflow} association is EAGER and {@code findAll()} does not
-     *       fetch it along. Batching that needs an answer to the soft-delete question first —
-     *       {@code Workflow} carries {@code @SQLRestriction} and the association has no
-     *       {@code @NotFound}, so a schedule pointing at a deleted workflow is its own topic
-     *       (TODO c9ec9844).</li>
+     *   <li>{@code /schedules}: fixed, 91 → 33 → 3 statements. The last 30 were one
+     *       {@code select workflows} per schedule, because the EAGER association
+     *       {@code ScheduledWorkflow.workflow} is not fetched along by {@code findAll()}; the list
+     *       now runs through {@code findAllWithTargets()} with a LEFT JOIN FETCH over workflow,
+     *       project, container and chain (TODO c9ec9844). The soft-delete question that blocked
+     *       this is answered and pinned: a schedule pointing at a deleted workflow resolves to a
+     *       null target instead of throwing — see
+     *       {@code ScheduleSoftDeletedWorkflowIntegrationTest}. What is left is the query itself
+     *       plus the two bundled run-status queries.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
@@ -123,7 +124,7 @@ class RequestCostRatchetTest {
             "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
             "/api/v1/search?q=Workflow", new Cost(32, 18_000),
-            "/api/v1/schedules", new Cost(33, 20_000)));
+            "/api/v1/schedules", new Cost(3, 20_000)));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -182,8 +183,9 @@ class RequestCostRatchetTest {
         }
 
         // Ein Zeitplan je Workflow: Die Route /schedules laedt ueber ScheduledWorkflow.workflow
-        // (EAGER) und Workflow.project (EAGER); eine Query je Zeile zeigt sich damit als
-        // Vielfaches von 30 (TODO 172a6a67).
+        // (EAGER) und Workflow.project (EAGER). Faellt der JOIN FETCH aus findAllWithTargets()
+        // weg, loest Hibernate die Assoziationen wieder Zeile fuer Zeile auf und die Zahl der
+        // Statements springt sichtbar auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
         for (Workflow workflow : workflows) {
             scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
                     .workflow(workflow)
