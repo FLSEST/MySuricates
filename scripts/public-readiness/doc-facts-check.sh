@@ -248,6 +248,6 @@ DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migr
 RC=$?
 
 if [ "$RC" -eq 0 ]; then
-  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen und Testzahl-Datierung."
+  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Testzahl-Datierung und Zahlen ueber die ausgelieferten Definitionen."
 fi
 exit "$RC"

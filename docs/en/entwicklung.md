@@ -424,8 +424,9 @@ splitting (`some_cmd {{ previous_output }}` became several arguments, one per wo
     self-set variable counts as trusted again and does not taint the run.
   - Or deliberately work without quoting: redesign the following command so a single quoted argument
     is enough (e.g. have it expect the argument in quotes instead of splitting it itself).
-  - Among the shipped definitions, one built-in is affected (`saas-continuous-improve.json`); its
-    following block is an AI prompt, whose behavior does not change.
+  - Which of the shipped definitions put platform data into a shell field at all shifts with every
+    new pool entry, so no fixed count stands here. That they use the safe, unquoted form is pinned
+    by `TemplateHygieneGateTest`.
 
 **Since 2026-09-18 (TODO 22e6bec8): the output of an AI block with platform data in its prompt is
 coloured.** If you use `{{ previous_report }}` or `{{ open_todos }}` in the prompt of an AI block
