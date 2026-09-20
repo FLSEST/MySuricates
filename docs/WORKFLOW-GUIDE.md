@@ -785,6 +785,13 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 
+> **Plattform-Daten fehlen nie stillschweigend.** `previous_report`, `open_todos` und
+> `request_metrics` werden einzeln injiziert: Scheitert eine dieser Ladungen, bekommen die beiden
+> anderen sie trotzdem, und die ausgefallene Variable steht als
+> `NICHT GEMESSEN: <name> (nicht verfügbar: <Fehlerart>)` im Kontext — dazu eine WARN-Zeile im
+> Activity-Log mit der Run-Id. Ein Gate-Block sieht also die Lücke und nicht den rohen Platzhalter
+> `{{ … }}` oder einen leeren Wert, der als GREEN durchginge.
+
 ### Kontext-Variablen
 
 Eigene Variablen über den Ausführungskontext übergeben:
