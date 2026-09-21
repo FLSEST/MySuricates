@@ -6,6 +6,7 @@ import { downloadJSON } from '../utils/downloadFile';
 import type { Workflow, WorkflowRun, WorkflowRunListItem, CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowExportData, PageResponse } from '../types';
 import { TERMINAL_RUN_STATUSES } from '../types';
 import { useModuleEnabled } from './useModules';
+import { PENDING_INPUTS_KEY } from './usePendingInputs';
 
 interface WorkflowApiResponse {
   id: string;
@@ -309,12 +310,17 @@ export function useRunCommand() {
 
 export function useSubmitApproval() {
   const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn: ({ runId, answer }: { runId: string; answer: string }) =>
       api.post(`/executions/${runId}/approve`, { answer }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: PENDING_INPUTS_KEY });
     },
+    // e.g. 400 when the answer is not one of the offered options
+    onError: (err) => toast.error(apiErrorMessage(err, t.approvals.answerFailed)),
   });
 }
 

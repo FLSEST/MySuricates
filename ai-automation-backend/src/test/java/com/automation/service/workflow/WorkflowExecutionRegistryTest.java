@@ -5,9 +5,12 @@ import com.automation.executor.ExecutionContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class WorkflowExecutionRegistryTest {
 
@@ -314,5 +317,76 @@ class WorkflowExecutionRegistryTest {
         assertThat(swapping.cancel("run-1")).isTrue();
         assertThat(provisional.shouldStop()).isTrue();
         assertThat(real.shouldStop()).isTrue();
+    }
+
+    // --- TODO 50c7b5d5: ein Approval nimmt nur seine Optionen an ---
+
+    @Test
+    void resolveApproval_answerNotOffered_isRefusedAndKeepsWaiting() {
+        ExecutionContext ctx = buildContext("c1", "run-1");
+        registry.register("run-1", ctx);
+        var future = ctx.requestApproval(ApprovalRequest.builder()
+                .blockId("approval-3").question("Satz uebernehmen?").options(List.of("Ja", "Nein")).stepIndex(3).build());
+
+        assertThatThrownBy(() -> registry.resolveApproval("run-1", "No"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Ja");
+        assertThat(future).isNotDone();
+        assertThat(registry.getPendingApproval("run-1")).isNotNull();
+    }
+
+    @Test
+    void resolveApproval_offeredAnswerInOtherCase_passesTheOptionSpelling() throws Exception {
+        ExecutionContext ctx = buildContext("c1", "run-1");
+        registry.register("run-1", ctx);
+        var future = ctx.requestApproval(ApprovalRequest.builder()
+                .blockId("approval-3").question("Satz uebernehmen?").options(List.of("Ja", "Nein")).stepIndex(3).build());
+
+        registry.resolveApproval("run-1", " nein ");
+
+        assertThat(future.get()).isEqualTo("Nein");
+    }
+
+    @Test
+    void resolveApproval_humanInput_acceptsFreeText() throws Exception {
+        ExecutionContext ctx = buildContext("c1", "run-1");
+        registry.register("run-1", ctx);
+        var future = ctx.requestApproval(ApprovalRequest.builder()
+                .blockId("human-input-2").question("Name?").type("human-input")
+                .options(List.of("dev", "prod")).stepIndex(2).build());
+
+        registry.resolveApproval("run-1", "{\"env\": \"staging\"}");
+
+        assertThat(future.get()).isEqualTo("{\"env\": \"staging\"}");
+    }
+
+    // --- TODO 52d946cc: wartende Eingaben über alle Läufe ---
+
+    @Test
+    void listPendingInputs_onlyWaitingRuns_oldestFirst() {
+        ExecutionContext busy = buildContext("c1", "run-busy");
+        ExecutionContext newer = buildContext("c2", "run-newer");
+        ExecutionContext older = buildContext("c3", "run-older");
+        registry.register("run-busy", busy);
+        registry.register("run-newer", newer);
+        registry.register("run-older", older);
+        Instant now = Instant.now();
+        newer.requestApproval(ApprovalRequest.builder().blockId("approval-1").question("B?")
+                .requestedAt(now).build());
+        older.requestApproval(ApprovalRequest.builder().blockId("human-input-4").question("A?").type("human-input")
+                .requestedAt(now.minusSeconds(600)).build());
+
+        var pending = registry.listPendingInputs();
+
+        assertThat(pending).extracting(WorkflowExecutionRegistry.PendingInput::runId)
+                .containsExactly("run-older", "run-newer");
+        assertThat(pending.get(0).request().getQuestion()).isEqualTo("A?");
+    }
+
+    @Test
+    void listPendingInputs_nothingWaiting_isEmpty() {
+        registry.register("run-1", buildContext("c1", "run-1"));
+
+        assertThat(registry.listPendingInputs()).isEmpty();
     }
 }

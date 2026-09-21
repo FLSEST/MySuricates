@@ -292,6 +292,26 @@ class HumanInputBlockExecutorTest {
 
     // --- Helpers ---
 
+    @Test
+    void execute_promptAndDefaultPlaceholders_areResolved() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Befund: {{ block.scan.output }}. Welche Datei?");
+        config.put("default_value", "{{ block.scan.output }}.md");
+        config.put("timeout_minutes", 15);
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("ok");
+        context.recordOutput("scan", "bericht");
+
+        executor.execute(block, context);
+
+        var captor = ArgumentCaptor.forClass(ApprovalRequest.class);
+        verify(context).requestApproval(captor.capture());
+        assertThat(captor.getValue().getQuestion()).isEqualTo("Befund: bericht. Welche Datei?");
+        assertThat(captor.getValue().getDefaultValue()).isEqualTo("bericht.md");
+        assertThat(captor.getValue().getTimeoutMinutes()).isEqualTo(15);
+    }
+
     private ExecutionContext buildContext() {
         return ExecutionContext.builder()
                 .containerId("container-1")

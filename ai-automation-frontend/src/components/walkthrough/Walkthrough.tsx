@@ -5,7 +5,7 @@ import { useT, useI18nStore, type Locale } from '../../i18n';
 import { useWalkthroughText } from '../../i18n/walkthrough';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { WALKTHROUGH_PANELS } from '../../data/walkthroughPanels';
+import { WALKTHROUGH_PANELS, type PanelModule } from '../../data/walkthroughPanels';
 import walkthroughImages from '../../data/walkthroughImages.json';
 import { PanelDiagram } from './PanelDiagram';
 
@@ -21,22 +21,30 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
   const text = useWalkthroughText();
   const locale = useI18nStore((s) => s.locale);
   const setLocale = useI18nStore((s) => s.setLocale);
-  const auditEnabled = useModuleEnabled('audit');
+  // One call per value of `PanelModule` — the record below is total over that union, so a new
+  // gated panel does not compile until its module is looked up here.
+  const audit = useModuleEnabled('audit');
+  const factory = useModuleEnabled('factory');
+  const integrations = useModuleEnabled('integrations');
   const [index, setIndex] = useState(0);
 
-  const panels = useMemo(
-    () => WALKTHROUGH_PANELS.filter((p) => p.module !== 'audit' || auditEnabled),
-    [auditEnabled],
-  );
+  const panels = useMemo(() => {
+    const on: Record<PanelModule, boolean> = { audit, factory, integrations };
+    return WALKTHROUGH_PANELS.filter((p) => !p.module || on[p.module]);
+  }, [audit, factory, integrations]);
 
-  const last = index >= panels.length - 1;
-  const panel = panels[index];
+  // Module state is optimistic until the backend answers, so the list can shrink under a reader
+  // who is already past its new end. Clamped on read rather than corrected in an effect: the
+  // stored index is never wrong for long, and a render-time clamp cannot leave a blank frame.
+  const position = Math.min(index, panels.length - 1);
+  const last = position >= panels.length - 1;
+  const panel = panels[position];
 
   const next = useCallback(() => {
     if (last) onClose();
-    else setIndex((i) => i + 1);
-  }, [last, onClose]);
-  const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+    else setIndex(position + 1);
+  }, [last, position, onClose]);
+  const back = useCallback(() => setIndex(Math.max(0, position - 1)), [position]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -96,7 +104,7 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
         </button>
 
         {/* Stage. Illustration always on the left, diagram always on the right — the same split on
-            every panel is what makes eight of them read as one set. The illustration sits on a plate
+            every panel is what makes them read as one set. The illustration sits on a plate
             of its own: a generated image carries fixed colours and would fight the themed surround. */}
         {(panel.diagram || image) && (
           <div className="shrink-0 h-36 sm:h-44 px-6 sm:px-10 py-4 bg-surface-raised border-b border-border flex items-center justify-center gap-5">
@@ -129,12 +137,14 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="shrink-0 flex items-center justify-between gap-4 px-6 sm:px-9 py-4 border-t border-border">
-          <div className="flex items-center gap-1.5" aria-hidden="true">
+          {/* Wraps rather than pushing the buttons off the edge: at thirteen panels the row is
+              wider than a phone footer has room for. */}
+          <div className="flex flex-wrap items-center gap-1.5 min-w-0" aria-hidden="true">
             {panels.map((p, i) => (
               <span
                 key={p.id}
                 className={`h-1.5 rounded-full transition-all ${
-                  i === index ? 'w-5 bg-accent' : 'w-1.5 bg-border-strong'
+                  i === position ? 'w-5 bg-accent' : 'w-1.5 bg-border-strong'
                 }`}
               />
             ))}
@@ -145,7 +155,7 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
                 {t.walkthrough.skip}
               </button>
             )}
-            {index > 0 && (
+            {position > 0 && (
               <Button size="sm" variant="secondary" onClick={back}>
                 {t.walkthrough.back}
               </Button>

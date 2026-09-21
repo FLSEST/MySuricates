@@ -220,8 +220,9 @@ These use non-obvious paths — always use these, never guess:
 | Run workflow | POST | `/api/v1/workflows/{id}/execute` |
 | Run chain | POST | `/api/v1/chains/{id}/execute` |
 | Cancel execution | POST | `/api/v1/executions/{id}/cancel` |
-| Approve step | POST | `/api/v1/executions/{id}/approve` — body: `{"answer": "Yes"}` (field is `answer`, NOT `approved`) |
-| Check approval | GET | `/api/v1/executions/{id}/approval` — returns `{"pending": true, "options": [...]}` or `{"pending": false}` |
+| Approve step | POST | `/api/v1/executions/{id}/approve` — body: `{"answer": "Yes"}` (field is `answer`, NOT `approved`); an approval accepts only its `options` (else 400), rejection = `reject_options` (default `No`/`Nein`) |
+| Check approval | GET | `/api/v1/executions/{id}/approval` — returns `{"pending": true, "options": [...], "rejectOptions": [...]}` or `{"pending": false}` |
+| List waiting approvals | GET | `/api/v1/executions/pending-input` — all runs waiting for an approval/human input, oldest first (UI: sidebar entry + `/approvals`) |
 | Pause execution | POST | `/api/v1/executions/{id}/pause` |
 | Resume execution | POST | `/api/v1/executions/{id}/resume` |
 | List workflow versions | GET | `/api/v1/workflows/{id}/versions?page=0&size=20` |

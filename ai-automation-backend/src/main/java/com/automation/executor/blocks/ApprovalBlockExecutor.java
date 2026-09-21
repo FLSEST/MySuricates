@@ -3,6 +3,7 @@ package com.automation.executor.blocks;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
+import com.automation.executor.ApprovalRejection;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
@@ -38,10 +39,14 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         Instant start = Instant.now();
         Map<String, Object> config = block.getConfig();
 
-        String question = (String) config.getOrDefault("question", "Approval required");
+        // Aufgelöst, damit wer freigibt die Grundlage sieht statt {{ block.X.output }} (TODO e2efb393)
+        String question = context.resolveTemplate(
+                (String) config.getOrDefault("question", "Approval required"));
         List<String> options = config.containsKey("options")
                 ? (List<String>) config.get("options")
                 : List.of("Yes", "Yes always", "No");
+        List<String> rejectAnswers = ApprovalRejection.rejectAnswers(config.get("reject_options"));
+        List<String> rejectOptions = ApprovalRejection.rejectingOptions(options, rejectAnswers);
         String mode = (String) config.getOrDefault("mode", "ask");
         String autoAnswer = (String) config.get("auto_answer");
         String onNo = (String) config.getOrDefault("on_no", "continue");
@@ -69,7 +74,9 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                         .blockId(blockId)
                         .question(question)
                         .options(options)
+                        .rejectOptions(rejectOptions)
                         .stepIndex(stepIndex)
+                        .timeoutMinutes(timeoutMinutes)
                         .build();
 
                 CompletableFuture<String> future = context.requestApproval(request);
@@ -83,6 +90,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                                     "blockId", blockId,
                                     "question", question,
                                     "options", options,
+                                    "rejectOptions", rejectOptions,
                                     "stepIndex", stepIndex
                             )
                     );
@@ -127,7 +135,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         context.setVariable(variableName, answer);
 
         // Determine step status based on answer and on_no config
-        if ("No".equalsIgnoreCase(answer)) {
+        if (ApprovalRejection.isRejection(answer, rejectAnswers)) {
             return switch (onNo) {
                 case "fail" -> buildResult(stepIndex, start, question,
                         "Approval denied: " + answer, StepStatus.FAILED);

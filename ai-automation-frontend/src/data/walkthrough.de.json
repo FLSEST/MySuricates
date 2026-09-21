@@ -1,6 +1,6 @@
 {
   "intro": {
-    "title": "Acht Beispiele. Nicht die ganze Liste.",
+    "title": "Beispiele. Nicht die ganze Liste.",
     "points": [
       "Was folgt, sind Beispiele dafür, was damit möglich wird",
       "Alle aus denselben wenigen Bausteinen, nur anders zusammengesteckt",
@@ -24,11 +24,20 @@
     ]
   },
   "notice": {
-    "title": "Was auffällt, verfällt nicht.",
+    "title": "Was auffällt, kommt zurück.",
     "points": [
       "Nebenbefunde werden Vorgänge statt verlorener Gedanken",
       "Ein Vorgang kann die Arbeit selbst auslösen und sich nach der Prüfung schließen",
-      "Zurück in die Sitzung, aus der er entstanden ist"
+      "Im Repo tauchen sie wieder auf — dem Projekt über seinen Pfad zugeordnet",
+      "Zurück in die Sitzung, aus der einer entstanden ist"
+    ]
+  },
+  "unattended": {
+    "title": "Es startet ohne dich.",
+    "points": [
+      "Ein Zeitplan oder ein neuer Vorgang stößt es an — niemand muss an der Tastatur sitzen",
+      "Mehrere laufen nebeneinander; sie reihen sich ein, statt sich in die Quere zu kommen",
+      "Du kommst zu einem Ergebnis zurück, nicht zu einer wartenden Frage"
     ]
   },
   "wait": {
@@ -37,6 +46,14 @@
       "Anhalten für eine Freigabe, eine Eingabe oder bis morgen",
       "Es geht da weiter, wo es stand — nicht von vorn",
       "Verpasste Termine holt der Planer nach einem Neustart nach"
+    ]
+  },
+  "repair": {
+    "title": "Es versucht es nochmal — so oft, wie du erlaubst.",
+    "points": [
+      "Ein gescheiterter Lauf wird analysiert, ein Fix entworfen und erprobt, bevor er zählt",
+      "Versuche, Zeit und Token stehen vorher fest, nicht hinterher in der Rechnung",
+      "Aus, bis du es einschaltest — je Ablauf oder als Voreinstellung"
     ]
   },
   "verdict": {
@@ -61,6 +78,14 @@
       "Derselbe Ablauf bei einem anderen Anbieter — auf Wunsch je Schritt",
       "Modellnamen kommen vom Rechner, nicht aus einer fest eingetragenen Liste",
       "Zwei Anbieter an denselben Ablauf setzen und vergleichen"
+    ]
+  },
+  "connect": {
+    "title": "Steck an, was du ohnehin benutzt.",
+    "points": [
+      "GitHub, Jira, Confluence, Google, Trello und Taskwarrior — als Quelle und als Ziel",
+      "Ein Ablauf geht als Prozessbild raus und kommt als Prozessbild zurück",
+      "Die Liste ist aus der Nutzung gewachsen, nicht geplant — was fehlt, kommt dazu statt umgebaut zu werden"
     ]
   },
   "blocks": {

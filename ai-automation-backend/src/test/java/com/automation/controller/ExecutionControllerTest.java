@@ -9,6 +9,8 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
+import com.automation.service.execution.PendingInputService;
+import com.automation.dto.response.PendingInputResponse;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.RunLiveLogService;
@@ -58,6 +60,8 @@ class ExecutionControllerTest {
     private RunDeletionService runDeletionService;
     @MockitoBean
     private RunLiveLogService runLiveLogService;
+    @MockitoBean
+    private PendingInputService pendingInputService;
 
     @MockitoBean
     private ExecutionQueryService executionQueryService;
@@ -350,6 +354,59 @@ class ExecutionControllerTest {
                 .andExpect(jsonPath("$.pending").value(true))
                 .andExpect(jsonPath("$.question").value("Approve?"))
                 .andExpect(jsonPath("$.options[0]").value("Yes"));
+    }
+
+    @Test
+    void getPendingApproval_carriesRejectOptions() throws Exception {
+        var approval = ApprovalRequest.builder()
+                .blockId("approval-30").question("Satz uebernehmen?")
+                .options(List.of("Ja", "Nein")).rejectOptions(List.of("Nein")).stepIndex(30).build();
+        when(workflowExecutor.getPendingApproval("run-1")).thenReturn(approval);
+
+        mockMvc.perform(get("/api/v1/executions/run-1/approval"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rejectOptions[0]").value("Nein"));
+    }
+
+    @Test
+    void approveExecution_answerNotOffered_returns400() throws Exception {
+        doThrow(new IllegalArgumentException("Answer 'No' is not one of the offered options [Ja, Nein]"))
+                .when(workflowExecutor).resolveApproval("run-1", "No");
+
+        mockMvc.perform(post("/api/v1/executions/run-1/approve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"answer": "No"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("offered options")));
+    }
+
+    @Test
+    void listPendingInputs_returnsWaitingRunsAcrossWorkflows() throws Exception {
+        Instant since = Instant.parse("2026-09-21T12:50:00Z");
+        when(pendingInputService.listPendingInputs()).thenReturn(List.of(new PendingInputResponse(
+                "run-1", "wf-1", "Rundgang-Illustrationen erzeugen", "approval", "approval-30",
+                "Satz uebernehmen?", List.of("Ja", "Nein"), List.of("Nein"), 30,
+                since, since.plusSeconds(240 * 60))));
+
+        mockMvc.perform(get("/api/v1/executions/pending-input"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].runId").value("run-1"))
+                .andExpect(jsonPath("$[0].workflowId").value("wf-1"))
+                .andExpect(jsonPath("$[0].workflowName").value("Rundgang-Illustrationen erzeugen"))
+                .andExpect(jsonPath("$[0].rejectOptions[0]").value("Nein"))
+                .andExpect(jsonPath("$[0].timeoutAt").value("2026-09-21T16:50:00Z"));
+    }
+
+    @Test
+    void listPendingInputs_nothingWaiting_returnsEmptyArray() throws Exception {
+        when(pendingInputService.listPendingInputs()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/executions/pending-input"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        verify(executionQueryService, org.mockito.Mockito.never()).getExecutionResponse(anyString());
     }
 
     @Test

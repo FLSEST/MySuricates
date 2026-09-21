@@ -28,7 +28,7 @@ import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
 import { latestStepByBlock, stepBlockType } from '../components/workflow/stepMetadata';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import { useCreateTodo } from '../hooks/useTodos';
-import { useExecutionWebSocket } from '../hooks/useWebSocket';
+import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useToast } from '../hooks/useToast';
@@ -66,16 +66,14 @@ export function WorkflowExecution() {
   const [command, setCommand] = useState('');
   const [notesText, setNotesText] = useState<string | null>(null);
   const [containerTab, setContainerTab] = useState<'command' | 'terminal'>('command');
-  const [recoveredApproval, setRecoveredApproval] = useState<{
-    blockId: string; question: string; options: string[]; stepIndex: number;
-  } | null>(null);
+  const [recoveredApproval, setRecoveredApproval] = useState<PendingApproval | null>(null);
   const [recoveredHumanInput, setRecoveredHumanInput] = useState<PendingHumanInput | null>(null);
 
   // Recovery: check for pending approval/human-input on page load/reload
   useEffect(() => {
     if (!runId) return;
     api.get<{
-      pending: boolean; blockId?: string; question?: string; options?: string[]; stepIndex?: number;
+      pending: boolean; blockId?: string; question?: string; options?: string[]; rejectOptions?: string[]; stepIndex?: number;
       type?: string; inputType?: string; defaultValue?: string; variableName?: string;
       required?: boolean; validationPattern?: string | null;
     }>(
@@ -99,6 +97,7 @@ export function WorkflowExecution() {
             blockId: data.blockId,
             question: data.question!,
             options: data.options!,
+            rejectOptions: data.rejectOptions,
             stepIndex: data.stepIndex!,
           });
         }
