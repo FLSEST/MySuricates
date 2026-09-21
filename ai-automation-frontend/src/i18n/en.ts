@@ -683,6 +683,10 @@ export const en = {
     orientationToggle: 'Toggle orientation',
     orientationVertical: 'Vertical',
     orientationHorizontal: 'Horizontal',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    zoomFit: 'Fit',
+    zoomHint: 'Zoom — also with Ctrl/⌘ + mouse wheel',
     viewDefinition: 'View definition',
     definitionHint: 'Full workflow definition (JSON). The line numbers in the diagram refer to this document.',
     bpmnLabels: {

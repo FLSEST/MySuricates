@@ -685,6 +685,10 @@ export const de: TranslationKeys = {
     orientationToggle: 'Ausrichtung wechseln',
     orientationVertical: 'Vertikal',
     orientationHorizontal: 'Horizontal',
+    zoomIn: 'Vergrößern',
+    zoomOut: 'Verkleinern',
+    zoomFit: 'Einpassen',
+    zoomHint: 'Zoom — auch mit Strg/⌘ + Mausrad',
     viewDefinition: 'Definition ansehen',
     definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
     bpmnLabels: {
