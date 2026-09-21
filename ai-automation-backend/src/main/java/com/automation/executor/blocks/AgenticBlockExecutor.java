@@ -162,6 +162,9 @@ public class AgenticBlockExecutor implements BlockExecutor {
                 break;
             }
 
+            // Cancelled while reasoning: neither ask for approval nor start the action
+            if (context.shouldStop()) break;
+
             // === Optional APPROVAL gate ===
             if (approvalRequired && !plan.getAction().isEmpty()) {
                 AgenticApprovalGate.Decision decision = approvalGate.ask(context, stepIndex, iteration, plan, iterData, fullOutput, history);
