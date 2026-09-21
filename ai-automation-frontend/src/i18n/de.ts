@@ -1709,6 +1709,15 @@ export const de: TranslationKeys = {
     diagnoseTitle: 'Den Assistenten fragen, warum dieser Lauf fehlgeschlagen ist',
     diagnosePrompt: 'Der Workflow „{name}" ist beim letzten Lauf fehlgeschlagen.\n- Status: {status}\n- Fehlgeschlagener Schritt: {step}\n- Fehlermeldung: {error}\n- Run-ID: {runId}\n\nBitte analysiere die Ursache und schlage eine konkrete Lösung vor.',
   },
+  walkthrough: {
+    skip: 'Überspringen',
+    back: 'Zurück',
+    next: 'Weiter',
+    done: 'Fertig',
+    reopen: 'Rundgang erneut zeigen',
+    reopenHint: 'Die Panels mit den Grundkonzepten — jederzeit wieder aufrufbar.',
+    showAction: 'Zeigen',
+  },
   auditCenter: {
     acceptedCount: 'davon {count} akzeptiert',
     acceptedAt: 'Akzeptiert am',

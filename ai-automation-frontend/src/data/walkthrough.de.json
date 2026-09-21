@@ -1,0 +1,73 @@
+{
+  "mix": {
+    "title": "Rechnen, wo es rechnen kann. Fragen, wo es urteilen muss.",
+    "points": [
+      "Shell-Schritte kosten nichts, sind schnell und liefern jedes Mal dasselbe",
+      "Ein Modell nur dort, wo geurteilt werden muss — je Schritt wählbar",
+      "Im Protokoll steht hinterher, welcher Schritt was war"
+    ]
+  },
+  "trace": {
+    "title": "Erst zusehen. Dann nachlesen.",
+    "points": [
+      "Jeden Schritt live verfolgen und hinterher Schritt für Schritt nachlesen",
+      "Jede Änderung am Ablauf ist eine Version, die sich zurückholen lässt",
+      "Das Ganze als Prozessbild exportieren"
+    ]
+  },
+  "notice": {
+    "title": "Was auffällt, verfällt nicht.",
+    "points": [
+      "Nebenbefunde werden Vorgänge statt verlorener Gedanken",
+      "Ein Vorgang kann die Arbeit selbst auslösen und sich nach der Prüfung schließen",
+      "Zurück in die Sitzung, aus der er entstanden ist"
+    ]
+  },
+  "wait": {
+    "title": "Warten ist kein Fehlschlag.",
+    "points": [
+      "Anhalten für eine Freigabe, eine Eingabe oder bis morgen",
+      "Es geht da weiter, wo es stand — nicht von vorn",
+      "Verpasste Termine holt der Planer nach einem Neustart nach"
+    ]
+  },
+  "verdict": {
+    "title": "Ein Urteil mit Halbwertszeit.",
+    "points": [
+      "Ein Risiko einmal akzeptieren — mit Begründung und dem Beleg dahinter",
+      "Verschlechtert sich der Beleg, kommt der Befund von selbst zurück",
+      "Ein halbes Jahr später liegt er wieder auf dem Tisch"
+    ]
+  },
+  "refill": {
+    "title": "Den Rahmen einmal bauen. Er füllt sich weiter.",
+    "points": [
+      "Neues wird eingearbeitet statt angehäuft",
+      "Abgelaufenes fällt von selbst heraus",
+      "Themen kommen der Reihe nach dran, damit nichts liegen bleibt"
+    ]
+  },
+  "swap": {
+    "title": "Modell tauschen, Ablauf behalten.",
+    "points": [
+      "Derselbe Ablauf bei einem anderen Anbieter — auf Wunsch je Schritt",
+      "Modellnamen kommen vom Rechner, nicht aus einer fest eingetragenen Liste",
+      "Zwei Anbieter an denselben Ablauf setzen und vergleichen"
+    ]
+  },
+  "blocks": {
+    "title": "Alles ist ein Baustein.",
+    "points": [
+      "Ein ganzer Ablauf kann ein Schritt in einem anderen sein",
+      "Ketten reihen fertige Abläufe aneinander",
+      "Schleifen, Verzweigungen, Wiederholungen und Freigaben sind Bausteine wie jeder andere"
+    ]
+  },
+  "closing": {
+    "title": "Dieser Rundgang wurde von dem gebaut, was er zeigt.",
+    "points": [
+      "Texte, Bilder und diese Abfolge stammen aus Workflows im Pool",
+      "Einen davon installieren, starten und das Protokoll lesen"
+    ]
+  }
+}

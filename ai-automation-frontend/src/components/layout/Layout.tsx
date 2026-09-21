@@ -7,6 +7,7 @@ import { RateLimitBanner } from './RateLimitBanner';
 import { ApiKeyGuard } from './ApiKeyGuard';
 import { AssistantPanel } from '../AssistantPanel';
 import { CommandPalette } from '../palette/CommandPalette';
+import { WalkthroughGate } from '../walkthrough/Walkthrough';
 import { Spinner } from '../ui';
 import { useSidebarStore } from '../../stores/sidebarStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -65,6 +66,7 @@ export function Layout() {
       </div>
       {assistantModule && <AssistantPanel />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <WalkthroughGate />
     </ApiKeyGuard>
   );
 }
