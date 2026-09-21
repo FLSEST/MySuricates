@@ -313,7 +313,9 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 
 **Container row:** `ContainerService.createAndStartContainer` updates an existing `containers` row (upsert) instead of deleting and re-inserting it — the delete was un-scheduled during flush by the `Project.container` cascade, so the following INSERT failed on `UNIQUE(containers.project_id)`. The per-project lock now stays in the map (removing it under contention creates a second monitor), and `lastActivityAt` is stamped by a JPQL update (`ContainerRepository.touchActivity`) rather than a detached merge.
 
-### Block Types (16 total)
+### Block Types
+
+Complete list; the authoritative source is the registry `BlockTypesIndexSection.BLOCK_TYPES`, against which `BlockTypeListsGuardTest` pins the existing executor classes.
 
 | Type | Executor | Description |
 |---|---|---|
@@ -333,6 +335,10 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 | `document` | `DocumentBlockExecutor` | Extracts text from PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
 | `compress` | `CompressBlockExecutor` | Rule-based compression of an earlier block output (stage chain, 0 tokens) |
 | `compress-ai` | `CompressAiBlockExecutor` | Tool-less AI compression of an earlier block output with input/output limits |
+| `todo-create` | `TodoCreateBlockExecutor` | Creates a todo, directly via the service rather than the REST API |
+| `todo-update` | `TodoUpdateBlockExecutor` | Updates an existing todo |
+| `todo-close` | `TodoCloseBlockExecutor` | Sets a todo to DONE |
+| `dashboard-report` | `DashboardReportBlockExecutor` | Writes a run's counts and status as a dashboard widget |
 
 **Template variables** (`{{ variable }}`, `${varName}`) are resolved at runtime in the `ExecutionContext`. `{{ previous_output }}` contains the output of the previous block.
 
