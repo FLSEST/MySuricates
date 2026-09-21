@@ -367,24 +367,29 @@ backend: `bash scripts/tests/test-cleanup-runs.sh`.
 ### Installer on a fresh machine (installer probe)
 
 `scripts/installer-probe.sh` checks `scripts/setup.sh` the way a new user experiences it: in a fresh
-container (default `ubuntu:24.04`) that has nothing but git, sudo and tzdata. It always checks a
-committed state (default `HEAD`, otherwise `--ref`), never the working tree. Requires Docker.
+container (default `ubuntu:24.04`, with `--image rockylinux:9` also a dnf system) that has nothing but
+git, sudo and tzdata. It always checks a committed state (default `HEAD`, otherwise `--ref`), never
+the working tree. Requires Docker.
 
 ```bash
 ./scripts/installer-probe.sh --interactive          # fresh machine as a shell — click through yourself
 ./scripts/installer-probe.sh --ref main             # automatic run with report
+./scripts/installer-probe.sh --image rockylinux:9   # the same on a dnf system
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
 ```
 
-The automatic run walks through the three steps from [GETTING-STARTED.md](GETTING-STARTED.md)
-(`setup.sh` → `--install` → `--start`, module prompt answered with Enter), each under a pseudo
-terminal. It turns red when phase 1 does not report missing tools cleanly, phase 3 does not end with
-exit 0, backend or frontend do not answer, the login with the generated key fails, the backend is
-built more than once, or the clone is no longer clean afterwards (`git status`). The result is a
-single HTML page with terminal transcript and screenshots under
+The automatic run takes the "one instance on this machine" way from
+[GETTING-STARTED.md](GETTING-STARTED.md) in two phases, each under a pseudo terminal:
+`setup.sh --check` (check only) and `setup.sh --yes --runtime host --bind 0.0.0.0` (one pass up to
+the running instance). Each phase writes its own exit code to a file inside the container — through
+`script` and `docker exec` an abort once came back as 0. The run turns red when phase 1 does not name
+the missing tools, phase 2 does not end with exit 0, health or the interface on the one port do not
+answer, the login with the generated key fails, the key shows up in a log, the backend is not built
+exactly once, or the clone is no longer clean afterwards (`git status`). The result is a single HTML
+page with terminal transcript and screenshots under
 `~/.local/state/mysuricates/installer-probe/<time>-<sha>/report.html` (`latest` points to the last
-run). A run takes about ten minutes and downloads JDK, Node, npm packages and Maven dependencies
-fresh every time. Ports are bound to `127.0.0.1` only.
+run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time. The container
+way (Docker inside the container) is not part of the probe yet.
 
 Before a release it runs as the workflow **Installer probe** (pool entry
 `mysuricates-installer-probe`, variable `ref`, default `main`). The workflow takes the probe script
