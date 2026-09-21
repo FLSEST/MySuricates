@@ -36,6 +36,12 @@ public class CodexAiProvider implements AiProvider {
     }
 
     @Override
+    public ProviderSetup setup() {
+        return new ProviderSetup("codex", "npm install -g @openai/codex", "codex login",
+                java.util.List.of(".codex/auth.json"));
+    }
+
+    @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
         // Merge system prompt into user prompt since Codex doesn't support --system-prompt
         // Reasoning is always read-only (analysis only, no file writes)
