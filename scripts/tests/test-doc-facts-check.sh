@@ -259,6 +259,24 @@ OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "Controller im Codeblock erkannt" 'grep -qE "^DRIFT docs/baum.md:4 .*sagt 38, Code 2" <<<"$OUT"'
 check "Migrationen im Codeblock erkannt" 'grep -qE "^DRIFT docs/baum.md:5 .*sagt 68, Code 3" <<<"$OUT"'
 rm "$FAKE/docs/baum.md"
+echo "4g) Zahl am Zeilenende, Substantiv in der Folgezeile (TODO 880a17ea)"
+cat > "$FAKE/docs/umbruch.md" <<'MD_EOF'
+# Umbruch
+Der Pool ergaenzt die 44 built-in
+templates um eigene Workflows.
+Stimmt: die 6 built-in
+templates reichen.
+Ein Satz endet mit 44.
+Templates stehen woanders.
+There are 44 predefined workflow templates in total.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "umbrochene falsche Zahl gemeldet (Zeile der Zahl)" 'grep -qE "^DRIFT docs/umbruch.md:2 templates sagt 44, Code 6" <<<"$OUT"'
+check "umbrochene richtige Zahl bleibt frei"   '! grep -qE "^DRIFT docs/umbruch.md:4" <<<"$OUT"'
+check "Satzende trennt die Zeilen"             '! grep -qE "^DRIFT docs/umbruch.md:6" <<<"$OUT"'
+check "Treffer in einer Zeile nur einmal"      '[ "$(grep -cE "^DRIFT docs/umbruch.md:8 " <<<"$OUT")" -eq 1 ]'
+rm "$FAKE/docs/umbruch.md"
+
 
 echo "5) Zeilen mit Ignore-Marker werden uebersprungen"
 cat > "$FAKE/docs/historisch.md" <<'MD_EOF'
