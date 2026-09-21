@@ -58,7 +58,7 @@ Workflow trägt es nicht weiter, und die Datenbank kennt es nicht.
 
 ### Der heutige Bestand
 
-13 `repo`, 7 `portable`:
+16 `repo`, 7 `portable`:
 
 | Eintrag | scope | Name |
 |---|---|---|
@@ -67,8 +67,11 @@ Workflow trägt es nicht weiter, und die Datenbank kennt es nicht.
 | `mocking-gap-audit` | portable | Mocking Gap Audit |
 | `mysuricates-architektur-review` | repo | Architektur-Review MySuricates |
 | `mysuricates-build-gate` | repo | MySuricates Build Gate |
+| `mysuricates-concept-pages` | repo | MySuricates Konzeptseiten je Mechanismus |
+| `mysuricates-concept-pages-en` | repo | MySuricates Konzeptseiten DE→EN Sync |
 | `mysuricates-health-check` | repo | MySuricates Gesundheitscheck |
 | `mysuricates-i18n-sync` | repo | i18n Sync prüfen und fixen |
+| `mysuricates-installer-probe` | repo | Installer-Probe |
 | `mysuricates-performance-audit` | repo | Performance-Audit MySuricates |
 | `mysuricates-release-readiness` | repo | Release-Bereitschaft MySuricates |
 | `mysuricates-security-audit` | repo | Security-Audit MySuricates |

@@ -380,6 +380,34 @@ Befund ab (2026-08-04 hat ein DELETE auf einer bereits korrupten DB den Schaden 
 `--db <pfad>` lässt sich das Skript gegen eine andere Datei richten. Skript-Tests liegen unter
 `scripts/tests/` und laufen ohne Backend: `bash scripts/tests/test-cleanup-runs.sh`.
 
+### Installer auf frischer Maschine (Installer-Probe)
+
+`scripts/installer-probe.sh` prüft `scripts/setup.sh` so, wie ein neuer Nutzer ihn erlebt: in
+einem frischen Container (Default `ubuntu:24.04`), auf dem nur git, sudo und tzdata liegen. Geprüft
+wird immer ein committeter Stand (Default `HEAD`, sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
+
+```bash
+./scripts/installer-probe.sh --interactive          # frische Maschine als Shell — selbst durchklicken
+./scripts/installer-probe.sh --ref main             # automatischer Lauf mit Report
+./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
+```
+
+Der automatische Lauf geht die drei Schritte aus [GETTING-STARTED.md](GETTING-STARTED.md) durch
+(`setup.sh` → `--install` → `--start`, Modul-Abfrage mit Enter), jeden unter einem Pseudo-Terminal.
+Rot wird er, wenn Phase 1 fehlende Tools nicht sauber meldet, Phase 3 nicht mit Exit 0 endet,
+Backend oder Frontend nicht antworten, der Login mit dem erzeugten Key scheitert, das Backend mehr
+als einmal gebaut wird oder der Klon danach nicht mehr sauber ist (`git status`). Das Ergebnis ist
+eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshots unter
+`~/.local/state/mysuricates/installer-probe/<zeit>-<sha>/report.html` (`latest` zeigt auf den letzten
+Lauf). Ein Lauf dauert etwa zehn Minuten und lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten
+jedes Mal frisch. Ports liegen nur auf `127.0.0.1`.
+
+Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
+`mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript
+aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-Tests laufen ohne
+Docker: `bash scripts/tests/test-installer-probe.sh` und
+`python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
 ## Versionierung & Releases
 
 ### Wo die Version definiert ist

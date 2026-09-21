@@ -364,6 +364,34 @@ any finding (on 2026-08-04 a DELETE on an already corrupt DB made the damage wor
 points the script at a different file. Script tests live under `scripts/tests/` and run without a
 backend: `bash scripts/tests/test-cleanup-runs.sh`.
 
+### Installer on a fresh machine (installer probe)
+
+`scripts/installer-probe.sh` checks `scripts/setup.sh` the way a new user experiences it: in a fresh
+container (default `ubuntu:24.04`) that has nothing but git, sudo and tzdata. It always checks a
+committed state (default `HEAD`, otherwise `--ref`), never the working tree. Requires Docker.
+
+```bash
+./scripts/installer-probe.sh --interactive          # fresh machine as a shell — click through yourself
+./scripts/installer-probe.sh --ref main             # automatic run with report
+./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
+```
+
+The automatic run walks through the three steps from [GETTING-STARTED.md](GETTING-STARTED.md)
+(`setup.sh` → `--install` → `--start`, module prompt answered with Enter), each under a pseudo
+terminal. It turns red when phase 1 does not report missing tools cleanly, phase 3 does not end with
+exit 0, backend or frontend do not answer, the login with the generated key fails, the backend is
+built more than once, or the clone is no longer clean afterwards (`git status`). The result is a
+single HTML page with terminal transcript and screenshots under
+`~/.local/state/mysuricates/installer-probe/<time>-<sha>/report.html` (`latest` points to the last
+run). A run takes about ten minutes and downloads JDK, Node, npm packages and Maven dependencies
+fresh every time. Ports are bound to `127.0.0.1` only.
+
+Before a release it runs as the workflow **Installer probe** (pool entry
+`mysuricates-installer-probe`, variable `ref`, default `main`). The workflow takes the probe script
+from the state under test, not from the branch that happens to be checked out. The script tests run
+without Docker: `bash scripts/tests/test-installer-probe.sh` and
+`python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
 ## Versioning & Releases
 
 ### Where the Version Is Defined

@@ -58,7 +58,7 @@ does not carry it on, and the database does not know it.
 
 ### Today's inventory
 
-13 `repo`, 7 `portable`:
+16 `repo`, 7 `portable`:
 
 | Entry | scope | Name |
 |---|---|---|
@@ -67,8 +67,11 @@ does not carry it on, and the database does not know it.
 | `mocking-gap-audit` | portable | Mocking Gap Audit |
 | `mysuricates-architektur-review` | repo | Architecture review MySuricates |
 | `mysuricates-build-gate` | repo | MySuricates Build Gate |
+| `mysuricates-concept-pages` | repo | MySuricates concept pages by mechanism |
+| `mysuricates-concept-pages-en` | repo | MySuricates concept pages DE→EN sync |
 | `mysuricates-health-check` | repo | MySuricates health check |
 | `mysuricates-i18n-sync` | repo | Check and fix i18n sync |
+| `mysuricates-installer-probe` | repo | Installer probe |
 | `mysuricates-performance-audit` | repo | Performance audit MySuricates |
 | `mysuricates-release-readiness` | repo | Release readiness MySuricates |
 | `mysuricates-security-audit` | repo | Security audit MySuricates |
