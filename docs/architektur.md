@@ -1,5 +1,16 @@
 # Architektur
 
+MySuricates ist eine selbst betriebene Workflow-Plattform: ein Spring-Boot-Backend mit
+Web-Oberflaeche, in dem Ablaeufe aus Bloecken bestehen — teils deterministisch (Shell,
+Verzweigung, Schleife), teils KI-Aufrufe. Diese Seite beschreibt den inneren Aufbau. Fuer den
+Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 > Die Abläufe dieser Seite gibt es auch als Diagramme: [docs/diagramme.md](diagramme.md)
 > — Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment.
 
@@ -310,6 +321,8 @@ Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer au
 
 **Resume schneidet nach Blöcken, nicht nach Step-Indizes** (`ResumePlan`): `POST /executions/{id}/resume-from-step` setzt hinter dem letzten COMPLETED-Step an. Maßgeblich ist dessen **Position** in der Blockliste, nicht sein `stepIndex` — Wrapper-Blöcke (foreach, while, retry, conditional, switch) ziehen pro Item/Iteration einen weiteren Index, sodass der Index eines Blocks seiner Position vorauseilt. Grundlage ist die Zusage von `BlockStepRunner`: genau ein persistierter Step pro Top-Level-Block, in Blockreihenfolge (innere Items werden nie gespeichert). Die Steps des fortgesetzten Abschnitts werden über `ExecutionContext.startStepIndicesAt` oberhalb aller bereits persistierten Indizes weitergezählt, bleiben also eindeutig und sortierbar. Vorher wurde der frisch vergebene Index gegen den persistierten verglichen — nach einem Wrapper übersprang der Resume damit Blöcke, die nie gelaufen waren (TODO `1be423b4`).
 
+**Block-Position je Step** (`metadata.blockIndex`): `BlockStepRunner.startStep` schreibt die Position des Blocks in der Top-Level-Liste in die Step-Metadaten, `runStep` hält sie gegen Executor-Metadaten fest. Das Ablauf-Diagramm der Run-Seite ordnet Steps darüber seinen Kästen (`b_<Position>`) zu (`latestStepByBlock` in `stepMetadata.ts`); Runs ohne den Schlüssel fallen auf die Position in der index-sortierten Liste zurück. Nach einem Resume steht der abgebrochene Versuch eines Blocks neben dem neuen — beide mit demselben `blockIndex`, der höhere `stepIndex` ist der aktuelle (TODO `dcba60da`).
+
 **Container-Start/-Stop ohne Transaktion:** `ProjectService.startContainer`/`stopContainer` sind bewusst **nicht** `@Transactional`: der Docker-Aufruf liegt zwischen zwei kurzen `TransactionTemplate`-Bursts (STARTING → Docker außerhalb jeder Transaktion → RUNNING/ERROR), weil `ContainerService` dabei den Projekt-Monitor hält — eine umschließende Transaktion würde die einzige Connection über den ganzen 5–15-s-Docker-Start pinnen und einen parallelen Workflow-Run (der den Monitor zuerst nimmt) in den 120-s-Connection-Timeout laufen lassen (Lock-Order-Inversion Monitor ↔ Connection). Weil der STARTING-Burst bereits vor dem Docker-Start committet, holt `ProjectStatusReconciler` beim `ApplicationReadyEvent` alle Projekte ab, die ein Absturz in diesem Fenster in STARTING zurückgelassen hat (RUNNING-Container-Zeile ⇒ RUNNING, sonst STOPPED) — das Projekt-Gegenstück zu `WorkflowExecutor.cleanupZombieRuns`. `ProjectService.delete` folgt demselben Muster in umgekehrter Reihenfolge: zuerst der Archivierungs-Burst (`archivedAt` + ActivityLog), danach der Docker-Stop außerhalb jeder Transaktion — schlägt er fehl, bleibt das Projekt archiviert (ERROR-Log), und nur der verwaiste Container bleibt zurück, den `DockerOrphanReconciler`/Idle-Cleanup einsammeln.
 
 Dasselbe Muster gilt für `WorkflowMemoryService.extractKnowledge`/`extractAndActivate` (Security-Finding 4, analog zu `ebd508c5`): der KI-Summarization-Call (`ClaudeSummarizer`/`CodexSummarizer`, Sekunden bis Minuten) läuft außerhalb jeder Transaktion, zwischen einem lesenden `TransactionTemplate`-Burst (Runs laden, lazy `steps`-Collection in eine neue Liste materialisieren — OSIV ist aus —, Run-IDs sammeln) und einem schreibenden Burst (`WorkflowMemory` speichern bzw. `deactivateAllForWorkflow` + Aktivierung). `activate`/`update`/`delete` bleiben kurze `@Transactional`-Methoden.
@@ -322,7 +335,9 @@ Dasselbe Muster gilt für `WorkflowMemoryService.extractKnowledge`/`extractAndAc
 
 **Container-Zeile:** `ContainerService.createAndStartContainer` aktualisiert eine vorhandene `containers`-Zeile (Upsert) statt sie zu löschen und neu anzulegen — die Löschung wurde über die Cascade `Project.container` beim Flush wieder aufgehoben, sodass der folgende INSERT an `UNIQUE(containers.project_id)` scheiterte. Der Projekt-Lock bleibt dauerhaft in der Map (Entfernen unter Konkurrenz erzeugt einen zweiten Monitor), und `lastActivityAt` wird per JPQL-Update (`ContainerRepository.touchActivity`) statt per detached Merge gesetzt.
 
-### Block-Typen (16 gesamt)
+### Block-Typen
+
+Vollständige Liste; die verbindliche Quelle ist die Registry `BlockTypesIndexSection.BLOCK_TYPES`, gegen die `BlockTypeListsGuardTest` die vorhandenen Executor-Klassen pinnt.
 
 | Typ | Executor | Beschreibung |
 |---|---|---|
@@ -342,6 +357,10 @@ Dasselbe Muster gilt für `WorkflowMemoryService.extractKnowledge`/`extractAndAc
 | `document` | `DocumentBlockExecutor` | Extrahiert Text aus PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
 | `compress` | `CompressBlockExecutor` | Regelbasierte Komprimierung einer früheren Blockausgabe (Stufenkette, 0 Tokens) |
 | `compress-ai` | `CompressAiBlockExecutor` | Werkzeuglose KI-Komprimierung einer früheren Blockausgabe mit Ein-/Ausgabegrenze |
+| `todo-create` | `TodoCreateBlockExecutor` | Legt ein TODO an, direkt über den Service statt über die REST-API |
+| `todo-update` | `TodoUpdateBlockExecutor` | Ändert ein bestehendes TODO |
+| `todo-close` | `TodoCloseBlockExecutor` | Setzt ein TODO auf DONE |
+| `dashboard-report` | `DashboardReportBlockExecutor` | Schreibt Zahlen und Status eines Laufs als Dashboard-Widget |
 
 **Template-Variablen** (`{{ variable }}`, `${varName}`) werden zur Laufzeit im `ExecutionContext` aufgelöst. `{{ previous_output }}` enthält die Ausgabe des vorherigen Blocks.
 
@@ -420,10 +439,19 @@ Er wird geloggt und zu YELLOW `gate-invalid` — verschärfen darf er, mildern n
 bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlägt, war zuvor von
 einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
 
-**Gate → Run-Status-Mapping:**
-- **YELLOW → `COMPLETED_WITH_ERRORS`:** Run wird mit diesem Status beendet statt `COMPLETED`
-- **RED → `COMPLETED`:** RED-Gates ändern den Run-Status nicht — `AutoTodoService` erstellt stattdessen ein TODO
-- `GateStatusResolver` — leitet Gate-Status aus Run-Status ab, wenn kein expliziter Marker existiert (`FAILED` → RED, `COMPLETED` → GREEN)
+**Ein Gate ändert den Run-Status nicht.** Weder YELLOW noch RED: Das Gate ist ein Befund über
+das Ergebnis, kein Fehlschlag der Ausführung. RED erzeugt über `AutoTodoService` ein TODO und
+eine Warnung im Aktivitätslog, YELLOW nur die Warnung — der Lauf bleibt `COMPLETED`.
+
+Den Run-Status bestimmt etwas Unabhängiges: `RunCompletionHandler` setzt
+`COMPLETED_WITH_ERRORS`, wenn ein Schritt mit `checkedCommand`-Metadatum fehlgeschlagen ist,
+sonst `COMPLETED`. Beides kann zusammentreffen — `RunCompletionHandlerTest` hält genau den Fall
+fest: ein fehlgeschlagener `checked_command` ergibt `COMPLETED_WITH_ERRORS` **und**
+`gate_status: RED`.
+
+Die Richtung, die es wirklich gibt, ist die umgekehrte: `GateStatusResolver` leitet ein
+Gate-Urteil aus dem Run-Status ab, wenn kein Marker geschrieben wurde (`FAILED` → RED,
+`COMPLETED` → GREEN, `COMPLETED_WITH_ERRORS` → YELLOW).
 
 Ein Shell-Block muss diese Marker nicht selbst schreiben: `checked_command`/`check_category` leiten
 das Gate automatisch aus dem Exit-Code ab, mit Vorrang für einen eigenen (mindestens gleich

@@ -63,6 +63,8 @@ Status ändern: `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "DONE"}`
 Aktualisieren: `PUT /api/v1/todos/{id}` — Body: `{ "title": "...", "priority": "HIGH", "tags": [...], "linkedWorkflowId": "..." }`
 Resolver starten: `POST /api/v1/todos/{id}/resolve`
 
+**TODOs immer mit Titel nennen:** `82ca537f (Titel des TODOs)`, nie die ID allein — in Antworten, Commit-Messages und Notizen. Die ID allein kann der Mensch nicht einordnen. Titel nicht zur Hand → vorher `GET /api/v1/todos/{id}` nachschlagen.
+
 ### TODO-Resolve-Workflow
 
 ```

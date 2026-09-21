@@ -32,7 +32,7 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
             new ProfileDefinition("onboarding-base", "base",
                     Map.of("de", "Basis", "en", "Base"),
                     Map.of("de", "MySuricates API-Referenz und Grundregeln", "en", "MySuricates API reference and basic rules"),
-                    "onboarding/base.md", OnboardingProfileType.BASE, 0, 2),
+                    "onboarding/base.md", OnboardingProfileType.BASE, 0, 3),
             new ProfileDefinition("onboarding-developer", "developer",
                     Map.of("de", "Entwickler", "en", "Developer"),
                     Map.of("de", "Code-Review, Test-Pipelines, Auto-Fix, Quality Gates, vollständige API-Referenz", "en", "Code review, test pipelines, auto-fix, quality gates, full API reference"),

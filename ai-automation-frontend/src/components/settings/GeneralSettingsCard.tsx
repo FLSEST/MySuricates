@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Card, CardHeader, Toggle, Select } from '../ui';
+import { Card, CardHeader, Toggle, Select, Button } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
@@ -9,7 +9,7 @@ import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled, setWalkthroughSeen } = useSettingsStore();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
@@ -51,6 +51,16 @@ export function GeneralSettingsCard() {
             <p className="text-xs text-text-tertiary">{t.settings.simpleModeHint}</p>
           </div>
           <Toggle enabled={simpleMode} onChange={setSimpleMode} />
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-text">{t.walkthrough.reopen}</p>
+            <p className="text-xs text-text-tertiary">{t.walkthrough.reopenHint}</p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setWalkthroughSeen(false)}>
+            {t.walkthrough.showAction}
+          </Button>
         </div>
 
         <div className="flex items-center justify-between">

@@ -275,4 +275,55 @@ describe('BpmnDiagramView', () => {
     // Skript-Marker: drei Linien oben links im Kasten
     expect(container.querySelectorAll('g.stroke-text-secondary line').length).toBeGreaterThanOrEqual(3);
   });
+
+  describe('Zoom', () => {
+    // SAMPLE_XML: viewBox 752 × 180; jsdom misst keine Breite, eingepasst gilt daher Maßstab 1
+    const svgOf = (container: HTMLElement) => container.querySelector('svg[role="img"]')!;
+
+    it('vergrößert per Knopf auf feste Größe und passt wieder ein', () => {
+      const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
+      expect(svgOf(container).getAttribute('width')).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Vergrößern' }));
+      expect(svgOf(container).getAttribute('width')).toBe('940');
+      expect(svgOf(container).getAttribute('height')).toBe('225');
+      expect(screen.getByRole('button', { name: 'Einpassen' }).textContent).toBe('125 %');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Einpassen' }));
+      expect(svgOf(container).getAttribute('width')).toBeNull();
+    });
+
+    it('zoomt mit Strg + Mausrad, ohne Strg bleibt das Mausrad Scrollen', () => {
+      const { container } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
+      const scroller = svgOf(container).parentElement!;
+
+      fireEvent.wheel(scroller, { deltaY: -100 });
+      expect(svgOf(container).getAttribute('width')).toBeNull();
+
+      const zoomed = fireEvent.wheel(scroller, { deltaY: -100, ctrlKey: true });
+      expect(zoomed).toBe(false); // preventDefault: kein Browser-Seitenzoom
+      expect(svgOf(container).getAttribute('width')).toBe('940');
+
+      fireEvent.wheel(scroller, { deltaY: 100, ctrlKey: true });
+      expect(svgOf(container).getAttribute('width')).toBe('752');
+    });
+
+    it('begrenzt den Zoom und sperrt den Knopf an der Grenze', () => {
+      render(<BpmnDiagramView xml={SAMPLE_XML} />);
+      const zoomOut = screen.getByRole('button', { name: 'Verkleinern' });
+      for (let i = 0; i < 10; i++) fireEvent.click(zoomOut);
+      expect(screen.getByRole('button', { name: 'Einpassen' }).textContent).toBe('25 %');
+      expect(zoomOut).toBeDisabled();
+    });
+
+    it('passt nach einem Wechsel der Ausrichtung wieder ein', () => {
+      const { container, rerender } = render(<BpmnDiagramView xml={SAMPLE_XML} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Vergrößern' }));
+      rerender(<BpmnDiagramView xml={SAMPLE_XML} orientation="vertical" />);
+      // vertikal eingepasst = native Größe, kein übernommener Zoom
+      expect(screen.getByRole('button', { name: 'Einpassen' })).toBeDisabled();
+      rerender(<BpmnDiagramView xml={SAMPLE_XML} />);
+      expect(svgOf(container).getAttribute('width')).toBeNull();
+    });
+  });
 });

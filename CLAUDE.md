@@ -56,6 +56,7 @@ curl -X POST http://localhost:9090/api/v1/todos \
 - **Sprache**: Deutsch für Titel
 - **Priority**: `HIGH` = blockierend, `MEDIUM` = bald, `LOW` = nice-to-have
 - **Tags**: `backend`, `frontend`, `architektur`, `security`, `performance`, `ux`, `ui`, `feature`, `bug`, `testing`, `documentation`, `workflow-execution`, `container-execution`, `staging`
+- **TODOs immer mit Titel nennen**: `82ca537f (Titel des TODOs)`, nie die ID allein — in Antworten, Commit-Messages, Docs und Memory-Einträgen. Die Kurz-ID ist nur für Maschinen eindeutig, für Menschen ist sie Rauschen. Titel nicht zur Hand (etwa aus einer Notiz, die nur die ID trägt) → vorher `GET /api/v1/todos/<id>` nachschlagen statt die ID nackt weiterzugeben.
 
 ### Claude-Code-Session-ID mitgeben
 

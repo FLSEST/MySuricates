@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  compressionFacts, formatMetadataValue, persistedForEachItems, persistedTotalItems, stepMetadataSummary, wrapperFacts,
+  compressionFacts, formatMetadataValue, latestStepByBlock, persistedForEachItems, persistedTotalItems, stepBlockIndex,
+  stepMetadataSummary, wrapperFacts,
 } from '../stepMetadata';
 import type { StepResult } from '../../../types';
 
@@ -86,5 +87,38 @@ describe('compressionFacts', () => {
       stages: [{ op: 'lines.filter', inChars: 736706, outChars: 150220, note: '−8.914 Zeilen' }],
     });
     expect(compressionFacts({ id: 's', stepIndex: 0, input: '', output: '', status: 'COMPLETED', durationMs: 1, error: null, metadata: {} })).toBeNull();
+  });
+
+  describe('latestStepByBlock', () => {
+    const at = (stepIndex: number, status: StepResult['status'], metadata?: Record<string, unknown>): StepResult =>
+      ({ id: `s${stepIndex}`, stepIndex, input: '', output: '', status, durationMs: 1, error: null, metadata }) as StepResult;
+
+    it('maps steps to block positions although wrapper items pushed the step index ahead', () => {
+      // Run 192d8be8: two foreach blocks with ten items each → step indices 0, 1, 12, 13, 24, 25
+      const steps = [0, 1, 12, 13, 24, 25].map((i) => at(i, 'COMPLETED'));
+      const byBlock = latestStepByBlock(steps);
+      expect([...byBlock.keys()]).toEqual([0, 1, 2, 3, 4, 5]);
+      expect(byBlock.get(2)?.stepIndex).toBe(12);
+    });
+
+    it('prefers metadata.blockIndex and lets the newest attempt of a resumed block win', () => {
+      const steps = [
+        at(4, 'COMPLETED', { blockIndex: 3 }),
+        at(0, 'COMPLETED', { blockIndex: 0 }),
+        at(1, 'COMPLETED', { blockIndex: 1 }),
+        at(2, 'FAILED', { blockIndex: 2 }),
+        at(3, 'COMPLETED', { blockIndex: 2 }),
+      ];
+      const byBlock = latestStepByBlock(steps);
+      expect([...byBlock.keys()].sort()).toEqual([0, 1, 2, 3]);
+      expect(byBlock.get(2)?.status).toBe('COMPLETED');
+      expect(byBlock.get(3)?.stepIndex).toBe(4);
+    });
+
+    it('reads only numeric block positions', () => {
+      expect(stepBlockIndex(at(0, 'COMPLETED', { blockIndex: '2' }))).toBeNull();
+      expect(stepBlockIndex(at(0, 'COMPLETED'))).toBeNull();
+      expect(stepBlockIndex(at(7, 'COMPLETED', { blockIndex: 0 }))).toBe(0);
+    });
   });
 });

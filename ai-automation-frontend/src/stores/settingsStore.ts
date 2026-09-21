@@ -26,6 +26,8 @@ interface SettingsState {
   sidebarHiddenItems: string[];
   pinnedWorkflowIds: string[];
   simpleOnboardingSeen: boolean;
+  /** Welcome walkthrough dismissed; set back to false to show it again. */
+  walkthroughSeen: boolean;
   /** Todos list view: rows per page. */
   listPageSize: number;
   /** Todos board view: cards loaded per kanban column (one query per column). */
@@ -44,6 +46,7 @@ interface SettingsState {
   setSidebarHiddenItems: (hidden: string[]) => void;
   togglePinnedWorkflow: (id: string) => void;
   setSimpleOnboardingSeen: (seen: boolean) => void;
+  setWalkthroughSeen: (seen: boolean) => void;
   setListPageSize: (size: number) => void;
   setKanbanColumnSize: (size: number) => void;
 }
@@ -65,6 +68,7 @@ export const useSettingsStore = create<SettingsState>()(
       sidebarHiddenItems: [],
       pinnedWorkflowIds: [],
       simpleOnboardingSeen: false,
+      walkthroughSeen: false,
       listPageSize: 30,
       kanbanColumnSize: 50,
       setApiKey: (apiKey) => set({ apiKey }),
@@ -86,6 +90,7 @@ export const useSettingsStore = create<SettingsState>()(
             : [...state.pinnedWorkflowIds, id],
         })),
       setSimpleOnboardingSeen: (simpleOnboardingSeen) => set({ simpleOnboardingSeen }),
+      setWalkthroughSeen: (walkthroughSeen) => set({ walkthroughSeen }),
       setListPageSize: (size) => set({ listPageSize: clampPageSize(size) }),
       setKanbanColumnSize: (size) => set({ kanbanColumnSize: clampPageSize(size) }),
     }),

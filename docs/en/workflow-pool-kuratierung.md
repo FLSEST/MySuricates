@@ -16,7 +16,7 @@ Two mechanisms exist side by side, and they answer different questions.
 
 | | Built-in templates | Workflow pool |
 |---|---|---|
-| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (66) | `workflow-pool/*.json` (20 tracked) |
+| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (67) | `workflow-pool/*.json` |
 | Way into an instance | `WorkflowTemplateSeeder` seeds them into the database at startup, comparing semver | manual: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Visible as | a template in the catalogue, present in every instance | an entry in the pool browser, a workflow only after a deliberate install |
 | Updates | the seeder pulls in a higher version | none; an installed workflow is a copy and lives on by itself |
@@ -56,35 +56,22 @@ field, not a comment:
 `scope` is **pool metadata**, not a field of the workflow definition: an installed workflow
 does not carry it on, and the database does not know it.
 
-### Today's inventory
+### Where the inventory lives
 
-16 `repo`, 7 `portable`:
+It is deliberately **not** listed here. A list inside the document ages with every export —
+and this one already had: it said 13 `repo` and 7 `portable` and was out of date a few
+entries later.
 
-| Entry | scope | Name |
-|---|---|---|
-| `code-review-pipeline` | portable | Code Review Pipeline |
-| `master-commit-sanity-check` | repo | Master Commit Sanity Check |
-| `mocking-gap-audit` | portable | Mocking Gap Audit |
-| `mysuricates-architektur-review` | repo | Architecture review MySuricates |
-| `mysuricates-build-gate` | repo | MySuricates Build Gate |
-| `mysuricates-concept-pages` | repo | MySuricates concept pages by mechanism |
-| `mysuricates-concept-pages-en` | repo | MySuricates concept pages DE→EN sync |
-| `mysuricates-health-check` | repo | MySuricates health check |
-| `mysuricates-i18n-sync` | repo | Check and fix i18n sync |
-| `mysuricates-installer-probe` | repo | Installer probe |
-| `mysuricates-performance-audit` | repo | Performance audit MySuricates |
-| `mysuricates-release-readiness` | repo | Release readiness MySuricates |
-| `mysuricates-security-audit` | repo | Security audit MySuricates |
-| `mysuricates-test-coverage` | repo | Check test coverage MySuricates |
-| `mysuricates-test-sync` | repo | Write a test (TODO-driven) |
-| `project-health-check` | portable | Project health check |
-| `project-junk-cleanup` | portable | Project Junk Cleanup |
-| `public-readiness-behauptungen` | repo | Public Readiness — Claims |
-| `public-readiness-evidenz` | repo | Public Readiness — Evidence |
-| `public-readiness-todos` | portable | Public Readiness — Reviewed TODO Proposal |
-| `readme-generator` | portable | README generator |
-| `release-readiness-report` | portable | Release Readiness Report |
-| `system-performance-analysis` | repo | System performance analysis |
+The directory itself gives the reliable answer, because every definition carries its `scope`
+as a field:
+
+```bash
+grep -h '"scope"' workflow-pool/*.json | tr -d ' ",' | sort | uniq -c  # the split
+grep -l '"scope": "portable"' workflow-pool/*.json                     # the portable ones
+```
+
+`bash scripts/ci/pool-neutrality.sh` prints the checked total at the end, and the pool
+browser shows the `scope` badge next to each version.
 
 ## 3. Criteria per entry — the gate's rule set
 
@@ -115,19 +102,21 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `DB-DIRECT` | the definition does not read the database directly | `sqlite3` anywhere, or `automation.db` together with a read access (`SELECT`, `INSERT INTO`, `.tables`, …); looking at the file size (`stat`, `du`) stays allowed |
 | `PARSE` | the file is valid JSON and an object | `json.load` |
 
-**Bilingual steps.** A pool file with the marker `"i18n": ["de", "en"]` may also carry step names, questions, prompts and `instructions` as `{de, en}`. It is then installed in the UI language (`locale` in the install body). Which fields must stay single-language (shell fields, compared values, `metadata`) is described in [WORKFLOW-GUIDE → Bilingual templates](WORKFLOW-GUIDE.md#bilingual-templates). `LocalizedDefinitionGateTest` checks this in the backend build, not `pool-neutrality.sh`.
-
 ### The block type registry
 
-`BLOCK-TYPE` checks against these 19 types. The source is
-`BlockTypesIndexSection.BLOCK_TYPES` in the backend, itself pinned against the existing
-`BlockExecutor` classes (`BlockTypeListsGuardTest`). The copy in
-`scripts/lib/hygiene-rules.sh` is compared against the registry by
-`scripts/tests/test-public-hygiene.sh` — if either drifts, that test says so.
+The source is `BlockTypesIndexSection.BLOCK_TYPES` in the backend, itself pinned against the
+existing `BlockExecutor` classes (`BlockTypeListsGuardTest`). For the scripts the list is
+**generated** from it — `scripts/lib/block-types.generated.sh`, written by
+`BlockTypesGateListTest`. No hand maintains it, so it cannot drift.
 
-`agentic`, `approval`, `compress`, `compress-ai`, `conditional`, `document`, `foreach`,
-`human-input`, `integration`, `retry`, `shell`, `simple`, `skill-capability`,
-`sub-workflow`, `switch`, `todo-close`, `todo-create`, `todo-update`, `while`
+The current list therefore does not live here; it comes from the file:
+
+```bash
+. scripts/lib/block-types.generated.sh && printf '%s\n' "${HYGIENE_POOL_BLOCK_TYPES[@]}"
+```
+
+An enumeration at this point would be a third copy — and was one: it said 19 types and did not
+know about `dashboard-report` once that was added.
 
 ### Own REST API, credentials, database — and why the patterns are two-stage
 

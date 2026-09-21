@@ -47,6 +47,9 @@ Done. `b` goes one step back, `q` quits.
   in Test, run them reliably in Prod. For now workflows move by export and import in the interface;
   an automatic sync between the three is not set up yet.
 - **Modules:** Standard (smallest surface), Research, Full or your own selection incl. hardening.
+  The names say little on the first run — that is fine: the choice is not final (section 4); when
+  in doubt take Standard. What the modules do is in [architektur.md](architektur.md) and
+  [deployment.md](deployment.md).
   Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
   In the container the instance uses the CLI **and** your login from the machine — no second login
@@ -94,7 +97,7 @@ The application is running. A first way in, without building anything:
 
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
    your machine (in the container: inside the projects folder).
-2. **Take a template** — *Templates* holds 66 ready-made workflows. Pick one, copy it into the
+2. **Take a template** — *Templates* holds 67 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens.
 3. **Look at the run** — the detail view shows per block its duration, its status and whether it was
    deterministic or called a model.

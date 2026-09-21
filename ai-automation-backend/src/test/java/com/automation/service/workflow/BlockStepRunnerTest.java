@@ -80,12 +80,13 @@ class BlockStepRunnerTest {
 
     @Test
     void startStep_persistsRunningPlaceholderAndBroadcasts() {
-        StepResult step = runner.startStep(run, 3, block(null, null));
+        // step index 3 at block position 1: a wrapper block before it drew extra indices
+        StepResult step = runner.startStep(run, 3, block(null, null), 1);
 
         assertThat(step.getStepIndex()).isEqualTo(3);
         assertThat(step.getStatus()).isEqualTo(StepStatus.RUNNING);
         assertThat(step.getStartedAt()).isNotNull();
-        assertThat(step.getMetadata()).isEqualTo(Map.of("blockType", "simple"));
+        assertThat(step.getMetadata()).isEqualTo(Map.of("blockType", "simple", "blockIndex", 1));
         assertThat(step.getWorkflowRun()).isSameAs(run);
         // the step is part of the run before it is persisted, and it is saved before the broadcast
         assertThat(run.getSteps()).containsExactly(step);
@@ -100,7 +101,7 @@ class BlockStepRunnerTest {
     void runStep_validationFailsWithoutRetry_marksFailedAndAppendsReason() {
         BlockDefinition block = block("b", Map.of("contains", "OK"));
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "nope"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -116,7 +117,7 @@ class BlockStepRunnerTest {
         when(blockExecutor.execute(eq(block), any()))
                 .thenReturn(result(StepStatus.COMPLETED, "nope"))
                 .thenReturn(result(StepStatus.COMPLETED, "all OK"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -131,7 +132,7 @@ class BlockStepRunnerTest {
     void runStep_retriesExhausted_finalCheckMarksFailed() {
         BlockDefinition block = block("b", Map.of("contains", "OK", "retry_on_fail", true, "max_retries", 1));
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "nope"));
-        StepResult step = runner.startStep(run, 2, block);
+        StepResult step = runner.startStep(run, 2, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -149,7 +150,7 @@ class BlockStepRunnerTest {
     void runStep_copiesOutputIntoContext() {
         BlockDefinition block = block("Report", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "the output"));
-        StepResult step = runner.startStep(run, 1, block);
+        StepResult step = runner.startStep(run, 1, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -168,10 +169,24 @@ class BlockStepRunnerTest {
     }
 
     @Test
+    void runStep_keepsTheBlockPositionOverExecutorMetadata() {
+        BlockDefinition block = block("messen", null);
+        StepResult executed = result(StepStatus.COMPLETED, "ok");
+        executed.getMetadata().put("blockIndex", 99); // an executor must not move the step to another block
+        when(blockExecutor.execute(eq(block), any())).thenReturn(executed);
+        StepResult step = runner.startStep(run, 12, block, 2);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        assertThat(step.getStepIndex()).isEqualTo(12);
+        assertThat(step.getMetadata()).containsEntry("blockIndex", 2).containsEntry("tokens", 7);
+    }
+
+    @Test
     void runStep_unnamedBlock_setsNoBlockOutputAndNoBlockName() {
         BlockDefinition block = block("   ", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, null));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -187,7 +202,7 @@ class BlockStepRunnerTest {
         context.setVariable("user_var", "kept");
         run.setInputContext(new HashMap<>(Map.of("from_input", "ignored")));
         context.setVariable("from_input", "ignored");
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -199,7 +214,7 @@ class BlockStepRunnerTest {
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.FAILED, "boom"));
         context.setVariable("user_var", "kept");
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -212,7 +227,7 @@ class BlockStepRunnerTest {
     void runStep_broadcastsBeforePersisting() {
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "out"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, "container-1");
 
@@ -226,7 +241,7 @@ class BlockStepRunnerTest {
     void runStep_noContainer_skipsActivity() {
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "out"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -250,7 +265,7 @@ class BlockStepRunnerTest {
     void startStep_appendsToExistingSteps() {
         run.setSteps(new ArrayList<>(List.of(StepResult.builder().stepIndex(0).build())));
 
-        StepResult step = runner.startStep(run, 1, block("b", null));
+        StepResult step = runner.startStep(run, 1, block("b", null), 0);
 
         assertThat(run.getSteps()).hasSize(2);
         assertThat(run.getSteps().get(1)).isSameAs(step);
@@ -263,7 +278,7 @@ class BlockStepRunnerTest {
         BlockDefinition block = block("report", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "x; id"));
         context.setUntrustedVariable("branch", "main");
-        StepResult step = runner.startStep(run, 1, block);
+        StepResult step = runner.startStep(run, 1, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -279,7 +294,7 @@ class BlockStepRunnerTest {
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "x; id"));
         context.setUntrustedVariable("branch", "main; id");
         run.setInputContext(new HashMap<>(Map.of("branch", "main; id")));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -292,7 +307,7 @@ class BlockStepRunnerTest {
     void runStep_cleanRun_addsNoTaintToContextOrDelta() {
         BlockDefinition block = block("report", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "a | b"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -306,9 +321,9 @@ class BlockStepRunnerTest {
 
     @Test
     void startStep_placeholderCarriesTheBlockName() {
-        StepResult step = runner.startStep(run, 4, block("Build", null));
+        StepResult step = runner.startStep(run, 4, block("Build", null), 0);
 
-        assertThat(step.getMetadata()).isEqualTo(Map.of("blockType", "simple", "blockName", "Build"));
+        assertThat(step.getMetadata()).isEqualTo(Map.of("blockType", "simple", "blockName", "Build", "blockIndex", 0));
     }
 
     @Test
@@ -323,7 +338,7 @@ class BlockStepRunnerTest {
             LiveOutput.current().emit(LiveLineKind.LINE, "attempt " + boundDuringExecute.size());
             return result(StepStatus.COMPLETED, boundDuringExecute.size() == 1 ? "nope" : "OK");
         });
-        StepResult step = runner.startStep(run, 3, block);
+        StepResult step = runner.startStep(run, 3, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -336,7 +351,7 @@ class BlockStepRunnerTest {
     void runStep_flushesLiveLinesBeforeTheFinalStepBroadcast() {
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "out"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -352,7 +367,7 @@ class BlockStepRunnerTest {
         when(liveLog.sinkFor("run-1", 0, "b")).thenReturn((kind, text) -> {});
         BlockDefinition block = block("b", null);
         when(blockExecutor.execute(eq(block), any())).thenThrow(new IllegalStateException("executor crashed"));
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         assertThatThrownBy(() -> runner.runStep(step, block, blockExecutor, context, run, null))
                 .hasMessage("executor crashed");
@@ -369,7 +384,7 @@ class BlockStepRunnerTest {
         StepResult executed = result(StepStatus.FAILED, "boom");
         executed.getMetadata().put("exitCode", 2);
         when(blockExecutor.execute(eq(block), any())).thenReturn(executed);
-        StepResult step = runner.startStep(run, 0, block);
+        StepResult step = runner.startStep(run, 0, block, 0);
 
         runner.runStep(step, block, blockExecutor, context, run, null);
 
@@ -404,7 +419,7 @@ class BlockStepRunnerTest {
                         Map.of("type", "simple", "config", Map.of("command", "und weiter")))))));
         BlockDefinition switchBlock = BlockDefinition.builder()
                 .type("switch").name("router").config(config).build();
-        StepResult step = runner.startStep(run, 0, switchBlock);
+        StepResult step = runner.startStep(run, 0, switchBlock, 0);
 
         runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
 
@@ -435,7 +450,7 @@ class BlockStepRunnerTest {
                         Map.of("type", "simple", "name", "befund", "config", Map.of("command", "tu was")))))));
         BlockDefinition switchBlock = BlockDefinition.builder()
                 .type("switch").name("verteiler").config(config).build();
-        StepResult step = runner.startStep(run, 0, switchBlock);
+        StepResult step = runner.startStep(run, 0, switchBlock, 0);
 
         runner.runStep(step, switchBlock, new SwitchBlockExecutor(commandExecutor), context, run, null);
 
