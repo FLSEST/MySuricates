@@ -457,7 +457,13 @@ start_frontend() {
   echo "Starte Frontend ..."
   (
     cd "${FRONTEND_DIR}"
-    nohup npm run dev > "${FRONTEND_LOG}" 2>&1 &
+    # Eigene Sitzung statt nur nohup: Node setzt beim Start alle Signal-Dispositionen zurueck und hebt
+    # damit das SIG_IGN von nohup auf — schloss man das Terminal, beendete SIGHUP den Vite-Server,
+    # waehrend das Backend (Java respektiert SIG_IGN) weiterlief (454f8ac5, gefunden von
+    # scripts/installer-probe.sh). python3 statt setsid, weil setsid nur unter Linux dabei ist;
+    # execvp behaelt die PID, die PID-Datei zeigt also weiter auf npm.
+    nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' npm run dev \
+      > "${FRONTEND_LOG}" 2>&1 &
     echo "$!" > "${FRONTEND_PID_FILE}"
   )
 }

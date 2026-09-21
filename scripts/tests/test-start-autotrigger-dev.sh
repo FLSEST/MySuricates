@@ -116,6 +116,33 @@ check "build starts neither backend nor frontend"        '[ "$(sed -n 3p <<<"$OU
 check "build runs clean package once, tests skipped"     '[ "$(grep -c "clean package -DskipTests" "$TMP/backend/mvn-calls.log")" -eq 1 ]'
 check "build refuses the container mode"                 '[ "$(run_in_script "COMMAND=build; RUNTIME_MODE=container; ( main >/dev/null 2>&1 ); echo \$?")" = 2 ]'
 
+echo "7) the frontend outlives the terminal it was started from (454f8ac5)"
+# Node resets signal dispositions at startup, so `nohup` alone did not protect Vite: closing the
+# terminal sent SIGHUP and the frontend died while the backend lived on. `script` plays the
+# terminal that closes; the fake npm is a plain node process, like `npm run dev` → vite.
+if command -v node >/dev/null 2>&1 && command -v script >/dev/null 2>&1; then
+  mkdir -p "$TMP/npm-bin" "$TMP/fe"
+  printf '#!/usr/bin/env bash\nexec node -e "setInterval(() => {}, 1000)"\n' > "$TMP/npm-bin/npm"
+  chmod +x "$TMP/npm-bin/npm"
+  cat > "$TMP/frontend-case.sh" <<CASE
+export HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" PATH="$TMP/npm-bin:\$PATH"
+source "$SCRIPT" >/dev/null 2>&1
+FRONTEND_DIR="$TMP/fe"
+frontend_is_ready() { return 1; }
+start_frontend >/dev/null 2>&1
+sleep 1
+CASE
+  script -qec "bash $TMP/frontend-case.sh" /dev/null >/dev/null 2>&1
+  sleep 1
+  FE_PID="$(cat "$TMP/state/autotrigger-dev/frontend.pid" 2>/dev/null)"
+  check "frontend still runs after the terminal closed"  '[ -n "$FE_PID" ] && kill -0 "$FE_PID" 2>/dev/null'
+  check "it leads its own session (no controlling tty)"  '[ "$(ps -o sid= -p "$FE_PID" 2>/dev/null | tr -d " ")" = "$FE_PID" ]'
+  check "the pid file names the node process itself"     '[[ "$(ps -o args= -p "$FE_PID" 2>/dev/null)" == node* ]]'
+  [ -n "$FE_PID" ] && kill "$FE_PID" 2>/dev/null
+else
+  echo "  skip (node or script missing)"
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
