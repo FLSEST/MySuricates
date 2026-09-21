@@ -30,7 +30,7 @@ export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
             <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value: number) => [`$${value.toFixed(4)}`, t.insights.cost]}
+              formatter={(value) => [`$${Number(value ?? 0).toFixed(4)}`, t.insights.cost]}
             />
             <Area type="monotone" dataKey="cost" stroke="var(--color-chart-3)" strokeWidth={2} fill="url(#costGradient)" />
           </AreaChart>

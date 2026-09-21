@@ -50,7 +50,7 @@ export function SuccessRateChart({ data }: SuccessRateChartProps) {
                 fontSize: 13,
               }}
               labelStyle={{ color: 'var(--color-text-secondary)' }}
-              formatter={(value: number) => [`${value}%`, t.charts.rate]}
+              formatter={(value) => [`${Number(value ?? 0)}%`, t.charts.rate]}
             />
             <Line
               type="monotone"

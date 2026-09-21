@@ -26,7 +26,7 @@ export function CostByWorkflowChart({ data }: { data?: CostByWorkflowEntry[] }) 
             <YAxis type="category" dataKey="name" tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} width={100} />
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value: number) => [`$${value.toFixed(4)}`, t.insights.cost]}
+              formatter={(value) => [`$${Number(value ?? 0).toFixed(4)}`, t.insights.cost]}
             />
             <Bar dataKey="cost" radius={[0, 4, 4, 0]} maxBarSize={14}>
               {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

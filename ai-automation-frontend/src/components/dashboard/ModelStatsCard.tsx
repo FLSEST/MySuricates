@@ -60,9 +60,9 @@ export function ModelStatsCard({ data }: ModelStatsCardProps) {
                 color: 'var(--color-text)',
                 fontSize: 12,
               }}
-              formatter={(value: number, name: string) => {
-                if (name === 'tokens') return [`${value}k`, t.charts.tokens];
-                return [value, name];
+              formatter={(value, name) => {
+                if (name === 'tokens') return [`${Number(value ?? 0)}k`, t.charts.tokens];
+                return [Number(value ?? 0), name];
               }}
               labelStyle={{ color: 'var(--color-text-secondary)' }}
             />
