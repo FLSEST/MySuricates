@@ -1,0 +1,106 @@
+{
+  "intro": {
+    "title": "Examples. Not the whole list.",
+    "points": [
+      "What follows are examples of what this makes possible",
+      "All of them are built from the same handful of blocks, combined differently",
+      "Which combination fits depends on what you are working on"
+    ]
+  },
+  "mix": {
+    "title": "Compute what you can. Ask what you must.",
+    "points": [
+      "Shell steps are free, fast, and identical every time",
+      "Put a model only where judgment is needed — per step",
+      "The run log tells you which step was which"
+    ]
+  },
+  "trace": {
+    "title": "Watch it run. Then read it back.",
+    "points": [
+      "Follow every step live, then step through it afterwards",
+      "Each edit to a flow is a version you can restore",
+      "Export the whole thing as a process diagram"
+    ]
+  },
+  "notice": {
+    "title": "What you notice comes back around.",
+    "points": [
+      "Side findings become tracked items, not lost thoughts",
+      "An item can trigger the work itself, then close when it's verified",
+      "Back in your repo they surface again — matched to the project by its path",
+      "Jump into the session that created one"
+    ]
+  },
+  "unattended": {
+    "title": "It starts without you.",
+    "points": [
+      "A schedule or a new item sets it off — nobody has to be at the keyboard",
+      "Several can run at once; they queue instead of colliding",
+      "You come back to a result, not to a question waiting for an answer"
+    ]
+  },
+  "wait": {
+    "title": "Waiting isn't failing.",
+    "points": [
+      "Pause for an approval, an input, or until tomorrow",
+      "It resumes where it stopped — not from the top",
+      "Missed schedules get picked up after a restart"
+    ]
+  },
+  "repair": {
+    "title": "It tries again — as often as you allow.",
+    "points": [
+      "A failed run is analysed, a fix drafted and tried out before it counts",
+      "Attempts, time and token budget are set beforehand, not found in the bill",
+      "Off until you turn it on, per flow or as the default"
+    ]
+  },
+  "verdict": {
+    "title": "A verdict with a half-life.",
+    "points": [
+      "Accept a risk once, with a reason and the evidence behind it",
+      "If the evidence degrades, the finding comes back on its own",
+      "Six months later it's on your desk again"
+    ]
+  },
+  "refill": {
+    "title": "Build the frame once. It keeps filling.",
+    "points": [
+      "New material is merged in, not piled on",
+      "Expired entries drop out by themselves",
+      "Topics rotate, so nothing sits untouched"
+    ]
+  },
+  "swap": {
+    "title": "Swap the model, keep the flow.",
+    "points": [
+      "Run the same flow on a different provider — per step if you want",
+      "Model names come from your machine, not a hard-coded list",
+      "Put two providers on one flow and compare"
+    ]
+  },
+  "connect": {
+    "title": "Plug in what you already use.",
+    "points": [
+      "GitHub, Jira, Confluence, Google, Trello and Taskwarrior — as sources and as targets",
+      "A flow leaves as a process diagram and comes back as one",
+      "The list grew out of use, not from a roadmap — a missing one is an addition, not a rebuild"
+    ]
+  },
+  "blocks": {
+    "title": "Everything is a building block.",
+    "points": [
+      "A whole flow can be one step inside another",
+      "Chains line up finished flows end to end",
+      "Loops, branches, retries and approvals are blocks like any other"
+    ]
+  },
+  "closing": {
+    "title": "This tour was built by the thing it's showing you.",
+    "points": [
+      "The texts, the images and this sequence come from workflows in the pool",
+      "Install one of them, run it, and read the log"
+    ]
+  }
+}

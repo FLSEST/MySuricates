@@ -1,0 +1,95 @@
+{
+  "name": {
+    "de": "Rundgang-Illustrationen erzeugen",
+    "en": "Generate walkthrough illustrations"
+  },
+  "description": {
+    "de": "Erzeugt die Erdmaennchen-Illustrationen des Willkommens-Rundgangs ueber die Codex-CLI — alle in EINEM Lauf, damit sie ein Satz werden. Die Prompts sind kuratiert (Stil-Steckbrief plus eine Szene je Panel in walkthroughImagePrompts.json); kein KI-Schritt formuliert sie um, denn genau das erzeugt Stildrift. Geprueft wird dreistufig: mechanisch (Masse, Groesse, Randfarbe, Farbklima), durch Codex' eigenen Blick (Text, Logos, Anzahl Erdmaennchen — es gibt kein OCR auf dem Host) und zuletzt durch einen Menschen, denn ob ein Bild das Richtige sagt, kann keine Messung entscheiden. Erst nach der Freigabe wird das Manifest geschrieben; bis dahin zeigt die Anwendung nichts. Nur auf dem Dev-Host lauffaehig.",
+    "en": "Generates the meerkat illustrations of the welcome walkthrough via the Codex CLI — all in ONE run so they form a set. The prompts are curated (style sheet plus one scene per panel in walkthroughImagePrompts.json); no AI step rewords them, because that is exactly what causes style drift. Checking has three stages: mechanical (dimensions, size, border colour, colour climate), Codex's own look (text, logos, number of meerkats — there is no OCR on the host) and finally a person, because no measurement can decide whether a picture says the right thing. The manifest is written only after approval; until then the application shows nothing. Runs on the dev host only."
+  },
+  "icon": "🎨",
+  "category": "DOCUMENTATION",
+  "scope": "repo",
+  "tags": [
+    "ux",
+    "images",
+    "codex",
+    "foreach",
+    "gate",
+    "approval"
+  ],
+  "provider": null,
+  "model": null,
+  "effort": null,
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "instructions": "Bildgenerierung auf dem Dev-Host. Die Bloecke sind reine Shell-Bloecke und greifen weder auf die REST-API noch auf die Datenbank zu. Codex wird ausschliesslich zum Erzeugen und zum Ansehen von Bildern aufgerufen, nie zum Schreiben oder Kopieren von Dateien.",
+  "defaultContext": {},
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "vorpruefung",
+      "config": {
+        "command": "set -euo pipefail\ncommand -v codex >/dev/null || { echo \"FEHLER: codex nicht im PATH. Dieser Workflow laeuft nur auf dem Dev-Host (Codex startet in Containern nicht).\"; exit 1; }\npython3 -c \"import PIL\" 2>/dev/null || { echo \"FEHLER: Pillow fehlt. Der Workflow normiert und misst die Bilder damit.\"; exit 1; }\n[ -f \"ai-automation-frontend/src/data/walkthroughImagePrompts.json\" ] || { echo \"FEHLER: Bildkonzepte fehlen: ai-automation-frontend/src/data/walkthroughImagePrompts.json\"; exit 1; }\npython3 - <<'PY'\nimport json\nd = json.load(open(\"ai-automation-frontend/src/data/walkthroughImagePrompts.json\"))\nassert d.get(\"stil\"), \"stil fehlt\"\nszenen = d.get(\"szenen\") or {}\nassert szenen, \"keine Szenen\"\nprint(f\"Stil-Steckbrief: {len(d['stil'])} Zeichen\")\nprint(f\"Szenen: {len(szenen)} -> {', '.join(szenen)}\")\nprint(f\"Hintergrund: {d.get('hintergrund')} · Format: {d.get('format')}\")\nPY\nmkdir -p \"ai-automation-frontend/public/walkthrough\"\necho \"Ausgabe: $PWD/ai-automation-frontend/public/walkthrough\"",
+        "timeout_seconds": 60
+      }
+    },
+    {
+      "type": "foreach",
+      "name": "bilder",
+      "config": {
+        "variable_name": "panel",
+        "items_source": "command",
+        "items_command": "python3 -c \"import json; d=json.load(open('ai-automation-frontend/src/data/walkthroughImagePrompts.json')); a=d.get('anker'); ids=list(d['szenen']); print(chr(10).join(([a] if a in ids else []) + [i for i in ids if i != a]))\"",
+        "execution_mode": "shell",
+        "timeout_seconds": 420,
+        "continue_on_error": true,
+        "command": "set -euo pipefail\nPANEL={{ panel }}\nKONZEPT=\"ai-automation-frontend/src/data/walkthroughImagePrompts.json\"\nOUT=\"ai-automation-frontend/public/walkthrough/$PANEL.png\"\nGENDIR=\"${CODEX_HOME:-$HOME/.codex}/generated_images\"\nMARKER=\"$(mktemp)\"\n\nANKER=$(python3 -c \"import json; print(json.load(open('$KONZEPT')).get('anker') or '')\")\nANKERBILD=\"ai-automation-frontend/public/walkthrough/$ANKER.webp\"\n\n# Der Anker legt Medium und Figur fest und entsteht ohne Referenz. Alle weiteren Bilder bekommen\n# ihn per -i als Referenz: laut OpenAI-Bildleitfaden ist ein Ankerbild der verlaessliche Weg,\n# Stil und Charakter ueber eine Serie zu halten — eine Textbeschreibung allein reicht nicht,\n# das Modell leitet das Medium sonst aus den Materialien der Szene ab (Holz -> gezeichnet,\n# Metall -> gerendert). Die Vorgaben werden bei jeder Iteration woertlich wiederholt.\n# Der Anker ist die Stilentscheidung, kein Zufallsprodukt: Existiert er, bleibt er stehen.\n# Neu wuerfeln heisst ihn loeschen — bewusst, nicht als Nebenwirkung jedes Laufs.\n# Seit der Anker den Satz zusammenhaelt, haengt Einheitlichkeit nicht mehr am gemeinsamen Lauf.\n# Deshalb bleibt stehen, was schon da ist — einzelne Bilder zieht man nach, indem man sie loescht.\nif [ -f \"${OUT%.png}.webp\" ]; then\n  echo \"$PANEL: vorhanden, bleibt unveraendert (zum Neuerzeugen die Datei loeschen)\"\n  exit 0\nfi\n\nif [ \"$PANEL\" = \"$ANKER\" ] || [ ! -f \"$ANKERBILD\" ]; then\n  TEXT=$(python3 -c \"\nimport json\nd = json.load(open('$KONZEPT'))\nprint(' '.join(x.strip() for x in (d['medium'], d['welt'], d['stil'], d['szenen']['$PANEL'])))\n\")\n  REF=\"\"\nelse\n  TEXT=$(python3 -c \"\nimport json\nd = json.load(open('$KONZEPT'))\nprint('Match the attached reference image exactly in medium and character: same hand-painted look, '\n      'same brush texture and shading, the same meerkat with the same face, proportions, clothing '\n      'and colour palette, the same flat dark background and the same left-third placement. Do not '\n      'redesign the character. Do not switch to a 3D or photorealistic render. Only the scene '\n      'changes. New scene: ' + d['szenen']['$PANEL'].strip())\n\")\n  # codex -i nimmt verlaesslich PNG; das Ankerbild liegt als WebP.\n  REF=\"$(mktemp --suffix=.png)\"\n  python3 -c \"from PIL import Image; Image.open('$ANKERBILD').convert('RGB').save('$REF','PNG')\"\nfi\n\n# Zwei belegte Fallen (Workflow ac4d041e):\n# 1) stdin liefert den Prompt und damit zugleich das EOF — ohne EOF haengt codex exec bis zum\n#    Block-Timeout. Ein nachgestelltes Prompt-Argument geht nicht: -i ist variadisch und liest\n#    es als zweite Bilddatei (\"No prompt provided via stdin\").\n# 2) Codex darf NUR generieren — seine bwrap-Sandbox startet im Backend-Kontext nicht. Deshalb\n#    auch nicht ueber das imagegen-Skill gehen: dafuer wuerde Codex erst dessen SKILL.md per\n#    Shell-Kommando lesen. Kopiert wird unten vom Workflow-Bash.\nPROMPT=\"Use the built-in image_gen tool directly to create EXACTLY ONE square image. Do not read any files, do not open any skill documentation, do not run any shell command, do not validate and do not copy anything. Stop immediately after the image has been generated. Image description: $TEXT\"\nif [ -n \"$REF\" ]; then\n  printf '%s' \"$PROMPT\" | timeout 300 codex exec --skip-git-repo-check --sandbox workspace-write -C \"$PWD\" -i \"$REF\" - >/dev/null 2>&1 || true\nelse\n  printf '%s' \"$PROMPT\" | timeout 300 codex exec --skip-git-repo-check --sandbox workspace-write -C \"$PWD\" - >/dev/null 2>&1 || true\nfi\n\ntrap '[ -n \"${REF:-}\" ] && [ \"${REF#/tmp/}\" != \"$REF\" ] && rm -f \"$REF\"' EXIT\nIMG=$(find \"$GENDIR\" -type f -name '*.png' -newer \"$MARKER\" -printf '%T@ %p\\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)\nrm -f \"$MARKER\"\n[ -n \"$IMG\" ] && [ -f \"$IMG\" ] || { echo \"FEHLER $PANEL: kein neu erzeugtes Bild in $GENDIR\"; exit 1; }\ncp \"$IMG\" \"$OUT\"\nROH=$(stat -c%s \"$OUT\")\npython3 - \"$OUT\" <<'PY'\nimport sys\nfrom PIL import Image\np = sys.argv[1]\nim = Image.open(p)\n# Kommt das Bild freigestellt (Alpha) zurueck, bewusst auf die Hintergrundfarbe komponieren —\n# convert(\"RGB\") allein legt es auf Schwarz und laesst farbige Randsaeume stehen.\nif im.mode in (\"RGBA\", \"LA\", \"P\"):\n    im = im.convert(\"RGBA\")\n    grund = Image.new(\"RGBA\", im.size, (0x1b, 0x17, 0x14, 255))\n    im = Image.alpha_composite(grund, im)\nim = im.convert(\"RGB\")\nw, h = im.size\ns = min(w, h)\nl, t = (w - s) // 2, (h - s) // 2\nim = im.crop((l, t, l + s, t + s))\n# Native Aufloesung halten (nur nach oben deckeln). Gemessen: WebP q88 bei 1254 px ist 132 KB,\n# ein 640-px-PNG derselben Vorlage 525 KB — die hoehere Aufloesung kostet also nichts, und\n# dieselben Bilder sollen spaeter auch die oeffentliche Seite speisen.\nif s > 1280:\n    im = im.resize((1280, 1280), Image.LANCZOS)\nim.save(p.rsplit(\".\", 1)[0] + \".webp\", \"WEBP\", quality=88, method=6)\nPY\nrm -f \"$OUT\"\nOUT=\"${OUT%.png}.webp\"\necho \"$PANEL${REF:+ (Anker: $ANKER)} -> $OUT (roh $((ROH/1024)) KB -> $(python3 -c \"from PIL import Image; print('x'.join(map(str,Image.open('$OUT').size)))\") WebP, $(($(stat -c%s \"$OUT\")/1024)) KB)\""
+      }
+    },
+    {
+      "type": "shell",
+      "name": "messen",
+      "config": {
+        "command": "set -euo pipefail\npython3 - <<'PY'\nimport json, os, sys\nfrom PIL import Image\n\nkonzept = json.load(open(\"ai-automation-frontend/src/data/walkthroughImagePrompts.json\"))\nids = list(konzept[\"szenen\"])\nroh = konzept.get(\"hintergrund\", \"#1b1714\").lstrip(\"#\")\nwant_bg = tuple(int(roh[i:i+2], 16) for i in (0, 2, 4))\noutdir = \"ai-automation-frontend/public/walkthrough\"\n\nhart, weich, ok_ids = [], [], []\nverteilungen = {}\n\nfor pid in ids:\n    path = os.path.join(outdir, pid + \".webp\")\n    if not os.path.exists(path):\n        hart.append(f\"{pid}: keine Datei\"); continue\n    size = os.path.getsize(path)\n    if size < 20_000:\n        hart.append(f\"{pid}: nur {size} Bytes — vermutlich Fehlschlag\"); continue\n    if size > 400_000:\n        weich.append(f\"{pid}: {size//1024} KB, gross fuer ein Panel\")\n    im = Image.open(path).convert(\"RGB\")\n    w, h = im.size\n    if w != h:\n        hart.append(f\"{pid}: {w}x{h} nicht quadratisch — Normierung fehlgeschlagen\"); continue\n    if w < 900:\n        hart.append(f\"{pid}: nur {w} px Kante\"); continue\n\n    rand = [im.getpixel(q) for q in\n            ((2, 2), (w-3, 2), (2, h-3), (w-3, h-3), (w//2, 2), (w//2, h-3), (2, h//2), (w-3, h//2))]\n    mittel = tuple(sum(c[i] for c in rand) // len(rand) for i in range(3))\n    abstand = max(abs(mittel[i] - want_bg[i]) for i in range(3))\n    if abstand > 24:\n        weich.append(f\"{pid}: Rand #{mittel[0]:02x}{mittel[1]:02x}{mittel[2]:02x} statt #{want_bg[0]:02x}{want_bg[1]:02x}{want_bg[2]:02x} (Abstand {abstand})\")\n    klein = im.resize((64, 64))\n    verteilungen[pid] = [sum(v) for v in zip(*[klein.getpixel((x, y)) for x in range(64) for y in range(64)])]\n\n    ok_ids.append(pid)\n    print(f\"OK   {pid}: {w}x{h}, {size//1024} KB\")\n\n# Ausreisser im Farbklima: was aus dem Satz faellt, ist fast immer Stildrift.\nif len(verteilungen) >= 3:\n    mittelwert = [sum(v[i] for v in verteilungen.values()) / len(verteilungen) for i in range(3)]\n    for pid, v in verteilungen.items():\n        rel = max(abs(v[i] - mittelwert[i]) / max(mittelwert[i], 1) for i in range(3))\n        if rel > 0.22:\n            weich.append(f\"{pid}: Farbklima weicht {rel*100:.0f} % vom Satz ab\")\n\nprint()\nfor zeile in weich: print(\"WARNUNG\", zeile)\nfor zeile in hart: print(\"FEHLER \", zeile)\nprint()\nprint(f\"{len(ok_ids)}/{len(ids)} Bilder bestehen die harte Pruefung\")\nif hart:\n    sys.exit(1)\nPY",
+        "timeout_seconds": 120
+      }
+    },
+    {
+      "type": "foreach",
+      "name": "sichtpruefung",
+      "config": {
+        "variable_name": "panel",
+        "items_source": "command",
+        "items_command": "python3 -c \"import json; d=json.load(open('ai-automation-frontend/src/data/walkthroughImagePrompts.json')); a=d.get('anker'); ids=list(d['szenen']); print(chr(10).join(([a] if a in ids else []) + [i for i in ids if i != a]))\"",
+        "execution_mode": "shell",
+        "timeout_seconds": 200,
+        "continue_on_error": true,
+        "command": "set -euo pipefail\nPANEL={{ panel }}\nBILD=\"ai-automation-frontend/public/walkthrough/$PANEL.webp\"\n[ -f \"$BILD\" ] || { echo \"$PANEL: kein Bild\"; exit 1; }\n# codex -i nimmt verlaesslich PNG; die Panelbilder liegen als WebP.\nIMG=\"$(mktemp --suffix=.png)\"; trap 'rm -f \"$IMG\"' EXIT\npython3 -c \"from PIL import Image; Image.open('$BILD').convert('RGB').save('$IMG','PNG')\"\n# Kein OCR auf dem Host — die einzige verfuegbare Textpruefung ist Codex' eigener Blick.\n# \"-i\" ist variadisch: ein nachgestelltes Prompt-Argument wuerde als zweite Bilddatei gelesen\n# (\"No prompt provided via stdin\"). Deshalb Prompt ueber stdin mit \"-\"; die Pipe liefert das EOF.\nFRAGE=\"Look at the attached image and answer in ONE line, nothing else. Run no commands. Answer exactly OK if ALL of these hold: no letters, no digits, no logos, no watermark anywhere; exactly one meerkat visible; the meerkat wears a dark technical harness and a head-mounted visor; the background is a single flat dark colour. Otherwise answer PROBLEM: followed by what is wrong, in at most fifteen words.\"\nROH=$(printf '%s' \"$FRAGE\" | timeout 150 codex exec --skip-git-repo-check --sandbox read-only -i \"$IMG\" - 2>/dev/null || true)\nANS=$(printf '%s' \"$ROH\" | grep -Eo '(PROBLEM:.*|OK)' | tail -1 || true)\necho \"$PANEL: ${ANS:-KEINE ANTWORT}\""
+      },
+      "on_failure": "continue"
+    },
+    {
+      "type": "approval",
+      "name": "freigabe",
+      "config": {
+        "question": "## Messung\\n\\n{{ block.messen.output }}\\n\\n## Codex' Blick\\n\\n{{ block.sichtpruefung.output }}\\n\\nDie Bilder liegen in `ai-automation-frontend/public/walkthrough/`. Beurteile sie **als Satz**, nicht einzeln: Wirkt derselbe Charakter, dieselbe Werkstatt, dasselbe Licht? Und sagt jedes Bild das, was sein Panel behauptet?\\n\\nSatz uebernehmen?",
+        "options": [
+          "Ja",
+          "Nein"
+        ],
+        "variable_name": "bildsatz_freigabe",
+        "timeout_minutes": 240,
+        "on_no": "fail"
+      }
+    },
+    {
+      "type": "shell",
+      "name": "veroeffentlichen",
+      "config": {
+        "command": "set -euo pipefail\npython3 - <<'PY'\nimport json, os\nkonzept = json.load(open(\"ai-automation-frontend/src/data/walkthroughImagePrompts.json\"))\nmanifest = {}\nfor pid in konzept[\"szenen\"]:\n    if os.path.exists(os.path.join(\"ai-automation-frontend/public/walkthrough\", pid + \".webp\")):\n        manifest[pid] = \"/walkthrough/\" + pid + \".webp\"\nwith open(\"ai-automation-frontend/src/data/walkthroughImages.json\", \"w\") as fh:\n    json.dump(manifest, fh, indent=2, ensure_ascii=False)\n    fh.write(\"\\n\")\nprint(f\"{len(manifest)} Bilder in ai-automation-frontend/src/data/walkthroughImages.json eingetragen\")\nfor k, v in manifest.items():\n    print(\" \", k, \"->\", v)\nPY\necho\necho \"Die Anwendung zeigt die Bilder ab jetzt. Rueckgaengig: Manifest auf {} setzen.\"",
+        "timeout_seconds": 60
+      }
+    }
+  ]
+}

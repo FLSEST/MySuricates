@@ -686,6 +686,10 @@ export const de: TranslationKeys = {
     orientationToggle: 'Ausrichtung wechseln',
     orientationVertical: 'Vertikal',
     orientationHorizontal: 'Horizontal',
+    zoomIn: 'Vergrößern',
+    zoomOut: 'Verkleinern',
+    zoomFit: 'Einpassen',
+    zoomHint: 'Zoom — auch mit Strg/⌘ + Mausrad',
     viewDefinition: 'Definition ansehen',
     definitionHint: 'Vollständige Workflow-Definition (JSON). Die Zeilennummern im Diagramm beziehen sich auf dieses Dokument.',
     bpmnLabels: {
@@ -1729,6 +1733,15 @@ export const de: TranslationKeys = {
     diagnose: 'Diagnose',
     diagnoseTitle: 'Den Assistenten fragen, warum dieser Lauf fehlgeschlagen ist',
     diagnosePrompt: 'Der Workflow „{name}" ist beim letzten Lauf fehlgeschlagen.\n- Status: {status}\n- Fehlgeschlagener Schritt: {step}\n- Fehlermeldung: {error}\n- Run-ID: {runId}\n\nBitte analysiere die Ursache und schlage eine konkrete Lösung vor.',
+  },
+  walkthrough: {
+    skip: 'Überspringen',
+    back: 'Zurück',
+    next: 'Weiter',
+    done: 'Fertig',
+    reopen: 'Rundgang erneut zeigen',
+    reopenHint: 'Die Panels mit den Grundkonzepten — jederzeit wieder aufrufbar.',
+    showAction: 'Zeigen',
   },
   auditCenter: {
     acceptedCount: 'davon {count} akzeptiert',

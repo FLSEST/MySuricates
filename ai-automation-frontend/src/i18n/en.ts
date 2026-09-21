@@ -684,6 +684,10 @@ export const en = {
     orientationToggle: 'Toggle orientation',
     orientationVertical: 'Vertical',
     orientationHorizontal: 'Horizontal',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    zoomFit: 'Fit',
+    zoomHint: 'Zoom — also with Ctrl/⌘ + mouse wheel',
     viewDefinition: 'View definition',
     definitionHint: 'Full workflow definition (JSON). The line numbers in the diagram refer to this document.',
     bpmnLabels: {
@@ -1732,6 +1736,15 @@ export const en = {
     diagnose: 'Diagnose',
     diagnoseTitle: 'Ask the assistant why this run failed',
     diagnosePrompt: 'Workflow "{name}" failed on its last run.\n- Status: {status}\n- Failed step: {step}\n- Error: {error}\n- Run ID: {runId}\n\nPlease analyse the root cause and suggest a concrete fix.',
+  },
+  walkthrough: {
+    skip: 'Skip',
+    back: 'Back',
+    next: 'Next',
+    done: 'Done',
+    reopen: 'Show the tour again',
+    reopenHint: 'The panels on the core concepts — available any time.',
+    showAction: 'Show',
   },
   auditCenter: {
     acceptedCount: 'of which {count} accepted',

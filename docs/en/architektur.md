@@ -1,5 +1,16 @@
 # Architecture
 
+MySuricates is a self-hosted workflow platform: a Spring Boot backend with a web interface, in
+which processes consist of blocks — some deterministic (shell, branch, loop), some AI calls.
+This page describes its internal structure. For getting started see
+[README.md](../../README.md); for building workflows see
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
+> Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
+> provenance markers: commits of this repository, or items in the accompanying
+> MySuricates instance. They record when and why something came about — from the
+> outside, only the commit can be looked up.
+
 ## System Overview
 
 ```
@@ -305,6 +316,8 @@ The workflow engine executes blocks sequentially. The Claude CLI always runs **o
 
 **Resume cuts by blocks, not by step index** (`ResumePlan`): `POST /executions/{id}/resume-from-step` picks up after the last COMPLETED step. What counts is that step's **position** in the block list, not its `stepIndex` — wrapper blocks (foreach, while, retry, conditional, switch) draw one more index per item or iteration, so a block's index runs ahead of its position. This rests on the guarantee `BlockStepRunner` gives: exactly one persisted step per top-level block, in block order (inner items are never persisted). The resumed segment's steps continue above every index already persisted (`ExecutionContext.startStepIndicesAt`), so indices stay unique and sortable. Previously the freshly allocated index was compared against the persisted one — after a wrapper block, the resume skipped blocks that had never run (TODO `1be423b4`).
 
+**Block position per step** (`metadata.blockIndex`): `BlockStepRunner.startStep` writes the block's position in the top-level list into the step metadata, `runStep` keeps it over executor metadata. The run page's flow diagram maps steps to its boxes (`b_<position>`) through it (`latestStepByBlock` in `stepMetadata.ts`); runs without the key fall back to the position in the index-ordered list. After a resume the interrupted attempt of a block sits next to the new one — both with the same `blockIndex`, the higher `stepIndex` is the current one (TODO `dcba60da`).
+
 **Container start/stop outside transactions:** `ProjectService.startContainer`/`stopContainer` are deliberately **not** `@Transactional`: the Docker call sits between two short `TransactionTemplate` bursts (STARTING → Docker outside any transaction → RUNNING/ERROR), because `ContainerService` holds the per-project monitor while it runs — an enclosing transaction would pin the single connection for the whole 5–15 s Docker start and push a concurrent workflow run (which takes the monitor first) into the 120 s connection timeout (lock-order inversion between monitor and connection). Because the STARTING burst commits before the Docker start, `ProjectStatusReconciler` picks up every project a crash in that window left in STARTING on `ApplicationReadyEvent` (RUNNING container row ⇒ RUNNING, otherwise STOPPED) — the project-level counterpart of `WorkflowExecutor.cleanupZombieRuns`. `ProjectService.delete` follows the same pattern in reverse order: the archive burst (`archivedAt` + activity log) commits first, the Docker stop runs outside any transaction afterwards — if it fails the project stays archived (ERROR log) and only the orphaned container is left for `DockerOrphanReconciler`/idle cleanup to reap.
 
 The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAndActivate` (security finding 4, same shape as `ebd508c5`): the AI summarization call (`ClaudeSummarizer`/`CodexSummarizer`, seconds to minutes) runs outside any transaction, between a read `TransactionTemplate` burst (load runs, materialize the lazy `steps` collection into a new list — OSIV is off —, collect run ids) and a write burst (save the `WorkflowMemory`, or `deactivateAllForWorkflow` + activation). `activate`/`update`/`delete` stay short `@Transactional` methods.
@@ -313,7 +326,9 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 
 **Container row:** `ContainerService.createAndStartContainer` updates an existing `containers` row (upsert) instead of deleting and re-inserting it — the delete was un-scheduled during flush by the `Project.container` cascade, so the following INSERT failed on `UNIQUE(containers.project_id)`. The per-project lock now stays in the map (removing it under contention creates a second monitor), and `lastActivityAt` is stamped by a JPQL update (`ContainerRepository.touchActivity`) rather than a detached merge.
 
-### Block Types (16 total)
+### Block Types
+
+Complete list; the authoritative source is the registry `BlockTypesIndexSection.BLOCK_TYPES`, against which `BlockTypeListsGuardTest` pins the existing executor classes.
 
 | Type | Executor | Description |
 |---|---|---|
@@ -333,6 +348,10 @@ The same pattern applies to `WorkflowMemoryService.extractKnowledge`/`extractAnd
 | `document` | `DocumentBlockExecutor` | Extracts text from PDF/DOCX/XLSX/HTML/TXT via Apache Tika |
 | `compress` | `CompressBlockExecutor` | Rule-based compression of an earlier block output (stage chain, 0 tokens) |
 | `compress-ai` | `CompressAiBlockExecutor` | Tool-less AI compression of an earlier block output with input/output limits |
+| `todo-create` | `TodoCreateBlockExecutor` | Creates a todo, directly via the service rather than the REST API |
+| `todo-update` | `TodoUpdateBlockExecutor` | Updates an existing todo |
+| `todo-close` | `TodoCloseBlockExecutor` | Sets a todo to DONE |
+| `dashboard-report` | `DashboardReportBlockExecutor` | Writes a run's counts and status as a dashboard widget |
 
 **Template variables** (`{{ variable }}`, `${varName}`) are resolved at runtime in the `ExecutionContext`. `{{ previous_output }}` contains the output of the previous block.
 
@@ -399,10 +418,18 @@ gate_description: <description>
 - `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED)
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
-**Gate → Run Status Mapping:**
-- **YELLOW → `COMPLETED_WITH_ERRORS`:** Run is completed with this status instead of `COMPLETED`
-- **RED → `COMPLETED`:** RED gates do not change the run status — `AutoTodoService` creates a TODO instead
-- `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
+**A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
+the result, not a failure of the execution. RED creates a todo via `AutoTodoService` plus a
+warning in the activity log, YELLOW only the warning — the run stays `COMPLETED`.
+
+The run status is decided by something independent: `RunCompletionHandler` sets
+`COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and
+`COMPLETED` otherwise. Both can coincide — `RunCompletionHandlerTest` pins exactly that case: a
+failed `checked_command` yields `COMPLETED_WITH_ERRORS` **and** `gate_status: RED`.
+
+The direction that does exist is the reverse one: `GateStatusResolver` derives a gate verdict
+from the run status when no marker was written (`FAILED` → RED, `COMPLETED` → GREEN,
+`COMPLETED_WITH_ERRORS` → YELLOW).
 
 A shell block does not have to write these markers itself: `checked_command`/`check_category`
 derive the gate automatically from the exit code, giving precedence to the script's own marker when

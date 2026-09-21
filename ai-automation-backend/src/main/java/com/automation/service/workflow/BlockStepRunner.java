@@ -45,14 +45,20 @@ public class BlockStepRunner {
     private final ContainerRepository containerRepository;
     private final RunLiveLogService liveLog;
 
-    /** Pre-creates, persists and broadcasts the RUNNING placeholder so the UI shows the step immediately. */
-    public StepResult startStep(WorkflowRun run, int stepIndex, BlockDefinition block) {
+    /**
+     * Pre-creates, persists and broadcasts the RUNNING placeholder so the UI shows the step immediately.
+     * {@code blockPosition} is the block's place in the top-level block list, stored as metadata
+     * {@code blockIndex}: the step index runs ahead of it once a wrapper block has run (see
+     * {@link com.automation.executor.StepIndexCounter}), so only this key maps a step to its block.
+     */
+    public StepResult startStep(WorkflowRun run, int stepIndex, BlockDefinition block, int blockPosition) {
         StepResult step = new StepResult();
         step.setStepIndex(stepIndex);
         step.setStartedAt(Instant.now());
         step.setStatus(StepStatus.RUNNING);
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("blockType", block.getType());
+        metadata.put("blockIndex", blockPosition);
         if (block.getName() != null && !block.getName().isBlank()) {
             metadata.put("blockName", block.getName());
         }
@@ -85,12 +91,16 @@ public class BlockStepRunner {
         step.setStatus(result.getStatus());
         step.setCompletedAt(result.getCompletedAt());
         step.setDurationMs(result.getDurationMs());
+        Object blockIndex = step.getMetadata() != null ? step.getMetadata().get("blockIndex") : null;
         Map<String, Object> stepMetadata = result.getMetadata() != null
                 ? new HashMap<>(result.getMetadata())
                 : new HashMap<>();
         stepMetadata.put("blockType", block.getType());
         if (block.getName() != null && !block.getName().isBlank()) {
             stepMetadata.put("blockName", block.getName());
+        }
+        if (blockIndex != null) {
+            stepMetadata.put("blockIndex", blockIndex);
         }
         step.setMetadata(stepMetadata);
         // recordOutput/setDerivedVariable, not the plain setters: in a run that carries untrusted

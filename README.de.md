@@ -24,7 +24,7 @@ Es heisst nicht, dass die Frage beantwortet ist.
 |---|---|
 | Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → Gate-Bewertung → automatisch erzeugtes TODO → `TodoTrigger` startet einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft. |
 | Was muss ein Agent ueber ein Projekt wissen, und woher kommt dieses Wissen, wenn niemand es aufschreibt? | **Workflow-Memory**: aus abgeschlossenen Runs wird Wissen extrahiert und vor dem naechsten Lauf als Kontext eingespielt. |
-| Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
+| Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act — erst entscheidet ein Aufruf, was zu tun ist, ein zweiter fuehrt es aus — und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
 | Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO mit hoher, YELLOW eines mit mittlerer Prioritaet. Die Bewertung steckt im Workflow, nicht in der Plattform. |
 
 Die ehrlichste Antwort nach sieben Monaten: die Mechanismen tragen, aber sie brauchen Leitplanken,
@@ -35,8 +35,8 @@ die wiederkehrende Lehre.
 ## Was da steht
 
 Stand 2026-09-19, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
-`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf vom 2026-09-18 in einem
-isolierten Worktree:
+`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf in einem isolierten
+Worktree, datiert in der Tabelle:
 
 | | |
 |---|---|
@@ -46,9 +46,9 @@ isolierten Worktree:
 | Tests | Backend 9 197 (0 Fehler, 1 uebersprungen), Frontend 1 367 — Lauf vom 2026-09-19 |
 | Bausteine | 20 Block-Typen, 67 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
-Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
-sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein CI-Lauf
-auf einem externen Git-Host steht noch aus.
+Die Testzahlen sind ein datierter Befund aus einem lokalen Lauf. Die CI-Definition
+(`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push, zusaetzlich
+zu Hygiene-Gate und Secret-Scan; die Zahlen oben stammen aber nicht aus einem CI-Lauf.
 
 ## Reifegrad und bekannte Schulden
 
@@ -56,7 +56,7 @@ Experimentell. Das System laeuft taeglich auf einem Rechner und hatte am 2026-09
 Runs hinter sich — es ist nie unter Last, nie mit mehreren Benutzern und nie ausserhalb eines
 vertrauenswuerdigen Netzes betrieben worden.
 
-Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center fuehrte am 2026-09-12
+Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine Seite der Anwendung, in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-12
 **89 Befunde**:
 26 offen (davon 1 kritisch, 4 hoch), 25 warten auf Verifikation, 38 sind erledigt. Inhaltlich fast
 durchgehend Struktur: zu grosse und zu stark gekoppelte Services und UI-Komponenten, unscharfe
@@ -88,7 +88,7 @@ ein VPN davor, kein offener Port. Vollstaendig:
 | Backend | Spring Boot 3.4, Java 21 |
 | Frontend | React 19, TypeScript, Vite 7 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
-| Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Container-Bloecke |
+| Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Shell-Bloecke mit `container_image` |
 | Styling | Tailwind CSS 4.2, CSS-Variablen |
 | State | Zustand 4.4 + TanStack Query 5 |
 | WebSocket | STOMP ueber SockJS |
@@ -97,18 +97,19 @@ ein VPN davor, kein offener Port. Vollstaendig:
 | PWA | Vite PWA Plugin |
 | Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior |
 
-Ausgefuehrt wird **auf dem Host**: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die
-installierte CLI. Docker ist optional und wird nur gebraucht, wenn ein Shell-Block ausdruecklich ein
-`container_image` setzt.
+Ausgefuehrt wird dort, wo die Instanz laeuft — im Container (empfohlen) oder direkt auf dem
+Rechner: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die installierte CLI (im
+Container samt Anmeldung vom Rechner eingebunden, ohne zweite Anmeldung). Einen eigenen Container je
+Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklich freigegeben ist.
 
 ## Quickstart
 
 > Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
-> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
+> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
-git clone <repository-url> mysuricates
-cd mysuricates
+git clone https://github.com/FLSEST/MySuricates.git autotrigger
+cd autotrigger
 ./scripts/setup.sh              # gefuehrt, auf Englisch; auf Deutsch: ./scripts/setup.sh --lang de
 ```
 
@@ -148,7 +149,10 @@ Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der
 
 ## Todo-Workflow-Verknuepfung
 
-Todos koennen optional mit einem Resolver-Workflow verknuepft werden. Die Verknuepfung ist bewusst nicht global und startet nichts automatisch.
+Todos koennen optional mit einem **Resolver-Workflow** verknuepft werden — dem Workflow, der
+dieses eine Todo erledigen soll. Die Verknuepfung ist bewusst nicht global und startet nichts
+automatisch. Eingestellt wird sie in der Todo-Ansicht der Oberflaeche; die genannten Feldnamen
+sind die der REST-API (`/api/v1/todos`).
 
 - `linkedWorkflowId` am Todo ist optional.
 - Ein verlinkter Workflow wird erst durch die manuelle Aktion `Loesen` gestartet.

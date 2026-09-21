@@ -48,6 +48,9 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   in Test prüfen, in Prod verlässlich laufen lassen. Workflows wandern vorerst per Export und
   Import in der Oberfläche; ein automatischer Abgleich zwischen den dreien ist noch nicht eingerichtet.
 - **Module:** Standard (kleinste Oberfläche), Research, Voll oder eine eigene Auswahl samt Härtung.
+  Die Namen sagen beim ersten Lauf noch wenig — das ist in Ordnung: Die Wahl ist nicht endgültig
+  (Abschnitt 4), im Zweifel Standard nehmen. Was die Module tun, steht in
+  [architektur.md](architektur.md) und [deployment.md](deployment.md).
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
@@ -96,7 +99,7 @@ Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
 
 1. **Projekt anlegen** — jeder Workflow gehört zu einem Projekt; ein Projekt zeigt auf ein
    Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners).
-2. **Eine Vorlage übernehmen** — unter *Templates* liegen 66 fertige Workflows. Eine auswählen,
+2. **Eine Vorlage übernehmen** — unter *Templates* liegen 67 fertige Workflows. Eine auswählen,
    ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert.
 3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch
    war oder ein Modell gerufen hat.

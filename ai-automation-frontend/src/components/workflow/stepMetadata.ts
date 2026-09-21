@@ -16,6 +16,29 @@ export function stepBlockName(step: StepResult): string | null {
 }
 
 /**
+ * Top-level block position of a step (`metadata.blockIndex`), null for runs from before the backend wrote it.
+ * Not `stepIndex`: wrapper blocks draw one index per item or iteration, so the index runs ahead of the position.
+ */
+export function stepBlockIndex(step: StepResult): number | null {
+  const fromMetadata = step.metadata?.blockIndex;
+  return typeof fromMetadata === 'number' ? fromMetadata : null;
+}
+
+/**
+ * The newest step of each top-level block, keyed by block position — what the flow diagram colours and
+ * jumps to. Steps without `blockIndex` fall back to their place in the index-ordered list: the backend
+ * persists exactly one step per top-level block, in block order (see `ResumePlan`). A resumed block has an
+ * older attempt next to its new one; the higher step index wins.
+ */
+export function latestStepByBlock(steps: readonly StepResult[]): Map<number, StepResult> {
+  const byBlock = new Map<number, StepResult>();
+  [...steps]
+    .sort((a, b) => a.stepIndex - b.stepIndex)
+    .forEach((step, position) => byBlock.set(stepBlockIndex(step) ?? position, step));
+  return byBlock;
+}
+
+/**
  * What decided the step's outcome: an AI call, fixed logic, or a person. `unknown` is a wrapper whose result
  * metadata is not there (still running, or a run from before wrappers recorded it) — no guessing.
  */

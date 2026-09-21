@@ -1,0 +1,106 @@
+{
+  "intro": {
+    "title": "Beispiele. Nicht die ganze Liste.",
+    "points": [
+      "Was folgt, sind Beispiele dafür, was damit möglich wird",
+      "Alle aus denselben wenigen Bausteinen, nur anders zusammengesteckt",
+      "Welche Kombination passt, hängt davon ab, woran du arbeitest"
+    ]
+  },
+  "mix": {
+    "title": "Rechnen, wo es rechnen kann. Fragen, wo es urteilen muss.",
+    "points": [
+      "Shell-Schritte kosten nichts, sind schnell und liefern jedes Mal dasselbe",
+      "Ein Modell nur dort, wo geurteilt werden muss — je Schritt wählbar",
+      "Im Protokoll steht hinterher, welcher Schritt was war"
+    ]
+  },
+  "trace": {
+    "title": "Erst zusehen. Dann nachlesen.",
+    "points": [
+      "Jeden Schritt live verfolgen und hinterher Schritt für Schritt nachlesen",
+      "Jede Änderung am Ablauf ist eine Version, die sich zurückholen lässt",
+      "Das Ganze als Prozessbild exportieren"
+    ]
+  },
+  "notice": {
+    "title": "Was auffällt, kommt zurück.",
+    "points": [
+      "Nebenbefunde werden Vorgänge statt verlorener Gedanken",
+      "Ein Vorgang kann die Arbeit selbst auslösen und sich nach der Prüfung schließen",
+      "Im Repo tauchen sie wieder auf — dem Projekt über seinen Pfad zugeordnet",
+      "Zurück in die Sitzung, aus der einer entstanden ist"
+    ]
+  },
+  "unattended": {
+    "title": "Es startet ohne dich.",
+    "points": [
+      "Ein Zeitplan oder ein neuer Vorgang stößt es an — niemand muss an der Tastatur sitzen",
+      "Mehrere laufen nebeneinander; sie reihen sich ein, statt sich in die Quere zu kommen",
+      "Du kommst zu einem Ergebnis zurück, nicht zu einer wartenden Frage"
+    ]
+  },
+  "wait": {
+    "title": "Warten ist kein Fehlschlag.",
+    "points": [
+      "Anhalten für eine Freigabe, eine Eingabe oder bis morgen",
+      "Es geht da weiter, wo es stand — nicht von vorn",
+      "Verpasste Termine holt der Planer nach einem Neustart nach"
+    ]
+  },
+  "repair": {
+    "title": "Es versucht es nochmal — so oft, wie du erlaubst.",
+    "points": [
+      "Ein gescheiterter Lauf wird analysiert, ein Fix entworfen und erprobt, bevor er zählt",
+      "Versuche, Zeit und Token stehen vorher fest, nicht hinterher in der Rechnung",
+      "Aus, bis du es einschaltest — je Ablauf oder als Voreinstellung"
+    ]
+  },
+  "verdict": {
+    "title": "Ein Urteil mit Halbwertszeit.",
+    "points": [
+      "Ein Risiko einmal akzeptieren — mit Begründung und dem Beleg dahinter",
+      "Verschlechtert sich der Beleg, kommt der Befund von selbst zurück",
+      "Ein halbes Jahr später liegt er wieder auf dem Tisch"
+    ]
+  },
+  "refill": {
+    "title": "Den Rahmen einmal bauen. Er füllt sich weiter.",
+    "points": [
+      "Neues wird eingearbeitet statt angehäuft",
+      "Abgelaufenes fällt von selbst heraus",
+      "Themen kommen der Reihe nach dran, damit nichts liegen bleibt"
+    ]
+  },
+  "swap": {
+    "title": "Modell tauschen, Ablauf behalten.",
+    "points": [
+      "Derselbe Ablauf bei einem anderen Anbieter — auf Wunsch je Schritt",
+      "Modellnamen kommen vom Rechner, nicht aus einer fest eingetragenen Liste",
+      "Zwei Anbieter an denselben Ablauf setzen und vergleichen"
+    ]
+  },
+  "connect": {
+    "title": "Steck an, was du ohnehin benutzt.",
+    "points": [
+      "GitHub, Jira, Confluence, Google, Trello und Taskwarrior — als Quelle und als Ziel",
+      "Ein Ablauf geht als Prozessbild raus und kommt als Prozessbild zurück",
+      "Die Liste ist aus der Nutzung gewachsen, nicht geplant — was fehlt, kommt dazu statt umgebaut zu werden"
+    ]
+  },
+  "blocks": {
+    "title": "Alles ist ein Baustein.",
+    "points": [
+      "Ein ganzer Ablauf kann ein Schritt in einem anderen sein",
+      "Ketten reihen fertige Abläufe aneinander",
+      "Schleifen, Verzweigungen, Wiederholungen und Freigaben sind Bausteine wie jeder andere"
+    ]
+  },
+  "closing": {
+    "title": "Dieser Rundgang wurde von dem gebaut, was er zeigt.",
+    "points": [
+      "Texte, Bilder und diese Abfolge stammen aus Workflows im Pool",
+      "Einen davon installieren, starten und das Protokoll lesen"
+    ]
+  }
+}

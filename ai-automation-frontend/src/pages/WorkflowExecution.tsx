@@ -25,7 +25,7 @@ import {
 import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
 import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
-import { stepBlockType } from '../components/workflow/stepMetadata';
+import { latestStepByBlock, stepBlockType } from '../components/workflow/stepMetadata';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
@@ -110,20 +110,25 @@ export function WorkflowExecution() {
 
   // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
   const { data: bpmnXml } = useWorkflowBpmn(id!, (run?.steps?.length ?? 0) > 0);
+  // Diagramm-Kästen sind nach Block-Position nummeriert, Steps nach stepIndex — der läuft nach jedem
+  // Wrapper-Block (foreach, while, …) voraus, deshalb die Zuordnung über latestStepByBlock.
+  const stepByBlock = useMemo(() => latestStepByBlock(run?.steps ?? []), [run?.steps]);
   const statusByBlock = useMemo(() => {
     const map = new Map<number, RunStatus>();
-    for (const step of run?.steps ?? []) {
+    for (const [blockIndex, step] of stepByBlock) {
       const s = step.status === 'RUNNING' ? 'running' : step.status === 'COMPLETED' ? 'completed' : step.status === 'FAILED' ? 'failed' : undefined;
-      if (s) map.set(step.stepIndex, s);
+      if (s) map.set(blockIndex, s);
     }
     return map;
-  }, [run?.steps]);
+  }, [stepByBlock]);
 
-  // Klick im Diagramm scrollt zum Step und hebt ihn kurz hervor
+  // Klick im Diagramm scrollt zum Step des Blocks und hebt ihn kurz hervor
   const [stepHighlight, setStepHighlight] = useState<{ index: number; nonce: number } | null>(null);
   const handleSelectStep = (sel: DiagramSelection) => {
-    document.getElementById(`exec-step-${sel.blockIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setStepHighlight((prev) => ({ index: sel.blockIndex, nonce: (prev?.nonce ?? 0) + 1 }));
+    const step = stepByBlock.get(sel.blockIndex);
+    if (!step) return; // Block ist (noch) nicht gelaufen
+    document.getElementById(`exec-step-${step.stepIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setStepHighlight((prev) => ({ index: step.stepIndex, nonce: (prev?.nonce ?? 0) + 1 }));
     window.setTimeout(() => setStepHighlight(null), 1800);
   };
 

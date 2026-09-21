@@ -107,6 +107,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` |
 | Trello | `trello` | API key + token (no OAuth flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` |
 | Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` |
+| GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` |
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 

@@ -74,6 +74,140 @@ class RunWorkspaceServiceTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("one repository name");
     }
 
+    @Test
+    void policy_takesWorkspaceFromFirstBlock_whenMetadataHasNone() {
+        var first = com.automation.entity.BlockDefinition.builder()
+                .config(Map.of("workspace", Map.of("mode", "isolated"))).build();
+        var second = com.automation.entity.BlockDefinition.builder()
+                .config(Map.of("workspace", Map.of("mode", "project"))).build();
+
+        Map<String, Object> effective = RunWorkspaceService.policy(Map.of("other", 1), java.util.List.of(first, second));
+
+        assertThat(effective).containsEntry("other", 1).containsEntry("workspace", Map.of("mode", "isolated"));
+    }
+
+    @Test
+    void policy_keepsMetadataWorkspace_andToleratesNoBlocksOrBlocksWithoutWorkspace() {
+        var block = com.automation.entity.BlockDefinition.builder()
+                .config(Map.of("workspace", Map.of("mode", "isolated"))).build();
+        Map<String, Object> own = Map.of("workspace", Map.of("mode", "project"));
+
+        assertThat(RunWorkspaceService.policy(own, java.util.List.of(block))).isEqualTo(own);
+        assertThat(RunWorkspaceService.policy(Map.of(), java.util.List.of())).isEmpty();
+        assertThat(RunWorkspaceService.policy(Map.of(), java.util.List.of(new com.automation.entity.BlockDefinition())))
+                .isEmpty();
+    }
+
+    @Test
+    void policyForRun_prefersThePolicyPinnedAtRunStart() {
+        var pinned = WorkflowRun.builder().id("run")
+                .metadata(new java.util.HashMap<>(Map.of("workspacePolicy", Map.of("mode", "isolated")))).build();
+        var unpinned = WorkflowRun.builder().id("run").build();
+        Map<String, Object> current = Map.of("workspace", Map.of("mode", "project"), "x", 1);
+
+        assertThat(RunWorkspaceService.policyForRun(pinned, current))
+                .containsEntry("workspace", Map.of("mode", "isolated")).containsEntry("x", 1);
+        assertThat(RunWorkspaceService.policyForRun(unpinned, current)).isSameAs(current);
+    }
+
+    @Test
+    void enabled_onlyForIsolatedMode_andRejectsUnknownModes() {
+        assertThat(RunWorkspaceService.enabled(Map.of())).isFalse();
+        assertThat(RunWorkspaceService.enabled(Map.of("workspace", "isolated"))).isFalse();
+        assertThat(RunWorkspaceService.enabled(Map.of("workspace", Map.of()))).isFalse();
+        assertThat(RunWorkspaceService.enabled(Map.of("workspace", Map.of("mode", "project")))).isFalse();
+        assertThat(RunWorkspaceService.enabled(Map.of("workspace", Map.of("mode", "isolated")))).isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        RunWorkspaceService.enabled(Map.of("workspace", Map.of("mode", "sandbox"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("sandbox");
+    }
+
+    @Test
+    void pinSource_pinsHeadCommitAndPolicy_onlyOncePerRun() throws Exception {
+        Path source = directory.resolve("repo");
+        Files.createDirectories(source);
+        git(source, "init", "-q");
+        git(source, "config", "user.email", "test@example.invalid");
+        git(source, "config", "user.name", "Test");
+        Files.writeString(source.resolve("f"), "1");
+        git(source, "add", ".");
+        git(source, "commit", "-qm", "one");
+        var repository = mock(WorkflowRunRepository.class);
+        var service = new RunWorkspaceService(repository, new ObjectMapper(), directory.resolve("runs").toString());
+        var project = Project.builder().id("project").path(source.toString()).build();
+        var run = WorkflowRun.builder().id("run").build();
+        Map<String, Object> policy = Map.of("workspace", Map.of("mode", "isolated"));
+
+        service.pinSource(run, project, policy);
+        Map<?, ?> pinned = (Map<?, ?>) run.getMetadata().get("workspaceSource");
+        git(source, "commit", "-q", "--allow-empty", "-m", "two");
+        service.pinSource(run, project, policy);
+
+        assertThat(pinned.get("path")).isEqualTo(source.toString());
+        assertThat(String.valueOf(pinned.get("commit"))).matches("[a-f0-9]{40,64}");
+        assertThat(run.getMetadata().get("workspaceSource")).isSameAs(pinned);
+        assertThat(run.getMetadata()).containsEntry("workspacePolicy", Map.of("mode", "isolated"))
+                .containsEntry("workspaceAdditionalSources", Map.of());
+        verify(repository, org.mockito.Mockito.times(1)).save(run);
+    }
+
+    @Test
+    void pinSource_disabledPolicy_changesNothing() {
+        var repository = mock(WorkflowRunRepository.class);
+        var service = new RunWorkspaceService(repository, new ObjectMapper(), directory.toString());
+        var run = WorkflowRun.builder().id("run").build();
+
+        service.pinSource(run, Project.builder().id("p").path("/nowhere").build(), Map.of());
+
+        assertThat(run.getMetadata()).doesNotContainKey("workspaceSource");
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void pinSource_nonRepositorySource_failsAsExecutionError() {
+        var service = new RunWorkspaceService(mock(WorkflowRunRepository.class), new ObjectMapper(), directory.toString());
+        var run = WorkflowRun.builder().id("run").build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.pinSource(run,
+                        Project.builder().id("p").path(directory.resolve("plain").toString()).build(),
+                        Map.of("workspace", Map.of("mode", "isolated"))))
+                .isInstanceOf(com.automation.exception.WorkflowExecutionException.class)
+                .hasMessageContaining("Cannot pin workspace source");
+    }
+
+    @Test
+    void pinSource_invalidAdditionalAlias_isRejected() throws Exception {
+        Path source = directory.resolve("repo2");
+        Files.createDirectories(source);
+        git(source, "init", "-q");
+        git(source, "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit", "-q", "--allow-empty", "-m", "x");
+        var repository = mock(WorkflowRunRepository.class);
+        var service = new RunWorkspaceService(repository, new ObjectMapper(), directory.toString());
+        var run = WorkflowRun.builder().id("run").build();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.pinSource(run,
+                        Project.builder().id("p").path(source.toString()).build(),
+                        Map.of("workspace", Map.of("mode", "isolated",
+                                "additional_sources", Map.of("../evil", source.toString())))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Invalid repository alias");
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @Test
+    void prepare_withoutIsolation_returnsTheOriginalProjectUntouched() {
+        var repository = mock(WorkflowRunRepository.class);
+        var service = new RunWorkspaceService(repository, new ObjectMapper(), directory.toString());
+        var project = Project.builder().id("p").path("/original").build();
+        var context = ExecutionContext.builder().workflowRunId("run").build();
+
+        var result = service.prepare(WorkflowRun.builder().id("run").build(), project,
+                Map.of("workspace", Map.of("mode", "project")), context, false);
+
+        assertThat(result).isSameAs(project);
+        assertThat(context.getProjectPath()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
     private void git(Path source, String... args) throws Exception {
         var command = new java.util.ArrayList<>(java.util.List.of("git", "-C", source.toString()));
         command.addAll(java.util.List.of(args));

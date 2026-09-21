@@ -1,5 +1,14 @@
 # MySuricates — Vision
 
+MySuricates ist eine selbst betriebene Anwendung aus Backend und Web-Oberflaeche, in der
+Arbeitsablaeufe als Ketten von Bloecken laufen. Dieses Dokument beschreibt nicht, was sie heute
+tut — das steht in [README.de.md](../README.de.md) —, sondern wohin sie sich entwickeln soll.
+
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 ## Die Idee
 
 MySuricates verfolgt zwei Ziele:
@@ -52,54 +61,58 @@ Der Kern: Jeder Workflow ist ein gelöstes Problem. Jede Chain ist eine gelöste
 
 Das System wird mit jeder Ausführung besser. Vier Mechanismen treiben die Evolution:
 
-### Wishes — From Intent to Solution
+### Wishes — vom Wunsch zur Lösung
 
-The user says what they want in natural language. The system decomposes, builds, tests, executes, evaluates, and iterates.
+Der Nutzer sagt in eigenen Worten, was er will. Das System zerlegt, baut, testet, führt aus,
+bewertet und bessert nach.
 
 ```
-User: "Ich brauche einen wöchentlichen Security-Report für mein Projekt"
+Nutzer: "Ich brauche einen wöchentlichen Security-Report für mein Projekt"
 
 MySuricates:
-  1. Decompose → 3 sub-tasks identified
-  2. Build → Workflow with shell + agentic blocks
-  3. Pre-flight verify → Syntax OK, dependencies available
-  4. Execute → Run on test instance
-  5. Evaluate → Success rate, output quality
-  6. Iterate → Fix issues, re-run if needed
+  1. Zerlegen    → 3 Teilaufgaben erkannt
+  2. Bauen       → Workflow aus shell- und agentic-Blöcken
+  3. Vorprüfung  → Syntax in Ordnung, Abhängigkeiten vorhanden
+  4. Ausführen   → Lauf auf der Testinstanz
+  5. Bewerten    → Erfolgsquote, Qualität der Ausgabe
+  6. Nachbessern → Fehler beheben, erneut laufen lassen
 ```
 
-The Decompose-Approval Gate lets the user review and adjust the plan before execution. Pre-flight verification catches errors before they waste compute.
+Ein Freigabe-Schritt nach dem Zerlegen lässt den Nutzer den Plan prüfen und ändern, bevor
+etwas ausgeführt wird. Die Vorprüfung fängt Fehler ab, bevor sie Rechenzeit kosten.
 
-### Factory — Workflow Generation Pipeline
+### Factory — Fließband für Workflows
 
-Topic in, verified template out:
+Thema hinein, geprüfte Vorlage heraus:
 
-1. **Generate**: AI creates a workflow from a topic description
-2. **Test**: Auto-deploy to the test instance and run
-3. **Verify**: Check success, output quality, cost
-4. **Promote**: Successful workflows become reusable templates
+1. **Erzeugen**: Die KI baut aus einer Themenbeschreibung einen Workflow
+2. **Testen**: Automatisch auf die Testinstanz bringen und laufen lassen
+3. **Prüfen**: Erfolg, Qualität der Ausgabe und Kosten bewerten
+4. **Übernehmen**: Bewährte Workflows werden wiederverwendbare Vorlagen
 
-Multi-provider support (Claude + Codex + Pi) means the best model for each generation task.
+Weil mehrere KI-Anbieter zur Verfügung stehen (Claude, Codex, Pi), lässt sich je Aufgabe das
+passende Modell wählen.
 
-### Learning — Feedback Loop
+### Learning — Rückkopplung
 
-Every workflow run produces data that flows back into generation:
+Jeder Workflow-Lauf erzeugt Daten, die in die nächste Erzeugung zurückfließen:
 
-- **Success rates** per template, block type, and model
-- **Strategy patterns** — what worked, what didn't
-- **Cost tracking** — token usage per block and workflow
-- **Cross-project recognition** — reusable patterns across different projects
+- **Erfolgsquoten** je Vorlage, Blocktyp und Modell
+- **Strategiemuster** — was funktioniert hat und was nicht
+- **Kostenverfolgung** — Tokenverbrauch je Block und Workflow
+- **Projektübergreifende Wiedererkennung** — Muster, die sich anderswo wiederverwenden lassen
 
-Learning feedback is injected into prompts, making each generation smarter than the last.
+Die Rückmeldungen werden in die Prompts eingespielt, sodass jede Erzeugung von der vorherigen
+profitiert.
 
-### Memory — Accumulated Knowledge
+### Memory — angesammeltes Wissen
 
-Workflows accumulate knowledge across runs:
+Workflows sammeln Wissen über Läufe hinweg:
 
-- Knowledge extraction from completed runs
-- Summarization via Claude or Codex
-- Active memories injected into future executions
-- Per-workflow knowledge base that grows over time
+- Wissen wird aus abgeschlossenen Läufen extrahiert
+- Zusammenfassung über Claude oder Codex
+- Aktive Einträge werden vor künftigen Ausführungen eingespielt
+- Je Workflow eine Wissensbasis, die mit der Zeit wächst
 
 ---
 

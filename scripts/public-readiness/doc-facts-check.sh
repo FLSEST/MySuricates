@@ -38,7 +38,10 @@ if [ -z "$ROOT" ]; then
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 fi
 ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || { echo "doc-facts-check: Wurzel nicht lesbar" >&2; exit 2; }
-[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md)
+# workflow-pool/README.md nennt die Zahl der Built-in-Templates und gehoert deshalb
+# in die Pruefung -- sonst waere sie eine eingefrorene Zahl ausserhalb der Reichweite
+# des Gates, genau die Sorte, die dieses Skript verhindern soll.
+[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(docs README.de.md workflow-pool/README.md)
 
 BACKEND="$ROOT/ai-automation-backend"
 FRONTEND="$ROOT/ai-automation-frontend"

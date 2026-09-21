@@ -4,6 +4,11 @@ Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst
 
 **Zielgruppe**: KI-Agenten (Claude, Codex) und Entwickler, die Workflows erstellen oder debuggen.
 
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 ---
 
 ## 1. Schnellstart
@@ -989,11 +994,18 @@ gate_category: lint-errors
 gate_description: 3 Probleme gefunden
 ```
 
-| Gate | Run-Status | Auto-Todo-Priorität | Bedeutung |
-|------|-----------|-------------------|---------|
-| GREEN | `COMPLETED` | — | Alle Prüfungen bestanden |
-| YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnungen, nicht-blockierende Probleme |
-| RED | `COMPLETED` | HIGH | Kritische Probleme (via AutoTodoService behandelt) |
+| Gate | Auto-Todo-Priorität | Bedeutung |
+|------|-------------------|---------|
+| GREEN | — | Alle Prüfungen bestanden |
+| YELLOW | MEDIUM | Warnungen, nicht-blockierende Probleme |
+| RED | HIGH | Kritische Probleme (via `AutoTodoService` behandelt) |
+
+**Ein Gate ändert den Run-Status nicht.** Ein Lauf, der ein RED meldet, steht trotzdem auf
+`COMPLETED` — das Gate ist ein Befund über das Ergebnis, kein Fehlschlag der Ausführung. Den
+Run-Status bestimmt etwas anderes: `COMPLETED_WITH_ERRORS` entsteht, wenn ein Schritt mit
+`checked_command` fehlschlägt (`RunCompletionHandler`), und `FAILED`, wenn die Ausführung selbst
+abbricht. Eine frühere Fassung dieser Tabelle führte eine Spalte „Run-Status", die eine
+Kausalität behauptete, die es im Code nicht gibt.
 
 **Shell-Block-Beispiel** mit Gate-Emission:
 ```bash
