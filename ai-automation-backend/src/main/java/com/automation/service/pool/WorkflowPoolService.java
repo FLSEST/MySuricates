@@ -7,13 +7,12 @@ import com.automation.dto.request.InstallPoolWorkflowRequest;
 import com.automation.dto.request.UpdateWorkflowRequest;
 import com.automation.dto.response.ExportToPoolResponse;
 import com.automation.dto.response.PoolWorkflowEntry;
-import com.automation.entity.BlockDefinition;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Workflow;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.workflow.WorkflowService;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.automation.util.LocalizedJson;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +38,11 @@ public class WorkflowPoolService {
     private final PoolExportWriter exportWriter;
 
     public List<PoolWorkflowEntry> listAll() {
+        return listAll(LocalizedJson.DEFAULT_LOCALE);
+    }
+
+    /** @param locale language of the blocks of bilingual pool files; name/description stay maps */
+    public List<PoolWorkflowEntry> listAll(String locale) {
         if (!config.isEnabled()) {
             return Collections.emptyList();
         }
@@ -53,7 +57,7 @@ public class WorkflowPoolService {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(poolDir, "*.json")) {
             for (Path file : stream) {
                 try {
-                    PoolWorkflowEntry entry = parsePoolFile(file);
+                    PoolWorkflowEntry entry = PoolFileParser.parse(file, objectMapper, locale);
                     if (entry != null) {
                         entries.add(entry);
                     }
@@ -75,7 +79,11 @@ public class WorkflowPoolService {
     }
 
     public PoolWorkflowEntry findById(String id) {
-        return listAll().stream()
+        return findById(id, LocalizedJson.DEFAULT_LOCALE);
+    }
+
+    public PoolWorkflowEntry findById(String id, String locale) {
+        return listAll(locale).stream()
                 .filter(e -> e.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("PoolWorkflow", id));
@@ -84,12 +92,15 @@ public class WorkflowPoolService {
     public record InstallResult(Workflow workflow, boolean created) {}
 
     public InstallResult install(String poolId, InstallPoolWorkflowRequest request) {
-        PoolWorkflowEntry entry = findById(poolId);
+        String locale = LocalizedJson.normalize(request.locale());
+        PoolWorkflowEntry entry = findById(poolId, locale);
 
         String resolvedName = request.name() != null && !request.name().isBlank()
                 ? request.name()
-                : entry.name().getOrDefault("en", entry.name().values().iterator().next());
-        String description = entry.description() != null ? entry.description().getOrDefault("en", "") : null;
+                : LocalizedJson.pick(entry.name(), locale);
+        String description = entry.description() != null
+                ? Objects.requireNonNullElse(LocalizedJson.pick(entry.description(), locale), "")
+                : null;
 
         // Auto-inject project_path from Project entity into defaultContext
         Map<String, Object> mergedContext = entry.defaultContext() != null
@@ -102,7 +113,7 @@ public class WorkflowPoolService {
         });
 
         if (!Boolean.TRUE.equals(request.forceCreate())) {
-            Optional<Workflow> existing = workflowService.findByNameAndProjectId(resolvedName, request.projectId());
+            Optional<Workflow> existing = findInstalled(entry, resolvedName, request.projectId());
             if (existing.isPresent()) {
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
@@ -138,6 +149,24 @@ public class WorkflowPoolService {
     }
 
     /**
+     * The workflow an earlier install of {@code entry} left in the project — under the requested name
+     * or under the name of another language, so switching languages updates it instead of adding a
+     * second copy.
+     */
+    private Optional<Workflow> findInstalled(PoolWorkflowEntry entry, String resolvedName, String projectId) {
+        Optional<Workflow> byName = workflowService.findByNameAndProjectId(resolvedName, projectId);
+        if (byName.isPresent()) {
+            return byName;
+        }
+        return entry.name().values().stream()
+                .filter(name -> name != null && !name.equals(resolvedName))
+                .distinct()
+                .map(name -> workflowService.findByNameAndProjectId(name, projectId))
+                .flatMap(Optional::stream)
+                .findFirst();
+    }
+
+    /**
      * Schreibt einen Workflow als Pool-Definition.
      *
      * @param scope {@code repo} oder {@code portable}; ohne Angabe gilt {@code portable}
@@ -150,65 +179,6 @@ public class WorkflowPoolService {
         PoolScope poolScope = PoolScope.fromParam(scope);
         Workflow workflow = workflowService.findById(workflowId);
         return exportWriter.write(workflow, request, poolScope, resolvePoolDirectory());
-    }
-
-    private PoolWorkflowEntry parsePoolFile(Path file) throws IOException {
-        Map<String, Object> raw = objectMapper.readValue(file.toFile(), new TypeReference<>() {});
-
-        @SuppressWarnings("unchecked")
-        Map<String, String> name = (Map<String, String>) raw.get("name");
-        if (name == null || name.isEmpty()) {
-            log.warn("Pool file missing required 'name' field: {}", file.getFileName());
-            return null;
-        }
-
-        Object blocksRaw = raw.get("blocks");
-        if (blocksRaw == null) {
-            log.warn("Pool file missing required 'blocks' field: {}", file.getFileName());
-            return null;
-        }
-        List<BlockDefinition> blocks = objectMapper.convertValue(blocksRaw, new TypeReference<>() {});
-
-        String filename = file.getFileName().toString();
-        String id = filename.replace(".json", "");
-
-        @SuppressWarnings("unchecked")
-        Map<String, String> description = raw.containsKey("description")
-                ? (Map<String, String>) raw.get("description")
-                : Map.of();
-
-        String icon = (String) raw.getOrDefault("icon", "📋");
-        String category = (String) raw.get("category");
-        // Bewusst ohne Default: ein Eintrag ohne 'scope' soll im Pool-Browser als
-        // "nicht deklariert" erkennbar sein, nicht als portabel durchgehen.
-        String scope = raw.get("scope") instanceof String s ? s : null;
-
-        @SuppressWarnings("unchecked")
-        List<String> tags = raw.containsKey("tags")
-                ? (List<String>) raw.get("tags")
-                : List.of();
-
-        String instructions = (String) raw.get("instructions");
-        String model = (String) raw.get("model");
-        String effort = (String) raw.get("effort");
-        String version = (String) raw.getOrDefault("version", "1.0.0");
-        String author = (String) raw.get("author");
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> defaultContext = raw.containsKey("defaultContext")
-                ? (Map<String, Object>) raw.get("defaultContext")
-                : null;
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> metadata = raw.containsKey("metadata")
-                ? (Map<String, Object>) raw.get("metadata")
-                : null;
-
-        return new PoolWorkflowEntry(
-                id, name, description, icon, category, scope, tags,
-                blocks, instructions, model, effort, version, author,
-                defaultContext, metadata, filename
-        );
     }
 
     private Path resolvePoolDirectory() {

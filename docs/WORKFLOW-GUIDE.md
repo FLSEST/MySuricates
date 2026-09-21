@@ -1674,6 +1674,34 @@ Alle 65+ eingebauten Templates mit ihrem primären Pattern:
 | `test-matrix` | Shell scannen + ForEach + Skill | CODE |
 | `todo-creator` | Agentic | UTILITY |
 | `topic-deep-dive` | Sequentielle Simple-Kette | RESEARCH |
+| `example-approval` | Messen + Freigabe (zweisprachiges Beispiel) | EXAMPLE |
+
+### Zweisprachige Vorlagen
+
+Name und Beschreibung einer Vorlage sind immer `{"de": …, "en": …}`. Eine Vorlage oder Pool-Datei mit dem Marker `"i18n": ["de", "en"]` darf dieselbe Form auch **in den Schritten** verwenden, also in `blocks` und `instructions`. Beim Anlegen wählt die Plattform eine Sprache: die UI-Sprache (Rückfall Englisch, dann Deutsch). Der neue Workflow ist danach einsprachig und gehört dir.
+
+```json
+{
+  "i18n": ["de", "en"],
+  "name": {"de": "Beispiel: Freigabe mit Messung", "en": "Example: approval with a measurement"},
+  "blocks": [
+    {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+    {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+     "config": {"question": {"de": "{{ block.messen.output }} – weiter?", "en": "{{ block.measure.output }} – continue?"},
+                "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}], "on_no": "fail"}}
+  ]
+}
+```
+
+**Regeln** (das Gate `LocalizedDefinitionGateTest` prüft sie):
+
+- **Jede Map trägt genau die deklarierten Sprachen, keine bleibt leer.** Ohne Marker wird nichts aufgelöst.
+- **Einsprachig bleiben Shell-Felder** (`command`, `condition` …, sonst hieße es zwei Befehle prüfen) **und alles, was verglichen oder ausgewertet wird:** `type`, `variable_name`, `auto_answer`, `reject_options`, `mode`, `on_no`, `execution_mode`, `model`, `provider` sowie `metadata`.
+- **Schritt-Namen sind übersetzbar, aber pro Sprache konsistent.** `{{ block.X.output }}` und compress-`source` zeigen in jeder Fassung auf einen vorhandenen Namen. Der Report-Block eines Audits (`metadata.audit.reportBlock`) bleibt einsprachig.
+- **Übersetzte Approval-`options` dürfen nirgends verglichen werden.** Die Antwortvariable darf in keinem Shell-, conditional-, switch- oder while-Feld vorkommen, denn auf Deutsch wäre die Antwort `Nein` statt `No`. Die Ablehnung erkennt der Approval-Block selbst (`reject_options`, Vorgabe `No`/`Nein`).
+- **Bestehende Datenbanken erhalten geänderte eingebaute Vorlagen nur über einen Versionssprung** (`version`), wie jede Änderung an einer eingebauten Vorlage.
+
+Die API liefert die Schritte in der gewünschten Sprache: `GET /api/v1/workflow-templates?locale=de`. Pool und Ketten installieren mit `"locale"` im Body.
 
 ---
 

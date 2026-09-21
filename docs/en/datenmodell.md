@@ -582,7 +582,7 @@ M:N relationship between workflows and skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-66 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
+67 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -1251,6 +1251,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V75 | `V75__audit_finding_unknown_rule_key.sql` | unknown_rule_key in audit_findings (finding whose ruleKey is outside the catalog, default 0) |
 | V76 | `V76__todo_agent_session_ref.sql` | agent_session_ref in todos + index (agent conversation; one-time backfill of the `--resume` UUIDs from the descriptions) |
 | V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (evidence names no measurement of the run; such findings create no managed todo) |
+| V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unresolved bilingual steps, resolved on read via `?locale=`) |
 
 ## SQLite Specifics
 

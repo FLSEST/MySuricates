@@ -567,7 +567,7 @@ Das Backend umfasst **47 REST-Controller** und **20 Block-Typen**:
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
-**Flyway-Migrationen:** V1–V77 (SQLite)
+**Flyway-Migrationen:** V1–V78 (SQLite)
 
 ### Gate Status System
 
@@ -605,7 +605,7 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 - **SkillSeeder:** Legt 19 Built-in-Skills beim Start an (idempotent, Update bei Version-Bump) und registriert sie im `SkillRegistry`
 - Skill-Definitionen als JSON + Prompt-`.md` unter `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
+- **WorkflowTemplateSeeder:** Legt 67 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
 ### Modul-Katalog

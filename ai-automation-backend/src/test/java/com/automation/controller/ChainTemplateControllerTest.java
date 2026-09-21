@@ -109,7 +109,7 @@ class ChainTemplateControllerTest {
                         ChainEntry.builder().workflowId("wf-2").build()
                 ))
                 .build();
-        when(chainTemplateService.install(eq("ci-cd-pipeline-chain"), eq("proj-1"), any()))
+        when(chainTemplateService.install(eq("ci-cd-pipeline-chain"), eq("proj-1"), any(), any()))
                 .thenReturn(chain);
 
         mockMvc.perform(post("/api/v1/chain-templates/ci-cd-pipeline-chain/install")
@@ -125,6 +125,20 @@ class ChainTemplateControllerTest {
     }
 
     @Test
+    void installTemplate_passesTheLocale() throws Exception {
+        WorkflowChain chain = WorkflowChain.builder().id("chain-2").name("CI/CD pipeline").entries(List.of()).build();
+        when(chainTemplateService.install("ci-cd-pipeline-chain", "proj-1", null, "en")).thenReturn(chain);
+
+        mockMvc.perform(post("/api/v1/chain-templates/ci-cd-pipeline-chain/install")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"projectId": "proj-1", "locale": "en"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.chainName").value("CI/CD pipeline"));
+    }
+
+    @Test
     void installTemplate_missingProjectId_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/chain-templates/ci-cd-pipeline-chain/install")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,7 +150,7 @@ class ChainTemplateControllerTest {
 
     @Test
     void installTemplate_nonExistentTemplate_returns404() throws Exception {
-        when(chainTemplateService.install(eq("unknown"), any(), any()))
+        when(chainTemplateService.install(eq("unknown"), any(), any(), any()))
                 .thenThrow(new NoSuchElementException("Chain template not found: unknown"));
 
         mockMvc.perform(post("/api/v1/chain-templates/unknown/install")

@@ -111,6 +111,30 @@ class WorkflowTemplateServiceTest {
         assertThat(result.getCategory()).isEqualTo("automation");
     }
 
+    @Test
+    void update_blocks_dropsTheStoredBilingualSource() {
+        WorkflowTemplate existing = WorkflowTemplate.builder().id("t-1").i18nSource("{\"i18n\":[\"de\",\"en\"]}").build();
+        when(templateRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(templateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkflowTemplate result = templateService.update("t-1", new UpdateWorkflowTemplateRequest(
+                null, null, null, null, List.of(BlockDefinition.builder().type("shell").build()), null, null, null));
+
+        assertThat(result.getI18nSource()).isNull();
+    }
+
+    @Test
+    void update_cosmeticFields_keepTheStoredBilingualSource() {
+        WorkflowTemplate existing = WorkflowTemplate.builder().id("t-1").i18nSource("{\"i18n\":[\"de\",\"en\"]}").build();
+        when(templateRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(templateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        WorkflowTemplate result = templateService.update("t-1", new UpdateWorkflowTemplateRequest(
+                null, null, "✋", null, null, null, null, null));
+
+        assertThat(result.getI18nSource()).isNotNull();
+    }
+
     // --- delete ---
 
     @Test

@@ -111,6 +111,7 @@ class WorkflowTemplateTest {
                 "category",
                 blocks,
                 "instructions",
+                "{\"i18n\":[\"de\",\"en\"]}",
                 "model",
                 true,
                 5,
@@ -123,6 +124,7 @@ class WorkflowTemplateTest {
         assertThat(template.getId()).isEqualTo("id-123");
         assertThat(template.getName()).isSameAs(name);
         assertThat(template.getDescription()).isSameAs(description);
+        assertThat(template.getI18nSource()).isEqualTo("{\"i18n\":[\"de\",\"en\"]}");
         assertThat(template.getIcon()).isEqualTo("icon");
         assertThat(template.getCategory()).isEqualTo("category");
         assertThat(template.getBlocks()).isSameAs(blocks);

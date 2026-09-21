@@ -41,10 +41,10 @@ isolierten Worktree:
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, rund 1 600 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 67 000 Zeilen, 47 REST-Controller, 77 Flyway-Migrationen |
+| Backend | Java 21 / Spring Boot 3.4, rund 67 000 Zeilen, 47 REST-Controller, 78 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 66 000 Zeilen |
 | Tests | Backend 9 197 (0 Fehler, 1 uebersprungen), Frontend 1 367 — Lauf vom 2026-09-19 |
-| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
+| Bausteine | 20 Block-Typen, 67 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund. Dass sie es bleiben, prueft seit dem 2026-09-12 die CI:
 sie faehrt beide Suiten bei jedem Push, zusaetzlich zu Hygiene-Gate und Secret-Scan. Ein CI-Lauf

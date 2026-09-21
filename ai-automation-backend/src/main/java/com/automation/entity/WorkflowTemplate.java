@@ -57,6 +57,15 @@ public class WorkflowTemplate {
     @Column(columnDefinition = "text")
     private String instructions;
 
+    /**
+     * Unresolved {@code blocks}/{@code instructions} of a bilingual template, with its {@code i18n}
+     * marker ({@link com.automation.util.LocalizedJson#localizedSource}). {@code blocks} and
+     * {@code instructions} above hold the English variant; the other language is resolved from here
+     * when read. {@code null} for single-language templates.
+     */
+    @Column(name = "i18n_source", columnDefinition = "text")
+    private String i18nSource;
+
     private String model;
 
     @Builder.Default

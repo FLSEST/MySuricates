@@ -40,10 +40,10 @@ class AuditWorkflowContractGateTest {
     @Test
     void should_notCombineAuditAndAutoTodo_inShippedAuditWorkflows() throws IOException {
         List<String> violations = new ArrayList<>();
-        for (Path file : auditDefinitions()) {
-            JsonNode metadata = MAPPER.readTree(file.toFile()).path("metadata");
+        for (ShippedDefinitions.Variant variant : auditVariants()) {
+            JsonNode metadata = variant.root().path("metadata");
             if (!metadata.path("autoTodo").isMissingNode()) {
-                violations.add(file.getFileName() + " -> metadata.autoTodo neben metadata.audit");
+                violations.add(variant.label() + " -> metadata.autoTodo neben metadata.audit");
             }
         }
         assertThat(violations)
@@ -54,14 +54,14 @@ class AuditWorkflowContractGateTest {
     @Test
     void should_declareExistingReportBlock_inShippedAuditWorkflows() throws IOException {
         List<String> violations = new ArrayList<>();
-        for (Path file : auditDefinitions()) {
-            JsonNode root = MAPPER.readTree(file.toFile());
+        for (ShippedDefinitions.Variant variant : auditVariants()) {
+            JsonNode root = variant.root();
             String reportBlock = root.path("metadata").path("audit").path("reportBlock").asText("");
             long matches = blocks(root).stream()
                     .filter(block -> reportBlock.equals(block.path("name").asText(null)))
                     .count();
             if (reportBlock.isBlank() || matches != 1) {
-                violations.add(file.getFileName() + " -> reportBlock='" + reportBlock + "', passende Bloecke: " + matches);
+                violations.add(variant.label() + " -> reportBlock='" + reportBlock + "', passende Bloecke: " + matches);
             }
         }
         assertThat(violations)
@@ -72,13 +72,13 @@ class AuditWorkflowContractGateTest {
     @Test
     void should_requestResultEnvelope_inReportBlockPrompt() throws IOException {
         List<String> violations = new ArrayList<>();
-        for (Path file : auditDefinitions()) {
-            JsonNode root = MAPPER.readTree(file.toFile());
+        for (ShippedDefinitions.Variant variant : auditVariants()) {
+            JsonNode root = variant.root();
             String reportBlock = root.path("metadata").path("audit").path("reportBlock").asText("");
             blocks(root).stream()
                     .filter(block -> reportBlock.equals(block.path("name").asText(null)))
                     .filter(block -> !block.path("config").path("command").asText("").contains(ENVELOPE_MARKER))
-                    .forEach(block -> violations.add(file.getFileName() + " -> Report-Block ohne " + ENVELOPE_MARKER));
+                    .forEach(block -> violations.add(variant.label() + " -> Report-Block ohne " + ENVELOPE_MARKER));
         }
         assertThat(violations)
                 .as("Der Report-Block muss den Ergebnis-Envelope anfordern")
@@ -88,11 +88,11 @@ class AuditWorkflowContractGateTest {
     @Test
     void should_notInstructTodoItemMarkers_inShippedAuditWorkflows() throws IOException {
         List<String> violations = new ArrayList<>();
-        for (Path file : auditDefinitions()) {
-            for (JsonNode block : blocks(MAPPER.readTree(file.toFile()))) {
+        for (ShippedDefinitions.Variant variant : auditVariants()) {
+            for (JsonNode block : blocks(variant.root())) {
                 String command = block.path("config").path("command").asText("");
                 if (TODO_ITEM_LINE.matcher(command).find()) {
-                    violations.add(file.getFileName() + " -> todo_item-Anweisung in Block '"
+                    violations.add(variant.label() + " -> todo_item-Anweisung in Block '"
                             + block.path("name").asText("(unbenannt)") + "'");
                 }
             }
@@ -120,6 +120,15 @@ class AuditWorkflowContractGateTest {
     }
 
     /** Pool-Definitionen mit {@code metadata.audit.enabled == true}. */
+    /** Every language variant of every shipped audit definition ({@link ShippedDefinitions}). */
+    private static List<ShippedDefinitions.Variant> auditVariants() throws IOException {
+        List<ShippedDefinitions.Variant> variants = new ArrayList<>();
+        for (Path file : auditDefinitions()) {
+            variants.addAll(ShippedDefinitions.variants(file));
+        }
+        return variants;
+    }
+
     private static List<Path> auditDefinitions() throws IOException {
         Path pool = firstExisting(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
         assertThat(pool).as("workflow-pool nicht gefunden ab " + Paths.get("").toAbsolutePath()).isNotNull();

@@ -115,6 +115,8 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `DB-DIRECT` | the definition does not read the database directly | `sqlite3` anywhere, or `automation.db` together with a read access (`SELECT`, `INSERT INTO`, `.tables`, …); looking at the file size (`stat`, `du`) stays allowed |
 | `PARSE` | the file is valid JSON and an object | `json.load` |
 
+**Bilingual steps.** A pool file with the marker `"i18n": ["de", "en"]` may also carry step names, questions, prompts and `instructions` as `{de, en}`. It is then installed in the UI language (`locale` in the install body). Which fields must stay single-language (shell fields, compared values, `metadata`) is described in [WORKFLOW-GUIDE → Bilingual templates](WORKFLOW-GUIDE.md#bilingual-templates). `LocalizedDefinitionGateTest` checks this in the backend build, not `pool-neutrality.sh`.
+
 ### The block type registry
 
 `BLOCK-TYPE` checks against these 19 types. The source is
