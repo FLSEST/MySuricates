@@ -103,10 +103,16 @@ public class AuditCenterService {
             if (auditKey != null) predicates.add(cb.equal(root.get("auditKey"), auditKey));
             if (status != null) predicates.add(cb.equal(root.get("status"), status));
             if (severity != null) predicates.add(cb.equal(root.get("severity"), severity));
+            // Severity steht als Text in der DB; alphabetisch käme LOW vor MEDIUM (TODO f4ddc836).
+            if (query != null && !Long.class.equals(query.getResultType())) {
+                query.orderBy(cb.asc(cb.selectCase(root.get("severity"))
+                                .when(AuditSeverity.CRITICAL, 0).when(AuditSeverity.HIGH, 1)
+                                .when(AuditSeverity.MEDIUM, 2).otherwise(3)),
+                        cb.desc(root.get("lastSeenAt")));
+            }
             return cb.and(predicates.toArray(Predicate[]::new));
         };
-        Page<AuditFinding> result = findingRepository.findAll(spec, PageRequest.of(page, size,
-                Sort.by(Sort.Order.asc("severity"), Sort.Order.desc("lastSeenAt"))));
+        Page<AuditFinding> result = findingRepository.findAll(spec, PageRequest.of(page, size));
         Map<String, List<TodoLink>> links = todoLinks(result.getContent().stream().map(AuditFinding::getId).toList());
         List<AuditFindingResponse> content = result.getContent().stream()
                 .map(f -> toFinding(f, links.getOrDefault(f.getId(), List.of()))).toList();
