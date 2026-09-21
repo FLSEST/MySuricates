@@ -26,5 +26,49 @@ check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" 
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
 check "list shows the instance and its port"  'bash "$SCRIPT" list | grep "demo.*19400" >/dev/null'
+echo "2) AUTOMATION_* lines reach the instance"
+check "compose passes the instance file as env_file" 'grep -q "env_file:" "$HERE/../../deploy/compose.yml" && grep -q "MYSURICATES_ENV_FILE" "$HERE/../../deploy/compose.yml"'
+
+echo "3) host runtime (java stub, no real build)"
+STATE="$TMP/state/mysuricates/hostdemo"
+mkdir -p "$STATE/frontend" "$TMP/hostbin"
+echo jar > "$STATE/app.jar"
+cat > "$TMP/hostbin/java" <<'STUB'
+#!/bin/sh
+env > "$JAVA_ENV_OUT"
+echo "$*" >> "$JAVA_ENV_OUT.args"
+exec sleep 300
+STUB
+cat > "$TMP/hostbin/curl" <<'STUB'
+#!/bin/sh
+case "$*" in *system/health*) echo '{"status":"UP"}'; exit 0 ;; esac
+exit 7
+STUB
+chmod +x "$TMP/hostbin/java" "$TMP/hostbin/curl"
+cat > "$TMP/inst/hostdemo.env" <<'ENV'
+MYSURICATES_RUNTIME=host
+MYSURICATES_PORT=19401
+MYSURICATES_PRESET=research
+AUTOMATION_MODULES_WEBHOOKS=true
+AUTOMATION_AI_DEFAULT_PROVIDER=PI
+ENV
+export JAVA_ENV_OUT="$TMP/java.env" XDG_STATE_HOME="$TMP/state"
+PATH="$TMP/hostbin:$PATH" INSTANCE_HEALTH_TIMEOUT=10 bash "$SCRIPT" up --name hostdemo >"$TMP/host-up.out" 2>&1
+check "host up reports the address"           'grep "localhost:19401" "$TMP/host-up.out" >/dev/null'
+check "java started with the port"            'grep -x "AUTOMATION_PORT=19401" "$JAVA_ENV_OUT" >/dev/null'
+check "backend serves the built frontend"     'grep -x "AUTOMATION_SERVEFRONTEND=true" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_FRONTENDPATH=$STATE/frontend" "$JAVA_ENV_OUT" >/dev/null'
+check "bound to 127.0.0.1 by default"         'grep -x "SERVER_ADDRESS=127.0.0.1" "$JAVA_ENV_OUT" >/dev/null'
+check "data stays in the instance state dir"  'grep -x "AUTOMATION_DB_PATH=$STATE/data/automation.db" "$JAVA_ENV_OUT" >/dev/null'
+check "AUTOMATION_* from the file reach java"  'grep -x "AUTOMATION_MODULES_WEBHOOKS=true" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_AI_DEFAULT_PROVIDER=PI" "$JAVA_ENV_OUT" >/dev/null'
+check "preset from MYSURICATES_PRESET"        'grep -x "AUTOMATION_MODULES_PRESET=research" "$JAVA_ENV_OUT" >/dev/null'
+check "own user.home per instance"             'grep -- "-Duser.home=$STATE/home" "$JAVA_ENV_OUT.args" >/dev/null'
+check "CLI lookups still use the real home"   'grep -x "AUTOMATION_HOST_HOME=$HOME" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_HOSTPI_CONFIGDIR=$HOME/.pi/agent" "$JAVA_ENV_OUT" >/dev/null'
+check "no docker call for the host runtime"   '! grep "hostdemo" "$DOCKER_LOG" >/dev/null'
+check "pid file written"                      '[ -s "$STATE/instance.pid" ]'
+PID="$(cat "$STATE/instance.pid" 2>/dev/null)"
+PATH="$TMP/hostbin:$PATH" bash "$SCRIPT" down --name hostdemo >/dev/null 2>&1
+check "down stops the process"                '! kill -0 "$PID" 2>/dev/null'
+check "list shows the runtime"                'bash "$SCRIPT" list | grep "hostdemo.*19401.*host" >/dev/null'
+
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

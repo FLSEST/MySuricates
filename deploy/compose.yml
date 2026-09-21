@@ -11,6 +11,10 @@ services:
     container_name: mysuricates-${MYSURICATES_NAME:?}
     ports:
       - "${MYSURICATES_BIND:-127.0.0.1}:${MYSURICATES_PORT:?}:9090"
+    # Alle AUTOMATION_*-Zeilen der Instanz-Datei (Einzelmodule, Haertung, Standard-Anbieter …)
+    # gehen unveraendert an die Instanz; die Liste darunter setzt nur, was aus MYSURICATES_* folgt.
+    env_file:
+      - ${MYSURICATES_ENV_FILE:?}
     environment:
       - HOST_UID=${HOST_UID:?}
       - HOST_GID=${HOST_GID:?}
