@@ -24,6 +24,8 @@ export interface ApprovalRequiredMessage {
   blockId: string;
   question: string;
   options: string[];
+  /** the options that count as a rejection; missing from older backends */
+  rejectOptions?: string[];
   stepIndex: number;
 }
 
@@ -220,6 +222,8 @@ export interface PendingApproval {
   blockId: string;
   question: string;
   options: string[];
+  /** the options that count as a rejection; undefined = old backend, then only "No" is one */
+  rejectOptions?: string[];
   stepIndex: number;
 }
 

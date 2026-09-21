@@ -30,6 +30,7 @@ import type { TranslationKeys } from '../../i18n/en';
 import type { FeatureModuleName } from '../../types';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';
+import { PendingInputNavItem } from './PendingInputNavItem';
 
 const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs', '/projects', '/schedules', '/todos', '/activity']);
 
@@ -282,6 +283,9 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+        {!editMode && (
+          <PendingInputNavItem showLabels={showLabels} onNavigate={() => { if (isMobile) setMobileOpen(false); }} />
+        )}
         {editMode && !collapsed ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={editModeNavItems.map((i) => i.to)} strategy={verticalListSortingStrategy}>

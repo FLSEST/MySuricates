@@ -9,6 +9,8 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAssistantStore } from '../../stores/assistantStore';
 import { useAssistantSuggestions } from '../../hooks/useAssistant';
 import { resolveContextId } from '../palette/resolveContext';
+import { usePendingInputs } from '../../hooks/usePendingInputs';
+import { PendingPulse } from './PendingInputNavItem';
 
 function isMac(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -110,6 +112,8 @@ export function Header() {
   const { locale, setLocale } = useI18nStore();
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
   const isMobile = useIsMobile();
+  const { data: pendingInputs } = usePendingInputs();
+  const pendingCount = pendingInputs?.length ?? 0;
   const location = useLocation();
   const contextId = resolveContextId(location.pathname);
   const triggerLabel = t.commandPalette.contexts[contextId].triggerLabel;
@@ -120,10 +124,14 @@ export function Header() {
       {isMobile && (
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-raised transition-colors"
-          aria-label={t.common.menu}
+          className="relative p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-raised transition-colors"
+          aria-label={pendingCount > 0
+            ? `${t.common.menu} — ${t.nav.approvals}: ${t.approvals.navWaiting.replace('{count}', String(pendingCount))}`
+            : t.common.menu}
         >
           <Menu className="w-5 h-5" />
+          {/* the sidebar is closed on mobile — without this, a waiting approval would stay invisible */}
+          {pendingCount > 0 && <PendingPulse />}
         </button>
       )}
 

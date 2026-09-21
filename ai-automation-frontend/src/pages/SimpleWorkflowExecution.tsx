@@ -14,7 +14,7 @@ import {
   useWorkflow, useWorkflowRuns,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
-import { useExecutionWebSocket } from '../hooks/useWebSocket';
+import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
@@ -85,15 +85,13 @@ export function SimpleWorkflowExecution() {
   const cancelExecution = useCancelExecution();
   const submitApproval = useSubmitApproval();
 
-  const [recoveredApproval, setRecoveredApproval] = useState<{
-    blockId: string; question: string; options: string[]; stepIndex: number;
-  } | null>(null);
+  const [recoveredApproval, setRecoveredApproval] = useState<PendingApproval | null>(null);
   const [recoveredHumanInput, setRecoveredHumanInput] = useState<PendingHumanInput | null>(null);
 
   useEffect(() => {
     if (!runId) return;
     api.get<{
-      pending: boolean; blockId?: string; question?: string; options?: string[]; stepIndex?: number;
+      pending: boolean; blockId?: string; question?: string; options?: string[]; rejectOptions?: string[]; stepIndex?: number;
       type?: string; inputType?: string; defaultValue?: string; variableName?: string;
       required?: boolean; validationPattern?: string | null;
     }>(`/executions/${runId}/approval`).then((data) => {
@@ -115,6 +113,7 @@ export function SimpleWorkflowExecution() {
             blockId: data.blockId,
             question: data.question!,
             options: data.options!,
+            rejectOptions: data.rejectOptions,
             stepIndex: data.stepIndex!,
           });
         }

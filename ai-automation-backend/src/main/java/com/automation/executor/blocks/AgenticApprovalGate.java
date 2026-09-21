@@ -49,7 +49,9 @@ public class AgenticApprovalGate {
                         .blockId("agentic-" + stepIndex + "-iter-" + iteration)
                         .question("Approve action: " + truncate(plan.getAction(), TRUNCATE_SHORT))
                         .options(List.of("Yes", "Yes always", "No"))
+                        .rejectOptions(List.of("No"))
                         .stepIndex(stepIndex)
+                        .timeoutMinutes(30)
                         .build());
 
         String answer;

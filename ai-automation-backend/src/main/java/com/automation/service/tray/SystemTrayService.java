@@ -42,7 +42,7 @@ public class SystemTrayService {
     private final SystemIdentityService systemIdentity;
 
     private TrayIcon trayIcon;
-    private TrayState previousState;
+    private volatile TrayState previousState;
     private boolean initialized = false;
     private volatile String stableVersion = null;
     private final Map<IconColor, Image> iconCache = new EnumMap<>(IconColor.class);
@@ -92,6 +92,9 @@ public class SystemTrayService {
 
             PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false, false));
             trayIcon.setPopupMenu(menu);
+            // Doppelklick aufs Icon bzw. Klick auf die Meldung (je nach Desktop): wartet eine Freigabe, direkt dorthin
+            trayIcon.addActionListener(e -> TrayLinks.open(TrayLinks.clickTarget(trayConfig,
+                    previousState != null ? previousState.pendingApprovals() : 0)));
 
             systemTray.add(trayIcon);
             initialized = true;
@@ -254,30 +257,30 @@ public class SystemTrayService {
         menu.addSeparator();
 
         if (state.pendingApprovals > 0) {
-            MenuItem approvalItem = new MenuItem(state.pendingApprovals + " Approval(s) wartend");
-            approvalItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl()));
+            MenuItem approvalItem = new MenuItem(state.pendingApprovals + " Freigabe(n) wartend");
+            approvalItem.addActionListener(e -> TrayLinks.open(TrayLinks.approvals(trayConfig)));
             menu.add(approvalItem);
             menu.addSeparator();
         }
 
         MenuItem devUiItem = new MenuItem("Dev Web-UI oeffnen");
-        devUiItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl()));
+        devUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl()));
         menu.add(devUiItem);
 
         MenuItem stableUiItem = new MenuItem("Stable Web-UI oeffnen");
-        stableUiItem.addActionListener(e -> openUrl(trayConfig.getStableUrl()));
+        stableUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getStableUrl()));
         menu.add(stableUiItem);
 
         MenuItem dashboardDevItem = new MenuItem("Dashboard (Dev)");
-        dashboardDevItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl() + "/"));
+        dashboardDevItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl() + "/"));
         menu.add(dashboardDevItem);
 
         MenuItem dashboardStableItem = new MenuItem("Dashboard (Stable)");
-        dashboardStableItem.addActionListener(e -> openUrl(trayConfig.getStableUrl() + "/"));
+        dashboardStableItem.addActionListener(e -> TrayLinks.open(trayConfig.getStableUrl() + "/"));
         menu.add(dashboardStableItem);
 
         MenuItem activityItem = new MenuItem("Activity Log");
-        activityItem.addActionListener(e -> openUrl(trayConfig.getWebUiUrl() + "/activity"));
+        activityItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl() + "/activity"));
         menu.add(activityItem);
 
         menu.addSeparator();
@@ -311,7 +314,7 @@ public class SystemTrayService {
 
         if (state.pendingApprovals > previousState.pendingApprovals) {
             trayIcon.displayMessage("MySuricates",
-                    state.pendingApprovals + " Approval(s) warten auf Eingabe",
+                    state.pendingApprovals + " Freigabe(n) warten auf dich — Seitenleiste: Freigaben",
                     TrayIcon.MessageType.WARNING);
         }
     }
@@ -372,16 +375,6 @@ public class SystemTrayService {
             }
         } catch (Exception e) {
             log.debug("Failed to extract stable version: {}", e.getMessage());
-        }
-    }
-
-    private void openUrl(String url) {
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(new URI(url));
-            }
-        } catch (Exception e) {
-            log.warn("Failed to open URL {}: {}", url, e.getMessage());
         }
     }
 
