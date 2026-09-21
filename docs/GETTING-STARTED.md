@@ -34,7 +34,7 @@ und wird nur für Container-Execution-Workflow-Blöcke gebraucht.
 > passende Maven-Version herunter. `scripts/setup.sh` und der Start nutzen ihn automatisch.
 > Node-Nutzer mit `nvm` bekommen mit `nvm use` (im Frontend-Ordner) die richtige Node-Version.
 
-Die Person braucht einen **eigenen Claude-Account** und meldet sich mit `claude login` selbst an.
+Du brauchst einen **eigenen Claude-Account** und meldest dich mit `claude login` selbst an.
 
 Vieles richtet sich beim **ersten Backend-Start automatisch** ein: SQLite-Datenbank +
 Flyway-Migrationen, API-Key, Verschlüsselungs-Key für Integrationen, Built-in-Skills/Templates.
@@ -61,6 +61,7 @@ Optionen:
 ./scripts/setup.sh --install   # fehlende Tools per apt automatisch installieren (sonst: Hinweise ausgeben)
 ./scripts/setup.sh --start     # nach erfolgreichem Setup direkt starten
 ./scripts/setup.sh --preset research   # Modul-Preset ohne Rückfrage wählen
+./scripts/setup.sh --show-key  # den erzeugten API-Key ausgeben (siehe Abschnitt 4)
 ```
 
 **Module:** Beim ersten Lauf fragt das Skript, welche optionalen Module die Instanz beim Start
@@ -72,6 +73,11 @@ vorhandene Datei bleibt unangetastet):
 | `core` (Default) | nur den Kern: Workflows, Runs, Projekte, TODOs, Schedules, Gates |
 | `research` | Kern + Chains, Assistent, Insights, Workflow-Memory, Audit Center, BPMN |
 | `full` | alles, auch Integrationen, Webhooks, Remote Access, Terminal, Staging |
+
+Die Modulnamen sagen beim ersten Lauf noch wenig — das ist in Ordnung: Die Wahl ist nicht
+endgültig, einzelne Module lassen sich später einschalten (siehe unten). Im Zweifel `core`
+nehmen. Was die einzelnen Module tun, steht in
+[architektur.md](architektur.md) und [deployment.md](deployment.md).
 
 Fertige Vorlagen für alles aus bzw. alles an: `ai-automation-backend/config-examples/application-minimal.yml`
 und `application-maximal.yml` (siehe [deployment.md](deployment.md#konfigurationen-minimal-und-maximal)).
@@ -136,6 +142,20 @@ export AUTOMATION_API_KEY="dein-key"   # vor dem Start setzen
 Die API-Key-Pflicht lässt sich für rein lokale Experimente abschalten
 (`AUTOMATION_SECURITY_ENABLED=false`) — für den Normalbetrieb aktiviert lassen.
 
+### Und jetzt?
+
+Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
+
+1. **Projekt anlegen** — jeder Workflow gehört zu einem Projekt; ein Projekt zeigt auf ein
+   Verzeichnis auf deinem Rechner.
+2. **Eine Vorlage übernehmen** — unter *Templates* liegen 66 fertige Workflows. Eine auswählen,
+   ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert.
+3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch
+   war oder ein Modell gerufen hat.
+
+Eigene Workflows baut man danach am besten mit dem
+[Workflow-Leitfaden](WORKFLOW-GUIDE.md) daneben.
+
 ---
 
 ## 5. Claude CLI einrichten (für AI-Workflows)
@@ -152,10 +172,11 @@ darauf hin. Ohne `claude` startet die App trotzdem — nur AI-Workflows funktion
 
 ---
 
-## 6. Optional: Docker (nur für Container-Blöcke)
+## 6. Optional: Docker (nur für Shell-Blöcke mit `container_image`)
 
-Die App und alle Nicht-Container-Workflows (Simple, Shell, Agentic auf dem Host …) laufen **ohne**
-Docker. Erst Workflow-Blöcke, die in isolierten Containern ausführen, brauchen einen laufenden
+Einen eigenen Container-Blocktyp gibt es nicht: Gemeint ist ein `shell`-Block, dem man mit
+`container_image` ein Image mitgibt — er läuft dann isoliert statt auf dem Host. Die App und
+alle übrigen Workflows laufen **ohne** Docker. Nur für diesen Fall braucht es einen laufenden
 Docker-Daemon:
 
 ```bash
@@ -197,7 +218,7 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | `claude: command not found` | `npm install -g @anthropic-ai/claude-code` + `claude login` |
 | AI-Block schlägt fehl, „nicht eingeloggt" | `claude login` ausführen |
 | Port 9090 / 3000 belegt | belegenden Prozess beenden (`lsof -i :9090`). Das Start-Skript setzt 9090/3000 voraus; andere Ports nur beim manuellen Start: Backend `AUTOMATION_PORT=9190`, Frontend `VITE_API_BASE_URL=http://localhost:9190/api/v1 VITE_WS_BASE_URL=ws://localhost:9190 npm run dev -- --port 3100` |
-| Frontend startet, aber Skript meldet „nicht erreichbar" | behoben — das Start-Skript prüft jetzt HTTP **und** HTTPS |
+| Frontend startet, aber Skript meldet „nicht erreichbar" | Sollte nicht mehr auftreten — das Start-Skript prüft HTTP und HTTPS. Tritt es doch auf: Skript neu starten und prüfen, ob `localhost:3000` im Browser antwortet |
 | Container-Block schlägt fehl | Docker installieren/starten (Abschnitt 6) |
 | `permission denied` auf Docker-Socket | `sudo usermod -aG docker $USER`, dann neu einloggen |
 | Self-signed-Cert-Warnung im Browser | bei Dev erwartet; akzeptieren oder Abschnitt 7 / kein Cert nutzen |

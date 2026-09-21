@@ -36,7 +36,7 @@ and only needed for container-execution workflow blocks.
 > Maven version on the first build. `scripts/setup.sh` and the start scripts use it automatically.
 > Node users with `nvm` get the correct Node version with `nvm use` (in the frontend directory).
 
-Each person needs their **own Claude account** and logs in themselves with `claude login`.
+You need your **own Claude account** and log in yourself with `claude login`.
 
 Much of the setup happens **automatically on the first backend start**: SQLite database +
 Flyway migrations, API key, encryption key for integrations, built-in skills/templates.
@@ -63,6 +63,7 @@ Options:
 ./scripts/setup.sh --install   # automatically install missing tools via apt (otherwise: print hints)
 ./scripts/setup.sh --start     # start directly after a successful setup
 ./scripts/setup.sh --preset research   # choose the module preset without asking
+./scripts/setup.sh --show-key  # print the generated API key (see section 4)
 ```
 
 **Modules:** On the first run the script asks which optional modules the instance enables at
@@ -74,6 +75,11 @@ is left untouched):
 | `core` (default) | the core only: workflows, runs, projects, TODOs, schedules, gates |
 | `research` | core + chains, assistant, insights, workflow memory, audit center, BPMN |
 | `full` | everything, including integrations, webhooks, remote access, terminal, staging |
+
+The module names will not mean much on a first run — that is fine: the choice is not final,
+individual modules can be switched on later (see below). When in doubt take `core`. What the
+individual modules do is described in [architektur.md](architektur.md) and
+[deployment.md](deployment.md).
 
 Ready-made templates for everything off or everything on: `ai-automation-backend/config-examples/application-minimal.yml`
 and `application-maximal.yml` (see [deployment.md](deployment.md#configurations-minimal-and-maximal)).
@@ -138,6 +144,20 @@ export AUTOMATION_API_KEY="your-key"   # set before starting
 The API key requirement can be disabled for purely local experiments
 (`AUTOMATION_SECURITY_ENABLED=false`) — leave it enabled for normal operation.
 
+### What Now?
+
+The application is running. One way in without building anything:
+
+1. **Create a project** — every workflow belongs to a project, and a project points at a
+   directory on your machine.
+2. **Take a template** — under *Templates* there are 66 ready-made workflows. Pick one, copy it
+   into the project, start it. The run shows step by step what happens.
+3. **Look at the run** — the detail view shows, per block, duration, status and whether it was
+   deterministic or called a model.
+
+For building your own workflows afterwards, keep the
+[workflow guide](WORKFLOW-GUIDE.md) open alongside.
+
 ---
 
 ## 5. Setting Up the Claude CLI (for AI Workflows)
@@ -154,10 +174,11 @@ point this out if not. Without `claude` the app still starts — only AI workflo
 
 ---
 
-## 6. Optional: Docker (only for Container Blocks)
+## 6. Optional: Docker (only for shell blocks with `container_image`)
 
-The app and all non-container workflows (Simple, Shell, Agentic on the host …) run **without**
-Docker. Only workflow blocks that execute in isolated containers require a running Docker daemon:
+There is no separate container block type: what is meant is a `shell` block given an image via
+`container_image` — it then runs isolated instead of on the host. The app and all other
+workflows run **without** Docker. Only for this case is a running Docker daemon required:
 
 ```bash
 curl -fsSL https://get.docker.com | sh
@@ -200,7 +221,7 @@ in the repo — SSL off with the default password remains allowed.
 | `claude: command not found` | `npm install -g @anthropic-ai/claude-code` + `claude login` |
 | AI block fails, "not logged in" | Run `claude login` |
 | Port 9090 / 3000 in use | Stop the occupying process (`lsof -i :9090`). The start script assumes 9090/3000; other ports only with a manual start: backend `AUTOMATION_PORT=9190`, frontend `VITE_API_BASE_URL=http://localhost:9190/api/v1 VITE_WS_BASE_URL=ws://localhost:9190 npm run dev -- --port 3100` |
-| Frontend starts but script reports "not reachable" | Fixed — the start script now checks both HTTP **and** HTTPS |
+| Frontend starts but script reports "not reachable" | Should no longer happen — the start script checks HTTP and HTTPS. If it still does: restart the script and check whether `localhost:3000` answers in the browser |
 | Container block fails | Install/start Docker (Section 6) |
 | `permission denied` on Docker socket | `sudo usermod -aG docker $USER`, then log in again |
 | Self-signed cert warning in browser | Expected in dev; accept it, use Section 7, or skip the cert |
