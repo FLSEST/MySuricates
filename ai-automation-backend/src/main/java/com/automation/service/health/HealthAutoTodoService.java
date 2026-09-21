@@ -31,8 +31,10 @@ public class HealthAutoTodoService {
     @Value("${automation.autopilot.project-id:}")
     private String autopilotProjectId;
 
-    private volatile boolean previousStableHealthy = true;
-    private volatile boolean previousTestHealthy = true;
+    // null = not observed yet. The first tick only records a baseline: an instance that was never
+    // installed (fresh install with a single instance) must not count as "went down".
+    private volatile Boolean previousStableHealthy;
+    private volatile Boolean previousTestHealthy;
 
     @Scheduled(fixedRate = 60_000, initialDelay = 30_000)
     public void checkInstanceHealth() {
@@ -45,10 +47,11 @@ public class HealthAutoTodoService {
         checkInstance("test", testingService.isHealthy(), previousTestHealthy, "Test");
     }
 
-    private void checkInstance(String refId, boolean currentlyHealthy, boolean previouslyHealthy, String label) {
+    private void checkInstance(String refId, boolean currentlyHealthy, Boolean previouslyHealthy, String label) {
         try {
-            if (previouslyHealthy && !currentlyHealthy) {
-                // Transition healthy → unhealthy: create todo if none open
+            if (Boolean.TRUE.equals(previouslyHealthy) && !currentlyHealthy) {
+                // Transition healthy → unhealthy: create todo if none open. Unknown → unhealthy is
+                // only a baseline: never seen healthy in this process, so nothing "went down".
                 Optional<Todo> existing = todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId);
                 if (existing.isEmpty()) {
                     String projectId = (autopilotProjectId != null && !autopilotProjectId.isBlank()
@@ -68,8 +71,8 @@ public class HealthAutoTodoService {
                     todoRepository.save(todo);
                     log.info("Created health todo for {} instance", label);
                 }
-            } else if (!previouslyHealthy && currentlyHealthy) {
-                // Transition unhealthy → healthy: close open todo
+            } else if (!Boolean.TRUE.equals(previouslyHealthy) && currentlyHealthy) {
+                // Unhealthy/unknown → healthy: close an open todo (also one left over from before a restart)
                 todoRepository.findOpenByReferenceTypeAndId(REFERENCE_TYPE, refId).ifPresent(todo -> {
                     todo.setStatus(Todo.Status.DONE);
                     todoRepository.save(todo);

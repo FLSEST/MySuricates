@@ -38,6 +38,41 @@ class HealthAutoTodoServiceTest {
         ReflectionTestUtils.setField(service, "autopilotProjectId", "test-project-uuid");
     }
 
+    /** First tick with both instances up — sets the "seen healthy" baseline a transition needs. */
+    private void primeBothHealthy() {
+        when(stagingService.isHealthy()).thenReturn(true);
+        when(testingService.isHealthy()).thenReturn(true);
+        when(todoRepository.findOpenByReferenceTypeAndId(any(), any())).thenReturn(Optional.empty());
+        service.checkInstanceHealth();
+        reset(todoRepository);
+    }
+
+    @Test
+    void checkInstanceHealth_freshInstallWithoutStableAndTest_createsNoTodo() {
+        // Single-instance install: stable/test were never there, so nothing "went down"
+        when(stagingService.isHealthy()).thenReturn(false);
+        when(testingService.isHealthy()).thenReturn(false);
+
+        service.checkInstanceHealth();
+        service.checkInstanceHealth();
+
+        verifyNoInteractions(todoRepository, projectRepository);
+    }
+
+    @Test
+    void checkInstanceHealth_healthyOnFirstTick_closesTodoLeftFromBeforeRestart() {
+        Todo stale = Todo.builder().title("[Health] Stable").status(Todo.Status.OPEN).build();
+        when(stagingService.isHealthy()).thenReturn(true);
+        when(testingService.isHealthy()).thenReturn(true);
+        when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.of(stale));
+        when(todoRepository.findOpenByReferenceTypeAndId("health_check", "test")).thenReturn(Optional.empty());
+
+        service.checkInstanceHealth();
+
+        assertThat(stale.getStatus()).isEqualTo(Todo.Status.DONE);
+        verify(todoRepository).save(stale);
+    }
+
     @Test
     void checkInstanceHealth_stagingModuleDisabled_probesNothingAndCreatesNoTodo() {
         HealthAutoTodoService coreOnly = new HealthAutoTodoService(stagingService, testingService, todoRepository,
@@ -50,7 +85,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_stableGoesDown_createsTodo() {
-        // Initially healthy (default), now unhealthy
+        primeBothHealthy();
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
@@ -67,6 +102,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_stableGoesDown_projectMissing_createsTodoWithoutProject() {
+        primeBothHealthy();
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "stable")).thenReturn(Optional.empty());
@@ -82,6 +118,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_stableRecovers_closesTodo() {
+        primeBothHealthy();
         // First call: stable goes down
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
@@ -101,6 +138,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_stableAlreadyDown_noNewTodo() {
+        primeBothHealthy();
         // Stable already down — existing open todo
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
@@ -114,6 +152,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_testGoesDown_createsTodo() {
+        primeBothHealthy();
         when(stagingService.isHealthy()).thenReturn(true);
         when(testingService.isHealthy()).thenReturn(false);
         when(todoRepository.findOpenByReferenceTypeAndId("health_check", "test")).thenReturn(Optional.empty());
@@ -128,6 +167,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_bothHealthy_noAction() {
+        primeBothHealthy();
         when(stagingService.isHealthy()).thenReturn(true);
         when(testingService.isHealthy()).thenReturn(true);
 
@@ -139,6 +179,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_staysDown_noAction() {
+        primeBothHealthy();
         // First call: goes down
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
@@ -157,6 +198,7 @@ class HealthAutoTodoServiceTest {
 
     @Test
     void checkInstanceHealth_saveFails_retriesTransitionOnNextTick() {
+        primeBothHealthy();
         // First call: stable goes down, but save throws
         when(stagingService.isHealthy()).thenReturn(false);
         when(testingService.isHealthy()).thenReturn(true);
