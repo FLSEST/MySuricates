@@ -1,0 +1,136 @@
+{
+  "name": {
+    "de": "npm-Abhängigkeiten aktualisieren",
+    "en": "Update npm dependencies"
+  },
+  "icon": "📦",
+  "description": {
+    "de": "Plant und führt npm-Updates aus: Patch/Minor gebündelt, Major-Gruppen einzeln, jeweils gegen die Prüf-Scripts des Projekts; was rot wird, wird zurückgenommen. Ergebnis ist ein Branch im isolierten Run-Workspace, KI nur für Migrationshinweise zu gescheiterten Major-Updates.",
+    "en": "Plans and applies npm updates: patch/minor bundled, major groups one by one, each checked against the project's check scripts; anything that turns red is rolled back. The result is a branch in the isolated run workspace; AI is only used for migration notes on failed major updates."
+  },
+  "category": "CODE",
+  "scope": "portable",
+  "tags": [
+    "dependencies",
+    "npm",
+    "maintenance",
+    "shell",
+    "approval"
+  ],
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "model": "opus",
+  "effort": "medium",
+  "instructions": "npm-Abhängigkeiten eines Projekts planen und aktualisieren – deterministisch per Shell, KI nur für gescheiterte Major-Updates.\n\nAblauf: isolierter Run-Workspace mit eigenem Branch → npm ci + Baseline-Gates → npm outdated wird in Patch/Minor und Major-Gruppen eingeteilt (Gruppen: @types/x mit x, gleicher Scope, Pflicht-Peers) → Freigabe → Patch/Minor gebündelt (bei Rot halbiert, bis die schuldigen Pakete feststehen) → jede Major-Gruppe einzeln → pro gescheiterter Gruppe ein TODO-Vorschlag mit Migrationshinweis → Bericht.\n\nEin rotes Gate läuft ein zweites Mal, bevor es zählt; solche instabilen Gates nennt der Bericht.\n\nVariablen: frontend_dir (Verzeichnis mit package.json relativ zum Projekt, Default \".\"), gate_scripts (npm-Scripts als Prüfung; nur vorhandene laufen, mindestens eines muss existieren), exclude_packages (Pakete, die nie angefasst werden, durch Komma oder Leerzeichen getrennt).\n\nBetriebsarten über den Freigabe-Schritt: interaktiv (Default) fragt nach dem Plan. Für einen unbeaufsichtigten Lauf (Schedule) im installierten Workflow beim Schritt „Freigabe“ mode auf \"auto\" und auto_answer auf \"Alles ausführen\", \"Nur Patch/Minor\" oder \"Nur Plan\" setzen.\n\nErgebnis: Commits auf dem Run-Branch im Run-Workspace; Push ist dort gesperrt. Der Bericht nennt den git-fetch-Befehl zum Übernehmen. Gate GREEN = alles aktuell, YELLOW = Updates offen. TODO-Vorschläge (autoTodo, Modus approval) bestätigt ein Mensch; ein späterer grüner Lauf schliesst sie.\n\nVoraussetzungen: npm mit package-lock.json (pnpm/yarn werden abgelehnt), git, node, python3. Die Baseline muss grün sein, sonst bricht der Lauf ab – ein Fehler wäre sonst keinem Update zuzuordnen.",
+  "defaultContext": {
+    "frontend_dir": ".",
+    "gate_scripts": "typecheck lint test build",
+    "exclude_packages": ""
+  },
+  "metadata": {
+    "autoTodo": {
+      "enabled": true,
+      "mode": "approval"
+    },
+    "autoMemoryExtraction": {
+      "enabled": false
+    }
+  },
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "vorbereiten",
+      "config": {
+        "label": "Workspace, npm ci, Baseline-Gates",
+        "command": "set -euo pipefail\nset -- {{ execution_path }}; WS=\"${1:-}\"\nset -- {{ workspace_source_sha }}; SRC=\"${1:-}\"\nset -- {{ frontend_dir }}; FE_REL=\"${1:-.}\"\nset -- {{ gate_scripts }}; GATES=\"$*\"\n\nfail() {\n  echo \"FEHLER: $1\"\n  echo \"gate_status: RED\"\n  echo \"gate_category: dependencies\"\n  echo \"gate_description: $1\"\n  exit 1\n}\n\n# Nur im isolierten Run-Workspace arbeiten: Das Original-Checkout bleibt unberuehrt.\nif [ \"$WS\" = \"{{\" ] || [ \"$SRC\" = \"{{\" ] || [ ! -d \"$WS/.git\" ]; then\n  fail \"Kein isolierter Run-Workspace - der erste Block braucht workspace.mode=isolated\"\nfi\n[ \"$FE_REL\" = \"{{\" ] && FE_REL=\".\"\ncase \"$GATES\" in *\"{{\"*|\"\") GATES=\"typecheck lint test build\" ;; esac\ncase \"$FE_REL\" in\n  /*|..|../*|*/..|*/../*) fail \"frontend_dir muss ein relativer Pfad innerhalb des Projekts sein: $FE_REL\" ;;\nesac\n\nFE=\"$WS/$FE_REL\"\n[ -f \"$FE/package.json\" ] || fail \"Keine package.json unter '$FE_REL'\"\nif [ ! -f \"$FE/package-lock.json\" ]; then\n  for f in pnpm-lock.yaml yarn.lock bun.lock bun.lockb; do\n    [ -f \"$FE/$f\" ] && fail \"$f gefunden - dieser Workflow unterstuetzt nur npm (package-lock.json)\"\n  done\n  fail \"Keine package-lock.json unter '$FE_REL'\"\nfi\n\n# Zwischenstaende liegen unter .git/ - so landen sie nie in einem Commit.\nST=\"$WS/.git/dep-update\"\nrm -rf \"$ST\"\nmkdir -p \"$ST/logs\"\n(cd \"$FE\" && pwd) > \"$ST/fe_abs\"\nprintf '%s\\n' \"$FE_REL\" > \"$ST/fe_rel\"\n\n# Gates = die gewuenschten npm-Scripts, die es in package.json wirklich gibt.\nnode -e '\n  const s = require(process.argv[1]).scripts || {};\n  for (const g of process.argv[2].split(/[\\s,]+/)) if (g && s[g]) console.log(g);\n' \"$FE/package.json\" \"$GATES\" > \"$ST/gates\"\n[ -s \"$ST/gates\" ] || fail \"Keines der Gate-Scripts ($GATES) steht in package.json - ohne Pruefung wird nichts aktualisiert\"\n\ncat > \"$ST/lib.sh\" <<'LIB'\n# Gemeinsame Funktionen der Update-Bloecke. Erwartet $ST.\nFE=\"$(cat \"$ST/fe_abs\")\"\n\n# Ein Gate laufen lassen; Ausgabe zusaetzlich nach $ST/gate.out\ngate_once() {\n  (cd \"$FE\" && CI=true npm run --silent \"$1\") > \"$ST/gate.out\" 2>&1\n  local rc=$?\n  cat \"$ST/gate.out\" >> \"$2\"\n  return $rc\n}\n\n# Alle Gates nacheinander; haengt an Log $1 an. Ein rotes Gate laeuft ein zweites\n# Mal - erst dann zaehlt es (instabile Tests unter Last). Grund -> $ST/reason\nrun_gates() {\n  local g\n  while IFS= read -r g; do\n    [ -n \"$g\" ] || continue\n    echo \"--- npm run $g\" >> \"$1\"\n    gate_once \"$g\" \"$1\" && continue\n    echo \"--- npm run $g (Wiederholung)\" >> \"$1\"\n    if gate_once \"$g\" \"$1\"; then\n      echo \"$g\" >> \"$ST/flaky.txt\"\n      continue\n    fi\n    echo \"Gate '$g' rot: $(error_lines \"$ST/gate.out\")\" > \"$ST/reason\"\n    return 1\n  done < \"$ST/gates\"\n}\n\n# Die ersten echten Fehlerzeilen (nicht Warnungen) einer Gate-Ausgabe, einzeilig\nerror_lines() {\n  { grep -E -m 3 \"[[:space:]]error[[:space:]]|error TS[0-9]|FAIL|ERR!\" \"$1\" \\\n      || grep -E -v \"warning\" \"$1\" | grep -E -m 3 \"[Ee]rror|✖|×\" \\\n      || tail -n 3 \"$1\"; } | cut -c1-140 | tr -s ' \\n' ' '\n}\n\n# Kurzname fuer Dateinamen\nslug() { printf '%s' \"$1\" | tr '/@' '__'; }\n\n# try_update <log> <name@version>... : package.json anpassen, installieren, Gates\ntry_update() {\n  local log=\"$1\"; shift\n  : > \"$log\"\n  if ! python3 \"$ST/apply.py\" \"$ST\" \"$@\" >> \"$log\" 2>&1; then\n    echo \"package.json nicht anpassbar\" > \"$ST/reason\"; return 1\n  fi\n  if ! (cd \"$FE\" && npm install --no-audit --no-fund) >> \"$log\" 2>&1; then\n    echo \"npm install fehlgeschlagen (Peer-Konflikt?)\" > \"$ST/reason\"; return 1\n  fi\n  run_gates \"$log\"\n}\n\n# bisect_update <name@version>... : ganze Menge versuchen; rot -> halbieren.\n# Gruene Teilmengen werden committet, rote Einzelpakete landen in skipped_minor.txt.\nbisect_update() {\n  local log=\"$ST/logs/minor-$(slug \"$1\")-$#.log\"\n  if try_update \"$log\" \"$@\"; then\n    if [ $# -eq 1 ]; then\n      commit_update \"deps(npm): $1\"\n    else\n      commit_update \"deps(npm): $# Patch/Minor-Updates\" \"$(printf '%s\\n' \"$@\")\"\n    fi\n    printf '%s\\n' \"$@\" >> \"$ST/applied.txt\"\n    echo \"  gruen $# Paket(e): $*\"\n    return 0\n  fi\n  revert_update\n  if [ $# -eq 1 ]; then\n    echo \"$1 - $(cat \"$ST/reason\") (Log: logs/$(basename \"$log\"))\" >> \"$ST/skipped_minor.txt\"\n    echo \"  rot   $1 - $(cat \"$ST/reason\")\"\n    return 0\n  fi\n  local half=$(( $# / 2 ))\n  echo \"  rot   $# Pakete ($(head -n 1 \"$ST/reason\")) - halbieren\"\n  bisect_update \"${@:1:half}\"\n  bisect_update \"${@:half+1}\"\n}\n\nrevert_update() {\n  (cd \"$FE\" && git checkout -q -- package.json package-lock.json && npm ci --no-audit --no-fund) > \"$ST/revert.log\" 2>&1\n}\n\n# commit_update <titel> [<text>]\ncommit_update() {\n  (cd \"$FE\" && git add -- package.json package-lock.json && \\\n    if [ -n \"${2:-}\" ]; then git commit -q -m \"$1\" -m \"$2\"; else git commit -q -m \"$1\"; fi)\n}\nLIB\n\ncat > \"$ST/apply.py\" <<'PY'\n# apply.py <state-dir> <name@version>... - setzt die Versionen in package.json,\n# behaelt Abschnitt, Praefix (^, ~ oder exakt) und Einrueckung bei.\nimport json, re, sys\n\nst = sys.argv[1]\nfe = open(st + \"/fe_abs\").read().strip()\npath = fe + \"/package.json\"\nraw = open(path, encoding=\"utf-8\").read()\npkg = json.loads(raw)\nm = re.search(r'^([ \\t]+)\"', raw, re.M)\nindent = m.group(1) if m else \"  \"\n\nfor item in sys.argv[2:]:\n    name, _, to = item.rpartition(\"@\")\n    for sec in (\"dependencies\", \"devDependencies\", \"optionalDependencies\"):\n        deps = pkg.get(sec) or {}\n        if name in deps:\n            prefix = re.match(r\"[\\^~]?\", deps[name]).group(0)\n            deps[name] = prefix + to\n            print(f\"{sec}: {name} -> {deps[name]}\")\n            break\n    else:\n        sys.exit(f\"{name} steht nicht in package.json\")\n\nwith open(path, \"w\", encoding=\"utf-8\") as f:\n    f.write(json.dumps(pkg, indent=indent, ensure_ascii=False) + (\"\\n\" if raw.endswith(\"\\n\") else \"\"))\nPY\n\n. \"$ST/lib.sh\"\necho \"Projekt: $FE_REL (Quelle ${SRC:0:12}, Branch $(git -C \"$WS\" branch --show-current))\"\necho \"Gates: $(tr '\\n' ' ' < \"$ST/gates\")\"\n\n(cd \"$FE\" && npm ci --no-audit --no-fund) > \"$ST/npm-ci.log\" 2>&1 || {\n  tail -n 40 \"$ST/npm-ci.log\"\n  fail \"npm ci schlug fehl\"\n}\nif run_gates \"$ST/baseline.log\"; then\n  echo \"Baseline: alle Gates gruen.\"\nelse\n  tail -n 60 \"$ST/baseline.log\"\n  fail \"Baseline rot ($(cat \"$ST/reason\")) - erst den bestehenden Fehler beheben, sonst ist kein Update zuzuordnen\"\nfi\n",
+        "timeout_seconds": 1200,
+        "shell_escape_variables": true,
+        "on_failure": "stop",
+        "workspace": {
+          "mode": "isolated",
+          "source": "commit",
+          "branch": true
+        }
+      }
+    },
+    {
+      "type": "shell",
+      "name": "plan",
+      "config": {
+        "label": "Plan: veraltete Pakete einteilen und gruppieren",
+        "command": "set -euo pipefail\nset -- {{ execution_path }}; WS=\"${1:-}\"\nset -- {{ exclude_packages }}; EXCL=\"$*\"\ncase \"$EXCL\" in *\"{{\"*) EXCL=\"\" ;; esac\n\nST=\"$WS/.git/dep-update\"\nFE=\"$(cat \"$ST/fe_abs\")\"\n# npm outdated endet mit 1, sobald etwas veraltet ist - das ist hier der Normalfall.\n(cd \"$FE\" && npm outdated --json > \"$ST/outdated.json\" 2> \"$ST/outdated.err\") || true\n\nST=\"$ST\" EXCL=\"$EXCL\" python3 - <<'PY'\nimport json, os, re, subprocess\n\nst = os.environ[\"ST\"]\nfe = open(st + \"/fe_abs\").read().strip()\nfe_rel = open(st + \"/fe_rel\").read().strip()\npkg = json.load(open(fe + \"/package.json\", encoding=\"utf-8\"))\ntry:\n    outdated = json.load(open(st + \"/outdated.json\")) or {}\nexcept ValueError:\n    raise SystemExit(\"npm outdated lieferte kein JSON:\\n\" + open(st + \"/outdated.err\").read()[-800:])\nexcl = {e for e in re.split(r\"[\\s,]+\", os.environ.get(\"EXCL\", \"\")) if e}\nSECTIONS = (\"dependencies\", \"devDependencies\", \"optionalDependencies\")\n\n\ndef ver(v):\n    m = re.fullmatch(r\"(\\d+)\\.(\\d+)\\.(\\d+)\", v or \"\")\n    return tuple(map(int, m.groups())) if m else None\n\n\ndef breaking(a, b):\n    # semver: Major-Wechsel, bei 0.x schon der Minor-Wechsel\n    return a[0] != b[0] or (a[0] == 0 and a[1] != b[1])\n\n\ndef spec(name):\n    for s in SECTIONS:\n        if name in (pkg.get(s) or {}):\n            return pkg[s][name]\n    return None\n\n\nminor, majors, skipped = [], {}, []\nfor name, info in sorted(outdated.items()):\n    if isinstance(info, list):\n        info = info[0]\n    cur, wanted, latest = ver(info.get(\"current\")), ver(info.get(\"wanted\")), ver(info.get(\"latest\"))\n    sp = spec(name)\n    if name in excl:\n        skipped.append((name, \"ausgeschlossen (exclude_packages)\")); continue\n    if sp is None:\n        skipped.append((name, \"nicht direkt in package.json\")); continue\n    if not re.fullmatch(r\"[\\^~]?\\d+\\.\\d+\\.\\d+\", sp):\n        skipped.append((name, f\"Versionsangabe '{sp}' wird nicht automatisch geaendert\")); continue\n    if not cur or not latest:\n        skipped.append((name, \"Version nicht lesbar (nicht installiert oder Vorabversion)\")); continue\n    safe = latest if not breaking(cur, latest) else (\n        wanted if wanted and wanted > cur and not breaking(cur, wanted) else None)\n    if not safe or safe <= cur:\n        # Exakt/eng gepinnt: npm outdated kennt die neueste Version im selben Major nicht.\n        try:\n            r = subprocess.run([\"npm\", \"view\", \"--json\", f\"{name}@^{info['current']}\", \"version\"],\n                               cwd=fe, capture_output=True, text=True, timeout=90)\n            found = json.loads(r.stdout) if r.stdout.strip() else []\n        except (subprocess.SubprocessError, ValueError):\n            found = []\n        cands = [v for v in map(ver, found if isinstance(found, list) else [found]) if v]\n        safe = max(cands) if cands else None\n    if safe and safe > cur:\n        minor.append({\"name\": name, \"from\": info[\"current\"], \"to\": \".\".join(map(str, safe))})\n    if breaking(cur, latest):\n        majors[name] = {\"name\": name, \"from\": info[\"current\"], \"to\": info[\"latest\"]}\n\n# Major-Gruppen: was nur zusammen funktioniert, wird zusammen versucht.\nparent = {n: n for n in majors}\n\n\ndef find(n):\n    while parent[n] != n:\n        n = parent[n]\n    return n\n\n\ndef union(a, b):\n    parent[find(a)] = find(b)\n\n\nnames = set(majors)\nfor n in sorted(names):\n    if n.startswith(\"@types/\"):                      # @types/x  <-> x\n        base = n[len(\"@types/\"):]\n        base = \"@\" + base.replace(\"__\", \"/\") if \"__\" in base else base\n        if base in names:\n            union(n, base)\n    if n.startswith(\"@\"):                            # @eslint/js <-> eslint, gleicher Scope\n        scope = n[1:].split(\"/\")[0]\n        if scope in names:\n            union(n, scope)\n        for m in names:\n            if m != n and m.startswith(\"@\" + scope + \"/\"):\n                union(n, m)\n    try:                                             # Pflicht-Peers der Zielversion\n        r = subprocess.run([\"npm\", \"view\", \"--json\", f\"{n}@{majors[n]['to']}\"],\n                           cwd=fe, capture_output=True, text=True, timeout=90)\n        manifest = json.loads(r.stdout) if r.stdout.strip() else {}\n        if isinstance(manifest, list):\n            manifest = manifest[-1] if manifest else {}\n    except (subprocess.SubprocessError, ValueError):\n        manifest = {}\n    optional = {p for p, meta in (manifest.get(\"peerDependenciesMeta\") or {}).items()\n                if isinstance(meta, dict) and meta.get(\"optional\")}\n    for p in manifest.get(\"peerDependencies\") or {}:\n        if p in names and p not in optional:\n            union(n, p)\n\ngroups = {}\nfor n in sorted(names):\n    groups.setdefault(find(n), []).append(majors[n])\nkeyed = {}\nfor members in groups.values():\n    lead = min((m[\"name\"] for m in members), key=lambda x: (x.startswith(\"@types/\"), len(x), x))\n    keyed[lead.replace(\"/\", \"__\")] = members\n\njson.dump({\"minor\": minor, \"groups\": keyed, \"skipped\": skipped},\n          open(st + \"/plan.json\", \"w\"), indent=2, ensure_ascii=False)\nwith open(st + \"/major_keys.txt\", \"w\") as f:\n    f.writelines(k + \"\\n\" for k in sorted(keyed))\n\nprint(f\"## Update-Plan fuer {fe_rel}\\n\")\nif not minor and not keyed:\n    print(\"Alles aktuell - es gibt nichts zu aktualisieren.\")\nif minor:\n    print(f\"### Patch/Minor ({len(minor)}) - gebuendelt, bei Rot halbiert\")\n    for m in minor:\n        print(f\"- {m['name']}: {m['from']} -> {m['to']}\")\n    print()\nif keyed:\n    print(f\"### Major ({len(keyed)} Gruppen) - jede Gruppe einzeln geprueft\")\n    for k in sorted(keyed):\n        print(f\"- [{k}] \" + \", \".join(f\"{m['name']} {m['from']} -> {m['to']}\" for m in keyed[k]))\n    print()\nif skipped:\n    print(f\"### Nicht angefasst ({len(skipped)})\")\n    for n, why in skipped:\n        print(f\"- {n}: {why}\")\nPY\n",
+        "timeout_seconds": 600,
+        "shell_escape_variables": true,
+        "on_failure": "stop"
+      }
+    },
+    {
+      "type": "approval",
+      "name": "freigabe",
+      "config": {
+        "label": "Freigabe",
+        "question": "Der Update-Plan steht in der Ausgabe des Schritts „Plan“ dieses Laufs.\n\n- **Alles ausführen**: Patch/Minor gebündelt, danach jede Major-Gruppe einzeln – was rot wird, wird zurückgenommen\n- **Nur Patch/Minor**: Major-Updates bleiben offen\n- **Nur Plan**: nichts ändern\n\nIst der Plan leer, ist die Antwort egal.",
+        "options": [
+          "Alles ausführen",
+          "Nur Patch/Minor",
+          "Nur Plan"
+        ],
+        "variable_name": "update_freigabe",
+        "mode": "ask",
+        "timeout_minutes": 240
+      }
+    },
+    {
+      "type": "shell",
+      "name": "patch_minor",
+      "config": {
+        "label": "Patch/Minor aktualisieren",
+        "command": "set -euo pipefail\nset -- {{ execution_path }}; WS=\"${1:-}\"\nset -- {{ update_freigabe }}; ANTWORT=\"$*\"\n\nST=\"$WS/.git/dep-update\"\n. \"$ST/lib.sh\"\n: > \"$ST/major_items.txt\"\n: > \"$ST/applied.txt\"\n: > \"$ST/skipped_minor.txt\"\nprintf '%s\\n' \"$ANTWORT\" > \"$ST/antwort\"\n\ncase \"$ANTWORT\" in\n  \"Alles ausführen\") cp \"$ST/major_keys.txt\" \"$ST/major_items.txt\" ;;\n  \"Nur Patch/Minor\") ;;\n  *) echo \"Freigabe: '$ANTWORT' - es wird nichts geaendert.\"; exit 0 ;;\nesac\n\npython3 -c '\nimport json, sys\nfor m in json.load(open(sys.argv[1]))[\"minor\"]:\n    print(m[\"name\"] + \"@\" + m[\"to\"])\n' \"$ST/plan.json\" > \"$ST/minor_items.txt\"\nif [ ! -s \"$ST/minor_items.txt\" ]; then\n  echo \"Keine Patch/Minor-Updates.\"\n  exit 0\nfi\n\nset --\nwhile IFS= read -r i; do set -- \"$@\" \"$i\"; done < \"$ST/minor_items.txt\"\n\necho \"Patch/Minor: $# Pakete - erst alle zusammen, bei Rot halbieren:\"\nbisect_update \"$@\"\n",
+        "timeout_seconds": 3600,
+        "shell_escape_variables": true,
+        "on_failure": "stop"
+      }
+    },
+    {
+      "type": "foreach",
+      "name": "major",
+      "config": {
+        "label": "Major-Gruppen einzeln",
+        "items_source": "command",
+        "items_command": "cat {{ execution_path }}/.git/dep-update/major_items.txt 2>/dev/null || true",
+        "variable_name": "gruppe",
+        "execution_mode": "shell",
+        "command": "set -euo pipefail\nset -- {{ execution_path }}; WS=\"${1:-}\"\nset -- {{ gruppe }}; KEY=\"${1:-}\"\n\nST=\"$WS/.git/dep-update\"\n. \"$ST/lib.sh\"\n\nset --\nwhile IFS= read -r i; do set -- \"$@\" \"$i\"; done < <(python3 -c '\nimport json, sys\nfor m in json.load(open(sys.argv[1]))[\"groups\"][sys.argv[2]]:\n    print(m[\"name\"] + \"@\" + m[\"to\"])\n' \"$ST/plan.json\" \"$KEY\")\n\nLOG=\"$ST/logs/major-$KEY.log\"\nif try_update \"$LOG\" \"$@\"; then\n  commit_update \"deps(npm): Major $*\" \"Gruppe $KEY, Gates gruen.\"\n  echo \"$KEY\" >> \"$ST/applied_major.txt\"\n  echo \"gruen  $KEY: $*\"\n  exit 0\nfi\n\n# Rot: Material fuer den Migrationshinweis sichern, dann zuruecknehmen.\nD=\"$ST/failed/$KEY\"\nmkdir -p \"$D\"\nprintf '%s\\n' \"$@\" > \"$D/pakete.txt\"\ncp \"$ST/reason\" \"$D/grund.txt\"\ntail -n 150 \"$LOG\" > \"$D/gate.log\"\nfor i in \"$@\"; do\n  n=\"${i%@*}\"\n  for c in CHANGELOG.md CHANGELOG.MD changelog.md CHANGELOG History.md; do\n    if [ -f \"$FE/node_modules/$n/$c\" ]; then\n      head -c 15000 \"$FE/node_modules/$n/$c\" > \"$D/changelog-${n//\\//__}.md\"\n      break\n    fi\n  done\n  (cd \"$FE\" && npm view \"$i\" repository.url homepage) >> \"$D/quellen.txt\" 2>/dev/null || true\ndone\nrevert_update\necho \"$KEY\" >> \"$ST/failed.txt\"\necho \"rot    $KEY: $(cat \"$ST/reason\") - zurueckgenommen\"\nexit 1\n",
+        "shell_escape_variables": true,
+        "continue_on_error": true,
+        "timeout_seconds": 1800
+      }
+    },
+    {
+      "type": "foreach",
+      "name": "migration",
+      "config": {
+        "label": "Migrationshinweise für rote Major-Gruppen",
+        "items_source": "command",
+        "items_command": "cat {{ execution_path }}/.git/dep-update/failed.txt 2>/dev/null || true",
+        "variable_name": "gruppe",
+        "execution_mode": "ai",
+        "command": "Ein npm-Major-Update ist an den Pruefungen des Projekts gescheitert und wurde zurueckgenommen.\nPaketgruppe: {{ gruppe }}\n\nMaterial (nur lesen) im Verzeichnis {{ execution_path }}/.git/dep-update/failed/{{ gruppe }}/ :\n- pakete.txt: Paket@Zielversion\n- grund.txt: welche Pruefung scheiterte\n- gate.log: Ausgabe von npm install bzw. der Pruefung\n- changelog-*.md: Anfang des Changelogs, falls das Paket einen mitliefert\n- quellen.txt: Repository und Homepage\nQuelldateien des Projekts darfst du lesen, um die betroffenen Stellen zu benennen.\n\nRegeln: Schreibe KEINE Dateien, fuehre KEINE Befehle aus, installiere nichts.\n\nAntworte mit genau einer Zeile in diesem Format und sonst nichts:\ntodo_item: npm-Major-Update <Paketgruppe> auf <Zielversion> migrieren | MEDIUM | dependencies,npm | <Ursache in einem Satz>. Schritte: <zwei bis vier konkrete Schritte mit Dateinamen>. Material: .git/dep-update/failed/<Paketgruppe>/ im Run-Workspace.\n\nKein senkrechter Strich innerhalb der Felder, kein Zeilenumbruch.",
+        "shell_escape_variables": true,
+        "continue_on_error": true,
+        "timeout_seconds": 600
+      }
+    },
+    {
+      "type": "shell",
+      "name": "bericht",
+      "config": {
+        "label": "Bericht und Gate",
+        "command": "set -euo pipefail\nset -- {{ execution_path }}; WS=\"${1:-}\"\nset -- {{ workspace_source_sha }}; SRC=\"${1:-}\"\nset -- {{ block.migration.output }}; MIG=\"${1:-}\"\n\nST=\"$WS/.git/dep-update\"\ncnt() { if [ -f \"$1\" ]; then awk 'NF { n++ } END { print n + 0 }' \"$1\"; else echo 0; fi; }\nlst() { if [ -s \"$1\" ]; then sed 's/^/- /' \"$1\"; else echo \"- (keine)\"; fi; }\n\nANTWORT=\"$(cat \"$ST/antwort\" 2>/dev/null || echo \"?\")\"\nFE_REL=\"$(cat \"$ST/fe_rel\")\"\nBRANCH=\"$(git -C \"$WS\" branch --show-current)\"\nMINOR_TOTAL=\"$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))[\"minor\"]))' \"$ST/plan.json\")\"\nMAJOR_TOTAL=\"$(cnt \"$ST/major_keys.txt\")\"\nMINOR_OK=\"$(cnt \"$ST/applied.txt\")\"\nMINOR_RED=\"$(cnt \"$ST/skipped_minor.txt\")\"\nMAJOR_OK=\"$(cnt \"$ST/applied_major.txt\")\"\nMAJOR_RED=\"$(cnt \"$ST/failed.txt\")\"\nCOMMITS=\"$(git -C \"$WS\" rev-list --count \"$SRC..HEAD\")\"\nOFFEN=$(( MINOR_TOTAL - MINOR_OK + MAJOR_TOTAL - MAJOR_OK ))\n\necho \"## npm-Update: Ergebnis fuer $FE_REL\"\necho\necho \"Freigabe: **$ANTWORT**\"\necho\necho \"| | geplant | uebernommen | rot |\"\necho \"|---|---|---|---|\"\necho \"| Patch/Minor-Pakete | $MINOR_TOTAL | $MINOR_OK | $MINOR_RED |\"\necho \"| Major-Gruppen | $MAJOR_TOTAL | $MAJOR_OK | $MAJOR_RED |\"\necho\necho \"### Commits ($COMMITS)\"\ngit -C \"$WS\" log --oneline \"$SRC..HEAD\" | sed 's/^/- /'\n[ \"$COMMITS\" -gt 0 ] || echo \"- (keine)\"\necho\necho \"### Rot und zurueckgenommen\"\necho \"Patch/Minor:\"\nlst \"$ST/skipped_minor.txt\"\necho \"Major (Material je Gruppe unter .git/dep-update/failed/ im Run-Workspace):\"\nlst \"$ST/failed.txt\"\nif [ -s \"$ST/flaky.txt\" ]; then\n  echo\n  echo \"### Instabile Gates\"\n  echo \"Erst im zweiten Anlauf gruen (Tests unter Last?) - Updates wurden trotzdem uebernommen:\"\n  sort \"$ST/flaky.txt\" | uniq -c | awk '{ print \"- \" $2 \": \" $1 \"x\" }'\nfi\necho\necho \"Logs je Versuch: .git/dep-update/logs/ im Run-Workspace.\"\necho\nif [ \"$COMMITS\" -gt 0 ]; then\n  echo \"### Uebernehmen\"\n  echo \"Die Commits liegen auf \\`$BRANCH\\` im Run-Workspace; Push ist dort gesperrt. Im eigenen Checkout:\"\n  echo\n  echo \"    git fetch $WS $BRANCH:deps/npm-update-$(date +%Y%m%d)\"\n  echo \"    git log --oneline ..deps/npm-update-$(date +%Y%m%d)\"\n  echo\nfi\n\n# foreach stellt jeder Ausgabe \"[gruppe]: \" voran - so stuende todo_item: nicht am\n# Zeilenanfang und wuerde nicht ausgewertet. Hier einmal sauber ausgeben.\nTODOS=\"$(printf '%s\\n' \"$MIG\" | sed -n 's/^\\[[^]]*\\]: *\\(todo_item:\\)/\\1/p')\"\nif [ -n \"$TODOS\" ]; then\n  echo \"### TODO-Vorschlaege (Migration)\"\n  printf '%s\\n' \"$TODOS\"\n  echo\nfi\n\necho \"gate_category: dependencies\"\nif [ \"$OFFEN\" -eq 0 ]; then\n  echo \"gate_status: GREEN\"\n  echo \"gate_description: Alle npm-Abhaengigkeiten aktuell ($COMMITS Commits)\"\nelse\n  echo \"gate_status: YELLOW\"\n  echo \"gate_description: $OFFEN npm-Updates offen ($MINOR_RED Patch/Minor rot, $MAJOR_RED Major-Gruppen rot, Freigabe: $ANTWORT)\"\nfi\n",
+        "timeout_seconds": 120,
+        "shell_escape_variables": true,
+        "on_failure": "stop"
+      }
+    }
+  ]
+}
