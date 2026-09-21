@@ -56,8 +56,8 @@ check "garbage → default"   '[ "$(module_preset_prompt core <<<"x" 2>/dev/null
 
 echo "6) setup.sh argument handling"
 SETUP="$HERE/../setup.sh"
-check "--help documents --preset"                     'bash "$SETUP" --help | grep -q -- "--preset core"'
-check "--help documents --lang"                       'bash "$SETUP" --help | grep -q -- "--lang de"'
+check "--help documents --preset"                     'bash "$SETUP" --help | grep -- "--preset core" >/dev/null'
+check "--help documents --lang"                       'bash "$SETUP" --help | grep -- "--lang de" >/dev/null'
 check "unknown preset exits 2 before any check"       'bash "$SETUP" --preset everything >/dev/null 2>&1; [ $? -eq 2 ]'
 
 echo "7) generated module catalog"
@@ -209,7 +209,7 @@ check "a bad preset returns 2 and writes nothing"       '[ "$RC" -eq 2 ] && diff
 echo "14) setup.sh --force"
 FORCED="$TMP/forced/config/application.yml"; mkdir -p "$(dirname "$FORCED")"
 write_existing "$FORCED"; cp "$FORCED" "$TMP/forced.orig"
-check "--help documents --force"                       'bash "$SETUP" --help | grep -q -- "--force"'
+check "--help documents --force"                       'bash "$SETUP" --help | grep -- "--force" >/dev/null'
 check "--force without --preset exits 2 and says why"  'out="$(bash "$SETUP" --force 2>&1 >/dev/null)"; [ $? -eq 2 ] && [[ "$out" == *"--preset"* ]]'
 # Ohne Flag bleibt es beim alten Verhalten: module_preset_write fasst die Datei nicht an.
 module_preset_write "$FORCED" full; RC=$?

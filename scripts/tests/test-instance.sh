@@ -19,12 +19,12 @@ MYSURICATES_PORT=19400
 MYSURICATES_PRESET=research
 ENV
 check "bash -n"                               'bash -n "$SCRIPT"'
-check "--help lists the commands"             'bash "$SCRIPT" --help | grep -q "up|down|status|logs|key|list"'
+check "--help lists the commands"             'bash "$SCRIPT" --help | grep "up|down|status|logs|key|list" >/dev/null'
 check "unknown instance exits 2"              'bash "$SCRIPT" up --name nope >/dev/null 2>&1; [ $? -eq 2 ]'
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1
 check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" "$DOCKER_LOG"'
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
-check "list shows the instance and its port"  'bash "$SCRIPT" list | grep -q "demo.*19400"'
+check "list shows the instance and its port"  'bash "$SCRIPT" list | grep "demo.*19400" >/dev/null'
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]
