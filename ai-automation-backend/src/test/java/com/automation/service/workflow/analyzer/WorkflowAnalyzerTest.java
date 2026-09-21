@@ -71,6 +71,30 @@ class WorkflowAnalyzerTest {
         });
     }
 
+    /** Step-Indizes sind 0-basiert: {@code step_0_output} ist der erste Block (TODO fb4f2ccf). */
+    @Test
+    void ausgabeUeberNullBasiertenStepIndexGiltAlsGelesen() {
+        var blocks = List.of(
+                block("simple", "analyse", Map.of("prompt", "Analysiere das Projekt ausfuehrlich")),
+                block("shell", "zwischen", Map.of("command", "set -euo pipefail\necho ok")),
+                block("simple", "report", Map.of("prompt", "Schreibe einen Bericht aus {{ step_0_output }}")));
+
+        assertThat(rules(blocks, null)).doesNotContain("unwired-output");
+    }
+
+    @Test
+    void verweisAufDenFolgendenStepIndexLiestDenBlockNicht() {
+        var blocks = List.of(
+                block("simple", "analyse", Map.of("prompt", "Analysiere das Projekt ausfuehrlich")),
+                block("shell", "zwischen", Map.of("command", "set -euo pipefail\necho ok")),
+                block("simple", "report", Map.of("prompt", "Schreibe einen Bericht aus {{ step_1_output }}")));
+
+        assertThat(analyzer.analyze(blocks, null)).anySatisfy(f -> {
+            assertThat(f.rule()).isEqualTo("unwired-output");
+            assertThat(f.blockIndex()).isZero();
+        });
+    }
+
     /**
      * Ein Shell-Block, dessen Ausgabe niemand ueber einen Platzhalter liest, schreibt meist eine
      * Datei, die der naechste Block wieder einliest — das ist legitim und darf nicht melden.
