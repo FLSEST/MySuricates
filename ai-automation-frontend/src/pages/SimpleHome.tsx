@@ -6,7 +6,7 @@ import { useWorkflows, useExecuteWorkflow } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
-import { useModuleEnabled } from '../hooks/useModules';
+import { useModuleEnabled, useSystemModules } from '../hooks/useModules';
 import { buildHomeTiles, greetingKey } from '../utils/homeTiles';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
@@ -29,16 +29,17 @@ export function SimpleHome() {
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
   const assistantModule = useModuleEnabled('assistant');
+  const { data: systemModules } = useSystemModules();
 
   const [assistantInput, setAssistantInput] = useState('');
   const [executeDialog, setExecuteDialog] = useState<{ open: boolean; workflow: Workflow | null; variables: string[] }>(
     { open: false, workflow: null, variables: [] },
   );
 
-  const { navTiles, runTiles } = useMemo(
-    () => buildHomeTiles(workflows ?? [], pinnedWorkflowIds, 4),
-    [workflows, pinnedWorkflowIds],
-  );
+  const { navTiles, runTiles } = useMemo(() => {
+    const disabled = new Set((systemModules?.modules ?? []).filter((m) => !m.enabled).map((m) => m.name));
+    return buildHomeTiles(workflows ?? [], pinnedWorkflowIds, 4, disabled);
+  }, [workflows, pinnedWorkflowIds, systemModules]);
   const greeting = t.simple.home[greetingKey(new Date())];
 
   const submitAssistant = () => {

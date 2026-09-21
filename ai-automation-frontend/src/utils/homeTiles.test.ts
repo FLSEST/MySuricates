@@ -24,6 +24,18 @@ describe('buildHomeTiles', () => {
     ]);
   });
 
+  it('leaves out tiles of disabled modules (core preset)', () => {
+    const { navTiles } = buildHomeTiles([], [], 4, new Set(['factory', 'integrations', 'audit', 'wishes']));
+    expect(navTiles.map((t) => t.id)).toEqual([
+      'workflows', 'results', 'projects', 'schedules', 'todos', 'activity',
+    ]);
+  });
+
+  it('keeps a module tile while only other modules are disabled', () => {
+    const { navTiles } = buildHomeTiles([], [], 4, new Set(['skills']));
+    expect(navTiles).toHaveLength(10);
+  });
+
   it('returns top-N run tiles by runCount', () => {
     const all = [wf('a', 5), wf('b', 100), wf('c', 50)];
     const { runTiles } = buildHomeTiles(all, [], 2);
