@@ -355,7 +355,7 @@ for FIELD in $HEALTH_FIELDS; do
   check "ohne $FIELD: RED/audit-invalid mit Begruendung" \
     'grep -qx "gate_status: RED" "$TMP/health-gate.out" \
        && grep -qx "gate_category: audit-invalid" "$TMP/health-gate.out" \
-       && grep "^gate_description:" "$TMP/health-gate.out" | grep -q "$FIELD"'
+       && grep "^gate_description:" "$TMP/health-gate.out" | grep "$FIELD" >/dev/null'
   check "Report-Prompt nennt Pflichtfeld $FIELD" 'grep -q "$FIELD" "$TMP/health-prompt.txt"'
 done
 run_health_gate "$TMP/empty.txt"
@@ -424,7 +424,7 @@ for FIELD in $PERF_FIELDS; do
   check "ohne $FIELD: RED/audit-invalid mit Begruendung" \
     'grep -qx "gate_status: RED" "$TMP/perf-gate.out" \
        && grep -qx "gate_category: audit-invalid" "$TMP/perf-gate.out" \
-       && grep "^gate_description:" "$TMP/perf-gate.out" | grep -q "$FIELD"'
+       && grep "^gate_description:" "$TMP/perf-gate.out" | grep "$FIELD" >/dev/null'
   check "Report-Prompt nennt Pflichtfeld $FIELD" 'grep -q "$FIELD" "$TMP/perf-prompt.txt"'
 done
 run_perf_gate "$TMP/empty.txt"

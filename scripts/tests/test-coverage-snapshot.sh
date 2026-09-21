@@ -98,7 +98,7 @@ check "kein com/automation-Praefix"           '! grep -q "com/automation" "$UNTE
 check "kein absoluter Pfad in den Zeilen"     '! grep -q "^/" "$UNTESTED_ROWS"'
 check "absteigend nach LOC sortiert" \
   'cut -f2 "$UNTESTED_ROWS" | sort -rn | cmp -s - <(cut -f2 "$UNTESTED_ROWS")'
-check "erste Zeile ist die groesste Klasse"   'head -1 "$UNTESTED_ROWS" | grep -q "Untested20.java"'
+check "erste Zeile ist die groesste Klasse"   'head -1 "$UNTESTED_ROWS" | grep "Untested20.java" >/dev/null'
 
 echo "3) Duenne Tests ebenfalls vollstaendig und ohne Shell-Fehler"
 check "Zaehlzeile 'DUENNE TESTS gesamt: 2'"   'grep -qx "DUENNE TESTS gesamt: 2" "$TMP/out.txt"'
@@ -172,7 +172,7 @@ check "Gate laeuft ohne stderr"              '[ ! -s "$TMP/gate-err.txt" ]'
 run_gate "$(envelope_report 18 true)"
 check "18/20 Findings: RED"                  'grep -qx "gate_status: RED" "$TMP/gate.txt"'
 check "18/20 Findings: audit-incomplete"     'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
-check "18/20 Findings: Zahlen im Grund"      'grep "^gate_description:" "$TMP/gate.txt" | grep -q "18" && grep "^gate_description:" "$TMP/gate.txt" | grep -q "20"'
+check "18/20 Findings: Zahlen im Grund"      'grep "^gate_description:" "$TMP/gate.txt" | grep "18" >/dev/null && grep "^gate_description:" "$TMP/gate.txt" | grep "20" >/dev/null'
 
 run_gate "$(printf '### Coverage-Coach\n\ngate_status: GREEN\n')"
 check "kein Envelope: RED"                   'grep -qx "gate_status: RED" "$TMP/gate.txt"'

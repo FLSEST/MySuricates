@@ -114,26 +114,26 @@ for s in packages cycles sizes churn coupling summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/run1.txt'"
 done
 for k in packages edges cycles files files_over_300 files_over_500 churn_files_90d; do
-  check "summary-Schluessel $k" "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^$k=[0-9]+\$'"
+  check "summary-Schluessel $k" "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^$k=[0-9]+\$' >/dev/null"
 done
 check "summary nennt cycles_state" \
-  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^cycles_state=(ok|failed|no_edges)\$'"
+  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^cycles_state=(ok|failed|no_edges)\$' >/dev/null"
 check "compile= steht in ## run, nicht in ## summary" \
-  "sed -n '/^## run\$/,\$p' '$TMP/run1.txt' | grep -qE '^compile=' && ! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^compile='"
+  "sed -n '/^## run\$/,\$p' '$TMP/run1.txt' | grep -E '^compile=' >/dev/null && ! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^compile=' >/dev/null"
 check "jdeps= steht in ## run, nicht in ## summary" \
-  "sed -n '/^## run\$/,\$p' '$TMP/run1.txt' | grep -qE '^jdeps=' && ! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^jdeps='"
+  "sed -n '/^## run\$/,\$p' '$TMP/run1.txt' | grep -E '^jdeps=' >/dev/null && ! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^jdeps=' >/dev/null"
 check "packages liefert com.automation-Kanten" \
-  "grep -cE '^com\.automation[^${TAB}]*${TAB}com\.automation[^${TAB}]*${TAB}[0-9]+\$' '$TMP/run1.txt' | grep -qvx 0"
+  "grep -cE '^com\.automation[^${TAB}]*${TAB}com\.automation[^${TAB}]*${TAB}[0-9]+\$' '$TMP/run1.txt' | grep -vx 0 >/dev/null"
 check "sizes liefert Zeilen/Pfad-Paare" \
-  "sed -n '/^## sizes\$/,/^## churn\$/p' '$TMP/run1.txt' | grep -qE '^[0-9]+${TAB}com/automation/.*\.java\$'"
+  "sed -n '/^## sizes\$/,/^## churn\$/p' '$TMP/run1.txt' | grep -E '^[0-9]+${TAB}com/automation/.*\.java\$' >/dev/null"
 check "coupling liefert Paket-Kennzahlen" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/run1.txt' | grep -qE '^com\.automation[^${TAB}]*(${TAB}[0-9]+){4}\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/run1.txt' | grep -E '^com\.automation[^${TAB}]*(${TAB}[0-9]+){4}\$' >/dev/null"
 check "keine absoluten Benutzerpfade in der Ausgabe" \
   "! grep -qE '(/home/|/Users/)[a-zA-Z_-]+/' '$TMP/run1.txt'"
 check "packages>0 in summary" \
-  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^packages=[1-9][0-9]*\$'"
+  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^packages=[1-9][0-9]*\$' >/dev/null"
 check "files>0 in summary" \
-  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -qE '^files=[1-9][0-9]*\$'"
+  "sed -n '/^## summary\$/,/^## run\$/p' '$TMP/run1.txt' | grep -E '^files=[1-9][0-9]*\$' >/dev/null"
 
 echo "3) Zwei Laeufe liefern identische Messung (Determinismus)"
 bash "$SCRIPT" "$REPO" > "$TMP/run2.txt" 2> "$TMP/run2.err"; RC2=$?
@@ -282,7 +282,7 @@ check "python3-Fehlschlag: exit 0 (Faktenblatt bleibt)" '[ "$RC" -eq 0 ]'
 check "python3-Fehlschlag: cycles_state=failed"         'grep -qx "cycles_state=failed" "$TMP/fail-py.txt"'
 check "python3-Fehlschlag: error nennt cycles_failed"   'grep -qE "^error=.*cycles_failed" "$TMP/fail-py.txt"'
 check "python3-Fehlschlag: cycles-Abschnitt sagt nicht gemessen" \
-  "sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fail-py.txt' | grep -q 'nicht gemessen'"
+  "sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fail-py.txt' | grep 'nicht gemessen' >/dev/null"
 check "python3-Fehlschlag: behauptet keine Zyklenfreiheit" \
   "! grep -q 'keine Zyklen zwischen' '$TMP/fail-py.txt'"
 
@@ -293,7 +293,7 @@ check "jdeps-Fehlschlag: exit 0"                   '[ "$RC" -eq 0 ]'
 check "jdeps-Fehlschlag: jdeps=failed in ## run"   'grep -qx "jdeps=failed" "$TMP/fail-jdeps.txt"'
 check "jdeps-Fehlschlag: error nennt jdeps_failed" 'grep -qE "^error=.*jdeps_failed" "$TMP/fail-jdeps.txt"'
 check "jdeps-Fehlschlag: packages sagt nicht gemessen" \
-  "sed -n '/^## packages\$/,/^## cycles\$/p' '$TMP/fail-jdeps.txt' | grep -q 'nicht gemessen'"
+  "sed -n '/^## packages\$/,/^## cycles\$/p' '$TMP/fail-jdeps.txt' | grep 'nicht gemessen' >/dev/null"
 check "jdeps-Fehlschlag: edges=0"                  'grep -qx "edges=0" "$TMP/fail-jdeps.txt"'
 
 PATH="$TMP/bin-nojdeps" bash "$SCRIPT" "$TMP/fixture" > "$TMP/no-jdeps.txt" 2>/dev/null; RC=$?
