@@ -252,7 +252,7 @@ else
   SHOTS_RC=$?
   unset KEY
   if [ "$SHOTS_RC" = 0 ]; then
-    check "Login im Browser mit dem erzeugten API-Key" ok "$(grep -o 'console-errors [0-9]*' <<<"$SHOTS" | sed 's/console-errors /Konsolenfehler: /')"
+    check "Login im Browser mit dem erzeugten API-Key" ok "$(grep -o 'console-errors [0-9]*' <<<"$SHOTS" | sed 's/console-errors /Konsolenfehler: /')$(grep '^console-error ' <<<"$SHOTS" | sed 's/^console-error / · /' | tr -d '\n')"
   else
     check "Login im Browser mit dem erzeugten API-Key" fail "$(grep -E 'failed' <<<"$SHOTS" | head -n1)"
   fi

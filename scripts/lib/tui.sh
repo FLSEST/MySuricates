@@ -269,7 +269,7 @@ _tui_toggle() {
 # tui_confirm FRAGE y|n — 0 = ja, 1 = nein; ohne Terminal der Default
 tui_confirm() {
   local question="$1" def="${2:-y}" answer hint
-  if [ "$def" = y ]; then hint="[Y/n]"; else hint="[y/N]"; fi
+  if [ "$def" = y ]; then hint="$(_tui_msg confirm_default_yes '[Y/n]')"; else hint="$(_tui_msg confirm_default_no '[y/N]')"; fi
   if [ "$TUI_TTY" != 1 ]; then
     printf '  %s %s %s\n' "$question" "$hint" "$def"
     [ "$def" = y ]; return

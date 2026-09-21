@@ -271,7 +271,7 @@ docker_ready() {
 
 # --- Schritt 4: Module ------------------------------------------------------------------------------
 step_modules() {
-  local choice rc items key tier on sel hard
+  local choice rc items key tier on sel hard label=""
   section 3
   if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)"; return 0; fi
   CUSTOM_LINES=""
@@ -285,7 +285,7 @@ step_modules() {
     case "$choice" in
       0) PRESET=core ;; 1) PRESET=research ;; 2) PRESET=full ;;
       3)
-        PRESET=core
+        PRESET=core; label="$(msg modules_custom_done)"
         items=()
         for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
           tier="$(module_catalog_get TIER "$key")"; on=off; [ "$tier" = standard ] && on=on
@@ -320,7 +320,7 @@ step_modules() {
     CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=true
 "
   done
-  tui_done "$(msg step_modules)" "$PRESET${MODULES:+ + $MODULES}"
+  tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}"
   return 0
 }
 

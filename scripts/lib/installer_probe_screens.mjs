@@ -40,6 +40,8 @@ try {
     failed = true;
   }
   console.log(`console-errors ${errors.length}`);
+  // The texts themselves: a count alone does not tell a 401 before the login from a real error
+  for (const e of errors.slice(0, 5)) console.log(`console-error ${e.replace(/\s+/g, ' ').slice(0, 200)}`);
 } catch (err) {
   console.log(`login failed: ${String(err).split('\n')[0]}`);
   failed = true;
