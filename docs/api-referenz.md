@@ -2088,6 +2088,28 @@ Anwendungs-Einstellung setzen.
 
 **Response:** `200 OK`
 
+### `GET /api/v1/system/tray-config`
+
+Laufzeit-Einstellungen des Host-Tray-Icons abrufen.
+
+**Response:**
+
+```json
+{
+  "popupsEnabled": true,
+  "notifyApprovals": true,
+  "notifyFailures": true,
+  "notifySuccess": false,
+  "publicUrl": "https://mysuricates.example.com"
+}
+```
+
+### `PUT /api/v1/system/tray-config`
+
+Tray-Einstellungen aktualisieren. Teil-Updates sind erlaubt. Externe Browserziele müssen HTTPS verwenden; HTTP ist nur für Loopback-Adressen zulässig. Das Browserziel ist von den internen Healthcheck-URLs getrennt.
+
+**Request/Response:** dieselben Felder wie bei `GET`; die Response enthält den vollständigen validierten Stand.
+
 ### `GET /api/v1/system/execution-config`
 
 Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält zusätzlich ein read-only-Feld `activeRuns` mit der Anzahl aktiver Runs.

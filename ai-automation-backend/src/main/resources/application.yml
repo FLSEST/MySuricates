@@ -237,3 +237,4 @@ automation:
     poll-interval-ms: ${AUTOMATION_TRAY_POLL_MS:15000}
     web-ui-url: ${AUTOMATION_WEB_UI_URL:http://localhost:3000}
     stable-url: ${AUTOMATION_STABLE_URL:http://localhost:9091}
+    public-url: ${AUTOMATION_TRAY_PUBLIC_URL:}

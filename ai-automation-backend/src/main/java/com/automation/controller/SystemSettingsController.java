@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.service.system.ExecutionSettingsService;
 import com.automation.service.system.SystemSettingsService;
+import com.automation.service.tray.TraySettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ public class SystemSettingsController {
 
     private final SystemSettingsService systemSettingsService;
     private final ExecutionSettingsService executionSettingsService;
+    private final TraySettingsService traySettingsService;
 
     @GetMapping("/settings/{key}")
     public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {
@@ -49,6 +51,20 @@ public class SystemSettingsController {
         try {
             executionSettingsService.updateAll(settings);
             return ResponseEntity.ok(executionSettingsService.getCurrentSettings());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/tray-config")
+    public ResponseEntity<Map<String, Object>> getTrayConfig() {
+        return ResponseEntity.ok(traySettingsService.getCurrentSettings());
+    }
+
+    @PutMapping("/tray-config")
+    public ResponseEntity<?> updateTrayConfig(@RequestBody Map<String, Object> settings) {
+        try {
+            return ResponseEntity.ok(traySettingsService.update(settings));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
