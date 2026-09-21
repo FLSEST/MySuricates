@@ -197,4 +197,17 @@ class GateStatusOutputParserTest {
         assertThat(result.get().category()).isEqualTo("security");
         assertThat(result.get().description()).isEqualTo("SQL injection vulnerability detected");
     }
+
+    /** foreach setzt "[<item>]: " vor jede Iterationsausgabe (TODO 8671d03b). */
+    @Test
+    void parse_markersBehindForeachItemPrefix() {
+        String output = """
+                [frontend]: gate_status: YELLOW
+                [frontend]: gate_description: 3 Updates offen
+                """;
+        Optional<ParsedGateStatus> result = GateStatusOutputParser.parse(output);
+        assertThat(result).isPresent();
+        assertThat(result.get().status()).isEqualTo(GateStatus.YELLOW);
+        assertThat(result.get().description()).isEqualTo("3 Updates offen");
+    }
 }

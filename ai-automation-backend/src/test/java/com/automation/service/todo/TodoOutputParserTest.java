@@ -292,4 +292,23 @@ class TodoOutputParserTest {
         assertThat(items.get(1).description()).isNull();
         assertThat(items.get(3).description()).isNull();
     }
+
+    /** foreach setzt "[<item>]: " vor jede Iterationsausgabe (TODO 8671d03b). */
+    @Test
+    void parse_markerBehindForeachItemPrefix() {
+        String output = """
+                [@types/react]: todo_item: React 19 migrieren | MEDIUM | dependencies,npm | Typen brechen
+                [vite]: kein Befund
+                """;
+        List<ParsedTodoItem> items = TodoOutputParser.parse(output);
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).title()).isEqualTo("React 19 migrieren");
+        assertThat(items.get(0).description()).isEqualTo("Typen brechen");
+    }
+
+    @Test
+    void parse_bracketTextInsideALine_isNoPrefix() {
+        assertThat(TodoOutputParser.parse("Siehe [Link]: todo_item: X | HIGH | a"))
+                .as("nur ein Präfix am Zeilenanfang zählt").isEmpty();
+    }
 }
