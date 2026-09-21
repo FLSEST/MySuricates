@@ -293,6 +293,10 @@ class WorkflowExecutorDeterministicIntegrationTest {
         assertThat(lineCount(project, "b.log")).as("interrupted block must run again").isEqualTo(1);
         assertThat(lineCount(project, "c.log")).as("block after the interrupted one must run").isEqualTo(1);
         assertThat(stepsFor(resumed)).extracting(StepResult::getStepIndex).doesNotHaveDuplicates();
+        // Only metadata.blockIndex maps a step to its block: the step indices ran ahead, and the
+        // interrupted attempt of b is still persisted next to its resumed one.
+        assertThat(stepsFor(resumed)).extracting(s -> s.getMetadata().get("blockIndex"))
+                .containsExactly(0, 1, 2, 2, 3);
     }
 
     /** Puts the run into the state an application restart leaves behind: run INTERRUPTED, last step still RUNNING. */

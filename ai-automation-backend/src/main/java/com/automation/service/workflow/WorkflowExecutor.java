@@ -216,7 +216,8 @@ public class WorkflowExecutor {
             for (BlockDefinition block : blocks) {
                 // Resume: blocks of the earlier segment are skipped by position. Step indices are not
                 // comparable across segments — wrapper blocks consumed extra ones (TODO 1be423b4).
-                if (blockPosition++ < resume.blocksToSkip()) continue;
+                int position = blockPosition++;
+                if (position < resume.blocksToSkip()) continue;
 
                 if (context.shouldStop()) {
                     run.setStatus(RunStatus.CANCELLED);
@@ -232,7 +233,7 @@ public class WorkflowExecutor {
 
                 // Pre-create RUNNING placeholder so UI shows the step immediately
                 int stepIndex = context.preAllocateStepIndex();
-                StepResult step = stepRunner.startStep(run, stepIndex, block);
+                StepResult step = stepRunner.startStep(run, stepIndex, block, position);
                 stepRunner.runStep(step, block, executor, context, run, containerId);
 
                 // Restore baseline skill context after a block with extra skills
