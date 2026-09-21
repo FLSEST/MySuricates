@@ -94,8 +94,16 @@ wait_health() {
 # Container
 # ---------------------------------------------------------------------------------------------------
 container_cmd() {
-  local override="$INSTANCES_DIR/$NAME.override.yml"
+  local override="$INSTANCES_DIR/$NAME.override.yml" owner
   compose() { docker compose -p "mysuricates-$NAME" -f "$COMPOSE_FILE" -f "$override" "$@"; }
+  # Ein gleichnamiger Container aus einer anderen Einrichtung (z. B. docker-compose.test.yml →
+  # mysuricates-test) wird nie angefasst; down/logs bleiben ohnehin im eigenen Compose-Projekt.
+  case "$CMD" in down|logs) ;; *)
+    if owner="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "mysuricates-$NAME" 2>/dev/null)" \
+       && [ "$owner" != "mysuricates-$NAME" ]; then
+      die "Es gibt schon einen Container mysuricates-$NAME aus einer anderen Einrichtung (Compose-Projekt: ${owner:-keins}) — bitte einen anderen Namen wählen (--name)"
+    fi ;;
+  esac
   case "$CMD" in
     up)
       host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" > "$override"

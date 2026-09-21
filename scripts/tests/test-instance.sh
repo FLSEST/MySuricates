@@ -9,7 +9,11 @@ mkdir -p "$TMP/bin" "$TMP/inst" "$TMP/home"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >> "$DOCKER_LOG"
-case "$*" in *"compose"*"config"*) exit 0 ;; *"inspect"*) echo healthy ;; esac
+case "$*" in
+  *"compose"*"config"*) exit 0 ;;
+  *"com.docker.compose.project"*) [ -n "${OWNER+x}" ] || exit 1; echo "$OWNER"; exit 0 ;;  # Container da? wem gehoert er?
+  *"inspect"*) echo healthy ;;
+esac
 exit 0
 STUB
 chmod +x "$TMP/bin/docker"
@@ -26,6 +30,16 @@ check "compose project named after instance"  'grep -q -- "-p mysuricates-demo" 
 check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DOCKER_LOG" && grep -q "demo.override.yml" "$DOCKER_LOG"'
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
 check "list shows the instance and its port"  'bash "$SCRIPT" list | grep "demo.*19400" >/dev/null'
+echo "1b) a container of the same name from another setup is never touched"
+: > "$DOCKER_LOG"
+OUT="$(OWNER=ai-automation-backend bash "$SCRIPT" up --name demo --no-wait 2>&1)"; RC=$?
+check "foreign container: up refuses (exit 2)"  '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep "ai-automation-backend" >/dev/null'
+check "foreign container: no compose call"      '! grep -q "^compose " "$DOCKER_LOG"'
+OUT="$(OWNER= bash "$SCRIPT" key --name demo 2>&1)"; RC=$?
+check "container without compose label counts as foreign" '[ "$RC" = 2 ]'
+check "own container is fine"                   'OWNER=mysuricates-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1'
+check "down stays inside its compose project"   'OWNER=ai-automation-backend bash "$SCRIPT" down --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -- "-p mysuricates-demo" >/dev/null'
+
 echo "2) AUTOMATION_* lines reach the instance"
 check "compose passes the instance file as env_file" 'grep -q "env_file:" "$HERE/../../deploy/compose.yml" && grep -q "MYSURICATES_ENV_FILE" "$HERE/../../deploy/compose.yml"'
 
