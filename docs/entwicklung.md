@@ -394,6 +394,10 @@ sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
 ./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
 ```
 
+Die interaktive Maschine teilt das Netz des Rechners (`--network host`): Die Adresse, die
+`setup.sh` am Ende nennt, öffnet man direkt im Browser, belegte Ports des Rechners umgeht der
+Installer selbst. Im Modus-Schritt „auf diesem Rechner“ wählen — Docker gibt es in der Probe nicht.
+
 Der automatische Lauf nimmt den Weg „eine Instanz auf diesem Rechner“ aus
 [GETTING-STARTED.md](GETTING-STARTED.md) in zwei Phasen, jede unter einem Pseudo-Terminal:
 `setup.sh --check` (nur prüfen) und `setup.sh --yes --runtime host --bind 0.0.0.0` (ein Durchgang

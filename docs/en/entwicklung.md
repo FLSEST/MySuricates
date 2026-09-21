@@ -378,6 +378,10 @@ the working tree. Requires Docker.
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
 ```
 
+The interactive machine shares the host network (`--network host`): open the address `setup.sh`
+names at the end directly in the browser; the installer skips ports that are busy on the host. Pick
+"on this machine" in the mode step — there is no Docker inside the probe.
+
 The automatic run takes the "one instance on this machine" way from
 [GETTING-STARTED.md](GETTING-STARTED.md) in two phases, each under a pseudo terminal:
 `setup.sh --check` (check only) and `setup.sh --yes --runtime host --bind 0.0.0.0` (one pass up to

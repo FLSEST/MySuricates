@@ -96,7 +96,7 @@ M_ai_login_hint="Vor dem ersten KI-Workflow bei %s anmelden: %s"
 
 # Ports und Ordner
 M_ports_title="Ports und Ordner"
-M_ports_q="Port für %s"
+M_ports_q="Port für %s (Oberfläche und API — ein Port)"
 M_ports_busy="Port %s ist belegt — nehme %s"
 M_projects_q="Ordner mit deinen Projekten (wird in den Container eingebunden)"
 M_socket_q="Shell-Blöcke mit container_image erlauben? (bindet den Docker-Socket ein — volle Kontrolle über Docker)"

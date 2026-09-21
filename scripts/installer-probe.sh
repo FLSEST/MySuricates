@@ -6,13 +6,15 @@
 #
 #   scripts/installer-probe.sh                   # HEAD dieses Checkouts prüfen, Report schreiben
 #   scripts/installer-probe.sh --ref main        # anderen Stand prüfen (Branch, Tag oder SHA)
-#   scripts/installer-probe.sh --interactive     # dieselbe frische Maschine als Shell — selbst durchklicken
+#   scripts/installer-probe.sh --interactive     # dieselbe frische Maschine als Shell — selbst durchklicken;
+#                                                # teilt das Netz des Rechners: die Adresse, die setup.sh am
+#                                                # Ende nennt, geht direkt im Browser
 #   scripts/installer-probe.sh --keep            # Container nach dem Lauf stehen lassen, Instanz ansehen
 #
 #   Weitere Optionen: --repo <pfad>   Repo, aus dem der Stand kommt (Default: dieses)
 #                     --image <image> apt- oder dnf-Image (Default ubuntu:24.04; z. B. rockylinux:9)
 #                     --out <dir>     Report-Verzeichnis (Default: ~/.local/state/mysuricates/installer-probe/<zeit>-<sha>)
-#                     --port <n>      Port auf 127.0.0.1 (Default: automatisch; interaktiv 23000)
+#                     --port <n>      Port auf 127.0.0.1 (Default: automatisch; nur automatischer Lauf)
 #                     --no-screenshots
 #
 # Automatischer Lauf (Weg „eine Instanz auf dem Rechner“): 1-pruefen `setup.sh --check`, 2-einrichten
@@ -57,7 +59,7 @@ while [ "$#" -gt 0 ]; do
     --keep)           KEEP=1 ;;
     --interactive)    INTERACTIVE=1 ;;
     --no-screenshots) SCREENSHOTS=0 ;;
-    -h|--help)        sed -n '3,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)        sed -n '3,/^set -uo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
     *)                die "Unbekannte Option: $1 (siehe --help)" ;;
   esac
   shift
@@ -67,6 +69,9 @@ done
 [ -n "$IMAGE" ] || die "--image braucht einen Wert"
 if [ -n "$FRONTEND_PORT" ] && ! [[ "$FRONTEND_PORT" =~ ^[0-9]+$ && "$FRONTEND_PORT" -ge 1024 && "$FRONTEND_PORT" -le 65000 ]]; then
   die "--port muss eine Zahl zwischen 1024 und 65000 sein"
+fi
+if [ "$INTERACTIVE" = 1 ] && [ -n "$FRONTEND_PORT" ]; then
+  die "--port gilt nur für den automatischen Lauf — interaktiv nennt setup.sh den Port selbst"
 fi
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "Kein Git-Repo: $REPO"
 SHA="$(git -C "$REPO" rev-parse --verify --quiet "${REF}^{commit}")" || die "Unbekannter Stand: $REF"
@@ -107,9 +112,13 @@ if ! git -C "$REPO" bundle create -q "$WORK/repo.bundle" "$REF" 2>/dev/null; the
   git -C "$REPO" bundle create -q "$WORK/repo.bundle" --all 2>/dev/null || die "git bundle fehlgeschlagen"
 fi
 
-# Ein Port: die Instanz liefert die Oberfläche selbst aus (setup.sh, Weg „auf dem Rechner“)
-[ "$INTERACTIVE" = 1 ] && FRONTEND_PORT="${FRONTEND_PORT:-23000}"
-if [ -n "$FRONTEND_PORT" ]; then PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:9090")
+# Ein Port: die Instanz liefert die Oberfläche selbst aus (setup.sh, Weg „auf dem Rechner“).
+# Automatisch: Container-Port 9090 auf einen freien Port des Rechners. Interaktiv: das Netz des
+# Rechners teilen — der Port, den setup.sh wählt (oder den man eintippt), ist dann direkt
+# localhost:<port>, belegte Ports des Rechners sieht setup.sh selbst. Ein fest veröffentlichter Port
+# ließ jede andere Wahl ins Leere laufen (6abc7fca). Die Instanz bleibt auf 127.0.0.1.
+if [ "$INTERACTIVE" = 1 ]; then PORT_ARGS=(--network host)
+elif [ -n "$FRONTEND_PORT" ]; then PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:9090")
 else PORT_ARGS=(-p "127.0.0.1::9090"); fi
 
 echo "Installer-Probe: ${REF} (${SHORT}) auf ${IMAGE}"
@@ -147,19 +156,21 @@ if [ "$INTERACTIVE" = 1 ]; then
   L=""; case "${LANG:-}" in de*) L=" --lang de" ;; esac
   HINTS="
   Frische Maschine: ${IMAGE}, Stand ${REF} (${SHORT}), Benutzer probe mit sudo.
-  So geht ein neuer Nutzer vor (--bind 0.0.0.0, damit der Browser draußen die Instanz erreicht):
+  So geht ein neuer Nutzer vor:
 
-    ./scripts/setup.sh --bind 0.0.0.0${L}
+    ./scripts/setup.sh${L}
 
   Im Modus-Schritt „auf diesem Rechner“ wählen — in diesem Wegwerf-Container gibt es kein Docker,
   „im Container“ und „Dev · Test · Prod“ scheitern hier (Probe dafür: TODO 2ed907a1).
   Nur ansehen, nichts installieren:  ./scripts/setup.sh --dry-run${L}
 
-  Danach im Browser: http://localhost:${FPORT}
+  Die Maschine teilt das Netz mit deinem Rechner: die Adresse, die der Installer am Ende nennt
+  (http://localhost:<port>), öffnest du direkt im Browser. Belegte Ports umgeht er selbst.
   API-Key für den Login:  scripts/instance.sh key --name main
   exit beendet die Probe und räumt den Container weg.
 "
-  docker exec -i -u probe "$NAME" bash -c 'cat > ~/.probe-hints && echo "cat ~/.probe-hints" >> ~/.bashrc' <<<"$HINTS"
+  # Eigene Eingabeaufforderung: mit dem Netz des Rechners hiesse die Maschine wie der Rechner selbst
+  docker exec -i -u probe "$NAME" bash -c 'cat > ~/.probe-hints && printf "%s\n" "cat ~/.probe-hints" "PS1='"'"'probe@frische-maschine:\\w\\$ '"'"'" >> ~/.bashrc' <<<"$HINTS"
   docker exec -it -u probe -w "$CLONE" -e TERM="${TERM:-xterm-256color}" -e LANG=C.UTF-8 "$NAME" bash
   exit 0
 fi

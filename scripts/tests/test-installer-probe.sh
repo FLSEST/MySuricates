@@ -40,11 +40,26 @@ check "port must be numeric"                            '[ "$(probe --port abc)"
 check "port below 1024 is refused"                      '[ "$(probe --port 80)" = 2 ]'
 check "--repo must be a git repo"                       '[ "$(probe --repo "$TMP")" = 2 ] && grep -q "Kein Git-Repo" "$TMP/out"'
 check "--interactive without a terminal is refused"     '[ "$(probe --interactive)" = 2 ] && grep -q "braucht ein Terminal" "$TMP/out"'
+check "--port with --interactive is refused"            '[ "$(probe --interactive --port 23000)" = 2 ] && grep -q "nur für den automatischen Lauf" "$TMP/out"'
 check "none of these touched docker"                    '[ ! -s "$DOCKER_CALLS" ]'
 
 echo "3) docker availability"
 check "unreachable daemon exits 2 with a reason"        '[ "$(probe --ref HEAD)" = 2 ] && grep -q "Docker-Daemon nicht erreichbar" "$TMP/out"'
 check "it asked docker info, nothing else"              '[ "$(cat "$DOCKER_CALLS")" = info ]'
+
+echo "4) interactive: the machine shares the host network (6abc7fca)"
+# Der Port, den setup.sh in der Probe waehlt, muss draussen unter localhost:<port> antworten — ein
+# fest veroeffentlichter Port (frueher 9090 → 23000) laesst jede andere Wahl ins Leere laufen.
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
+  mkdir -p "$TMP/bin2"
+  printf '#!/usr/bin/env bash\necho "$*" >> "$DOCKER_CALLS"\ncase "$1" in info) exit 0 ;; *) exit 1 ;; esac\n' > "$TMP/bin2/docker"
+  chmod +x "$TMP/bin2/docker"; : > "$DOCKER_CALLS"
+  script -qec "PATH='$TMP/bin2:$PATH' bash '$PROBE' --interactive" /dev/null </dev/null >/dev/null 2>&1
+  check "interactive container uses the host network"   'grep -E "^run .*--network host" "$DOCKER_CALLS" >/dev/null'
+  check "interactive container publishes no port"       '! grep -E "^run .* -p " "$DOCKER_CALLS" >/dev/null'
+else
+  echo "  skip (no usable script command)"
+fi
 
 echo
 echo "passed=$PASS failed=$FAIL"

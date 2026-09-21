@@ -97,7 +97,7 @@ M_ai_login_hint="Log in to %s before the first AI workflow: %s"
 
 # Ports and folders
 M_ports_title="Ports and folders"
-M_ports_q="Port for %s"
+M_ports_q="Port for %s (interface and API — one port)"
 M_ports_busy="Port %s is in use — taking %s"
 M_projects_q="Folder with your projects (mounted into the container)"
 M_socket_q="Allow shell blocks with container_image? (mounts the Docker socket — full control over Docker)"
