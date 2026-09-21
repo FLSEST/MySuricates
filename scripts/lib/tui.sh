@@ -192,9 +192,9 @@ tui_select() {
       q) _tui_cursor on; return 3 ;;
     esac
   done
+  # Das Panel verschwindet; den erledigten Schritt schreibt der Aufrufer als Einzeiler (tui_done)
   tui_clear_lines "$TUI_LAST_DRAWN"
-  i=0; for opt in "$@"; do [ "$i" -eq "$sel" ] && label="${opt%%|*}"; i=$((i + 1)); done
-  tui_box "$title" "$(printf '%s%s%s %s%s%s' "$C_AMBER" "$T_PTR" "$C_RESET" "$C_BOLD" "$label" "$C_RESET")"
+  TUI_LAST_DRAWN=0
   _tui_cursor on
   printf -v "$var" '%s' "$sel"
   return 0
@@ -242,6 +242,8 @@ tui_checklist() {
         q) _tui_cursor on; return 3 ;;
       esac
     done
+    tui_clear_lines "$TUI_LAST_DRAWN"
+    TUI_LAST_DRAWN=0
     _tui_cursor on
   fi
   result=""; i=0

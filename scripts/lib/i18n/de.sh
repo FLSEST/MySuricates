@@ -40,3 +40,73 @@ M_mode_staged_hint="in Dev planen und bauen, in Test prüfen, in Prod laufen las
 # Befehle ausfuehren
 M_run_failed="%s fehlgeschlagen (Exit %s) — letzte Zeilen:"
 M_run_log="Vollständiges Log: %s"
+
+# Willkommen / erneuter Aufruf
+M_welcome_intro="Richtet MySuricates auf diesem Rechner in %s Schritten ein. b geht zurück, q beendet."
+M_rerun_title="Es gibt schon eine Einrichtung"
+M_rerun_change="Einstellungen von %s ändern"
+M_rerun_change_hint="Port, Module, KI-Anbieter"
+M_rerun_fresh="Neu einrichten"
+M_rerun_fresh_hint="schreibt die Konfiguration neu"
+M_rerun_quit="Beenden"
+M_quit="Einrichtung abgebrochen."
+
+# Pruefung
+M_checks_system="%s · Paketmanager: %s"
+M_checks_all_ok="Alle Voraussetzungen vorhanden"
+M_checks_plan="Fehlt oder zu alt — wird ausgeführt:"
+M_checks_install_q="Fehlende Werkzeuge jetzt installieren? (Systempakete brauchen sudo)"
+M_checks_manual="Bitte von Hand installieren: %s"
+M_checks_still_missing="Fehlt noch: %s — installieren und scripts/setup.sh erneut starten."
+M_checks_docker_group="Docker läuft für diesen Durchgang über 'sg docker'; einmal ab- und anmelden, dann überall."
+M_checks_docker_down="Docker ist installiert, läuft aber nicht — starten (Linux: sudo systemctl start docker, macOS: Docker Desktop öffnen)."
+M_checks_summary_ok="Alles vorhanden — scripts/setup.sh im Terminal starten oder mit --yes."
+M_checks_summary_missing="Fehlt: %s — scripts/setup.sh im Terminal oder mit --yes starten, dann wird es installiert."
+M_status_ok="ok"
+M_status_old="zu alt"
+M_status_missing="fehlt"
+
+# Module
+M_modules_title="Welche Funktionen soll diese Instanz haben?"
+M_modules_standard="Standard"
+M_modules_standard_hint="Kern + Dashboard-Bericht — kleinste Oberfläche"
+M_modules_research="Research"
+M_modules_research_hint="+ Chains, Assistent, Insights, Memory, Audit"
+M_modules_full="Voll"
+M_modules_full_hint="alles, auch Webhooks, Fernzugriff, Terminal"
+M_modules_custom="Eigene Auswahl…"
+M_modules_custom_hint="einzelne Module und Härtung wählen"
+M_modules_pick_title="Module"
+M_modules_hardening_title="Härtung"
+M_modules_ui_editable_q="Module später in der Oberfläche umschaltbar? (jeder mit API-Key könnte dann Netzwerk- und Host-Funktionen einschalten)"
+M_modules_staged="Dev: alle Module · Test und Prod: Standard, unbeaufsichtigt nur versiegelte Workflows"
+
+# KI
+M_ai_title="KI-Anbieter"
+M_ai_logged_in="installiert, angemeldet"
+M_ai_logged_out="installiert, nicht angemeldet"
+M_ai_missing="nicht installiert"
+M_ai_choose="Welchen Anbieter sollen Workflows standardmäßig nutzen?"
+M_ai_none="Keine KI-CLI gefunden. MySuricates startet trotzdem; KI-Blöcke brauchen eine davon:"
+M_ai_install="%s — installieren: %s   anmelden: %s"
+M_ai_login_hint="Vor dem ersten KI-Workflow bei %s anmelden: %s"
+
+# Ports und Ordner
+M_ports_title="Ports und Ordner"
+M_ports_q="Port für %s"
+M_ports_busy="Port %s ist belegt — nehme %s"
+M_projects_q="Ordner mit deinen Projekten (wird in den Container eingebunden)"
+M_socket_q="Shell-Blöcke mit container_image erlauben? (bindet den Docker-Socket ein — volle Kontrolle über Docker)"
+
+# Bauen und fertig
+M_build_q="Jetzt bauen und starten?"
+M_build_run="%s bauen und starten"
+M_build_failed="Start von %s fehlgeschlagen — Details: %s"
+M_dry_run="(Probelauf) würde ausführen: %s"
+M_kept_existing="Vorhandene %s bleibt (--reconfigure schreibt sie neu)"
+M_done_open="→  %s"
+M_done_key="API-Key für den Login: %s"
+M_done_manage="Start / Stopp:"
+M_done_change="Ändern:       "
+M_done_not_started="eingerichtet, noch nicht gestartet"
+M_done_key_cmd="API-Key ganz:  "

@@ -42,6 +42,8 @@ jobs:
           bash scripts/tests/test-providers.sh
           bash scripts/tests/test-i18n.sh
           bash scripts/tests/test-tui.sh
+          bash scripts/tests/test-deps.sh
+          bash scripts/tests/test-setup.sh
           python3 scripts/tools/installer-art.py --check
       # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
       # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
