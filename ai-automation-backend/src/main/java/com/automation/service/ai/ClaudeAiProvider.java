@@ -29,6 +29,15 @@ public class ClaudeAiProvider implements AiProvider {
     }
 
     @Override
+    public ProviderSetup setup() {
+        // macOS legt die Anmeldung im Schluesselbund ab; dann bleibt .claude.json mit oauthAccount
+        return new ProviderSetup("claude",
+                "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
+                "claude auth login",
+                java.util.List.of(".claude/.credentials.json", ".claude.json:oauthAccount"));
+    }
+
+    @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
         HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
                 request.prompt(),

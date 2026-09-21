@@ -6,7 +6,7 @@
 #
 # Linux: the AI CLIs themselves AND their logins come from the host, so nobody logs in twice
 # (Flo, 2026-09-21). macOS: a Mac binary does not run in a Linux container — only the logins are
-# mounted, the CLIs live in the image. bash 3.2 compatible (macOS): no associative arrays.
+# mounted; the CLIs have to come from the image (not built in yet — TODO 3dd32594). bash 3.2 (macOS).
 
 HOST_MOUNTS_PROVIDER_COUNT=0
 

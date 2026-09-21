@@ -383,24 +383,29 @@ Befund ab (2026-08-04 hat ein DELETE auf einer bereits korrupten DB den Schaden 
 ### Installer auf frischer Maschine (Installer-Probe)
 
 `scripts/installer-probe.sh` prüft `scripts/setup.sh` so, wie ein neuer Nutzer ihn erlebt: in
-einem frischen Container (Default `ubuntu:24.04`), auf dem nur git, sudo und tzdata liegen. Geprüft
-wird immer ein committeter Stand (Default `HEAD`, sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
+einem frischen Container (Default `ubuntu:24.04`, mit `--image rockylinux:9` auch ein dnf-System),
+auf dem nur git, sudo und tzdata liegen. Geprüft wird immer ein committeter Stand (Default `HEAD`,
+sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
 
 ```bash
 ./scripts/installer-probe.sh --interactive          # frische Maschine als Shell — selbst durchklicken
 ./scripts/installer-probe.sh --ref main             # automatischer Lauf mit Report
+./scripts/installer-probe.sh --image rockylinux:9   # dasselbe auf einem dnf-System
 ./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
 ```
 
-Der automatische Lauf geht die drei Schritte aus [GETTING-STARTED.md](GETTING-STARTED.md) durch
-(`setup.sh` → `--install` → `--start`, Modul-Abfrage mit Enter), jeden unter einem Pseudo-Terminal.
-Rot wird er, wenn Phase 1 fehlende Tools nicht sauber meldet, Phase 3 nicht mit Exit 0 endet,
-Backend oder Frontend nicht antworten, der Login mit dem erzeugten Key scheitert, das Backend mehr
-als einmal gebaut wird oder der Klon danach nicht mehr sauber ist (`git status`). Das Ergebnis ist
-eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshots unter
+Der automatische Lauf nimmt den Weg „eine Instanz auf diesem Rechner“ aus
+[GETTING-STARTED.md](GETTING-STARTED.md) in zwei Phasen, jede unter einem Pseudo-Terminal:
+`setup.sh --check` (nur prüfen) und `setup.sh --yes --runtime host --bind 0.0.0.0` (ein Durchgang
+bis zur laufenden Instanz). Den Exit-Code schreibt jede Phase selbst in eine Datei im Container —
+über `script` und `docker exec` ging ein Abbruch schon als 0 durch. Rot wird der Lauf, wenn Phase 1
+fehlende Tools nicht nennt, Phase 2 nicht mit Exit 0 endet, Health oder Oberfläche auf dem einen
+Port nicht antworten, der Login mit dem erzeugten Key scheitert, der Key in einem Log steht, das
+Backend nicht genau einmal gebaut wird oder der Klon danach nicht mehr sauber ist (`git status`).
+Das Ergebnis ist eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshots unter
 `~/.local/state/mysuricates/installer-probe/<zeit>-<sha>/report.html` (`latest` zeigt auf den letzten
-Lauf). Ein Lauf dauert etwa zehn Minuten und lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten
-jedes Mal frisch. Ports liegen nur auf `127.0.0.1`.
+Lauf). Ein Lauf lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten jedes Mal frisch. Der
+Container-Weg (Docker im Container) ist noch nicht Teil der Probe.
 
 Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
 `mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript

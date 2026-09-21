@@ -260,13 +260,12 @@ def render(directory: Path, meta: dict) -> str:
                          f"<td class=\"num\">{esc(rc)}</td><td class=\"num\">{esc(_duration(seconds))}</td></tr>")
         parts.append("</tbody></table>")
         parts.append("<h2>Terminal-Mitschnitt</h2><p class=\"note\">Aufgezeichnet unter einem "
-                     "Pseudo-Terminal wie bei einem Menschen am Bildschirm. Die Modul-Abfrage wurde "
-                     "mit Enter beantwortet (Default); die Eingabe selbst ist nicht zu sehen. "
-                     "apt zeigt keinen animierten Fortschrittsbalken.</p>")
+                     "Pseudo-Terminal wie bei einem Menschen am Bildschirm, so wie der Installer ohne "
+                     "Rückfragen (--yes) läuft. apt zeigt keinen animierten Fortschrittsbalken.</p>")
         for index, (name, command, rc, seconds) in enumerate(phases):
             log = directory / "logs" / f"{name}.log"
             body = ansi_to_html(log.read_text(encoding="utf-8", errors="replace")) if log.is_file() else ""
-            is_open = " open" if index != 1 else ""
+            is_open = " open"
             parts.append(f"<details{is_open}><summary>{esc(name)} <span class=\"rc\">$ {esc(command)} "
                          f"· Exit {esc(rc)} · {esc(_duration(seconds))}</span></summary>"
                          f"<pre class=\"term\">{body}</pre></details>")

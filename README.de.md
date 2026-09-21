@@ -103,32 +103,24 @@ installierte CLI. Docker ist optional und wird nur gebraucht, wenn ein Shell-Blo
 
 ## Quickstart
 
-> Neuer Rechner (Linux), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+> Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
 > fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 ```bash
-# 1. Repository klonen
-git clone <repository-url> autotrigger
-cd autotrigger
-
-# 2. Backend bauen und starten
-cd ai-automation-backend
-mvn clean package -DskipTests
-java -jar target/ai-automation-backend-*.jar
-
-# 3. Frontend installieren und starten (neues Terminal)
-cd ai-automation-frontend
-npm install
-npm run dev
-
-# 4. Oeffnen
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:9090/api/v1
+git clone <repository-url> mysuricates
+cd mysuricates
+./scripts/setup.sh              # gefuehrt, auf Englisch; auf Deutsch: ./scripts/setup.sh --lang de
 ```
 
-Alternativ laeuft das Backend im Container — dann bitte vorher den Abschnitt
-[Deployment](docs/deployment.md) lesen: die Compose-Datei bindet den Host-Docker-Socket ein und
-erwartet einen selbst gesetzten API-Schluessel.
+Der Installer fragt nach dem Weg — eine Instanz im Container (empfohlen), direkt auf dem Rechner
+oder gestuft **Dev · Test · Prod** —, installiert fehlende Werkzeuge nach Rueckfrage, baut und
+startet die Instanz. Danach: http://localhost:9090, den API-Key zeigt
+`scripts/instance.sh key --name main`. Die Instanz lauscht nur auf `127.0.0.1`; der Docker-Socket
+wird nur auf ausdruecklichen Wunsch eingebunden.
+
+Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start`, danach
+`./scripts/start-autotrigger-dev.sh` (Backend :9090, Vite mit Hot Reload :3000) — siehe
+[docs/entwicklung.md](docs/entwicklung.md).
 
 <!-- Screenshot-Platzhalter -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
@@ -137,7 +129,7 @@ erwartet einen selbst gesetzten API-Schluessel.
 
 | Dokument | Inhalt |
 |---|---|
-| [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation auf einem neuen Linux-Rechner (Bootstrap-Skript, Prereqs, KI-Setup) |
+| [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
 | [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
 | [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment) |
 | [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |

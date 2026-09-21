@@ -27,8 +27,8 @@ probe() { PATH="$TMP/bin:$PATH" bash "$PROBE" "$@" </dev/null >"$TMP/out" 2>&1; 
 
 echo "1) syntax and help"
 check "bash -n passes"                                  'bash -n "$PROBE"'
-check "--help names the interactive mode"               'bash "$PROBE" --help | grep -q -- "--interactive"'
-check "--help names --ref and the gate lines"           'bash "$PROBE" --help | grep -q -- "--ref main" && bash "$PROBE" --help | grep -q "gate_status"'
+check "--help names the interactive mode"               'bash "$PROBE" --help | grep -- "--interactive" >/dev/null'
+check "--help names --ref and the gate lines"           'bash "$PROBE" --help | grep -- "--ref main" >/dev/null && bash "$PROBE" --help | grep "gate_status" >/dev/null'
 check "the report renderer parses"                      'python3 -m py_compile "$HERE/../lib/installer_probe_report.py"'
 check "the screenshot helper parses"                    '! command -v node >/dev/null || node --check "$HERE/../lib/installer_probe_screens.mjs"'
 
