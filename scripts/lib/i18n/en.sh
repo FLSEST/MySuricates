@@ -111,7 +111,7 @@ M_kept_existing="Keeping the existing %s (--reconfigure rewrites it)"
 M_done_open="→  %s"
 M_done_key="API key for the login: %s"
 M_done_manage="Start / stop:"
-M_done_change="Change:      "
+M_done_change="Change:"
 M_done_not_started="configured, not started yet"
 M_done_key_cmd="Full API key:"
 

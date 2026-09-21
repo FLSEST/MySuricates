@@ -110,9 +110,9 @@ M_kept_existing="Vorhandene %s bleibt (--reconfigure schreibt sie neu)"
 M_done_open="→  %s"
 M_done_key="API-Key für den Login: %s"
 M_done_manage="Start / Stopp:"
-M_done_change="Ändern:       "
+M_done_change="Ändern:"
 M_done_not_started="eingerichtet, noch nicht gestartet"
-M_done_key_cmd="API-Key ganz:  "
+M_done_key_cmd="API-Key ganz:"
 
 # Hilfe (--help) und Fehler in den Argumenten
 M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in einem Durchgang.

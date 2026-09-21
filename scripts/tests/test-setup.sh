@@ -108,6 +108,12 @@ check "English by default"                              'out | grep -E "Mode|Che
 rm -rf "$INST"
 run --yes --dry-run --runtime host --lang de >/dev/null
 check "German with --lang de"                           'out | grep -E "Modus|Prüfung" >/dev/null'
+# Die drei Befehle im Abschluss-Kasten beginnen in derselben Spalte — in jeder Sprache
+# Spalte per bash (zaehlt Zeichen); busybox-awk index() zaehlt Bytes und verrutscht an „Ä“
+cols() { out | grep -E "instance.sh key --name|up\|down\|status --name|setup.sh · deploy" | while IFS= read -r l; do l="${l%%scripts/*}"; echo "${#l}"; done | sort -u | wc -l | tr -d " "; }
+check "done box: commands aligned (de)"                  '[ "$(cols)" = 1 ]'
+rm -rf "$INST"; run --yes --dry-run --runtime host >/dev/null
+check "done box: commands aligned (en)"                  '[ "$(cols)" = 1 ]'
 
 echo "9) the API key hint never points to the log (bc6d1902)"
 check "no 'backend log' in the installer"               '! grep -niE "backend.?log|AUTO-GENERATED" "$SETUP" >/dev/null'

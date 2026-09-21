@@ -436,7 +436,7 @@ step_build() {
 
 # --- Schritt 8: Fertig ------------------------------------------------------------------------------
 step_done() {
-  local n port key lines
+  local n port key lines l_key l_manage l_change w l
   section 7
   lines=()
   for n in $INSTANCES; do
@@ -454,9 +454,12 @@ step_done() {
   done
   n="$(printf '%s' "$INSTANCES" | cut -d' ' -f1)"
   lines[${#lines[@]}]=""
-  lines[${#lines[@]}]="$(msg done_key_cmd)  ${C_BOLD}scripts/instance.sh key --name $n${C_RESET}"
-  lines[${#lines[@]}]="$(msg done_manage)  ${C_BOLD}scripts/instance.sh up|down|status --name $n${C_RESET}"
-  lines[${#lines[@]}]="$(msg done_change)  ${C_BOLD}scripts/setup.sh${C_RESET} · deploy/instances/$n.env"
+  # Beschriftungen auf gleiche Breite — die Laenge haengt von der Sprache ab, nie in der Uebersetzung auffuellen
+  l_key="$(msg done_key_cmd)"; l_manage="$(msg done_manage)"; l_change="$(msg done_change)"; w=0
+  for l in "$l_key" "$l_manage" "$l_change"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
+  lines[${#lines[@]}]="${l_key}$(_tui_repeat ' ' $((w - ${#l_key} + 2)))${C_BOLD}scripts/instance.sh key --name $n${C_RESET}"
+  lines[${#lines[@]}]="${l_manage}$(_tui_repeat ' ' $((w - ${#l_manage} + 2)))${C_BOLD}scripts/instance.sh up|down|status --name $n${C_RESET}"
+  lines[${#lines[@]}]="${l_change}$(_tui_repeat ' ' $((w - ${#l_change} + 2)))${C_BOLD}scripts/setup.sh${C_RESET} · deploy/instances/$n.env"
   logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
   [ "$logged" = logged-in ] || lines[${#lines[@]}]="${C_AMBER}$(msg ai_login_hint "$PROVIDER" "$(provider_get "$PROVIDER" login)")${C_RESET}"
   tui_box "$(msg step_of 8 ${#STEPS[@]}) · $(msg step_done)" "${lines[@]}"
