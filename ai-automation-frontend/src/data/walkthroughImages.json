@@ -1,1 +1,12 @@
-{}
+{
+  "intro": "/walkthrough/intro.webp",
+  "mix": "/walkthrough/mix.webp",
+  "trace": "/walkthrough/trace.webp",
+  "notice": "/walkthrough/notice.webp",
+  "wait": "/walkthrough/wait.webp",
+  "verdict": "/walkthrough/verdict.webp",
+  "refill": "/walkthrough/refill.webp",
+  "swap": "/walkthrough/swap.webp",
+  "blocks": "/walkthrough/blocks.webp",
+  "closing": "/walkthrough/closing.webp"
+}
