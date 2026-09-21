@@ -20,6 +20,20 @@ export function formatRelativeTime(dateStr: string, locale: string = 'en'): stri
   return rtf.format(-days, 'day');
 }
 
+/** A point in the future relative to now ("in 3 hours"); past points read like {@link formatRelativeTime}. */
+export function formatTimeUntil(dateStr: string, locale: string = 'en'): string {
+  const diff = new Date(dateStr).getTime() - Date.now();
+  if (diff <= 0) return formatRelativeTime(dateStr, locale);
+  const minutes = Math.round(diff / 60_000);
+  const hours = Math.round(minutes / 60);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+
+  if (minutes < 1) return rtf.format(Math.round(diff / 1000), 'second');
+  if (minutes < 90) return rtf.format(minutes, 'minute');
+  if (hours < 48) return rtf.format(hours, 'hour');
+  return rtf.format(Math.round(hours / 24), 'day');
+}
+
 export function formatDateTime(dateStr: string, locale: string = 'en'): string {
   const d = new Date(dateStr);
   const intlLocale = locale === 'de' ? 'de-DE' : 'en-US';

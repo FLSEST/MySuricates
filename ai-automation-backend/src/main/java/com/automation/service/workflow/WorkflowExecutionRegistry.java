@@ -5,7 +5,10 @@ import com.automation.executor.ExecutionContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -182,11 +185,19 @@ public class WorkflowExecutionRegistry {
         }
     }
 
+    /**
+     * Beantwortet die offene Frage eines Laufs. Ein Approval nimmt nur eine seiner Optionen an
+     * ({@link ApprovalRequest#acceptedAnswer}); ohne offene Frage bleibt der Aufruf wirkungslos.
+     *
+     * @throws IllegalArgumentException wenn das offene Approval die Antwort nicht anbietet
+     */
     public void resolveApproval(String runId, String answer) {
         ExecutionContext context = activeExecutions.get(runId);
         if (context != null) {
-            context.resolveApproval(answer);
-            log.info("Resolved approval for run {}: {}", runId, answer);
+            ApprovalRequest pending = context.getCurrentApprovalRequest().get();
+            String accepted = pending != null ? pending.acceptedAnswer(answer) : answer;
+            context.resolveApproval(accepted);
+            log.info("Resolved approval for run {}: {}", runId, accepted);
         }
     }
 
@@ -195,6 +206,21 @@ public class WorkflowExecutionRegistry {
                 .filter(ctx -> ctx.getCurrentApprovalRequest().get() != null)
                 .count();
     }
+
+    /** Alle Läufe, die gerade auf eine Antwort warten (Approval oder Human-Input), die ältesten zuerst. */
+    public List<PendingInput> listPendingInputs() {
+        return activeExecutions.entrySet().stream()
+                .map(e -> {
+                    ApprovalRequest request = e.getValue().getCurrentApprovalRequest().get();
+                    return request == null ? null : new PendingInput(e.getKey(), request);
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(p -> p.request().getRequestedAt()))
+                .toList();
+    }
+
+    /** Ein wartender Lauf und die Frage, auf die er wartet. */
+    public record PendingInput(String runId, ApprovalRequest request) {}
 
     public ApprovalRequest getPendingApproval(String runId) {
         ExecutionContext context = activeExecutions.get(runId);

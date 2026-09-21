@@ -3,6 +3,7 @@ package com.automation.executor;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +14,17 @@ public class ApprovalRequest {
     private final String question;
     private final List<String> options;
     private final int stepIndex;
+
+    /** Die {@link #options}, die eine Ablehnung sind (siehe {@link ApprovalRejection}) — für die UI. */
+    @Builder.Default
+    private final List<String> rejectOptions = List.of();
+
+    /** Seit wann der Lauf wartet — der Request entsteht unmittelbar vor dem Warten. */
+    @Builder.Default
+    private final Instant requestedAt = Instant.now();
+
+    /** Nach wie vielen Minuten der wartende Block aufgibt; {@code null}, wenn unbekannt. */
+    private final Integer timeoutMinutes;
 
     // Human-input specific fields
     @Builder.Default
@@ -32,4 +44,24 @@ public class ApprovalRequest {
      * description, validation_pattern.
      */
     private final List<Map<String, Object>> fields;
+
+    /**
+     * Die Antwort so, wie der wartende Block sie bekommt. Ein Approval nimmt nur eine seiner Optionen
+     * an — ohne Groß-/Kleinschreibung verglichen, weitergereicht in der Schreibweise der Option. Ohne
+     * diese Prüfung wurde jeder Freitext stillschweigend zur Freigabe (TODO 50c7b5d5). Human-Input
+     * bleibt frei: Er erwartet Text, Zahlen oder ein JSON-Formular.
+     *
+     * @throws IllegalArgumentException wenn ein Approval die Antwort nicht anbietet
+     */
+    public String acceptedAnswer(String answer) {
+        if (!"approval".equals(type) || options == null || options.isEmpty() || answer == null) {
+            return answer;
+        }
+        String trimmed = answer.strip();
+        return options.stream()
+                .filter(o -> o.strip().equalsIgnoreCase(trimmed))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Answer '" + answer + "' is not one of the offered options " + options));
+    }
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button, Input } from '../ui';
 import { useT } from '../../i18n';
 import type { HumanInputField, PendingHumanInput } from '../../types';
+import { ApprovalQuestion } from './ApprovalQuestion';
 
 interface HumanInputDialogProps {
   humanInput: PendingHumanInput;
@@ -99,7 +100,7 @@ export function HumanInputDialog({ humanInput, onSubmit, loading }: HumanInputDi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">
-      <div className="bg-surface-raised border border-border rounded-2xl shadow-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface-raised border border-border rounded-2xl shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-bold text-text mb-1">
           {t.workflows.execution.humanInput.title}
         </h3>
@@ -107,8 +108,8 @@ export function HumanInputDialog({ humanInput, onSubmit, loading }: HumanInputDi
           {t.workflows.execution.humanInput.description}
         </p>
 
-        <div className="bg-surface rounded-lg p-4 mb-4 border border-border">
-          <p className="text-sm font-medium text-text">{humanInput.prompt}</p>
+        <div className="mb-4">
+          <ApprovalQuestion question={humanInput.prompt} maxHeightClass="max-h-[40vh]" />
           <p className="text-xs text-text-tertiary mt-1">Step {humanInput.stepIndex + 1}</p>
         </div>
 

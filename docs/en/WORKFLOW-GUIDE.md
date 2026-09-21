@@ -433,17 +433,18 @@ Repeats a command until a condition is met or the maximum iteration count is rea
 
 ### `approval` — Human Approval
 
-Pauses execution and waits for human approval via WebSocket.
+Pauses execution and waits for human approval. Answer it in the dialog on the run page or on the **Approvals** page (`/approvals`). Its sidebar entry appears and pulses while a run is waiting.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `question` | string | `"Approval required"` | Approval question for the user |
-| `options` | list | `["Yes", "Yes always", "No"]` | Available response options |
+| `question` | string | `"Approval required"` | Approval question (Markdown). Placeholders such as `{{ block.X.output }}` are resolved before it is shown |
+| `options` | list | `["Yes", "Yes always", "No"]` | Available response options. `POST /approve` accepts only these (case-insensitive), otherwise 400 |
+| `reject_options` | list | `["No", "Nein"]` | Which answers are a rejection and trigger `on_no` (case-insensitive) |
 | `variable_name` | string | `"approval_answer"` | Context variable for the answer |
 | `timeout_minutes` | int | 30 | Wait time |
 | `mode` | string | `"ask"` | `"ask"` (interactive) or `"auto"` (uses `auto_answer`) |
 | `auto_answer` | string | — | Automatic answer when `mode` = `"auto"` |
-| `on_no` | string | `"continue"` | Behavior on "No": `"continue"` (proceed, status COMPLETED), `"fail"` (FAILED), or `"skip"` (SKIPPED) |
+| `on_no` | string | `"continue"` | Behavior on a rejection (see `reject_options`): `"continue"` (proceed, status COMPLETED), `"fail"` (FAILED), or `"skip"` (SKIPPED) |
 
 ```json
 {
@@ -451,12 +452,15 @@ Pauses execution and waits for human approval via WebSocket.
   "config": {
     "question": "## Result\n\n{{ previous_output }}\n\nProceed?",
     "options": ["Yes", "No", "Abort"],
+    "reject_options": ["No", "Abort"],
     "variable_name": "pr_decision",
     "timeout_minutes": 60,
     "on_no": "fail"
   }
 }
 ```
+
+**Custom options**: Without `reject_options` only "No" and "Nein" count as a rejection. If you offer other rejections ("Abort" in the example), list them in `reject_options`. Otherwise the workflow carries on despite `on_no`.
 
 **"Yes always"**: When the user selects "Yes always", the answer is remembered for this question for the rest of the run — subsequent approval blocks with the same question are answered automatically.
 
@@ -472,7 +476,7 @@ Pauses execution to collect free-text input from the user.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `prompt` | string | `"Please provide input:"` | Question for the user |
+| `prompt` | string | `"Please provide input:"` | Question for the user (placeholders are resolved) |
 | `input_type` | string | `"text"` | `"text"` or `"select"` |
 | `variable_name` | string | `"user_input"` | Context variable for the input |
 | `options` | list | `[]` | Selection options (for `select` type) |

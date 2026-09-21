@@ -42,13 +42,14 @@ public class HumanInputBlockExecutor implements BlockExecutor {
         Instant start = Instant.now();
         Map<String, Object> config = block.getConfig();
 
-        String prompt = (String) config.getOrDefault("prompt", "Please provide input:");
+        // Aufgelöst wie die Approval-Frage: {{ block.X.output }} soll im Dialog stehen, nicht wörtlich (TODO e2efb393)
+        String prompt = context.resolveTemplate((String) config.getOrDefault("prompt", "Please provide input:"));
         String inputType = (String) config.getOrDefault("input_type", "text");
         String variableName = (String) config.getOrDefault("variable_name", "user_input");
         List<String> options = config.containsKey("options")
                 ? (List<String>) config.get("options")
                 : List.of();
-        String defaultValue = (String) config.getOrDefault("default_value", "");
+        String defaultValue = context.resolveTemplate((String) config.getOrDefault("default_value", ""));
         boolean required = config.containsKey("required")
                 ? Boolean.TRUE.equals(config.get("required"))
                 : true;
@@ -78,6 +79,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
                 .required(required)
                 .validationPattern(validationPattern)
                 .fields(fields)
+                .timeoutMinutes(timeoutMinutes)
                 .build();
 
         CompletableFuture<String> future = context.requestApproval(request);

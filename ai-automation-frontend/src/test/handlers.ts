@@ -15,6 +15,9 @@ export const handlers = [
   ),
   http.delete(`${BASE}/projects/:id`, () => new HttpResponse(null, { status: 204 })),
 
+  // Runs waiting for an answer — none by default (the sidebar polls this on every page)
+  http.get(`${BASE}/executions/pending-input`, () => HttpResponse.json([])),
+
   // Workflows
   http.get(`${BASE}/workflows`, () =>
     HttpResponse.json([

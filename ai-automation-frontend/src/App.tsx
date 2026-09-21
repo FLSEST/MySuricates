@@ -113,6 +113,7 @@ const Docs = lazy(() => import('./pages/Docs').then(m => ({ default: m.Docs })))
 const Reports = lazy(() => import('./pages/AuditCenter').then(m => ({ default: m.AuditCenter })));
 const Insights = lazy(() => import('./pages/Insights').then(m => ({ default: m.Insights })));
 const DialogImport = lazy(() => import('./pages/DialogImport').then(m => ({ default: m.DialogImport })));
+const Approvals = lazy(() => import('./pages/Approvals').then(m => ({ default: m.Approvals })));
 const OnboardingProfiles = lazy(() => import('./pages/OnboardingProfiles').then(m => ({ default: m.OnboardingProfiles })));
 
 const router = createBrowserRouter([
@@ -133,6 +134,7 @@ const router = createBrowserRouter([
       { path: 'chains', element: <ModuleRoute module="chains"><Chains /></ModuleRoute> },
       { path: 'chains/:id/run/:runId', element: <ModuleRoute module="chains"><ChainExecution /></ModuleRoute> },
       { path: 'runs', element: <RunsRoute /> },
+      { path: 'approvals', element: <Approvals /> },
       { path: 'runs/:runId', element: <RunRedirect /> },
       { path: 'skills', element: <ModuleRoute module="skills"><Skills /></ModuleRoute> },
       { path: 'schedules', element: <SchedulesRoute /> },
