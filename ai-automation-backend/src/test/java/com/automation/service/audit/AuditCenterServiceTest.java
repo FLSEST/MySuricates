@@ -274,7 +274,7 @@ class AuditCenterServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void listFindings_sortsBySeverityThenRecency_andAttachesLinksInOneBatch() {
+    void listFindings_ordersInTheQuery_andAttachesLinksInOneBatch() {
         AuditFinding finding = finding();
         when(findingRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(finding), PageRequest.of(0, 50), 1));
@@ -287,8 +287,10 @@ class AuditCenterServiceTest {
         assertThat(page.content().getFirst().todos()).isEmpty();
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(findingRepository).findAll(any(Specification.class), pageable.capture());
-        assertThat(pageable.getValue().getSort()).containsExactly(
-                Sort.Order.asc("severity"), Sort.Order.desc("lastSeenAt"));
+        // Nicht per Sort.by("severity"): das sortiert den Enum-Text alphabetisch (LOW vor MEDIUM).
+        // Die Rangfolge steht in der Specification; belegt gegen SQLite in
+        // AuditFindingSeverityOrderIntegrationTest (TODO f4ddc836).
+        assertThat(pageable.getValue().getSort().isUnsorted()).isTrue();
     }
 
     @Test

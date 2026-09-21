@@ -16,20 +16,24 @@ public final class GateStatusOutputParser {
 
     public record ParsedGateStatus(GateStatus status, String category, String description) {}
 
+    // foreach stellt jeder Iterationsausgabe "[<item>]: " voran (ForEachBlockExecutor) — ein
+    // Marker in der ersten Zeile einer Iteration stuende sonst nicht am Zeilenanfang (TODO 8671d03b).
+    private static final String FOREACH_PREFIX = "(?:\\[[^\\]\\n]*\\]:\\s*)?";
+
     // Line-anchored patterns, tolerant of:
     // - Markdown headings (###), bold (**), backticks (`)
     // - Hyphens (Gate-Status) and underscores (gate_status)
     // - Trailing text after the value
     private static final Pattern STATUS_PATTERN = Pattern.compile(
-            "^(?:#{1,6}\\s+)?[*`]*gate[_-]status[*`]*:\\s*[*`]*(RED|YELLOW|GREEN)[*`]*(?:\\s.*)?$",
+            "^" + FOREACH_PREFIX + "(?:#{1,6}\\s+)?[*`]*gate[_-]status[*`]*:\\s*[*`]*(RED|YELLOW|GREEN)[*`]*(?:\\s.*)?$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern CATEGORY_PATTERN = Pattern.compile(
-            "^(?:#{1,6}\\s+)?[*`]*gate[_-]category[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
+            "^" + FOREACH_PREFIX + "(?:#{1,6}\\s+)?[*`]*gate[_-]category[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern DESCRIPTION_PATTERN = Pattern.compile(
-            "^(?:#{1,6}\\s+)?[*`]*gate[_-]description[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
+            "^" + FOREACH_PREFIX + "(?:#{1,6}\\s+)?[*`]*gate[_-]description[*`]*:\\s*[*`]*(.+?)[*`]*\\s*$",
             Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
 
     /**

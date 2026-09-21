@@ -1,6 +1,6 @@
 import { GitBranch, History, FolderKanban, Calendar, CheckSquare, ScrollText, Factory, Plug, FileText, Lightbulb } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Workflow } from '../types';
+import type { FeatureModuleName, Workflow } from '../types';
 import { curateWorkflows } from './curateWorkflows';
 
 export type NavTileId =
@@ -13,6 +13,8 @@ export interface NavTileConfig {
   icon: LucideIcon;
   /** Accent hue for this tile (works on light + dark). */
   color: string;
+  /** Optional module the page belongs to; the tile is hidden when the module is disabled (like the sidebar). */
+  module?: FeatureModuleName;
 }
 
 /** Shared accent hue per area — single source for tiles and Simple sub-pages. */
@@ -37,10 +39,10 @@ export const NAV_TILES: NavTileConfig[] = [
   { id: 'schedules', to: '/schedules', icon: Calendar, color: AREA_COLORS.schedules },
   { id: 'todos', to: '/todos', icon: CheckSquare, color: AREA_COLORS.todos },
   { id: 'activity', to: '/activity', icon: ScrollText, color: AREA_COLORS.activity },
-  { id: 'factory', to: '/factory', icon: Factory, color: AREA_COLORS.factory },
-  { id: 'integrations', to: '/integrations', icon: Plug, color: AREA_COLORS.integrations },
-  { id: 'reports', to: '/reports', icon: FileText, color: AREA_COLORS.reports },
-  { id: 'wishes', to: '/wishes', icon: Lightbulb, color: AREA_COLORS.wishes },
+  { id: 'factory', to: '/factory', icon: Factory, color: AREA_COLORS.factory, module: 'factory' },
+  { id: 'integrations', to: '/integrations', icon: Plug, color: AREA_COLORS.integrations, module: 'integrations' },
+  { id: 'reports', to: '/reports', icon: FileText, color: AREA_COLORS.reports, module: 'audit' },
+  { id: 'wishes', to: '/wishes', icon: Lightbulb, color: AREA_COLORS.wishes, module: 'wishes' },
 ];
 
 export interface HomeTiles {
@@ -48,10 +50,17 @@ export interface HomeTiles {
   runTiles: Workflow[];
 }
 
-/** Fixed nav tiles + top-N run-workflow tiles (pinned ∪ most-used). Pure function. */
-export function buildHomeTiles(workflows: Workflow[], pinnedIds: string[], runCount = 4): HomeTiles {
+/**
+ * Fixed nav tiles + top-N run-workflow tiles (pinned ∪ most-used). Pure function.
+ * Tiles of disabled modules are left out — on the public `core` preset they would only lead
+ * to the "module disabled" page.
+ */
+export function buildHomeTiles(
+  workflows: Workflow[], pinnedIds: string[], runCount = 4,
+  disabledModules: ReadonlySet<string> = new Set(),
+): HomeTiles {
   return {
-    navTiles: NAV_TILES,
+    navTiles: NAV_TILES.filter((tile) => !tile.module || !disabledModules.has(tile.module)),
     runTiles: curateWorkflows(workflows, pinnedIds, runCount).curated,
   };
 }

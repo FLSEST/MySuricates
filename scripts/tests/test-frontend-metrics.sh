@@ -103,7 +103,7 @@ check "modules=9 (Testdateien und *.d.ts zaehlen nicht)" 'grep -qx "modules=9" "
 check "test_files=2"                                     'grep -qx "test_files=2" "$TMP/fix1.txt"'
 check "scan=ok in ## run"                                'grep -qx "scan=ok" "$TMP/fix1.txt"'
 check "scan= steht nicht in ## summary" \
-  "! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/fix1.txt' | grep -qE '^scan='"
+  "! sed -n '/^## summary\$/,/^## run\$/p' '$TMP/fix1.txt' | grep -E '^scan=' >/dev/null"
 
 echo "2) Fixture: bekannte Zeilenzahlen"
 check "a.ts hat 4 Zeilen"          "grep -qx '4${TAB}a.ts' '$TMP/fix1.txt'"
@@ -126,9 +126,9 @@ check "edges=13 (alle Arten)" 'grep -qx "edges=13" "$TMP/fix1.txt"'
 check "der reine import-type-Zyklus t1<->t2 wird NICHT als Zyklus gemeldet" \
   "! grep -q 't1\.ts' <<<\"\$(sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fix1.txt')\""
 check "t1 <-> t2 taucht trotzdem als Verzeichniskopplung/Kante auf" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^t1\.ts${TAB}[0-9]+${TAB}[0-9]+\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -E '^t1\.ts${TAB}[0-9]+${TAB}[0-9]+\$' >/dev/null"
 check "gemischter Spezifizierer { type A, useB } bleibt Laufzeitkante (mixed.ts -> a.ts)" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^mixed\.ts${TAB}5${TAB}0\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -E '^mixed\.ts${TAB}5${TAB}0\$' >/dev/null"
 
 echo "3b) Fixture: dynamische Importe"
 check "dynamic_imports=2" 'grep -qx "dynamic_imports=2" "$TMP/fix1.txt"'
@@ -136,7 +136,7 @@ check "dynamic_edges=2"   'grep -qx "dynamic_edges=2" "$TMP/fix1.txt"'
 check "dynamischer Import zaehlt als Verzeichniskante deep -> (src)" \
   "grep -qx 'deep${TAB}(src)${TAB}2' '$TMP/fix1.txt'"
 check "lazy.ts hat zwei eingehende Importe (deep/c.tsx direkt, mixed.ts via .then)"  \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^lazy\.ts${TAB}0${TAB}2\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -E '^lazy\.ts${TAB}0${TAB}2\$' >/dev/null"
 # Die Einordnung selbst ist in der Fixture oben schon gepinnt (type_edges=5 gegen
 # dynamic_edges=2; waeren die beiden Typ-Queries dynamisch gezaehlt, stuende dort 3 zu 4).
 # Weil die einzelnen edge-Saetze nur in der Zwischendatei stehen und nicht im Faktenblatt,
@@ -173,7 +173,7 @@ check "dynamischer Import ist weder external noch unresolved" \
 
 echo "4) Fixture: Aufloesung von Importen"
 check "mehrzeiliger Import wird gesehen (deep/c.tsx -> a.ts)" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qE '^a\.ts${TAB}[0-9]+${TAB}[0-9]+\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -E '^a\.ts${TAB}[0-9]+${TAB}[0-9]+\$' >/dev/null"
 check "Barrel-Import ueber index.ts aufgeloest (Verzeichniskante deep -> lib)" \
   "grep -qE '^deep${TAB}lib${TAB}[0-9]+\$' '$TMP/fix1.txt'"
 check "export-from erzeugt eine Kante (lib -> (src))" \
@@ -216,7 +216,7 @@ check "kein Frontend: summary vorhanden"     'grep -qx "## summary" "$TMP/leer.o
 check "kein Frontend: error nennt source_missing" 'grep -qE "^error=.*source_missing" "$TMP/leer.out"'
 check "kein Frontend: scan=no_source"        'grep -qx "scan=no_source" "$TMP/leer.out"'
 check "kein Frontend: packages sagt NICHT GEMESSEN" \
-  "sed -n '/^## packages\$/,/^## cycles\$/p' '$TMP/leer.out' | grep -q 'NICHT GEMESSEN'"
+  "sed -n '/^## packages\$/,/^## cycles\$/p' '$TMP/leer.out' | grep 'NICHT GEMESSEN' >/dev/null"
 check "kein Frontend: behauptet keine Zyklenfreiheit" \
   "! grep -q 'keine Import-Zyklen zwischen Modulen gefunden' '$TMP/leer.out'"
 
@@ -227,7 +227,7 @@ check "python3-Fehlschlag: exit 0 (Faktenblatt bleibt)" '[ "$RC" -eq 0 ]'
 check "python3-Fehlschlag: scan=failed"                 'grep -qx "scan=failed" "$TMP/fail-py.txt"'
 check "python3-Fehlschlag: error nennt scan_failed"     'grep -qE "^error=.*scan_failed" "$TMP/fail-py.txt"'
 check "python3-Fehlschlag: cycles sagt NICHT GEMESSEN"  \
-  "sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fail-py.txt' | grep -q 'NICHT GEMESSEN'"
+  "sed -n '/^## cycles\$/,/^## sizes\$/p' '$TMP/fail-py.txt' | grep 'NICHT GEMESSEN' >/dev/null"
 check "python3-Fehlschlag: behauptet keine Zyklenfreiheit" \
   "! grep -q 'keine Import-Zyklen zwischen Modulen gefunden' '$TMP/fail-py.txt'"
 
@@ -235,13 +235,13 @@ echo "7) Lauf gegen das echte Frontend"
 bash "$SCRIPT" "$REPO" > "$TMP/real.txt" 2> "$TMP/real.err"; RC=$?
 check "exit 0"                        '[ "$RC" -eq 0 ]'
 check "scan=ok"                       'grep -qx "scan=ok" "$TMP/real.txt"'
-check "modules>0"                     'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^modules=[1-9][0-9]*\$"'
-check "edges>0"                       'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^edges=[1-9][0-9]*\$"'
+check "modules>0"                     'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -E "^modules=[1-9][0-9]*\$" >/dev/null'
+check "edges>0"                       'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -E "^edges=[1-9][0-9]*\$" >/dev/null'
 check "keine unaufloesbaren Importe"  'grep -qx "unresolved_imports=0" "$TMP/real.txt"'
 check "Typkanten werden getrennt ausgewiesen" \
-  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^type_edges=[1-9][0-9]*\$"'
+  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -E "^type_edges=[1-9][0-9]*\$" >/dev/null'
 check "dynamische Importe werden gefunden (Router-Lazy-Loading)" \
-  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^dynamic_imports=[1-9][0-9]*\$"'
+  'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -E "^dynamic_imports=[1-9][0-9]*\$" >/dev/null'
 check "edges = runtime + type + dynamic" 'python3 - "$TMP/real.txt" <<'"'"'PY'"'"'
 import re, sys
 text = open(sys.argv[1]).read()
@@ -250,12 +250,12 @@ def value(key):
 assert value("edges") == value("runtime_edges") + value("type_edges") + value("dynamic_edges")
 PY'
 check "sizes liefert Zeilen/Pfad-Paare" \
-  "sed -n '/^## sizes\$/,/^## churn\$/p' '$TMP/real.txt' | grep -qE '^[0-9]+${TAB}[a-z].*\.tsx?\$'"
+  "sed -n '/^## sizes\$/,/^## churn\$/p' '$TMP/real.txt' | grep -E '^[0-9]+${TAB}[a-z].*\.tsx?\$' >/dev/null"
 check "coupling liefert Verzeichnis-Kennzahlen" \
-  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/real.txt' | grep -qE '^[a-z(][^${TAB}]*(${TAB}[0-9]+){4}\$'"
+  "sed -n '/^## coupling\$/,/^## summary\$/p' '$TMP/real.txt' | grep -E '^[a-z(][^${TAB}]*(${TAB}[0-9]+){4}\$' >/dev/null"
 check "keine absoluten Benutzerpfade in der Ausgabe" \
   "! grep -qE '(/home/|/Users/)[a-zA-Z_-]+/' '$TMP/real.txt'"
-check "churn gemessen" 'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -qE "^churn_files_90d=[0-9]+\$"'
+check "churn gemessen" 'sed -n "/^## summary\$/,/^## run\$/p" "$TMP/real.txt" | grep -E "^churn_files_90d=[0-9]+\$" >/dev/null'
 
 echo "8) Pool-Workflow ruft das Skript auf und uebergibt es an den KI-Block"
 POOL="$REPO/workflow-pool/mysuricates-architektur-review.json"

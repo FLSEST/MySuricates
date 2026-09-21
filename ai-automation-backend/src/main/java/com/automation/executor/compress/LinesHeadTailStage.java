@@ -44,11 +44,16 @@ final class LinesHeadTailStage implements CompressionStage {
     @Override
     public StageResult apply(String input, Map<String, Object> config, RegexGuard guard) {
         int keep = StageConfig.intValue(config, "lines", null, 1, 1_000_000, StageConfig.where(op()));
-        List<String> lines = Arrays.asList(input.split("\n", -1));
+        // Ein abschließender Umbruch beendet die letzte Zeile, er beginnt keine neue — sonst zählte
+        // die leere Restzeile mit und lines.tail lieferte statt der letzten Zeile nur "".
+        boolean trailingNewline = input.endsWith("\n");
+        String text = trailingNewline ? input.substring(0, input.length() - 1) : input;
+        List<String> lines = Arrays.asList(text.split("\n", -1));
         if (lines.size() <= keep) return new StageResult(input, null);
         int omitted = lines.size() - keep;
         String notice = "[… " + CompressionNumbers.fmt(omitted) + " Zeilen ausgelassen …]";
         String body = String.join("\n", head ? lines.subList(0, keep) : lines.subList(lines.size() - keep, lines.size()));
-        return new StageResult(head ? body + "\n" + notice : notice + "\n" + body, CompressionNumbers.lines(omitted));
+        String output = head ? body + "\n" + notice : notice + "\n" + body;
+        return new StageResult(trailingNewline ? output + "\n" : output, CompressionNumbers.lines(omitted));
     }
 }

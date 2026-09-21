@@ -449,6 +449,34 @@ def check_test_claim_dated(rel, no, line, next_line, findings):
                         f" (z. B. 'Stand 2026-09-18') | {line.strip()[:120]}")
 
 
+def check_sizes(rel, no, line, text, boundary, facts, findings):
+    """Groessen-Muster auf text; gemeldet wird an Zeile no.
+
+    boundary 0: der Zeilenlauf, jeder Treffer zaehlt. Sonst ist text die Zeile plus
+    Folgezeile, und es zaehlen nur Treffer, deren Zahl vor und deren Ende hinter der
+    Grenze liegt — so wird kein Treffer doppelt gemeldet.
+    """
+    is_table = line.lstrip().startswith("|")
+    for name, regexes in COMPILED.items():
+        expected = facts.get(name)
+        if expected is None:
+            continue
+        if is_table and name in TABLE_EXEMPT:
+            continue
+        for regex in regexes:
+            for match in regex.finditer(text):
+                if boundary and not (match.start(1) < boundary < match.end()):
+                    continue
+                said = int(match.group(1))
+                if name == "migration-max" and span_is_declared_excerpt(
+                        text, match, expected):
+                    continue
+                if said != expected:
+                    findings.append(
+                        f"DRIFT {rel}:{no} {name} sagt {said}, Code {expected}"
+                        f" | {line.strip()[:120]}")
+
+
 def scan(root, rel, facts, findings):
     path = os.path.join(root, rel)
     try:
@@ -462,23 +490,15 @@ def scan(root, rel, facts, findings):
         # ```-Bloecken und sind genau die Stellen, die am haeufigsten driften.
         if IGNORE_MARKER in line:
             continue
-        is_table = line.lstrip().startswith("|")
-        for name, regexes in COMPILED.items():
-            expected = facts.get(name)
-            if expected is None:
-                continue
-            if is_table and name in TABLE_EXEMPT:
-                continue
-            for regex in regexes:
-                for match in regex.finditer(line):
-                    said = int(match.group(1))
-                    if name == "migration-max" and span_is_declared_excerpt(
-                            line, match, expected):
-                        continue
-                    if said != expected:
-                        findings.append(
-                            f"DRIFT {rel}:{no} {name} sagt {said}, Code {expected}"
-                            f" | {line.strip()[:120]}")
+        check_sizes(rel, no, line, line, 0, facts, findings)
+        # Zwei-Zeilen-Fenster (TODO 880a17ea): "... the 66 built-in" / "templates ..." —
+        # die Zahl steht am Zeilenende, das Substantiv in der Folgezeile. Geprueft werden
+        # hier nur Treffer, die ueber die Grenze reichen; alles andere findet der Zeilenlauf.
+        next_line = lines[no] if no < len(lines) else ""
+        if next_line and IGNORE_MARKER not in next_line and sentence_continues(line):
+            first = line.rstrip("\n").rstrip()
+            check_sizes(rel, no, line, first + " " + next_line.lstrip(), len(first), facts,
+                        findings)
         check_version_row(rel, no, line, facts.get("versions"), findings)
         if rel == README_SOURCE:
             check_readme_head(rel, no, line, facts, findings)

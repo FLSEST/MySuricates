@@ -3,11 +3,13 @@ import { FolderKanban, GitBranch, Zap } from 'lucide-react';
 import { Card, CardHeader, Button } from '../ui';
 import { useDashboardData } from './dashboardDataContext';
 import { useT } from '../../i18n';
+import { useModuleEnabled } from '../../hooks/useModules';
 
 export function QuickActionsCard() {
   const t = useT();
   const navigate = useNavigate();
   const { data: stats } = useDashboardData();
+  const skillsEnabled = useModuleEnabled('skills');
 
   return (
     <Card>
@@ -31,15 +33,17 @@ export function QuickActionsCard() {
         >
           {t.workflows.create}
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="w-full justify-start"
-          icon={<Zap className="w-4 h-4" />}
-          onClick={() => navigate('/skills')}
-        >
-          {t.skills.title}
-        </Button>
+        {skillsEnabled && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full justify-start"
+            icon={<Zap className="w-4 h-4" />}
+            onClick={() => navigate('/skills')}
+          >
+            {t.skills.title}
+          </Button>
+        )}
       </div>
 
       {/* Top workflows */}

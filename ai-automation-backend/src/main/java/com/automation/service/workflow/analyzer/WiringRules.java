@@ -99,7 +99,7 @@ final class WiringRules {
 
             String byName = block.getName() == null || block.getName().isBlank()
                     ? null : "block." + block.getName() + ".output";
-            String byIndex = "step_" + (i + 1) + "_output";
+            String byIndex = "step_" + i + "_output"; // Step-Indizes sind 0-basiert (BlockStepRunner)
             boolean readLater = false;
             for (int j = i + 1; j < blocks.size() && !readLater; j++) {
                 String text = texts.get(j);

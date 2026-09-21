@@ -328,4 +328,71 @@ class ApprovalBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
     }
+
+    // --- TODO 2a05c365: mode und auto_answer per Variable ---
+
+    @Test
+    void execute_modeAndAutoAnswerFromVariables_autoApproves() {
+        context.setVariable("approval_mode", "auto");
+        context.setVariable("approval_answer", "Yes");
+        BlockDefinition block = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of(
+                        "question", "Deploy?",
+                        "mode", "{{ approval_mode }}",
+                        "auto_answer", "{{ approval_answer }}"
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).contains("Approved: Yes");
+    }
+
+    @Test
+    void execute_unknownModeValue_fallsBackToAsk() {
+        context.setVariable("approval_mode", "sometimes");
+        doAnswer(invocation -> {
+            context.resolveApproval("No");
+            return null;
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        BlockDefinition block = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of(
+                        "question", "Deploy?",
+                        "mode", "{{ approval_mode }}",
+                        "auto_answer", "Yes",
+                        "on_no", "fail"
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).as("unbekannter Modus fragt nach, statt automatisch freizugeben")
+                .isEqualTo(StepStatus.FAILED);
+    }
+
+    @Test
+    void execute_untrustedRun_doesNotResolveModePlaceholder() {
+        context.setUntrustedVariable("approval_mode", "auto");
+        doAnswer(invocation -> {
+            context.resolveApproval("No");
+            return null;
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        BlockDefinition block = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of(
+                        "question", "Deploy?",
+                        "mode", "{{ approval_mode }}",
+                        "auto_answer", "Yes",
+                        "on_no", "fail"
+                )))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).as("fremde Eingabe darf die Freigabe nicht selbst erteilen")
+                .isEqualTo(StepStatus.FAILED);
+    }
 }

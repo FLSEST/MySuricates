@@ -1,5 +1,6 @@
 package com.automation.service.assistant.fetch;
 
+import com.automation.entity.Workflow;
 import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,9 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BlockConfigSummaryFormatterTest {
@@ -93,6 +96,27 @@ class BlockConfigSummaryFormatterTest {
 
         assertThat(summary("compress-ai", Map.of("source", "previous", "instruction", " Kurz fassen ")))
                 .isEqualTo("     source: previous\n     instruction: Kurz fassen\n");
+    }
+
+    /** Die echten Typnamen sind kleingeschrieben bzw. mit Bindestrich (TODO f8d74d01). */
+    @Test
+    void foreach_showsItemsAndNestedBlockCount() {
+        assertThat(summary("foreach", Map.of("items", "{{ dateien }}", "blocks", List.of(Map.of(), Map.of()))))
+                .isEqualTo("     items: {{ dateien }}\n     nested blocks: 2\n");
+    }
+
+    @Test
+    void subWorkflow_showsTheWorkflowNameInsteadOfItsId() {
+        when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(Workflow.builder().name("Nachtlauf").build()));
+
+        assertThat(summary("sub-workflow", Map.of("workflow_id", "wf-1")))
+                .isEqualTo("     sub-workflow: Nachtlauf\n");
+    }
+
+    @Test
+    void humanInput_showsPromptAndInputType() {
+        assertThat(summary("human-input", Map.of("prompt", "Welche Version?", "input_type", "text")))
+                .contains("     prompt: Welche Version?\n").contains("     input_type: text\n");
     }
 
     @Test

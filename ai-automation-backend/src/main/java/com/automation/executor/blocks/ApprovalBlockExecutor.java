@@ -47,8 +47,8 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 : List.of("Yes", "Yes always", "No");
         List<String> rejectAnswers = ApprovalRejection.rejectAnswers(config.get("reject_options"));
         List<String> rejectOptions = ApprovalRejection.rejectingOptions(options, rejectAnswers);
-        String mode = (String) config.getOrDefault("mode", "ask");
-        String autoAnswer = (String) config.get("auto_answer");
+        String mode = "auto".equals(resolveSwitch(config.get("mode"), context)) ? "auto" : "ask";
+        String autoAnswer = resolveSwitch(config.get("auto_answer"), context);
         String onNo = (String) config.getOrDefault("on_no", "continue");
         String variableName = (String) config.getOrDefault("variable_name", "approval_answer");
         int timeoutMinutes = config.containsKey("timeout_minutes")
@@ -160,5 +160,23 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 .completedAt(end)
                 .durationMs(end.toEpochMilli() - start.toEpochMilli())
                 .build();
+    }
+
+    /**
+     * {@code mode} und {@code auto_answer} dürfen per Variable gesetzt werden (z. B.
+     * {@code {{ approval_mode }}} aus dem defaultContext), damit ein Workflow ohne Handänderung
+     * zwischen interaktiv und unbeaufsichtigt wechselt (TODO 2a05c365). Ausnahme: Trägt der Lauf
+     * fremde Eingaben, bleibt ein Platzhalter unaufgelöst — sonst könnte ein Webhook-Payload die
+     * Freigabe selbst erteilen. Dann gilt „ask“ bzw. keine Automatik-Antwort.
+     */
+    private static String resolveSwitch(Object raw, ExecutionContext context) {
+        if (!(raw instanceof String value)) return null;
+        if (value.contains("{{")) {
+            if (context.hasUntrustedInput()) return null;
+            value = context.resolveTemplate(value);
+            if (value.contains("{{")) return null; // Variable fehlt — nie einen Platzhalter als Antwort nehmen
+        }
+        value = value.trim();
+        return value.isEmpty() ? null : value;
     }
 }

@@ -92,8 +92,8 @@ check "pid file of a foreign process (sleep) is removed" '[ "$OUT" = removed ]'
 
 echo "5) help and syntax"
 check "bash -n passes"                                   'bash -n "$SCRIPT"'
-check "--help prints usage without side effects"         '"$SCRIPT" --help | grep -q "restart"'
-check "--help documents build"                           '"$SCRIPT" --help | grep -q " build "'
+check "--help prints usage without side effects"         '"$SCRIPT" --help | grep "restart" >/dev/null'
+check "--help documents build"                           '"$SCRIPT" --help | grep " build " >/dev/null'
 
 echo "6) build: only the runtime jar, nothing started (setup.sh builds once)"
 mkdir -p "$TMP/backend"

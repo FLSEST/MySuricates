@@ -94,6 +94,18 @@ class LineStagesTest {
         assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 9), guard).output()).isEqualTo(input);
     }
 
+    /** TODO 0f376d6a: Der abschließende Umbruch zählt nicht als eigene (leere) Zeile. */
+    @Test
+    void headAndTail_trailingNewlineIsNoExtraLine() {
+        String input = "a\nb\n";
+
+        assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 1), guard).output())
+                .isEqualTo("[… 1 Zeilen ausgelassen …]\nb\n");
+        assertThat(LinesHeadTailStage.head().apply(input, Map.of("lines", 1), guard).output())
+                .isEqualTo("a\n[… 1 Zeilen ausgelassen …]\n");
+        assertThat(LinesHeadTailStage.tail().apply(input, Map.of("lines", 2), guard).output()).isEqualTo(input);
+    }
+
     @Test
     void veryLongSingleLine_isHandled() {
         String input = "x".repeat(200_000);

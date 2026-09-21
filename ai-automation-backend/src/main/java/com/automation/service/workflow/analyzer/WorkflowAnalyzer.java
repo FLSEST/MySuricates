@@ -19,7 +19,7 @@ import java.util.List;
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
  * meldet, er blockiert nicht.
  *
- * <p><b>Was er heute prüft</b> — sieben Regeln, jede eindeutig am Text entscheidbar:
+ * <p><b>Was er heute prüft</b> — acht Regeln, jede eindeutig am Text entscheidbar:
  * <ul>
  *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
  *   <li>{@code chain-only-placeholder} — Chain-Variable in einem einzeln laufenden Workflow</li>
@@ -28,6 +28,7 @@ import java.util.List;
  *   <li>{@code missing-strict-mode} — Shell-Block ohne {@code set -euo pipefail}</li>
  *   <li>{@code duplicated-instructions} — Block-Prompt wiederholt {@code workflow.instructions}</li>
  *   <li>{@code dated-model-id} — datierte Modell-ID statt Alias</li>
+ *   <li>{@code on-no-without-reject-option} — Approval mit {@code on_no}, aber ohne Option, die ablehnt</li>
  * </ul>
  *
  * <p><b>Was er bewusst nicht prüft.</b> Drei Regeln des Tickets brauchen mehr als den Text und
@@ -66,6 +67,7 @@ public class WorkflowAnalyzer {
         List<AnalyzerFinding> findings = new ArrayList<>();
         WiringRules.apply(blocks, findings);
         HygieneRules.apply(blocks, instructions, findings);
+        ApprovalRules.apply(blocks, findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

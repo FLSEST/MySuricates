@@ -34,7 +34,7 @@ public class DocsFetchHandler {
             Map.entry("memory",         "## 9."),
             Map.entry("chains",         "## 10."),
             Map.entry("dos-and-donts",  "## 11."),
-            Map.entry("appendix",       "## Appendix")
+            Map.entry("appendix",       "## Anhang")
     );
 
     public String formatDocsSection(String docId) {
@@ -79,9 +79,11 @@ public class DocsFetchHandler {
     private String buildDocsToc(String docId, String content) {
         var sb = new StringBuilder();
         sb.append("**Documentation: ").append(docId).append("** — Table of contents\n\n");
-        content.lines()
-                .filter(l -> l.startsWith("## "))
-                .forEach(l -> sb.append(l).append("\n"));
+        boolean inFence = false;
+        for (String line : content.split("\n")) {
+            if (line.startsWith("```")) inFence = !inFence;
+            else if (!inFence && line.startsWith("## ")) sb.append(line).append("\n");
+        }
         if ("workflow-guide".equals(docId)) {
             sb.append("\nAvailable section IDs for `<fetch type=\"docs\" id=\"workflow-guide/<id>\"/>`:\n");
             WF_GUIDE_SECTIONS.forEach((k, v) -> sb.append("  ").append(k).append("\n"));
@@ -90,15 +92,20 @@ public class DocsFetchHandler {
         return sb.toString();
     }
 
-    private String extractSection(String content, String headerPrefix) {
+    static String extractSection(String content, String headerPrefix) {
         String[] lines = content.split("\n");
         var sb = new StringBuilder();
         boolean inSection = false;
+        boolean inFence = false; // "## …" in einem Codeblock ist Beispieltext, keine Überschrift
         for (String line : lines) {
-            if (!inSection) {
-                if (line.startsWith(headerPrefix)) inSection = true;
-            } else {
-                if (line.startsWith("## ") && !line.startsWith(headerPrefix)) break;
+            if (line.startsWith("```")) {
+                inFence = !inFence;
+            } else if (!inFence) {
+                if (!inSection) {
+                    if (line.startsWith(headerPrefix)) inSection = true;
+                } else if (line.startsWith("## ") && !line.startsWith(headerPrefix)) {
+                    break;
+                }
             }
             if (inSection) sb.append(line).append("\n");
         }
