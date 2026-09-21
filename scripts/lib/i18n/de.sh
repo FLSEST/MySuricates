@@ -37,7 +37,7 @@ M_mode_container_hint="nur Docker nötig"
 M_mode_host="Eine Instanz — auf diesem Rechner"
 M_mode_host_hint="installiert Java und Node bei Bedarf"
 M_mode_staged="Gestaffelt — Dev · Test · Prod"
-M_mode_staged_hint="in Dev planen und bauen, in Test prüfen, in Prod laufen lassen"
+M_mode_staged_hint="Dev baut, Test prüft, Prod läuft"
 
 # Befehle ausfuehren
 M_run_failed="%s fehlgeschlagen (Exit %s) — letzte Zeilen:"
@@ -71,7 +71,7 @@ M_status_missing="fehlt"
 # Module
 M_modules_title="Welche Funktionen soll diese Instanz haben?"
 M_modules_standard="Standard"
-M_modules_standard_hint="Kern + Dashboard-Bericht — kleinste Oberfläche"
+M_modules_standard_hint="Kern + Dashboard-Bericht, sonst nichts"
 M_modules_research="Research"
 M_modules_research_hint="+ Chains, Assistent, Insights, Memory, Audit"
 M_modules_full="Voll"

@@ -115,6 +115,25 @@ check "done box: commands aligned (de)"                  '[ "$(cols)" = 1 ]'
 rm -rf "$INST"; run --yes --dry-run --runtime host >/dev/null
 check "done box: commands aligned (en)"                  '[ "$(cols)" = 1 ]'
 
+echo "8b) menus fit the panel — nothing cut off (pseudo terminal, stub tools)"
+# Abgeschnitten = „…“ direkt vor dem rechten Rahmen; „Eigene Auswahl…“ mitten in der Zeile ist gewollt
+cut() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -E "…[[:space:]]*│[[:space:]]*$" >/dev/null; }
+pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
+  local l="$1" keys="$2"; shift 2
+  rm -rf "$INST"
+  printf "$keys" | script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --dry-run --lang $l $*" /dev/null > "$TMP/menu" 2>&1
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
+  for l in en de; do
+    pty_setup "$l" q
+    check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    pty_setup "$l" q --runtime host
+    check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+  done
+else
+  echo "  skip (no usable script command)"
+fi
+
 echo "9) the API key hint never points to the log (bc6d1902)"
 check "no 'backend log' in the installer"               '! grep -niE "backend.?log|AUTO-GENERATED" "$SETUP" >/dev/null'
 FE="$HERE/../../ai-automation-frontend/src/i18n"

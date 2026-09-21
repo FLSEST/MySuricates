@@ -38,7 +38,7 @@ M_mode_container_hint="only Docker needed"
 M_mode_host="One instance — on this machine"
 M_mode_host_hint="installs Java and Node if needed"
 M_mode_staged="Staged — Dev · Test · Prod"
-M_mode_staged_hint="plan and build in Dev, check in Test, run in Prod"
+M_mode_staged_hint="Dev builds, Test checks, Prod runs"
 
 # Running commands
 M_run_failed="%s failed (exit %s) — last lines:"

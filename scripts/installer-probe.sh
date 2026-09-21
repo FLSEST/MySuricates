@@ -147,14 +147,13 @@ if [ "$INTERACTIVE" = 1 ]; then
   L=""; case "${LANG:-}" in de*) L=" --lang de" ;; esac
   HINTS="
   Frische Maschine: ${IMAGE}, Stand ${REF} (${SHORT}), Benutzer probe mit sudo.
-  So geht ein neuer Nutzer vor:
+  So geht ein neuer Nutzer vor (--bind 0.0.0.0, damit der Browser draußen die Instanz erreicht):
 
-    ./scripts/setup.sh${L}
+    ./scripts/setup.sh --bind 0.0.0.0${L}
 
-  Im Modus-Schritt „auf diesem Rechner“ wählen — in diesem Wegwerf-Container gibt es kein Docker.
-  Mit --bind 0.0.0.0 ist die Instanz von außen erreichbar:
-
-    ./scripts/setup.sh --runtime host --bind 0.0.0.0${L}
+  Im Modus-Schritt „auf diesem Rechner“ wählen — in diesem Wegwerf-Container gibt es kein Docker,
+  „im Container“ und „Dev · Test · Prod“ scheitern hier (Probe dafür: TODO 2ed907a1).
+  Nur ansehen, nichts installieren:  ./scripts/setup.sh --dry-run${L}
 
   Danach im Browser: http://localhost:${FPORT}
   API-Key für den Login:  scripts/instance.sh key --name main
