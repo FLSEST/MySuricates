@@ -1,9 +1,15 @@
+import { useState } from 'react';
+import { FolderPlus } from 'lucide-react';
 import { Button, Input, Modal, Select } from '../ui';
 import { TemplateSelector } from './TemplateSelector';
 import type { CreateWorkflowRequest, Project, WorkflowTemplate } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import type { Locale } from '../../i18n';
 import { resolveTemplateName } from '../../utils/templateUtils';
+import { useCreateProject } from '../../hooks/useProjects';
+import { FirstProjectActions } from '../project/FirstProjectActions';
+import { ProjectFormFields } from '../project/ProjectFormFields';
+import { EMPTY_PROJECT_FORM, type ProjectFormValues } from '../project/projectForm';
 
 export type CreateStep = 'closed' | 'template' | 'details';
 
@@ -38,15 +44,58 @@ export function WorkflowCreateFlow({
   onClose,
   onBackToTemplates,
 }: WorkflowCreateFlowProps) {
+  // Non-null while the details dialog shows the project form instead (TODO d12c7560): the way from
+  // "New workflow" to a project, inside the same dialog because a dialog cannot open a second one on top.
+  const [newProject, setNewProject] = useState<ProjectFormValues | null>(null);
+  const createProject = useCreateProject();
+  const noProjects = projects !== undefined && projects.length === 0;
+
+  const close = () => {
+    setNewProject(null);
+    onClose();
+  };
+
+  const handleCreateProject = () => {
+    if (!newProject) return;
+    createProject.mutate(newProject, {
+      onSuccess: (project) => {
+        setNewProject(null);
+        onFormChange({ ...form, projectId: project.id });
+      },
+    });
+  };
+
   return (
     <>
-      <Modal open={createStep === 'template'} onClose={onClose} title={t.workflows.create} size="lg">
+      <Modal open={createStep === 'template'} onClose={close} title={t.workflows.create} size="lg">
         <TemplateSelector onSelect={onTemplateSelect} onPoolSelect={onPoolSelect} />
       </Modal>
 
       <Modal
-        open={createStep === 'details'}
-        onClose={onClose}
+        open={createStep === 'details' && newProject !== null}
+        onClose={close}
+        title={t.projects.create}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setNewProject(null)}>
+              {t.common.back}
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              loading={createProject.isPending}
+              disabled={!newProject?.name || !newProject?.path}
+            >
+              {t.common.create}
+            </Button>
+          </>
+        }
+      >
+        {newProject && <ProjectFormFields value={newProject} onChange={setNewProject} placeholders />}
+      </Modal>
+
+      <Modal
+        open={createStep === 'details' && newProject === null}
+        onClose={close}
         title={t.workflows.create}
         footer={
           <>
@@ -77,15 +126,35 @@ export function WorkflowCreateFlow({
               </div>
             </div>
           )}
-          <Select
-            label={t.common.project}
-            value={form.projectId}
-            onChange={(e) => onFormChange({ ...form, projectId: e.target.value })}
-            options={[
-              { value: '', label: t.common.selectProject },
-              ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
-            ]}
-          />
+          {noProjects ? (
+            <div className="space-y-3 p-3 rounded-lg border border-border bg-surface-raised text-center">
+              <p className="text-sm text-text-secondary">{t.workflows.needsProject}</p>
+              <FirstProjectActions
+                onCreateOwn={() => setNewProject(EMPTY_PROJECT_FORM)}
+                onProjectReady={(project) => onFormChange({ ...form, projectId: project.id })}
+              />
+            </div>
+          ) : (
+            <div>
+              <Select
+                label={t.common.project}
+                value={form.projectId}
+                onChange={(e) => onFormChange({ ...form, projectId: e.target.value })}
+                options={[
+                  { value: '', label: t.common.selectProject },
+                  ...(projects?.map((p) => ({ value: p.id, label: p.name })) ?? []),
+                ]}
+              />
+              <button
+                type="button"
+                onClick={() => setNewProject(EMPTY_PROJECT_FORM)}
+                className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-hover transition-colors"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+                {t.workflows.newProject}
+              </button>
+            </div>
+          )}
           <Input
             label={t.common.name}
             value={form.name}

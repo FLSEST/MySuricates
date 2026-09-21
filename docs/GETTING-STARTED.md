@@ -98,7 +98,9 @@ scripts/instance.sh list                         # alle Instanzen mit Port
 Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
 
 1. **Projekt anlegen** — jeder Workflow gehört zu einem Projekt; ein Projekt zeigt auf ein
-   Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners).
+   Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners). Zum Ausprobieren
+   gibt es das **Beispielprojekt**: Dashboard, Workflows und Projekte bieten es an, solange noch kein
+   Projekt existiert. Ein Klick, und die Beispiel-Workflows laufen ohne KI und ohne Einrichtung.
 2. **Eine Vorlage übernehmen** — unter *Templates* liegen 67 fertige Workflows. Eine auswählen,
    ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert.
 3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch

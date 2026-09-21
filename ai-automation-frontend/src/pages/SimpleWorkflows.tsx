@@ -7,6 +7,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleRow, StatusDot } from '../components/simple/kit';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
+import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import {
   useWorkflows,
   useCreateWorkflow,
@@ -196,7 +197,14 @@ export function SimpleWorkflows() {
         </div>
       )}
 
-      {visible.length === 0 ? (
+      {!search && projects?.length === 0 ? (
+        <EmptyState
+          icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
+          title={t.projects.firstProject.title}
+          description={t.projects.firstProject.workflowsHint}
+          action={<FirstProjectActions />}
+        />
+      ) : visible.length === 0 ? (
         <EmptyState
           icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
           title={t.workflows.title}

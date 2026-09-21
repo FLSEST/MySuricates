@@ -6,6 +6,7 @@ import { DashboardEditBar } from '../components/dashboard/DashboardEditBar';
 import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog';
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
+import { FirstStepsCard } from '../components/dashboard/FirstStepsCard';
 import { WorkflowWidgetProvider } from '../components/dashboard/WorkflowWidgetProvider';
 import { useDashboardData } from '../components/dashboard/dashboardDataContext';
 import { DASHBOARD_VIEW_PANEL_ID, viewTabId } from '../components/dashboard/viewTabA11y';
@@ -136,6 +137,8 @@ function DashboardPage() {
       )}
 
       <DashboardDataErrorBanner />
+
+      <FirstStepsCard />
 
       {/* Collapses when there is a single view and no filter to show. */}
       <div className="space-y-3 empty:hidden">

@@ -96,7 +96,9 @@ scripts/instance.sh list                         # all instances with their port
 The application is running. A first way in, without building anything:
 
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
-   your machine (in the container: inside the projects folder).
+   your machine (in the container: inside the projects folder). To try things out there is the
+   **example project**: the dashboard, workflows and projects offer it while no project exists yet.
+   One click, and its example workflows run without AI and without any setup.
 2. **Take a template** — *Templates* holds 67 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens.
 3. **Look at the run** — the detail view shows per block its duration, its status and whether it was

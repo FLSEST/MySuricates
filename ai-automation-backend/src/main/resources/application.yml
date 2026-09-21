@@ -222,6 +222,10 @@ automation:
   pool:
     directory: ${AUTOMATION_POOL_DIR:workflow-pool}
     enabled: ${AUTOMATION_POOL_ENABLED:true}
+  examples:
+    # Copy of the bundled example project (POST /projects/example). Empty: below the workspace root
+    # if one is set, else ./data/examples next to the default database (ExampleProjectService).
+    directory: ${AUTOMATION_EXAMPLES_DIR:}
   wish:
     total-timeout-minutes: ${AUTOMATION_WISH_TOTAL_TIMEOUT:120}
     workflow-wait-minutes: ${AUTOMATION_WISH_WORKFLOW_WAIT:30}

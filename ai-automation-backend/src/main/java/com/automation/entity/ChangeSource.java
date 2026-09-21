@@ -16,6 +16,8 @@ public enum ChangeSource {
     CONVERSION("conversion"),
     CHAIN_TEMPLATE("chain-template"),
     POOL_INSTALL("pool-install"),
+    /** The bundled example project: its example workflows, created from the built-in EXAMPLE templates. */
+    EXAMPLE_PROJECT("example-project"),
     IMPORT("import"),
     BPMN_IMPORT("bpmn-import"),
     RESTORE("restore"),

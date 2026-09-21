@@ -12,6 +12,7 @@ import { WorkflowImportModal } from '../components/workflow/WorkflowImportModal'
 import { ProjectGroup } from '../components/workflow/ProjectGroup';
 import { DiscoveryView } from '../components/workflow/DiscoveryView';
 import { WorkflowDetailPanel } from '../components/workflow/WorkflowDetailPanel';
+import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import {
   useWorkflows,
   useCreateWorkflow,
@@ -405,7 +406,14 @@ export function Workflows() {
     <div className="flex flex-col h-full animate-fade-in">
       <WorkflowListHeader t={t} onOpenCreate={openCreate} onImportReady={handleImportReady} />
 
-      {filtered.length === 0 ? (
+      {!search && projects?.length === 0 ? (
+        <EmptyState
+          icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
+          title={t.projects.firstProject.title}
+          description={t.projects.firstProject.workflowsHint}
+          action={<FirstProjectActions />}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={<GitBranch className="w-8 h-8 text-text-tertiary" />}
           title={search ? t.common.noResults : t.workflows.title}

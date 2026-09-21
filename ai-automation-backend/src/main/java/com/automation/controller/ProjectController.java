@@ -8,6 +8,7 @@ import com.automation.dto.response.ProjectResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.example.ExampleProjectService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.project.ProjectOnboardingService;
 import com.automation.service.project.ProjectService;
@@ -27,6 +28,7 @@ import java.util.Map;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ExampleProjectService exampleProjectService;
     private final WorkflowService workflowService;
     private final ProjectContextService projectContextService;
     private final ProjectOnboardingService projectOnboardingService;
@@ -42,6 +44,17 @@ public class ProjectController {
     public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody CreateProjectRequest request) {
         var project = projectService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(projectMapper.toResponse(project));
+    }
+
+    /**
+     * The bundled example project for a fresh installation: created on the first call (201), returned
+     * on every further call (200) — with any example workflow it lacks added.
+     */
+    @PostMapping("/example")
+    public ResponseEntity<ProjectResponse> ensureExampleProject(@RequestParam(required = false) String locale) {
+        var result = exampleProjectService.ensure(locale);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(projectMapper.toResponse(result.project()));
     }
 
     @GetMapping("/{id}")

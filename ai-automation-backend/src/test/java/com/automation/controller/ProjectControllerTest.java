@@ -9,6 +9,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.service.example.ExampleProjectService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.project.ProjectOnboardingService;
 import com.automation.service.project.ProjectService;
@@ -56,6 +57,9 @@ class ProjectControllerTest {
 
     @MockitoBean
     private WorkflowService workflowService;
+
+    @MockitoBean
+    private ExampleProjectService exampleProjectService;
 
     @MockitoBean
     private ProjectContextService projectContextService;
@@ -143,6 +147,28 @@ class ProjectControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("proj-1"));
+    }
+
+    @Test
+    void ensureExampleProject_firstCall_returns201WithTheProject() throws Exception {
+        when(exampleProjectService.ensure("de"))
+                .thenReturn(new ExampleProjectService.Result(testProject, true, 1));
+        when(projectMapper.toResponse(testProject)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/projects/example").param("locale", "de"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("proj-1"));
+    }
+
+    @Test
+    void ensureExampleProject_existingProject_returns200() throws Exception {
+        when(exampleProjectService.ensure(null))
+                .thenReturn(new ExampleProjectService.Result(testProject, false, 0));
+        when(projectMapper.toResponse(testProject)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/projects/example"))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("proj-1"));
     }
 

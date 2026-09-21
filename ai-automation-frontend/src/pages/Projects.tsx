@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Archive, ArchiveRestore, FolderKanban, Pencil, Plus, Search } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
+import { Card, Button, Input, Modal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
-import { useProjects, useCreateProject, useUpdateProject, useStartContainer, useStopContainer, useArchivedProjects, useRestoreProject } from '../hooks/useProjects';
+import { useProjects, useUpdateProject, useStartContainer, useStopContainer, useArchivedProjects, useRestoreProject } from '../hooks/useProjects';
 import { useT } from '../i18n';
-import type { Project, ProjectType, CreateProjectRequest, UpdateProjectRequest } from '../types';
-
-const PROJECT_TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSONAL'];
+import { CreateProjectModal } from '../components/project/CreateProjectModal';
+import { FirstProjectActions } from '../components/project/FirstProjectActions';
+import { ProjectFormFields } from '../components/project/ProjectFormFields';
+import type { Project, ProjectType, UpdateProjectRequest } from '../types';
 
 export function Projects() {
   const t = useT();
   const navigate = useNavigate();
   const { data: projects, isLoading, error, refetch } = useProjects();
-  const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const startContainer = useStartContainer();
   const stopContainer = useStopContainer();
@@ -25,7 +25,6 @@ export function Projects() {
   const [search, setSearch] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState<CreateProjectRequest>({ name: '', type: 'CODE', path: '' });
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [editForm, setEditForm] = useState<UpdateProjectRequest & { name: string; type: ProjectType; path: string }>({ name: '', type: 'CODE', path: '' });
 
@@ -60,15 +59,6 @@ export function Projects() {
       { id: editProject.id, data: editForm },
       { onSuccess: () => setEditProject(null) }
     );
-  };
-
-  const handleCreate = () => {
-    createProject.mutate(form, {
-      onSuccess: () => {
-        setShowCreate(false);
-        setForm({ name: '', subtitle: '', description: '', type: 'CODE', path: '' });
-      },
-    });
   };
 
   if (isLoading) {
@@ -117,7 +107,14 @@ export function Projects() {
       </div>
 
       {/* Project cards */}
-      {filtered.length === 0 ? (
+      {!search && !showArchived && (projects?.length ?? 0) === 0 ? (
+        <EmptyState
+          icon={<FolderKanban className="w-8 h-8 text-text-tertiary" />}
+          title={t.projects.firstProject.title}
+          description={t.projects.firstProject.projectsHint}
+          action={<FirstProjectActions onCreateOwn={() => setShowCreate(true)} />}
+        />
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={showArchived ? <Archive className="w-8 h-8 text-text-tertiary" /> : <FolderKanban className="w-8 h-8 text-text-tertiary" />}
           title={search ? t.common.noResults : showArchived ? t.projects.archived : t.projects.title}
@@ -141,9 +138,10 @@ export function Projects() {
               <div className="flex items-start justify-between mb-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-text truncate">{project.name}</h3>
+                    {/* The name keeps its width; a long subtitle is what gets cut, never the name. */}
+                    <h3 className="font-semibold text-text truncate shrink-0 max-w-full">{project.name}</h3>
                     {project.subtitle && (
-                      <span className="text-xs text-text-tertiary shrink-0">{project.subtitle}</span>
+                      <span className="text-xs text-text-tertiary truncate min-w-0">{project.subtitle}</span>
                     )}
                     {showArchived && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium shrink-0">
@@ -215,66 +213,7 @@ export function Projects() {
         </div>
       )}
 
-      {/* Create modal */}
-      <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title={t.projects.create}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>
-              {t.common.cancel}
-            </Button>
-            <Button
-              onClick={handleCreate}
-              loading={createProject.isPending}
-              disabled={!form.name || !form.path}
-            >
-              {t.common.create}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label={t.projects.name}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="My Project"
-          />
-          <Input
-            label={t.projects.subtitleField}
-            value={form.subtitle ?? ''}
-            onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-            placeholder={t.projects.subtitlePlaceholder}
-          />
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.projects.descriptionField}</label>
-            <textarea
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-hidden focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
-              rows={3}
-              value={form.description ?? ''}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder={t.projects.descriptionPlaceholder}
-            />
-          </div>
-          <Select
-            label={t.projects.type}
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value as ProjectType })}
-            options={PROJECT_TYPES.map((type) => ({
-              value: type,
-              label: t.projects.types[type],
-            }))}
-          />
-          <DirectoryPicker
-            label={t.projects.path}
-            value={form.path}
-            onChange={(path) => setForm({ ...form, path })}
-            placeholder="/home/user/projects/my-project"
-          />
-        </div>
-      </Modal>
+      <CreateProjectModal open={showCreate} onClose={() => setShowCreate(false)} />
 
       {/* Edit modal */}
       <Modal
@@ -292,43 +231,7 @@ export function Projects() {
           </>
         }
       >
-        <div className="space-y-4">
-          <Input
-            label={t.projects.name}
-            value={editForm.name}
-            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-          />
-          <Input
-            label={t.projects.subtitleField}
-            value={editForm.subtitle ?? ''}
-            onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
-            placeholder={t.projects.subtitlePlaceholder}
-          />
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.projects.descriptionField}</label>
-            <textarea
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-hidden focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
-              rows={3}
-              value={editForm.description ?? ''}
-              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-              placeholder={t.projects.descriptionPlaceholder}
-            />
-          </div>
-          <Select
-            label={t.projects.type}
-            value={editForm.type}
-            onChange={(e) => setEditForm({ ...editForm, type: e.target.value as ProjectType })}
-            options={PROJECT_TYPES.map((type) => ({
-              value: type,
-              label: t.projects.types[type],
-            }))}
-          />
-          <DirectoryPicker
-            label={t.projects.path}
-            value={editForm.path}
-            onChange={(path) => setEditForm({ ...editForm, path })}
-          />
-        </div>
+        <ProjectFormFields value={editForm} onChange={setEditForm} />
       </Modal>
     </div>
   );

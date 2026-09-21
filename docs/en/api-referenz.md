@@ -132,6 +132,20 @@ Create a new project.
 
 **Response:** `201` with `ProjectResponse`
 
+### `POST /api/v1/projects/example`
+
+Create the bundled example project, meant for a fresh installation. The UI offers it while there is no project yet.
+
+- **Directory:** The template `classpath:examples/example-project/` is copied to `<automation.examples.directory>/example-project`. The default is `mysuricates-examples` below the workspace root, or `./data/examples` next to the database without a workspace root. The environment variable for it is `AUTOMATION_EXAMPLES_DIR`. An existing directory is never overwritten.
+- **Workflows:** one workflow per built-in template of category `EXAMPLE`, with `changeSource` `example-project`.
+- **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added.
+
+| Parameter | Type | Required | Values |
+|---|---|---|---|
+| `locale` | Query | No | `de`, `en` (default `en`): language of the project name and the example workflows |
+
+**Response:** `201` with `ProjectResponse` when the project was created, `200` otherwise.
+
 ### `GET /api/v1/projects/{id}`
 
 Retrieve a single project.

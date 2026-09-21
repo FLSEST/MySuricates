@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
-import { useT } from '../i18n';
+import { useT, useI18nStore } from '../i18n';
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from '../types';
 
 export function useProjects() {
@@ -30,6 +30,26 @@ export function useCreateProject() {
       toast.success(t.toast.projectCreated);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.projectCreateFailed)),
+  });
+}
+
+/**
+ * The bundled example project (`POST /projects/example`): created on the first call, returned
+ * afterwards. Its example workflows appear with it, so the workflow list is refreshed too.
+ */
+export function useCreateExampleProject() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
+  return useMutation({
+    mutationFn: () => api.post<Project>(`/projects/example?locale=${locale}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      qc.invalidateQueries({ queryKey: ['workflows'] });
+      toast.success(t.toast.exampleProjectReady);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.toast.exampleProjectFailed)),
   });
 }
 

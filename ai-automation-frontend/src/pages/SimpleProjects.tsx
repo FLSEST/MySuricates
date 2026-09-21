@@ -6,6 +6,7 @@ import { useProjects, useCreateProject, useStartContainer, useStopContainer } fr
 import { Spinner, Button, Modal, Select, Input } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
+import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { SimplePage, SimplePageHeader, SimpleCard, StatusDot } from '../components/simple/kit';
 import { AREA_COLORS } from '../utils/homeTiles';
 import type { ProjectType } from '../types';
@@ -52,8 +53,9 @@ export function SimpleProjects() {
       {(projects?.length ?? 0) === 0 ? (
         <EmptyState
           icon={<FolderKanban className="w-8 h-8 text-text-tertiary" />}
-          title={t.simple.projects.empty}
-          description={t.simple.projects.emptyHint}
+          title={t.projects.firstProject.title}
+          description={t.projects.firstProject.projectsHint}
+          action={<FirstProjectActions onCreateOwn={() => setCreateOpen(true)} />}
         />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

@@ -294,7 +294,7 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 
 **Hinweise:**
 - Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
-- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
+- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
 - Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
 - Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false), `{{ workflow_definition_hash }}`, `{{ trigger_source }}`
 
@@ -404,6 +404,7 @@ DELETE /api/v1/assistant/sessions/<session-uuid>
 | TODO lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/todos/{id}` |
 | TODO-Status setzen | `PATCH /api/v1/todos/{id}/status` — Body: `{"status": "IN_PROGRESS", "sessionId": "..."}` |
 | Projekt anlegen / lesen / ändern | `POST /api/v1/projects`, `GET`/`PUT /api/v1/projects/{id}` |
+| Beispielprojekt anlegen (idempotent) | `POST /api/v1/projects/example?locale=de` — 201 beim ersten Aufruf, danach 200 mit demselben Projekt |
 | App-Setting lesen / setzen | `GET`/`PUT /api/v1/system/settings/{key}` — PUT-Body: `{"value": "..."}` |
 | Execution-Config (Timeouts, Concurrency) | `GET`/`PUT /api/v1/system/execution-config` |
 

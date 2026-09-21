@@ -134,6 +134,20 @@ Neues Projekt erstellen.
 
 **Response:** `201` mit `ProjectResponse`
 
+### `POST /api/v1/projects/example`
+
+Das mitgelieferte Beispielprojekt anlegen, gedacht für eine frische Installation. Die Oberfläche bietet es an, solange es kein Projekt gibt.
+
+- **Verzeichnis:** Die Vorlage `classpath:examples/example-project/` wird nach `<automation.examples.directory>/example-project` kopiert. Standard ist `mysuricates-examples` unter dem Workspace-Root, ohne Workspace-Root `./data/examples` neben der Datenbank. Die Umgebungsvariable dafür ist `AUTOMATION_EXAMPLES_DIR`. Ein vorhandenes Verzeichnis wird nie überschrieben.
+- **Workflows:** je ein Workflow pro eingebauter Vorlage der Kategorie `EXAMPLE`, mit `changeSource` `example-project`.
+- **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt.
+
+| Parameter | Typ | Pflicht | Werte |
+|---|---|---|---|
+| `locale` | Query | Nein | `de`, `en` (Default `en`): Sprache von Projektname und Beispiel-Workflows |
+
+**Response:** `201` mit `ProjectResponse`, wenn das Projekt neu angelegt wurde, sonst `200`.
+
 ### `GET /api/v1/projects/{id}`
 
 Einzelnes Projekt abrufen.
