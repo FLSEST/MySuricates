@@ -44,7 +44,8 @@ Done. `b` goes one step back, `q` quits.
 
 - **Mode:** one instance in a container (only Docker needed), one instance directly on this machine,
   or staged **Dev · Test · Prod** — plan and build workflows in Dev (Factory, assistant), check them
-  in Test, run them reliably in Prod; definitions move by definition sync.
+  in Test, run them reliably in Prod. For now workflows move by export and import in the interface;
+  an automatic sync between the three is not set up yet.
 - **Modules:** Standard (smallest surface), Research, Full or your own selection incl. hardening.
   Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.

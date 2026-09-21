@@ -45,7 +45,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
 
 - **Modus:** eine Instanz im Container (nur Docker nötig), eine Instanz direkt auf diesem Rechner,
   oder gestaffelt **Dev · Test · Prod** — in Dev Workflows planen und bauen (Factory, Assistent),
-  in Test prüfen, in Prod verlässlich laufen lassen; Definitionen wandern per Definition-Sync.
+  in Test prüfen, in Prod verlässlich laufen lassen. Workflows wandern vorerst per Export und
+  Import in der Oberfläche; ein automatischer Abgleich zwischen den dreien ist noch nicht eingerichtet.
 - **Module:** Standard (kleinste Oberfläche), Research, Voll oder eine eigene Auswahl samt Härtung.
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
