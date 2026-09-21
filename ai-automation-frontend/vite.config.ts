@@ -4,6 +4,17 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Vendor-Pakete je eigenem Chunk. monaco-editor wird lazy aus components/shared/monacoSetup.ts
+// geladen — der Name monaco-* laesst die PWA ihn beim Precaching auslassen.
+const VENDOR_CHUNKS: Record<string, string[]> = {
+  react: ['react', 'react-dom', 'react-router-dom', 'react-router', 'scheduler'],
+  query: ['@tanstack/react-query', '@tanstack/query-core'],
+  ws: ['@stomp/stompjs', 'sockjs-client'],
+  markdown: ['react-markdown', 'remark-gfm'],
+  dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+  monaco: ['monaco-editor'],
+};
+
 function normalizeApiProxyTarget(url: string): string {
   return url.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
 }
@@ -63,11 +74,11 @@ export default defineConfig(() => {
       host: true,
       port: 3000,
       strictPort: true,
-      ...(process.env.VITE_HTTPS !== 'false' && fs.existsSync(path.resolve(__dirname, '../certs/dev.crt'))
+      ...(process.env.VITE_HTTPS !== 'false' && fs.existsSync(path.resolve(import.meta.dirname, '../certs/dev.crt'))
         ? {
             https: {
-              cert: fs.readFileSync(path.resolve(__dirname, '../certs/dev.crt')),
-              key: fs.readFileSync(path.resolve(__dirname, '../certs/dev.key')),
+              cert: fs.readFileSync(path.resolve(import.meta.dirname, '../certs/dev.crt')),
+              key: fs.readFileSync(path.resolve(import.meta.dirname, '../certs/dev.key')),
             },
           }
         : {}),
@@ -85,16 +96,14 @@ export default defineConfig(() => {
     },
     build: {
       chunkSizeWarningLimit: 600,
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-router-dom'],
-            query: ['@tanstack/react-query'],
-            ws: ['@stomp/stompjs', 'sockjs-client'],
-            markdown: ['react-markdown', 'remark-gfm'],
-            dnd: ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
-            // lazily imported by components/shared/monacoSetup.ts — named so the PWA can skip precaching it
-            monaco: ['monaco-editor/esm/vs/editor/edcore.main.js'],
+          // Rolldown (Vite 8) nimmt manualChunks nur noch als Funktion.
+          manualChunks: (id: string) => {
+            for (const [chunk, packages] of Object.entries(VENDOR_CHUNKS)) {
+              if (packages.some((pkg) => id.includes(`/node_modules/${pkg}/`))) return chunk;
+            }
+            return undefined;
           },
         },
       },
