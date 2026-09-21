@@ -701,6 +701,9 @@ export const en = {
       // Start/end event names
       event: { 'Start': 'Start', 'Ende': 'End' },
     },
+    hideSidebar: 'Hide sidebar',
+    showSidebar: 'Show sidebar',
+    resizeSidebar: 'Resize sidebar (double-click to reset)',
     versionsTab: 'Versions',
     blocksTab: 'Blocks',
     noVersions: 'No versions yet.',

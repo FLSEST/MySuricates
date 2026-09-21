@@ -1,12 +1,13 @@
 import { useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, History } from 'lucide-react';
+import { Plus, History, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
 const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDiagramTab'));
 type DiagramSelection = import('../components/workflow/BpmnDiagramView').DiagramSelection;
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
+import { ResizableSplit } from '../components/shared/ResizableSplit';
 import { apiErrorMessage } from '../api/client';
 import { useToast } from '../hooks/useToast';
 import {
@@ -15,6 +16,7 @@ import {
 } from '../hooks/useWorkflows';
 import { useSkills, useActivateSkills, useDeactivateSkill } from '../hooks/useSkills';
 import { useModuleEnabled } from '../hooks/useModules';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { useProjects } from '../hooks/useProjects';
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
@@ -71,6 +73,7 @@ export function WorkflowDetail() {
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [cloneForm, setCloneForm] = useState({ projectId: '', name: '' });
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState('workflow-detail-sidebar-collapsed', false);
 
   if (isLoading) {
     return (
@@ -305,8 +308,13 @@ export function WorkflowDetail() {
         optimizeLoading={optimizeWorkflow.isPending}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+      <ResizableSplit
+        storageKey="workflow-detail-sidebar-width"
+        separatorLabel={t.workflows.resizeSidebar}
+        collapsed={sidebarCollapsed}
+        sideId="workflow-detail-sidebar"
+        main={
+        <div className="space-y-4">
           <div className="flex border-b border-border mb-0">
             <button
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -341,6 +349,16 @@ export function WorkflowDetail() {
                 {t.workflows.diagramTab}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-controls="workflow-detail-sidebar"
+              aria-expanded={!sidebarCollapsed}
+              className="ml-auto hidden lg:inline-flex items-center gap-1.5 self-center px-2 py-1 rounded-md text-sm text-text-secondary hover:text-text hover:bg-surface-raised transition-colors"
+            >
+              {sidebarCollapsed ? <PanelRightOpen className="w-4 h-4" /> : <PanelRightClose className="w-4 h-4" />}
+              {sidebarCollapsed ? t.workflows.showSidebar : t.workflows.hideSidebar}
+            </button>
           </div>
 
           {activeTab === 'blocks' && (
@@ -399,7 +417,8 @@ export function WorkflowDetail() {
             </Suspense>
           )}
         </div>
-
+        }
+        side={
         <WorkflowDetailSidebar
           workflow={workflow}
           workflowVariables={workflowVariables}
@@ -411,7 +430,8 @@ export function WorkflowDetail() {
           onDeactivateSkill={(wId, sId) => deactivateSkill.mutate({ workflowId: wId, skillId: sId })}
           onNavigateToRun={(runId) => navigate(`/workflows/${workflow.id}/run/${runId}`)}
         />
-      </div>
+        }
+      />
 
       <CompletionTriggerSection workflowId={workflow.id} allWorkflows={allWorkflows} />
 
