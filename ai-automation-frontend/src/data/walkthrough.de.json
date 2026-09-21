@@ -1,4 +1,12 @@
 {
+  "intro": {
+    "title": "Acht Beispiele. Nicht die ganze Liste.",
+    "points": [
+      "Was folgt, sind Beispiele dafür, was damit möglich wird",
+      "Alle aus denselben wenigen Bausteinen, nur anders zusammengesteckt",
+      "Welche Kombination passt, hängt davon ab, woran du arbeitest"
+    ]
+  },
   "mix": {
     "title": "Rechnen, wo es rechnen kann. Fragen, wo es urteilen muss.",
     "points": [

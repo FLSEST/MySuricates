@@ -152,12 +152,110 @@ function Refill() {
   );
 }
 
+/** Few shapes, many arrangements — the point of the whole tour, said once without words. */
+function Intro() {
+  const grid = [90, 140, 190, 240];
+  const rows = [12, 42, 72];
+  return (
+    <>
+      {rows.map((y) => (
+        <Box key={y} x={8} y={y} w={28} h={20} />
+      ))}
+      <Arrow from={40} to={82} y={52} />
+      {rows.map((y) =>
+        grid.map((x) => <Box key={`${x}-${y}`} x={x} y={y} w={30} h={20} ai={x === 190 && y === 42} />),
+      )}
+    </>
+  );
+}
+
+function Notice() {
+  return (
+    <>
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.5}>
+        <line x1={8} y1={88} x2={104} y2={88} />
+      </g>
+      {/* Caught on the way out. */}
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <path d="M56 84 C 56 60, 64 48, 76 40" strokeDasharray="4 4" />
+        <polyline points="72,44 78,38 80,46" strokeLinejoin="round" />
+        <rect x={98} y={22} width={34} height={54} rx={17} />
+        <circle cx={115} cy={49} r={5} fill="currentColor" stroke="none" />
+      </g>
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} fill="none">
+        {[186, 234, 282].map((x) => (
+          <g key={x}>
+            <rect x={x - 15} y={28} width={30} height={48} rx={15} />
+            <circle cx={x} cy={52} r={4} fill="currentColor" stroke="none" />
+          </g>
+        ))}
+      </g>
+    </>
+  );
+}
+
+function Swap() {
+  return (
+    <>
+      {/* Lifted out while the line keeps moving. */}
+      <Box x={20} y={10} w={48} h={26} ai />
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <path d="M44 62 L44 42" strokeDasharray="4 4" />
+        <polyline points="39,47 44,40 49,47" strokeLinejoin="round" />
+      </g>
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <polyline points="20,64 20,88 68,88 68,64" strokeLinejoin="round" />
+        <line x1={8} y1={98} x2={300} y2={98} opacity={0.5} />
+      </g>
+      <Box x={150} y={52} w={48} h={26} />
+      <Box x={214} y={52} w={48} h={26} />
+    </>
+  );
+}
+
+function Blocks() {
+  return (
+    <>
+      <Box x={16} y={40} w={40} h={24} />
+      <Arrow from={58} to={108} y={52} />
+      {/* A whole flow is one step inside another. */}
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} fill="none">
+        <rect x={112} y={16} width={168} height={74} rx={12} />
+      </g>
+      {[128, 176, 224].map((x) => (
+        <Box key={x} x={x} y={28} w={40} h={22} ai={x === 176} />
+      ))}
+      <Box x={152} y={58} w={40} h={22} />
+      <Box x={200} y={58} w={40} h={22} />
+    </>
+  );
+}
+
+function Closing() {
+  const xs = [8, 84, 160, 236];
+  return (
+    <>
+      {xs.map((x) => (
+        <Box key={`a${x}`} x={x} y={10} w={62} h={34} />
+      ))}
+      {xs.map((x) => (
+        <Box key={`b${x}`} x={x} y={56} w={62} h={34} ai={x === 236} />
+      ))}
+    </>
+  );
+}
+
 const DIAGRAMS: Record<PanelDiagramId, () => React.JSX.Element> = {
+  intro: Intro,
   mix: Mix,
   trace: Trace,
+  notice: Notice,
   wait: Wait,
   verdict: Verdict,
   refill: Refill,
+  swap: Swap,
+  blocks: Blocks,
+  closing: Closing,
 };
 
 export function PanelDiagram({ id }: { id: PanelDiagramId }) {

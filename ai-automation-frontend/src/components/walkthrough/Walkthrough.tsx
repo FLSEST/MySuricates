@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useT } from '../../i18n';
+import { useT, useI18nStore, type Locale } from '../../i18n';
 import { useWalkthroughText } from '../../i18n/walkthrough';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { WALKTHROUGH_PANELS } from '../../data/walkthroughPanels';
+import walkthroughImages from '../../data/walkthroughImages.json';
 import { PanelDiagram } from './PanelDiagram';
 
 /**
@@ -18,6 +19,8 @@ import { PanelDiagram } from './PanelDiagram';
 export function Walkthrough({ onClose }: { onClose: () => void }) {
   const t = useT();
   const text = useWalkthroughText();
+  const locale = useI18nStore((s) => s.locale);
+  const setLocale = useI18nStore((s) => s.setLocale);
   const auditEnabled = useModuleEnabled('audit');
   const [index, setIndex] = useState(0);
 
@@ -51,6 +54,9 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
 
   if (!panel) return null;
   const copy = text(panel.id);
+  // Written by the image workflow after the set has been approved — until then the stage
+  // shows the diagram alone and panels without one have no stage at all.
+  const image = (walkthroughImages as Record<string, string>)[panel.id];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -63,6 +69,23 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
         className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-surface-overlay border border-border
                    rounded-2xl shadow-2xl overflow-hidden animate-slide-up"
       >
+        {/* The tour is often the first thing a new instance shows — the language switch has to be
+            reachable here, not three clicks away in the settings. */}
+        <div className="absolute top-3 left-3 z-10 flex items-center gap-0.5 p-0.5 rounded-lg bg-surface-overlay/80">
+          {(['en', 'de'] as Locale[]).map((l) => (
+            <button
+              key={l}
+              onClick={() => setLocale(l)}
+              aria-pressed={locale === l}
+              className={`px-2 py-1 text-[0.7rem] font-medium uppercase tracking-wide rounded-md transition-colors ${
+                locale === l ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:text-text'
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+
         <button
           onClick={onClose}
           aria-label={t.walkthrough.skip}
@@ -75,11 +98,11 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
         {/* Stage. Illustration always on the left, diagram always on the right — the same split on
             every panel is what makes eight of them read as one set. The illustration sits on a plate
             of its own: a generated image carries fixed colours and would fight the themed surround. */}
-        {(panel.diagram || panel.image) && (
+        {(panel.diagram || image) && (
           <div className="shrink-0 h-36 sm:h-44 px-6 sm:px-10 py-4 bg-surface-raised border-b border-border flex items-center justify-center gap-5">
-            {panel.image && (
+            {image && (
               <img
-                src={panel.image}
+                src={image}
                 alt=""
                 aria-hidden="true"
                 className="h-full w-auto max-w-[40%] object-contain rounded-xl bg-[#1b1714] p-2"

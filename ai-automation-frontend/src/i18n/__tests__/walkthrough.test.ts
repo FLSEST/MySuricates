@@ -3,6 +3,7 @@ import de from '../../data/walkthrough.de.json';
 import en from '../../data/walkthrough.en.json';
 import { walkthroughText, WALKTHROUGH_LANGUAGES } from '../walkthrough';
 import { WALKTHROUGH_PANELS } from '../../data/walkthroughPanels';
+import prompts from '../../data/walkthroughImagePrompts.json';
 
 const catalogs: Record<string, Record<string, { title: string; points: string[] }>> = { de, en };
 
@@ -36,6 +37,16 @@ describe('walkthrough copy', () => {
     for (const lang of WALKTHROUGH_LANGUAGES) {
       expect(Object.keys(catalogs[lang] ?? {}).sort(), lang).toEqual(structure);
     }
+  });
+
+  // Ohne Szene im Bildkonzept bekaeme ein Panel nie eine Illustration — und das faellt sonst
+  // erst auf, wenn der Bild-Workflow durchgelaufen ist.
+  it('has an image concept for every panel', () => {
+    expect(Object.keys(prompts.szenen).sort()).toEqual(WALKTHROUGH_PANELS.map((p) => p.id).sort());
+    for (const [id, szene] of Object.entries(prompts.szenen)) {
+      expect(szene, id).toBeTruthy();
+    }
+    expect(prompts.stil).toBeTruthy();
   });
 
   it('has no duplicate panel ids', () => {

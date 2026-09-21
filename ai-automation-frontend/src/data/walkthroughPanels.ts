@@ -7,7 +7,9 @@
  * (different routes) and with per-module switches; a state probe cannot tell "not done yet" from
  * "not available here", which makes it worse than no checklist at all.
  */
-export type PanelDiagramId = 'mix' | 'trace' | 'wait' | 'verdict' | 'refill';
+export type PanelDiagramId =
+  | 'intro' | 'mix' | 'trace' | 'notice' | 'wait'
+  | 'verdict' | 'refill' | 'swap' | 'blocks' | 'closing';
 
 export interface WalkthroughPanel {
   /** Key into `walkthrough.<lang>.json`. */
@@ -16,20 +18,19 @@ export interface WalkthroughPanel {
   diagram?: PanelDiagramId;
   /** Hidden when this module is off. Only set where the panel would otherwise claim something untrue. */
   module?: 'audit';
-  /** Meerkat illustration, added once the image workflow has produced the set. */
-  image?: string;
   /** The last panel closes the tour instead of advancing. */
   closing?: boolean;
 }
 
 export const WALKTHROUGH_PANELS: readonly WalkthroughPanel[] = [
+  { id: 'intro', diagram: 'intro' },
   { id: 'mix', diagram: 'mix' },
   { id: 'trace', diagram: 'trace' },
-  { id: 'notice' },
+  { id: 'notice', diagram: 'notice' },
   { id: 'wait', diagram: 'wait' },
   { id: 'verdict', diagram: 'verdict', module: 'audit' },
   { id: 'refill', diagram: 'refill' },
-  { id: 'swap' },
-  { id: 'blocks' },
-  { id: 'closing', closing: true },
+  { id: 'swap', diagram: 'swap' },
+  { id: 'blocks', diagram: 'blocks' },
+  { id: 'closing', diagram: 'closing', closing: true },
 ];

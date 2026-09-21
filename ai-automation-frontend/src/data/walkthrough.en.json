@@ -1,4 +1,12 @@
 {
+  "intro": {
+    "title": "Eight examples. Not the whole list.",
+    "points": [
+      "What follows are examples of what this makes possible",
+      "All of them are built from the same handful of blocks, combined differently",
+      "Which combination fits depends on what you are working on"
+    ]
+  },
   "mix": {
     "title": "Compute what you can. Ask what you must.",
     "points": [

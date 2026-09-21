@@ -1,0 +1,21 @@
+{
+  "_": "Bildkonzepte für die Rundgang-Illustrationen. Kuratiert, nicht erzeugt: ein Modell, das den Prompt bei jedem Lauf neu formuliert, ist die Ursache von Stildrift. Der Workflow walkthrough-illustrationen.json setzt stil + szene zusammen und ändert nichts daran. Bildparität mit walkthroughPanels.ts prüft walkthrough.test.ts. Der Stil ist in medium/welt/rest geteilt, damit ein Wechsel des Looks eine Zeile ist und nicht ein neuer Text.",
+  "hintergrund": "#1b1714",
+  "format": "quadratisch, wird auf 640x640 normiert (das Modell haelt Pixelmasse im Prompt nicht ein — gemessen: 1254x1254 statt angeforderter 1024)",
+  "medium": "Hand-painted illustration, soft outlines, warm earthy colours, visible brush texture.",
+  "welt": "The setting is a high-tech workshop: anodised aluminium, brushed steel, glass, machined modular parts, precision tools and thin LED edge light. No wood grain, no brass, no leather, no vintage props.",
+  "stil": " A single meerkat, always the same character: slim, standing upright, three-quarter view at mid-shot distance, sandy fur with a darker mask around the eyes, wearing a slim dark technical work vest with one chest pocket. The meerkat is the operator — it observes, it decides, it hands work on; it never becomes the machine itself. Square composition: the meerkat in the left third, the subject of the scene in the right two thirds, with calm empty space around both. Cool diffuse key light from the upper left, one warm amber accent light on the single element that matters. The background is a fully OPAQUE flat colour #1b1714 filling the entire frame edge to edge — no transparency, no alpha channel, no cut-out, no vignette, no frame, no border, no ground line, no horizon. Palette: sandy #d8a657 for the meerkat, warm amber #e8b661 for exactly one accented element, muted slate #7c8b8f and deep brown #3a2f28 for everything else. Absolutely no text, no letters, no digits, no logos, no watermark and no user interface anywhere in the image. The scene:",
+  "anker": "verdict",
+  "szenen": {
+    "intro": "The meerkat stands beside a tall rack filled with many small illuminated modules of only a few repeating shapes, arranged in many different combinations across the rack. It gestures calmly towards the rack. One single module glows amber; all the others stay neutral.",
+    "mix": "A line of identical machined modules glides past on a slim rail. The meerkat lets almost all of them run by untouched and lifts exactly one out, holding it under a small inspection lens. The lifted module glows amber; all the others stay plain metal.",
+    "trace": "The meerkat watches a row of modules travel away to the right along a rail. Behind it a projected light strip shows the very same modules already laid out in the same order.",
+    "notice": "A single amber spark rises from the bench and is about to leave the frame. The meerkat catches it in a small glass-and-metal capsule just in time. On a rack behind it stand several capsules, each with a spark resting quietly inside.",
+    "wait": "A module stands halted on a rail that continues, unbroken, into the dark. A soft amber standby ring pulses around it. The meerkat waits calmly beside it, one paw resting on the module, completely unhurried.",
+    "verdict": "The meerkat presses an amber seal onto a thin glass plate clamped in a slim metal frame. Beside the frame a circular indicator has already run most of the way round.",
+    "refill": "A slim metal magazine rack the meerkat has just installed. Fresh cartridges feed into it from above while one spent, dimmed cartridge slides out at the bottom. The meerkat stands beside it, tools already set down, simply watching.",
+    "swap": "The rail keeps running while the meerkat pulls one module out of its socket and holds a second, differently coloured module ready in the other paw. Two further modules of the same shape rest on the bench.",
+    "blocks": "The meerkat assembles machined modular units on the bench. One larger unit stands open, and inside it sits a smaller arrangement of the very same units.",
+    "closing": "The meerkat has just stepped back from its bench, on which eight small illuminated panels stand side by side, each showing a simple abstract scene. Its tools lie set down beside them."
+  }
+}
