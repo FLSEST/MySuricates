@@ -2,28 +2,28 @@
 
 # MySuricates
 
-A research project exploring how far software development can be carried out with AI agents in a controlled way — and a working system in which this can be observed.
+A research project on the question of how far software development can be operated in a controlled way with AI agents — and a runnable system in which that can be observed.
 
-MySuricates is a local workflow platform: workflows consist of blocks that are either deterministic (shell, branch, loop) or call an AI. This mix has produced a feedback loop that generates findings about its own codebase, turns them into TODOs, triggers fix workflows, and then verifies the result. The code was created largely in AI sessions, part of it through this feedback loop itself.
+MySuricates is a local workflow platform: workflows consist of blocks that are either deterministic (shell, branch, loop) or call an AI. This mix has produced a feedback loop that generates findings about its own codebase, turns them into TODOs, triggers fix workflows, and then checks the result again. The code was created largely in AI sessions, part of it through this feedback loop itself.
 
-**What this is not:** not a product, not a service, no support, no stability promise. The architectural debt is known and is tracked in the system itself as audit findings — see [Maturity level](#maturity-level-and-known-debt).
+**What this is not:** not a product, not a service, no support, no stability promise. The architectural debt is known and is tracked in the system itself as audit findings — see [Maturity](#maturity-and-known-debt).
 
 ## The questions behind it
 
-Four mechanisms were built to investigate one question each. Built means: they run. It does not mean the question has been answered.
+Four mechanisms were built to investigate one question each. Built here means: they run. It does not mean the question has been answered.
 
 | Question | Mechanism in the code |
 |---|---|
 | Can a system identify and work through its own need for improvement without someone giving it the initial push? | **Self-Improvement Loop**: audit workflow → gate evaluation → automatically generated TODO → `TodoTrigger` starts a fix workflow → verification. Three layers prevent the loop from chasing itself. |
 | What does an agent need to know about a project, and where does that knowledge come from if nobody writes it down? | **Workflow Memory**: knowledge is extracted from completed runs and injected as context before the next run. |
-| How do you stay in control of an agent that plans several steps on its own? | **Agentic blocks** separate Reason and Act and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
+| How do you stay in control of an agent that plans several steps on its own? | **Agentic blocks** separate Reason and Act — first one call decides what to do, a second carries it out — and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
 | Can the quality of AI output be evaluated by machine instead of by reading it? | **Gates**: blocks output `gate_status: GREEN\|YELLOW\|RED`. RED creates a high-priority TODO, YELLOW a medium-priority one. The evaluation lives in the workflow, not in the platform. |
 
 The most honest answer after seven months: the mechanisms hold, but they need guardrails, and those guardrails are the actual result. A gate that only asks a language model whether something is good reliably produces findings — including fabricated ones. Deterministic measurement before AI evaluation is the recurring lesson.
 
 ## What is there
 
-As of 2026-09-19, commit counts and lines from the working tree on that day (lines via `wc -l`, including blank and comment lines). Test numbers from a run on 2026-09-18 in an isolated worktree:
+As of 2026-09-19, commit counts and lines from the working tree on that day (lines via `wc -l`, including blank and comment lines). Test numbers from a run in an isolated worktree, dated in the table:
 
 | | |
 |---|---|
@@ -33,13 +33,13 @@ As of 2026-09-19, commit counts and lines from the working tree on that day (lin
 | Tests | Backend 9,197 (0 failures, 1 skipped), Frontend 1,367 — run from 2026-09-19 |
 | Building blocks | 20 block types, 66 workflow templates, 19 built-in skills, 7 integration providers |
 
-The test numbers are a dated finding. Since 2026-09-12, CI has been checking that they remain so: it runs both suites on every push, in addition to a hygiene gate and secret scan. A CI run on an external Git host is still pending.
+The test numbers are a dated finding from a local run. Since 2026-09-12, the CI definition (`.github/workflows/ci.yml`) has run both suites on every push, in addition to a hygiene gate and secret scan; however, the numbers above do not come from a CI run.
 
-## Maturity level and known debt
+## Maturity and known debt
 
 Experimental. The system runs daily on one machine and had about 2,400 runs behind it on 2026-09-12 — it has never been operated under load, with multiple users, or outside a trusted network.
 
-The debt is not hidden; it is counted. On 2026-09-12, the Audit Center listed **89 findings**:
+The debt is not hidden; it is counted. The Audit Center — a page in the application where the findings from the audit workflows are tracked over time — counted **89 findings** on 2026-09-12:
 26 open (1 critical, 4 high), 25 waiting for verification, 38 completed. In terms of content, they are almost entirely structural: services and UI components that are too large and too tightly coupled, fuzzy controller/repository boundaries, storage and retention topics. How these findings are produced and what the statuses mean is described in the
 [Audit Workflow Protocol](docs/en/audit-workflow-protocol.md).
 
@@ -61,7 +61,7 @@ Shell blocks and AI calls run **on the host with your permissions**, not in a co
 | Backend | Spring Boot 3.4, Java 21 |
 | Frontend | React 19, TypeScript, Vite 7 |
 | Database | SQLite (WAL mode) + Flyway |
-| Container | Docker (Java Docker Client 3.4.1) — optional, only for container blocks |
+| Container | Docker (Java Docker Client 3.4.1) — optional, only for shell blocks with `container_image` |
 | Styling | Tailwind CSS 4.2, CSS variables |
 | State | Zustand 4.4 + TanStack Query 5 |
 | WebSocket | STOMP over SockJS |
@@ -75,11 +75,13 @@ Execution happens **on the host**: shell blocks through the user's shell, AI blo
 ## Quickstart
 
 > New machine (Linux), possibly without Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/en/GETTING-STARTED.md)**
-> walks you through the setup step by step. Short version: `git clone <repository-url> autotrigger && cd autotrigger && ./scripts/setup.sh`.
+> walks you through the setup step by step. Short version: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
+
+Java 21, Maven, Node 20+ and npm are required. AI blocks additionally require a logged-in AI CLI (`claude`, `codex` or `pi`) — without one, only the deterministic block types run. `./scripts/setup.sh` checks all of this and installs anything missing.
 
 ```bash
 # 1. Clone the repository
-git clone <repository-url> autotrigger
+git clone https://github.com/FLSEST/MySuricates.git autotrigger
 cd autotrigger
 
 # 2. Build and start the backend
@@ -87,8 +89,8 @@ cd ai-automation-backend
 mvn clean package -DskipTests
 java -jar target/ai-automation-backend-*.jar
 
-# 3. Install and start the frontend (new terminal)
-cd ai-automation-frontend
+# 3. Install and start the frontend (new terminal, again in the repo root directory)
+cd autotrigger/ai-automation-frontend
 npm install
 npm run dev
 
@@ -119,14 +121,14 @@ Alternatively, the backend runs in a container — in that case, please read the
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
 | [Assistant](docs/en/assistant-system.md) | Chat assistant, sessions, suggestions |
 | [Audit Protocol](docs/en/audit-workflow-protocol.md) | How findings are produced, gate status, TODO linking |
-| [Evidence](docs/en/belege.md) | Cases where a mechanism found something the normal process had missed — with run ID and number |
+| [Evidence](docs/en/belege.md) | Cases where a mechanism found something the normal process missed — with run ID and number |
 | [Vision](docs/en/vision.md) | Product vision and roadmap |
 
 For agents that call the REST API directly, [AGENTS.md](AGENTS.md) is the entry point.
 
 ## Todo workflow linking
 
-Todos can optionally be linked to a resolver workflow. The link is deliberately not global and does not start anything automatically.
+Todos can optionally be linked to a **resolver workflow** — the workflow that is meant to resolve this one todo. The link is deliberately not global and does not start anything automatically. It is configured in the todo view of the UI; the field names mentioned are those of the REST API (`/api/v1/todos`).
 
 - `linkedWorkflowId` on the todo is optional.
 - A linked workflow is only started by the manual `Loesen` action.
