@@ -2081,6 +2081,28 @@ Set an application setting.
 
 **Response:** `200 OK`
 
+### `GET /api/v1/system/tray-config`
+
+Retrieve runtime settings for the host tray icon.
+
+**Response:**
+
+```json
+{
+  "popupsEnabled": true,
+  "notifyApprovals": true,
+  "notifyFailures": true,
+  "notifySuccess": false,
+  "publicUrl": "https://mysuricates.example.com"
+}
+```
+
+### `PUT /api/v1/system/tray-config`
+
+Update tray settings. Partial updates are accepted. External browser targets must use HTTPS; HTTP is allowed only for loopback addresses. The browser target is separate from internal health-check URLs.
+
+**Request/response:** the same fields as `GET`; the response contains the complete validated state.
+
 ### `GET /api/v1/system/execution-config`
 
 Retrieve current execution configuration (timeouts, token limits, etc.). Additionally contains a read-only field `activeRuns` with the number of active runs.

@@ -6,6 +6,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.ExecutionSettingsService;
 import com.automation.service.system.SystemSettingsService;
+import com.automation.service.tray.TraySettingsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,6 +35,9 @@ class SystemSettingsControllerTest {
 
     @MockitoBean
     private ExecutionSettingsService executionSettingsService;
+
+    @MockitoBean
+    private TraySettingsService traySettingsService;
 
     @MockitoBean
     private ActivityLogService activityLogService;
@@ -110,5 +114,56 @@ class SystemSettingsControllerTest {
                         .content("{\"claude-max-concurrent-calls\":\"999\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Invalid value for claude-max-concurrent-calls: must be 1-20"));
+    }
+
+    @Test
+    void getTrayConfig_returnsPopupChoicesAndBrowserTarget() throws Exception {
+        when(traySettingsService.getCurrentSettings()).thenReturn(java.util.Map.of(
+                "popupsEnabled", true,
+                "notifyApprovals", true,
+                "notifyFailures", true,
+                "notifySuccess", false,
+                "publicUrl", "https://mysuricates.example.com"
+        ));
+
+        mockMvc.perform(get("/api/v1/system/tray-config"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popupsEnabled").value(true))
+                .andExpect(jsonPath("$.notifySuccess").value(false))
+                .andExpect(jsonPath("$.publicUrl").value("https://mysuricates.example.com"));
+    }
+
+    @Test
+    void updateTrayConfig_returnsValidatedSettings() throws Exception {
+        when(traySettingsService.update(any())).thenReturn(java.util.Map.of(
+                "popupsEnabled", false,
+                "notifyApprovals", true,
+                "notifyFailures", true,
+                "notifySuccess", false,
+                "publicUrl", "https://mysuricates.example.com"
+        ));
+
+        mockMvc.perform(put("/api/v1/system/tray-config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"popupsEnabled\":false,\"publicUrl\":\"https://mysuricates.example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popupsEnabled").value(false));
+
+        verify(traySettingsService).update(java.util.Map.of(
+                "popupsEnabled", false,
+                "publicUrl", "https://mysuricates.example.com"
+        ));
+    }
+
+    @Test
+    void updateTrayConfig_rejectsInvalidExternalHttpUrl() throws Exception {
+        doThrow(new IllegalArgumentException("publicUrl must use HTTPS"))
+                .when(traySettingsService).update(any());
+
+        mockMvc.perform(put("/api/v1/system/tray-config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"publicUrl\":\"http://example.com\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("publicUrl must use HTTPS"));
     }
 }

@@ -60,6 +60,11 @@ class TrayConfigTest {
         assertThat(config.getStableUrl()).isEqualTo("http://localhost:9091");
     }
 
+    @Test
+    void should_returnEmptyPublicUrl_byDefault() {
+        assertThat(config.getPublicUrl()).isEmpty();
+    }
+
     // --- Setter/Override tests (simulating @ConfigurationProperties injection) ---
 
     @Test
@@ -84,6 +89,12 @@ class TrayConfigTest {
     void should_returnCustomUrl_when_stableUrlIsOverridden() {
         config.setStableUrl("https://stable.example.com");
         assertThat(config.getStableUrl()).isEqualTo("https://stable.example.com");
+    }
+
+    @Test
+    void should_returnCustomUrl_when_publicUrlIsOverridden() {
+        config.setPublicUrl("https://mysuricates.example.com");
+        assertThat(config.getPublicUrl()).isEqualTo("https://mysuricates.example.com");
     }
 
     // --- Edge cases ---

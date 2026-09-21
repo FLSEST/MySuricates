@@ -6,6 +6,7 @@ import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, u
 import { useTestingStatus, useTestingStart, useTestingStop, useTestingReset, useTestingSync, useTestingPullChanges } from '../hooks/useTesting';
 import { GeneralSettingsCard } from '../components/settings/GeneralSettingsCard';
 import { AppearanceCard } from '../components/settings/AppearanceCard';
+import { TraySettingsCard } from '../components/settings/TraySettingsCard';
 import { SecurityCard } from '../components/settings/SecurityCard';
 import { TodoSettingsCard } from '../components/settings/TodoSettingsCard';
 import { RemoteAccessCard } from '../components/settings/RemoteAccessCard';
@@ -86,6 +87,7 @@ export function Settings() {
 
           <SettingsSection id="appearance" title={t.settings.appearance} collapsible open={!!openSections['appearance']} onToggle={() => toggleSection('appearance')}>
             <AppearanceCard />
+            <TraySettingsCard />
           </SettingsSection>
 
           {!simpleMode && (

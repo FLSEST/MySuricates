@@ -14,11 +14,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import javax.imageio.ImageIO;
 import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -40,6 +36,7 @@ public class SystemTrayService {
     private final WorkflowExecutionRegistry executionRegistry;
     private final DockerClient dockerClient;
     private final SystemIdentityService systemIdentity;
+    private final TraySettingsService traySettings;
 
     private TrayIcon trayIcon;
     private volatile TrayState previousState;
@@ -54,12 +51,14 @@ public class SystemTrayService {
                              WorkflowRunRepository runRepository,
                              WorkflowExecutionRegistry executionRegistry,
                              DockerClient dockerClient,
-                             SystemIdentityService systemIdentity) {
+                             SystemIdentityService systemIdentity,
+                             TraySettingsService traySettings) {
         this.trayConfig = trayConfig;
         this.runRepository = runRepository;
         this.executionRegistry = executionRegistry;
         this.dockerClient = dockerClient;
         this.systemIdentity = systemIdentity;
+        this.traySettings = traySettings;
     }
 
     record TrayState(int activeRuns, long runsToday, long failedToday, int pendingApprovals, boolean dockerOk, boolean frontendOk, boolean stableOk) {
@@ -93,7 +92,7 @@ public class SystemTrayService {
             PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false, false));
             trayIcon.setPopupMenu(menu);
             // Doppelklick aufs Icon bzw. Klick auf die Meldung (je nach Desktop): wartet eine Freigabe, direkt dorthin
-            trayIcon.addActionListener(e -> TrayLinks.open(TrayLinks.clickTarget(trayConfig,
+            trayIcon.addActionListener(e -> TrayLinks.open(TrayLinks.clickTarget(traySettings.browserBaseUrl(),
                     previousState != null ? previousState.pendingApprovals() : 0)));
 
             systemTray.add(trayIcon);
@@ -113,55 +112,11 @@ public class SystemTrayService {
         }
     }
 
-    private void loadIcons(int targetSize) throws IOException {
+    private void loadIcons(int targetSize) {
         for (IconColor color : IconColor.values()) {
-            String path = "tray/tray-" + color.name().toLowerCase() + ".png";
-            try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
-                if (is == null) {
-                    throw new IOException("Tray icon not found: " + path);
-                }
-                BufferedImage source = ImageIO.read(is);
-                iconCache.put(color, progressiveScale(source, targetSize));
-            }
+            iconCache.put(color, TrayIconRenderer.render(color, targetSize));
         }
-        log.info("Loaded and scaled {} tray icons to {}x{}", iconCache.size(), targetSize, targetSize);
-    }
-
-    /**
-     * Progressive bilinear downscale — halves the image repeatedly until close
-     * to the target size, then does one final scale. This produces much sharper
-     * results than a single large downscale.
-     */
-    private static BufferedImage progressiveScale(BufferedImage source, int targetSize) {
-        BufferedImage current = source;
-        int w = current.getWidth();
-        int h = current.getHeight();
-
-        while (w / 2 >= targetSize && h / 2 >= targetSize) {
-            w /= 2;
-            h /= 2;
-            BufferedImage half = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = half.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.drawImage(current, 0, 0, w, h, null);
-            g.dispose();
-            current = half;
-        }
-
-        if (w != targetSize || h != targetSize) {
-            BufferedImage result = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = result.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.drawImage(current, 0, 0, targetSize, targetSize, null);
-            g.dispose();
-            return result;
-        }
-
-        return current;
+        log.info("Rendered {} tray icons at {}x{}", iconCache.size(), targetSize, targetSize);
     }
 
     Image getIcon(IconColor color) {
@@ -256,12 +211,18 @@ public class SystemTrayService {
 
         menu.addSeparator();
 
+        String browserBaseUrl = traySettings.browserBaseUrl();
+
         if (state.pendingApprovals > 0) {
             MenuItem approvalItem = new MenuItem(state.pendingApprovals + " Freigabe(n) wartend");
-            approvalItem.addActionListener(e -> TrayLinks.open(TrayLinks.approvals(trayConfig)));
+            approvalItem.addActionListener(e -> TrayLinks.open(TrayLinks.approvals(browserBaseUrl)));
             menu.add(approvalItem);
             menu.addSeparator();
         }
+
+        MenuItem openItem = new MenuItem("MySuricates oeffnen");
+        openItem.addActionListener(e -> TrayLinks.open(browserBaseUrl));
+        menu.add(openItem);
 
         MenuItem devUiItem = new MenuItem("Dev Web-UI oeffnen");
         devUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl()));
@@ -271,16 +232,8 @@ public class SystemTrayService {
         stableUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getStableUrl()));
         menu.add(stableUiItem);
 
-        MenuItem dashboardDevItem = new MenuItem("Dashboard (Dev)");
-        dashboardDevItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl() + "/"));
-        menu.add(dashboardDevItem);
-
-        MenuItem dashboardStableItem = new MenuItem("Dashboard (Stable)");
-        dashboardStableItem.addActionListener(e -> TrayLinks.open(trayConfig.getStableUrl() + "/"));
-        menu.add(dashboardStableItem);
-
         MenuItem activityItem = new MenuItem("Activity Log");
-        activityItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl() + "/activity"));
+        activityItem.addActionListener(e -> TrayLinks.open(TrayLinks.route(browserBaseUrl, "/activity")));
         menu.add(activityItem);
 
         menu.addSeparator();
@@ -298,21 +251,23 @@ public class SystemTrayService {
 
     private void emitNotifications(TrayState state) {
         if (previousState == null) return;
+        TraySettingsService.Preferences preferences = traySettings.current();
+        if (!preferences.popupsEnabled()) return;
 
-        if (previousState.activeRuns > 0 && state.activeRuns == 0) {
+        if (preferences.notifySuccess() && previousState.activeRuns > 0 && state.activeRuns == 0) {
             trayIcon.displayMessage("MySuricates",
                     "Alle Workflows abgeschlossen",
                     TrayIcon.MessageType.INFO);
         }
 
-        if (state.failedToday > previousState.failedToday) {
+        if (preferences.notifyFailures() && state.failedToday > previousState.failedToday) {
             long newFailures = state.failedToday - previousState.failedToday;
             trayIcon.displayMessage("MySuricates",
                     newFailures + " Workflow(s) fehlgeschlagen",
                     TrayIcon.MessageType.WARNING);
         }
 
-        if (state.pendingApprovals > previousState.pendingApprovals) {
+        if (preferences.notifyApprovals() && state.pendingApprovals > previousState.pendingApprovals) {
             trayIcon.displayMessage("MySuricates",
                     state.pendingApprovals + " Freigabe(n) warten auf dich — Seitenleiste: Freigaben",
                     TrayIcon.MessageType.WARNING);
@@ -384,6 +339,10 @@ public class SystemTrayService {
      */
     public void showNotification(String title, String message, boolean isError) {
         if (!initialized || trayIcon == null) return;
+        TraySettingsService.Preferences preferences = traySettings.current();
+        if (!preferences.popupsEnabled()
+                || (isError && !preferences.notifyFailures())
+                || (!isError && !preferences.notifySuccess())) return;
         java.awt.EventQueue.invokeLater(() -> {
             try {
                 trayIcon.displayMessage(title, message,

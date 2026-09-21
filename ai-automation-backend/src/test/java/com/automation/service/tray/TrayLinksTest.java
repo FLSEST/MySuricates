@@ -1,27 +1,26 @@
 package com.automation.service.tray;
 
-import com.automation.config.TrayConfig;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class TrayLinksTest {
 
-    private final TrayConfig config = mock(TrayConfig.class);
-
     @Test
     void clickTarget_approvalsPending_opensApprovalsPage() {
-        when(config.getWebUiUrl()).thenReturn("http://localhost:3000");
-
-        assertThat(TrayLinks.clickTarget(config, 2)).isEqualTo("http://localhost:3000/approvals");
+        assertThat(TrayLinks.clickTarget("https://mysuricates.example.com", 2))
+                .isEqualTo("https://mysuricates.example.com/approvals");
     }
 
     @Test
     void clickTarget_nothingPending_opensWebUi() {
-        when(config.getWebUiUrl()).thenReturn("http://localhost:3000");
+        assertThat(TrayLinks.clickTarget("https://mysuricates.example.com/", 0))
+                .isEqualTo("https://mysuricates.example.com");
+    }
 
-        assertThat(TrayLinks.clickTarget(config, 0)).isEqualTo("http://localhost:3000");
+    @Test
+    void route_avoidsDoubleSlash() {
+        assertThat(TrayLinks.route("https://mysuricates.example.com/", "/activity"))
+                .isEqualTo("https://mysuricates.example.com/activity");
     }
 }

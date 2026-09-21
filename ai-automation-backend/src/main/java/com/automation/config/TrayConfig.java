@@ -18,4 +18,7 @@ public class TrayConfig {
     private String webUiUrl = "http://localhost:3000";
 
     private String stableUrl = "http://localhost:9091";
+
+    /** User-facing browser target. Unlike the health-check URLs this should normally use HTTPS. */
+    private String publicUrl = "";
 }

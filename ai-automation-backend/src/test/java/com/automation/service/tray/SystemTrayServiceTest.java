@@ -43,11 +43,14 @@ class SystemTrayServiceTest {
     @Mock
     private SystemIdentityService systemIdentity;
 
+    @Mock
+    private TraySettingsService traySettings;
+
     private SystemTrayService service;
 
     @BeforeEach
     void setUp() {
-        service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerClient, systemIdentity);
+        service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerClient, systemIdentity, traySettings);
     }
 
     @Test
