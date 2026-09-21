@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.request.CreateWorkflowTemplateRequest;
 import com.automation.dto.request.UpdateWorkflowTemplateRequest;
 import com.automation.dto.response.WorkflowTemplateResponse;
+import com.automation.mapper.TemplateResponseLocalizer;
 import com.automation.mapper.WorkflowTemplateMapper;
 import com.automation.service.workflow.TemplateVerificationService;
 import com.automation.service.workflow.WorkflowTemplateService;
@@ -23,16 +24,18 @@ public class WorkflowTemplateController {
     private final WorkflowTemplateMapper templateMapper;
     private final TemplateVerificationService verificationService;
 
+    /** @param locale {@code de}/{@code en}: language of the steps of bilingual templates; without it English */
     @GetMapping
-    public List<WorkflowTemplateResponse> listTemplates() {
+    public List<WorkflowTemplateResponse> listTemplates(@RequestParam(required = false) String locale) {
         var templates = templateService.findAll();
-        var responses = templateMapper.toResponseList(templates);
+        var responses = TemplateResponseLocalizer.localize(templates, templateMapper.toResponseList(templates), locale);
         return verificationService.enrichAllWithVerifications(responses);
     }
 
     @GetMapping("/{id}")
-    public WorkflowTemplateResponse getTemplate(@PathVariable String id) {
-        var response = templateMapper.toResponse(templateService.findById(id));
+    public WorkflowTemplateResponse getTemplate(@PathVariable String id, @RequestParam(required = false) String locale) {
+        var template = templateService.findById(id);
+        var response = TemplateResponseLocalizer.localize(template, templateMapper.toResponse(template), locale);
         return verificationService.enrichWithVerifications(response);
     }
 

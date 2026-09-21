@@ -102,6 +102,8 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 | `DB-DIRECT` | die Definition liest die Datenbank nicht direkt | `sqlite3` irgendwo, oder `automation.db` zusammen mit einem Lesezugriff (`SELECT`, `INSERT INTO`, `.tables`, …); die Dateigröße anzusehen (`stat`, `du`) bleibt erlaubt |
 | `PARSE` | die Datei ist gültiges JSON und ein Objekt | `json.load` |
 
+**Zweisprachige Schritte.** Eine Pool-Datei mit dem Marker `"i18n": ["de", "en"]` darf auch Schritt-Namen, Fragen, Prompts und `instructions` als `{de, en}` führen. Installiert wird dann in der Sprache der UI (`locale` im Install-Body). Welche Felder einsprachig bleiben müssen (Shell-Felder, verglichene Werte, `metadata`), steht in [WORKFLOW-GUIDE → Zweisprachige Vorlagen](WORKFLOW-GUIDE.md#zweisprachige-vorlagen). Das prüft `LocalizedDefinitionGateTest` im Backend-Build, nicht `pool-neutrality.sh`.
+
 ### Die Blocktyp-Registry
 
 Quelle ist `BlockTypesIndexSection.BLOCK_TYPES` im Backend, das selbst gegen die vorhandenen

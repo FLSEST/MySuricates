@@ -1664,6 +1664,34 @@ All 65+ built-in templates with their primary pattern:
 | `test-matrix` | Shell Scan + ForEach + Skill | CODE |
 | `todo-creator` | Agentic | UTILITY |
 | `topic-deep-dive` | Sequential Simple Chain | RESEARCH |
+| `example-approval` | Measure + Approval (bilingual example) | EXAMPLE |
+
+### Bilingual templates
+
+A template's name and description are always `{"de": …, "en": …}`. A template or pool file with the marker `"i18n": ["de", "en"]` may use the same form **inside its steps** too, in `blocks` and `instructions`. When a workflow is created, the platform picks one language: the UI language, falling back to English, then German. The new workflow is single-language from then on and yours to change.
+
+```json
+{
+  "i18n": ["de", "en"],
+  "name": {"de": "Beispiel: Freigabe mit Messung", "en": "Example: approval with a measurement"},
+  "blocks": [
+    {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+    {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+     "config": {"question": {"de": "{{ block.messen.output }} – weiter?", "en": "{{ block.measure.output }} – continue?"},
+                "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}], "on_no": "fail"}}
+  ]
+}
+```
+
+**Rules** (enforced by the gate `LocalizedDefinitionGateTest`):
+
+- **Every map carries exactly the declared languages, none left blank.** Without the marker nothing is resolved.
+- **These stay single-language:** shell fields (`command`, `condition` …; otherwise two commands would need review) **and everything that is compared or evaluated:** `type`, `variable_name`, `auto_answer`, `reject_options`, `mode`, `on_no`, `execution_mode`, `model`, `provider`, and `metadata`.
+- **Step names can be translated but must stay consistent within each language.** `{{ block.X.output }}` and compress `source` must point to an existing name in every variant. An audit's report block (`metadata.audit.reportBlock`) stays single-language.
+- **Translated approval `options` must not be compared anywhere.** The answer variable must not appear in any shell, conditional, switch or while field, because in German the answer would be `Nein` instead of `No`. The approval block recognises the rejection itself (`reject_options`, default `No`/`Nein`).
+- **Existing databases get a changed built-in template only through a version bump** (`version`), like any change to a built-in template.
+
+The API returns the steps in the requested language: `GET /api/v1/workflow-templates?locale=de`. Pool and chain installs take `"locale"` in the body.
 
 ---
 

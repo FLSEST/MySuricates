@@ -587,6 +587,8 @@ Remove the seal (same switch). Logs a `SECURITY` entry with the previous hash.
 
 List all workflow templates (sorted by `sortOrder`).
 
+**Query:** `locale` (optional, `de`/`en`): language of the steps (`blocks`, `instructions`) of bilingual templates. English when omitted. `name` and `description` stay maps. See [WORKFLOW-GUIDE → Bilingual templates](WORKFLOW-GUIDE.md#bilingual-templates).
+
 **Response:** `WorkflowTemplateResponse[]`
 
 ```json
@@ -617,7 +619,7 @@ List all workflow templates (sorted by `sortOrder`).
 
 ### `GET /api/v1/workflow-templates/{id}`
 
-Retrieve a single template.
+Retrieve a single template. Query `locale` as for the list.
 
 **Response:** `WorkflowTemplateResponse`
 
@@ -2596,7 +2598,8 @@ Install a chain template into a project (creates the chain and all referenced wo
 ```json
 {
   "projectId": "uuid",
-  "chainName": "My CI/CD Pipeline"
+  "chainName": "My CI/CD Pipeline",
+  "locale": "en"
 }
 ```
 
@@ -2604,6 +2607,7 @@ Install a chain template into a project (creates the chain and all referenced wo
 |---|---|---|
 | `projectId` | String | Yes |
 | `chainName` | String | No |
+| `locale` | String (`de`/`en`) | No: language of names, labels and the steps of bilingual templates; German when omitted |
 
 **Response:** `201` with `ChainInstallResponse`
 
@@ -3211,7 +3215,7 @@ Create a workflow from an agentic run.
 
 ### `GET /api/v1/pool`
 
-List all available pool workflows.
+List all available pool workflows. Query `locale` (optional): language of the steps of bilingual pool files, English when omitted.
 
 **Response:** `PoolWorkflowEntry[]`
 
@@ -3231,7 +3235,8 @@ Install a pool workflow into a project.
 {
   "projectId": "uuid",
   "name": "Optional Name",
-  "forceCreate": false
+  "forceCreate": false,
+  "locale": "en"
 }
 ```
 
@@ -3240,6 +3245,7 @@ Install a pool workflow into a project.
 | `projectId` | String | Yes |
 | `name` | String | No |
 | `forceCreate` | Boolean | No |
+| `locale` | String (`de`/`en`) | No: language of name, description and steps; English when omitted. A workflow installed earlier in the other language is updated, not duplicated |
 
 **Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
 

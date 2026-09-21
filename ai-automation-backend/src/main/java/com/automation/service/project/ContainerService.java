@@ -1,5 +1,6 @@
 package com.automation.service.project;
 
+
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
@@ -38,6 +39,7 @@ public class ContainerService {
     private final PathValidator pathValidator;
     private final DockerContainerGateway docker;
     private final DockerOrphanReconciler orphanReconciler;
+    private final DockerExpectation dockerExpectation;
     private final TransactionTemplate transactionTemplate;
     private final TransactionTemplate readOnlyTransactionTemplate;
 
@@ -64,6 +66,7 @@ public class ContainerService {
             PlatformTransactionManager transactionManager,
             DockerContainerGateway docker,
             DockerOrphanReconciler orphanReconciler,
+            DockerExpectation dockerExpectation,
             @Value("${docker.container.idle-timeout-minutes}") int idleTimeoutMinutes,
             @Value("${automation.cli.host-home:}") String hostHome) {
         this.containerRepository = containerRepository;
@@ -72,6 +75,7 @@ public class ContainerService {
         this.pathValidator = pathValidator;
         this.docker = docker;
         this.orphanReconciler = orphanReconciler;
+        this.dockerExpectation = dockerExpectation;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate.setReadOnly(true);
@@ -86,6 +90,11 @@ public class ContainerService {
     // browser-side "Failed to fetch" the user reported. Instead we run the
     // Docker work outside any transaction and use TransactionTemplate for the
     // short DB bursts (find existing row / upsert it).
+    /** Ob Docker hier eingerichtet ist; ohne Docker versucht ein Run keinen Projekt-Container (a0e85182). */
+    public boolean isDockerConfigured() {
+        return dockerExpectation.isConfigured();
+    }
+
     public Container createAndStartContainer(Project project) {
         synchronized (projectLocks.computeIfAbsent(project.getId(), k -> new Object())) {
             return doCreateAndStart(project);
@@ -231,6 +240,7 @@ public class ContainerService {
     // TransactionTemplate bursts per container.
     @Scheduled(fixedRate = 300_000)
     public void cleanupIdleContainers() {
+        if (!dockerExpectation.isConfigured()) return; // ohne Docker nichts aufzuraeumen (a0e85182)
         List<Container> running = readOnlyTransactionTemplate.execute(status ->
                 containerRepository.findByStatus(ContainerStatus.RUNNING));
         Set<String> activeContainers = executionRegistry.getActiveContainerIds();

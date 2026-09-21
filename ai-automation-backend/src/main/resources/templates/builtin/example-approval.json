@@ -1,0 +1,71 @@
+{
+  "id": "example-approval",
+  "icon": "✋",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Beispiel: Freigabe mit Messung",
+    "en": "Example: approval with a measurement"
+  },
+  "description": {
+    "de": "Misst kurz etwas und legt es dir zur Ja/Nein-Freigabe vor. Nein lässt den Lauf scheitern. Ohne KI, ohne Schreibzugriffe.",
+    "en": "Takes a quick measurement and asks you for a yes/no approval. No makes the run fail. No AI, no writes."
+  },
+  "category": "EXAMPLE",
+  "sortOrder": 66,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "messen",
+        "en": "measure"
+      },
+      "config": {
+        "command": "set -euo pipefail\nprintf -- '- %s\\n- %s\\n- %s\\n' \"$(date '+%H:%M:%S')\" \"$(uname -n)\" \"$(df -h . | awk 'NR==2 {print $4}')\""
+      },
+      "requiredCapabilities": []
+    },
+    {
+      "type": "approval",
+      "name": {
+        "de": "freigabe",
+        "en": "approval"
+      },
+      "config": {
+        "question": {
+          "de": "## Messung\n\nUhrzeit, Rechner und freier Platz im Arbeitsverzeichnis:\n\n{{ block.messen.output }}\n\nSoll der Lauf weitermachen? **Nein** lässt ihn scheitern.",
+          "en": "## Measurement\n\nTime, host and free space in the working directory:\n\n{{ block.measure.output }}\n\nShould the run continue? **No** makes it fail."
+        },
+        "options": [
+          {
+            "de": "Ja",
+            "en": "Yes"
+          },
+          {
+            "de": "Nein",
+            "en": "No"
+          }
+        ],
+        "on_no": "fail",
+        "timeout_minutes": 60
+      },
+      "requiredCapabilities": []
+    },
+    {
+      "type": "shell",
+      "name": {
+        "de": "abschluss",
+        "en": "finish"
+      },
+      "config": {
+        "command": "echo 'OK'"
+      },
+      "requiredCapabilities": []
+    }
+  ]
+}

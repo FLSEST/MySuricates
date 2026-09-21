@@ -12,7 +12,7 @@ permissions:
 jobs:
   hygiene:
     name: Public Hygiene
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       # fetch-depth: 0, weil doc-facts-check.sh die Commit-Zahl der README-Kopftabelle gegen
       # `git rev-list --count HEAD` haelt. Im flachen Standard-Checkout zaehlt das nur die
@@ -26,6 +26,25 @@ jobs:
         run: bash scripts/tests/test-public-hygiene.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
+      # Der Probelauf selbst braucht Docker und zehn Minuten — hier nur Aufruf, Vorab-Pruefungen
+      # und der Report-Renderer; der echte Lauf ist der Workflow "Installer-Probe" vor einem Release.
+      - name: Installer-Probe Selbsttest (ohne Docker)
+        run: |
+          bash scripts/tests/test-installer-probe.sh
+          python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'
+      - name: Container-Instanz Selbsttest (deploy/, ohne Docker)
+        run: |
+          bash scripts/tests/test-host-mounts.sh
+          bash scripts/tests/test-instance.sh
+          bash scripts/tests/test-deploy-files.sh
+      - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
+        run: |
+          bash scripts/tests/test-providers.sh
+          bash scripts/tests/test-i18n.sh
+          bash scripts/tests/test-tui.sh
+          bash scripts/tests/test-deps.sh
+          bash scripts/tests/test-setup.sh
+          python3 scripts/tools/installer-art.py --check
       # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
       # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
       - name: Doku-Zahlen gegen den Code pruefen
@@ -54,7 +73,7 @@ jobs:
 
   gitleaks:
     name: Gitleaks Secret Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -65,7 +84,7 @@ jobs:
 
   backend:
     name: Backend Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: ai-automation-backend
@@ -92,12 +111,24 @@ jobs:
       # aktivieren das Spring-Profil "integration" per @ActiveProfiles; ein eigenes
       # Maven-Profil dafuer gibt es nicht. Jede Test-JVM bekommt ihre eigene SQLite-Datei
       # (IntegrationTestDbSessionListener), der Pool bleibt bei einer Verbindung.
+      # Die Ausgabe der Tests geht je Klasse nach target/surefire-reports/<Klasse>-output.txt:
+      # Fehlerpfad-Tests lassen den Code absichtlich ERROR samt Stacktrace loggen (am
+      # 2026-09-21: 93 ERROR-Zeilen, 5716 Stacktrace-Zeilen in einem gruenen Lauf), und darin
+      # ging jede echte Meldung unter. Im Log bleiben Running/Tests run und die Surefire-
+      # Fehlermeldung eines roten Tests. Nur hier, nicht in der pom.xml: Der Workflow
+      # mysuricates-health-check greppt lokal target/surefire-reports/*.txt nach ERROR.
       - name: Run backend tests
-        run: ./mvnw -B --no-transfer-progress test
+        run: ./mvnw -B --no-transfer-progress -Dmaven.test.redirectTestOutputToFile=true test
+      - name: Surefire-Berichte samt Testausgabe sichern
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-surefire-reports
+          path: ai-automation-backend/target/surefire-reports/
 
   frontend:
     name: Frontend Lint + Test + Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: ai-automation-frontend

@@ -37,7 +37,11 @@ export function SystemInfoCard() {
           <div className="space-y-2 text-sm pt-3 border-t border-border mt-3">
             <div className="flex justify-between">
               <span className="text-text-secondary">Docker</span>
-              <StatusBadge status={health.docker === 'CONNECTED' ? 'RUNNING' : 'ERROR'} label={health.docker} />
+              {/* Nicht eingerichtet ist neutral, kein Fehler (a0e85182) */}
+              <StatusBadge
+                status={health.docker === 'CONNECTED' ? 'RUNNING' : health.docker === 'NOT_CONFIGURED' ? 'STOPPED' : 'ERROR'}
+                label={health.docker === 'NOT_CONFIGURED' ? t.health.dockerNotConfigured : health.docker}
+              />
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Last Check</span>

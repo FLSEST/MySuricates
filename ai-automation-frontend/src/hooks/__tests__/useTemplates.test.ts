@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
+import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
+import { useI18nStore } from '../../i18n';
 import { useTemplates, useCreateTemplate, useSaveWorkflowAsTemplate } from '../useTemplates';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -26,6 +28,20 @@ describe('useTemplates', () => {
   it('returns loading state initially', () => {
     const { result } = renderHook(() => useTemplates(), { wrapper: createWrapper() });
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('asks for the steps of bilingual templates in the UI language', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    let requested: string | null = null;
+    server.use(http.get('/api/v1/workflow-templates', ({ request }) => {
+      requested = new URL(request.url).searchParams.get('locale');
+      return HttpResponse.json([]);
+    }));
+
+    const { result } = renderHook(() => useTemplates(), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(requested).toBe('de');
   });
 });
 

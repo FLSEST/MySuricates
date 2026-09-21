@@ -9,6 +9,7 @@ import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.util.LocalizedJson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -141,6 +143,16 @@ public class ChainTemplateService {
 
     @Transactional
     public WorkflowChain install(String templateId, String projectId, String chainName) {
+        return install(templateId, projectId, chainName, null);
+    }
+
+    /**
+     * @param locale {@code de}/{@code en}: language of names, labels and — for bilingual templates —
+     *               the steps; without it German, as before (TODO a129a661)
+     */
+    @Transactional
+    public WorkflowChain install(String templateId, String projectId, String chainName, String locale) {
+        String lang = locale == null || locale.isBlank() ? "de" : LocalizedJson.normalize(locale);
         BuiltInChainTemplate template = findById(templateId);
         List<ChainEntryRequest> entries = new ArrayList<>();
 
@@ -148,17 +160,16 @@ public class ChainTemplateService {
             BuiltInChainTemplate.Entry entry = template.entries().get(i);
             WorkflowTemplate wfTemplate = workflowTemplateService.findById(entry.templateId());
 
-            String wfName = wfTemplate.getName().getOrDefault("de",
-                    wfTemplate.getName().values().iterator().next());
+            String wfName = LocalizedJson.pick(wfTemplate.getName(), lang);
 
             Workflow workflow = workflowService.create(new CreateWorkflowRequest(
                     projectId,
                     wfName,
                     null,
                     wfTemplate.getIcon(),
-                    wfTemplate.getBlocks(),
+                    LocalizedJson.blocksFor(wfTemplate.getI18nSource(), lang, wfTemplate.getBlocks()),
                     List.of(),
-                    wfTemplate.getInstructions(),
+                    LocalizedJson.instructionsFor(wfTemplate.getI18nSource(), lang, wfTemplate.getInstructions()),
                     wfTemplate.getModel(),
                     null,
                     wfTemplate.getId(),
@@ -169,7 +180,7 @@ public class ChainTemplateService {
 
             entries.add(new ChainEntryRequest(
                     workflow.getId(),
-                    entry.label().getOrDefault("de", ""),
+                    Objects.requireNonNullElse(LocalizedJson.pick(entry.label(), lang), ""),
                     i,
                     true,
                     Map.of()
@@ -181,11 +192,11 @@ public class ChainTemplateService {
 
         String resolvedName = (chainName != null && !chainName.isBlank())
                 ? chainName
-                : template.name().getOrDefault("de", template.id());
+                : Objects.requireNonNullElse(LocalizedJson.pick(template.name(), lang), template.id());
 
         return chainService.create(new CreateChainRequest(
                 resolvedName,
-                template.description().getOrDefault("de", ""),
+                Objects.requireNonNullElse(LocalizedJson.pick(template.description(), lang), ""),
                 template.icon(),
                 entries,
                 true

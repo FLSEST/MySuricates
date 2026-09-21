@@ -215,6 +215,15 @@ mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur di
 einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
 `Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
 
+**`ERROR`-Zeilen in einem grünen Lauf:** Viele Tests prüfen Fehlerpfade — ein Mock wirft, der
+Code fängt ab und loggt das korrekt auf `ERROR`, samt Stacktrace. Ein grüner Lauf schreibt so
+rund hundert `ERROR`-Zeilen und mehrere tausend Stacktrace-Zeilen; das sind keine Fehlschläge.
+Die CI leitet deshalb die Ausgabe je Testklasse nach
+`target/surefire-reports/<Klasse>-output.txt` um (`-Dmaven.test.redirectTestOutputToFile=true`)
+und lädt das Verzeichnis nur bei einem roten Lauf als Artefakt `backend-surefire-reports` hoch.
+Lokal geht dasselbe mit derselben Option; als Default in der `pom.xml` steht sie bewusst nicht,
+weil der Workflow `mysuricates-health-check` `target/surefire-reports/*.txt` nach `ERROR` durchsucht.
+
 **Klassengrößen-Ratchet:** `architecture/SourceSizeRatchetTest` zählt die Zeilen aller Dateien unter `src/main/java` und schlägt fehl, sobald eine Datei über 300 Zeilen liegt, die nicht in der Allowlist des Tests steht — oder eine gelistete Datei über ihre eingetragene Obergrenze wächst. Die Liste kennt nur eine Richtung: Wer eine gelistete Klasse verkleinert, senkt ihre Obergrenze; fällt sie auf ≤300 Zeilen, fliegt der Eintrag raus. Neue Dateien über 300 Zeilen werden gesplittet, nicht eingetragen (Audit-TODO 1e248ab9). Keine externe Dependency, reiner JUnit-Test.
 
 **Request-Kosten-Ratchet:** `architecture/RequestCostRatchetTest` misst für die Routen, die die UI bei jedem Seitenaufruf trifft (`/todos`, `/workflows`, `/projects`, `/executions`, `/learning/dashboard`, `/search`), zwei **deterministische** Kosten und vergleicht sie mit der `BASELINE`-Map im Test: die Zahl der SQL-Statements und die Antwortgröße in Bytes. Keine Millisekunden — Wanduhrzeit hängt auf einem Entwicklerrechner von Hostlast, JIT und davon ab, wer gerade die einzige SQLite-Connection hält, und würde flackern. Die beiden gepinnten Kosten sind dagegen reproduzierbar und genau die, die in der Vergangenheit ausgerissen sind: ein N+1 macht aus 3 Statements 33 (`1e465a9e perf(api)`), ein mitgeladener TEXT-Blob aus einer kleinen Antwort eine riesige (`443fa57e perf(dashboard)`). Gezählt wird über einen Hibernate-`StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, in `config/StatementInspectorConfig` registriert); vor jeder Messung leert der Test den Persistence-Context, sonst fände der Request die geseedeten Entities im First-Level-Cache und ein Lazy-N+1 bliebe unsichtbar. Wie beim Klassengrößen-Ratchet kennt die Liste nur eine Richtung: Obergrenzen sinken, wenn eine Route billiger wird (der Hinweis-Test nennt die neue Zahl). **Mehrere Obergrenzen schreiben derzeit einen bekannten Mangel fest, kein Ziel** — der erste Lauf fand drei N+1-Muster und eine unbegrenzt wachsende Antwort (TODOs 13d1e2a2, 9db34f3b, a05c9504); sie sind gepinnt, damit das Gate grün ist und nichts *schlimmer* wird, während sie behoben werden. Wer eine Obergrenze anhebt, begründet das in der Commit-Message.
@@ -380,6 +389,43 @@ Befund ab (2026-08-04 hat ein DELETE auf einer bereits korrupten DB den Schaden 
 `--db <pfad>` lässt sich das Skript gegen eine andere Datei richten. Skript-Tests liegen unter
 `scripts/tests/` und laufen ohne Backend: `bash scripts/tests/test-cleanup-runs.sh`.
 
+### Installer auf frischer Maschine (Installer-Probe)
+
+`scripts/installer-probe.sh` prüft `scripts/setup.sh` so, wie ein neuer Nutzer ihn erlebt: in
+einem frischen Container (Default `ubuntu:24.04`, mit `--image rockylinux:9` auch ein dnf-System),
+auf dem nur git, sudo und tzdata liegen. Geprüft wird immer ein committeter Stand (Default `HEAD`,
+sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
+
+```bash
+./scripts/installer-probe.sh --interactive          # frische Maschine als Shell — selbst durchklicken
+./scripts/installer-probe.sh --ref main             # automatischer Lauf mit Report
+./scripts/installer-probe.sh --image rockylinux:9   # dasselbe auf einem dnf-System
+./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
+```
+
+Die interaktive Maschine teilt das Netz des Rechners (`--network host`): Die Adresse, die
+`setup.sh` am Ende nennt, öffnet man direkt im Browser, belegte Ports des Rechners umgeht der
+Installer selbst. Im Modus-Schritt „auf diesem Rechner“ wählen — Docker gibt es in der Probe nicht.
+
+Der automatische Lauf nimmt den Weg „eine Instanz auf diesem Rechner“ aus
+[GETTING-STARTED.md](GETTING-STARTED.md) in zwei Phasen, jede unter einem Pseudo-Terminal:
+`setup.sh --check` (nur prüfen) und `setup.sh --yes --runtime host --bind 0.0.0.0` (ein Durchgang
+bis zur laufenden Instanz). Den Exit-Code schreibt jede Phase selbst in eine Datei im Container —
+über `script` und `docker exec` ging ein Abbruch schon als 0 durch. Rot wird der Lauf, wenn Phase 1
+fehlende Tools nicht nennt, Phase 2 nicht mit Exit 0 endet, Health oder Oberfläche auf dem einen
+Port nicht antworten, der Login mit dem erzeugten Key scheitert, der Key in einem Log steht, das
+Backend nicht genau einmal gebaut wird oder der Klon danach nicht mehr sauber ist (`git status`).
+Das Ergebnis ist eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshots unter
+`~/.local/state/mysuricates/installer-probe/<zeit>-<sha>/report.html` (`latest` zeigt auf den letzten
+Lauf). Ein Lauf lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten jedes Mal frisch. Der
+Container-Weg (Docker im Container) ist noch nicht Teil der Probe.
+
+Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
+`mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript
+aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-Tests laufen ohne
+Docker: `bash scripts/tests/test-installer-probe.sh` und
+`python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
 ## Versionierung & Releases
 
 ### Wo die Version definiert ist
@@ -403,7 +449,7 @@ Das Dashboard zeigt die Version über den `/api/v1/system/info`-Endpunkt an.
 Das Script:
 1. Liest die aktuelle Version aus `pom.xml` (ohne `-SNAPSHOT`)
 2. Berechnet die neue Version (Segment hochzählen)
-3. Aktualisiert `pom.xml` (`X.Y.Z-SNAPSHOT`) und `package.json` (`X.Y.Z`)
+3. Aktualisiert `pom.xml` (`X.Y.Z-SNAPSHOT`) sowie `package.json` und `package-lock.json` (`X.Y.Z`, über `npm version`) — ein Lockfile auf der alten Version macht jeden frischen Klon nach dem ersten `npm install` dirty; `packageLock.guard.test.ts` hält beide synchron
 4. Erstellt Git-Commit: `Release vX.Y.Z`
 5. Setzt Git-Tag: `vX.Y.Z`
 
@@ -534,7 +580,7 @@ Das Backend umfasst **47 REST-Controller** und **20 Block-Typen**:
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
-**Flyway-Migrationen:** V1–V77 (SQLite)
+**Flyway-Migrationen:** V1–V78 (SQLite)
 
 ### Gate Status System
 
@@ -572,7 +618,7 @@ Workflows können Wissen über Runs hinweg akkumulieren:
 
 - **SkillSeeder:** Legt 19 Built-in-Skills beim Start an (idempotent, Update bei Version-Bump) und registriert sie im `SkillRegistry`
 - Skill-Definitionen als JSON + Prompt-`.md` unter `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Legt 66 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
+- **WorkflowTemplateSeeder:** Legt 67 Built-in-Templates beim Start an (idempotent, Update bei Version-Bump)
 - Template-Definitionen als JSON unter `src/main/resources/templates/builtin/`
 
 ### Modul-Katalog

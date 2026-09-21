@@ -24,8 +24,26 @@ class RunContainerPreparationTest {
     private final ExecutionBroadcaster broadcaster = mock(ExecutionBroadcaster.class);
     private final Project project = Project.builder().id("p").name("Demo").build();
 
+    /** Alles ausser dem ersten Test setzt eingerichtetes Docker voraus — sonst kehrt der Aufruf sofort um. */
+    private void dockerConfigured() {
+        when(containers.isDockerConfigured()).thenReturn(true);
+    }
+
+    @Test
+    void withoutDocker_nothingIsAttempted_andNothingIsBroadcast() {
+        // a0e85182: ohne eingerichtetes Docker kein Versuch — sonst je Run ein Activity-Log-ERROR
+        when(containers.isDockerConfigured()).thenReturn(false);
+
+        assertThat(RunContainerPreparation.ensureRunning(project, "run", containers, broadcaster)).isNull();
+
+        verify(containers, never()).createAndStartContainer(any());
+        verify(containers, never()).getDockerContainerId(any());
+        verifyNoInteractions(broadcaster);
+    }
+
     @Test
     void runningContainer_isReusedWithoutBroadcast() {
+        dockerConfigured();
         when(containers.getDockerContainerId(project)).thenReturn("docker-1");
 
         assertThat(RunContainerPreparation.ensureRunning(project, "run", containers, broadcaster)).isEqualTo("docker-1");
@@ -36,6 +54,7 @@ class RunContainerPreparationTest {
 
     @Test
     void missingContainer_isStarted_andAnnounced() {
+        dockerConfigured();
         when(containers.getDockerContainerId(project)).thenThrow(new IllegalStateException("none"));
         when(containers.createAndStartContainer(project))
                 .thenReturn(Container.builder().dockerContainerId("docker-2").build());
@@ -49,6 +68,7 @@ class RunContainerPreparationTest {
 
     @Test
     void failedStart_fallsBackToHostExecution_withNullContainer() {
+        dockerConfigured();
         when(containers.getDockerContainerId(project)).thenThrow(new IllegalStateException("none"));
         when(containers.createAndStartContainer(project)).thenThrow(new RuntimeException("docker down"));
 

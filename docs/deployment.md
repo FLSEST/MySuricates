@@ -1,5 +1,41 @@
 # Deployment
 
+## Eine Instanz im Container (`deploy/`)
+
+Auf dem Rechner ist nur Docker nötig. `deploy/Dockerfile` baut Backend und Frontend in Docker
+(beim ersten Mal etwa acht Minuten, danach aus dem Schichten-Cache), das Backend liefert das
+Frontend selbst aus — eine Instanz ist ein Container und ein Port.
+
+```bash
+printf 'MYSURICATES_PORT=9090\n' > deploy/instances/main.env
+scripts/instance.sh up --name main       # bauen, starten, auf Health warten
+scripts/instance.sh key --name main      # API-Key für den Login
+scripts/instance.sh list                 # alle Instanzen mit Port
+scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
+```
+
+| Wert in `deploy/instances/<name>.env` | Bedeutung |
+|---|---|
+| `MYSURICATES_PORT` | Port auf dem Rechner (Pflicht) |
+| `MYSURICATES_BIND` | Adresse, Default `127.0.0.1` — nur lokal erreichbar |
+| `MYSURICATES_PRESET` | `core` (Default), `research`, `full` |
+| `MYSURICATES_PROJECTS` | Projektordner, Default: Ordner über dem Klon, nie ganz `$HOME` |
+| `MYSURICATES_DOCKER_SOCKET` | `1` bindet den Docker-Socket ein (für Shell-Blöcke mit `container_image`) — gibt der Instanz volle Kontrolle über Docker auf dem Rechner |
+| `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
+| `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
+
+Die Instanz nutzt die KI-CLIs samt Anmeldung vom Host, man meldet sich nicht doppelt an:
+unter Linux Programm und Anmeldung, unter macOS nur die Anmeldung (eine Mac-Binary startet im
+Linux-Container nicht). Die Benutzer-ID kommt beim Start aus `id(1)`, Dateien in eingebundenen
+Ordnern gehören also dem richtigen Benutzer. Daten liegen im Volume `mysuricates-<name>-data`, der
+Integrations-Schlüssel getrennt davon in `mysuricates-<name>-secrets`. Ohne Docker-Socket meldet
+die Instanz Docker als „nicht eingerichtet“ — das ist kein Fehler.
+
+Mehrere Instanzen — etwa Dev · Test · Prod — sind mehrere Env-Dateien mit eigenen Ports. Die
+bestehenden Dateien `docker-compose.stable.yml` und `docker-compose.test.yml` sind davon
+unberührt. Skript-Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
+`bash scripts/tests/test-instance.sh`, `bash scripts/tests/test-deploy-files.sh`.
+
 ## Docker Compose
 
 Das Projekt wird über Docker Compose deployt. Die Konfiguration liegt in `ai-automation-backend/docker-compose.yml`.

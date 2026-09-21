@@ -1,0 +1,38 @@
+# Genau eine MySuricates-Instanz. Nicht direkt benutzen: scripts/instance.sh setzt Name, Port und
+# Benutzer-ID und erzeugt daneben das Override mit den Mounts dieses Rechners
+# (scripts/lib/host-mounts.sh). Mehrere Instanzen (z. B. Dev · Test · Prod) = mehrere Namen.
+name: mysuricates-${MYSURICATES_NAME:?}
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: mysuricates:local
+    container_name: mysuricates-${MYSURICATES_NAME:?}
+    ports:
+      - "${MYSURICATES_BIND:-127.0.0.1}:${MYSURICATES_PORT:?}:9090"
+    # Alle AUTOMATION_*-Zeilen der Instanz-Datei (Einzelmodule, Haertung, Standard-Anbieter …)
+    # gehen unveraendert an die Instanz; die Liste darunter setzt nur, was aus MYSURICATES_* folgt.
+    env_file:
+      - ${MYSURICATES_ENV_FILE:?}
+    environment:
+      - HOST_UID=${HOST_UID:?}
+      - HOST_GID=${HOST_GID:?}
+      - HOST_USER=${HOST_USER:?}
+      - HOST_HOME=${HOST_HOME:?}
+      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
+      - AUTOMATION_MODULES_PRESET=${MYSURICATES_PRESET:-core}
+      - AUTOMATION_ENVIRONMENT=${MYSURICATES_ENVIRONMENT:-}
+      - AUTOMATION_CORS_ORIGINS=http://localhost:${MYSURICATES_PORT:?},http://127.0.0.1:${MYSURICATES_PORT:?}
+      - AUTOMATION_HARDENING_SEALING=${MYSURICATES_HARDENING_SEALING:-false}
+      - AUTOMATION_HARDENING_REQUIRESEALEDFORUNATTENDED=${MYSURICATES_HARDENING_REQUIRE_SEALED:-false}
+    volumes:
+      - data:/app/data
+      # Integrations-Schluessel getrennt von der DB (IntegrationEncryptionService, 3fb2242c)
+      - secrets:/app/secrets
+    restart: unless-stopped
+volumes:
+  data:
+    name: mysuricates-${MYSURICATES_NAME:?}-data
+  secrets:
+    name: mysuricates-${MYSURICATES_NAME:?}-secrets

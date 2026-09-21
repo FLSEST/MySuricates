@@ -30,6 +30,15 @@ public class PiAiProvider implements AiProvider {
     }
 
     @Override
+    public ProviderSetup setup() {
+        // pi ist selbst ein Hub: angemeldet ist, wer in auth.json mindestens ein Backend hat — ein
+        // Anfuehrungszeichen heisst "mindestens ein Schluessel", ein leeres {} zaehlt nicht
+        return new ProviderSetup("pi", "npm install -g @earendil-works/pi-coding-agent",
+                "pi, then /login   (or an API key as environment variable, see pi --help)",
+                java.util.List.of(".pi/agent/auth.json:\""));
+    }
+
+    @Override
     public AiProviderCapabilities getCapabilities() {
         // System prompt + model selection: yes (pi supports both).
         // Multi-turn reasoning: yes (--thinking levels).

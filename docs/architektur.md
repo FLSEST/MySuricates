@@ -671,7 +671,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Templates
 
 - Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
-- **66 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
+- **67 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
 - Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
 - Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
 - Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar
@@ -1111,6 +1111,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V75 | Kennzeichen fuer Findings mit ruleKey ausserhalb des Katalogs (`unknown_rule_key`) |
 | V76 | Agenten-Sitzungsherkunft am TODO (`agent_session_ref`) |
 | V77 | Beleg-Pruefung am Audit-Finding (`unverified_evidence`) |
+| V78 | Zweisprachige Schritte in Vorlagen (`workflow_templates.i18n_source`) |
 
 ## Architektur-Gates
 
@@ -1155,7 +1156,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 77 Flyway-Migrationen (V1–V77)
+│           └── db/migration/          ← 78 Flyway-Migrationen (V1–V78)
 │
 └── ai-automation-frontend/
     ├── package.json

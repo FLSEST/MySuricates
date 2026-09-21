@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowTemplateResponse;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowTemplateMapper;
@@ -71,6 +72,59 @@ class WorkflowTemplateControllerTest {
         mockMvc.perform(get("/api/v1/workflow-templates/t-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("t-1"));
+    }
+
+    @Test
+    void getTemplate_withLocale_returnsTheStepsOfABilingualTemplateInThatLanguage() throws Exception {
+        String source = com.automation.util.LocalizedJson.localizedSource(objectMapper.readTree("""
+                {"i18n": ["de", "en"], "blocks": [
+  {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+  {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+   "config": {"question": {"de": "Weiter?", "en": "Continue?"},
+              "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}]}}],
+ "instructions": {"de": "Deutsch", "en": "English"}}"""));
+        var template = WorkflowTemplate.builder().id("t-1").i18nSource(source).build();
+        var english = new WorkflowTemplateResponse("t-1", Map.of("en", "Test"), Map.of("en", "Desc"),
+                "icon", "EXAMPLE", List.of(BlockDefinition.builder().type("shell").name("measure").build()),
+                "English", null, true, 0, null, List.of(), "1.0.0", Instant.now(), Instant.now());
+        when(templateService.findById("t-1")).thenReturn(template);
+        when(templateMapper.toResponse(template)).thenReturn(english);
+        when(verificationService.enrichWithVerifications(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(get("/api/v1/workflow-templates/t-1").param("locale", "de"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blocks[0].name").value("messen"))
+                .andExpect(jsonPath("$.blocks[1].config.options[1]").value("Nein"))
+                .andExpect(jsonPath("$.instructions").value("Deutsch"));
+
+        mockMvc.perform(get("/api/v1/workflow-templates/t-1"))
+                .andExpect(jsonPath("$.blocks[0].name").value("measure"))
+                .andExpect(jsonPath("$.instructions").value("English"));
+    }
+
+    @Test
+    void listTemplates_withLocale_localizesOnlyBilingualTemplates() throws Exception {
+        String source = com.automation.util.LocalizedJson.localizedSource(objectMapper.readTree("""
+                {"i18n": ["de", "en"], "blocks": [
+  {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+  {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+   "config": {"question": {"de": "Weiter?", "en": "Continue?"},
+              "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}]}}],
+ "instructions": {"de": "Deutsch", "en": "English"}}"""));
+        var bilingual = WorkflowTemplate.builder().id("t-1").i18nSource(source).build();
+        var plain = WorkflowTemplate.builder().id("t-2").build();
+        var plainResponse = new WorkflowTemplateResponse("t-2", Map.of("en", "Plain"), Map.of(), "icon", "CODE",
+                List.of(BlockDefinition.builder().type("shell").name("build").build()), "Keep", null, true, 1, null,
+                List.of(), "1.0.0", Instant.now(), Instant.now());
+        when(templateService.findAll()).thenReturn(List.of(bilingual, plain));
+        when(templateMapper.toResponseList(any())).thenReturn(List.of(sampleResponse(), plainResponse));
+        when(verificationService.enrichAllWithVerifications(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(get("/api/v1/workflow-templates").param("locale", "de"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].blocks[0].name").value("messen"))
+                .andExpect(jsonPath("$[1].blocks[0].name").value("build"))
+                .andExpect(jsonPath("$[1].instructions").value("Keep"));
     }
 
     @Test

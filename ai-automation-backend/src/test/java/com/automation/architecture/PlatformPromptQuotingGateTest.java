@@ -48,7 +48,9 @@ class PlatformPromptQuotingGateTest {
         List<String> candidates = new ArrayList<>();
         List<String> violations = new ArrayList<>();
         for (Path file : definitionFiles()) {
-            scan(MAPPER.readTree(file.toFile()), false, file.getFileName().toString(), candidates, violations);
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                scan(variant.root(), false, variant.label(), candidates, violations);
+            }
         }
 
         assertThat(candidates)

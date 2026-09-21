@@ -4,6 +4,7 @@
 #   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
 #   scripts/start-autotrigger-dev.sh stop                                # nur Backend
 #   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
+#   scripts/start-autotrigger-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
 #   scripts/start-autotrigger-dev.sh [start|stop|restart] --container     # Backend im Docker-Container
 #
 # Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
@@ -16,6 +17,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+# Mounts fuer den Dev-Container: nur, was es auf diesem Rechner gibt (gemeinsam mit deploy/).
+# shellcheck source=lib/host-mounts.sh
+. "${SCRIPT_DIR}/lib/host-mounts.sh"
 
 COMMAND="start"
 # Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
@@ -26,13 +30,13 @@ FORCE=0
 REBUILD=0
 for arg in "$@"; do
   case "$arg" in
-    start|stop|restart) COMMAND="$arg" ;;
+    start|stop|restart|build) COMMAND="$arg" ;;
     --show-key) SHOW_KEY=1 ;;   # API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen)
     --force) FORCE=1 ;;         # restart trotz laufender Workflow-Runs
     --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
     --container) RUNTIME_MODE=container ;;  # Backend im Container statt als java -jar (TODO a1236a64)
     --host) RUNTIME_MODE=host ;;
-    -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # andere Argumente ignorieren
   esac
 done
@@ -320,41 +324,13 @@ compose_cmd() {
   docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
 }
 
-# Schreibt die Override-Datei mit genau den Provider-Mounts, die es auf DIESEM Rechner gibt.
-# Fest in die Compose-Datei geschrieben wuerden sie den Start auf jedem Rechner scheitern
-# lassen, der einen Provider nicht installiert hat — und eine Linux-Pfadannahme festschreiben.
+# Override mit genau den KI-Zugaengen, die es auf DIESEM Rechner gibt (scripts/lib/host-mounts.sh).
+# Projektwurzel und Docker-Socket bindet docker-compose.dev-container.yml selbst ein.
 write_compose_override() {
-  local mounts=() p
-  # Claude: Binary-Symlink, Versionsverzeichnis, Anmeldung.
-  for p in "${HOME}/.local/bin" "${HOME}/.local/share/claude"; do
-    [[ -e "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
-  done
-  [[ -f "${HOME}/.claude.json" ]] && mounts+=("      - ${HOME}/.claude.json:${HOME}/.claude.json:ro")
-  [[ -d "${HOME}/.claude" ]] && mounts+=("      - ${HOME}/.claude:${HOME}/.claude")
-  # Codex und Pi sind npm-Pakete AUSSERHALB von $HOME — genau deshalb laufen sie im
-  # Test-Container nicht, der nur $HOME-Pfade mountet. Beide brauchen Paket und Anmeldung.
-  local node_modules="${AUTOTRIGGER_DEV_NODE_MODULES:-/usr/lib/node_modules}"
-  for p in "${node_modules}/@openai/codex" "${node_modules}/@earendil-works/pi-coding-agent"; do
-    [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}:ro")
-  done
-  for p in "${HOME}/.codex" "${HOME}/.pi"; do
-    [[ -d "${p}" ]] && mounts+=("      - ${p}:${p}")
-  done
-
-  {
-    echo "# Erzeugt von start-autotrigger-dev.sh --container. Nicht von Hand aendern."
-    echo "services:"
-    echo "  backend:"
-    echo "    volumes:"
-    if [[ "${#mounts[@]}" -eq 0 ]]; then
-      echo "      []"
-    else
-      printf '%s\n' "${mounts[@]}"
-    fi
-  } > "${COMPOSE_OVERRIDE}"
-
-  echo "Provider-Mounts: ${#mounts[@]} (${COMPOSE_OVERRIDE})"
-  if [[ "${#mounts[@]}" -eq 0 ]]; then
+  local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-/usr/lib/node_modules}"
+  host_mounts_yaml backend "" 0 > "${COMPOSE_OVERRIDE}"
+  echo "Provider-Mounts: ${HOST_MOUNTS_PROVIDER_COUNT} (${COMPOSE_OVERRIDE})"
+  if [[ "${HOST_MOUNTS_PROVIDER_COUNT}" -eq 0 ]]; then
     echo "  Kein Provider-Zugang gefunden — KI-Bloecke werden im Container scheitern." >&2
   fi
 }
@@ -456,7 +432,13 @@ start_frontend() {
   echo "Starte Frontend ..."
   (
     cd "${FRONTEND_DIR}"
-    nohup npm run dev > "${FRONTEND_LOG}" 2>&1 &
+    # Eigene Sitzung statt nur nohup: Node setzt beim Start alle Signal-Dispositionen zurueck und hebt
+    # damit das SIG_IGN von nohup auf — schloss man das Terminal, beendete SIGHUP den Vite-Server,
+    # waehrend das Backend (Java respektiert SIG_IGN) weiterlief (454f8ac5, gefunden von
+    # scripts/installer-probe.sh). python3 statt setsid, weil setsid nur unter Linux dabei ist;
+    # execvp behaelt die PID, die PID-Datei zeigt also weiter auf npm.
+    nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' npm run dev \
+      > "${FRONTEND_LOG}" 2>&1 &
     echo "$!" > "${FRONTEND_PID_FILE}"
   )
 }
@@ -485,7 +467,7 @@ print_api_key() {
     key="$(cat "${key_file}")"; src="${key_file}"
     echo "API-Key (beim ersten Öffnen im Browser-Login einfügen):"
   else
-    echo "API-Key: noch nicht gefunden — siehe Backend-Log (${BACKEND_LOG})"
+    echo "API-Key: noch nicht angelegt — das Backend legt ihn beim ersten Start in ${key_file} ab"
     return 0
   fi
   if [[ "${SHOW_KEY}" -eq 1 ]]; then
@@ -528,6 +510,16 @@ main() {
   echo "Betriebsart: ${RUNTIME_MODE}"
 
   case "${COMMAND}" in
+    build)
+      # Baut das JAR, das ein spaeteres `start` ohne weiteren Build verwendet — so kompiliert
+      # scripts/setup.sh das Backend nur einmal statt test-compile + clean package (0ab376d3).
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        echo "build gilt nur fuer die Betriebsart host (Container bauen ihr Image selbst)." >&2
+        exit 2
+      fi
+      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+      build_backend_jar
+      ;;
     stop)
       if [[ "${RUNTIME_MODE}" == "container" ]]; then stop_backend_container; else stop_backend; fi
       ;;

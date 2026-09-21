@@ -93,6 +93,61 @@ check "pid file of a foreign process (sleep) is removed" '[ "$OUT" = removed ]'
 echo "5) help and syntax"
 check "bash -n passes"                                   'bash -n "$SCRIPT"'
 check "--help prints usage without side effects"         '"$SCRIPT" --help | grep -q "restart"'
+check "--help documents build"                           '"$SCRIPT" --help | grep -q " build "'
+
+echo "6) build: only the runtime jar, nothing started (setup.sh builds once)"
+mkdir -p "$TMP/backend"
+cat > "$TMP/backend/mvnw" <<'STUB'
+#!/usr/bin/env bash
+# Fake Maven wrapper: log the call, drop a fat jar where build_backend_jar looks for it.
+echo "$*" >> "$(dirname "$0")/mvn-calls.log"
+mkdir -p "$(dirname "$0")/target" && echo "fat" > "$(dirname "$0")/target/ai-automation-backend-9.9.9.jar"
+STUB
+chmod +x "$TMP/backend/mvnw"
+OUT="$(run_in_script '
+  BACKEND_DIR="'"$TMP"'/backend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMMAND=build; RUNTIME_MODE=host
+  ( main >/dev/null 2>&1 ); echo "rc=$?"
+  cat "$RUNTIME_DIR/current.jar" 2>/dev/null || echo no-jar
+  [ -e "$BACKEND_PID_FILE" ] || [ -e "$FRONTEND_PID_FILE" ] && echo started || echo nothing-started
+')"
+check "build exits 0"                                    '[ "$(sed -n 1p <<<"$OUT")" = rc=0 ]'
+check "build installs current.jar from target/"          '[ "$(sed -n 2p <<<"$OUT")" = fat ]'
+check "build starts neither backend nor frontend"        '[ "$(sed -n 3p <<<"$OUT")" = nothing-started ]'
+check "build runs clean package once, tests skipped"     '[ "$(grep -c "clean package -DskipTests" "$TMP/backend/mvn-calls.log")" -eq 1 ]'
+check "build refuses the container mode"                 '[ "$(run_in_script "COMMAND=build; RUNTIME_MODE=container; ( main >/dev/null 2>&1 ); echo \$?")" = 2 ]'
+
+echo "7) the frontend outlives the terminal it was started from (454f8ac5)"
+# Node resets signal dispositions at startup, so `nohup` alone did not protect Vite: closing the
+# terminal sent SIGHUP and the frontend died while the backend lived on. `script` plays the
+# terminal that closes; the fake npm is a plain node process, like `npm run dev` → vite.
+if command -v node >/dev/null 2>&1 && command -v script >/dev/null 2>&1; then
+  mkdir -p "$TMP/npm-bin" "$TMP/fe"
+  printf '#!/usr/bin/env bash\nexec node -e "setInterval(() => {}, 1000)"\n' > "$TMP/npm-bin/npm"
+  chmod +x "$TMP/npm-bin/npm"
+  cat > "$TMP/frontend-case.sh" <<CASE
+export HOME="$TMP/home" XDG_STATE_HOME="$TMP/state" PATH="$TMP/npm-bin:\$PATH"
+source "$SCRIPT" >/dev/null 2>&1
+FRONTEND_DIR="$TMP/fe"
+frontend_is_ready() { return 1; }
+start_frontend >/dev/null 2>&1
+sleep 1
+CASE
+  script -qec "bash $TMP/frontend-case.sh" /dev/null >/dev/null 2>&1
+  sleep 1
+  FE_PID="$(cat "$TMP/state/autotrigger-dev/frontend.pid" 2>/dev/null)"
+  check "frontend still runs after the terminal closed"  '[ -n "$FE_PID" ] && kill -0 "$FE_PID" 2>/dev/null'
+  check "it leads its own session (no controlling tty)"  '[ "$(ps -o sid= -p "$FE_PID" 2>/dev/null | tr -d " ")" = "$FE_PID" ]'
+  check "the pid file names the node process itself"     '[[ "$(ps -o args= -p "$FE_PID" 2>/dev/null)" == node* ]]'
+  [ -n "$FE_PID" ] && kill "$FE_PID" 2>/dev/null
+else
+  echo "  skip (node or script missing)"
+fi
+
+echo "8) dev container override comes from scripts/lib/host-mounts.sh"
+check "starter sources the mount library"   'grep -q "lib/host-mounts.sh" "$SCRIPT"'
+OUT="$(run_in_script 'mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"; write_compose_override >/dev/null; cat "$COMPOSE_OVERRIDE"')"
+check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
+check "login dir is mounted"                'grep -q "/.claude:" <<<"$OUT"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

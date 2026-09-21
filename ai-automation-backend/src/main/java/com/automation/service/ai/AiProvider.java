@@ -24,6 +24,12 @@ public interface AiProvider {
     AiProviderCapabilities getCapabilities();
 
     /**
+     * How a person sets this provider up on their machine — program, install, login. Pflicht fuer
+     * jeden Anbieter: daraus erzeugt ProviderCatalogTest den Katalog des Installers (2255f2ee).
+     */
+    ProviderSetup setup();
+
+    /**
      * Reasoning phase: "think about this prompt and respond".
      * Used by agentic REASON, optimization, conversion, wish analysis, etc.
      */

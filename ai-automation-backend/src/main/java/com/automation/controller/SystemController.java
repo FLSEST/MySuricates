@@ -2,9 +2,9 @@ package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
 import com.automation.config.RuntimeClasspathGuard;
+import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
-import com.github.dockerjava.api.DockerClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,11 +30,11 @@ import java.util.Map;
 @Slf4j
 public class SystemController {
 
-    private final DockerClient dockerClient;
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
     private final TailscaleService tailscaleService;
     private final RateLimitConfig rateLimitConfig;
+    private final DockerExpectation dockerExpectation;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -49,13 +49,7 @@ public class SystemController {
 
     @GetMapping("/health")
     public Map<String, Object> health() {
-        boolean dockerAvailable;
-        try {
-            dockerClient.pingCmd().exec();
-            dockerAvailable = true;
-        } catch (Exception | Error e) {
-            dockerAvailable = false;
-        }
+        DockerExpectation.State docker = dockerExpectation.probe();
 
         boolean dbAvailable;
         long dbResponseTimeMs;
@@ -69,10 +63,12 @@ public class SystemController {
         }
         dbResponseTimeMs = (System.nanoTime() - start) / 1_000_000;
 
+        // Kein Docker eingerichtet ist ein Normalzustand, kein gestoerter Betrieb (a0e85182);
+        // DEGRADED nur, wenn Docker da sein sollte und nicht antwortet.
         String status;
         if (!dbAvailable) {
             status = "DOWN";
-        } else if (!dockerAvailable) {
+        } else if (docker == DockerExpectation.State.DOWN) {
             status = "DEGRADED";
         } else {
             status = "UP";
@@ -83,7 +79,7 @@ public class SystemController {
         dbComponent.put("responseTimeMs", dbResponseTimeMs);
 
         Map<String, Object> dockerComponent = new LinkedHashMap<>();
-        dockerComponent.put("status", dockerAvailable ? "UP" : "DOWN");
+        dockerComponent.put("status", docker.name());
 
         Map<String, Object> components = new LinkedHashMap<>();
         components.put("database", dbComponent);
@@ -92,7 +88,11 @@ public class SystemController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", status);
         result.put("timestamp", Instant.now().toString());
-        result.put("docker", dockerAvailable ? "CONNECTED" : "UNAVAILABLE");
+        result.put("docker", switch (docker) {
+            case UP -> "CONNECTED";
+            case DOWN -> "UNAVAILABLE";
+            case NOT_CONFIGURED -> "NOT_CONFIGURED";
+        });
         result.put("components", components);
         return result;
     }

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import type { PoolWorkflowEntry, ExportToPoolRequest, ExportToPoolResponse, PoolScope } from '../types';
 
 export function usePoolWorkflows() {
@@ -15,9 +15,11 @@ export function useInstallPoolWorkflow() {
   const qc = useQueryClient();
   const toast = useToast();
   const t = useT();
+  // The server installs in this language: name, description and — for bilingual pool files — the steps
+  const locale = useI18nStore((s) => s.locale);
   return useMutation({
     mutationFn: ({ poolId, projectId, name, forceCreate }: { poolId: string; projectId: string; name?: string; forceCreate?: boolean }) =>
-      api.post<{ workflowId: string; workflowName: string; created: boolean }>(`/pool/${poolId}/install`, { projectId, name, forceCreate }),
+      api.post<{ workflowId: string; workflowName: string; created: boolean }>(`/pool/${poolId}/install`, { projectId, name, forceCreate, locale }),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
       toast.success(data.created ? t.toast.poolWorkflowInstalled : t.toast.poolWorkflowUpdated);

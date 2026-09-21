@@ -1625,7 +1625,7 @@ export const de: TranslationKeys = {
   security: {
     warning: 'Sicherheit ist deaktiviert. Alle API-Endpoints sind ohne Authentifizierung erreichbar.',
     authRequired: 'API-Key erforderlich, um auf die Plattform zuzugreifen.',
-    authHint: 'Sicherheit ist aktiviert. Gib den API-Key ein, der in den Backend-Server-Logs angezeigt wird. Suche nach "AUTO-GENERATED API KEY" in der Konsolenausgabe.',
+    authHint: 'Sicherheit ist aktiviert. Gib den API-Key dieser Instanz ein. Auf dem Rechner, auf dem MySuricates läuft, zeigt ihn „scripts/instance.sh key“ an (mit setup.sh eingerichtet); im Quellcode-Setup steht er in ~/.autotrigger/api-key.',
     invalidKey: 'Ungültiger API-Key. Bitte prüfen und erneut versuchen.',
     connectionError: 'Verbindung zum Server konnte nicht hergestellt werden.',
     connect: 'Verbinden',
@@ -2023,6 +2023,7 @@ export const de: TranslationKeys = {
     degraded: 'Eingeschränkt',
     down: 'Nicht erreichbar',
     dockerOffline: 'Docker offline',
+    dockerNotConfigured: 'nicht eingerichtet',
     databaseDown: 'DB Fehler',
   },
   factory: {

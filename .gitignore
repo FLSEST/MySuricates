@@ -119,3 +119,7 @@ __pycache__/
 # workflow-pool/ flach, ein Unterordner nimmt die Definitionen aus dem Pool.
 #
 # Eine neue private Definition also in .git/info/exclude eintragen, nicht hier.
+
+# Container-Instanzen (scripts/instance.sh): Konfiguration und erzeugte Mounts je Rechner
+deploy/instances/*
+!deploy/instances/.gitkeep

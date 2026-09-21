@@ -1,5 +1,7 @@
 package com.automation.config;
 
+import com.automation.util.LocalizedJson;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.WorkflowTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +30,36 @@ class BuiltInTemplateLoaderTest {
     @Test
     void loadAll_returnsAllTemplates() {
         assertThat(templates).hasSizeGreaterThanOrEqualTo(44);
+    }
+
+    /** The loader skips a file it can't read with only a log line — here that has to fail the build. */
+    @Test
+    void loadAll_loadsEveryTemplateFile() throws Exception {
+        int files = new PathMatchingResourcePatternResolver().getResources("classpath:templates/builtin/*.json").length;
+
+        assertThat(templates).hasSize(files);
+    }
+
+    @Test
+    void bilingualTemplate_keepsEnglishBlocks_andResolvesGermanFromItsSource() {
+        WorkflowTemplate example = templates.stream().filter(t -> "example-approval".equals(t.getId()))
+                .findFirst().orElseThrow();
+
+        assertThat(example.getBlocks()).extracting(BlockDefinition::getName)
+                .containsExactly("measure", "approval", "finish");
+        assertThat(example.getBlocks().get(1).getConfig().get("options")).isEqualTo(List.of("Yes", "No"));
+        assertThat(example.getI18nSource()).isNotBlank();
+
+        List<BlockDefinition> german = LocalizedJson.blocksFor(example.getI18nSource(), "de", List.of());
+        assertThat(german).extracting(BlockDefinition::getName).containsExactly("messen", "freigabe", "abschluss");
+        assertThat(german.get(1).getConfig().get("question").toString()).contains("{{ block.messen.output }}");
+        assertThat(german.get(1).getConfig().get("options")).isEqualTo(List.of("Ja", "Nein"));
+    }
+
+    @Test
+    void singleLanguageTemplates_haveNoBilingualSource() {
+        assertThat(templates.stream().filter(t -> !"example-approval".equals(t.getId())))
+                .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNull());
     }
 
     @Test

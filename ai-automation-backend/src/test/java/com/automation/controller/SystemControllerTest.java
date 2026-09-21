@@ -4,10 +4,9 @@ import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.PingCmd;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,9 +33,6 @@ class SystemControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private DockerClient dockerClient;
-
-    @MockitoBean
     private DataSource dataSource;
 
     @MockitoBean
@@ -54,6 +50,9 @@ class SystemControllerTest {
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
+    @MockitoBean
+    private DockerExpectation dockerExpectation;
+
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
         Statement stmt = mock(Statement.class);
@@ -63,8 +62,7 @@ class SystemControllerTest {
 
     @Test
     void health_allUp_returnsUp() throws Exception {
-        PingCmd pingCmd = mock(PingCmd.class);
-        when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.UP);
         mockDbHealthy();
 
         mockMvc.perform(get("/api/v1/system/health"))
@@ -77,8 +75,8 @@ class SystemControllerTest {
     }
 
     @Test
-    void health_dockerUnavailable_returnsDegraded() throws Exception {
-        when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Docker not available"));
+    void health_dockerConfiguredButUnavailable_returnsDegraded() throws Exception {
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.DOWN);
         mockDbHealthy();
 
         mockMvc.perform(get("/api/v1/system/health"))
@@ -90,9 +88,21 @@ class SystemControllerTest {
     }
 
     @Test
+    void health_dockerNotConfigured_isNotAnError() throws Exception {
+        // a0e85182: eine Installation ohne Docker ist ein Normalzustand, kein gestoerter Betrieb
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
+        mockDbHealthy();
+
+        mockMvc.perform(get("/api/v1/system/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.docker").value("NOT_CONFIGURED"))
+                .andExpect(jsonPath("$.components.docker.status").value("NOT_CONFIGURED"));
+    }
+
+    @Test
     void health_dbDown_returnsDown() throws Exception {
-        PingCmd pingCmd = mock(PingCmd.class);
-        when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.UP);
         when(dataSource.getConnection()).thenThrow(new RuntimeException("DB connection failed"));
 
         mockMvc.perform(get("/api/v1/system/health"))

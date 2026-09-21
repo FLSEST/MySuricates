@@ -35,8 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TemplateHygieneGateTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final List<String> SHELL_FIELDS =
-            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command");
     private static final Pattern QUOTED_OUTPUT = Pattern.compile(
             "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output"
                     + "|previous_report|open_todos)\\s*}}['\"]");
@@ -46,8 +44,10 @@ class TemplateHygieneGateTest {
     void should_notQuoteOutputPlaceholders_inShellFields() throws IOException {
         List<String> violations = new ArrayList<>();
         for (Path file : definitionFiles()) {
-            walkBlocks(MAPPER.readTree(file.toFile()),
-                    node -> collectQuotedOutputViolations(node, file.getFileName().toString(), violations));
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                walkBlocks(variant.root(),
+                        node -> collectQuotedOutputViolations(node, variant.label(), violations));
+            }
         }
         assertThat(violations)
                 .as("quoted Output-Platzhalter in Shell-Feldern (unquoted + shell_escape_variables verwenden)")
@@ -88,13 +88,13 @@ class TemplateHygieneGateTest {
     }
 
     /** Visits {@code node} itself (not its nested blocks — the caller's {@link #walkBlocks} does
-     * the recursion) and records a violation per quoted-output {@link #SHELL_FIELDS} entry that is
+     * the recursion) and records a violation per quoted-output {@link ShippedDefinitions#SHELL_FIELDS} entry that is
      * actually executed as shell for this block. */
     private static void collectQuotedOutputViolations(JsonNode node, String fileLabel, List<String> out) {
         JsonNode config = node.get("config");
         String type = node.path("type").asText(null);
-        for (String field : SHELL_FIELDS) {
-            if (!isShellField(field, type, config)) {
+        for (String field : ShippedDefinitions.SHELL_FIELDS) {
+            if (!ShippedDefinitions.isShellField(field, type, config)) {
                 continue;
             }
             JsonNode value = config.get(field);
@@ -104,40 +104,28 @@ class TemplateHygieneGateTest {
         }
     }
 
-    /**
-     * Whether {@code field} on a block of {@code type} (with {@code config}) is actually run
-     * through a shell. {@code items_command} on {@code foreach} always is (it only ever collects
-     * iteration targets, see {@code ForEachBlockExecutor}); every other shell field depends on the
-     * block being type {@code shell} itself, or carrying {@code execution_mode: shell} (foreach,
-     * while, conditional, retry, and a switch-nested shell/simple block — {@code ExecutionMode}).
-     */
-    private static boolean isShellField(String field, String type, JsonNode config) {
-        if ("items_command".equals(field)) {
-            return "foreach".equals(type);
-        }
-        return "shell".equals(type) || "shell".equals(config.path("execution_mode").asText(null));
-    }
-
     @Test
     void should_notPinDatedClaudeModelIds() throws IOException {
         List<String> violations = new ArrayList<>();
         for (Path file : definitionFiles()) {
-            collectModelFields(MAPPER.readTree(file.toFile()), file, violations);
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                collectModelFields(variant.root(), variant.label(), violations);
+            }
         }
         assertThat(violations)
                 .as("datierte Claude-Modell-IDs (Aliase opus/sonnet/haiku/fable verwenden)")
                 .isEmpty();
     }
 
-    private static void collectModelFields(JsonNode node, Path file, List<String> out) {
+    private static void collectModelFields(JsonNode node, String label, List<String> out) {
         if (node.isObject()) {
             JsonNode model = node.get("model");
             if (model != null && model.isTextual() && DATED_CLAUDE_MODEL.matcher(model.asText()).find()) {
-                out.add(file.getFileName() + " -> model=" + model.asText());
+                out.add(label + " -> model=" + model.asText());
             }
-            node.fields().forEachRemaining(e -> collectModelFields(e.getValue(), file, out));
+            node.fields().forEachRemaining(e -> collectModelFields(e.getValue(), label, out));
         } else if (node.isArray()) {
-            node.forEach(child -> collectModelFields(child, file, out));
+            node.forEach(child -> collectModelFields(child, label, out));
         }
     }
 

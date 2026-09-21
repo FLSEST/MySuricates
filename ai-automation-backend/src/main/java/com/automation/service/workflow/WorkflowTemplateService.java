@@ -74,6 +74,10 @@ public class WorkflowTemplateService {
         if (request.instructions() != null) {
             template.setInstructions(request.instructions());
         }
+        if (request.blocks() != null || request.instructions() != null) {
+            // An edit is single-language; a stale German variant must not survive it.
+            template.setI18nSource(null);
+        }
         if (request.model() != null) {
             template.setModel(request.model());
         }

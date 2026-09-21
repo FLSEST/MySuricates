@@ -439,6 +439,97 @@ class WorkflowPoolServiceTest {
                 eq(ChangeSource.POOL_INSTALL));
     }
 
+    // --- zweisprachige Pool-Dateien (TODO a129a661) ---
+
+    @Test
+    void listAll_bilingualFile_resolvesStepsToTheLocale_keepsNameMaps() throws Exception {
+        writePoolFile("approval.json", """
+                {"i18n": ["de", "en"],
+                 "name": {"de": "Freigabe-Beispiel", "en": "Approval example"},
+                 "description": {"de": "Zeigt eine Freigabe", "en": "Shows an approval"},
+                 "instructions": {"de": "Deutsch", "en": "English"},
+                 "blocks": [
+                   {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+                   {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+                    "config": {"question": {"de": "{{ block.messen.output }} weiter?", "en": "{{ block.measure.output }} continue?"},
+                               "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}]}}]}
+                """);
+
+        PoolWorkflowEntry de = poolService.findById("approval", "de");
+        PoolWorkflowEntry en = poolService.findById("approval");
+
+        assertThat(de.blocks()).extracting(BlockDefinition::getName).containsExactly("messen", "freigabe");
+        assertThat(de.blocks().get(1).getConfig().get("question")).isEqualTo("{{ block.messen.output }} weiter?");
+        assertThat(de.instructions()).isEqualTo("Deutsch");
+        assertThat(en.blocks()).extracting(BlockDefinition::getName).containsExactly("measure", "approval");
+        assertThat(en.blocks().get(1).getConfig().get("options")).isEqualTo(List.of("Yes", "No"));
+        assertThat(de.name()).containsEntry("de", "Freigabe-Beispiel").containsEntry("en", "Approval example");
+    }
+
+    @Test
+    void listAll_fileWithoutMarker_keepsDeEnDataMapsUntouched() throws Exception {
+        writePoolFile("plain.json", """
+                {"name": {"en": "Plain"}, "blocks": [{"type": "shell", "config": {"labels": {"de": "A", "en": "B"}}}]}
+                """);
+
+        PoolWorkflowEntry entry = poolService.findById("plain", "de");
+
+        assertThat(entry.blocks().get(0).getConfig().get("labels")).isEqualTo(Map.of("de", "A", "en", "B"));
+    }
+
+    @Test
+    void install_inGerman_createsTheGermanWorkflow() throws Exception {
+        writePoolFile("approval.json", """
+                {"i18n": ["de", "en"],
+                 "name": {"de": "Freigabe-Beispiel", "en": "Approval example"},
+                 "description": {"de": "Zeigt eine Freigabe", "en": "Shows an approval"},
+                 "instructions": {"de": "Deutsch", "en": "English"},
+                 "blocks": [
+                   {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+                   {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+                    "config": {"question": {"de": "{{ block.messen.output }} weiter?", "en": "{{ block.measure.output }} continue?"},
+                               "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}]}}]}
+                """);
+        when(workflowService.create(any(), eq(ChangeSource.POOL_INSTALL)))
+                .thenReturn(Workflow.builder().id("wf-1").name("Freigabe-Beispiel").build());
+
+        poolService.install("approval", new InstallPoolWorkflowRequest("proj-1", null, null, "de"));
+
+        verify(workflowService).create(argThat(req -> "Freigabe-Beispiel".equals(req.name())
+                        && "Zeigt eine Freigabe".equals(req.description())
+                        && "Deutsch".equals(req.instructions())
+                        && "messen".equals(req.blocks().get(0).getName())
+                        && List.of("Ja", "Nein").equals(req.blocks().get(1).getConfig().get("options"))),
+                eq(ChangeSource.POOL_INSTALL));
+    }
+
+    @Test
+    void install_inTheOtherLanguage_updatesTheEarlierInstallInsteadOfDuplicating() throws Exception {
+        writePoolFile("approval.json", """
+                {"i18n": ["de", "en"],
+                 "name": {"de": "Freigabe-Beispiel", "en": "Approval example"},
+                 "description": {"de": "Zeigt eine Freigabe", "en": "Shows an approval"},
+                 "instructions": {"de": "Deutsch", "en": "English"},
+                 "blocks": [
+                   {"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {"command": "date"}},
+                   {"type": "approval", "name": {"de": "freigabe", "en": "approval"},
+                    "config": {"question": {"de": "{{ block.messen.output }} weiter?", "en": "{{ block.measure.output }} continue?"},
+                               "options": [{"de": "Ja", "en": "Yes"}, {"de": "Nein", "en": "No"}]}}]}
+                """);
+        Workflow germanInstall = Workflow.builder().id("wf-7").name("Freigabe-Beispiel").build();
+        when(workflowService.findByNameAndProjectId("Approval example", "proj-1")).thenReturn(Optional.empty());
+        when(workflowService.findByNameAndProjectId("Freigabe-Beispiel", "proj-1")).thenReturn(Optional.of(germanInstall));
+        when(workflowService.update(eq("wf-7"), any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(germanInstall);
+
+        WorkflowPoolService.InstallResult result =
+                poolService.install("approval", new InstallPoolWorkflowRequest("proj-1", null, null, "en"));
+
+        assertThat(result.created()).isFalse();
+        verify(workflowService).update(eq("wf-7"),
+                argThat(req -> "Approval example".equals(req.name()) && "measure".equals(req.blocks().get(0).getName())),
+                eq(ChangeSource.POOL_INSTALL));
+    }
+
     private void stubWorkflow(Workflow workflow) {
         when(workflowService.findById(workflow.getId())).thenReturn(workflow);
     }

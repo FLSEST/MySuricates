@@ -1,11 +1,11 @@
 package com.automation.service.tray;
 
+import com.automation.service.project.DockerExpectation;
 import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
-import com.github.dockerjava.api.DockerClient;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -34,7 +34,7 @@ public class SystemTrayService {
     private final TrayConfig trayConfig;
     private final WorkflowRunRepository runRepository;
     private final WorkflowExecutionRegistry executionRegistry;
-    private final DockerClient dockerClient;
+    private final DockerExpectation dockerExpectation;
     private final SystemIdentityService systemIdentity;
     private final TraySettingsService traySettings;
 
@@ -50,13 +50,13 @@ public class SystemTrayService {
     public SystemTrayService(TrayConfig trayConfig,
                              WorkflowRunRepository runRepository,
                              WorkflowExecutionRegistry executionRegistry,
-                             DockerClient dockerClient,
+                             DockerExpectation dockerExpectation,
                              SystemIdentityService systemIdentity,
                              TraySettingsService traySettings) {
         this.trayConfig = trayConfig;
         this.runRepository = runRepository;
         this.executionRegistry = executionRegistry;
-        this.dockerClient = dockerClient;
+        this.dockerExpectation = dockerExpectation;
         this.systemIdentity = systemIdentity;
         this.traySettings = traySettings;
     }
@@ -152,7 +152,8 @@ public class SystemTrayService {
         long runsToday = runRepository.countByStartedAtAfter(todayStart);
         long failedToday = runRepository.countByStatusAndStartedAtAfter(RunStatus.FAILED, todayStart);
         int pendingApprovals = executionRegistry.getPendingApprovalCount();
-        boolean dockerOk = checkDocker();
+        // Nicht eingerichtetes Docker ist kein Warnzustand, nur eingerichtetes, das nicht antwortet (a0e85182)
+        boolean dockerOk = dockerExpectation.probe() != DockerExpectation.State.DOWN;
         boolean frontendOk = checkFrontend();
         boolean stableOk = checkStable();
 
@@ -203,7 +204,7 @@ public class SystemTrayService {
         menu.addSeparator();
 
         MenuItem dockerItem = new MenuItem(String.format("Docker: %s | %d aktiv | %d%% Erfolg",
-                state.dockerOk ? "OK" : "Offline",
+                !state.dockerOk ? "Offline" : dockerExpectation.isConfigured() ? "OK" : "nicht eingerichtet",
                 state.activeRuns,
                 state.successPercent()));
         dockerItem.setEnabled(false);
@@ -274,14 +275,6 @@ public class SystemTrayService {
         }
     }
 
-    private boolean checkDocker() {
-        try {
-            dockerClient.pingCmd().exec();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
 
     boolean checkFrontend() {
         try {

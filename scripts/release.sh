@@ -4,7 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 POM_FILE="$PROJECT_ROOT/ai-automation-backend/pom.xml"
-PACKAGE_JSON="$PROJECT_ROOT/ai-automation-frontend/package.json"
+FRONTEND_DIR="$PROJECT_ROOT/ai-automation-frontend"
+PACKAGE_JSON="$FRONTEND_DIR/package.json"
+PACKAGE_LOCK="$FRONTEND_DIR/package-lock.json"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,7 +20,7 @@ err()  { echo -e "${RED}[release]${NC} $*" >&2; }
 usage() {
     echo "Usage: $(basename "$0") [patch|minor|major]"
     echo ""
-    echo "Bumps the version in pom.xml and package.json, commits, and tags."
+    echo "Bumps the version in pom.xml, package.json and package-lock.json, commits, and tags."
     echo ""
     echo "  patch  (default)  0.1.0 → 0.1.1"
     echo "  minor             0.1.1 → 0.2.0"
@@ -64,9 +66,12 @@ update_pom() {
     fi
 }
 
+# package.json and package-lock.json together: a lockfile left at the old version makes every
+# fresh clone dirty after its first `npm install` (found by scripts/installer-probe.sh, 453c01b1).
+# `npm version` touches exactly the three version fields and nothing else.
 update_package_json() {
     local new_version="$1"
-    sed -i "s|\"version\": \"[0-9]*\.[0-9]*\.[0-9]*\"|\"version\": \"${new_version}\"|" "$PACKAGE_JSON"
+    (cd "$FRONTEND_DIR" && npm version "$new_version" --no-git-tag-version --allow-same-version --ignore-scripts >/dev/null)
 }
 
 # ── Main ──────────────────────────────────────────────────
@@ -97,12 +102,12 @@ echo ""
 log "Updating pom.xml → ${NEXT}-SNAPSHOT"
 update_pom "$NEXT"
 
-log "Updating package.json → ${NEXT}"
+log "Updating package.json + package-lock.json → ${NEXT}"
 update_package_json "$NEXT"
 
 # Commit and tag
 log "Committing..."
-git add "$POM_FILE" "$PACKAGE_JSON"
+git add "$POM_FILE" "$PACKAGE_JSON" "$PACKAGE_LOCK"
 git commit -m "Release v${NEXT}"
 
 log "Tagging v${NEXT}..."
@@ -111,7 +116,7 @@ git tag "v${NEXT}"
 echo ""
 log "Done! Version bumped to ${NEXT}"
 log "  pom.xml:      ${NEXT}-SNAPSHOT"
-log "  package.json: ${NEXT}"
+log "  package.json: ${NEXT} (package-lock.json mitgezogen)"
 log "  Git tag:      v${NEXT}"
 echo ""
 log "To push: git push && git push --tags"

@@ -25,6 +25,7 @@ import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -120,6 +121,44 @@ class ChainTemplateServiceTest {
             CreateChainRequest chainReq = chainRequestCaptor.getValue();
             assertThat(chainReq.entries()).hasSize(2);
             assertThat(chainReq.stopOnFailure()).isTrue();
+        }
+
+        @Test
+        void install_inEnglish_usesEnglishNamesAndTheEnglishStepsOfABilingualTemplate() throws Exception {
+            mockWfTemplate.setI18nSource(com.automation.util.LocalizedJson.localizedSource(
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+                            {"i18n": ["de", "en"], "blocks": [{"type": "shell", "name": {"de": "messen", "en": "measure"}, "config": {}}],
+                             "instructions": {"de": "Deutsch", "en": "English"}}""")));
+            when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenAnswer(inv -> {
+                CreateWorkflowRequest req = inv.getArgument(0);
+                return Workflow.builder().id("wf-" + req.name()).name(req.name()).build();
+            });
+            when(chainService.create(any())).thenReturn(WorkflowChain.builder().id("chain-1").build());
+
+            chainTemplateService.install("ci-cd-pipeline-chain", "proj-1", null, "en");
+
+            verify(workflowService, times(2)).create(argThat(req -> "Test Workflow".equals(req.name())
+                    && "measure".equals(req.blocks().get(0).getName())
+                    && "English".equals(req.instructions())), eq(ChangeSource.CHAIN_TEMPLATE));
+            verify(chainService).create(chainRequestCaptor.capture());
+            assertThat(chainRequestCaptor.getValue().name()).isNotBlank();
+        }
+
+        @Test
+        void install_withoutLocale_staysGerman() {
+            when(workflowTemplateService.findById(any())).thenReturn(mockWfTemplate);
+            when(workflowService.create(any(), eq(ChangeSource.CHAIN_TEMPLATE))).thenAnswer(inv -> {
+                CreateWorkflowRequest req = inv.getArgument(0);
+                return Workflow.builder().id("wf-" + req.name()).name(req.name()).build();
+            });
+            when(chainService.create(any())).thenReturn(WorkflowChain.builder().id("chain-1").build());
+
+            chainTemplateService.install("ci-cd-pipeline-chain", "proj-1", null);
+
+            verify(workflowService, times(2)).create(argThat(req -> "Test-Workflow".equals(req.name())
+                    && req.blocks().equals(mockWfTemplate.getBlocks())
+                    && "Do something".equals(req.instructions())), eq(ChangeSource.CHAIN_TEMPLATE));
         }
 
         @Test

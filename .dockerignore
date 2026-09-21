@@ -1,0 +1,14 @@
+# Positivliste fuer deploy/Dockerfile: Die Repo-Wurzel enthaelt .claude/worktrees mit vollen
+# Arbeitskopien samt node_modules — ohne Liste schickte `docker build` Gigabytes in den Kontext.
+# Die lokale Instanz-Konfiguration (ai-automation-backend/config/) kommt nie ins Image.
+*
+!ai-automation-backend/pom.xml
+!ai-automation-backend/src/main
+!ai-automation-frontend
+ai-automation-frontend/node_modules
+ai-automation-frontend/dist
+ai-automation-frontend/coverage
+ai-automation-frontend/cypress
+!docs
+!workflow-pool/*.json
+!deploy/entrypoint.sh

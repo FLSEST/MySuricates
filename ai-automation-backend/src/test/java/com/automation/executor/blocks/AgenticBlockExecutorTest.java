@@ -211,6 +211,9 @@ class AgenticBlockExecutorTest {
         StepResult result = executor.execute(buildBlock("Some goal"), context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        // Cancelled during the second REASON: its action must not start. The unstubbed ACT call
+        // used to return null and fail the step with an NPE, which made this test pass by accident.
+        verify(hostClaude, never()).executeAction(eq("More work"), any(), any(), any(), any(), anyBoolean(), any(), any(), any());
     }
 
     @Test

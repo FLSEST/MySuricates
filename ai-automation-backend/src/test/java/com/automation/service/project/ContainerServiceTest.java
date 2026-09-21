@@ -1,5 +1,6 @@
 package com.automation.service.project;
 
+
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
@@ -88,6 +89,7 @@ class ContainerServiceTest {
                 transactionManager,
                 docker,
                 new DockerOrphanReconciler(docker, activityLogService, 60),
+                new DockerExpectation(dockerClient, "tcp://docker.test:2375"), // Docker eingerichtet
                 60,                 // idleTimeoutMinutes
                 "/home/test"        // hostHome
         );
