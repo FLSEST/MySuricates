@@ -53,6 +53,8 @@ tui_init() {
 _tui_plain() { printf '%s' "$1" | sed "s/${_TUI_ESC}\[[0-9;?]*[A-Za-z]//g"; }
 _tui_len() { local s; s="$(_tui_plain "$1")"; printf '%s' "${#s}"; }
 _tui_repeat() { local s="" i=0; while [ "$i" -lt "$2" ]; do s="$s$1"; i=$((i + 1)); done; printf '%s' "$s"; }
+# TEXT auf BREITE Zeichen auffuellen — printf '%-Ns' zaehlt Bytes, „ä“ verschoebe die Spalte
+_tui_pad() { local n; n="$(_tui_len "$1")"; printf '%s' "$1"; [ "$n" -lt "$2" ] && _tui_repeat ' ' $(($2 - n)); return 0; }
 
 # Text aus den Sprachdateien, falls geladen (scripts/lib/i18n.sh), sonst der englische Default
 _tui_msg() {
@@ -123,7 +125,7 @@ _tui_rail_build() {
 
 # tui_done LABEL DETAIL [DAUER] — ein erledigter Schritt als Einzeiler
 tui_done() {
-  printf '  %s%s%s %s%-10s%s %s%s%s%s\n' "$C_GREEN" "$T_OK" "$C_RESET" "$C_TEXT" "$1" "$C_RESET" \
+  printf '  %s%s%s %s%s%s %s%s%s%s\n' "$C_GREEN" "$T_OK" "$C_RESET" "$C_TEXT" "$(_tui_pad "$1" 10)" "$C_RESET" \
     "$C_GREY" "${2:-}" "${3:+   $3}" "$C_RESET"
 }
 
@@ -220,9 +222,9 @@ tui_checklist() {
         label="${rest%%:*}"; hint=""; [ "$rest" != "$label" ] && hint="${rest#*:}"
         if [ "$state" = on ]; then mark="${C_AMBER}${C_BOLD}[x]${C_RESET}"; else mark="${C_GREY}[ ]${C_RESET}"; fi
         if [ "$i" -eq "$cur" ]; then
-          lines[${#lines[@]}]="$(printf '%s%s%s %s %s%-26s%s %s%s%s' "$C_AMBER" "$T_PTR" "$C_RESET" "$mark" "$C_BOLD" "$label" "$C_RESET" "$C_GREY" "$hint" "$C_RESET")"
+          lines[${#lines[@]}]="$(printf '%s%s%s %s %s%s%s %s%s%s' "$C_AMBER" "$T_PTR" "$C_RESET" "$mark" "$C_BOLD" "$(_tui_pad "$label" 26)" "$C_RESET" "$C_GREY" "$hint" "$C_RESET")"
         else
-          lines[${#lines[@]}]="$(printf '  %s %-26s %s%s%s' "$mark" "$label" "$C_GREY" "$hint" "$C_RESET")"
+          lines[${#lines[@]}]="$(printf '  %s %s %s%s%s' "$mark" "$(_tui_pad "$label" 26)" "$C_GREY" "$hint" "$C_RESET")"
         fi
         i=$((i + 1))
       done

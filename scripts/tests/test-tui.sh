@@ -12,6 +12,7 @@ export LC_ALL="${TUI_TEST_LOCALE:-C.UTF-8}"
 ESC="$(printf '\033')"
 visible() { sed "s/${ESC}\[[0-9;?]*[A-Za-z]//g"; }
 widths() { visible | while IFS= read -r l; do printf '%s\n' "${#l}"; done | sort -u; }
+col() { visible | while IFS= read -r l; do l="${l%%"$1"*}"; echo "${#l}"; done; }   # Spalte von $1, in Zeichen
 plain() { ( . "$LIB/tui.sh"; TUI_FORCE_PLAIN=1 tui_init; eval "$1" ) 2>&1; }
 color() { ( . "$LIB/tui.sh"; TUI_FORCE_COLOR=256 tui_init; eval "$1" ) 2>&1; }
 
@@ -65,6 +66,8 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
   check "b means back (rc 2)"                    'printf "%s" "$OUT" | grep "rc=2" >/dev/null'
   OUT="$(pty 'n\n' 'tui_confirm "Go?" y && echo YES || echo NO')"
   check "confirm reads n"                        'printf "%s" "$OUT" | grep NO >/dev/null'
+  OUT="$(pty '\n' 'tui_checklist S "M" "on:a:Härtung:xhint" "off:b:Module:xhint"; echo "sel=$S"')"
+  check "checklist: hint column equal with ä"     '[ "$(printf "%s\n" "$OUT" | grep -E "Härtung|Module" | col xhint | sort -u | wc -l | tr -d " ")" = 1 ]'
   OUT="$(pty 'j\n' ". \"$LIB/i18n.sh\"; i18n_load de; tui_confirm Weiter? n && echo JA || echo NEIN")"
   check "German confirm shows [j/N] and takes j"  'printf "%s" "$OUT" | grep "\[j/N\]" >/dev/null && printf "%s" "$OUT" | grep JA >/dev/null'
   # Titel laenger als die Zeile, Log noch leer: die Kuerzung darf nicht negativ werden (Ubuntu-Probe)
@@ -74,6 +77,10 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
 else
   echo "  skip (no usable script command)"
 fi
+
+echo "5b) umlauts do not shift columns (printf pads bytes, not characters)"
+OUT="$(color 'tui_done "Prüfung" "AAA"; tui_done "Modus" "AAA"')"
+check "done lines: value column equal with ü"     '[ "$(printf "%s\n" "$OUT" | col AAA | sort -u | wc -l | tr -d " ")" = 1 ]'
 
 echo "6) portability"
 check "no bash-4-only syntax (code, not comments)" '! grep -v "^[[:space:]]*#" "$LIB/tui.sh" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}|read [^|]*-t [0-9]*\\.[0-9]" >/dev/null'
