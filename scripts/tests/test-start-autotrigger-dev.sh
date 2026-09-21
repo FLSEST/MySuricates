@@ -143,6 +143,12 @@ else
   echo "  skip (node or script missing)"
 fi
 
+echo "8) dev container override comes from scripts/lib/host-mounts.sh"
+check "starter sources the mount library"   'grep -q "lib/host-mounts.sh" "$SCRIPT"'
+OUT="$(run_in_script 'mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"; write_compose_override >/dev/null; cat "$COMPOSE_OVERRIDE"')"
+check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
+check "login dir is mounted"                'grep -q "/.claude:" <<<"$OUT"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
