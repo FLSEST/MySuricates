@@ -8,12 +8,15 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Shared Docker container utilities for staging and testing environments:
  * <ul>
  *   <li>{@link #isRunning(String)} — check if a named container is up</li>
+ *   <li>{@link #containerExists(String)} — check if a named container exists, running or not</li>
  *   <li>{@link #isHealthy(String)} — HTTP health check</li>
  *   <li>{@link #runCommand(String, Path, Map, String...)} — run a command with output logging</li>
  * </ul>
@@ -26,25 +29,40 @@ public class DockerContainerManager {
      * Returns {@code true} if a Docker container matching {@code containerName} is currently running.
      */
     public boolean isRunning(String containerName) {
+        return !dockerPs(containerName, "--filter", "name=" + containerName, "--format", "{{.Status}}").isEmpty();
+    }
+
+    /**
+     * Returns {@code true} if a container named exactly {@code containerName} exists in any state
+     * (running, restarting, exited). {@code docker compose down} removes it; a crash leaves it behind.
+     */
+    public boolean containerExists(String containerName) {
+        return dockerPs(containerName, "-a", "--filter", "name=^" + containerName + "$", "--format", "{{.Names}}")
+                .lines().anyMatch(name -> name.equals(containerName));
+    }
+
+    /** Runs {@code docker ps <args>}; empty when the name is blank or docker is missing, unreachable or fails. */
+    private String dockerPs(String containerName, String... args) {
         if (containerName == null || containerName.isBlank()) {
-            return false;
+            return "";
         }
 
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "ps", "--filter",
-                    "name=" + containerName, "--format", "{{.Status}}");
+            List<String> command = new ArrayList<>(List.of("docker", "ps"));
+            command.addAll(List.of(args));
+            ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
             Process p = pb.start();
             String output = new String(p.getInputStream().readAllBytes()).trim();
             int exitCode = p.waitFor();
             if (exitCode != 0) {
                 log.debug("Container status check failed for '{}' (exit {}): {}", containerName, exitCode, output);
-                return false;
+                return "";
             }
-            return !output.isEmpty();
+            return output;
         } catch (Exception e) {
             log.debug("Container status check failed for '{}': {}", containerName, e.getMessage());
-            return false;
+            return "";
         }
     }
 

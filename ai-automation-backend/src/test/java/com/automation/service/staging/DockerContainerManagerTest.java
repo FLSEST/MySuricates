@@ -25,6 +25,18 @@ class DockerContainerManagerTest {
     }
 
     @Test
+    void containerExists_unknownContainer_returnsFalse() {
+        // false with or without docker on the machine — never throws
+        assertThat(manager.containerExists("nonexistent-test-container-12345")).isFalse();
+    }
+
+    @Test
+    void containerExists_blankName_returnsFalse() {
+        assertThat(manager.containerExists("")).isFalse();
+        assertThat(manager.containerExists(null)).isFalse();
+    }
+
+    @Test
     void isHealthy_invalidUrl_returnsFalse() {
         boolean result = manager.isHealthy("http://localhost:99999/health");
         assertThat(result).isFalse();
