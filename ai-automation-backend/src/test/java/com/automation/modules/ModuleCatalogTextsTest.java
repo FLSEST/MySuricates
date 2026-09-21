@@ -163,26 +163,36 @@ class ModuleCatalogTextsTest {
         return sb.append(")\n").toString();
     }
 
+    /**
+     * One scalar per module: {@code NAME__<key>="…"} ({@code -} becomes {@code _}). No associative
+     * arrays — macOS ships bash 3.2, and the installer must load this file there (3dd32594).
+     * {@code module_catalog_get} in module-preset.sh reads them via {@code ${!var}}.
+     */
     private static String map(String name, Function<ModuleCatalog, String> value) {
-        StringBuilder sb = new StringBuilder("declare -gA ").append(name).append("=(\n");
+        StringBuilder sb = new StringBuilder("# ").append(name).append('\n');
         for (ModuleCatalog module : ModuleCatalog.values()) {
-            sb.append("  [").append(module.key()).append("]=\"").append(quote(value.apply(module))).append("\"\n");
+            sb.append(name).append("__").append(varKey(module.key())).append("=\"")
+                    .append(quote(value.apply(module))).append("\"\n");
         }
-        return sb.append(")\n").toString();
+        return sb.toString();
     }
 
-    /** One associative array per field, keyed {@code <lang>:<module>} so no bash namerefs are needed. */
+    /** One scalar per language and module: {@code NAME__<lang>__<key>="…"}, read by module_text_get. */
     private static String texts(String name, Map<String, Map<String, Map<String, String>>> byLanguage, String field) {
-        StringBuilder sb = new StringBuilder("declare -gA ").append(name).append("=(\n");
+        StringBuilder sb = new StringBuilder("# ").append(name).append('\n');
         byLanguage.forEach((language, texts) -> {
-            sb.append("  # ").append(language).append('\n');
             for (ModuleCatalog module : ModuleCatalog.values()) {
                 String value = texts.getOrDefault(module.key(), Map.of()).getOrDefault(field, "");
-                sb.append("  [").append(language).append(':').append(module.key()).append("]=\"")
-                        .append(quote(value)).append("\"\n");
+                sb.append(name).append("__").append(language).append("__").append(varKey(module.key()))
+                        .append("=\"").append(quote(value)).append("\"\n");
             }
         });
-        return sb.append(")\n").toString();
+        return sb.toString();
+    }
+
+    /** Module keys are kebab-case; bash variable names allow letters, digits and underscores. */
+    private static String varKey(String key) {
+        return key.replaceAll("[^A-Za-z0-9_]", "_");
     }
 
     /** Everything bash would still expand inside double quotes. */

@@ -66,8 +66,9 @@ check "the generated file exists"                     '[ -f "$GENERATED" ]'
 check "the generated file parses (bash -n)"           'bash -n "$GENERATED"'
 check "says it is generated, not hand-written"        'grep -q "generiert von ModuleCatalogTextsTest" "$GENERATED"'
 check "keys = feature keys + hardening keys"          '[ "${#MODULE_CATALOG_KEYS[@]}" -eq $(( ${#MODULE_CATALOG_FEATURE_KEYS[@]} + ${#MODULE_CATALOG_HARDENING_KEYS[@]} )) ]'
-check "carries tier, risks and requires"              '[ "${MODULE_CATALOG_TIER[remote-access]}" = advanced ] && [ "${MODULE_CATALOG_RISKS[terminal]}" = host-access ] && [ "${MODULE_CATALOG_REQUIRES[sealing]}" = provenance ]'
-check "every key has a name in every language"        'for l in "${MODULE_CATALOG_LANGS[@]}"; do for k in "${MODULE_CATALOG_KEYS[@]}"; do [ -n "${MODULE_TEXT_NAME[$l:$k]:-}" ] && [ -n "${MODULE_TEXT_DESC[$l:$k]:-}" ] || exit 1; done; done'
+check "carries tier, risks and requires"              '[ "$(module_catalog_get TIER remote-access)" = advanced ] && [ "$(module_catalog_get RISKS terminal)" = host-access ] && [ "$(module_catalog_get REQUIRES sealing)" = provenance ]'
+check "every key has a name in every language"        '( for l in "${MODULE_CATALOG_LANGS[@]}"; do for k in "${MODULE_CATALOG_KEYS[@]}"; do [ -n "$(module_text_get NAME "$l" "$k")" ] && [ -n "$(module_text_get DESC "$l" "$k")" ] || exit 1; done; done )'
+check "bash 3.2: no associative arrays anywhere"      '! grep -nE "declare -g?A|mapfile|readarray" "$GENERATED" "$HERE/../lib/module-preset.sh"'
 
 echo "8) language choice (--lang / \$LANG, fallback en)"
 check "--lang de wins"                                '[ "$(module_text_lang de)" = de ]'
