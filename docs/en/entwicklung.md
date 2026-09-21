@@ -387,7 +387,7 @@ The dashboard displays the version via the `/api/v1/system/info` endpoint.
 The script:
 1. Reads the current version from `pom.xml` (without `-SNAPSHOT`)
 2. Calculates the new version (increments the segment)
-3. Updates `pom.xml` (`X.Y.Z-SNAPSHOT`) and `package.json` (`X.Y.Z`)
+3. Updates `pom.xml` (`X.Y.Z-SNAPSHOT`) plus `package.json` and `package-lock.json` (`X.Y.Z`, via `npm version`) — a lockfile left at the old version makes every fresh clone dirty after its first `npm install`; `packageLock.guard.test.ts` keeps both in sync
 4. Creates a git commit: `Release vX.Y.Z`
 5. Sets a git tag: `vX.Y.Z`
 
