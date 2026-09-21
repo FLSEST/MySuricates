@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Runs Mario Zechner's `pi` coding agent (`@mariozechner/pi-coding-agent`) on the host.
+ * Runs the `pi` coding agent (npm package `@earendil-works/pi-coding-agent`, formerly
+ * `@mariozechner/pi-coding-agent`) on the host.
  * Analogous to {@link HostClaudeService} but for the `pi` CLI.
  *
  * <p>Pi is itself a multi-provider hub: a single `pi -p --provider X --model Y` call can

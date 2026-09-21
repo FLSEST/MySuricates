@@ -1,174 +1,147 @@
-<!-- last-sync: 2026-06-29 from: docs/GETTING-STARTED.md -->
+# Getting Started — MySuricates on a new machine
 
-# Getting Started — MySuricates on a New Linux Machine
+This guide takes MySuricates from `git clone` to "running in the browser" — on a fresh **Linux** or
+**macOS** machine that may not have Java, Node or Docker yet. On **Windows** the same way runs in
+WSL2 (Ubuntu), see section 5.
 
-This guide takes MySuricates from `git clone` to "running in the browser" — on a fresh
-**Linux** machine that may not yet have Java, Node, or Docker installed.
-
-Recommended approach: **directly on the host from source** (not containerized). This is
-simpler and more reliable because the `claude` CLI runs on the host anyway, no JAR rebuild
-is required, and the database/migrations work without volume mapping. **Docker is optional**
-and only needed for container-execution workflow blocks.
-
-> **Before you start — the trust model in three sentences.** Shell blocks and AI calls run on the
-> host with *your* privileges, not in a container, and the Claude CLI does not prompt before using a
-> tool by default. Backend and frontend listen on all network interfaces, and a few endpoints
-> (health checks, the WebSocket handshake, the webhook entry point, OAuth callbacks) need no API
-> key. MySuricates is built for local operation by a single trusted person — for remote access put
-> a VPN in front rather than opening the port. Full detail:
-> [Trust Model and Network Exposure](deployment.md#trust-model-and-network-exposure).
+> **Before you start — the trust model in three sentences.** Shell blocks and AI calls run with
+> *your* permissions (on the machine, or with your mounted folders in the container); the AI CLIs do
+> not ask before using tools by default. The instance set up by the installer listens on
+> `127.0.0.1` only (only `--bind` opens it to the network), and some endpoints (health checks,
+> WebSocket handshake, webhook inbox, OAuth callbacks) need no API key. MySuricates is built for
+> local use by one trusted person — for remote access put a VPN in front, not an open port.
+> Full text: [Trust model and network exposure](deployment.md#trust-model-and-network-exposure).
 
 ---
 
-## 1. What You Need
+## 1. What you need
 
-| Tool | Version | Required? | Purpose |
-|---|---|---|---|
-| Java (JDK) | 21+ | ✅ | Build/run the backend |
-| Maven | — | ⬜ optional | The wrapper `ai-automation-backend/mvnw` is included and downloads Maven 3.9.9 itself (only Java + curl required) |
-| Node.js | 20.19+, 22.12+ or 24+ | ✅ | Frontend (version in `ai-automation-frontend/.nvmrc` → `nvm use`) |
-| npm | 10+ | ✅ | Frontend dependencies |
-| git, curl | current | ✅ | Basics |
-| python3 | 3.x | ✅ | Dev starter (`scripts/start-autotrigger-dev.sh`) |
-| **Claude account + `claude` CLI** | current | ✅ for AI | AI workflows run via `claude` on the host |
-| Docker | 24+ | ⬜ optional | only for container-execution blocks |
+Almost nothing — the installer checks what is missing, shows the commands and installs it after
+asking, in the same run (apt, dnf, pacman, zypper or Homebrew; Java and Node as a verified download
+without sudo when the package manager is too old).
 
-> **System Maven not required:** The Maven wrapper (`mvnw`) automatically downloads the correct
-> Maven version on the first build. `scripts/setup.sh` and the start scripts use it automatically.
-> Node users with `nvm` get the correct Node version with `nvm use` (in the frontend directory).
-
-Each person needs their **own Claude account** and logs in themselves with `claude login`.
-
-Much of the setup happens **automatically on the first backend start**: SQLite database +
-Flyway migrations, API key, encryption key for integrations, built-in skills/templates.
-None of this needs to be created manually.
-
----
-
-## 2. Setup in One Command
-
-```bash
-git clone <repository-url> autotrigger
-cd autotrigger
-./scripts/setup.sh
-```
-
-`scripts/setup.sh` checks all prerequisites and lists the appropriate install command for each
-missing or outdated tool (apt/dnf/pacman detected), installs frontend dependencies exactly as
-locked (`npm ci`), and builds the backend once — the start then uses that JAR without building
-again. It **never** accesses the database or the REST API, and without `--install` it installs
-nothing on its own.
-
-Options:
-
-```bash
-./scripts/setup.sh --install   # automatically install missing tools via apt (otherwise: print hints)
-./scripts/setup.sh --start     # start directly after a successful setup
-./scripts/setup.sh --preset research   # choose the module preset without asking
-```
-
-**Modules:** On the first run the script asks which optional modules the instance enables at
-startup and writes the choice to `ai-automation-backend/config/application.yml` (an existing file
-is left untouched):
-
-| Preset | Contains |
+| Way | Needed on the machine |
 |---|---|
-| `core` (default) | the core only: workflows, runs, projects, TODOs, schedules, gates |
-| `research` | core + chains, assistant, insights, workflow memory, audit center, BPMN |
-| `full` | everything, including integrations, webhooks, remote access, terminal, staging |
+| **One instance in a container** (suggested) | Docker |
+| **One instance on this machine** | Java 21, Node 20.19+/22.12+/24+ (build only), git, curl |
+| **Staged — Dev · Test · Prod** | Docker |
 
-Ready-made templates for everything off or everything on: `ai-automation-backend/config-examples/application-minimal.yml`
-and `application-maximal.yml` (see [deployment.md](deployment.md#configurations-minimal-and-maximal)).
-
-To unlock single modules later, add e.g. `automation.modules.webhooks: true` to the same file and
-restart the backend. **Settings → Modules & hardening** lists every module with its maturity and a
-ready-made snippet. Switching modules directly in the UI only works if the file contains
-`automation.modules.ui-editable: true` — then anyone with the API key can do it, so only enable that on
-instances that are not publicly reachable.
-
-If a required tool is missing, the script aborts with a clear list of missing items and install
-commands. Simply run `./scripts/setup.sh` again after installing.
+For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
+logged in to. MySuricates starts without one; the installer shows which it finds.
 
 ---
 
-## 3. Starting
+## 2. Install
 
 ```bash
-./scripts/start-autotrigger-dev.sh
+git clone <repository-url> mysuricates
+cd mysuricates
+./scripts/setup.sh              # English; in German: ./scripts/setup.sh --lang de
 ```
 
-Starts the backend (port **9090**) and frontend (port **3000**) in the background and waits until
-both are reachable. Then open in a browser:
+The installer guides you through eight steps: Welcome · Mode · Checks · Modules · AI · Ports · Build ·
+Done. `b` goes one step back, `q` quits.
 
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:9090/api/v1
+- **Mode:** one instance in a container (only Docker needed), one instance directly on this machine,
+  or staged **Dev · Test · Prod** — plan and build workflows in Dev (Factory, assistant), check them
+  in Test, run them reliably in Prod. For now workflows move by export and import in the interface;
+  an automatic sync between the three is not set up yet.
+- **Modules:** Standard (smallest surface), Research, Full or your own selection incl. hardening.
+  Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
+- **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
+  In the container the instance uses the CLI **and** your login from the machine — no second login
+  (on macOS only the login; the program lives in the image).
+- **Ports:** default 9090, busy ports are skipped. For the container also the projects folder the
+  instance sees (default: the folder above the clone, never your whole home).
 
-Logs are written to `~/.local/state/autotrigger-dev/{backend,frontend}.log`.
+Without questions, e.g. for scripts: the choices of the steps exist as flags (`--help` lists them);
+hardening, ui-editable and other settings go into the instance file (section 4).
 
-> Without a dev certificate, the frontend runs on **HTTP**. For HTTPS (e.g. for PWA installation),
-> see Section 7.
+```bash
+./scripts/setup.sh --yes                                   # defaults: container, Standard, port 9090
+./scripts/setup.sh --yes --runtime host --port 9190        # on this machine, another port
+./scripts/setup.sh --yes --mode staged                     # Dev · Test · Prod
+./scripts/setup.sh --check                                 # only check and show the plan
+./scripts/setup.sh --help                                  # all flags
+```
+
+Without a terminal (pipe, CI) and without `--yes` the installer only checks.
 
 ---
 
-## 4. Entering the API Key
+## 3. Log in and use it
 
-An API key is generated automatically on the first backend start. **`start-autotrigger-dev.sh`
-displays it in the terminal after startup** — by default **masked** (only the last 4 characters),
-so it does not accidentally end up in terminal scrollback/logs/screen-sharing. Display it in full
-with the flag:
+At the end the installer shows the address (e.g. http://localhost:9090) and the last characters of
+the API key. The full key:
 
 ```bash
-./scripts/start-autotrigger-dev.sh --show-key    # or: ./scripts/setup.sh --show-key --start
+scripts/instance.sh key --name main
 ```
 
-The key is always stored in plaintext in `~/.autotrigger/api-key` (and in the backend log):
+On **first visit** a **login screen** with an input field appears — paste the key, the browser
+remembers it. The key is **not** in the backend log (only masked there).
+
+Start, stop and inspect — the same command for every way:
 
 ```bash
-cat ~/.autotrigger/api-key
+scripts/instance.sh up|down|status|logs|key --name main
+scripts/instance.sh list                         # all instances with their port
 ```
 
-When you **first open** `localhost:3000`, a **login screen** with an input field appears
-automatically (it does not show the key — you paste it there). After that, the key is saved in the
-browser and you will not be asked again. It is used as the `X-API-Key` header for all API calls.
+### What now?
 
-To provide your own key instead of letting one be generated:
+The application is running. A first way in, without building anything:
 
-```bash
-export AUTOMATION_API_KEY="your-key"   # set before starting
-```
+1. **Create a project** — every workflow belongs to a project; a project points at a directory on
+   your machine (in the container: inside the projects folder).
+2. **Take a template** — *Templates* holds 66 ready-made workflows. Pick one, copy it into the
+   project, run it. The run shows step by step what happens.
+3. **Look at the run** — the detail view shows per block its duration, its status and whether it was
+   deterministic or called a model.
 
-The API key requirement can be disabled for purely local experiments
-(`AUTOMATION_SECURITY_ENABLED=false`) — leave it enabled for normal operation.
+Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to you.
 
 ---
 
-## 5. Setting Up the Claude CLI (for AI Workflows)
+## 4. Change settings later
 
-AI blocks execute `claude` on the host. One-time setup:
+Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). Or edit
+`deploy/instances/main.env` and run `scripts/instance.sh up --name main`:
 
-```bash
-npm install -g @anthropic-ai/claude-code   # if not already installed
-claude login                               # log in with your own Claude account
-```
+- `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
+- `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
+  `container_image`, but gives the instance full control over Docker on the machine
+- every `AUTOMATION_…` line reaches the instance unchanged, e.g. `AUTOMATION_MODULES_WEBHOOKS=true`
+  or `AUTOMATION_AI_DEFAULT_PROVIDER=CODEX`
 
-`scripts/setup.sh` checks whether `claude` is present and (heuristically) logged in, and will
-point this out if not. Without `claude` the app still starts — only AI workflows will not function.
-
----
-
-## 6. Optional: Docker (only for Container Blocks)
-
-The app and all non-container workflows (Simple, Shell, Agentic on the host …) run **without**
-Docker. Only workflow blocks that execute in isolated containers require a running Docker daemon:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER     # then log in again
-```
+**Settings → Modules & hardening** lists the modules with maturity and risk. Details on instances:
+[deployment.md](deployment.md#one-instance-in-a-container-deploy).
 
 ---
 
-## 7. Optional: HTTPS in the Dev Frontend
+## 5. Windows
+
+On Windows MySuricates runs in **WSL2**: `wsl --install -d Ubuntu`, then section 2 in the Ubuntu
+shell. The browser on Windows reaches `http://localhost:9090` directly. Native Windows is not
+supported yet (shell blocks need bash).
+
+---
+
+## 6. For contributors: source setup
+
+Working on MySuricates itself needs Vite with hot reload instead of a built interface:
+
+```bash
+./scripts/setup.sh --from-source --start     # tools, npm ci, runtime JAR, module preset, start
+./scripts/start-autotrigger-dev.sh           # later: backend :9090 + Vite :3000
+```
+
+The dev starter shows the API key masked after start (`--show-key` shows it in full); it lives in
+`~/.autotrigger/api-key`. Details: [entwicklung.md](entwicklung.md).
+
+---
+
+## 7. Optional: HTTPS in the Dev Frontend (source setup)
 
 For HTTPS at https://localhost:3000 (self-signed, e.g. for PWA installation or Tailscale):
 
@@ -195,17 +168,15 @@ in the repo — SSL off with the default password remains allowed.
 
 ## 8. Troubleshooting
 
-| Problem | Solution |
+| Problem | Fix |
 |---|---|
-| `mvn`/`java`/`node` "not found" | Run `./scripts/setup.sh` — it provides the exact install command |
-| Java too old (`requires 21+`) | Install JDK 21 (apt: `openjdk-21-jdk`, otherwise https://adoptium.net) |
-| `claude: command not found` | `npm install -g @anthropic-ai/claude-code` + `claude login` |
-| AI block fails, "not logged in" | Run `claude login` |
-| Port 9090 / 3000 in use | Stop the occupying process (`lsof -i :9090`). The start script assumes 9090/3000; other ports only with a manual start: backend `AUTOMATION_PORT=9190`, frontend `VITE_API_BASE_URL=http://localhost:9190/api/v1 VITE_WS_BASE_URL=ws://localhost:9190 npm run dev -- --port 3100` |
-| Frontend starts but script reports "not reachable" | Fixed — the start script now checks both HTTP **and** HTTPS |
-| Container block fails | Install/start Docker (Section 6) |
-| `permission denied` on Docker socket | `sudo usermod -aG docker $USER`, then log in again |
-| Self-signed cert warning in browser | Expected in dev; accept it, use Section 7, or skip the cert |
+| A tool is missing or too old | `./scripts/setup.sh --check` shows what is missing and the exact command |
+| `permission denied` on the Docker socket | the installer added you to the `docker` group — log out and back in once |
+| Docker installed but not running | Linux: `sudo systemctl start docker`, macOS: open Docker Desktop |
+| Port in use | the installer takes the next free one; change it in `deploy/instances/main.env` |
+| AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login` |
+| Instance does not start | `scripts/instance.sh logs --name main`; setup logs in `~/.local/state/mysuricates/setup-logs/` |
+| Settings show "Docker not set up" | not an error — only shell blocks with `container_image` need Docker |
 
 ---
 

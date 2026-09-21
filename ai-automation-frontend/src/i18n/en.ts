@@ -1609,7 +1609,7 @@ export const en = {
   security: {
     warning: 'Security is disabled. All API endpoints are accessible without authentication.',
     authRequired: 'API key required to access the platform.',
-    authHint: 'Security is enabled. Enter the API key shown in the backend server logs to connect. Look for "AUTO-GENERATED API KEY" in the console output.',
+    authHint: 'Security is enabled. Enter the API key of this instance. On the machine running MySuricates, "scripts/instance.sh key" shows it (set up with setup.sh); in a source setup it is in ~/.autotrigger/api-key.',
     invalidKey: 'Invalid API key. Please check and try again.',
     connectionError: 'Could not connect to the server.',
     connect: 'Connect',

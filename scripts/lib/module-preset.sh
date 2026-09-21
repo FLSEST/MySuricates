@@ -22,9 +22,6 @@ else
   MODULE_CATALOG_KEYS=()
   MODULE_CATALOG_FEATURE_KEYS=()
   MODULE_CATALOG_HARDENING_KEYS=()
-  declare -gA MODULE_CATALOG_TIER=() MODULE_CATALOG_MATURITY=() MODULE_CATALOG_DEFAULT=() \
-    MODULE_CATALOG_PROPERTY=() MODULE_CATALOG_RISKS=() MODULE_CATALOG_REQUIRES=() \
-    MODULE_TEXT_NAME=() MODULE_TEXT_DESC=()
 fi
 
 # ---------------------------------------------------------------------------
@@ -45,14 +42,30 @@ module_text_lang() {
 }
 
 # Display name of a module. $1 = key, $2 = language. Unknown key ⇒ the key itself.
+# The generated catalog holds scalars (NAME__key, NAME__lang__key) instead of associative arrays:
+# macOS ships bash 3.2 (3dd32594). These two read them via indirect expansion.
+_module_var_key() { printf '%s' "${1:-}" | tr -c 'A-Za-z0-9_' '_'; }
+
+# Catalog field of a module. $1 = field (TIER, MATURITY, DEFAULT, PROPERTY, RISKS, REQUIRES), $2 = key.
+module_catalog_get() {
+  local name="MODULE_CATALOG_${1:-}__$(_module_var_key "${2:-}")"
+  printf '%s' "${!name-}"
+}
+
+# Display text of a module. $1 = field (NAME, DESC), $2 = language, $3 = key.
+module_text_get() {
+  local name="MODULE_TEXT_${1:-}__$(_module_var_key "${2:-}")__$(_module_var_key "${3:-}")"
+  printf '%s' "${!name-}"
+}
+
 module_text_name() {
-  local value="${MODULE_TEXT_NAME[${2:-en}:${1:-}]:-}"
+  local value; value="$(module_text_get NAME "${2:-en}" "${1:-}")"
   if [ -n "$value" ]; then printf '%s' "$value"; else printf '%s' "${1:-}"; fi
 }
 
 # One-sentence description of a module. $1 = key, $2 = language. Unknown key ⇒ empty.
 module_text_desc() {
-  printf '%s' "${MODULE_TEXT_DESC[${2:-en}:${1:-}]:-}"
+  module_text_get DESC "${2:-en}" "${1:-}"
 }
 
 # Lists the feature modules a preset adds over the previous one, one "  Name — description" per
@@ -63,7 +76,7 @@ module_text_desc() {
 module_preset_modules() {
   local preset="${1:-}" lang="${2:-en}" key tier
   for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
-    tier="${MODULE_CATALOG_TIER[$key]:-}"
+    tier="$(module_catalog_get TIER "$key")"
     case "$preset" in
       core)     if [ "$tier" != "standard" ]; then continue; fi ;;
       research) if [ "$tier" != "research" ]; then continue; fi ;;
@@ -161,6 +174,9 @@ module_preset_update() {
   fi
   tmp="$(mktemp)" || return 1
   awk -v preset="$preset" '
+    # Einrueckung ohne printf-Breite per Stern (%*s): busybox-awk und aeltere BSD-awks (macOS)
+    # kennen sie nicht.
+    function spaces(k,   out) { out = ""; while (k-- > 0) out = out " "; return out }
     function fail(msg) { print "module_preset_update: " msg > "/dev/stderr"; failed = 1; exit 1 }
     { lines[NR] = $0 }
     END {
@@ -223,12 +239,12 @@ module_preset_update() {
         lines[target] = head preset rest
       } else if (mods_n == 1) {
         ind = (mods_child >= 0) ? mods_child : mods_ind + 2
-        insert_at = mods; insert_text = sprintf("%*s%s%s", ind, "", "preset: " preset, eol)
+        insert_at = mods; insert_text = spaces(ind) "preset: " preset eol
       } else if (autom_n == 1) {
         ind = (autom_child >= 0) ? autom_child : autom_ind + 2
         step = ind - autom_ind
         insert_at = autom
-        insert_text = sprintf("%*s%s%s\n%*s%s%s", ind, "", "modules:", eol, ind + step, "", "preset: " preset, eol)
+        insert_text = spaces(ind) "modules:" eol "\n" spaces(ind + step) "preset: " preset eol
       } else {
         append_text = "automation:" eol "\n  modules:" eol "\n    preset: " preset eol
       }
