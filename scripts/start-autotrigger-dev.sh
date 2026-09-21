@@ -467,7 +467,7 @@ print_api_key() {
     key="$(cat "${key_file}")"; src="${key_file}"
     echo "API-Key (beim ersten Öffnen im Browser-Login einfügen):"
   else
-    echo "API-Key: noch nicht gefunden — siehe Backend-Log (${BACKEND_LOG})"
+    echo "API-Key: noch nicht angelegt — das Backend legt ihn beim ersten Start in ${key_file} ab"
     return 0
   fi
   if [[ "${SHOW_KEY}" -eq 1 ]]; then

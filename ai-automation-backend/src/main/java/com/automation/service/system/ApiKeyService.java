@@ -52,6 +52,7 @@ public class ApiKeyService {
                 cachedApiKey = generated;
                 log.warn("========================================");
                 log.warn("  AUTO-GENERATED API KEY: ****{}", generated.substring(generated.length() - 4));
+                log.warn("  Full key: {}", apiKeyFile());
                 log.warn("  Set AUTOMATION_API_KEY env var to use your own.");
                 log.warn("========================================");
             }
@@ -59,8 +60,12 @@ public class ApiKeyService {
         writeApiKeyFile(cachedApiKey);
     }
 
+    private static Path apiKeyFile() {
+        return Path.of(System.getProperty("user.home"), ".autotrigger", "api-key");
+    }
+
     private void writeApiKeyFile(String key) {
-        Path apiKeyFile = Path.of(System.getProperty("user.home"), ".autotrigger", "api-key");
+        Path apiKeyFile = apiKeyFile();
         try {
             if (key == null || key.isBlank()) {
                 Files.deleteIfExists(apiKeyFile);
