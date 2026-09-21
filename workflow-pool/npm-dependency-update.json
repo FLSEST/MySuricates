@@ -17,15 +17,17 @@
     "shell",
     "approval"
   ],
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "MySuricates",
   "model": "opus",
   "effort": "medium",
-  "instructions": "npm-Abhängigkeiten eines Projekts planen und aktualisieren – deterministisch per Shell, KI nur für gescheiterte Major-Updates.\n\nAblauf: isolierter Run-Workspace mit eigenem Branch → npm ci + Baseline-Gates → npm outdated wird in Patch/Minor und Major-Gruppen eingeteilt (Gruppen: @types/x mit x, gleicher Scope, Pflicht-Peers) → Freigabe → Patch/Minor gebündelt (bei Rot halbiert, bis die schuldigen Pakete feststehen) → jede Major-Gruppe einzeln → pro gescheiterter Major-Gruppe ein TODO-Vorschlag mit Migrationshinweis (KI), pro rotem Patch/Minor-Paket einer mit Fehlerauszug (ohne KI) → Bericht.\n\nEin rotes Gate läuft ein zweites Mal, bevor es zählt; solche instabilen Gates nennt der Bericht.\n\nVariablen: frontend_dir (Verzeichnis mit package.json relativ zum Projekt, Default \".\"), gate_scripts (npm-Scripts als Prüfung; nur vorhandene laufen, mindestens eines muss existieren), exclude_packages (Pakete, die nie angefasst werden, durch Komma oder Leerzeichen getrennt).\n\nBetriebsarten über den Freigabe-Schritt: interaktiv (Default) fragt nach dem Plan. Für einen unbeaufsichtigten Lauf (Schedule) im installierten Workflow beim Schritt „Freigabe“ mode auf \"auto\" und auto_answer auf \"Alles ausführen\", \"Nur Patch/Minor\" oder \"Nur Plan\" setzen.\n\nErgebnis: Commits auf dem Run-Branch im Run-Workspace; Push ist dort gesperrt. Der Bericht nennt den git-fetch-Befehl zum Übernehmen. Gate GREEN = alles aktuell, YELLOW = Updates offen. TODO-Vorschläge (autoTodo, Modus approval) bestätigt ein Mensch; ein späterer grüner Lauf schliesst sie.\n\nVoraussetzungen: npm mit package-lock.json (pnpm/yarn werden abgelehnt), git, node, python3. Die Baseline muss grün sein, sonst bricht der Lauf ab – ein Fehler wäre sonst keinem Update zuzuordnen.",
+  "instructions": "npm-Abhängigkeiten eines Projekts planen und aktualisieren – deterministisch per Shell, KI nur für gescheiterte Major-Updates.\n\nAblauf: isolierter Run-Workspace mit eigenem Branch → npm ci + Baseline-Gates → npm outdated wird in Patch/Minor und Major-Gruppen eingeteilt (Gruppen: @types/x mit x, gleicher Scope, Pflicht-Peers) → Freigabe → Patch/Minor gebündelt (bei Rot halbiert, bis die schuldigen Pakete feststehen) → jede Major-Gruppe einzeln → pro gescheiterter Major-Gruppe ein TODO-Vorschlag mit Migrationshinweis (KI), pro rotem Patch/Minor-Paket einer mit Fehlerauszug (ohne KI) → Bericht.\n\nEin rotes Gate läuft ein zweites Mal, bevor es zählt; solche instabilen Gates nennt der Bericht.\n\nVariablen: frontend_dir (Verzeichnis mit package.json relativ zum Projekt, Default \".\"), gate_scripts (npm-Scripts als Prüfung; nur vorhandene laufen, mindestens eines muss existieren), exclude_packages (Pakete, die nie angefasst werden, durch Komma oder Leerzeichen getrennt).\n\nBetriebsarten über den Freigabe-Schritt: interaktiv (Default) fragt nach dem Plan. Für einen unbeaufsichtigten Lauf (Schedule) die Variablen approval_mode auf \"auto\" und approval_answer auf \"Alles ausführen\", \"Nur Patch/Minor\" oder \"Nur Plan\" (Default) setzen – im Zeitplan-Kontext, ohne den Workflow zu ändern.\n\nErgebnis: Commits auf dem Run-Branch im Run-Workspace; Push ist dort gesperrt. Der Bericht nennt den git-fetch-Befehl zum Übernehmen. Gate GREEN = alles aktuell, YELLOW = Updates offen. TODO-Vorschläge (autoTodo, Modus approval) bestätigt ein Mensch; ein späterer grüner Lauf schliesst sie.\n\nVoraussetzungen: npm mit package-lock.json (pnpm/yarn werden abgelehnt), git, node, python3. Die Baseline muss grün sein, sonst bricht der Lauf ab – ein Fehler wäre sonst keinem Update zuzuordnen.",
   "defaultContext": {
     "frontend_dir": ".",
     "gate_scripts": "typecheck lint test build",
-    "exclude_packages": ""
+    "exclude_packages": "",
+    "approval_mode": "ask",
+    "approval_answer": "Nur Plan"
   },
   "metadata": {
     "autoTodo": {
@@ -76,7 +78,8 @@
           "Nur Plan"
         ],
         "variable_name": "update_freigabe",
-        "mode": "ask",
+        "mode": "{{ approval_mode }}",
+        "auto_answer": "{{ approval_answer }}",
         "timeout_minutes": 240
       }
     },
