@@ -300,8 +300,9 @@ tui_input() {
 # tui_run TITEL LOGDATEI BEFEHL… — Ausgabe ins Log; im Terminal Spinner, Dauer und die jeweils
 # letzte Log-Zeile gedimmt. Bei Fehler: die letzten 15 Zeilen und der Pfad zum Log. Rueckgabe = Exit.
 tui_run() {
-  local title="$1" log="$2" start=$SECONDS rc pid i=0 last frame nframes dur
+  local title="$1" log="$2" start=$SECONDS rc pid i=0 last frame nframes dur room
   shift 2
+  room=$((TUI_WIDTH - 16 - ${#title})); [ "$room" -lt 0 ] && room=0   # ${x:0:-n} bricht bash ab
   : > "$log"
   if [ "$TUI_TTY" = 1 ]; then
     "$@" > "$log" 2>&1 < /dev/null &
@@ -310,7 +311,7 @@ tui_run() {
     _tui_cursor off
     while kill -0 "$pid" 2>/dev/null; do
       last="$(tail -n 1 "$log" 2>/dev/null | tr -d '\r' | sed "s/${_TUI_ESC}\[[0-9;?]*[A-Za-z]//g")"
-      last="${last:0:$((TUI_WIDTH - 16 - ${#title}))}"
+      last="${last:0:$room}"
       frame="${T_SPIN:$((i % nframes)):1}"
       dur=$((SECONDS - start))
       printf '\r\033[K  %s%s%s %s  %s%d:%02d%s  %s%s%s' "$C_AMBER" "$frame" "$C_RESET" "$title" \

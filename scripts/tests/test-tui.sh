@@ -65,6 +65,10 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
   check "b means back (rc 2)"                    'printf "%s" "$OUT" | grep "rc=2" >/dev/null'
   OUT="$(pty 'n\n' 'tui_confirm "Go?" y && echo YES || echo NO')"
   check "confirm reads n"                        'printf "%s" "$OUT" | grep NO >/dev/null'
+  # Titel laenger als die Zeile, Log noch leer: die Kuerzung darf nicht negativ werden (Ubuntu-Probe)
+  LONG="node (Node 24.21.0 → /home/someone/.local/share/mysuricates/node/and/more/path)"
+  OUT="$(pty '' "tui_run \"$LONG\" \"$TMP/long.log\" sh -c 'sleep 0.5; echo x'; echo \"rc=\$?\"")"
+  check "long title with empty log still runs"   'printf "%s" "$OUT" | grep "rc=0" >/dev/null && ! printf "%s" "$OUT" | grep "substring" >/dev/null'
 else
   echo "  skip (no usable script command)"
 fi

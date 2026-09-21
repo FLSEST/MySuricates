@@ -120,21 +120,24 @@ existing_instances() { local f; for f in "$INSTANCES_DIR"/*.env; do [ -f "$f" ] 
 
 # --- Schritt 1: Willkommen --------------------------------------------------------------------------
 step_welcome() {
-  local ai="" id st
+  local ai="" id st l_lang l_ai l_time w=0 l
   for id in $(providers_ids); do
     st="$(providers_status | awk -v i="$id" '$1==i{print $2" "$3}')"
     case "$st" in
-      "present logged-in") ai="$ai${C_GREEN}$id $T_OK${C_RESET} " ;;
-      "present logged-out") ai="$ai${C_AMBER}$id ($T_OK)${C_RESET} " ;;
-      *) ai="$ai${C_GREY}$id –${C_RESET} " ;;
+      "present logged-in") ai="$ai${C_GREEN}$id $T_OK${C_RESET}  " ;;
+      "present logged-out") ai="$ai${C_AMBER}$id $T_WARN${C_RESET}  " ;;
+      *) ai="$ai${C_GREY}$id $T_BAD${C_RESET}  " ;;
     esac
   done
+  # Beschriftungen auf gleiche Breite — die Laenge haengt von der Sprache ab
+  l_lang="$(msg header_language)"; l_ai="$(msg header_ai)"; l_time="$(msg header_time)"
+  for l in "$l_lang" "$l_ai" "$l_time"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
   if [ "$TUI_TTY" = 1 ]; then
     tui_header "${C_GREY}$(msg header_setup)${C_RESET}     ${C_BOLD}v$(version)${C_RESET}" \
       "${C_FRAME}$(_tui_repeat "$T_H" 30)${C_RESET}" \
-      "${C_GREY}$(msg header_language)${C_RESET}  $(msg header_language_value)" \
-      "${C_GREY}$(msg header_ai)${C_RESET}        $ai" \
-      "${C_GREY}$(msg header_time)${C_RESET}      $(msg header_time_value 10)"
+      "${C_GREY}${l_lang}$(_tui_repeat ' ' $((w - ${#l_lang} + 2)))${C_RESET}$(msg header_language_value)" \
+      "${C_GREY}${l_ai}$(_tui_repeat ' ' $((w - ${#l_ai} + 2)))${C_RESET}$ai" \
+      "${C_GREY}${l_time}$(_tui_repeat ' ' $((w - ${#l_time} + 2)))${C_RESET}$(msg header_time_value 10)"
   else
     printf 'MySuricates %s v%s\n' "$(msg header_setup)" "$(version)"
   fi
@@ -245,7 +248,7 @@ install_plan() {
         case "$cmd" in *usermod\ -aG\ docker*) DOCKER_SG=1 ;; esac ;;
       download)
         if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "download $tool")"; continue; fi
-        tui_run "$tool ($cmd)" "$LOG_DIR/download-$tool.log" deps_download "$( [ "$tool" = node ] && echo node || echo java )" || rc=1
+        tui_run "$tool" "$LOG_DIR/download-$tool.log" deps_download "$( [ "$tool" = node ] && echo node || echo java )" || rc=1
         [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh" ;;
       manual)
         printf '  %s%s%s %s\n' "$C_AMBER" "$T_WARN" "$C_RESET" "$(msg checks_manual "$cmd")"; rc=1 ;;

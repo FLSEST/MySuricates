@@ -184,9 +184,12 @@ run_phase() {  # name, command, input
   local name="$1" cmd="$2" input="$3" t0=$SECONDS rc
   printf '%b' "$input" | timeout "$PHASE_TIMEOUT" docker exec -i -u probe -w "$CLONE" \
     -e TERM=xterm-256color -e LANG=C.UTF-8 "$NAME" \
-    script -qefc "stty cols 120 rows 40 -echo 2>/dev/null; bash -c '$cmd'" /dev/null \
+    script -qefc "stty cols 120 rows 40 -echo 2>/dev/null; rm -f /tmp/phase.rc; bash -c '$cmd'; echo \$? > /tmp/phase.rc" /dev/null \
     > "$OUT/logs/${name}.log" 2>&1
   rc="${PIPESTATUS[1]}"
+  # Der Exit-Code der Phase selbst — über script/docker exec ging ein Abbruch schon als 0 durch
+  local inner
+  inner="$(docker exec "$NAME" cat /tmp/phase.rc 2>/dev/null)" && [ -n "$inner" ] && rc="$inner"
   printf '%s\t%s\t%s\t%s\n' "$name" "$cmd" "$rc" "$((SECONDS - t0))" >> "$OUT/phases.tsv"
   printf '  Phase %-10s exit=%s  %ss\n' "$name" "$rc" "$((SECONDS - t0))"
   return "$rc"
