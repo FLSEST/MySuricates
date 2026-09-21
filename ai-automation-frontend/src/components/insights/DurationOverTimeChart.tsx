@@ -26,7 +26,7 @@ export function DurationOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
             <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}s`} />
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value: number) => [formatDuration(value * 1000), t.insights.avgDuration]}
+              formatter={(value) => [formatDuration(Number(value ?? 0) * 1000), t.insights.avgDuration]}
             />
             <Line type="monotone" dataKey="duration" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
           </LineChart>
