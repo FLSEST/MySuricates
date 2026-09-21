@@ -197,4 +197,45 @@ class WorkflowAnalyzerTest {
         assertThat(findings).isNotEmpty();
         assertThat(findings.getFirst().severity()).isEqualTo(AnalyzerFinding.Severity.HIGH);
     }
+
+    // --- TODO 41aeeb09: on_no ohne Option, die ablehnt ---
+
+    @Test
+    void onNoOhneAblehnendeOptionIstEinBefund() {
+        var blocks = List.of(block("approval", "freigabe", Map.of(
+                "question", "Weiter?", "options", List.of("Weiter", "Abbrechen"), "on_no", "fail")));
+
+        var findings = analyzer.analyze(blocks, null);
+
+        assertThat(findings).anySatisfy(f -> {
+            assertThat(f.rule()).isEqualTo("on-no-without-reject-option");
+            assertThat(f.severity()).isEqualTo(AnalyzerFinding.Severity.HIGH);
+            assertThat(f.detail()).contains("Abbrechen");
+        });
+    }
+
+    @Test
+    void onNoMitNeinOderRejectOptionsIstKeinBefund() {
+        var blocks = List.of(
+                block("approval", "deutsch", Map.of("options", List.of("Ja", "Nein"), "on_no", "fail")),
+                block("approval", "eigene", Map.of("options", List.of("Weiter", "Abbrechen"),
+                        "reject_options", List.of("Abbrechen"), "on_no", "skip")),
+                block("approval", "vorgabe", Map.of("on_no", "fail")),
+                block("approval", "ohne-on-no", Map.of("options", List.of("A", "B"))));
+
+        assertThat(rules(blocks, null)).doesNotContain("on-no-without-reject-option");
+    }
+
+    @Test
+    void verschachteltesApprovalWirdMitgeprueft() {
+        var inner = Map.<String, Object>of("type", "approval", "name", "je-datei",
+                "config", Map.of("options", List.of("OK", "Stopp"), "on_no", "fail"));
+        var blocks = List.of(block("foreach", "dateien", Map.of("items", "a,b", "blocks", List.of(inner))));
+
+        assertThat(analyzer.analyze(blocks, null)).anySatisfy(f -> {
+            assertThat(f.rule()).isEqualTo("on-no-without-reject-option");
+            assertThat(f.blockIndex()).isZero();
+            assertThat(f.blockName()).isEqualTo("dateien › je-datei");
+        });
+    }
 }
