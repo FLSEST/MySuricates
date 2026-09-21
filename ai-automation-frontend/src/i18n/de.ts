@@ -703,6 +703,9 @@ export const de: TranslationKeys = {
       // Start-/End-Event-Namen
       event: { 'Start': 'Start', 'Ende': 'Ende' },
     },
+    hideSidebar: 'Seitenleiste ausblenden',
+    showSidebar: 'Seitenleiste einblenden',
+    resizeSidebar: 'Breite der Seitenleiste anpassen (Doppelklick setzt zurück)',
     versionsTab: 'Versionen',
     blocksTab: 'Blöcke',
     noVersions: 'Noch keine Versionen vorhanden.',
