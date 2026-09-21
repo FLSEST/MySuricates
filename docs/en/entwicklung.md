@@ -190,6 +190,15 @@ tests genuinely did not execute for some other reason can still look "green" fro
 if you only check it, or a truncated `tail`. What actually matters is the final
 `Results: Tests run: N` line of the whole Maven run, or its exit code.
 
+**`ERROR` lines in a green run:** Many tests exercise failure paths — a mock throws, the code
+catches it and correctly logs it at `ERROR`, stack trace included. A green run therefore writes
+around a hundred `ERROR` lines and several thousand stack-trace lines; none of them is a failure.
+CI therefore redirects each test class's output to
+`target/surefire-reports/<Class>-output.txt` (`-Dmaven.test.redirectTestOutputToFile=true`) and
+uploads that directory as the artifact `backend-surefire-reports` only when the run fails.
+Locally the same option works; it is deliberately not the default in `pom.xml`, because the
+`mysuricates-health-check` workflow greps `target/surefire-reports/*.txt` for `ERROR`.
+
 **Class-size ratchet:** `architecture/SourceSizeRatchetTest` counts the lines of every file under `src/main/java` and fails as soon as a file exceeds 300 lines without being on the test's allowlist — or a listed file grows past its recorded ceiling. The list only moves one way: whoever shrinks a listed class lowers its ceiling; once it drops to ≤300 lines the entry is removed. New files above 300 lines get split, not listed (audit TODO 1e248ab9). No external dependency, plain JUnit.
 
 **Request cost ratchet:** `architecture/RequestCostRatchetTest` measures two **deterministic** costs for the routes the UI hits on every page load (`/todos`, `/workflows`, `/projects`, `/executions`, `/learning/dashboard`, `/search`) and compares them against the `BASELINE` map in the test: the number of SQL statements and the response size in bytes. No milliseconds — wall-clock time on a developer machine depends on host load, JIT warm-up and who currently holds the single SQLite connection, so it would flake. The two pinned costs are reproducible and are exactly the ones that went wrong before: an N+1 turns 3 statements into 33 (`1e465a9e perf(api)`), a fetched TEXT blob turns a small response into a huge one (`443fa57e perf(dashboard)`). Counting goes through a Hibernate `StatementInspector` (`metrics/CountingStatementInspector` → `metrics/SqlStatementCounter`, ThreadLocal, registered in `config/StatementInspectorConfig`); the test clears the persistence context before each measurement, otherwise the request would find the seeded entities in the first-level cache and a lazy N+1 would stay invisible. Like the class-size ratchet the list only moves one way: ceilings drop when a route gets cheaper (the hint test prints the new number). **Several ceilings currently pin a known defect, not a target** — the first run found three N+1 patterns and one unbounded response (TODOs 13d1e2a2, 9db34f3b, a05c9504); they are pinned so the gate is green and nothing gets *worse* while they are fixed. Raising a ceiling needs a reason in the commit message.
