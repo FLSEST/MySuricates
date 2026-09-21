@@ -19,12 +19,18 @@ export function SystemInfoCard() {
         </div>
         {sysInfo && (
           <div className="space-y-2 text-sm">
-            {Object.entries(sysInfo).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-text-secondary capitalize">{key}</span>
-                <span className="text-text font-mono">{value}</span>
-              </div>
-            ))}
+            {Object.entries(sysInfo)
+              // Nur Primitive: `SystemInfo` waechst anderswo, und ein verschachteltes Feld als
+              // React-Kind laesst die ganze Seite abstuerzen ("Objects are not valid as a React
+              // child") — so geschehen, als `rateLimit` als Objekt dazukam (0d1d27a1). Die
+              // Rate-Limit-Werte stehen ohnehin einstellbar in der Ausfuehrungs-Karte.
+              .filter(([, value]) => value !== null && typeof value !== 'object')
+              .map(([key, value]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-text-secondary capitalize">{key}</span>
+                  <span className="text-text font-mono">{String(value)}</span>
+                </div>
+              ))}
           </div>
         )}
         {health && (
