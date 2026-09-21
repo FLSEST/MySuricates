@@ -1,5 +1,13 @@
 # Development
 
+This guide is about working **on** the MySuricates code — building, testing, shipping. If you
+only want to use the platform, start at [GETTING-STARTED.md](GETTING-STARTED.md).
+
+> Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
+> provenance markers: commits of this repository, or items in the accompanying
+> MySuricates instance. They record when and why something came about — from the
+> outside, only the commit can be looked up.
+
 ## Prerequisites
 
 | Tool | Version | Check |

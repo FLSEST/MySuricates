@@ -4,6 +4,11 @@ Praktischer Leitfaden zum Erstellen effektiver Workflows in MySuricates. Umfasst
 
 **Zielgruppe**: KI-Agenten (Claude, Codex) und Entwickler, die Workflows erstellen oder debuggen.
 
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 ---
 
 ## 1. Schnellstart

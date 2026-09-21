@@ -4,6 +4,11 @@ Practical guide for creating effective workflows in MySuricates. Covers all bloc
 
 **Target audience**: AI agents (Claude, Codex) and developers who create or debug workflows.
 
+> Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
+> provenance markers: commits of this repository, or items in the accompanying
+> MySuricates instance. They record when and why something came about — from the
+> outside, only the commit can be looked up.
+
 ---
 
 ## 1. Quick Start

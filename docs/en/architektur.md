@@ -1,5 +1,16 @@
 # Architecture
 
+MySuricates is a self-hosted workflow platform: a Spring Boot backend with a web interface, in
+which processes consist of blocks — some deterministic (shell, branch, loop), some AI calls.
+This page describes its internal structure. For getting started see
+[README.md](../../README.md); for building workflows see
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
+> Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
+> provenance markers: commits of this repository, or items in the accompanying
+> MySuricates instance. They record when and why something came about — from the
+> outside, only the commit can be looked up.
+
 ## System Overview
 
 ```

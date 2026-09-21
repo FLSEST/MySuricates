@@ -1,5 +1,14 @@
 # Entwicklung
 
+Diese Anleitung gilt der Arbeit **am** MySuricates-Code — bauen, testen, ausliefern. Wer die
+Plattform nur benutzen will, findet den Einstieg in
+[GETTING-STARTED.md](GETTING-STARTED.md).
+
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 ## Voraussetzungen
 
 | Tool | Version | Prüfung |

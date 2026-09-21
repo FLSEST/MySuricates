@@ -1,5 +1,14 @@
 # MySuricates — Vision
 
+MySuricates ist eine selbst betriebene Anwendung aus Backend und Web-Oberflaeche, in der
+Arbeitsablaeufe als Ketten von Bloecken laufen. Dieses Dokument beschreibt nicht, was sie heute
+tut — das steht in [README.de.md](../README.de.md) —, sondern wohin sie sich entwickeln soll.
+
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 ## Die Idee
 
 MySuricates verfolgt zwei Ziele:

@@ -1,5 +1,14 @@
 # MySuricates — Vision
 
+MySuricates is a self-hosted application made of a backend and a web interface, in which work
+runs as chains of blocks. This document does not describe what it does today — that is in
+[README.md](../../README.md) — but where it is meant to go.
+
+> Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
+> provenance markers: commits of this repository, or items in the accompanying
+> MySuricates instance. They record when and why something came about — from the
+> outside, only the commit can be looked up.
+
 ## The Idea
 
 MySuricates pursues two goals:

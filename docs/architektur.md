@@ -1,5 +1,16 @@
 # Architektur
 
+MySuricates ist eine selbst betriebene Workflow-Plattform: ein Spring-Boot-Backend mit
+Web-Oberflaeche, in dem Ablaeufe aus Bloecken bestehen — teils deterministisch (Shell,
+Verzweigung, Schleife), teils KI-Aufrufe. Diese Seite beschreibt den inneren Aufbau. Fuer den
+Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
+[WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
+> Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
+> Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
+> Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
+> sich davon nur der Commit.
+
 > Die Abläufe dieser Seite gibt es auch als Diagramme: [docs/diagramme.md](diagramme.md)
 > — Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment.
 
