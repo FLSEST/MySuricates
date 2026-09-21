@@ -142,7 +142,7 @@ Response: 201 Created
 | `while` | `description`, `command`, `condition_command`, `max_iterations?`, `execution_mode?` | Schleife |
 | `retry` | `description`, `command`, `max_retries?`, `delay?`, `exponential_backoff?`, `execution_mode?` | Wiederholung bei Fehler (`delay` in Sekunden) |
 | `switch` | `description`, `expression`, `cases`, `default` | Multi-Way-Branching |
-| `approval` | `description`, `question`, `options?`, `mode?`, `auto_answer?`, `on_no?`, `variable_name?`, `timeout_minutes?` | Warten auf Genehmigung |
+| `approval` | `description`, `question`, `options?`, `reject_options?`, `mode?`, `auto_answer?`, `on_no?`, `variable_name?`, `timeout_minutes?` | Warten auf Genehmigung |
 | `sub-workflow` | `description`, `workflow_id` | Verschachtelter Workflow (max 5 Ebenen) |
 | `skill-capability` | `description`, `capability`, `input?`, `params?`, `allow_writes?` | Skill-Ausführung (ohne `allow_writes` nur lesend) |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
@@ -274,8 +274,9 @@ Headers: X-API-Key: <key>
 | Fortsetzen | `POST /api/v1/executions/{id}/resume` |
 | Abbrechen | `POST /api/v1/executions/{id}/cancel` |
 | Wiederholen | `POST /api/v1/executions/{id}/retry` |
-| Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}` |
-| Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` |
+| Genehmigen | `POST /api/v1/executions/{id}/approve` — Body: `{"answer": "Yes"}`; bei einem Approval nur eine der angebotenen `options`, sonst 400 |
+| Genehmigung prüfen | `GET /api/v1/executions/{id}/approval` — mit `rejectOptions` (die Optionen, die `on_no` auslösen) |
+| Alle wartenden Freigaben | `GET /api/v1/executions/pending-input` — Approvals und Human-Input über alle Läufe, die ältesten zuerst |
 | Live-Output nachladen | `GET /api/v1/executions/{id}/live-log?afterSeq=-1` — gepufferte Zeilen laufender/kürzlich beendeter Runs |
 
 ### 8. Workflow-Versionen

@@ -471,4 +471,17 @@ class WorkflowRunRepositoryTest {
 
         assertThat(broken.stream().map(r -> r.getWorkflow().getId())).doesNotContain(workflowA.getId());
     }
+
+    @Test
+    void findWorkflowRefsByRunIds_returnsIdWorkflowAndRecordedName_onlyForAskedRuns() {
+        WorkflowRun waiting = run(workflowA, RunStatus.RUNNING, Instant.now());
+        run(workflowB, RunStatus.RUNNING, Instant.now());
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Object[]> rows = runRepository.findWorkflowRefsByRunIds(List.of(waiting.getId(), "no-such-run"));
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0)).containsExactly(waiting.getId(), workflowA.getId(), workflowA.getName());
+    }
 }

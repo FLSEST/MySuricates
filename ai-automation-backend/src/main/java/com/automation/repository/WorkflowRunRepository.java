@@ -104,6 +104,13 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            "LIMIT 5")
     List<Object[]> findTopWorkflows();
 
+    /**
+     * Lauf-Id, Workflow-Id und der beim Start festgehaltene Workflow-Name je Lauf — ohne Schritte und
+     * ohne Join auf den Workflow, in einer Abfrage. Für die Liste wartender Freigaben, die jede Seite pollt.
+     */
+    @Query("SELECT wr.id, wr.workflow.id, wr.workflowName FROM WorkflowRun wr WHERE wr.id IN :ids")
+    List<Object[]> findWorkflowRefsByRunIds(@Param("ids") Collection<String> ids);
+
     List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
 
     long countByStatusAndStartedAtAfter(RunStatus status, Instant since);

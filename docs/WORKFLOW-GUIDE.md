@@ -442,17 +442,18 @@ Wiederholt einen Befehl bis eine Bedingung erfüllt ist oder die maximale Iterat
 
 ### `approval` — Menschliche Freigabe
 
-Pausiert die Ausführung und wartet auf menschliche Freigabe via WebSocket.
+Pausiert die Ausführung und wartet auf menschliche Freigabe. Beantwortet wird im Dialog auf der Run-Seite oder auf der Seite **Freigaben** (`/approvals`). Deren Eintrag erscheint in der Seitenleiste und pulsiert, solange ein Lauf wartet.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `question` | string | `"Approval required"` | Freigabe-Frage für den Benutzer |
-| `options` | list | `["Yes", "Yes always", "No"]` | Verfügbare Antwortmöglichkeiten |
+| `question` | string | `"Approval required"` | Freigabe-Frage (Markdown). Platzhalter wie `{{ block.X.output }}` werden vor der Anzeige aufgelöst |
+| `options` | list | `["Yes", "Yes always", "No"]` | Verfügbare Antwortmöglichkeiten. `POST /approve` nimmt nur diese an (Groß-/Kleinschreibung egal), sonst 400 |
+| `reject_options` | list | `["No", "Nein"]` | Welche Antworten eine Ablehnung sind und `on_no` auslösen (Groß-/Kleinschreibung egal) |
 | `variable_name` | string | `"approval_answer"` | Kontext-Variable für die Antwort |
 | `timeout_minutes` | int | 30 | Wartezeit |
 | `mode` | string | `"ask"` | `"ask"` (interaktiv) oder `"auto"` (nutzt `auto_answer`) |
 | `auto_answer` | string | — | Automatische Antwort wenn `mode` = `"auto"` |
-| `on_no` | string | `"continue"` | Verhalten bei "No": `"continue"` (weiter, Status COMPLETED), `"fail"` (FAILED), oder `"skip"` (SKIPPED) |
+| `on_no` | string | `"continue"` | Verhalten bei einer Ablehnung (siehe `reject_options`): `"continue"` (weiter, Status COMPLETED), `"fail"` (FAILED), oder `"skip"` (SKIPPED) |
 
 ```json
 {
@@ -460,12 +461,15 @@ Pausiert die Ausführung und wartet auf menschliche Freigabe via WebSocket.
   "config": {
     "question": "## Ergebnis\n\n{{ previous_output }}\n\nFortfahren?",
     "options": ["Yes", "No", "Abort"],
+    "reject_options": ["No", "Abort"],
     "variable_name": "pr_decision",
     "timeout_minutes": 60,
     "on_no": "fail"
   }
 }
 ```
+
+**Eigene Optionen**: Ohne `reject_options` gelten nur „No“ und „Nein“ als Ablehnung. Wer andere Ablehnungen anbietet (im Beispiel „Abort“), muss sie in `reject_options` nennen. Sonst läuft der Workflow trotz `on_no` weiter.
 
 **"Yes always"**: Wenn der Benutzer "Yes always" wählt, wird die Antwort für diese Frage für den Rest des Runs gemerkt — nachfolgende Approval-Blöcke mit derselben Frage werden automatisch beantwortet.
 
@@ -481,7 +485,7 @@ Pausiert die Ausführung um Freitext-Eingaben vom Benutzer zu sammeln.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `prompt` | string | `"Please provide input:"` | Frage an den Benutzer |
+| `prompt` | string | `"Please provide input:"` | Frage an den Benutzer (Platzhalter werden aufgelöst) |
 | `input_type` | string | `"text"` | `"text"` oder `"select"` |
 | `variable_name` | string | `"user_input"` | Kontext-Variable für die Eingabe |
 | `options` | list | `[]` | Auswahlmöglichkeiten (für `select`-Typ) |

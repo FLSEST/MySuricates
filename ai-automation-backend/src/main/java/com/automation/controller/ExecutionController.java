@@ -6,6 +6,8 @@ import com.automation.dto.request.ExecuteCommandRequest;
 import com.automation.service.todo.PendingTodoApprovalService;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
+import com.automation.service.execution.PendingInputService;
+import com.automation.dto.response.PendingInputResponse;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
@@ -18,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -31,6 +34,7 @@ public class ExecutionController {
     private final PendingTodoApprovalService pendingTodoApprovalService;
     private final RunDeletionService runDeletionService;
     private final RunLiveLogService runLiveLogService;
+    private final PendingInputService pendingInputService;
 
     @GetMapping
     public PageResponse<WorkflowRunListItemResponse> listExecutions(
@@ -42,6 +46,12 @@ public class ExecutionController {
             @RequestParam(required = false) String search) {
 
         return executionQueryService.listExecutionResponses(page, size, status, workflowId, projectId, search);
+    }
+
+    /** Alle Läufe, die gerade auf eine Antwort warten — Approvals und Human-Input, die ältesten zuerst. */
+    @GetMapping("/pending-input")
+    public List<PendingInputResponse> listPendingInputs() {
+        return pendingInputService.listPendingInputs();
     }
 
     @GetMapping("/{id}")
@@ -99,6 +109,7 @@ public class ExecutionController {
         return ResponseEntity.ok(executionCommandService.resumeFromStep(id));
     }
 
+    /** Beantwortet die offene Frage des Laufs. 400, wenn ein Approval die Antwort nicht als Option anbietet. */
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,
@@ -118,6 +129,7 @@ public class ExecutionController {
         response.put("blockId", request.getBlockId());
         response.put("question", request.getQuestion());
         response.put("options", request.getOptions());
+        response.put("rejectOptions", request.getRejectOptions());
         response.put("stepIndex", request.getStepIndex());
         response.put("type", request.getType());
 

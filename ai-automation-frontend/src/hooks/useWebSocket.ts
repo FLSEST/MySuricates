@@ -121,6 +121,7 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
                 blockId: data.blockId,
                 question: data.question,
                 options: data.options,
+                rejectOptions: data.rejectOptions,
                 stepIndex: data.stepIndex,
               });
             } else if (isApprovalResolved(data)) {
