@@ -111,3 +111,41 @@ M_done_manage="Start / stop:"
 M_done_change="Change:      "
 M_done_not_started="configured, not started yet"
 M_done_key_cmd="Full API key:"
+
+# Help (--help) and argument errors
+M_help="MySuricates setup — from a bare machine to the login in one pass.
+
+  ./scripts/setup.sh                 in a terminal: guided, step by step
+  ./scripts/setup.sh --yes           no questions: defaults, install missing tools, start
+  ./scripts/setup.sh --check         only check and show the plan (exit 1 if something is missing)
+
+  --mode one|staged            one instance (default) or Dev · Test · Prod
+  --runtime container|host     in a container (default, needs only Docker) or on this machine
+  --preset core|research|full  modules (default core); --modules a,b adds single modules
+  --provider claude|codex|pi   default AI provider (default: the first one logged in)
+  --port N                     port of the instance (default 9090, busy ports are skipped)
+  --bind ADDR                  address (default 127.0.0.1; 0.0.0.0 = from the network, VPN in front)
+  --projects DIR               projects folder for the container (default: the folder above the clone)
+  --docker-socket              container: allow shell blocks with container_image (full Docker control)
+  --name NAME                  name of the instance (default main)
+  --lang de                    Deutsch (default English)
+  --reconfigure                rewrite an existing instance file
+  --preset core --force        in an existing setup change only the preset
+  --dry-run                    install, build and start nothing — only show and write the files
+  --show-key                   show the full API key at the end (default: masked)
+  --from-source                for contributors: source setup with Vite (docs/entwicklung.md)
+  --install / --start          older spelling: install without questions / start at the end
+
+Without a terminal and without --yes/--install/--start it only checks. Every instance is a file
+deploy/instances/<name>.env; start, stop and inspect it with scripts/instance.sh.
+Everything else (hardening, ui-editable, AUTOMATION_… settings) goes into that file."
+M_err_option="Unknown option: %s (see --help)"
+M_err_preset="Unknown preset: %s (allowed: %s)"
+M_err_force="--force only works together with --preset <%s> (see --help)"
+M_err_mode="--mode one|staged, not '%s'"
+M_err_runtime="--runtime container|host, not '%s'"
+M_err_name="--name only from a-z, 0-9 and -"
+M_err_bind="--bind needs an IP address"
+M_err_port="--port needs a number"
+M_err_provider="Unknown provider: %s (known: %s)"
+M_err_module="Unknown module: %s"

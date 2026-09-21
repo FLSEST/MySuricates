@@ -110,3 +110,41 @@ M_done_manage="Start / Stopp:"
 M_done_change="Ändern:       "
 M_done_not_started="eingerichtet, noch nicht gestartet"
 M_done_key_cmd="API-Key ganz:  "
+
+# Hilfe (--help) und Fehler in den Argumenten
+M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in einem Durchgang.
+
+  ./scripts/setup.sh                 im Terminal: geführt, Schritt für Schritt
+  ./scripts/setup.sh --yes           ohne Rückfragen: Defaults, fehlende Werkzeuge installieren, starten
+  ./scripts/setup.sh --check         nur prüfen und den Plan zeigen (Exit 1, wenn etwas fehlt)
+
+  --mode one|staged            eine Instanz (Default) oder Dev · Test · Prod
+  --runtime container|host     im Container (Default, nur Docker nötig) oder auf diesem Rechner
+  --preset core|research|full  Module (Default core); --modules a,b nimmt einzelne Module dazu
+  --provider claude|codex|pi   Standard-KI-Anbieter (Default: der erste angemeldete)
+  --port N                     Port der Instanz (Default 9090, belegte werden übersprungen)
+  --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = aus dem Netz, VPN davor)
+  --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
+  --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)
+  --name NAME                  Name der Instanz (Default main)
+  --lang de                    Deutsch (Default Englisch)
+  --reconfigure                vorhandene Instanz-Datei neu schreiben
+  --preset core --force        in einer vorhandenen Einrichtung nur das Preset ändern
+  --dry-run                    nichts installieren, bauen oder starten — nur zeigen und Dateien schreiben
+  --show-key                   API-Key am Ende vollständig zeigen (Default: maskiert)
+  --from-source                für Mitwirkende: Quellcode-Setup mit Vite (docs/entwicklung.md)
+  --install / --start          ältere Schreibweise: ohne Rückfragen installieren bzw. am Ende starten
+
+Ohne Terminal und ohne --yes/--install/--start wird nur geprüft. Jede Instanz ist eine Datei
+deploy/instances/<name>.env; starten, stoppen und ansehen mit scripts/instance.sh.
+Alles Weitere (Härtung, ui-editable, AUTOMATION_…-Einstellungen) gehört in diese Datei."
+M_err_option="Unbekannte Option: %s (siehe --help)"
+M_err_preset="Unbekanntes Preset: %s (erlaubt: %s)"
+M_err_force="--force gilt nur zusammen mit --preset <%s> (siehe --help)"
+M_err_mode="--mode one|staged, nicht '%s'"
+M_err_runtime="--runtime container|host, nicht '%s'"
+M_err_name="--name nur aus a-z, 0-9 und -"
+M_err_bind="--bind braucht eine IP-Adresse"
+M_err_port="--port braucht eine Zahl"
+M_err_provider="Unbekannter Anbieter: %s (bekannt: %s)"
+M_err_module="Unbekanntes Modul: %s"

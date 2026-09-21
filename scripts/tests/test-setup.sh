@@ -46,6 +46,9 @@ check "unknown preset exits 2"                          '[ "$(run --preset every
 check "--force without --preset exits 2 and says why"   '[ "$(run --force)" = 2 ] && out | grep -- "--preset" >/dev/null'
 check "unknown runtime exits 2"                         '[ "$(run --runtime moon)" = 2 ]'
 check "unknown module exits 2"                          '[ "$(run --yes --dry-run --modules nope)" = 2 ] && out | grep nope >/dev/null'
+check "--help is English by default"                    'bash "$SETUP" --help | sed -n 1p | grep "from a bare machine" >/dev/null'
+check "--help --lang de is German"                      'bash "$SETUP" --help --lang de | sed -n 1p | grep "nackten Maschine" >/dev/null'
+check "argument errors follow the language"             '[ "$(run --lang de --mode x)" = 2 ] && out | grep "nicht" >/dev/null && [ "$(run --mode x)" = 2 ] && out | grep "not" >/dev/null'
 
 echo "2) check only (no terminal, no --yes): nothing is written"
 check "all present → exit 0"                            '[ "$(run --runtime host)" = 0 ] && [ ! -e "$INST/main.env" ]'
@@ -65,6 +68,8 @@ rm -rf "$INST"
 check "--yes --dry-run → container"                     '[ "$(run --yes --dry-run)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = container ]'
 check "projects: folder above the clone"                '[ "$(val main MYSURICATES_PROJECTS)" = "$(cd "$HERE/../../.." && pwd)" ]'
 check "docker socket off by default"                    '[ "$(val main MYSURICATES_DOCKER_SOCKET)" = 0 ]'
+rm -rf "$INST"
+check "--docker-socket mounts it on request"            '[ "$(run --yes --dry-run --docker-socket)" = 0 ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ]'
 
 echo "5) staged — Dev · Test · Prod"
 rm -rf "$INST"

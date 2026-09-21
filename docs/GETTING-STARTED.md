@@ -55,7 +55,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
 - **Ports:** Default 9090, belegte Ports werden übersprungen. Beim Container zusätzlich der
   Projektordner, den die Instanz sieht (Default: der Ordner über dem Klon, nie das ganze Home).
 
-Ohne Rückfragen, z. B. für Skripte: jede Wahl gibt es als Flag.
+Ohne Rückfragen, z. B. für Skripte: die Entscheidungen der Schritte gibt es als Flag (`--help` listet
+sie); Härtung, ui-editable und weitere Einstellungen stehen in der Instanz-Datei (Abschnitt 4).
 
 ```bash
 ./scripts/setup.sh --yes                                   # Defaults: Container, Standard, Port 9090
@@ -111,8 +112,8 @@ Oder direkt die Datei `deploy/instances/main.env` bearbeiten und `scripts/instan
 ausführen:
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
-- `MYSURICATES_DOCKER_SOCKET=1` — erlaubt Shell-Blöcke mit `container_image`, gibt der Instanz aber
-  volle Kontrolle über Docker auf dem Rechner
+- `MYSURICATES_DOCKER_SOCKET=1` (oder `setup.sh --docker-socket`) — erlaubt Shell-Blöcke mit
+  `container_image`, gibt der Instanz aber volle Kontrolle über Docker auf dem Rechner
 - jede `AUTOMATION_…`-Zeile geht unverändert an die Instanz, z. B. `AUTOMATION_MODULES_WEBHOOKS=true`
   oder `AUTOMATION_AI_DEFAULT_PROVIDER=CODEX`
 

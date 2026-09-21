@@ -8,6 +8,18 @@ LIB="$HERE/../lib"; DIR="$LIB/i18n"
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi; }
 keys() { grep -oE '^M_[a-z0-9_]+=' "$1" | sed 's/=$//' | sort -u; }
+# Nur Kommentare und M_name="Wert"; ein Wert darf ueber mehrere Zeilen gehen (Hilfe-Text), enthaelt
+# aber nie ", $ oder ` — die Datei wird per source geladen, ein $(…) darin liefe mit.
+wellformed() {
+  awk '
+    !/^#/ && /[$`]/ { bad = 1 }
+    inq { if ($0 ~ /^[^"]*"$/) inq = 0; else if ($0 ~ /"/) bad = 1; next }
+    /^(#.*)?$/ { next }
+    /^M_[a-z0-9_]+="[^"]*"$/ { next }
+    /^M_[a-z0-9_]+="[^"]*$/ { inq = 1; next }
+    { bad = 1 }
+    END { exit (bad || inq) }' "$1"
+}
 run() { ( I18N_DIR="${I18N_DIR:-$DIR}"; export I18N_DIR; . "$LIB/i18n.sh"; eval "$1" ); }
 
 echo "1) language files"
@@ -15,10 +27,17 @@ check "English base exists"                    '[ -f "$DIR/en.sh" ]'
 check "at least two languages"                 '[ "$(run i18n_languages | wc -l)" -ge 2 ]'
 for f in "$DIR"/*.sh; do
   l="$(basename "$f" .sh)"
-  check "$l: only M_ assignments and comments"  '! grep -vE "^(#.*|M_[a-z0-9_]+=\"[^\"]*\"|)$" "$f" | grep . >/dev/null'
+  check "$l: only M_ assignments and comments"  'wellformed "$f"'
   check "$l: parses (bash -n)"                  'bash -n "$f"'
   check "$l: no key outside the English base"   '[ -z "$(comm -13 <(keys "$DIR/en.sh") <(keys "$f"))" ]'
 done
+
+T="$(mktemp -d)"
+printf 'M_a="x $(id)"\n' > "$T/sub.sh"; printf 'M_a="one\ntwo"\n' > "$T/multi.sh"; printf 'M_a="open\n' > "$T/open.sh"
+printf 'echo hi\n' > "$T/cmd.sh"
+check "format check rejects \$(…), code and open quotes" '! wellformed "$T/sub.sh" && ! wellformed "$T/cmd.sh" && ! wellformed "$T/open.sh"'
+check "format check accepts multi-line values"  'wellformed "$T/multi.sh"'
+rm -rf "$T"
 
 echo "2) lookup"
 check "English by default"                     '[ "$(run "i18n_load; msg step_mode")" = "Mode" ]'

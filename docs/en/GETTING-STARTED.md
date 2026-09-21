@@ -53,7 +53,8 @@ Done. `b` goes one step back, `q` quits.
 - **Ports:** default 9090, busy ports are skipped. For the container also the projects folder the
   instance sees (default: the folder above the clone, never your whole home).
 
-Without questions, e.g. for scripts: every choice exists as a flag.
+Without questions, e.g. for scripts: the choices of the steps exist as flags (`--help` lists them);
+hardening, ui-editable and other settings go into the instance file (section 4).
 
 ```bash
 ./scripts/setup.sh --yes                                   # defaults: container, Standard, port 9090
@@ -107,8 +108,8 @@ Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provid
 `deploy/instances/main.env` and run `scripts/instance.sh up --name main`:
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
-- `MYSURICATES_DOCKER_SOCKET=1` — allows shell blocks with `container_image`, but gives the instance
-  full control over Docker on the machine
+- `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
+  `container_image`, but gives the instance full control over Docker on the machine
 - every `AUTOMATION_…` line reaches the instance unchanged, e.g. `AUTOMATION_MODULES_WEBHOOKS=true`
   or `AUTOMATION_AI_DEFAULT_PROVIDER=CODEX`
 

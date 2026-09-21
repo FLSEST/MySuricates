@@ -1,26 +1,7 @@
 #!/usr/bin/env bash
 #
 # MySuricates — Installer. Fuehrt in einem Durchgang von der nackten Maschine bis zum Login.
-#
-#   ./scripts/setup.sh                     # im Terminal: gefuehrt, Schritt fuer Schritt
-#   ./scripts/setup.sh --yes               # ohne Rueckfragen: Defaults, fehlende Werkzeuge installieren, starten
-#   ./scripts/setup.sh --check             # nur pruefen und den Plan zeigen (Exit 1, wenn etwas fehlt)
-#
-#   --mode one|staged            eine Instanz (Default) oder Dev · Test · Prod
-#   --runtime container|host     Container (Default, nur Docker noetig) oder direkt auf diesem Rechner
-#   --preset core|research|full  Module (Standard = core); --modules a,b fuer einzelne Module dazu
-#   --provider claude|codex|pi   Standard-KI-Anbieter (Default: der erste angemeldete)
-#   --port N                     Port der Instanz (Default 9090)
-#   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = auch aus dem Netz — VPN davor)
-#   --projects DIR               Projektordner fuer den Container (Default: Ordner ueber dem Klon)
-#   --name NAME                  Name der Instanz (Default main)
-#   --lang de                    Deutsch (Default Englisch)
-#   --reconfigure                vorhandene Instanz-Datei neu schreiben
-#   --preset core --force        in einer vorhandenen Einrichtung nur das Preset aendern
-#   --dry-run                    nichts installieren, bauen oder starten — nur zeigen und Dateien schreiben
-#   --show-key                   API-Key am Ende vollstaendig zeigen (Default: maskiert)
-#   --from-source                fuer Mitwirkende: Quellcode-Setup mit Vite (docs/entwicklung.md)
-#   --install / --start          aeltere Schreibweise: ohne Rueckfragen installieren bzw. am Ende starten
+# Flags und Beispiele: ./scripts/setup.sh --help (Text in scripts/lib/i18n/<sprache>.sh, M_help).
 #
 # Ohne Terminal und ohne --yes/--install/--start wird nur geprueft. Jede Instanz landet als Datei
 # in deploy/instances/<name>.env; starten, stoppen und ansehen danach mit scripts/instance.sh.
@@ -46,7 +27,15 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # --- Flags ------------------------------------------------------------------------------------------
 MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
+HELP=0; SOCKET_FLAG=0
 die() { echo "setup.sh: $*" >&2; exit 2; }
+_prev=""
+for _a in "$@"; do
+  [ "$_prev" = --lang ] && LANG_OPT="$_a"
+  case "$_a" in --lang=*) LANG_OPT="${_a#*=}" ;; esac
+  _prev="$_a"
+done
+i18n_load "$LANG_OPT"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --mode) MODE="${2:-}"; shift ;;          --mode=*) MODE="${1#*=}" ;;
@@ -68,27 +57,28 @@ while [ "$#" -gt 0 ]; do
     --start) START=1 ;;
     --force) FORCE=1 ;;
     --reconfigure) RECONF=1 ;;
-    -h|--help) sed -n '3,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "Unbekannte Option: $1 (siehe --help)" ;;
+    --docker-socket) SOCKET_FLAG=1 ;;
+    -h|--help) HELP=1 ;;
+    *) die "$(msg err_option "$1")" ;;
   esac
   shift
 done
-[ -z "$PRESET" ] || module_preset_valid "$PRESET" || die "Unbekanntes Preset: $PRESET (erlaubt: $MODULE_PRESETS)"
-[ "$FORCE" = 0 ] || [ -n "$PRESET" ] || die "--force gilt nur zusammen mit --preset <${MODULE_PRESETS// /|}> (siehe --help)"
-case "$MODE" in ""|one|staged) ;; *) die "--mode one|staged, nicht '$MODE'" ;; esac
-case "$RUNTIME" in ""|container|host) ;; *) die "--runtime container|host, nicht '$RUNTIME'" ;; esac
-case "$NAME" in *[!a-z0-9-]*|"") die "--name nur aus a-z, 0-9 und -" ;; esac
-case "$BIND" in *[!0-9.:a-fA-F]*|"") die "--bind braucht eine IP-Adresse" ;; esac
-[ -z "$PORT" ] || case "$PORT" in *[!0-9]*) die "--port braucht eine Zahl" ;; esac
+if [ "$HELP" = 1 ]; then printf '%s\n' "$(msg help)"; exit 0; fi
+[ -z "$PRESET" ] || module_preset_valid "$PRESET" || die "$(msg err_preset "$PRESET" "$MODULE_PRESETS")"
+[ "$FORCE" = 0 ] || [ -n "$PRESET" ] || die "$(msg err_force "${MODULE_PRESETS// /|}")"
+case "$MODE" in ""|one|staged) ;; *) die "$(msg err_mode "$MODE")" ;; esac
+case "$RUNTIME" in ""|container|host) ;; *) die "$(msg err_runtime "$RUNTIME")" ;; esac
+case "$NAME" in *[!a-z0-9-]*|"") die "$(msg err_name)" ;; esac
+case "$BIND" in *[!0-9.:a-fA-F]*|"") die "$(msg err_bind)" ;; esac
+[ -z "$PORT" ] || case "$PORT" in *[!0-9]*) die "$(msg err_port)" ;; esac
 if [ -n "$PROVIDER" ]; then
   PROVIDER="$(printf '%s' "$PROVIDER" | tr 'A-Z' 'a-z')"
-  providers_ids | grep -x "$PROVIDER" >/dev/null || die "Unbekannter Anbieter: $PROVIDER (bekannt: $(providers_ids | tr '\n' ' '))"
+  providers_ids | grep -x "$PROVIDER" >/dev/null || die "$(msg err_provider "$PROVIDER" "$(providers_ids | tr '\n' ' ')")"
 fi
 for m in $(printf '%s' "$MODULES" | tr ',' ' '); do
-  printf '%s\n' "${MODULE_CATALOG_FEATURE_KEYS[@]}" | grep -x "$m" >/dev/null || die "Unbekanntes Modul: $m"
+  printf '%s\n' "${MODULE_CATALOG_FEATURE_KEYS[@]}" | grep -x "$m" >/dev/null || die "$(msg err_module "$m")"
 done
 
-i18n_load "$LANG_OPT"
 tui_init
 INTERACTIVE=0; [ "$TUI_TTY" = 1 ] && [ "$YES" = 0 ] && INTERACTIVE=1
 # Ohne Terminal und ohne Auftrag: nur pruefen — kein unbeabsichtigtes Installieren aus Pipes und CI
@@ -500,7 +490,7 @@ from_source() {
 # --- Ablauf -----------------------------------------------------------------------------------------
 PRESET_FLAG="$PRESET"
 [ "$FROM_SOURCE" = 1 ] && from_source
-SOCKET=0; CUSTOM_LINES=""
+SOCKET="$SOCKET_FLAG"; CUSTOM_LINES=""
 step_welcome
 FLOW=(step_mode step_checks step_modules step_ai step_ports step_build step_done)
 i=0
