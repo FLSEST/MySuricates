@@ -28,7 +28,7 @@ export function TokenBreakdownChart({ input, output }: { input: number; output: 
             </Pie>
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value: number) => [formatTokens(value)]}
+              formatter={(value) => [formatTokens(Number(value ?? 0))]}
             />
           </PieChart>
         </ResponsiveContainer>
