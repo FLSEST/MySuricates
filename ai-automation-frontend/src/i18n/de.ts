@@ -1995,6 +1995,7 @@ export const de: TranslationKeys = {
     degraded: 'Eingeschränkt',
     down: 'Nicht erreichbar',
     dockerOffline: 'Docker offline',
+    dockerNotConfigured: 'nicht eingerichtet',
     databaseDown: 'DB Fehler',
   },
   factory: {

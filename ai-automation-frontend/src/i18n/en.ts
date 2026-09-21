@@ -1998,6 +1998,7 @@ export const en = {
     degraded: 'Degraded',
     down: 'Down',
     dockerOffline: 'Docker offline',
+    dockerNotConfigured: 'not set up',
     databaseDown: 'DB error',
   },
   factory: {

@@ -1,5 +1,6 @@
 package com.automation.service.tray;
 
+import com.automation.service.project.DockerExpectation;
 import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
@@ -7,8 +8,6 @@ import com.automation.service.system.SystemIdentityService;
 import com.automation.service.tray.SystemTrayService.IconColor;
 import com.automation.service.tray.SystemTrayService.TrayState;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.PingCmd;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,19 +34,16 @@ class SystemTrayServiceTest {
     private WorkflowExecutionRegistry executionRegistry;
 
     @Mock
-    private DockerClient dockerClient;
-
-    @Mock
-    private PingCmd pingCmd;
-
-    @Mock
     private SystemIdentityService systemIdentity;
+
+    @Mock
+    private DockerExpectation dockerExpectation;
 
     private SystemTrayService service;
 
     @BeforeEach
     void setUp() {
-        service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerClient, systemIdentity);
+        service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerExpectation, systemIdentity);
     }
 
     @Test
@@ -56,7 +52,7 @@ class SystemTrayServiceTest {
         when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(10L);
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(1L);
         when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
-        when(dockerClient.pingCmd()).thenReturn(pingCmd);
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.UP);
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
         when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
 
@@ -75,13 +71,27 @@ class SystemTrayServiceTest {
         when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
         when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
-        when(dockerClient.pingCmd()).thenThrow(new RuntimeException("Connection refused"));
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.DOWN);
         when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
         when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
 
         TrayState state = service.collectStatus();
 
         assertThat(state.dockerOk()).isFalse();
+    }
+
+    @Test
+    void collectStatus_dockerNotConfiguredIsNoWarning() {
+        // a0e85182: ohne eingerichtetes Docker bleibt das Tray-Icon gruen
+        when(executionRegistry.getActiveRunCount()).thenReturn(0);
+        when(runRepository.countByStartedAtAfter(any(Instant.class))).thenReturn(0L);
+        when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
+        when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
+        when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
+        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
+        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
+
+        assertThat(service.collectStatus().dockerOk()).isTrue();
     }
 
     @Test
