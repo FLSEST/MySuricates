@@ -4,7 +4,7 @@
 #
 # Prüft alle Voraussetzungen für den From-Source-Betrieb auf dem Host,
 # nennt für Fehlendes die passenden Install-Befehle und bereitet das Repo
-# zum Start vor (Git-Hooks, Frontend-Deps, Backend-Vorkompilierung).
+# zum Start vor (Git-Hooks, Frontend-Deps per npm ci, Backend-JAR, das der Start dann nutzt).
 #
 # Bewusst KEINE Magie: ohne --install wird nichts installiert, nur geprüft
 # und angeleitet. Greift nie auf die SQLite-DB oder die REST-API zu.
@@ -127,6 +127,12 @@ hint_for() {
     git:pacman) echo "sudo pacman -S --noconfirm git" ;;
     git:*)      echo "git installieren" ;;
 
+    python3:apt)    echo "sudo apt-get install -y python3" ;;
+    python3:dnf)    echo "sudo dnf install -y python3" ;;
+    python3:pacman) echo "sudo pacman -S --noconfirm python" ;;
+    python3:zypper) echo "sudo zypper install -y python3" ;;
+    python3:*)      echo "Python 3 installieren — https://www.python.org/downloads/" ;;
+
     curl:apt)    echo "sudo apt-get install -y curl" ;;
     curl:dnf)    echo "sudo dnf install -y curl" ;;
     curl:pacman) echo "sudo pacman -S --noconfirm curl" ;;
@@ -150,6 +156,7 @@ apt_install_for() {
     node)   echo "curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs" ;;
     git)    echo "sudo apt-get install -y git" ;;
     curl)   echo "sudo apt-get install -y curl" ;;
+    python3) echo "sudo apt-get install -y python3" ;;
     *) echo "" ;;
   esac
 }
@@ -183,6 +190,9 @@ if have git; then ok "git $(git --version | awk '{print $3}')"; else need_build 
 # --- curl ---
 if have curl; then ok "curl vorhanden"; else need_build curl "curl fehlt"; fi
 
+# --- python3 (der Dev-Starter verlangt es: Runtime-Vorbereitung, API-Key-Anzeige) ---
+if have python3; then ok "python3 $(python3 -c 'import platform; print(platform.python_version())' 2>/dev/null)"; else need_build python3 "python3 fehlt (braucht scripts/start-autotrigger-dev.sh)"; fi
+
 # --- Java 21+ ---
 if have java; then
   JAVA_VER="$(java -version 2>&1 | awk -F'"' '/version/{print $2; exit}')"
@@ -201,14 +211,12 @@ fi
 # Mit Wrapper ist System-Maven NICHT erforderlich (mvnw lädt Maven selbst, nur Java + curl nötig).
 # -B + ANSI-Strip beim Parsen: Maven 3.8+ färbt die Versionsausgabe ein.
 if [ -x "$BACKEND_DIR/mvnw" ]; then
-  MVN_CMD="$BACKEND_DIR/mvnw"
   ok "Maven-Wrapper (mvnw) vorhanden — lädt Maven selbst, System-Maven optional"
   if have mvn; then
     MVN_VER="$(mvn -B -version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Apache Maven/{print $3; exit}')"
     [ -n "$MVN_VER" ] && ok "System-Maven ${MVN_VER} (zusätzlich vorhanden)"
   fi
 elif have mvn; then
-  MVN_CMD="mvn"
   MVN_VER="$(mvn -B -version 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '/Apache Maven/{print $3; exit}')"
   if [ -n "$MVN_VER" ] && version_ge "$MVN_VER" "3.6.3"; then
     if version_ge "$MVN_VER" "3.9"; then ok "Maven ${MVN_VER}"; else ok "Maven ${MVN_VER} (3.9+ empfohlen)"; fi
@@ -216,7 +224,6 @@ elif have mvn; then
     need_build maven "Maven ${MVN_VER:-?} gefunden, benötigt wird 3.6.3+"
   fi
 else
-  MVN_CMD="mvn"
   need_build maven "Maven (3.6.3+, 3.9+ empfohlen) fehlt — oder den Wrapper ai-automation-backend/mvnw nutzen"
 fi
 
@@ -330,19 +337,23 @@ else
   warn "Git-Hooks-Installation übersprungen (kein Git-Repo?)"
 fi
 
-echo "  Frontend-Abhängigkeiten installieren (npm install) ..."
-if ( cd "$FRONTEND_DIR" && npm install ); then
+# npm ci statt npm install: installiert genau den committeten Lockfile und schreibt ihn nie um —
+# ein frischer Klon bleibt nach dem Setup unverändert (453c01b1).
+echo "  Frontend-Abhängigkeiten installieren (npm ci, genau nach package-lock.json) ..."
+if ( cd "$FRONTEND_DIR" && npm ci ); then
   ok "Frontend-Deps installiert"
 else
-  fail "npm install fehlgeschlagen — siehe Ausgabe oben"
+  fail "npm ci fehlgeschlagen — siehe Ausgabe oben"
   exit 1
 fi
 
-echo "  Backend vorkompilieren (${MVN_CMD##*/} test-compile) ..."
-if ( cd "$BACKEND_DIR" && "$MVN_CMD" -q -DskipTests test-compile ); then
-  ok "Backend kompiliert"
+# Genau der Build, den der Start sonst selbst machen würde: das Runtime-JAR. `start` findet es
+# danach und baut nicht noch einmal (vorher: test-compile hier + clean package im Starter, 0ab376d3).
+echo "  Backend bauen (Runtime-JAR, das der Start verwendet) ..."
+if bash "${SCRIPT_DIR}/start-autotrigger-dev.sh" build; then
+  ok "Backend gebaut"
 else
-  fail "Backend-Kompilierung fehlgeschlagen — siehe Ausgabe oben"
+  fail "Backend-Build fehlgeschlagen — siehe Ausgabe oben"
   exit 1
 fi
 

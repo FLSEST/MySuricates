@@ -29,6 +29,7 @@ and only needed for container-execution workflow blocks.
 | Node.js | 20.19+, 22.12+ or 24+ | ✅ | Frontend (version in `ai-automation-frontend/.nvmrc` → `nvm use`) |
 | npm | 10+ | ✅ | Frontend dependencies |
 | git, curl | current | ✅ | Basics |
+| python3 | 3.x | ✅ | Dev starter (`scripts/start-autotrigger-dev.sh`) |
 | **Claude account + `claude` CLI** | current | ✅ for AI | AI workflows run via `claude` on the host |
 | Docker | 24+ | ⬜ optional | only for container-execution blocks |
 
@@ -53,9 +54,10 @@ cd autotrigger
 ```
 
 `scripts/setup.sh` checks all prerequisites and lists the appropriate install command for each
-missing or outdated tool (apt/dnf/pacman detected), installs frontend dependencies, and
-pre-compiles the backend. It **never** accesses the database or the REST API, and without
-`--install` it installs nothing on its own.
+missing or outdated tool (apt/dnf/pacman detected), installs frontend dependencies exactly as
+locked (`npm ci`), and builds the backend once — the start then uses that JAR without building
+again. It **never** accesses the database or the REST API, and without `--install` it installs
+nothing on its own.
 
 Options:
 

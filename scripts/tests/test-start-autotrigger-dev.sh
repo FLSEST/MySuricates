@@ -93,6 +93,28 @@ check "pid file of a foreign process (sleep) is removed" '[ "$OUT" = removed ]'
 echo "5) help and syntax"
 check "bash -n passes"                                   'bash -n "$SCRIPT"'
 check "--help prints usage without side effects"         '"$SCRIPT" --help | grep -q "restart"'
+check "--help documents build"                           '"$SCRIPT" --help | grep -q " build "'
+
+echo "6) build: only the runtime jar, nothing started (setup.sh builds once)"
+mkdir -p "$TMP/backend"
+cat > "$TMP/backend/mvnw" <<'STUB'
+#!/usr/bin/env bash
+# Fake Maven wrapper: log the call, drop a fat jar where build_backend_jar looks for it.
+echo "$*" >> "$(dirname "$0")/mvn-calls.log"
+mkdir -p "$(dirname "$0")/target" && echo "fat" > "$(dirname "$0")/target/ai-automation-backend-9.9.9.jar"
+STUB
+chmod +x "$TMP/backend/mvnw"
+OUT="$(run_in_script '
+  BACKEND_DIR="'"$TMP"'/backend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMMAND=build; RUNTIME_MODE=host
+  ( main >/dev/null 2>&1 ); echo "rc=$?"
+  cat "$RUNTIME_DIR/current.jar" 2>/dev/null || echo no-jar
+  [ -e "$BACKEND_PID_FILE" ] || [ -e "$FRONTEND_PID_FILE" ] && echo started || echo nothing-started
+')"
+check "build exits 0"                                    '[ "$(sed -n 1p <<<"$OUT")" = rc=0 ]'
+check "build installs current.jar from target/"          '[ "$(sed -n 2p <<<"$OUT")" = fat ]'
+check "build starts neither backend nor frontend"        '[ "$(sed -n 3p <<<"$OUT")" = nothing-started ]'
+check "build runs clean package once, tests skipped"     '[ "$(grep -c "clean package -DskipTests" "$TMP/backend/mvn-calls.log")" -eq 1 ]'
+check "build refuses the container mode"                 '[ "$(run_in_script "COMMAND=build; RUNTIME_MODE=container; ( main >/dev/null 2>&1 ); echo \$?")" = 2 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

@@ -4,6 +4,7 @@
 #   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
 #   scripts/start-autotrigger-dev.sh stop                                # nur Backend
 #   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
+#   scripts/start-autotrigger-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
 #   scripts/start-autotrigger-dev.sh [start|stop|restart] --container     # Backend im Docker-Container
 #
 # Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
@@ -26,13 +27,13 @@ FORCE=0
 REBUILD=0
 for arg in "$@"; do
   case "$arg" in
-    start|stop|restart) COMMAND="$arg" ;;
+    start|stop|restart|build) COMMAND="$arg" ;;
     --show-key) SHOW_KEY=1 ;;   # API-Key voll anzeigen (Default: maskiert, nur letzte 4 Zeichen)
     --force) FORCE=1 ;;         # restart trotz laufender Workflow-Runs
     --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
     --container) RUNTIME_MODE=container ;;  # Backend im Container statt als java -jar (TODO a1236a64)
     --host) RUNTIME_MODE=host ;;
-    -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # andere Argumente ignorieren
   esac
 done
@@ -528,6 +529,16 @@ main() {
   echo "Betriebsart: ${RUNTIME_MODE}"
 
   case "${COMMAND}" in
+    build)
+      # Baut das JAR, das ein spaeteres `start` ohne weiteren Build verwendet — so kompiliert
+      # scripts/setup.sh das Backend nur einmal statt test-compile + clean package (0ab376d3).
+      if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        echo "build gilt nur fuer die Betriebsart host (Container bauen ihr Image selbst)." >&2
+        exit 2
+      fi
+      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+      build_backend_jar
+      ;;
     stop)
       if [[ "${RUNTIME_MODE}" == "container" ]]; then stop_backend_container; else stop_backend; fi
       ;;
