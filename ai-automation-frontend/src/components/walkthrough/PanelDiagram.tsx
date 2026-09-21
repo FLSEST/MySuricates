@@ -190,6 +190,105 @@ function Notice() {
           </g>
         ))}
       </g>
+      {/* And back to the bench it came from: the loop is the point, not the shelf. */}
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <path d="M282 80 C 282 99, 150 102, 72 94" strokeDasharray="4 4" />
+        <polyline points="79,89 70,94 80,98" strokeLinejoin="round" />
+      </g>
+    </>
+  );
+}
+
+/** Two things that need no hand start the same line; the line runs on out of the frame. */
+function Unattended() {
+  return (
+    <>
+      {/* A time and an arriving item — the two triggers that are core, not a module. */}
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <circle cx={26} cy={26} r={13} />
+        <polyline points="26,18 26,26 32,30" strokeLinejoin="round" />
+        <rect x={12} y={62} width={28} height={22} rx={6} />
+        <line x1={19} y1={69} x2={33} y2={69} />
+        <line x1={19} y1={77} x2={28} y2={77} />
+      </g>
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <path d="M42 30 C 62 34, 68 42, 74 50" strokeDasharray="4 4" />
+        <path d="M44 72 C 62 70, 68 62, 74 54" strokeDasharray="4 4" />
+        <polyline points="70,44 77,52 68,55" strokeLinejoin="round" />
+      </g>
+      <Box x={82} y={37} w={52} h={30} />
+      <Arrow from={134} to={152} y={52} />
+      <Box x={152} y={37} w={52} h={30} ai />
+      <Arrow from={204} to={222} y={52} />
+      <Box x={222} y={37} w={52} h={30} />
+      {/* Runs on past the edge: nobody is waiting at the end of it. */}
+      <Arrow from={274} to={312} y={52} />
+    </>
+  );
+}
+
+/** A failed step is picked up again — and the return has a floor it cannot go below. */
+function Repair() {
+  return (
+    <>
+      <Box x={8} y={12} w={48} h={28} />
+      <Arrow from={56} to={74} y={26} />
+      <Box x={74} y={12} w={48} h={28} />
+      <Arrow from={122} to={140} y={26} />
+      {/* The step that broke. */}
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round">
+        <rect x={140} y={12} width={48} height={28} rx={8} />
+        <line x1={155} y1={19} x2={173} y2={33} />
+        <line x1={173} y1={19} x2={155} y2={33} />
+        {/* Back to the step before it, not to the start. */}
+        <path d="M188 34 C 196 58, 130 62, 98 44" strokeDasharray="4 4" />
+        <polyline points="102,49 94,42 103,38" strokeLinejoin="round" />
+      </g>
+      {/* The ceiling: the attempts run along it and stop where it ends. */}
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <line x1={8} y1={84} x2={232} y2={84} opacity={0.5} />
+        {[64, 120, 176].map((x) => (
+          <line key={x} x1={x} y1={80} x2={x} y2={88} opacity={0.5} />
+        ))}
+        <line x1={232} y1={72} x2={232} y2={96} />
+      </g>
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <line x1={8} y1={84} x2={120} y2={84} />
+      </g>
+    </>
+  );
+}
+
+function Connect() {
+  // Deliberately three different outlines: what hangs on the outside is not one kind of thing.
+  const shape = (x: number, y: number, kind: number) =>
+    kind === 0 ? <rect x={x} y={y} width={26} height={20} rx={4} /> :
+    kind === 1 ? <circle cx={x + 13} cy={y + 10} r={11} /> :
+    <polygon points={`${x + 13},${y - 1} ${x + 26},${y + 10} ${x + 13},${y + 21} ${x},${y + 10}`} />;
+  const rows = [10, 42, 74];
+  return (
+    <>
+      <g className="text-text-tertiary" stroke="currentColor" strokeWidth={2} fill="none" strokeLinejoin="round">
+        {rows.map((y, i) => (
+          <g key={`l${y}`}>{shape(8, y, i)}</g>
+        ))}
+        {rows.map((y, i) => (
+          <g key={`r${y}`}>{shape(286, y, i)}</g>
+        ))}
+      </g>
+      {/* In and out through the same opening — a source here is a target there. */}
+      {rows.map((y) => (
+        <Arrow key={`ai${y}`} from={38} to={126} y={y + 10} />
+      ))}
+      {rows.map((y) => (
+        <Arrow key={`ao${y}`} from={194} to={282} y={y + 10} />
+      ))}
+      {/* Tall enough for all three arrows to land on it — a row pointing past the box would say
+          the outer system connects to nothing. */}
+      <g className="text-accent" stroke="currentColor" strokeWidth={2} fill="none">
+        <rect x={128} y={12} width={64} height={80} rx={12} />
+        <circle cx={160} cy={52} r={4} fill="currentColor" stroke="none" />
+      </g>
     </>
   );
 }
@@ -250,7 +349,10 @@ const DIAGRAMS: Record<PanelDiagramId, () => React.JSX.Element> = {
   mix: Mix,
   trace: Trace,
   notice: Notice,
+  unattended: Unattended,
   wait: Wait,
+  repair: Repair,
+  connect: Connect,
   verdict: Verdict,
   refill: Refill,
   swap: Swap,

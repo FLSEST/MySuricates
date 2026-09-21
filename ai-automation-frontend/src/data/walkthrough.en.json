@@ -1,6 +1,6 @@
 {
   "intro": {
-    "title": "Eight examples. Not the whole list.",
+    "title": "Examples. Not the whole list.",
     "points": [
       "What follows are examples of what this makes possible",
       "All of them are built from the same handful of blocks, combined differently",
@@ -24,11 +24,20 @@
     ]
   },
   "notice": {
-    "title": "What you notice doesn't evaporate.",
+    "title": "What you notice comes back around.",
     "points": [
       "Side findings become tracked items, not lost thoughts",
       "An item can trigger the work itself, then close when it's verified",
-      "Jump back into the session that created it"
+      "Back in your repo they surface again — matched to the project by its path",
+      "Jump into the session that created one"
+    ]
+  },
+  "unattended": {
+    "title": "It starts without you.",
+    "points": [
+      "A schedule or a new item sets it off — nobody has to be at the keyboard",
+      "Several can run at once; they queue instead of colliding",
+      "You come back to a result, not to a question waiting for an answer"
     ]
   },
   "wait": {
@@ -37,6 +46,14 @@
       "Pause for an approval, an input, or until tomorrow",
       "It resumes where it stopped — not from the top",
       "Missed schedules get picked up after a restart"
+    ]
+  },
+  "repair": {
+    "title": "It tries again — as often as you allow.",
+    "points": [
+      "A failed run is analysed, a fix drafted and tried out before it counts",
+      "Attempts, time and token budget are set beforehand, not found in the bill",
+      "Off until you turn it on, per flow or as the default"
     ]
   },
   "verdict": {
@@ -61,6 +78,14 @@
       "Run the same flow on a different provider — per step if you want",
       "Model names come from your machine, not a hard-coded list",
       "Put two providers on one flow and compare"
+    ]
+  },
+  "connect": {
+    "title": "Plug in what you already use.",
+    "points": [
+      "GitHub, Jira, Confluence, Google, Trello and Taskwarrior — as sources and as targets",
+      "A flow leaves as a process diagram and comes back as one",
+      "The list grew out of use, not from a roadmap — a missing one is an addition, not a rebuild"
     ]
   },
   "blocks": {
