@@ -50,16 +50,16 @@ MySuricates is an **AI-driven workflow automation platform** with a visual inter
 
 | Technology | Version | Purpose |
 |---|---|---|
-| **React** | 19.2 | UI framework (SPA) |
-| **TypeScript** | 5.3.3 | Type-safe JavaScript development |
-| **Vite** | 7.3 | Build tool & dev server |
+| **React** | 19.3 | UI framework (SPA) |
+| **TypeScript** | 6.0 | Type-safe JavaScript development |
+| **Vite** | 8.3 | Build tool & dev server |
 | **TanStack Query** | 5.17.0 | Server-state management & caching |
 | **Zustand** | 4.4.7 | Client-state management |
-| **TailwindCSS** | 4.2 | Utility-first CSS framework (CSS-first configuration in `src/index.css`, no `tailwind.config.*`) |
+| **TailwindCSS** | 4.3 | Utility-first CSS framework (CSS-first configuration in `src/index.css`, no `tailwind.config.*`) |
 | **Monaco Editor** | 4.6.0 | Code editor (VS Code engine) |
 | **xterm.js** | 6.0.0 | Terminal emulator for WebSocket terminal |
-| **Cypress** | 15.21 | End-to-end testing |
-| **Vite PWA** | 1.2 | Progressive Web App support |
+| **Cypress** | 16.1 | End-to-end testing |
+| **Vite PWA** | 1.3 | Progressive Web App support |
 
 ### Infrastructure
 
