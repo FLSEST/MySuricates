@@ -32,6 +32,11 @@ jobs:
         run: |
           bash scripts/tests/test-installer-probe.sh
           python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'
+      - name: Container-Instanz Selbsttest (deploy/, ohne Docker)
+        run: |
+          bash scripts/tests/test-host-mounts.sh
+          bash scripts/tests/test-instance.sh
+          bash scripts/tests/test-deploy-files.sh
       # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
       # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
       - name: Doku-Zahlen gegen den Code pruefen

@@ -1,5 +1,41 @@
 # Deployment
 
+## One instance in a container (`deploy/`)
+
+The machine only needs Docker. `deploy/Dockerfile` builds backend and frontend inside Docker
+(about eight minutes the first time, afterwards from the layer cache), and the backend serves the
+frontend itself — one instance is one container and one port.
+
+```bash
+printf 'MYSURICATES_PORT=9090\n' > deploy/instances/main.env
+scripts/instance.sh up --name main       # build, start, wait for health
+scripts/instance.sh key --name main      # API key for the login
+scripts/instance.sh list                 # all instances with their port
+scripts/instance.sh down --name main     # stop; data stays in the volumes
+```
+
+| Value in `deploy/instances/<name>.env` | Meaning |
+|---|---|
+| `MYSURICATES_PORT` | port on the machine (required) |
+| `MYSURICATES_BIND` | address, default `127.0.0.1` — local only |
+| `MYSURICATES_PRESET` | `core` (default), `research`, `full` |
+| `MYSURICATES_PROJECTS` | projects folder, default: the folder above the clone, never all of `$HOME` |
+| `MYSURICATES_DOCKER_SOCKET` | `1` mounts the Docker socket (for shell blocks with `container_image`) — gives the instance full control over Docker on the machine |
+| `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
+| `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
+
+The instance uses the host's AI CLIs including their login, so nobody logs in twice: on Linux the
+program and the login, on macOS only the login (a Mac binary does not start in a Linux container).
+The user ID comes from `id(1)` at start, so files in mounted folders belong to the right user. Data
+lives in the volume `mysuricates-<name>-data`, the integration key separately in
+`mysuricates-<name>-secrets`. Without the Docker socket the instance reports Docker as "not set
+up" — that is not an error.
+
+Several instances — say Dev · Test · Prod — are several env files with their own ports. The
+existing files `docker-compose.stable.yml` and `docker-compose.test.yml` are unaffected. Script
+tests without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-instance.sh`,
+`bash scripts/tests/test-deploy-files.sh`.
+
 ## Docker Compose
 
 The project is deployed via Docker Compose. The configuration is located in `ai-automation-backend/docker-compose.yml`.
