@@ -162,10 +162,11 @@ class OnboardingProfileSeederTest {
 
         seeder.run(null);
 
-        // base updated (version 1 < 2) + 5 others seeded = 6 saves
+        // base updated (version 1 < 3) + 5 others seeded = 6 saves
         verify(profileRepository, times(6)).save(any());
-        assertThat(outdated.getVersion()).isEqualTo(2);
+        assertThat(outdated.getVersion()).isEqualTo(3);
         assertThat(outdated.getContent()).isNotEqualTo("old content");
+        assertThat(outdated.getContent()).contains("TODOs immer mit Titel nennen");
     }
 
     @Test
