@@ -437,10 +437,19 @@ Er wird geloggt und zu YELLOW `gate-invalid` — verschärfen darf er, mildern n
 bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlägt, war zuvor von
 einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
 
-**Gate → Run-Status-Mapping:**
-- **YELLOW → `COMPLETED_WITH_ERRORS`:** Run wird mit diesem Status beendet statt `COMPLETED`
-- **RED → `COMPLETED`:** RED-Gates ändern den Run-Status nicht — `AutoTodoService` erstellt stattdessen ein TODO
-- `GateStatusResolver` — leitet Gate-Status aus Run-Status ab, wenn kein expliziter Marker existiert (`FAILED` → RED, `COMPLETED` → GREEN)
+**Ein Gate ändert den Run-Status nicht.** Weder YELLOW noch RED: Das Gate ist ein Befund über
+das Ergebnis, kein Fehlschlag der Ausführung. RED erzeugt über `AutoTodoService` ein TODO und
+eine Warnung im Aktivitätslog, YELLOW nur die Warnung — der Lauf bleibt `COMPLETED`.
+
+Den Run-Status bestimmt etwas Unabhängiges: `RunCompletionHandler` setzt
+`COMPLETED_WITH_ERRORS`, wenn ein Schritt mit `checkedCommand`-Metadatum fehlgeschlagen ist,
+sonst `COMPLETED`. Beides kann zusammentreffen — `RunCompletionHandlerTest` hält genau den Fall
+fest: ein fehlgeschlagener `checked_command` ergibt `COMPLETED_WITH_ERRORS` **und**
+`gate_status: RED`.
+
+Die Richtung, die es wirklich gibt, ist die umgekehrte: `GateStatusResolver` leitet ein
+Gate-Urteil aus dem Run-Status ab, wenn kein Marker geschrieben wurde (`FAILED` → RED,
+`COMPLETED` → GREEN, `COMPLETED_WITH_ERRORS` → YELLOW).
 
 Ein Shell-Block muss diese Marker nicht selbst schreiben: `checked_command`/`check_category` leiten
 das Gate automatisch aus dem Exit-Code ab, mit Vorrang für einen eigenen (mindestens gleich

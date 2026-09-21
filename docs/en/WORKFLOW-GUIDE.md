@@ -974,11 +974,17 @@ gate_category: lint-errors
 gate_description: 3 issues found
 ```
 
-| Gate | Run Status | Auto-Todo Priority | Meaning |
-|------|-----------|-------------------|---------|
-| GREEN | `COMPLETED` | — | All checks passed |
-| YELLOW | `COMPLETED_WITH_ERRORS` | MEDIUM | Warnings, non-blocking issues |
-| RED | `COMPLETED` | HIGH | Critical issues (handled via AutoTodoService) |
+| Gate | Auto-todo priority | Meaning |
+|------|-------------------|---------|
+| GREEN | — | All checks passed |
+| YELLOW | MEDIUM | Warnings, non-blocking problems |
+| RED | HIGH | Critical problems (handled via `AutoTodoService`) |
+
+**A gate does not change the run status.** A run that reports RED still ends up `COMPLETED` — the
+gate is a finding about the result, not a failure of the execution. The run status comes from
+elsewhere: `COMPLETED_WITH_ERRORS` is set when a step with `checked_command` fails
+(`RunCompletionHandler`), and `FAILED` when the execution itself breaks off. An earlier version of
+this table carried a "run status" column that implied a causality the code does not have.
 
 **Shell block example** with gate emission:
 ```bash

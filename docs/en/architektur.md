@@ -416,10 +416,18 @@ gate_description: <description>
 - `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED)
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
-**Gate → Run Status Mapping:**
-- **YELLOW → `COMPLETED_WITH_ERRORS`:** Run is completed with this status instead of `COMPLETED`
-- **RED → `COMPLETED`:** RED gates do not change the run status — `AutoTodoService` creates a TODO instead
-- `GateStatusResolver` — derives gate status from run status when no explicit marker exists (`FAILED` → RED, `COMPLETED` → GREEN)
+**A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
+the result, not a failure of the execution. RED creates a todo via `AutoTodoService` plus a
+warning in the activity log, YELLOW only the warning — the run stays `COMPLETED`.
+
+The run status is decided by something independent: `RunCompletionHandler` sets
+`COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and
+`COMPLETED` otherwise. Both can coincide — `RunCompletionHandlerTest` pins exactly that case: a
+failed `checked_command` yields `COMPLETED_WITH_ERRORS` **and** `gate_status: RED`.
+
+The direction that does exist is the reverse one: `GateStatusResolver` derives a gate verdict
+from the run status when no marker was written (`FAILED` → RED, `COMPLETED` → GREEN,
+`COMPLETED_WITH_ERRORS` → YELLOW).
 
 A shell block does not have to write these markers itself: `checked_command`/`check_category`
 derive the gate automatically from the exit code, giving precedence to the script's own marker when
