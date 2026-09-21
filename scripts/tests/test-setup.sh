@@ -85,6 +85,11 @@ check "single modules as AUTOMATION_ lines"             '[ "$(val main AUTOMATIO
 check "provider pi"                                     '[ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
 check "port 9555"                                       '[ "$(val main MYSURICATES_PORT)" = 9555 ]'
 
+rm -rf "$INST"
+check "--bind 0.0.0.0 for access from the network" '[ "$(run --yes --dry-run --runtime host --bind 0.0.0.0)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 0.0.0.0 ]'
+check "bound to 127.0.0.1 by default"             'rm -rf "$INST"; [ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 127.0.0.1 ]'
+check "--bind rejects non-addresses"              '[ "$(run --bind "x;y")" = 2 ]'
+
 echo "7) an existing setup is kept unless asked"
 printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\n' > "$INST/main.env"
 check "kept without --reconfigure"                      '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'

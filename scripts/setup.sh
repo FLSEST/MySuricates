@@ -11,6 +11,7 @@
 #   --preset core|research|full  Module (Standard = core); --modules a,b fuer einzelne Module dazu
 #   --provider claude|codex|pi   Standard-KI-Anbieter (Default: der erste angemeldete)
 #   --port N                     Port der Instanz (Default 9090)
+#   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = auch aus dem Netz — VPN davor)
 #   --projects DIR               Projektordner fuer den Container (Default: Ordner ueber dem Klon)
 #   --name NAME                  Name der Instanz (Default main)
 #   --lang de                    Deutsch (Default Englisch)
@@ -43,7 +44,7 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
 
 # --- Flags ------------------------------------------------------------------------------------------
-MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"
+MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
 die() { echo "setup.sh: $*" >&2; exit 2; }
 while [ "$#" -gt 0 ]; do
@@ -54,6 +55,7 @@ while [ "$#" -gt 0 ]; do
     --modules) MODULES="${2:-}"; shift ;;    --modules=*) MODULES="${1#*=}" ;;
     --provider) PROVIDER="${2:-}"; shift ;;  --provider=*) PROVIDER="${1#*=}" ;;
     --port) PORT="${2:-}"; shift ;;          --port=*) PORT="${1#*=}" ;;
+    --bind) BIND="${2:-}"; shift ;;          --bind=*) BIND="${1#*=}" ;;
     --projects) PROJECTS="${2:-}"; shift ;;  --projects=*) PROJECTS="${1#*=}" ;;
     --name) NAME="${2:-}"; shift ;;          --name=*) NAME="${1#*=}" ;;
     --lang) LANG_OPT="${2:-}"; shift ;;      --lang=*) LANG_OPT="${1#*=}" ;;
@@ -66,7 +68,7 @@ while [ "$#" -gt 0 ]; do
     --start) START=1 ;;
     --force) FORCE=1 ;;
     --reconfigure) RECONF=1 ;;
-    -h|--help) sed -n '3,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "Unbekannte Option: $1 (siehe --help)" ;;
   esac
   shift
@@ -76,6 +78,7 @@ done
 case "$MODE" in ""|one|staged) ;; *) die "--mode one|staged, nicht '$MODE'" ;; esac
 case "$RUNTIME" in ""|container|host) ;; *) die "--runtime container|host, nicht '$RUNTIME'" ;; esac
 case "$NAME" in *[!a-z0-9-]*|"") die "--name nur aus a-z, 0-9 und -" ;; esac
+case "$BIND" in *[!0-9.:a-fA-F]*|"") die "--bind braucht eine IP-Adresse" ;; esac
 [ -z "$PORT" ] || case "$PORT" in *[!0-9]*) die "--port braucht eine Zahl" ;; esac
 if [ -n "$PROVIDER" ]; then
   PROVIDER="$(printf '%s' "$PROVIDER" | tr 'A-Z' 'a-z')"
@@ -401,7 +404,7 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
   {
     printf '# MySuricates-Instanz „%s“ — geschrieben von scripts/setup.sh.\n' "$1"
     printf '# Werte aendern, dann: scripts/instance.sh up --name %s   (AUTOMATION_*-Zeilen gehen an die Instanz)\n' "$1"
-    printf 'MYSURICATES_RUNTIME=%s\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=127.0.0.1\nMYSURICATES_PRESET=%s\n' "$2" "$3" "$4"
+    printf 'MYSURICATES_RUNTIME=%s\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=%s\nMYSURICATES_PRESET=%s\n' "$2" "$3" "$BIND" "$4"
     [ -n "$5" ] && printf 'MYSURICATES_ENVIRONMENT=%s\n' "$5"
     if [ "$2" = container ]; then printf 'MYSURICATES_PROJECTS=%s\nMYSURICATES_DOCKER_SOCKET=%s\n' "${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${SOCKET:-0}"; fi
     printf 'MYSURICATES_HARDENING_SEALING=%s\nMYSURICATES_HARDENING_REQUIRE_SEALED=%s\n' "${6:-false}" "${7:-false}"

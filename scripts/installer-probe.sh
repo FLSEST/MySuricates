@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # installer-probe.sh — prüft scripts/setup.sh so, wie ein neuer Nutzer ihn erlebt: auf einer frischen
-# Linux-Maschine (Container, Default ubuntu:24.04), auf der nur git, sudo und tzdata liegen.
+# Linux-Maschine (Container; apt- oder dnf-Image, Default ubuntu:24.04), auf der nur git, sudo und
+# tzdata liegen.
 #
 #   scripts/installer-probe.sh                   # HEAD dieses Checkouts prüfen, Report schreiben
 #   scripts/installer-probe.sh --ref main        # anderen Stand prüfen (Branch, Tag oder SHA)
@@ -9,18 +10,19 @@
 #   scripts/installer-probe.sh --keep            # Container nach dem Lauf stehen lassen, Instanz ansehen
 #
 #   Weitere Optionen: --repo <pfad>   Repo, aus dem der Stand kommt (Default: dieses)
-#                     --image <image> apt-basiertes Image (Default: ubuntu:24.04)
+#                     --image <image> apt- oder dnf-Image (Default ubuntu:24.04; z. B. rockylinux:9)
 #                     --out <dir>     Report-Verzeichnis (Default: ~/.local/state/mysuricates/installer-probe/<zeit>-<sha>)
-#                     --port <n>      Frontend-Port auf 127.0.0.1 (Default: automatisch; interaktiv 23000)
+#                     --port <n>      Port auf 127.0.0.1 (Default: automatisch; interaktiv 23000)
 #                     --no-screenshots
 #
-# Automatischer Lauf: drei Phasen wie im Getting-Started — 1-pruefen `setup.sh`, 2-install
-# `setup.sh --install`, 3-start `setup.sh --start` (Modul-Abfrage: Enter = Default). Jede Phase läuft
-# unter einem Pseudo-Terminal, der Mitschnitt zeigt also Farben und Abfrage wie am Bildschirm.
-# Harte Prüfungen: Phase 1 meldet fehlende Tools sauber, Phase 3 endet mit Exit 0, Backend UP,
-# Frontend 200, Login mit dem erzeugten Key klappt (falls Playwright da ist), das Backend wird genau
-# einmal gebaut, und der Klon ist nach dem Setup unverändert. Ergebnis: <out>/report.html — eine
-# Datei, Screenshots eingebettet — und am Ende gate_status: GREEN|RED für den MySuricates-Workflow.
+# Automatischer Lauf (Weg „eine Instanz auf dem Rechner“): 1-pruefen `setup.sh --check`, 2-einrichten
+# `setup.sh --yes --runtime host --bind 0.0.0.0` — ein Durchgang bis zur laufenden Instanz. Jede Phase
+# läuft unter einem Pseudo-Terminal, der Mitschnitt zeigt also Farben und Kopf wie am Bildschirm.
+# Harte Prüfungen: Phase 1 nennt die fehlenden Werkzeuge, Phase 2 endet mit Exit 0, Health UP (ohne
+# Docker ist das kein Fehler), Oberfläche 200 auf demselben Port, Login mit dem erzeugten Key klappt
+# (falls Playwright da ist), das Backend wird genau einmal gebaut, der Key steht in keinem Log und
+# keinem Mitschnitt, und der Klon ist danach unverändert. Ergebnis: <out>/report.html — eine Datei,
+# Screenshots eingebettet — und am Ende gate_status: GREEN|RED für den MySuricates-Workflow.
 #
 # Geprüft wird immer der committete Stand; uncommittete Änderungen sind nicht dabei (wie bei einem
 # echten Klon). Ports nur auf 127.0.0.1. Greift nie auf DB oder REST-API der Dev-Instanz zu.
@@ -105,14 +107,10 @@ if ! git -C "$REPO" bundle create -q "$WORK/repo.bundle" "$REF" 2>/dev/null; the
   git -C "$REPO" bundle create -q "$WORK/repo.bundle" --all 2>/dev/null || die "git bundle fehlgeschlagen"
 fi
 
-if [ "$INTERACTIVE" = 1 ]; then
-  FRONTEND_PORT="${FRONTEND_PORT:-23000}"
-  PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:3000" -p "127.0.0.1:$((FRONTEND_PORT + 6190)):9090")
-elif [ -n "$FRONTEND_PORT" ]; then
-  PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:3000" -p "127.0.0.1:$((FRONTEND_PORT + 6190)):9090")
-else
-  PORT_ARGS=(-p "127.0.0.1::3000" -p "127.0.0.1::9090")
-fi
+# Ein Port: die Instanz liefert die Oberfläche selbst aus (setup.sh, Weg „auf dem Rechner“)
+[ "$INTERACTIVE" = 1 ] && FRONTEND_PORT="${FRONTEND_PORT:-23000}"
+if [ -n "$FRONTEND_PORT" ]; then PORT_ARGS=(-p "127.0.0.1:${FRONTEND_PORT}:9090")
+else PORT_ARGS=(-p "127.0.0.1::9090"); fi
 
 echo "Installer-Probe: ${REF} (${SHORT}) auf ${IMAGE}"
 docker run -d --name "$NAME" "${PORT_ARGS[@]}" "$IMAGE" sleep infinity >/dev/null \
@@ -121,12 +119,17 @@ docker run -d --name "$NAME" "${PORT_ARGS[@]}" "$IMAGE" sleep infinity >/dev/nul
 # Was ein Mensch nach `git clone` mindestens hat — und sonst nichts. tzdata gehört auf jedem echten
 # Rechner dazu (sonst fragt apt beim JDK nach der Zeitzone); der animierte apt-Fortschrittsbalken ist
 # abgeschaltet, weil er im Mitschnitt nur Steuerzeichen-Salat hinterlässt.
-PREP='command -v apt-get >/dev/null || { echo "nur apt-basierte Images werden unterstützt" >&2; exit 3; }
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq && apt-get install -y -qq git sudo tzdata >/dev/null 2>&1 || exit 1
+PREP='if command -v apt-get >/dev/null; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -qq && apt-get install -y -qq git sudo tzdata >/dev/null 2>&1 || exit 1
+  echo "Dpkg::Progress-Fancy \"0\";" > /etc/apt/apt.conf.d/99probe-no-fancy-progress
+elif command -v dnf >/dev/null; then
+  dnf install -y -q git sudo tzdata util-linux >/dev/null 2>&1 || exit 1
+else
+  echo "nur apt- oder dnf-Images werden unterstützt" >&2; exit 3
+fi
 id -u probe >/dev/null 2>&1 || useradd -m -s /bin/bash probe
-echo "probe ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/probe && chmod 440 /etc/sudoers.d/probe
-echo "Dpkg::Progress-Fancy \"0\";" > /etc/apt/apt.conf.d/99probe-no-fancy-progress'
+echo "probe ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/probe && chmod 440 /etc/sudoers.d/probe'
 docker exec "$NAME" bash -c "$PREP" || die "Grundausstattung im Container fehlgeschlagen"
 docker cp -q "$WORK/repo.bundle" "$NAME:/tmp/repo.bundle" >/dev/null && docker exec "$NAME" chmod 644 /tmp/repo.bundle \
   || die "Bundle ließ sich nicht in den Container kopieren"
@@ -135,8 +138,8 @@ docker exec -u probe -w "$USER_HOME" -e PROBE_SHA="$SHA" -e PROBE_BRANCH="$BRANC
   || die "Klon im Container fehlgeschlagen"
 
 host_port() { docker port "$NAME" "$1/tcp" 2>/dev/null | head -n1 | sed 's/.*://'; }
-FPORT="$(host_port 3000)"
 BPORT="$(host_port 9090)"
+FPORT="$BPORT"
 
 # --- Interaktiv: Shell in der frischen Maschine ----------------------------------------------------
 if [ "$INTERACTIVE" = 1 ]; then
@@ -146,12 +149,15 @@ if [ "$INTERACTIVE" = 1 ]; then
   Frische Maschine: ${IMAGE}, Stand ${REF} (${SHORT}), Benutzer probe mit sudo.
   So geht ein neuer Nutzer vor:
 
-    ./scripts/setup.sh${L}              # 1. prüfen — listet, was fehlt
-    ./scripts/setup.sh --install${L}    # 2. fehlende Tools per apt installieren
-    ./scripts/setup.sh --start${L}      # 3. vorbereiten, Modul-Preset wählen, starten
+    ./scripts/setup.sh${L}
 
-  Danach im Browser: http://localhost:${FPORT}   (Backend: http://localhost:${BPORT})
-  API-Key für den Login:  cat ~/.autotrigger/api-key
+  Im Modus-Schritt „auf diesem Rechner“ wählen — in diesem Wegwerf-Container gibt es kein Docker.
+  Mit --bind 0.0.0.0 ist die Instanz von außen erreichbar:
+
+    ./scripts/setup.sh --runtime host --bind 0.0.0.0${L}
+
+  Danach im Browser: http://localhost:${FPORT}
+  API-Key für den Login:  scripts/instance.sh key --name main
   exit beendet die Probe und räumt den Container weg.
 "
   docker exec -i -u probe "$NAME" bash -c 'cat > ~/.probe-hints && echo "cat ~/.probe-hints" >> ~/.bashrc' <<<"$HINTS"
@@ -186,32 +192,29 @@ run_phase() {  # name, command, input
   return "$rc"
 }
 
-run_phase 1-pruefen "./scripts/setup.sh --lang de" ""; RC1=$?
-run_phase 2-install "./scripts/setup.sh --install --lang de" ""; RC2=$?
-run_phase 3-start   "./scripts/setup.sh --start --lang de" "\n"; RC3=$?
+run_phase 1-pruefen    "./scripts/setup.sh --check --runtime host --lang de" ""; RC1=$?
+run_phase 2-einrichten "./scripts/setup.sh --yes --runtime host --bind 0.0.0.0 --lang de" ""; RC2=$?
 
 echo "Prüfungen:"
-if [ "$RC1" = 1 ] && grep -q "Setup unvollständig" "$OUT/logs/1-pruefen.log"; then
-  check "Phase 1 meldet fehlende Pflicht-Tools und bricht sauber ab" ok \
-    "$(sed 's/\x1b\[[0-9;]*m//g' "$OUT/logs/1-pruefen.log" | tr -d '\r' | awk -F': ' '/Fehlende\/zu alte Pflicht-Tools/{print $2; exit}')"
+P1="$(sed 's/\x1b\[[0-9;]*m//g' "$OUT/logs/1-pruefen.log" | tr -d '\r')"
+if [ "$RC1" = 1 ] && grep "Fehlt:" <<<"$P1" >/dev/null; then
+  check "Phase 1 nennt die fehlenden Werkzeuge" ok "$(grep -o 'Fehlt: [a-z0-9 ]*' <<<"$P1" | head -n1)"
 elif [ "$RC1" = 0 ]; then
-  check "Phase 1 meldet fehlende Pflicht-Tools und bricht sauber ab" skip "Image bringt schon alles mit"
+  check "Phase 1 nennt die fehlenden Werkzeuge" skip "Image bringt schon alles mit"
 else
-  check "Phase 1 meldet fehlende Pflicht-Tools und bricht sauber ab" fail "Exit ${RC1}"
+  check "Phase 1 nennt die fehlenden Werkzeuge" fail "Exit ${RC1}"
 fi
-if [ "$RC2" = 0 ] || { [ "$RC2" = 1 ] && grep -q "erneut ausführen" "$OUT/logs/2-install.log"; }; then
-  check "Phase 2 (--install) läuft durch" ok "Exit ${RC2} — verlangt wie vorgesehen einen zweiten Lauf"
-else
-  check "Phase 2 (--install) läuft durch" fail "Exit ${RC2}"
-fi
-if [ "$RC3" = 0 ]; then check "Phase 3 (Setup + Start) endet mit Exit 0" ok ""; else check "Phase 3 (Setup + Start) endet mit Exit 0" fail "Exit ${RC3}"; fi
+if [ "$RC2" = 0 ]; then check "Phase 2: ein Durchgang bis zur laufenden Instanz (Exit 0)" ok ""
+else check "Phase 2: ein Durchgang bis zur laufenden Instanz (Exit 0)" fail "Exit ${RC2}"; fi
 
-HEALTH="$(curl -s --max-time 10 "http://127.0.0.1:${BPORT}/actuator/health" 2>/dev/null)"
-if grep -q '"status":"UP"' <<<"$HEALTH"; then check "Backend meldet UP" ok ""; else check "Backend meldet UP" fail "${HEALTH:-keine Antwort}"; fi
+HEALTH="$(curl -s --max-time 10 "http://127.0.0.1:${BPORT}/api/v1/system/health" 2>/dev/null)"
+if grep '"status":"UP"' <<<"$HEALTH" >/dev/null; then check "Health UP — ohne Docker kein Fehler" ok "$(grep -o '"docker":"[A-Z_]*"' <<<"$HEALTH")"
+else check "Health UP — ohne Docker kein Fehler" fail "${HEALTH:-keine Antwort}"; fi
 HTTP="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:${FPORT}/" 2>/dev/null)"
-if [ "$HTTP" = 200 ]; then check "Frontend antwortet (HTTP 200)" ok ""; else check "Frontend antwortet (HTTP 200)" fail "HTTP ${HTTP:-—}"; fi
+if [ "$HTTP" = 200 ]; then check "Oberfläche auf demselben Port (HTTP 200)" ok ""; else check "Oberfläche auf demselben Port (HTTP 200)" fail "HTTP ${HTTP:-—}"; fi
 
-BUILDS="$(cat "$OUT"/logs/*.log | grep -c 'Baue Backend-JAR')"
+SETUP_LOGS="${USER_HOME}/.local/state/mysuricates/setup-logs"
+BUILDS="$(docker exec -u probe "$NAME" sh -c "cat $SETUP_LOGS/*.log 2>/dev/null" | grep -c 'Baue Backend')"
 if [ "$BUILDS" = 1 ]; then check "Backend genau einmal gebaut" ok ""; else check "Backend genau einmal gebaut" fail "${BUILDS}× gebaut"; fi
 
 DIRTY="$(docker exec -u probe -w "$CLONE" "$NAME" git status --porcelain 2>&1)"
@@ -219,6 +222,15 @@ if [ -z "$DIRTY" ]; then
   check "Klon nach dem Setup unverändert (git status leer)" ok ""
 else
   check "Klon nach dem Setup unverändert (git status leer)" fail "$(tr '\n' ' ' <<<"$DIRTY")"
+fi
+
+KEY="$(docker exec -u probe -w "$CLONE" "$NAME" bash scripts/instance.sh key --name main 2>/dev/null)"
+if [ -z "$KEY" ]; then
+  check "API-Key steht in keinem Log und keinem Mitschnitt" fail "kein Key gefunden"
+else
+  LEAK="$( { cat "$OUT"/logs/*.log; docker exec -u probe "$NAME" sh -c "cat ${USER_HOME}/.local/state/mysuricates/setup-logs/*.log ${USER_HOME}/.local/state/mysuricates/main/data/logs/*.log 2>/dev/null"; } | grep -cF "$KEY")"
+  if [ "$LEAK" = 0 ]; then check "API-Key steht in keinem Log und keinem Mitschnitt" ok ""
+  else check "API-Key steht in keinem Log und keinem Mitschnitt" fail "${LEAK} Fundstelle(n)"; fi
 fi
 
 PLAYWRIGHT=""
@@ -232,7 +244,6 @@ elif [ -z "$PLAYWRIGHT" ] || ! command -v node >/dev/null 2>&1; then
 elif [ "$HTTP" != 200 ]; then
   check "Login im Browser mit dem erzeugten API-Key" skip "Frontend nicht erreichbar"
 else
-  KEY="$(docker exec -u probe "$NAME" cat "${USER_HOME}/.autotrigger/api-key" 2>/dev/null)"
   SHOTS="$(PLAYWRIGHT_MODULE="$PLAYWRIGHT" PROBE_API_KEY="$KEY" \
     timeout 180 node "$SCRIPT_DIR/lib/installer_probe_screens.mjs" "http://127.0.0.1:${FPORT}/" "$OUT/screens" 2>&1)"
   SHOTS_RC=$?
