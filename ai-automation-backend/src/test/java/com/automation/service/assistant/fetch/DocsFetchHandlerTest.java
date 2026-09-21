@@ -57,6 +57,24 @@ class DocsFetchHandlerTest {
         assertThat(out).contains("## 1. Schnellstart").doesNotContain("## 10.").doesNotContain("## 2.");
     }
 
+    /** Die Überschrift heißt „## Anhang: Template-Kurzreferenz“, nicht „## Appendix“ (TODO f8d74d01). */
+    @Test
+    void appendixSection_isFound() {
+        assertThat(handler.formatDocsSection("workflow-guide/appendix"))
+                .startsWith("**workflow-guide / appendix:**\n\n## Anhang");
+    }
+
+    /** Ein „## …“ in einem Codeblock ist Beispielausgabe, keine Überschrift (TODO f8d74d01). */
+    @Test
+    void headingInsideCodeFence_isNeitherTocEntryNorSectionEnd() {
+        assertThat(handler.formatDocsSection("workflow-guide")).doesNotContain("## backend_tests");
+        String doc = "## 2. Blöcke\nText\n```\n## beispiel — FAILED\n```\nnoch Abschnitt 2\n## 3. Weiter\n";
+        assertThat(DocsFetchHandler.extractSection(doc, "## 2."))
+                .contains("## beispiel — FAILED")
+                .endsWith("noch Abschnitt 2")
+                .doesNotContain("## 3.");
+    }
+
     @Test
     void unknownSectionKey_fallsBackToWholeDocTruncatedAt8000() {
         String out = handler.formatDocsSection("workflow-guide/no-such-section");

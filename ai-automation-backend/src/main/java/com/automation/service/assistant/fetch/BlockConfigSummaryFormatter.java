@@ -41,7 +41,7 @@ public class BlockConfigSummaryFormatter {
                 int falseCount = falseBlocks instanceof List<?> l ? l.size() : 0;
                 sb.append("     if true: ").append(trueCount).append(" block(s), if false: ").append(falseCount).append(" block(s)\n");
             }
-            case "forEach" -> {
+            case "foreach" -> {
                 Object items = cfg.get("items");
                 if (items != null) sb.append("     items: ").append(items).append("\n");
                 Object nested = cfg.get("blocks");
@@ -65,7 +65,7 @@ public class BlockConfigSummaryFormatter {
                     sb.append("     inner block type: ").append(inner.get("type")).append("\n");
                 }
             }
-            case "sub_workflow" -> {
+            case "sub-workflow" -> {
                 Object wfId = cfg.get("workflow_id");
                 if (wfId != null) {
                     String name = workflowRepository.findById(String.valueOf(wfId))
@@ -73,7 +73,7 @@ public class BlockConfigSummaryFormatter {
                     sb.append("     sub-workflow: ").append(name).append("\n");
                 }
             }
-            case "human_input" -> {
+            case "human-input" -> {
                 Object prompt = cfg.get("prompt");
                 if (prompt != null) sb.append("     prompt: ").append(prompt).append("\n");
                 Object inputType = cfg.get("input_type");
