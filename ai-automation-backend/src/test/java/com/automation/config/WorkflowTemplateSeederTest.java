@@ -106,6 +106,19 @@ class WorkflowTemplateSeederTest {
     }
 
     @Test
+    void run_newerVersion_copiesTheBilingualSource() throws Exception {
+        WorkflowTemplate existing = template("t1", "Template 1", "1.0.0");
+        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(existing));
+        WorkflowTemplate newer = template("t1", "Template 1", "1.1.0");
+        newer.setI18nSource("{\"i18n\":[\"de\",\"en\"]}");
+        when(templateLoader.loadAll()).thenReturn(List.of(newer));
+
+        seeder.run(null);
+
+        assertThat(existing.getI18nSource()).isEqualTo("{\"i18n\":[\"de\",\"en\"]}");
+    }
+
+    @Test
     void run_olderVersion_doesNotDowngrade() throws Exception {
         WorkflowTemplate existing = template("t1", "Template 1", "2.0.0");
         when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(existing));

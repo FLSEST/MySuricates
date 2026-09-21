@@ -22,14 +22,15 @@ public class WorkflowPoolController {
 
     private final WorkflowPoolService poolService;
 
+    /** @param locale {@code de}/{@code en}: language of the steps of bilingual pool files; without it English */
     @GetMapping
-    public List<PoolWorkflowEntry> listAll() {
-        return poolService.listAll();
+    public List<PoolWorkflowEntry> listAll(@RequestParam(required = false) String locale) {
+        return poolService.listAll(locale);
     }
 
     @GetMapping("/{id}")
-    public PoolWorkflowEntry getById(@PathVariable String id) {
-        return poolService.findById(id);
+    public PoolWorkflowEntry getById(@PathVariable String id, @RequestParam(required = false) String locale) {
+        return poolService.findById(id, locale);
     }
 
     @PostMapping("/{id}/install")

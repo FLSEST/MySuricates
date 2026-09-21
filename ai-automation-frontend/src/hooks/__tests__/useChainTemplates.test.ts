@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
+import { useI18nStore } from '../../i18n';
 import { useChainTemplates, useInstallChainTemplate } from '../useChainTemplates';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -48,5 +49,23 @@ describe('useInstallChainTemplate', () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.chainId).toBe('c1');
+  });
+
+  it('installs in the UI language', async () => {
+    useI18nStore.setState({ locale: 'en' });
+    let body: unknown = null;
+    server.use(
+      http.post('/api/v1/chain-templates/:templateId/install', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ chainId: 'c1', chainName: 'Chain', workflowIds: [] });
+      }),
+    );
+    const { result } = renderHook(() => useInstallChainTemplate(), { wrapper: createWrapper() });
+    await act(async () => {
+      result.current.mutate({ templateId: 'ct1', projectId: 'p1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(body).toMatchObject({ projectId: 'p1', locale: 'en' });
   });
 });

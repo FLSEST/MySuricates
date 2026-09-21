@@ -592,6 +592,8 @@ Siegel lösen (gleicher Schalter). Protokolliert einen `SECURITY`-Eintrag mit de
 
 Alle Workflow-Templates auflisten (sortiert nach `sortOrder`).
 
+**Query:** `locale` (optional, `de`/`en`): Sprache der Schritte (`blocks`, `instructions`) zweisprachiger Templates. Ohne Angabe gilt Englisch. `name` und `description` bleiben Maps. Siehe [WORKFLOW-GUIDE → Zweisprachige Vorlagen](WORKFLOW-GUIDE.md#zweisprachige-vorlagen).
+
 **Response:** `WorkflowTemplateResponse[]`
 
 ```json
@@ -622,7 +624,7 @@ Alle Workflow-Templates auflisten (sortiert nach `sortOrder`).
 
 ### `GET /api/v1/workflow-templates/{id}`
 
-Einzelnes Template abrufen.
+Einzelnes Template abrufen. Query `locale` wie bei der Liste.
 
 **Response:** `WorkflowTemplateResponse`
 
@@ -2600,7 +2602,8 @@ Chain-Template in ein Projekt installieren (erstellt die Chain und alle referenz
 ```json
 {
   "projectId": "uuid",
-  "chainName": "Meine CI/CD Pipeline"
+  "chainName": "Meine CI/CD Pipeline",
+  "locale": "de"
 }
 ```
 
@@ -2608,6 +2611,7 @@ Chain-Template in ein Projekt installieren (erstellt die Chain und alle referenz
 |---|---|---|
 | `projectId` | String | Ja |
 | `chainName` | String | Nein |
+| `locale` | String (`de`/`en`) | Nein: Sprache der Namen, Labels und der Schritte zweisprachiger Templates; ohne Angabe Deutsch |
 
 **Response:** `201` mit `ChainInstallResponse`
 
@@ -3215,7 +3219,7 @@ Workflow aus einem Agentic-Run erstellen.
 
 ### `GET /api/v1/pool`
 
-Alle verfügbaren Pool-Workflows auflisten.
+Alle verfügbaren Pool-Workflows auflisten. Query `locale` (optional): Sprache der Schritte zweisprachiger Pool-Dateien, ohne Angabe Englisch.
 
 **Response:** `PoolWorkflowEntry[]`
 
@@ -3235,7 +3239,8 @@ Pool-Workflow in ein Projekt installieren.
 {
   "projectId": "uuid",
   "name": "Optionaler Name",
-  "forceCreate": false
+  "forceCreate": false,
+  "locale": "de"
 }
 ```
 
@@ -3244,6 +3249,7 @@ Pool-Workflow in ein Projekt installieren.
 | `projectId` | String | Ja |
 | `name` | String | Nein |
 | `forceCreate` | Boolean | Nein |
+| `locale` | String (`de`/`en`) | Nein: Sprache von Name, Beschreibung und Schritten; ohne Angabe Englisch. Ein früher in der anderen Sprache installierter Workflow wird aktualisiert, nicht dupliziert |
 
 **Response:** `{ "workflowId": "uuid", "workflowName": "...", "created": true }`
 

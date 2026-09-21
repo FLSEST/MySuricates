@@ -1,5 +1,6 @@
 package com.automation.service.audit;
 
+import com.automation.architecture.ShippedDefinitions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -92,17 +93,18 @@ class AuditRuleKeyCatalogTest {
      */
     @Test
     void everyRuleKeyFixedInAPoolPromptIsInTheCatalog() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
         List<String> violations = new ArrayList<>();
         Set<String> found = new LinkedHashSet<>();
         for (Path file : poolDefinitions()) {
-            JsonNode root = mapper.readTree(file.toFile());
-            String auditKey = root.path("metadata").path("audit").path("key").asText("");
-            for (String ruleKey : literalRuleKeys(root)) {
-                found.add(ruleKey);
-                if (!catalog.allowedKeys(auditKey).contains(ruleKey)) {
-                    violations.add(file.getFileName() + " (" + auditKey + ") vergibt ruleKey '" + ruleKey
-                            + "' — in src/main/resources/audit/rule-keys.json nachtragen");
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                String auditKey = root.path("metadata").path("audit").path("key").asText("");
+                for (String ruleKey : literalRuleKeys(root)) {
+                    found.add(ruleKey);
+                    if (!catalog.allowedKeys(auditKey).contains(ruleKey)) {
+                        violations.add(variant.label() + " (" + auditKey + ") vergibt ruleKey '" + ruleKey
+                                + "' — in src/main/resources/audit/rule-keys.json nachtragen");
+                    }
                 }
             }
         }

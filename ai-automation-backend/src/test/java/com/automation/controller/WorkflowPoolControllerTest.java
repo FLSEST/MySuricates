@@ -53,7 +53,7 @@ class WorkflowPoolControllerTest {
 
     @Test
     void listAll_returnsOk() throws Exception {
-        when(poolService.listAll()).thenReturn(List.of(sampleEntry()));
+        when(poolService.listAll(null)).thenReturn(List.of(sampleEntry()));
 
         mockMvc.perform(get("/api/v1/pool"))
                 .andExpect(status().isOk())
@@ -65,7 +65,7 @@ class WorkflowPoolControllerTest {
 
     @Test
     void listAll_emptyPool_returnsEmptyList() throws Exception {
-        when(poolService.listAll()).thenReturn(List.of());
+        when(poolService.listAll(null)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/pool"))
                 .andExpect(status().isOk())
@@ -73,8 +73,17 @@ class WorkflowPoolControllerTest {
     }
 
     @Test
+    void listAll_passesTheLocaleForBilingualSteps() throws Exception {
+        when(poolService.listAll("de")).thenReturn(List.of(sampleEntry()));
+
+        mockMvc.perform(get("/api/v1/pool").param("locale", "de"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
     void getById_existing_returnsOk() throws Exception {
-        when(poolService.findById("code-review")).thenReturn(sampleEntry());
+        when(poolService.findById("code-review", null)).thenReturn(sampleEntry());
 
         mockMvc.perform(get("/api/v1/pool/code-review"))
                 .andExpect(status().isOk())
@@ -84,7 +93,7 @@ class WorkflowPoolControllerTest {
 
     @Test
     void getById_notFound_returns404() throws Exception {
-        when(poolService.findById("unknown"))
+        when(poolService.findById("unknown", null))
                 .thenThrow(new ResourceNotFoundException("PoolWorkflow", "unknown"));
 
         mockMvc.perform(get("/api/v1/pool/unknown"))

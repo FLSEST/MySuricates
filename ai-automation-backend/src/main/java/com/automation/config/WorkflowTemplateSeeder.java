@@ -50,6 +50,7 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
                 // Existing template with older version — update
                 dbTemplate.setBlocks(template.getBlocks());
                 dbTemplate.setInstructions(template.getInstructions());
+                dbTemplate.setI18nSource(template.getI18nSource());
                 dbTemplate.setModel(template.getModel());
                 dbTemplate.setIcon(template.getIcon());
                 dbTemplate.setName(template.getName());

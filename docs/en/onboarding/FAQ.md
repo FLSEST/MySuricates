@@ -99,7 +99,7 @@ All AI calls go through `HostClaudeService`:
 
 ### How does the template system work?
 
-- 66 built-in templates as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`)
+- 67 built-in templates as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`)
 - Seeded on startup by `WorkflowTemplateSeeder` (idempotent)
 - Name/description are i18n JSON maps: `{"de":"...", "en":"..."}`
 - Frontend resolves language via `resolveTemplateName()` in `utils/templateUtils.ts`

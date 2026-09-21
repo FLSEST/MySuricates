@@ -40,7 +40,7 @@ public class ChainTemplateController {
     public ResponseEntity<ChainInstallResponse> installTemplate(
             @PathVariable String id,
             @Valid @RequestBody InstallChainTemplateRequest request) {
-        WorkflowChain chain = chainTemplateService.install(id, request.projectId(), request.chainName());
+        WorkflowChain chain = chainTemplateService.install(id, request.projectId(), request.chainName(), request.locale());
         List<String> workflowIds = chain.getEntries().stream()
                 .map(e -> e.getWorkflowId())
                 .toList();

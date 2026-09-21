@@ -44,18 +44,20 @@ class PoolAnalyzerGateTest {
         int checked = 0;
 
         for (Path file : definitionFiles()) {
-            JsonNode root = objectMapper.readTree(Files.readString(file));
-            List<BlockDefinition> blocks = blocksOf(root);
-            if (blocks.isEmpty()) continue;
-            checked++;
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                List<BlockDefinition> blocks = blocksOf(root);
+                if (blocks.isEmpty()) continue;
+                checked++;
 
-            String instructions = root.path("instructions").isTextual()
-                    ? root.path("instructions").asText() : null;
-            for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions)) {
-                byRule.merge(finding.rule(), 1, Integer::sum);
-                if (finding.severity() == AnalyzerFinding.Severity.HIGH) {
-                    severe.add(file.getFileName() + " [Block " + finding.blockIndex() + "] "
-                            + finding.rule() + ": " + finding.detail());
+                String instructions = root.path("instructions").isTextual()
+                        ? root.path("instructions").asText() : null;
+                for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions)) {
+                    byRule.merge(finding.rule(), 1, Integer::sum);
+                    if (finding.severity() == AnalyzerFinding.Severity.HIGH) {
+                        severe.add(variant.label() + " [Block " + finding.blockIndex() + "] "
+                                + finding.rule() + ": " + finding.detail());
+                    }
                 }
             }
         }

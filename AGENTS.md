@@ -484,3 +484,4 @@ curl -s -X POST http://localhost:9090/api/v1/testing/report-result \
 - **DB nie direkt beschreiben:** Immer über REST API gehen
 - **foreach ist lowercase:** Block-Typ heißt `foreach`, nicht `forEach`
 - **Approval-Feld:** `{"answer": "Yes"}`, nicht `{"approved": true}`
+- **Sprache aus Vorlagen:** `GET /api/v1/workflow-templates?locale=de|en` liefert die Schritte zweisprachiger Vorlagen in dieser Sprache (ohne Angabe Englisch). Pool- und Ketten-Install nehmen `"locale"` im Body (Pool ohne Angabe Englisch, Ketten Deutsch). Wer Blöcke einer Vorlage in `POST /workflows` kopiert, holt sie vorher mit `?locale=`. Regeln: [docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md#zweisprachige-vorlagen)

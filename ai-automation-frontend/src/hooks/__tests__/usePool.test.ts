@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { usePoolWorkflows, useInstallPoolWorkflow, usePoolExport } from '../usePool';
 import { useToastStore } from '../../stores/toastStore';
+import { useI18nStore } from '../../i18n';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -49,6 +50,24 @@ describe('useInstallPoolWorkflow', () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.workflowId).toBe('w1');
+  });
+
+  it('installs in the UI language', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    let body: unknown = null;
+    server.use(
+      http.post('/api/v1/pool/:poolId/install', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ workflowId: 'w1', workflowName: 'Installiert', created: true });
+      }),
+    );
+    const { result } = renderHook(() => useInstallPoolWorkflow(), { wrapper: createWrapper() });
+    await act(async () => {
+      result.current.mutate({ poolId: 'p1', projectId: 'proj1' });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(body).toMatchObject({ projectId: 'proj1', locale: 'de' });
   });
 });
 

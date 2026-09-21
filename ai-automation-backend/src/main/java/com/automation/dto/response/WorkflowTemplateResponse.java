@@ -23,6 +23,14 @@ public record WorkflowTemplateResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
+    /** The same template with its blocks and instructions in another language (bilingual templates). */
+    public WorkflowTemplateResponse withBlocksAndInstructions(List<BlockDefinition> localizedBlocks,
+                                                              String localizedInstructions) {
+        return new WorkflowTemplateResponse(id, name, description, icon, category, localizedBlocks,
+                localizedInstructions, model, builtIn, sortOrder, qualityStatus, verifications, version,
+                createdAt, updatedAt);
+    }
+
     public record TemplateVerificationInfo(
             String projectId,
             String projectName,

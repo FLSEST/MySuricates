@@ -1,6 +1,8 @@
 package com.automation.config;
 
 import com.automation.entity.WorkflowTemplate;
+import com.automation.util.LocalizedJson;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -46,9 +48,16 @@ public class BuiltInTemplateLoader {
 
             for (Resource resource : resources) {
                 try (InputStream is = resource.getInputStream()) {
-                    BuiltInTemplateDefinition def = objectMapper.readValue(is, BuiltInTemplateDefinition.class);
-                    templates.add(toEntity(def));
-                } catch (IOException e) {
+                    // Bilingual files carry {de,en} maps inside blocks, which BlockDefinition can't
+                    // take — the entity gets the English variant, the raw content goes to i18nSource.
+                    JsonNode root = objectMapper.readTree(is);
+                    BuiltInTemplateDefinition def = objectMapper.treeToValue(
+                            LocalizedJson.resolveDefinition(root, LocalizedJson.DEFAULT_LOCALE),
+                            BuiltInTemplateDefinition.class);
+                    WorkflowTemplate template = toEntity(def);
+                    template.setI18nSource(LocalizedJson.localizedSource(root));
+                    templates.add(template);
+                } catch (IOException | IllegalArgumentException e) {
                     log.error("Failed to load built-in template from {}: {}", resource.getFilename(), e.getMessage());
                 }
             }
