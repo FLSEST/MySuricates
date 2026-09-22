@@ -2,6 +2,8 @@ import type { TranslationKeys } from './en';
 
 export const de: TranslationKeys = {
   common: {
+    maximize: 'Maximieren',
+    restore: 'Größe zurücksetzen',
     save: 'Speichern',
     cancel: 'Abbrechen',
     delete: 'Löschen',
@@ -487,6 +489,12 @@ export const de: TranslationKeys = {
     blockConfig: 'Konfiguration (JSON)',
     blockSkills: 'Block-Skills',
     blockSkillsHint: 'Zusätzliche Skills, die nur für diesen Block aktiviert werden (ergänzend zu Workflow-Skills).',
+    blockSkillsNoEffect: 'Dieser Blocktyp ruft keine KI auf, die Skills wirken hier nicht. Zum Entfernen anklicken.',
+    configEditor: {
+      hint: 'Strg+Leertaste: Vorschläge (nochmal: mit Erklärung) · Maus über einen Schlüssel: Erklärung',
+      problems: '{count} Warnung(en)',
+      format: 'Formatieren',
+    },
     blockAiOverride: 'KI-Anbieter und Modell für diesen Block',
     blockAiOverrideHint: 'Überschreibt die Workflow-Einstellung nur für diesen Block (Config-Schlüssel provider/model). Leer = Workflow-Einstellung, dann System-Standard.',
     blockProvider: 'Anbieter',

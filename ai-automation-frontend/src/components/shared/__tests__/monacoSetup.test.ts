@@ -4,9 +4,10 @@ const config = vi.fn();
 vi.mock('@monaco-editor/react', () => ({ loader: { config } }));
 vi.mock('monaco-editor/esm/vs/editor/edcore.main.js', () => ({ editor: {}, marker: 'local-monaco' }));
 const contributions: string[] = [];
+const setDiagnosticsOptions = vi.fn();
 vi.mock('monaco-editor/esm/vs/language/json/monaco.contribution.js', () => {
   contributions.push('json');
-  return {};
+  return { jsonDefaults: { setDiagnosticsOptions } };
 });
 vi.mock('monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js', () => {
   contributions.push('markdown');
@@ -30,5 +31,22 @@ describe('ensureLocalMonaco', () => {
       .MonacoEnvironment;
     expect(env.getWorker('1', 'json').kind).toBe('json');
     expect(env.getWorker('2', 'editorWorkerService').kind).toBe('editor');
+  });
+
+  it('keeps one schema per editor model and only warns about schema deviations', async () => {
+    const { ensureLocalMonaco, registerJsonSchema } = await import('../monacoSetup');
+    await ensureLocalMonaco();
+    const latest = () => setDiagnosticsOptions.mock.calls.at(-1)![0];
+
+    const unregisterA = registerJsonSchema('editor-a.json', { title: 'A' });
+    registerJsonSchema('editor-b.json', { title: 'B' });
+    expect(latest().schemaValidation).toBe('warning');
+    expect(latest().enableSchemaRequest).toBe(false);
+    expect(latest().schemas.map((s: { fileMatch: string[] }) => s.fileMatch[0])).toEqual(['editor-a.json', 'editor-b.json']);
+
+    // A newer schema for the same editor replaces the old one; the stale unregister must not remove it
+    registerJsonSchema('editor-a.json', { title: 'A2' });
+    unregisterA();
+    expect(latest().schemas.map((s: { schema: { title: string } }) => s.schema.title)).toEqual(['A2', 'B']);
   });
 });
