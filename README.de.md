@@ -15,6 +15,29 @@ entstanden, ein Teil davon ueber diesen Regelkreis selbst.
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
 [Reifegrad](#reifegrad-und-bekannte-schulden).
 
+## Dokumentation
+
+| Dokument | Inhalt |
+|---|---|
+| [Getting Started](docs/GETTING-STARTED.md) | Ausprobieren ohne Installation (Tryout-Image) und Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
+| [Konzepte](docs/konzepte/README.md) | Acht Mechanismen zum Uebernehmen — Gates, Selbstverbesserung, Haertung u. a. —, je mit Ablaufdiagramm, Codebelegen und datierter Messung |
+| [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
+| [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
+| [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Steuerung und Status, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment, Logging und Monitoring) |
+| [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
+| [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
+| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
+| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
+| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
+| [Entwickler-Onboarding](docs/onboarding/README.md) | Einstieg in den Code: Architektur, Code-Rundgang, Glossar, FAQ |
+| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
+| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
+| [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
+| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
+| [Vision](docs/vision.md) | Produktvision und Roadmap |
+
+Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
+
 ## Die Fragen dahinter
 
 Vier Mechanismen sind gebaut, um jeweils eine Frage zu untersuchen. Gebaut heisst hier: sie laufen.
@@ -30,22 +53,28 @@ Es heisst nicht, dass die Frage beantwortet ist.
 Die ehrlichste Antwort nach sieben Monaten: die Mechanismen tragen, aber sie brauchen Leitplanken,
 und die Leitplanken sind der eigentliche Ertrag. Ein Gate, das nur ein Sprachmodell fragt, ob etwas
 gut ist, liefert zuverlaessig Befunde — auch erfundene. Deterministische Messung vor KI-Bewertung ist
-die wiederkehrende Lehre.
+die wiederkehrende Lehre. Die Mechanismen einzeln, je mit Ablaufdiagramm, Codebelegen und Grenzen:
+[Konzepte](docs/konzepte/README.md).
+
+Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
+Start festgelegt werden: das Preset `core` (Standard) enthaelt den Kern, `research` ergaenzt
+Chains, Assistent, Learning, Workflow-Memory, Audit Center und BPMN, `full` schaltet alles frei —
+darunter Integrationen, Webhooks und Fernzugriff. Der Installer fragt danach.
 
 ## Was da steht
 
-Stand 2026-09-21 (Commit `3776647f`), Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag
-(Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend `src/main/java`, Frontend `src`
-inkl. Tests). Testzahlen aus einem Lauf in einem isolierten
+Stand 2026-09-22 (Commit `d23a09ed`, Release v0.7.6 plus Nacharbeit), Commit-Zaehler und Zeilen
+aus dem Arbeitsbaum an diesem Tag (Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend
+`src/main/java`, Frontend `src` inkl. Tests). Testzahlen aus einem Lauf in einem isolierten
 Worktree, datiert in der Tabelle:
 
 | | |
 |---|---|
-| Entstanden seit | 2026-02-15, rund 1 750 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.5, rund 71 000 Zeilen, 48 REST-Controller, 84 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 71 000 Zeilen |
+| Entstanden seit | 2026-02-15, rund 1 800 Commits, ein Autor |
+| Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 48 REST-Controller, 84 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
 | Tests | Backend 10 313 (0 Fehler, 1 uebersprungen), Frontend 1 436 — Lauf vom 2026-09-21 |
-| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
+| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund aus einem lokalen Lauf. Die CI-Definition
 (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push, zusaetzlich
@@ -57,12 +86,14 @@ Experimentell. Das System laeuft beim Autor taeglich auf einem Rechner und hatte
 rund 2 400 Runs hinter sich — es ist bisher nicht unter Last, nicht mit mehreren Benutzern und
 nicht ausserhalb eines vertrauenswuerdigen Netzes betrieben worden (Eigenangabe).
 
-Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine Seite der Anwendung, in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-12
-**89 Befunde**:
-26 offen (davon 1 kritisch, 4 hoch), 25 warten auf Verifikation, 38 sind erledigt. Inhaltlich fast
-durchgehend Struktur: zu grosse und zu stark gekoppelte Services und UI-Komponenten, unscharfe
-Controller-Repository-Grenzen, Speicher- und Retention-Themen. Wie diese Befunde entstehen und was
-die Statusse bedeuten, steht im
+Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine Seite der Anwendung,
+in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-22 fuer
+MySuricates selbst **322 Befunde** seit dem 2026-07-19: 29 offen (davon 1 kritisch, 4 hoch),
+7 warten auf Gegenpruefung, 267 sind behoben, 18 als Risiko akzeptiert, 1 verworfen. Die offenen
+betreffen vor allem drei Felder: Struktur (eine zu grosse zentrale Ausfuehrungsklasse, stark
+gekoppelte Services, Controller mit direktem Repository-Zugriff), Performance und Speicher
+(Datenbankgroesse ohne Vacuum-Strategie, N+1-Kandidaten, Bundle-Groesse) und die Reife fuer eine
+Veroeffentlichung. Wie diese Befunde entstehen und was die Statusse bedeuten, steht im
 [Audit-Workflow-Protokoll](docs/audit-workflow-protocol.md).
 
 Bekannte harte Grenzen:
@@ -75,8 +106,9 @@ Bekannte harte Grenzen:
 
 ## Bevor du es startest
 
-Shell-Bloecke und KI-Aufrufe laufen **auf dem Host mit deinen Rechten**, nicht in einem Container;
-die Claude CLI fragt dabei standardmaessig nicht vor Werkzeugnutzung nach. Aus dem Quellcode
+Shell-Bloecke und KI-Aufrufe laufen **mit deinen Rechten** — direkt auf dem Rechner oder, bei der
+Instanz im Container, mit deinen eingebundenen Ordnern und Anmeldungen —, nicht je Block in einer
+Sandbox; die KI-CLIs fragen dabei standardmaessig nicht vor Werkzeugnutzung nach. Aus dem Quellcode
 gestartet lauschen Backend und Frontend auf allen Netzwerk-Interfaces (die per Installer
 eingerichtete Instanz bindet standardmaessig nur `127.0.0.1`), und einige Endpunkte brauchen
 keinen API-Key. MySuricates
@@ -95,10 +127,10 @@ ein VPN davor, kein offener Port. Vollstaendig:
 | Styling | Tailwind CSS 4, CSS-Variablen |
 | State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP ueber SockJS |
-| Sicherheit | API-Key-Auth, Rate Limiting |
+| Sicherheit | API-Key-Auth, Rate Limiting, Zulassungspruefung vor jedem Run; optional HMAC-signierte Workflow-Siegel |
 | i18n | Deutsch / Englisch |
 | PWA | Vite PWA Plugin |
-| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior |
+| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior — Modul, im Preset `full` |
 
 Ausgefuehrt wird dort, wo die Instanz laeuft — im Container (empfohlen) oder direkt auf dem
 Rechner: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die installierte CLI (im
@@ -110,6 +142,13 @@ Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklic
 > Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
 > fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
+Nur ausprobieren: Im geklonten Repository startet `scripts/tryout.sh build && scripts/tryout.sh start`
+einen Container mit allen Werkzeugen auf http://localhost:9095, der nichts vom Rechner einbindet —
+dafuer braucht es nur Docker
+([Getting Started](docs/GETTING-STARTED.md#nur-ausprobieren--ohne-installation)).
+
+Dauerhaft einrichten:
+
 ```bash
 git clone https://github.com/FLSEST/MySuricates.git autotrigger
 cd autotrigger
@@ -117,8 +156,8 @@ cd autotrigger
 ```
 
 Der Installer fragt nach dem Weg — eine Instanz im Container (empfohlen), direkt auf dem Rechner
-oder gestuft **Dev · Test · Prod** —, installiert fehlende Werkzeuge nach Rueckfrage, baut und
-startet die Instanz. Danach: http://localhost:9090, den API-Key zeigt
+oder gestuft **Dev · Test · Prod** — und nach den Modulen, installiert fehlende Werkzeuge nach
+Rueckfrage, baut und startet die Instanz. Danach: http://localhost:9090, den API-Key zeigt
 `scripts/instance.sh key --name main`. Die Instanz lauscht nur auf `127.0.0.1`; der Docker-Socket
 wird nur auf ausdruecklichen Wunsch eingebunden.
 
@@ -128,27 +167,6 @@ Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start`
 
 <!-- Screenshot-Platzhalter -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-
-## Dokumentation
-
-| Dokument | Inhalt |
-|---|---|
-| [Getting Started](docs/GETTING-STARTED.md) | Erstinstallation mit dem gefuehrten Installer (Container, Rechner oder Dev · Test · Prod) |
-| [Architektur](docs/architektur.md) | Systemuebersicht, Schichten, Datenfluss, Sicherheit |
-| [Diagramme](docs/diagramme.md) | Neun Seiten Ablauf- und Architekturdiagramme (Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment) |
-| [API-Referenz](docs/api-referenz.md) | REST-Endpunkte mit Request/Response |
-| [Datenmodell](docs/datenmodell.md) | Entities, DB-Schema, Migrationen |
-| [Frontend](docs/frontend.md) | Seiten, Komponenten, Hooks, Design-System |
-| [Deployment](docs/deployment.md) | Docker, Konfiguration, Umgebungsvariablen, Vertrauensmodell |
-| [Entwicklung](docs/entwicklung.md) | Lokales Setup, Build, Tests, Konventionen |
-| [Integrations](docs/integrations.md) | Plugin-System, OAuth, Provider-Referenz |
-| [Workflow-Guide](docs/WORKFLOW-GUIDE.md) | Block-Typen, Patterns, Timeouts |
-| [Assistant](docs/assistant-system.md) | Chat-Assistent, Sessions, Suggestions |
-| [Audit-Protokoll](docs/audit-workflow-protocol.md) | Wie Befunde entstehen, Gate-Status, TODO-Verknuepfung |
-| [Belege](docs/belege.md) | Faelle, in denen ein Mechanismus etwas fand, das der normale Prozess uebersah — mit Run-Id und Zahl |
-| [Vision](docs/vision.md) | Produktvision und Roadmap |
-
-Fuer Agenten, die die REST-API direkt ansprechen, ist [AGENTS.md](AGENTS.md) der Einstieg.
 
 ## Todo-Workflow-Verknuepfung
 
