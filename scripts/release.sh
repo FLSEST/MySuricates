@@ -21,11 +21,11 @@ usage() {
     echo "Usage: $(basename "$0") [patch|minor|major]"
     echo ""
     echo "Releases the next version from the last tag: writes it into pom.xml, package.json and"
-    echo "package-lock.json, commits, tags it, and then sets pom.xml to the next -SNAPSHOT."
+    echo "package-lock.json, commits, tags it, and then sets all three to the next -SNAPSHOT."
     echo ""
-    echo "  patch  (default)  v0.1.0 → v0.1.1   (afterwards pom 0.1.2-SNAPSHOT)"
-    echo "  minor             v0.1.1 → v0.2.0   (afterwards pom 0.2.1-SNAPSHOT)"
-    echo "  major             v0.2.0 → v1.0.0   (afterwards pom 1.0.1-SNAPSHOT)"
+    echo "  patch  (default)  v0.1.0 → v0.1.1   (afterwards 0.1.2-SNAPSHOT)"
+    echo "  minor             v0.1.1 → v0.2.0   (afterwards 0.2.1-SNAPSHOT)"
+    echo "  major             v0.2.0 → v1.0.0   (afterwards 1.0.1-SNAPSHOT)"
 }
 
 # ── Read current version ──────────────────────────────────
@@ -130,15 +130,18 @@ git commit -m "Release v${NEXT}"
 log "Tagging v${NEXT}..."
 git tag "v${NEXT}"
 
-# Back to development: without this, every later commit would carry the release number
+# Back to development: without this, every later commit would carry the release number.
+# Backend and frontend move together — the dashboard tile compares both numbers and would warn
+# about drift for good if package.json stayed on the release number.
 log "Continuing on ${DEV}-SNAPSHOT"
 update_pom "$DEV" snapshot
-git add "$POM_FILE"
+update_package_json "${DEV}-SNAPSHOT"
+git add "$POM_FILE" "$PACKAGE_JSON" "$PACKAGE_LOCK"
 git commit -m "Weiter an v${DEV}"
 
 echo ""
 log "Done! Released ${NEXT}"
 log "  Git tag v${NEXT}:  pom ${NEXT}, package.json ${NEXT} (package-lock.json mitgezogen)"
-log "  danach:            pom ${DEV}-SNAPSHOT"
+log "  danach:            pom + package.json ${DEV}-SNAPSHOT"
 echo ""
 log "To push: git push && git push --tags"

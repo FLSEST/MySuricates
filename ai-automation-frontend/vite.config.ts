@@ -37,6 +37,13 @@ export default defineConfig(() => {
   return {
     define: {
       __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+      // Die Frontend-Version steht sonst nirgends im Bundle. Die Kachel BuildInfoStat stellt sie
+      // neben die Backend-Version aus /system/info: weichen beide ab, laeuft ein neues Frontend
+      // gegen ein altes Backend-JAR — der Fall, der beim Test-Container 404er und haengende
+      // Seiten erzeugt (CLAUDE.md, Staging).
+      __APP_VERSION__: JSON.stringify(
+        JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version,
+      ),
       // Shim für sockjs-client, das bare `global` referenziert (siehe node_modules/sockjs-client/lib/*.js).
       // Ersetzt das bisherige Inline-<script>var global = globalThis;</script> in index.html (CSP-Verstoß).
       global: 'globalThis',

@@ -1,5 +1,5 @@
 import {
-  FolderKanban, GitBranch, Zap, TrendingUp, Coins, CalendarClock, CalendarRange, Info,
+  FolderKanban, GitBranch, Zap, TrendingUp, Coins, CalendarClock, CalendarRange, Info, AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../ui';
 import { useDashboardData } from './dashboardDataContext';
@@ -143,7 +143,14 @@ function formatBuildTime(iso: string | undefined): string {
 export function BuildInfoStat() {
   const t = useT();
   const { data: systemInfo } = useSystemInfo();
-  const feTimestamp = __BUILD_TIMESTAMP__;
+  // Zwischen zwei Releases steht in beiden Dateien X.Y.Z-SNAPSHOT; das Backend liefert die Nummer
+  // schon ohne Suffix (SystemIdentityService), hier faellt es genauso weg.
+  const feVersion = __APP_VERSION__.split('-')[0];
+  const beVersion = systemInfo?.version;
+  // Erst vergleichen, wenn das Backend geantwortet hat — sonst meldete die Kachel beim Laden Drift.
+  // Weichen die Nummern ab, laeuft ein neues Frontend gegen ein altes Backend-JAR (Test-Container:
+  // neue Endpunkte liefern 404, die Seite haengt auf „loading").
+  const mismatch = Boolean(beVersion) && beVersion !== feVersion;
 
   return (
     <Card className="flex items-center gap-3 py-3! px-4!">
@@ -152,9 +159,9 @@ export function BuildInfoStat() {
       </div>
       <div className="min-w-0">
         <p className="text-xs text-text-secondary">{t.dashboard.version}</p>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-lg font-bold text-text">
-            {systemInfo ? `v${systemInfo.version}` : '-'}
+            {beVersion ? `v${beVersion}` : '-'}
           </p>
           {systemInfo?.buildType && (
             <span className={`text-[9px] font-semibold px-1 py-0.5 rounded-full uppercase tracking-wide ${
@@ -166,9 +173,18 @@ export function BuildInfoStat() {
             </span>
           )}
         </div>
-        <div className="flex gap-2 text-[9px] text-text-tertiary">
-          <span title="Backend Build">BE {formatBuildTime(systemInfo?.buildTimestamp)}</span>
-          <span title="Frontend Build">FE {formatBuildTime(feTimestamp)}</span>
+        <div className={`flex gap-2 items-center flex-wrap text-[9px] ${mismatch ? 'text-warning' : 'text-text-tertiary'}`}>
+          <span className="whitespace-nowrap" title={`${t.dashboard.backendBuild}: ${formatBuildTime(systemInfo?.buildTimestamp)}`}>
+            BE {beVersion ?? '?'}
+          </span>
+          <span className="whitespace-nowrap" title={`${t.dashboard.frontendBuild}: ${formatBuildTime(__BUILD_TIMESTAMP__)}`}>
+            FE {feVersion}
+          </span>
+          {mismatch && (
+            <span title={t.dashboard.versionMismatch} aria-label={t.dashboard.versionMismatch} className="flex items-center">
+              <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+            </span>
+          )}
         </div>
       </div>
     </Card>

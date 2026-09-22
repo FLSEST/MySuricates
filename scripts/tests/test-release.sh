@@ -58,7 +58,7 @@ check "Tag v0.1.1 angelegt"                     'git -C "$TMP" rev-parse -q --ve
 check "im Tag ohne -SNAPSHOT"                   '[ "$(at_tag v0.1.1)" = "0.1.1" ]'
 check "package.json im Tag auf 0.1.1"           '[ "$(git -C "$TMP" show v0.1.1:ai-automation-frontend/package.json | json_version)" = "0.1.1" ]'
 check "danach 0.1.2-SNAPSHOT in der pom.xml"    '[ "$(pom_version)" = "0.1.2-SNAPSHOT" ]'
-check "package.json bleibt auf der Release-Nr." '[ "$(pkg_version)" = "0.1.1" ]'
+check "package.json zieht mit: 0.1.2-SNAPSHOT"  '[ "$(pkg_version)" = "0.1.2-SNAPSHOT" ]'
 check "zwei Commits: Release und Weiter an"     '[ "$(git -C "$TMP" log --format=%s -2 | tr "\\n" "|")" = "Weiter an v0.1.2|Release v0.1.1|" ]'
 check "Arbeitsbaum danach sauber"               '[ -z "$(git -C "$TMP" status --porcelain)" ]'
 
@@ -68,6 +68,7 @@ check "Skript laeuft durch"                     '[ "$RC3" -eq 0 ]'
 check "v0.2.0 statt v0.2.1"                     'git -C "$TMP" rev-parse -q --verify refs/tags/v0.2.0 >/dev/null'
 check "im Tag ohne -SNAPSHOT"                   '[ "$(at_tag v0.2.0)" = "0.2.0" ]'
 check "danach 0.2.1-SNAPSHOT"                   '[ "$(pom_version)" = "0.2.1-SNAPSHOT" ]'
+check "package.json ebenso 0.2.1-SNAPSHOT"      '[ "$(pkg_version)" = "0.2.1-SNAPSHOT" ]'
 
 echo "3) Schmutziger Arbeitsbaum"
 printf 'x\n' >> "$TMP/ai-automation-frontend/package.json"

@@ -420,13 +420,19 @@ without Docker: `bash scripts/tests/test-installer-probe.sh` and
 | File | Format | Example |
 |---|---|---|
 | `ai-automation-backend/pom.xml` | `X.Y.Z` in the tag, `X.Y.Z-SNAPSHOT` afterwards | `0.7.7` / `0.7.8-SNAPSHOT` |
-| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.7.3` |
+| `ai-automation-frontend/package.json` | same as pom.xml: `X.Y.Z` in the tag, `X.Y.Z-SNAPSHOT` afterwards | `0.7.7` / `0.7.8-SNAPSHOT` |
 | `application.yml` | via `@project.version@` (Maven filtering) | automatic |
 
 The dashboard displays the version via the `/api/v1/system/info` endpoint. The **build type** comes
 from the suffix (`SystemIdentityService`): no suffix means `RELEASE`, `-SNAPSHOT` means SNAPSHOT.
 That is why the tagged commit carries the bare number — up to v0.7.6 it carried `-SNAPSHOT`, so every
 installation of a release reported SNAPSHOT (TODO dd82775b).
+
+Backend and frontend carry the **same** number, between releases as well: the version tile on the
+dashboard shows both side by side (`BE … · FE …`) and warns when they drift apart — the "new
+frontend, old backend JAR" case that produces 404s and pages stuck on "loading" in the test
+container. If `package.json` stayed on the release number while `pom.xml` already moved to the next
+`-SNAPSHOT`, that warning would be on screen permanently.
 
 ### Release Script
 
@@ -441,7 +447,7 @@ The script:
 2. Calculates the new version (increments the segment) and stops if that tag exists already
 3. Writes it **without a suffix** into `pom.xml` plus `package.json` and `package-lock.json` (via `npm version`) — a lockfile left at the old version makes every fresh clone dirty after its first `npm install`; `packageLock.guard.test.ts` keeps both in sync
 4. Creates the git commit `Release vX.Y.Z` and sets the git tag `vX.Y.Z`
-5. Sets `pom.xml` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Weiter an vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number
+5. Sets `pom.xml` **and** `package.json` to the next development version `X.Y.(Z+1)-SNAPSHOT` and commits `Weiter an vX.Y.(Z+1)` — otherwise every commit after the tag would carry the release number and the version tile would report drift permanently
 
 **Prerequisite:** Clean working tree (no uncommitted changes).
 **Test:** `bash scripts/tests/test-release.sh` runs the flow in a throwaway repository.

@@ -436,13 +436,19 @@ Docker: `bash scripts/tests/test-installer-probe.sh` und
 | Datei | Format | Beispiel |
 |---|---|---|
 | `ai-automation-backend/pom.xml` | im Tag `X.Y.Z`, danach `X.Y.Z-SNAPSHOT` | `0.7.7` bzw. `0.7.8-SNAPSHOT` |
-| `ai-automation-frontend/package.json` | `X.Y.Z` | `0.7.7` |
+| `ai-automation-frontend/package.json` | wie die pom.xml: im Tag `X.Y.Z`, danach `X.Y.Z-SNAPSHOT` | `0.7.7` bzw. `0.7.8-SNAPSHOT` |
 | `application.yml` | via `@project.version@` (Maven-Filtering) | automatisch |
 
 Das Dashboard zeigt die Version über den `/api/v1/system/info`-Endpunkt an. Den **Bautyp** leitet
 `SystemIdentityService` aus dem Suffix ab: ohne Suffix `RELEASE`, mit `-SNAPSHOT` eben SNAPSHOT.
 Deshalb trägt der getaggte Commit die nackte Nummer — bis v0.7.6 stand dort `-SNAPSHOT`, und jede
 Installation eines Releases meldete SNAPSHOT (TODO dd82775b).
+
+Backend und Frontend tragen **dieselbe** Nummer, auch zwischen zwei Releases: die Versions-Kachel
+im Dashboard stellt beide nebeneinander (`BE … · FE …`) und warnt, wenn sie auseinanderlaufen —
+der Fall „neues Frontend, altes Backend-JAR", der im Test-Container 404er und hängende Seiten
+erzeugt. Liefe `package.json` auf der Release-Nummer weiter, während die `pom.xml` schon auf der
+nächsten `-SNAPSHOT` steht, stünde diese Warnung dauerhaft im Bild.
 
 ### Release-Script
 
@@ -457,7 +463,7 @@ Das Script:
 2. Berechnet die neue Version (Segment hochzählen) und bricht ab, wenn es den Tag schon gibt
 3. Schreibt sie **ohne Suffix** in `pom.xml` sowie in `package.json` und `package-lock.json` (über `npm version`) — ein Lockfile auf der alten Version macht jeden frischen Klon nach dem ersten `npm install` dirty; `packageLock.guard.test.ts` hält beide synchron
 4. Erstellt Git-Commit `Release vX.Y.Z` und setzt Git-Tag `vX.Y.Z`
-5. Setzt `pom.xml` auf die nächste Entwicklungsversion `X.Y.(Z+1)-SNAPSHOT` und committet `Weiter an vX.Y.(Z+1)` — sonst trüge jeder Commit nach dem Tag dieselbe Release-Nummer
+5. Setzt `pom.xml` **und** `package.json` auf die nächste Entwicklungsversion `X.Y.(Z+1)-SNAPSHOT` und committet `Weiter an vX.Y.(Z+1)` — sonst trüge jeder Commit nach dem Tag dieselbe Release-Nummer, und die Versions-Kachel meldete dauerhaft Drift
 
 **Voraussetzung:** Sauberer Working Tree (keine uncommitteten Änderungen).
 **Test:** `bash scripts/tests/test-release.sh` fährt den Ablauf in einem Wegwerf-Repo durch.
