@@ -6,7 +6,7 @@ import { Button, Modal } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { downloadBlob } from '../../utils/downloadFile';
 import type { LineRange } from '../../utils/workflowDefinition';
-import BpmnDiagramView, { type DiagramSelection, type DiagramOrientation } from './BpmnDiagramView';
+import BpmnDiagramView, { type BlockFlash, type DiagramSelection, type DiagramOrientation } from './BpmnDiagramView';
 
 export default function WorkflowDiagramTab({
   workflowId,
@@ -14,12 +14,16 @@ export default function WorkflowDiagramTab({
   definitionText,
   lineRanges,
   onSelectBlock,
+  flashBlock,
+  onHoverBlock,
 }: {
   workflowId: string;
   workflowName: string;
   definitionText: string;
   lineRanges: Map<number, LineRange>;
   onSelectBlock?: (selection: DiagramSelection) => void;
+  flashBlock?: BlockFlash | null;
+  onHoverBlock?: (blockIndex: number) => void;
 }) {
   const t = useT();
   const { data: xml, isLoading, isError } = useWorkflowBpmn(workflowId);
@@ -86,6 +90,8 @@ export default function WorkflowDiagramTab({
         onSelectBlock={onSelectBlock}
         infoByBlock={showInfo ? lineRanges : undefined}
         orientation={orientation}
+        flashBlock={flashBlock}
+        onHoverBlock={onHoverBlock}
       />
 
       <Modal open={showDefinition} onClose={() => setShowDefinition(false)} title={t.workflows.viewDefinition} size="xl">

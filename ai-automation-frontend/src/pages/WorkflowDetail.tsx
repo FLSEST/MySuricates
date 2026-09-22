@@ -6,6 +6,7 @@ import { Plus, History, PanelRightClose, PanelRightOpen } from 'lucide-react';
 const WorkflowVersionsTab = lazy(() => import('../components/workflow/WorkflowVersionsTab'));
 const WorkflowDiagramTab = lazy(() => import('../components/workflow/WorkflowDiagramTab'));
 type DiagramSelection = import('../components/workflow/BpmnDiagramView').DiagramSelection;
+type BlockFlash = import('../components/workflow/BpmnDiagramView').BlockFlash;
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ResizableSplit } from '../components/shared/ResizableSplit';
@@ -52,6 +53,9 @@ export function WorkflowDetail() {
   const deactivateSkill = useDeactivateSkill();
 
   const [showEdit, setShowEdit] = useState(false);
+  // Querverweis per Hover: Maus über einem Listen-Block lässt seinen Kasten im Diagramm blinken und
+  // umgekehrt (Klick öffnet hier den Editor, deshalb Hover statt Klick wie in der Workflow-Liste)
+  const [hoverFlash, setHoverFlash] = useState<(BlockFlash & { target: 'list' | 'diagram' }) | null>(null);
   const [showAddBlock, setShowAddBlock] = useState(false);
   const [showEditBlock, setShowEditBlock] = useState(false);
   const [editBlockIndex, setEditBlockIndex] = useState<number>(-1);
@@ -381,6 +385,8 @@ export function WorkflowDetail() {
                 // A sealed definition is read-only: no drag, edit or remove
                 <fieldset disabled={!!workflow.sealed} className="min-w-0" title={workflow.sealed ? t.workflows.sealedLocked : undefined}>
                   <SortableBlockList
+                    flashBlock={hoverFlash?.target === 'list' ? hoverFlash : null}
+                    onHoverBlock={bpmnModule ? (index) => setHoverFlash({ target: 'diagram', index, nonce: Date.now(), scroll: false }) : undefined}
                     workflowId={workflow.id}
                     blocks={workflow.blocks}
                     onEditBlock={workflow.sealed ? () => {} : handleOpenEditBlock}
@@ -410,6 +416,8 @@ export function WorkflowDetail() {
                   definitionText={definitionText}
                   lineRanges={definitionLineRanges}
                   onSelectBlock={handleSelectFromDiagram}
+                  flashBlock={hoverFlash?.target === 'diagram' ? hoverFlash : null}
+                  onHoverBlock={(index) => setHoverFlash({ target: 'list', index, nonce: Date.now(), scroll: false })}
                 />
               </Suspense>
             </section>

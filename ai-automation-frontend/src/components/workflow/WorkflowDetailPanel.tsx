@@ -1,3 +1,4 @@
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   Play,
   Pencil,
@@ -22,7 +23,8 @@ import { Button, Spinner } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
-import { useWorkflowRuns, useSimilarWorkflows } from '../../hooks/useWorkflows';
+import { useWorkflowRuns, useSimilarWorkflows, useWorkflowBpmn } from '../../hooks/useWorkflows';
+import { useModuleEnabled } from '../../hooks/useModules';
 import { useUpdateWorkflow, exportWorkflow } from '../../hooks/useWorkflows';
 import { TagEditor } from './TagEditor';
 import { formatDuration, formatDateTime } from '../../utils/formatTime';
@@ -30,6 +32,38 @@ import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import { useI18nStore } from '../../i18n';
+import type { BlockFlash as DiagramBlockFlash, DiagramSelection } from './BpmnDiagramView';
+
+const BpmnDiagramView = lazy(() => import('./BpmnDiagramView'));
+
+type BlockFlash = DiagramBlockFlash | null;
+
+function BlocksDiagram({
+  workflowId,
+  t,
+  flashBlock,
+  onSelectBlock,
+}: {
+  workflowId: string;
+  t: TranslationKeys;
+  flashBlock: BlockFlash;
+  onSelectBlock: (selection: DiagramSelection) => void;
+}) {
+  const { data: xml, isLoading, isError } = useWorkflowBpmn(workflowId);
+  if (isLoading) {
+    return <div className="flex justify-center py-4"><Spinner /></div>;
+  }
+  if (isError || !xml) {
+    return <div role="alert" className="py-2 text-xs text-text-secondary">{t.workflows.diagramLoadFailed}</div>;
+  }
+  return (
+    <div className="rounded-lg bg-surface-raised border border-border p-2">
+      <Suspense fallback={<div className="flex justify-center py-4"><Spinner /></div>}>
+        <BpmnDiagramView xml={xml} flashBlock={flashBlock} onSelectBlock={onSelectBlock} />
+      </Suspense>
+    </div>
+  );
+}
 
 const BLOCK_TYPE_ICONS: Record<string, React.ReactNode> = {
   shell: <Terminal className="w-3.5 h-3.5" />,
@@ -87,6 +121,21 @@ export function WorkflowDetailPanel({
   const autoRepairMode = workflow.metadata?.autoRepair?.mode ?? 'auto';
   const autoMemoryEnabled = !!workflow.metadata?.autoMemoryExtraction?.enabled;
   const autoMemoryInterval = workflow.metadata?.autoMemoryExtraction?.interval ?? 5;
+  const bpmnEnabled = useModuleEnabled('bpmn');
+  // Querverweis: Klick im Diagramm lässt den Listeneintrag blinken und umgekehrt
+  // (an die Workflow-ID gebunden, damit ein Wechsel der Auswahl nichts nachblinken lässt)
+  const [flash, setFlash] = useState<{ workflowId: string; target: 'list' | 'diagram'; index: number; nonce: number } | null>(null);
+  const current = flash?.workflowId === workflow.id ? flash : null;
+  const listFlash: BlockFlash = current?.target === 'list' ? current : null;
+  const diagramFlash: BlockFlash = current?.target === 'diagram' ? current : null;
+  const blockRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const listFlashIndex = listFlash?.index;
+  const listFlashNonce = listFlash?.nonce;
+  useEffect(() => {
+    if (listFlashIndex === undefined) return;
+    blockRefs.current[listFlashIndex]?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [listFlashIndex, listFlashNonce]);
 
   return (
     <div className="bg-surface border border-border rounded-xl p-6 space-y-6">
@@ -153,10 +202,22 @@ export function WorkflowDetailPanel({
           <h3 className="text-sm font-semibold text-text mb-2">{t.workflows.blocks}</h3>
           <div className="space-y-1">
             {workflow.blocks.map((block, idx) => (
-              <div
+              <button
                 key={idx}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-xs"
+                type="button"
+                ref={(el) => { blockRefs.current[idx] = el; }}
+                onClick={bpmnEnabled ? () => setFlash({ workflowId: workflow.id, target: 'diagram', index: idx, nonce: Date.now() }) : undefined}
+                className={`relative flex w-full items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-raised border border-border text-xs text-left ${
+                  bpmnEnabled ? 'hover:border-border-strong' : 'cursor-default'
+                }`}
               >
+                {listFlash?.index === idx && (
+                  <span
+                    key={listFlash.nonce}
+                    data-testid="block-list-flash"
+                    className="block-flash pointer-events-none absolute inset-0 rounded-lg bg-accent/20 ring-2 ring-accent"
+                  />
+                )}
                 <span className="text-text-tertiary shrink-0">
                   {BLOCK_TYPE_ICONS[block.type] ?? <Sparkles className="w-3.5 h-3.5" />}
                 </span>
@@ -164,9 +225,20 @@ export function WorkflowDetailPanel({
                 {getBlockLabel(block) && (
                   <span className="text-text-tertiary truncate font-mono">{getBlockLabel(block)}</span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
+          {bpmnEnabled && (
+            <div className="mt-3">
+              <p className="text-xs text-text-tertiary mb-1.5">{t.workflows.blocksDiagramHint}</p>
+              <BlocksDiagram
+                workflowId={workflow.id}
+                t={t}
+                flashBlock={diagramFlash}
+                onSelectBlock={(sel) => setFlash({ workflowId: workflow.id, target: 'list', index: sel.blockIndex, nonce: Date.now() })}
+              />
+            </div>
+          )}
         </div>
       )}
 

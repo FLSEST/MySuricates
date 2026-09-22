@@ -321,6 +321,37 @@ describe('BpmnDiagramView', () => {
     expect(titles).toContain('Vollautomatische Integrationstestsuite mit ausführlicher Fehleranalyse und Reporting');
   });
 
+  it('lässt nur den Kasten des angefragten Blocks aufblitzen und scrollt ihn ins Bild', () => {
+    const flashXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { container, rerender } = render(<BpmnDiagramView xml={flashXml} flashBlock={{ index: 1, nonce: 1 }} />);
+    expect(container.querySelector('[data-testid="bpmn-flash"]')).toBeNull();
+
+    rerender(<BpmnDiagramView xml={flashXml} flashBlock={{ index: 2, nonce: 2 }} />);
+    const flash = container.querySelector('[data-testid="bpmn-flash"]');
+    expect(flash?.closest('[data-block-index]')?.getAttribute('data-block-index')).toBe('2');
+    expect(flash?.getAttribute('class')).toContain('block-flash');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('scrollt nicht, wenn der Blitz per Hover kommt', () => {
+    const flashXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { container } = render(<BpmnDiagramView xml={flashXml} flashBlock={{ index: 2, nonce: 1, scroll: false }} />);
+    expect(container.querySelector('[data-testid="bpmn-flash"]')).not.toBeNull();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('meldet den Block-Index beim Überfahren eines Kastens', () => {
+    const hoverXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
+    const onHoverBlock = vi.fn();
+    const { container } = render(<BpmnDiagramView xml={hoverXml} onHoverBlock={onHoverBlock} />);
+    fireEvent.mouseEnter(container.querySelector('[data-block-index="2"]')!);
+    expect(onHoverBlock).toHaveBeenCalledWith(2);
+  });
+
   it('zeigt Block-Nummer und Zeilenbereich, wenn infoByBlock gesetzt ist', () => {
     const infoXml = SAMPLE_XML.replace('id="t1"', 'id="b_2_maven"').replace('bpmnElement="t1"', 'bpmnElement="b_2_maven"');
     render(<BpmnDiagramView xml={infoXml} infoByBlock={new Map([[2, { start: 8, end: 12 }]])} />);

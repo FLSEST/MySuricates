@@ -259,6 +259,19 @@
   }
 }
 
+/* Querverweis Blockliste ↔ Diagramm: das Gegenstück blinkt zweimal auf und verschwindet */
+@keyframes block-flash {
+  0%, 50%, 100% { opacity: 0; }
+  25%, 75% { opacity: 1; }
+}
+.block-flash {
+  opacity: 0;
+  animation: block-flash 1.4s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .block-flash { animation-duration: 0.01s; opacity: 1; }
+}
+
 /* Kurzes Aufblitzen der angesprungenen JSON-Zeile im Monaco-Editor (BPMN → Definitionszeile) */
 .bpmn-reveal-flash {
   background-color: color-mix(in srgb, var(--color-accent) 28%, transparent);

@@ -38,9 +38,12 @@ interface SortableBlockProps {
   onEdit: (index: number) => void;
   onRemove: (index: number) => void;
   allBlocks?: BlockDefinition[];
+  /** Gesetzt: der Block blitzt kurz auf; ein neuer Wert blitzt erneut. */
+  flashNonce?: number;
+  onHover?: (index: number) => void;
 }
 
-export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = [] }: SortableBlockProps) {
+export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = [], flashNonce, onHover }: SortableBlockProps) {
   const t = useT();
   const advancedMode = useSettingsStore((s) => s.advancedMode);
   const {
@@ -63,11 +66,19 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-start gap-3 px-5 py-4 group cursor-pointer hover:bg-surface/50 transition-colors ${
+      className={`relative flex items-start gap-3 px-5 py-4 group cursor-pointer hover:bg-surface/50 transition-colors ${
         isDragging ? 'bg-surface-raised shadow-lg rounded-xl' : ''
       }`}
       onClick={() => onEdit(index)}
+      onMouseEnter={onHover ? () => onHover(index) : undefined}
     >
+      {flashNonce !== undefined && (
+        <span
+          key={flashNonce}
+          data-testid="block-list-flash"
+          className="block-flash pointer-events-none absolute inset-0 bg-accent/15 ring-2 ring-inset ring-accent"
+        />
+      )}
       <button
         {...attributes}
         {...listeners}

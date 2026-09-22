@@ -694,6 +694,7 @@ export const en = {
       'The file content is taken over unchanged as the workflow definition. Only the format is checked, not the origin — so import files from sources you know.',
     bpmnExportFailed: 'BPMN export failed',
     diagramTab: 'Diagram',
+    blocksDiagramHint: 'Click a box to highlight its block in the list, and vice versa',
     diagramLoadFailed: 'Could not load diagram',
     diagramHint: 'BPMN 2.0 · Camunda Modeler compatible',
     diagramInfoToggle: 'Details',

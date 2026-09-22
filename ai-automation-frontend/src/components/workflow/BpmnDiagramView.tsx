@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useT } from '../../i18n';
 import { FIT_MIN_WIDTH_RATIO, useDiagramZoom } from './useDiagramZoom';
 
@@ -51,6 +51,9 @@ interface Diagram {
 }
 
 export type DiagramOrientation = 'horizontal' | 'vertical';
+
+/** Kurzes Aufblitzen eines Blocks (Querverweis Liste ↔ Diagramm); ein neuer `nonce` blitzt erneut. */
+export type BlockFlash = { index: number; nonce: number; scroll?: boolean };
 
 const VERTICAL_GAP = 70; // Leerraum zwischen Kästen im vertikalen Fluss
 /** Abstand zwischen Unterkante des Erzeugers und Oberkante seines Datenobjekts. */
@@ -461,6 +464,8 @@ export default function BpmnDiagramView({
   statusByBlock,
   infoByBlock,
   orientation,
+  flashBlock,
+  onHoverBlock,
 }: {
   xml: string;
   onSelectBlock?: (selection: DiagramSelection) => void;
@@ -470,6 +475,10 @@ export default function BpmnDiagramView({
   infoByBlock?: Map<number, { start: number; end: number }>;
   /** Fluss-Richtung: links→rechts (Standard) oder oben→unten. */
   orientation?: DiagramOrientation;
+  /** Lässt den Kasten dieses Top-Level-Blocks kurz aufblitzen; ein neuer `nonce` blitzt erneut. */
+  flashBlock?: BlockFlash | null;
+  /** Maus über einem Kasten — meldet den Top-Level-Block-Index (verschachtelte Kästen: ihren Eltern-Block). */
+  onHoverBlock?: (blockIndex: number) => void;
 }) {
   const t = useT();
   const maps = t.workflows.bpmnLabels as unknown as BpmnLabelMaps;
@@ -478,6 +487,15 @@ export default function BpmnDiagramView({
   const diagram = parsed && parsed.shapes.length > 0 ? (isVertical ? verticalLayout(parsed) : parsed) : null;
   const bounds = diagram ? diagramBounds(diagram) : null;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const flashIndex = flashBlock?.index;
+  const flashNonce = flashBlock?.nonce;
+  // Per Hover ausgelöst wird nicht gescrollt — sonst springt die Seite unter der Maus weg
+  const flashScroll = flashBlock?.scroll !== false;
+  useEffect(() => {
+    if (flashIndex === undefined || !flashScroll) return;
+    const el = scrollRef.current?.querySelector(`[data-block-index="${flashIndex}"]`);
+    el?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [flashIndex, flashNonce, flashScroll]);
   const zoom = useDiagramZoom(scrollRef, isVertical ? 'vertical' : 'horizontal', bounds?.width ?? 0, isVertical ? 'native' : 'width');
   if (!parsed) {
     return <div role="alert" className="p-4 text-sm text-text-secondary">{t.workflows.diagramInvalid}</div>;
@@ -558,16 +576,24 @@ export default function BpmnDiagramView({
             const clickable = sel !== null && !!onSelectBlock;
             const status = sel && statusByBlock ? statusByBlock.get(sel.blockIndex) : undefined;
             const info = sel && infoByBlock ? infoByBlock.get(sel.blockIndex) : undefined;
+            const topLevel = sel !== null && !sel.sub;
+            const flashing = topLevel && flashBlock?.index === sel.blockIndex;
             return (
               <g
                 key={s.id}
+                data-block-index={topLevel ? sel.blockIndex : undefined}
                 className={clickable ? 'cursor-pointer transition-opacity hover:opacity-70' : undefined}
                 onClick={clickable ? () => onSelectBlock!(sel!) : undefined}
+                onMouseEnter={sel && onHoverBlock ? () => onHoverBlock(sel.blockIndex) : undefined}
                 role={clickable ? 'button' : undefined}
                 tabIndex={clickable ? 0 : undefined}
                 onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectBlock!(sel!); } } : undefined}
               >
                 <ShapeSvg s={s} status={status} maps={maps} />
+                {flashing && (
+                  <rect key={flashBlock!.nonce} data-testid="bpmn-flash" x={s.x - 4} y={s.y - 4} width={s.w + 8} height={s.h + 8} rx={12}
+                    className="block-flash fill-accent/20 stroke-accent pointer-events-none" strokeWidth={2.5} />
+                )}
                 {info && sel && (
                   <text x={s.x} y={s.y - 4} className="fill-text-tertiary text-[9px]" style={{ fontFamily: 'monospace' }}>
                     #{sel.blockIndex + 1} · Z.{info.start}–{info.end}

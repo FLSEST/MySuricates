@@ -696,6 +696,7 @@ export const de: TranslationKeys = {
       'Der Inhalt der Datei wird unverändert als Workflow-Definition übernommen. Geprüft wird nur das Format, nicht die Herkunft — importiere daher nur Dateien, deren Quelle du kennst.',
     bpmnExportFailed: 'BPMN-Export fehlgeschlagen',
     diagramTab: 'Diagramm',
+    blocksDiagramHint: 'Klick auf einen Kasten markiert den Block in der Liste und umgekehrt',
     diagramLoadFailed: 'Diagramm konnte nicht geladen werden',
     diagramHint: 'BPMN 2.0 · Camunda-Modeler-kompatibel',
     diagramInfoToggle: 'Details',

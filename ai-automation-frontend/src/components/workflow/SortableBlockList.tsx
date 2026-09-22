@@ -18,6 +18,7 @@ import { useToast } from '../../hooks/useToast';
 import { useT } from '../../i18n';
 import { SortableBlock } from './SortableBlock';
 import type { BlockDefinition } from '../../types';
+import type { BlockFlash } from './BpmnDiagramView';
 
 interface SortableBlockListProps {
   workflowId: string;
@@ -26,9 +27,13 @@ interface SortableBlockListProps {
   onRemoveBlock: (index: number) => void;
   /** Sealed workflows: blocks cannot be reordered */
   locked?: boolean;
+  /** Lässt diesen Block kurz aufblitzen (Querverweis aus dem Diagramm). */
+  flashBlock?: BlockFlash | null;
+  /** Maus über einem Block — fürs Gegenstück im Diagramm. */
+  onHoverBlock?: (index: number) => void;
 }
 
-export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock, locked = false }: SortableBlockListProps) {
+export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlock, locked = false, flashBlock, onHoverBlock }: SortableBlockListProps) {
   const updateWorkflow = useUpdateWorkflow();
   const toast = useToast();
   const t = useT();
@@ -84,6 +89,8 @@ export function SortableBlockList({ workflowId, blocks, onEditBlock, onRemoveBlo
               onEdit={onEditBlock}
               onRemove={onRemoveBlock}
               allBlocks={displayBlocks}
+              flashNonce={flashBlock?.index === idx ? flashBlock.nonce : undefined}
+              onHover={onHoverBlock}
             />
           ))}
         </div>
