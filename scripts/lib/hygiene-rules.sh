@@ -198,8 +198,27 @@ HYGIENE_ALLOWLIST_FILE="scripts/ci/hygiene-allowlist.txt"
 # ist die durchsetzbare Hälfte davon; sie liegt selbst nicht im Repository
 # (auch sie steht in .git/info/exclude). Fehlt sie, wird der Check hörbar
 # übersprungen statt still zu bestehen. Vorlage: die .example-Datei daneben.
+#
+# Weil sie untrackt ist, fehlt sie in jedem Klon und jedem Worktree — auch im
+# isolierten Run-Workspace, in dem der Evidenz-Workflow das Gate fährt (TODO
+# 6e601c77, Private Hygiene-Liste fehlt). Deshalb gibt es zwei Ausweichorte
+# ausserhalb des Repositorys: $HYGIENE_PRIVATE_LIST und die Nutzerkonfiguration.
 # ---------------------------------------------------------------------------
 HYGIENE_PRIVATE_LIST_FILE="scripts/ci/hygiene-private.txt"
+
+# hygiene_private_list_path <repo-root> — gibt den Pfad der ersten vorhandenen
+# Liste aus (Repo-Datei, dann $HYGIENE_PRIVATE_LIST, dann
+# ${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/hygiene-private.txt); Exit 1,
+# wenn keine da ist.
+hygiene_private_list_path() {
+  local root="$1" c
+  for c in "$root/$HYGIENE_PRIVATE_LIST_FILE" \
+           "${HYGIENE_PRIVATE_LIST:-}" \
+           "${XDG_CONFIG_HOME:-${HOME:-}/.config}/mysuricates/hygiene-private.txt"; do
+    [ -n "$c" ] && [ -f "$c" ] && { printf '%s\n' "$c"; return 0; }
+  done
+  return 1
+}
 
 # Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).
 hygiene_allowlist_paths() {

@@ -5,6 +5,11 @@
 # keine Klartext-Namensliste landet). Fehlt die Kopie, ueberspringt das
 # Hygiene-Gate den Check mit einer Meldung — sie ist kein Pflichtteil.
 #
+# Klone und Worktrees (auch der isolierte Run-Workspace der Evidenz-Workflows)
+# haben die untrackte Kopie nicht. Dort sucht das Gate weiter unter
+# $HYGIENE_PRIVATE_LIST und ${XDG_CONFIG_HOME:-~/.config}/mysuricates/hygiene-private.txt
+# — am einfachsten ein Symlink von dort auf die Kopie im Haupt-Checkout.
+#
 # Wozu: .git/info/exclude haelt die persoenlichen Definitionen aus dem Bestand,
 # wird aber nicht geklont und gilt in keinem Worktree. Ein pauschales
 # "git add -A" in einem frischen Clone committet sie sonst wieder zurueck,

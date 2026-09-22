@@ -7,6 +7,10 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
+# Die Ausweichorte der Privatliste (hygiene_private_list_path) liegen ausserhalb
+# des Repos. Ohne diese Isolation faende das Gate die echte Liste des Rechners.
+export XDG_CONFIG_HOME="$TMP/xdg"
+unset HYGIENE_PRIVATE_LIST
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
@@ -517,6 +521,26 @@ check "Gate nennt die gestagte Datei"                    'grep -q "workflow-pool
 printf 'workflow-pool/etwas-anderes-*.json\n' > "$TMP/priv/scripts/ci/hygiene-private.txt"
 OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
 check "--staged ohne Treffer bleibt gruen (exit 0)"      '[ "$RC" -eq 0 ]'
+
+echo "34) Klon ohne Repo-Liste findet die Privatliste an den Ausweichorten (TODO 6e601c77)"
+rm -f "$TMP/priv/scripts/ci/hygiene-private.txt"
+mkdir -p "$XDG_CONFIG_HOME/mysuricates"
+printf 'workflow-pool/persoenlich-*.json
+' > "$XDG_CONFIG_HOME/mysuricates/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "XDG-Liste greift (exit 1)"                        '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                             'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+check "kein Skip-Hinweis"                                '! grep -qi "hygiene-private.txt fehlt" <<<"$OUT"'
+rm -f "$XDG_CONFIG_HOME/mysuricates/hygiene-private.txt"
+printf 'workflow-pool/persoenlich-*.json
+' > "$TMP/env-liste.txt"
+OUT=$(cd "$TMP/priv" && HYGIENE_PRIVATE_LIST="$TMP/env-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "\$HYGIENE_PRIVATE_LIST greift (exit 1)"           '[ "$RC" -eq 1 ]'
+check "Gate nennt die Datei"                             'grep -q "workflow-pool/persoenlich-beispiel.json" <<<"$OUT"'
+printf 'workflow-pool/etwas-anderes-*.json
+' > "$TMP/priv/scripts/ci/hygiene-private.txt"
+OUT=$(cd "$TMP/priv" && HYGIENE_PRIVATE_LIST="$TMP/env-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Repo-Liste hat Vorrang vor der Env-Liste (exit 0)" '[ "$RC" -eq 0 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

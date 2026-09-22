@@ -340,18 +340,22 @@ PY
 # gestagte Dateien vor dem Commit.
 #
 # Die Liste selbst liegt nicht im Repository — sie waere sonst genau die
-# Klartext-Namensliste, die exclude vermeiden soll. Fehlt sie, ist das kein
+# Klartext-Namensliste, die exclude vermeiden soll. Klone und Worktrees finden
+# sie ueber die Ausweichorte aus hygiene_private_list_path. Fehlt sie, ist das kein
 # Fehler, sondern ein hoerbar uebersprungener Check (Vorlage: die .example-Datei).
 # Gewertet werden nur Treffer unter workflow-pool/, auch wenn ein Muster breiter
 # gefasst ist: die Regel beantwortet die Pool-Frage, keine andere.
 # ---------------------------------------------------------------------------
 check_private_pool_list() {
-  local list="$REPO_ROOT/$HYGIENE_PRIVATE_LIST_FILE"
-  if [ ! -f "$list" ]; then
-    echo "  – ${HYGIENE_PRIVATE_LIST_FILE} fehlt — getrackte Pool-Dateien werden nicht gegen" \
+  local list label
+  if ! list="$(hygiene_private_list_path "$REPO_ROOT")"; then
+    echo "  – ${HYGIENE_PRIVATE_LIST_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_LIST und keine" \
+         "~/.config/mysuricates/hygiene-private.txt) — getrackte Pool-Dateien werden nicht gegen" \
          "die private Liste geprueft (uebersprungen; Vorlage: ${HYGIENE_PRIVATE_LIST_FILE}.example)"
     return 0
   fi
+  # Annotationen nennen die Datei, die wirklich gelesen wurde — im Repo relativ.
+  label="${list#"$REPO_ROOT/"}"
   local pattern f out rc lineno=0
   # "|| [ -n "$pattern" ]" nimmt die letzte Zeile mit, wenn die Datei ohne
   # Zeilenumbruch endet — sonst ist eine einzeilige Liste ein lautloser No-op.
@@ -370,7 +374,7 @@ check_private_pool_list() {
     # Ein Muster, das git nicht aufloesen kann, ist ein Fehler und kein Grund,
     # stillschweigend nichts zu pruefen: frueher verschluckte "|| true" den Fall.
     if [ "$rc" -ne 0 ]; then
-      annotate "$HYGIENE_PRIVATE_LIST_FILE" "$lineno" \
+      annotate "$label" "$lineno" \
         "Muster '${pattern}' ist keine gueltige Pfadangabe (git ls-files exit ${rc}): $(printf '%s' "$out" | tr '\n' ' ')"
       continue
     fi
@@ -379,7 +383,7 @@ check_private_pool_list() {
         workflow-pool/*) ;;
         *) continue ;;
       esac
-      annotate "$f" 1 "Pool-Definition im Index passt auf ein Muster aus ${HYGIENE_PRIVATE_LIST_FILE} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
+      annotate "$f" 1 "Pool-Definition im Index passt auf ein Muster aus ${label} — gehoert nicht ins oeffentliche Repository: git rm --cached '$f'"
     done <<<"$out"
   done < "$list"
 }
