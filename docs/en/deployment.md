@@ -2,7 +2,7 @@
 
 ## One instance in a container (`deploy/`)
 
-The machine only needs Docker. `deploy/Dockerfile` builds backend and frontend inside Docker
+The machine only needs Docker. `deploy/Dockerfile` (target `runtime`) builds backend and frontend inside Docker
 (about eight minutes the first time, afterwards from the layer cache), and the backend serves the
 frontend itself — one instance is one container and one port.
 
@@ -35,6 +35,35 @@ Several instances — say Dev · Test · Prod — are several env files with the
 existing files `docker-compose.stable.yml` and `docker-compose.test.yml` are unaffected. Script
 tests without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-instance.sh`,
 `bash scripts/tests/test-deploy-files.sh`.
+
+## Tryout image
+
+`deploy/Dockerfile` has two targets. `runtime` is the image of an installed instance (above; tools
+and AI logins come from the machine). `tryout` builds on it and brings everything itself, so
+MySuricates can be tried without installing it: AI CLIs, `python3-pip`/`-venv`, JDK and Maven from
+the build stage (`JAVA_HOME=/opt/java/jdk`), preset `research`. `HOME` lives on the data volume
+(`/app/data/home`), so logins and the API key survive a rebuild. Deliberately left out: gcc/make,
+Go, Rust, Gradle — if you need more, build `FROM mysuricates:tryout`.
+
+```bash
+scripts/tryout.sh build [--ref REF]   # newest vX.Y.Z tag (by version), else REF, e.g. HEAD
+scripts/tryout.sh start [--port N]    # container mysuricates-tryout, 127.0.0.1:9095
+scripts/tryout.sh login [claude|codex|pi] | key | shell | status | logs | stop
+scripts/tryout.sh remove [--data]     # --data also deletes mysuricates-tryout-data/-secrets
+scripts/tryout.sh export [FILE]       # docker save of both tags → .tar.gz for testers
+```
+
+The build uses `git archive <REF>`, never the working tree: the image matches the tag exactly,
+uncommitted changes and the local `config/` never get in. The Dockerfile itself comes from the tag;
+tags before v0.7.6 do not know the `tryout` stage yet and are refused. Tags are
+`mysuricates:<version>-tryout` and `mysuricates:tryout` (last built), with the labels
+`org.opencontainers.image.version`/`.revision`. For a new version: `build`, then `remove` (data
+stays) and `start`.
+
+The container mounts nothing from the machine (no project folder, no Docker socket, no login) — a
+shell block or `--dangerously-skip-permissions` only affects the container. The instance name
+`tryout` is reserved in `instance.sh` so containers and volumes never overlap. A registry image is
+a separate step (4c992a25). Tests without Docker: `bash scripts/tests/test-tryout.sh`.
 
 ## Docker Compose
 

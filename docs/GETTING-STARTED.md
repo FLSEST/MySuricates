@@ -15,6 +15,41 @@ Unter **Windows** läuft derselbe Weg in WSL2 (Ubuntu), siehe Abschnitt 5.
 
 ---
 
+## Nur ausprobieren — ohne Installation
+
+Wer MySuricates erst kennenlernen will, braucht nur Docker und startet einen Container, der alles
+mitbringt: KI-CLIs (`claude`, `codex`, `pi`), Python mit pip/venv, Node, JDK und Maven. Vom Rechner
+wird nichts eingebunden — kein Projektordner, kein Docker-Socket, keine vorhandene Anmeldung.
+Workflows sehen nur, was im Container liegt; eigene Projekte legst du unter `/app/data/home` an
+oder klonst sie dort hinein.
+
+Mit dem Repository (baut aus dem neuesten Release-Tag):
+
+```bash
+scripts/tryout.sh build          # Image mysuricates:<version>-tryout
+scripts/tryout.sh start          # http://localhost:9095, zeigt den API-Key
+scripts/tryout.sh login          # KI-Anmeldung im Container (claude; auch: login codex / login pi)
+scripts/tryout.sh remove --data  # Container, Daten und Anmeldungen wieder weg
+```
+
+Ohne Repository, mit einer Image-Datei (`scripts/tryout.sh export` erzeugt sie):
+
+```bash
+docker load < mysuricates-<version>-tryout.tar.gz
+docker run -d --name mysuricates-tryout -p 127.0.0.1:9095:9090 \
+  -e AUTOMATION_CORS_ORIGINS=http://localhost:9095 \
+  -v mysuricates-tryout-data:/app/data -v mysuricates-tryout-secrets:/app/secrets mysuricates:tryout
+docker exec -u 1000 mysuricates-tryout cat /app/data/home/.autotrigger/api-key   # API-Key
+docker exec -it -u 1000 mysuricates-tryout claude                                  # KI-Anmeldung
+```
+
+Statt der Anmeldung geht auch ein Schlüssel per Umgebungsvariable (`-e ANTHROPIC_API_KEY=…`).
+Ohne Anmeldung laufen nur Shell- und deterministische Blöcke — die Blaupausen außerhalb der
+Kategorie `AI` kommen damit aus. Für die Arbeit an eigenen Projekten auf dem Rechner ist der
+Installer (Abschnitt 2) der richtige Weg. Details: [Deployment → Tryout-Image](deployment.md#tryout-image).
+
+---
+
 ## 1. Was du brauchst
 
 Fast nichts — der Installer prüft, was fehlt, zeigt die Befehle und installiert es nach einer

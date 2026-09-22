@@ -7,6 +7,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+      target: runtime
     image: mysuricates:local
     container_name: mysuricates-${MYSURICATES_NAME:?}
     ports:

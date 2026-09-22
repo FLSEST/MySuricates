@@ -22,6 +22,16 @@ check "integration key on its own volume path" 'grep -q "AUTOMATION_INTEGRATION_
 check "state paths all under /app/data"        'grep -q "AUTOMATION_DB_PATH=/app/data/" "$DF" && grep -q "AUTOMATION_BACKUP_DIR=/app/data/" "$DF"'
 check "no host-built jar is copied"            '! grep -q "COPY target/" "$DF"'
 
+echo "2b) tryout stage (40c31211)"
+check "compose builds the runtime stage only"  'grep -q "target: runtime" "$R/deploy/compose.yml"'
+check "runtime stage comes before tryout"      '[ "$(grep -n "AS runtime$" "$DF" | cut -d: -f1)" -lt "$(grep -n "AS tryout$" "$DF" | cut -d: -f1)" ]'
+check "tryout builds on runtime"               'grep -q "^FROM runtime AS tryout$" "$DF"'
+check "tryout brings the AI CLIs"              'grep -q "@anthropic-ai/claude-code" "$DF" && grep -q "@openai/codex" "$DF" && grep -q "@earendil-works/pi-coding-agent" "$DF"'
+check "tryout brings pip/venv, JDK, Maven"     'grep -q "python3-venv" "$DF" && grep -q "JAVA_HOME=/opt/java/jdk" "$DF" && grep -q "/usr/local/bin/mvn" "$DF"'
+check "tryout home lives on the data volume"   'grep -q "HOST_HOME=/app/data/home" "$DF" && grep -q "TRYOUT_HOME=\"/app/data/home\"" "$R/scripts/tryout.sh"'
+check "tryout names itself in the UI"          'grep -q "AUTOMATION_ENVIRONMENT=Tryout" "$DF"'
+check "no host mounts in the tryout"           '! grep -q "docker.sock\|/seed/\|\$HOME:" "$R/scripts/tryout.sh"'
+
 echo "3) entrypoint"
 check "entrypoint parses"                      'bash -n "$EP"'
 check "drops root before starting java"        'grep -q "^exec gosu" "$EP"'

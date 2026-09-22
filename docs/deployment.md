@@ -2,7 +2,7 @@
 
 ## Eine Instanz im Container (`deploy/`)
 
-Auf dem Rechner ist nur Docker nötig. `deploy/Dockerfile` baut Backend und Frontend in Docker
+Auf dem Rechner ist nur Docker nötig. `deploy/Dockerfile` (Ziel `runtime`) baut Backend und Frontend in Docker
 (beim ersten Mal etwa acht Minuten, danach aus dem Schichten-Cache), das Backend liefert das
 Frontend selbst aus — eine Instanz ist ein Container und ein Port.
 
@@ -35,6 +35,36 @@ Mehrere Instanzen — etwa Dev · Test · Prod — sind mehrere Env-Dateien mit 
 bestehenden Dateien `docker-compose.stable.yml` und `docker-compose.test.yml` sind davon
 unberührt. Skript-Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
 `bash scripts/tests/test-instance.sh`, `bash scripts/tests/test-deploy-files.sh`.
+
+## Tryout-Image
+
+`deploy/Dockerfile` hat zwei Ziele. `runtime` ist das Image einer eingerichteten Instanz (oben; die
+Werkzeuge und KI-Anmeldungen kommen vom Rechner). `tryout` baut darauf auf und bringt alles selbst
+mit, damit man MySuricates ohne Installation ausprobieren kann: KI-CLIs, `python3-pip`/`-venv`, JDK
+und Maven aus der Build-Stufe (`JAVA_HOME=/opt/java/jdk`), Preset `research`. `HOME` liegt auf dem
+Daten-Volume (`/app/data/home`), Anmeldungen und API-Key überstehen also einen Neuaufbau. Bewusst
+nicht enthalten: gcc/make, Go, Rust, Gradle — wer mehr braucht, baut `FROM mysuricates:tryout`.
+
+```bash
+scripts/tryout.sh build [--ref REF]   # neuestes vX.Y.Z-Tag (nach Version), sonst REF, z. B. HEAD
+scripts/tryout.sh start [--port N]    # Container mysuricates-tryout, 127.0.0.1:9095
+scripts/tryout.sh login [claude|codex|pi] | key | shell | status | logs | stop
+scripts/tryout.sh remove [--data]     # --data löscht auch mysuricates-tryout-data/-secrets
+scripts/tryout.sh export [DATEI]      # docker save beider Tags → .tar.gz für Tester
+```
+
+Gebaut wird aus `git archive <REF>`, nie aus dem Arbeitsverzeichnis: Das Image entspricht genau dem
+Tag, Uncommittetes und die lokale `config/` kommen nicht hinein. Das Dockerfile stammt dabei aus dem
+Tag selbst; Tags vor v0.7.6 kennen die Stufe `tryout` noch nicht und werden abgewiesen. Getaggt
+wird `mysuricates:<version>-tryout` und `mysuricates:tryout` (zuletzt gebaut), mit den Labels
+`org.opencontainers.image.version`/`.revision`. Für eine neue Version: `build`, dann
+`remove` (Daten bleiben) und `start`.
+
+Der Container bindet nichts vom Rechner ein (kein Projektordner, kein Docker-Socket, keine
+Anmeldung) — ein Shell-Block oder `--dangerously-skip-permissions` wirkt nur im Container. Der
+Instanzname `tryout` ist für `instance.sh` reserviert, damit sich Container und Volumes nicht
+überschneiden. Ein Registry-Image ist ein eigener Schritt (4c992a25). Tests ohne Docker:
+`bash scripts/tests/test-tryout.sh`.
 
 ## Docker Compose
 

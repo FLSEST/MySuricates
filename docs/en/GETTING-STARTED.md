@@ -14,6 +14,41 @@ WSL2 (Ubuntu), see section 5.
 
 ---
 
+## Just trying it out — no installation
+
+If you first want to get to know MySuricates, all you need is Docker: start a container that brings
+everything along — AI CLIs (`claude`, `codex`, `pi`), Python with pip/venv, Node, JDK and Maven.
+Nothing from the machine is mounted — no project folder, no Docker socket, no existing login.
+Workflows only see what lives in the container; create your own projects under `/app/data/home` or
+clone them there.
+
+With the repository (builds from the newest release tag):
+
+```bash
+scripts/tryout.sh build          # image mysuricates:<version>-tryout
+scripts/tryout.sh start          # http://localhost:9095, shows the API key
+scripts/tryout.sh login          # AI login inside the container (claude; also: login codex / login pi)
+scripts/tryout.sh remove --data  # container, data and logins gone again
+```
+
+Without the repository, from an image file (`scripts/tryout.sh export` creates it):
+
+```bash
+docker load < mysuricates-<version>-tryout.tar.gz
+docker run -d --name mysuricates-tryout -p 127.0.0.1:9095:9090 \
+  -e AUTOMATION_CORS_ORIGINS=http://localhost:9095 \
+  -v mysuricates-tryout-data:/app/data -v mysuricates-tryout-secrets:/app/secrets mysuricates:tryout
+docker exec -u 1000 mysuricates-tryout cat /app/data/home/.autotrigger/api-key   # API key
+docker exec -it -u 1000 mysuricates-tryout claude                                  # AI login
+```
+
+Instead of logging in you can pass a key as an environment variable (`-e ANTHROPIC_API_KEY=…`).
+Without a login only shell and deterministic blocks run — enough for the blueprints outside the
+`AI` category. For working on your own projects on the machine, the installer (section 2) is the
+right way. Details: [Deployment → Tryout image](deployment.md#tryout-image).
+
+---
+
 ## 1. What you need
 
 Almost nothing — the installer checks what is missing, shows the commands and installs it after
