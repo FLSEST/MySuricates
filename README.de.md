@@ -34,16 +34,17 @@ die wiederkehrende Lehre.
 
 ## Was da steht
 
-Stand 2026-09-19, Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag (Zeilen per
-`wc -l`, inkl. Leer- und Kommentarzeilen). Testzahlen aus einem Lauf in einem isolierten
+Stand 2026-09-21 (Commit `3776647f`), Commit-Zaehler und Zeilen aus dem Arbeitsbaum an diesem Tag
+(Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend `src/main/java`, Frontend `src`
+inkl. Tests). Testzahlen aus einem Lauf in einem isolierten
 Worktree, datiert in der Tabelle:
 
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, rund 1 750 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 67 000 Zeilen, 47 REST-Controller, 78 Flyway-Migrationen |
-| Frontend | React 19 / TypeScript, rund 66 000 Zeilen |
-| Tests | Backend 9 197 (0 Fehler, 1 uebersprungen), Frontend 1 367 — Lauf vom 2026-09-19 |
+| Backend | Java 21 / Spring Boot 3.4, rund 71 000 Zeilen, 47 REST-Controller, 78 Flyway-Migrationen |
+| Frontend | React 19 / TypeScript, rund 71 000 Zeilen |
+| Tests | Backend 10 313 (0 Fehler, 1 uebersprungen), Frontend 1 436 — Lauf vom 2026-09-21 |
 | Bausteine | 20 Block-Typen, 67 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
 
 Die Testzahlen sind ein datierter Befund aus einem lokalen Lauf. Die CI-Definition
@@ -52,9 +53,9 @@ zu Hygiene-Gate und Secret-Scan; die Zahlen oben stammen aber nicht aus einem CI
 
 ## Reifegrad und bekannte Schulden
 
-Experimentell. Das System laeuft taeglich auf einem Rechner und hatte am 2026-09-12 rund 2 400
-Runs hinter sich — es ist nie unter Last, nie mit mehreren Benutzern und nie ausserhalb eines
-vertrauenswuerdigen Netzes betrieben worden.
+Experimentell. Das System laeuft beim Autor taeglich auf einem Rechner und hatte am 2026-09-12
+rund 2 400 Runs hinter sich — es ist bisher nicht unter Last, nicht mit mehreren Benutzern und
+nicht ausserhalb eines vertrauenswuerdigen Netzes betrieben worden (Eigenangabe).
 
 Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine Seite der Anwendung, in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-12
 **89 Befunde**:
@@ -75,8 +76,10 @@ Bekannte harte Grenzen:
 ## Bevor du es startest
 
 Shell-Bloecke und KI-Aufrufe laufen **auf dem Host mit deinen Rechten**, nicht in einem Container;
-die Claude CLI fragt dabei standardmaessig nicht vor Werkzeugnutzung nach. Backend und Frontend
-lauschen auf allen Netzwerk-Interfaces, und einige Endpunkte brauchen keinen API-Key. MySuricates
+die Claude CLI fragt dabei standardmaessig nicht vor Werkzeugnutzung nach. Aus dem Quellcode
+gestartet lauschen Backend und Frontend auf allen Netzwerk-Interfaces (die per Installer
+eingerichtete Instanz bindet standardmaessig nur `127.0.0.1`), und einige Endpunkte brauchen
+keinen API-Key. MySuricates
 ist fuer den lokalen Betrieb durch eine vertrauenswuerdige Person gebaut — fuer Fernzugriff gehoert
 ein VPN davor, kein offener Port. Vollstaendig:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
@@ -86,11 +89,11 @@ ein VPN davor, kein offener Port. Vollstaendig:
 | Komponente | Technologie |
 |---|---|
 | Backend | Spring Boot 3.4, Java 21 |
-| Frontend | React 19, TypeScript, Vite 7 |
+| Frontend | React 19, TypeScript 6, Vite 8 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
 | Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Shell-Bloecke mit `container_image` |
-| Styling | Tailwind CSS 4.2, CSS-Variablen |
-| State | Zustand 4.4 + TanStack Query 5 |
+| Styling | Tailwind CSS 4, CSS-Variablen |
+| State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP ueber SockJS |
 | Sicherheit | API-Key-Auth, Rate Limiting |
 | i18n | Deutsch / Englisch |
