@@ -1259,14 +1259,15 @@ For shell blocks that need more tools, set `container_image`:
 |---|---|---|
 | `automation-agent-python:latest` | Python 3.12 | pandas, numpy, requests, beautifulsoup4, pip, git, curl, jq |
 | `automation-agent-devops:latest` | Ubuntu 24.04 | git, curl, jq, python3, docker-cli, gh (GitHub CLI), trivy, gitleaks |
-| `automation-agent-node:latest` | Node.js 21 | npm (full ecosystem), git, curl, jq |
-| `automation-agent-go:latest` | Go 1.22 | git, curl, bash, jq |
+| `automation-agent-node:latest` | Node.js 22 | npm (full ecosystem), git, curl, jq |
+| `automation-agent-go:latest` | Go 1.24 | git, curl, bash, jq |
 
 ### Rules
 
 - Shell blocks WITHOUT `container_image` can ONLY use host tools
 - If a command needs pip, go, docker, gh, or other specialized tools -> set `container_image`
 - Containers mount the project directory to `/workspace`
+- `conditional`, `retry`, `foreach`, `while` and `switch` in shell mode also pass `container_image`, `mount_docker_socket` and `mounts` on to their command. The condition itself (`condition` or `condition_command`) runs on the host
 - Claude CLI always runs on the host (not in containers) to avoid nested session detection
 - The server can restrict `container_image` via an allowlist (`automation.execution.allowed-container-images` /
   `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Empty (default) allows any image. If an image is not listed, the

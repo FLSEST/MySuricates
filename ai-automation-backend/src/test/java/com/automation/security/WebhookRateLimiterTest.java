@@ -8,8 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -87,23 +85,29 @@ class WebhookRateLimiterTest {
     }
 
     @Test
-    void should_useFirstIpFromForwardedFor_when_multipleIps() {
-        // First request with forwarded IP "10.0.0.1, 10.0.0.2"
+    void should_useRightMostUntrustedIpFromForwardedFor_when_multipleIps() {
+        // ba6a91a6: "10.0.0.1" is client-controlled, "10.0.0.2" was appended by the trusted proxy
         when(request.getRemoteAddr()).thenReturn("10.0.0.10");
         when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1, 10.0.0.2");
 
-        // Exhaust limit for the first IP (10.0.0.1)
+        // Exhaust limit for the real client (10.0.0.2)
         for (int i = 0; i < 10; i++) {
             rateLimiter.tryAcquire(request);
         }
 
-        // 11th request should be blocked (counted under 10.0.0.1)
+        // 11th request should be blocked (counted under 10.0.0.2)
         assertThat(rateLimiter.tryAcquire(request)).isFalse();
 
-        // A request from the second IP (10.0.0.2) should still be allowed
+        // Changing the spoofed left part does not open a new bucket
+        HttpServletRequest respoofed = mock(HttpServletRequest.class);
+        when(respoofed.getRemoteAddr()).thenReturn("10.0.0.10");
+        when(respoofed.getHeader("X-Forwarded-For")).thenReturn("10.0.0.99, 10.0.0.2");
+        assertThat(rateLimiter.tryAcquire(respoofed)).isFalse();
+
+        // A request from another real client (10.0.0.1) is still allowed
         HttpServletRequest request2 = mock(HttpServletRequest.class);
         when(request2.getRemoteAddr()).thenReturn("10.0.0.10");
-        when(request2.getHeader("X-Forwarded-For")).thenReturn("10.0.0.2");
+        when(request2.getHeader("X-Forwarded-For")).thenReturn("10.0.0.1");
         assertThat(rateLimiter.tryAcquire(request2)).isTrue();
     }
 
@@ -171,9 +175,9 @@ class WebhookRateLimiterTest {
         assertThat(rateLimiter.tryAcquire(request)).isFalse();
 
         // Simulate time passing by manipulating the bucket's windowStart
-        Map<String, Object> buckets = (Map<String, Object>) ReflectionTestUtils.getField(rateLimiter, "buckets");
+        ClientBucketStore<?> buckets = (ClientBucketStore<?>) ReflectionTestUtils.getField(rateLimiter, "buckets");
         assertThat(buckets).isNotNull();
-        Object bucket = buckets.get("192.168.1.1");
+        Object bucket = buckets.peek("192.168.1.1");
         assertThat(bucket).isNotNull();
 
         // Set windowStart to 61 seconds ago
@@ -187,9 +191,9 @@ class WebhookRateLimiterTest {
     @Test
     void should_trimWhitespace_when_forwardedForHasSpaces() {
         when(request.getRemoteAddr()).thenReturn("10.0.0.10");
-        when(request.getHeader("X-Forwarded-For")).thenReturn("  10.0.0.1  , 10.0.0.2");
+        when(request.getHeader("X-Forwarded-For")).thenReturn("10.0.0.2 ,   10.0.0.1  ");
 
-        // This should work and use trimmed "10.0.0.1"
+        // This should work and use the trimmed right-most "10.0.0.1"
         assertThat(rateLimiter.tryAcquire(request)).isTrue();
 
         // Verify it's tracked under the same IP as a clean request

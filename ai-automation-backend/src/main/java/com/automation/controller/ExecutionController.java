@@ -12,6 +12,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
+import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.RunLiveLogService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -33,6 +34,7 @@ public class ExecutionController {
     private final ExecutionCommandService executionCommandService;
     private final PendingTodoApprovalService pendingTodoApprovalService;
     private final RunDeletionService runDeletionService;
+    private final RunDeletionPolicy runDeletionPolicy;
     private final RunLiveLogService runLiveLogService;
     private final PendingInputService pendingInputService;
 
@@ -74,9 +76,12 @@ public class ExecutionController {
      *
      * <p>409, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm haengt.
      * TODOs und Audit-Daten werden nie mitgeloescht — siehe {@link RunDeletionService}.
+     * 403 {@code RUN_DELETION_DISABLED}, wenn {@code automation.executions.allow-delete=false}
+     * ({@link RunDeletionPolicy}) — geprueft vor jedem Lookup, verraet also nicht, ob es den Lauf gibt.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteExecution(@PathVariable String id) {
+        runDeletionPolicy.requireAllowed();
         runDeletionService.delete(id);
         return ResponseEntity.noContent().build();
     }

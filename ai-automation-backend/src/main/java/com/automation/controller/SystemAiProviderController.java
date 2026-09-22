@@ -9,6 +9,7 @@ import com.automation.service.ai.catalog.ModelCatalog;
 import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.workflow.RunDeletionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +38,7 @@ public class SystemAiProviderController {
     private final SystemIdentityService systemIdentity;
     private final RequestMappingHandlerMapping requestMappingHandlerMapping;
     private final ModuleRegistry moduleRegistry;
+    private final RunDeletionPolicy runDeletionPolicy;
 
     @Value("${automation.environment:Dev}")
     private String environment;
@@ -79,7 +81,8 @@ public class SystemAiProviderController {
                 moduleRegistry.preset().key(),
                 moduleRegistry.describe().stream().map(SystemCapabilitiesResponse.ModuleCapabilityResponse::from).toList(),
                 Instant.now(),
-                moduleRegistry.uiEditable()
+                moduleRegistry.uiEditable(),
+                runDeletionPolicy.isAllowed()
         );
     }
 

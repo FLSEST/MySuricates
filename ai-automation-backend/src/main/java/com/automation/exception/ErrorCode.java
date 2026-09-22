@@ -26,6 +26,7 @@ public enum ErrorCode {
     TOKEN_BUDGET_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
     OPERATION_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
+    RUN_DELETION_DISABLED(HttpStatus.FORBIDDEN, "Deleting runs is disabled"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 
     private final HttpStatus httpStatus;

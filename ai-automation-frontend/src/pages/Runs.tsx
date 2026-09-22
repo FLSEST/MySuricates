@@ -11,6 +11,7 @@ import { useAllRuns, useDeleteRun, useWorkflows } from '../hooks/useWorkflows';
 import { useProjects } from '../hooks/useProjects';
 import { useAllChainRuns } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useRunDeletionAllowed } from '../hooks/useSystemCapabilities';
 import { useT, useI18nStore } from '../i18n';
 import { formatDuration, formatDateTime } from '../utils/formatTime';
 import type { WorkflowRunListItem, ChainRun } from '../types';
@@ -24,6 +25,7 @@ export function Runs() {
 
   const [persistedViewMode, setViewMode] = usePersistedState<ViewMode>('runs-view-mode', 'workflows');
   const chainsModule = useModuleEnabled('chains');
+  const runDeletionAllowed = useRunDeletionAllowed();
   // A remembered chains tab must not survive the chains module being switched off
   const viewMode: ViewMode = chainsModule ? persistedViewMode : 'workflows';
 
@@ -159,12 +161,13 @@ export function Runs() {
       ),
       width: '120px',
     },
-    {
+    // automation.executions.allow-delete=false: no delete column at all
+    ...(runDeletionAllowed ? [{
       key: 'actions',
       header: '',
       render: (r: WorkflowRunListItem) => <DeleteRunButton run={r} t={t} />,
       width: '48px',
-    },
+    }] : []),
   ];
 
   const chainColumns = [

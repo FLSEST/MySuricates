@@ -5,13 +5,16 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
+import com.automation.exception.ErrorCode;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.execution.PendingInputService;
 import com.automation.dto.response.PendingInputResponse;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.RunLiveLogService;
 import com.automation.service.workflow.WorkflowExecutor;
@@ -35,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -58,6 +62,9 @@ class ExecutionControllerTest {
     private PendingTodoApprovalService pendingTodoApprovalService;
     @MockitoBean
     private RunDeletionService runDeletionService;
+    /** A mock's {@code requireAllowed()} does nothing — deletion allowed, as by default. */
+    @MockitoBean
+    private RunDeletionPolicy runDeletionPolicy;
     @MockitoBean
     private RunLiveLogService runLiveLogService;
     @MockitoBean
@@ -161,6 +168,19 @@ class ExecutionControllerTest {
 
         mockMvc.perform(delete("/api/v1/executions/unknown"))
                 .andExpect(status().isNotFound());
+    }
+
+    /** automation.executions.allow-delete=false: no run can be deleted, existing or not. */
+    @Test
+    void deleteExecution_deletionDisabled_returns403AndNeverTouchesTheService() throws Exception {
+        doThrow(new HardeningException(ErrorCode.RUN_DELETION_DISABLED, "Deleting runs is disabled"))
+                .when(runDeletionPolicy).requireAllowed();
+
+        mockMvc.perform(delete("/api/v1/executions/run-1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("RUN_DELETION_DISABLED"));
+
+        verify(runDeletionService, never()).delete(anyString());
     }
 
     @Test

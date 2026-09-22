@@ -5,8 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -20,7 +18,8 @@ public class WebhookRateLimiter {
     private static final int MAX_REQUESTS_PER_MINUTE = 10;
 
     private final ClientIpResolver clientIpResolver;
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    /** Bounded and swept on access (ba6a91a6). */
+    private final ClientBucketStore<Bucket> buckets = new ClientBucketStore<>();
 
     @Autowired
     public WebhookRateLimiter(
@@ -34,14 +33,19 @@ public class WebhookRateLimiter {
 
     public boolean tryAcquire(HttpServletRequest request) {
         String clientIp = clientIpResolver.resolve(request);
-        Bucket bucket = buckets.computeIfAbsent(clientIp, k -> new Bucket());
+        Bucket bucket = buckets.get(clientIp, Bucket::new, System.currentTimeMillis());
         return bucket.tryConsume();
     }
 
-    private static class Bucket {
+    private static class Bucket implements ClientBucketStore.Windowed {
         private final AtomicInteger count = new AtomicInteger(0);
         private volatile long windowStart = System.currentTimeMillis();
         private final Object lock = new Object();
+
+        @Override
+        public long windowStart() {
+            return windowStart;
+        }
 
         boolean tryConsume() {
             long now = System.currentTimeMillis();

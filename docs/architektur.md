@@ -46,7 +46,7 @@ Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
 │                  Docker Engine                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
 │  │agent-node│  │agent-py  │  │agent-go  │              │
-│  │(Node 21) │  │(Python   │  │(Go 1.22) │              │
+│  │(Node 22) │  │(Python   │  │(Go 1.24) │              │
 │  │          │  │ 3.12)    │  │          │              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └─────────────────────────────────────────────────────────┘
@@ -186,6 +186,7 @@ SQLite (Datei: data/automation.db)
 ### Datenbank-Wartung (SQLite, pool-size=1)
 
 - **Run-Retention** (`RunCleanupService.cleanupTerminalRuns`, täglich 03:15): löscht abgeschlossene Runs (COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED) samt `step_results`, die älter als `run-retention-days` sind — älteste zuerst, höchstens `run-retention-max-per-night` pro Nacht, jeder Run in einer eigenen kurzen Transaktion über `RunDeletionService` (räumt DLQ-, TODO- und Wish-Verweise mit). Runs mit Audit-Report bleiben (Query-Ausschluss plus Guard im Service). Runtime-Settings in `ExecutionSettingsService`: `run-retention-days` [0,730] (0 = aus, Default 90), `run-retention-max-per-night` [10,5000] (Default 200). INTERRUPTED-Runs haben ihre eigene, ältere Regel (`cleanupInterruptedRuns`, 03:00).
+- **Run-Löschung per API abschaltbar** (`RunDeletionPolicy`): `automation.executions.allow-delete: false` (Startkonfiguration, Default `true`) lässt `DELETE /api/v1/executions/{id}` mit `403 RUN_DELETION_DISABLED` scheitern und blendet die Löschknöpfe aus (`runDeletionAllowed` in `/system/capabilities`). Bewusst ohne Laufzeitschalter. Die beiden Aufräumjobs oben sind Betrieb und laufen weiter; `run-retention-days` bleibt ein Runtime-Setting.
 - **Backup** (`DatabaseBackupService`, täglich 02:00, `automation.backup.retain-count`): läuft bewusst vor der Retention.
 - **VACUUM**: `PRAGMA auto_vacuum = INCREMENTAL` ist das **einzige** Statement im Hikari-Init-SQL — sqlite-jdbc führt von einem mehrteiligen Init-String nur das erste aus (`foreign_keys`/`busy_timeout` stehen deshalb in der JDBC-URL, Guard: `DataSourceConfigGuardTest`). Das Pragma greift nur bei leerer DB oder nach einem vollen `VACUUM`. Der Startup-Check `checkAutoVacuumMode` schreibt eine ActivityLog-WARNING, wenn die Datei noch auf NONE steht — dann einmal `POST /api/v1/system/vacuum` ausführen, danach gibt das nächtliche `incremental_vacuum` (03:00) Platz frei. Direkter `sqlite3`-Zugriff ist tabu (Hibernate-Cache, Single-Writer).
 
@@ -958,6 +959,8 @@ Response (DTO) → React Query Cache → UI-Update
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 - **Client-Backoff-Budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) und `client-default-retry-after-seconds` (10) — siehe unten
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
+- **Client-IP (`ClientIpResolver`):** `X-Forwarded-For` zählt nur, wenn der direkte Peer in `automation.security.trusted-proxies` steht (Default `127.0.0.1,::1`), und wird dann **von rechts** gelesen: Client-ID ist der rechteste Eintrag, der kein Trusted Proxy ist (alle Header-Zeilen als eine Kette). Der linke Teil stammt vom Client selbst und würde sonst jedem Request einen eigenen Eimer geben.
+- **Eimer-Speicher (`ClientBucketStore`):** beide Limiter fegen beim Zugriff abgelaufene Eimer aus (höchstens einmal pro Minute) und deckeln die Map bei 10 000 Clients — darüber fliegen die Eimer mit dem ältesten Fenster zuerst.
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
 **Server-Eimer global, Client-Sperre pro Pfad — die Asymmetrie ist Absicht.** Der Server zählt in

@@ -20,12 +20,14 @@ public record SystemCapabilitiesResponse(
         List<ModuleCapabilityResponse> modules,
         Instant generatedAt,
         /** {@code automation.modules.ui-editable}: feature modules can be switched in the settings UI. */
-        boolean modulesUiEditable
+        boolean modulesUiEditable,
+        /** {@code automation.executions.allow-delete}: runs may be deleted via the API (startup-only). */
+        boolean runDeletionAllowed
 ) {
     public SystemCapabilitiesResponse(String apiVersion, String appVersion, String buildType, String environment,
                                       List<RouteCapabilityResponse> routes, List<BlockTypeCapabilityResponse> blockTypes,
                                       String preset, List<ModuleCapabilityResponse> modules, Instant generatedAt) {
-        this(apiVersion, appVersion, buildType, environment, routes, blockTypes, preset, modules, generatedAt, false);
+        this(apiVersion, appVersion, buildType, environment, routes, blockTypes, preset, modules, generatedAt, false, true);
     }
 
     /**
