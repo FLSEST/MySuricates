@@ -2761,7 +2761,7 @@ Delete a TODO.
 
 ### `GET /api/v1/todos/count`
 
-Count TODOs by status.
+Count TODOs by status. Optional query parameter `projectId` counts only that project's TODOs (dashboard project filter).
 
 **Response:** `TodoCountResponse` with `open`, `inProgress`, `done`, `backlog`, `archived`
 

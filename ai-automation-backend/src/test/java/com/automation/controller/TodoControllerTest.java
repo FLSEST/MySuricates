@@ -154,12 +154,22 @@ class TodoControllerTest {
 
     @Test
     void countTodos_returnsCounts() throws Exception {
-        when(todoService.count()).thenReturn(new TodoCountResponse(5, 2, 10, 3, 0));
+        when(todoService.count(null)).thenReturn(new TodoCountResponse(5, 2, 10, 3, 0));
 
         mockMvc.perform(get("/api/v1/todos/count"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.open").value(5))
                 .andExpect(jsonPath("$.done").value(10));
+    }
+
+    @Test
+    void countTodos_passesProjectId() throws Exception {
+        when(todoService.count("p-1")).thenReturn(new TodoCountResponse(1, 0, 4, 0, 0));
+
+        mockMvc.perform(get("/api/v1/todos/count").param("projectId", "p-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.open").value(1))
+                .andExpect(jsonPath("$.done").value(4));
     }
 
     @Test

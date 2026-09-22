@@ -129,6 +129,24 @@ class TodoRepositoryIntegrationTest {
         assertThat(counts.backlog()).isZero();
     }
 
+    @Test
+    void countGroupedByStatusForProject_countsOnlyThatProject() {
+        Project other = createProject("todo-count-other");
+        createTodoWithProject("Mine open", Todo.Status.OPEN, Todo.Source.USER, null, null);
+        createTodoWithProject("Mine done", Todo.Status.DONE, Todo.Source.USER, null, null);
+        todoRepository.save(Todo.builder().title("Other open").status(Todo.Status.OPEN)
+                .priority(Todo.Priority.MEDIUM).source(Todo.Source.USER).projectId(other.getId()).build());
+        createTodo("No project", Todo.Status.OPEN, Todo.Priority.MEDIUM, Todo.Source.USER);
+
+        TodoCountResponse mine = todoRepository.countGroupedByStatusForProject(testProject.getId());
+        assertThat(mine.open()).isEqualTo(1);
+        assertThat(mine.done()).isEqualTo(1);
+
+        TodoCountResponse none = todoRepository.countGroupedByStatusForProject("no-such-project");
+        assertThat(none.open()).isZero();
+        assertThat(none.done()).isZero();
+    }
+
     // --- findOpenByCompositeKey ---
 
     @Test

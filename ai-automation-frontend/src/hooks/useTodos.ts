@@ -79,10 +79,13 @@ export function useTodo(id: string) {
   });
 }
 
-export function useTodoCount() {
+/** Status counts, optionally for one project (dashboard project filter); without projectId over all. */
+export function useTodoCount(projectId?: string) {
   return useQuery({
-    queryKey: ['todos', 'count'],
-    queryFn: () => api.get<TodoCountResponse>('/todos/count'),
+    queryKey: ['todos', 'count', projectId ?? null],
+    queryFn: () => api.get<TodoCountResponse>(
+      projectId ? `/todos/count?projectId=${encodeURIComponent(projectId)}` : '/todos/count',
+    ),
     refetchInterval: 60_000,
     staleTime: 60_000,
   });

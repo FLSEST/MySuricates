@@ -4,6 +4,7 @@ import { ChartCard } from './ChartCard';
 import { useTodoCount } from '../../hooks/useTodos';
 import { useT } from '../../i18n';
 import { WidgetSkeleton } from './WidgetSkeleton';
+import { useDashboardData } from './dashboardDataContext';
 
 const COLORS = {
   open: 'var(--color-text-tertiary)',
@@ -14,7 +15,8 @@ const COLORS = {
 
 export function TodosDonutChart() {
   const t = useT();
-  const { data: counts, isLoading } = useTodoCount();
+  const { projectId } = useDashboardData().filter;
+  const { data: counts, isLoading } = useTodoCount(projectId);
 
   const chartData = useMemo(() => {
     if (!counts) return [];
