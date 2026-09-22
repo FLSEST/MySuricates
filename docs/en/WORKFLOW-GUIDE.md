@@ -1694,7 +1694,7 @@ The API returns the steps in the requested language: `GET /api/v1/workflow-templ
 
 ### Blueprints
 
-Besides **templates** (finished tasks) and the **pool** there are **blueprints**: empty scaffolds with runnable placeholders that show how block types connect – form → branch, loop with approval, fallback on errors. They have their own tab in the create dialog, grouped into *Basic connections*, *Combinations* and *With AI*. You run a blueprint, see in the run how the steps work together, then replace the placeholders with your own commands.
+Besides **templates** (finished tasks) and the **pool** there are **blueprints**: empty scaffolds with runnable placeholders that show how block types connect – form → branch, loop with approval, fallback on errors. They are the first tab of the create dialog (before templates and pool), grouped into *Basic connections*, *Combinations* and *With AI*; the blank workflow sits on top. You run a blueprint, see in the run how the steps work together, then replace the placeholders with your own commands.
 
 - **Location:** `src/main/resources/templates/blueprints/*.json`, same format and loader as templates, `kind: BLUEPRINT` (column `workflow_templates.kind`). The API returns both kinds together with the field `kind`.
 - **Always bilingual** (`"i18n": ["de","en"]`), `id` prefixed `blueprint-`, category `BASICS`, `COMBINATIONS` or `AI`.

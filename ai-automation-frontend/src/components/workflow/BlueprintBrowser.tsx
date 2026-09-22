@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { FileText, Search } from 'lucide-react';
 import { Card, Input } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { resolveTemplateName } from '../../utils/templateUtils';
@@ -12,7 +12,8 @@ type Group = (typeof GROUPS)[number];
 
 interface BlueprintBrowserProps {
   blueprints: WorkflowTemplate[];
-  onSelect: (blueprint: WorkflowTemplate) => void;
+  /** `null` = the blank workflow, the emptiest scaffold of all */
+  onSelect: (blueprint: WorkflowTemplate | null) => void;
 }
 
 /**
@@ -48,7 +49,18 @@ export function BlueprintBrowser({ blueprints, onSelect }: BlueprintBrowserProps
       />
 
       <div className="max-h-[60vh] overflow-y-auto space-y-5">
-        {matching.length === 0 && (
+        {!q && (
+          <Card className="cursor-pointer hover:border-border-strong transition-colors" onClick={() => onSelect(null)}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-surface">
+                <FileText className="w-5 h-5 text-text-tertiary" />
+              </div>
+              <h5 className="font-semibold text-text">{t.templates.blank}</h5>
+            </div>
+            <p className="text-xs text-text-secondary">{t.templates.blankDescription}</p>
+          </Card>
+        )}
+        {q && matching.length === 0 && (
           <div className="py-8 text-center text-sm text-text-tertiary">{t.common.noResults}</div>
         )}
         {groups.map((group) => {
