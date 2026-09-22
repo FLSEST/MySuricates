@@ -5,6 +5,9 @@ import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.tray.TrayInstanceMonitor.InstanceKind;
+import com.automation.service.tray.TrayInstanceMonitor.InstanceLight;
+import com.automation.service.tray.TrayInstanceMonitor.LightColor;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -15,15 +18,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.awt.*;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -37,38 +36,41 @@ public class SystemTrayService {
     private final DockerExpectation dockerExpectation;
     private final SystemIdentityService systemIdentity;
     private final TraySettingsService traySettings;
+    private final TrayInstanceMonitor instanceMonitor;
 
     private TrayIcon trayIcon;
     private volatile TrayState previousState;
     private boolean initialized = false;
-    private volatile String stableVersion = null;
-    private final Map<IconColor, Image> iconCache = new EnumMap<>(IconColor.class);
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .build();
+    private int targetIconSize;
+    private final Map<List<InstanceLight>, Image> iconCache = new HashMap<>();
 
     public SystemTrayService(TrayConfig trayConfig,
                              WorkflowRunRepository runRepository,
                              WorkflowExecutionRegistry executionRegistry,
                              DockerExpectation dockerExpectation,
                              SystemIdentityService systemIdentity,
-                             TraySettingsService traySettings) {
+                             TraySettingsService traySettings,
+                             TrayInstanceMonitor instanceMonitor) {
         this.trayConfig = trayConfig;
         this.runRepository = runRepository;
         this.executionRegistry = executionRegistry;
         this.dockerExpectation = dockerExpectation;
         this.systemIdentity = systemIdentity;
         this.traySettings = traySettings;
+        this.instanceMonitor = instanceMonitor;
     }
 
-    record TrayState(int activeRuns, long runsToday, long failedToday, int pendingApprovals, boolean dockerOk, boolean frontendOk, boolean stableOk) {
+    record TrayState(int activeRuns,
+                     long runsToday,
+                     long failedToday,
+                     int pendingApprovals,
+                     boolean dockerOk,
+                     List<InstanceLight> instances) {
         int successPercent() {
             if (runsToday == 0) return 100;
             return (int) ((runsToday - failedToday) * 100 / runsToday);
         }
     }
-
-    enum IconColor { GREEN, YELLOW, RED, GRAY }
 
     @EventListener(ApplicationReadyEvent.class)
     public void initialize() {
@@ -83,13 +85,14 @@ public class SystemTrayService {
             int targetSize = Math.max(traySize.width, traySize.height);
             log.info("Tray icon target size: {}x{}", targetSize, targetSize);
 
-            loadIcons(targetSize);
+            targetIconSize = targetSize;
 
-            Image icon = iconCache.get(IconColor.GRAY);
+            List<InstanceLight> starting = List.of(new InstanceLight(InstanceKind.DEV, LightColor.GRAY));
+            Image icon = iconFor(starting);
             trayIcon = new TrayIcon(icon, "MySuricates | Starting...");
             trayIcon.setImageAutoSize(false);
 
-            PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, false, false));
+            PopupMenu menu = buildMenu(new TrayState(0, 0, 0, 0, false, starting));
             trayIcon.setPopupMenu(menu);
             // Doppelklick aufs Icon bzw. Klick auf die Meldung (je nach Desktop): wartet eine Freigabe, direkt dorthin
             trayIcon.addActionListener(e -> TrayLinks.open(TrayLinks.clickTarget(traySettings.browserBaseUrl(),
@@ -112,15 +115,9 @@ public class SystemTrayService {
         }
     }
 
-    private void loadIcons(int targetSize) {
-        for (IconColor color : IconColor.values()) {
-            iconCache.put(color, TrayIconRenderer.render(color, targetSize));
-        }
-        log.info("Rendered {} tray icons at {}x{}", iconCache.size(), targetSize, targetSize);
-    }
-
-    Image getIcon(IconColor color) {
-        return iconCache.get(color);
+    private Image iconFor(List<InstanceLight> lights) {
+        List<InstanceLight> key = List.copyOf(lights);
+        return iconCache.computeIfAbsent(key, value -> TrayIconRenderer.render(value, targetIconSize));
     }
 
     @Scheduled(fixedRateString = "${automation.tray.poll-interval-ms:15000}")
@@ -129,11 +126,10 @@ public class SystemTrayService {
 
         try {
             TrayState state = collectStatus();
-            IconColor color = determineIconColor(state);
             String tooltip = buildTooltip(state);
 
             EventQueue.invokeLater(() -> {
-                trayIcon.setImage(iconCache.get(color));
+                trayIcon.setImage(iconFor(state.instances()));
                 trayIcon.setToolTip(tooltip);
                 trayIcon.setPopupMenu(buildMenu(state));
             });
@@ -154,40 +150,32 @@ public class SystemTrayService {
         int pendingApprovals = executionRegistry.getPendingApprovalCount();
         // Nicht eingerichtetes Docker ist kein Warnzustand, nur eingerichtetes, das nicht antwortet (a0e85182)
         boolean dockerOk = dockerExpectation.probe() != DockerExpectation.State.DOWN;
-        boolean frontendOk = checkFrontend();
-        boolean stableOk = checkStable();
+        List<InstanceLight> instances = instanceMonitor.collect();
 
-        return new TrayState(activeRuns, runsToday, failedToday, pendingApprovals, dockerOk, frontendOk, stableOk);
-    }
-
-    IconColor determineIconColor(TrayState state) {
-        if (state.failedToday > 0 && (previousState == null || state.failedToday > previousState.failedToday)) {
-            return IconColor.RED;
-        }
-        if (!state.dockerOk || !state.frontendOk || !state.stableOk || state.pendingApprovals > 0) {
-            return IconColor.YELLOW;
-        }
-        return IconColor.GREEN;
+        return new TrayState(activeRuns, runsToday, failedToday, pendingApprovals, dockerOk, instances);
     }
 
     private String buildTooltip(TrayState state) {
-        String devVersion = systemIdentity.getVersion();
-        String stableInfo = state.stableOk
-                ? "UP" + (stableVersion != null ? " v" + stableVersion : "")
-                : "Offline";
-        return String.format("MySuricates v%s | Dev: UP | Stable: %s | %d aktiv | %d%% Erfolg",
-                devVersion, stableInfo, state.activeRuns, state.successPercent());
+        String instanceInfo = state.instances().stream()
+                .map(light -> light.kind().label() + ": " + statusText(light.color()))
+                .reduce((left, right) -> left + " | " + right)
+                .orElse("Keine Instanz erkannt");
+        return String.format("MySuricates v%s | %s | %d aktiv | %d%% Erfolg",
+                systemIdentity.getVersion(), instanceInfo, state.activeRuns(), state.successPercent());
+    }
+
+    static String statusText(LightColor color) {
+        return switch (color) {
+            case GREEN -> "OK";
+            case YELLOW -> "startet";
+            case RED -> "offline";
+            case GRAY -> "wird geprueft";
+        };
     }
 
     private PopupMenu buildMenu(TrayState state) {
-        return TrayMenuBuilder.build(state, systemIdentity.getVersion(), stableVersion, trayConfig,
-                dockerExpectation, traySettings, () -> rebuildMenu(state), this::exitFromTray);
-    }
-
-    private void rebuildMenu(TrayState fallbackState) {
-        if (trayIcon != null) {
-            trayIcon.setPopupMenu(buildMenu(previousState != null ? previousState : fallbackState));
-        }
+        return TrayMenuBuilder.build(state, systemIdentity.getVersion(), trayConfig,
+                dockerExpectation, traySettings, this::exitFromTray);
     }
 
     private void exitFromTray() {
@@ -220,58 +208,6 @@ public class SystemTrayService {
                     TrayIcon.MessageType.WARNING);
         }
     }
-
-
-    boolean checkFrontend() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(trayConfig.getWebUiUrl()))
-                    .timeout(Duration.ofSeconds(3))
-                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                    .build();
-            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            return response.statusCode() < 500;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    boolean checkStable() {
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(trayConfig.getStableUrl() + "/api/v1/system/info"))
-                    .timeout(Duration.ofSeconds(3))
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 500) {
-                extractStableVersion(response.body());
-                return true;
-            }
-            return false;
-        } catch (Exception e) {
-            stableVersion = null;
-            return false;
-        }
-    }
-
-    private void extractStableVersion(String body) {
-        try {
-            // Simple JSON parsing for "version":"x.y.z" — avoids Jackson dependency
-            int idx = body.indexOf("\"version\"");
-            if (idx >= 0) {
-                int colon = body.indexOf(':', idx);
-                int firstQuote = body.indexOf('"', colon + 1);
-                int lastQuote = body.indexOf('"', firstQuote + 1);
-                if (firstQuote > 0 && lastQuote > firstQuote) {
-                    stableVersion = body.substring(firstQuote + 1, lastQuote);
-                }
-            }
-        } catch (Exception e) {
-            log.debug("Failed to extract stable version: {}", e.getMessage());
-        }
-    }
-
     /**
      * Shows a desktop notification via the system tray icon.
      * Silently does nothing if the tray is not available.

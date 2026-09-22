@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useT } from '../i18n';
 import { useSystemInfo, useRepairAllFailed } from '../hooks/useSystem';
@@ -58,9 +58,19 @@ export function Settings() {
     setOpenSections(prev => ({ ...prev, [id]: true }));
   }, []);
 
+  useEffect(() => {
+    const targetId = window.location.hash.slice(1);
+    if (!targetId) return;
+    setOpenSections(prev => ({ ...prev, [targetId]: true }));
+    window.setTimeout(() => {
+      document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
+    }, 0);
+  }, []);
+
   const sections: NavSection[] = [
     { id: 'general', label: t.settings.settingsNavGeneral, visible: true },
     { id: 'appearance', label: t.settings.appearance, visible: true },
+    { id: 'tray', label: t.settings.trayNavTitle, visible: true, parentId: 'appearance' },
     { id: 'execution', label: t.settings.settingsNavExecution, visible: !simpleMode },
     { id: 'infrastructure', label: t.settings.settingsNavInfrastructure, visible: !simpleMode },
     { id: 'environments', label: t.settings.settingsNavEnvironments, visible: advancedMode && stagingModule },
@@ -87,6 +97,9 @@ export function Settings() {
 
           <SettingsSection id="appearance" title={t.settings.appearance} collapsible open={!!openSections['appearance']} onToggle={() => toggleSection('appearance')}>
             <AppearanceCard />
+          </SettingsSection>
+
+          <SettingsSection id="tray" title={t.settings.trayNavTitle}>
             <TraySettingsCard />
           </SettingsSection>
 

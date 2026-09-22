@@ -7,6 +7,7 @@ import java.awt.RenderingHints;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
+import java.util.List;
 
 /** Draws the website's bespectacled sentinel meerkat with a small status badge. */
 final class TrayIconRenderer {
@@ -20,7 +21,7 @@ final class TrayIconRenderer {
 
     private TrayIconRenderer() { }
 
-    static BufferedImage render(SystemTrayService.IconColor status, int size) {
+    static BufferedImage render(List<TrayInstanceMonitor.InstanceLight> lights, int size) {
         int renderSize = Math.max(ARTBOARD, size * 4);
         // X11/AWT tray implementations do not consistently preserve alpha. A transparent
         // canvas was therefore flattened to a white square on some Linux desktops. The
@@ -34,7 +35,7 @@ final class TrayIconRenderer {
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         drawMeerkat(g);
-        drawStatus(g, status);
+        drawStatuses(g, lights);
         g.dispose();
         return downscale(canvas, size);
     }
@@ -89,7 +90,14 @@ final class TrayIconRenderer {
         g.fill(new Ellipse2D.Double(131, 178, 22, 14));
     }
 
-    private static void drawStatus(Graphics2D g, SystemTrayService.IconColor status) {
+    private static void drawStatuses(Graphics2D g, List<TrayInstanceMonitor.InstanceLight> lights) {
+        int count = Math.min(lights.size(), 3);
+        for (int index = 0; index < count; index++) {
+            drawStatus(g, lights.get(index).color(), indicatorCenterX(index, count));
+        }
+    }
+
+    private static void drawStatus(Graphics2D g, TrayInstanceMonitor.LightColor status, double centerX) {
         Color color = switch (status) {
             case GREEN -> new Color(0x36C98F);
             case YELLOW -> new Color(0xF3B63F);
@@ -97,11 +105,15 @@ final class TrayIconRenderer {
             case GRAY -> new Color(0x8B9098);
         };
         g.setColor(new Color(0x211A14));
-        g.fill(new Ellipse2D.Double(174, 174, 70, 70));
+        g.fill(new Ellipse2D.Double(centerX - 23, 197, 46, 46));
         g.setColor(color);
-        g.fill(new Ellipse2D.Double(182, 182, 54, 54));
+        g.fill(new Ellipse2D.Double(centerX - 16, 204, 32, 32));
         g.setColor(new Color(255, 255, 255, 110));
-        g.fill(new Ellipse2D.Double(193, 190, 18, 12));
+        g.fill(new Ellipse2D.Double(centerX - 9, 208, 10, 7));
+    }
+
+    static double indicatorCenterX(int index, int count) {
+        return 128 + (index - (count - 1) / 2.0) * 52;
     }
 
     private static BufferedImage downscale(BufferedImage source, int size) {

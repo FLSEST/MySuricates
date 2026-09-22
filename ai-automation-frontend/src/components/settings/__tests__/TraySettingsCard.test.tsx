@@ -25,29 +25,35 @@ beforeEach(() => {
 
 describe('TraySettingsCard', () => {
   it('disables event choices when the popup master switch is off', () => {
+    vi.mocked(useTraySettings).mockReturnValue({
+      data: { ...settings, popupsEnabled: false },
+      isLoading: false,
+    } as never);
     render(<TraySettingsCard />);
-
-    fireEvent.click(screen.getByRole('switch', { name: /desktop popups/i }));
 
     expect(screen.getByRole('switch', { name: /waiting approvals/i })).toBeDisabled();
     expect(screen.getByRole('switch', { name: /failed workflows/i })).toBeDisabled();
     expect(screen.getByRole('switch', { name: /completed workflows/i })).toBeDisabled();
   });
 
-  it('saves popup choices and the browser target together', () => {
+  it('saves popup choices immediately as partial updates', () => {
     render(<TraySettingsCard />);
 
     fireEvent.click(screen.getByRole('switch', { name: /completed workflows/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
-    expect(mutate).toHaveBeenCalledWith({ ...settings, notifySuccess: true });
+    expect(mutate).toHaveBeenCalledWith({ notifySuccess: true });
   });
 
-  it('can copy the currently opened address into the browser target', () => {
+  it('saves the browser target separately', () => {
     render(<TraySettingsCard />);
 
     fireEvent.click(screen.getByRole('button', { name: /use current address/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     expect(screen.getByDisplayValue(window.location.origin)).toBeInTheDocument();
+    expect(mutate).toHaveBeenCalledWith(
+      { publicUrl: window.location.origin },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 });

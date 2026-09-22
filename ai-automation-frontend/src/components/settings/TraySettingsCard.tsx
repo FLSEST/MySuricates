@@ -16,18 +16,20 @@ export function TraySettingsCard() {
   const t = useT();
   const { data, isLoading } = useTraySettings();
   const updateSettings = useUpdateTraySettings();
-  const [form, setForm] = useState<TraySettings>(DEFAULTS);
+  const settings = data ?? DEFAULTS;
+  const [publicUrl, setPublicUrl] = useState('');
+  const [urlDirty, setUrlDirty] = useState(false);
 
   useEffect(() => {
-    if (data) setForm(data);
-  }, [data]);
+    if (data && !urlDirty) setPublicUrl(data.publicUrl);
+  }, [data, urlDirty]);
 
-  const hasChanges = !!data && JSON.stringify(form) !== JSON.stringify(data);
+  const hasUrlChanges = !!data && publicUrl.trim() !== data.publicUrl;
   const currentOrigin = typeof window === 'undefined' ? '' : window.location.origin;
 
   if (isLoading) {
     return (
-      <Card id="tray-settings">
+      <Card>
         <CardHeader title={t.settings.trayTitle} subtitle={t.settings.traySubtitle} />
         <div className="flex justify-center py-6"><Spinner /></div>
       </Card>
@@ -35,13 +37,17 @@ export function TraySettingsCard() {
   }
 
   return (
-    <Card id="tray-settings">
+    <Card>
       <CardHeader title={t.settings.trayTitle} subtitle={t.settings.traySubtitle} />
       <div className="space-y-5">
         <div className="flex items-center gap-4 rounded-xl border border-border bg-surface-raised/40 p-4">
           <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#211a14]">
             <img src="/icons/tray-meerkat.svg" alt="" className="h-12 w-12" />
-            <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full border-2 border-[#211a14] bg-emerald-400" />
+            <span className="absolute bottom-1 left-1/2 flex -translate-x-1/2 gap-0.5 rounded-full bg-[#211a14] p-0.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+            </span>
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm font-medium text-text">
@@ -55,29 +61,30 @@ export function TraySettingsCard() {
         <SettingToggle
           label={t.settings.trayPopups}
           hint={t.settings.trayPopupsHint}
-          enabled={form.popupsEnabled}
-          onChange={(popupsEnabled) => setForm((value) => ({ ...value, popupsEnabled }))}
+          enabled={settings.popupsEnabled}
+          disabled={updateSettings.isPending}
+          onChange={(popupsEnabled) => updateSettings.mutate({ popupsEnabled })}
         />
 
-        <div className={`space-y-3 border-l-2 border-border pl-4 ${form.popupsEnabled ? '' : 'opacity-50'}`}>
+        <div className={`space-y-3 border-l-2 border-border pl-4 ${settings.popupsEnabled ? '' : 'opacity-50'}`}>
           <SettingToggle
             label={t.settings.trayNotifyApprovals}
-            enabled={form.notifyApprovals}
-            disabled={!form.popupsEnabled}
-            onChange={(notifyApprovals) => setForm((value) => ({ ...value, notifyApprovals }))}
+            enabled={settings.notifyApprovals}
+            disabled={!settings.popupsEnabled || updateSettings.isPending}
+            onChange={(notifyApprovals) => updateSettings.mutate({ notifyApprovals })}
           />
           <SettingToggle
             label={t.settings.trayNotifyFailures}
-            enabled={form.notifyFailures}
-            disabled={!form.popupsEnabled}
-            onChange={(notifyFailures) => setForm((value) => ({ ...value, notifyFailures }))}
+            enabled={settings.notifyFailures}
+            disabled={!settings.popupsEnabled || updateSettings.isPending}
+            onChange={(notifyFailures) => updateSettings.mutate({ notifyFailures })}
           />
           <SettingToggle
             label={t.settings.trayNotifySuccess}
             hint={t.settings.trayNotifySuccessHint}
-            enabled={form.notifySuccess}
-            disabled={!form.popupsEnabled}
-            onChange={(notifySuccess) => setForm((value) => ({ ...value, notifySuccess }))}
+            enabled={settings.notifySuccess}
+            disabled={!settings.popupsEnabled || updateSettings.isPending}
+            onChange={(notifySuccess) => updateSettings.mutate({ notifySuccess })}
           />
         </div>
 
@@ -87,8 +94,11 @@ export function TraySettingsCard() {
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="min-w-0 flex-1">
               <Input
-                value={form.publicUrl}
-                onChange={(event) => setForm((value) => ({ ...value, publicUrl: event.target.value }))}
+                value={publicUrl}
+                onChange={(event) => {
+                  setPublicUrl(event.target.value);
+                  setUrlDirty(true);
+                }}
                 placeholder="https://mysuricates.example.com"
               />
             </div>
@@ -96,7 +106,10 @@ export function TraySettingsCard() {
               size="sm"
               variant="secondary"
               icon={<ExternalLink className="h-4 w-4" />}
-              onClick={() => setForm((value) => ({ ...value, publicUrl: currentOrigin }))}
+              onClick={() => {
+                setPublicUrl(currentOrigin);
+                setUrlDirty(true);
+              }}
             >
               {t.settings.trayUseCurrentUrl}
             </Button>
@@ -106,9 +119,12 @@ export function TraySettingsCard() {
         <div className="flex justify-end">
           <Button
             size="sm"
-            disabled={!hasChanges || updateSettings.isPending}
+            disabled={!hasUrlChanges || updateSettings.isPending}
             loading={updateSettings.isPending}
-            onClick={() => updateSettings.mutate({ ...form, publicUrl: form.publicUrl.trim() })}
+            onClick={() => updateSettings.mutate(
+              { publicUrl: publicUrl.trim() },
+              { onSuccess: () => setUrlDirty(false) },
+            )}
           >
             {t.common.save}
           </Button>

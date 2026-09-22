@@ -11,6 +11,8 @@ export interface TraySettings {
   publicUrl: string;
 }
 
+export type TraySettingsPatch = Partial<TraySettings>;
+
 const traySettingsKey = ['system', 'tray-config'] as const;
 
 export function useTraySettings() {
@@ -26,11 +28,22 @@ export function useUpdateTraySettings() {
   const t = useT();
 
   return useMutation({
-    mutationFn: (settings: TraySettings) => api.put<TraySettings>('/system/tray-config', settings),
+    mutationFn: (settings: TraySettingsPatch) => api.put<TraySettings>('/system/tray-config', settings),
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: traySettingsKey });
+      const previous = queryClient.getQueryData<TraySettings>(traySettingsKey);
+      if (previous) {
+        queryClient.setQueryData<TraySettings>(traySettingsKey, { ...previous, ...patch });
+      }
+      return { previous };
+    },
     onSuccess: (settings) => {
       queryClient.setQueryData(traySettingsKey, settings);
       toast.success(t.settings.traySaved);
     },
-    onError: (error) => toast.error(apiErrorMessage(error, t.settings.traySaveFailed)),
+    onError: (error, _patch, context) => {
+      if (context?.previous) queryClient.setQueryData(traySettingsKey, context.previous);
+      toast.error(apiErrorMessage(error, t.settings.traySaveFailed));
+    },
   });
 }

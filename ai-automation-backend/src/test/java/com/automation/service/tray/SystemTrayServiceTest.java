@@ -5,7 +5,9 @@ import com.automation.config.TrayConfig;
 import com.automation.entity.RunStatus;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.system.SystemIdentityService;
-import com.automation.service.tray.SystemTrayService.IconColor;
+import com.automation.service.tray.TrayInstanceMonitor.InstanceKind;
+import com.automation.service.tray.TrayInstanceMonitor.InstanceLight;
+import com.automation.service.tray.TrayInstanceMonitor.LightColor;
 import com.automation.service.tray.SystemTrayService.TrayState;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,12 +45,15 @@ class SystemTrayServiceTest {
     @Mock
     private TraySettingsService traySettings;
 
+    @Mock
+    private TrayInstanceMonitor instanceMonitor;
+
     private SystemTrayService service;
 
     @BeforeEach
     void setUp() {
         service = new SystemTrayService(trayConfig, runRepository, executionRegistry, dockerExpectation,
-                systemIdentity, traySettings);
+                systemIdentity, traySettings, instanceMonitor);
     }
 
     @Test
@@ -57,8 +63,8 @@ class SystemTrayServiceTest {
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(1L);
         when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
         when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.UP);
-        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
-        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
+        when(instanceMonitor.collect()).thenReturn(List.of(
+                new InstanceLight(InstanceKind.DEV, LightColor.GREEN)));
 
         TrayState state = service.collectStatus();
 
@@ -67,6 +73,8 @@ class SystemTrayServiceTest {
         assertThat(state.failedToday()).isEqualTo(1);
         assertThat(state.pendingApprovals()).isZero();
         assertThat(state.dockerOk()).isTrue();
+        assertThat(state.instances()).containsExactly(
+                new InstanceLight(InstanceKind.DEV, LightColor.GREEN));
     }
 
     @Test
@@ -76,8 +84,7 @@ class SystemTrayServiceTest {
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
         when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
         when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.DOWN);
-        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
-        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
+        when(instanceMonitor.collect()).thenReturn(List.of());
 
         TrayState state = service.collectStatus();
 
@@ -92,70 +99,29 @@ class SystemTrayServiceTest {
         when(runRepository.countByStatusAndStartedAtAfter(eq(RunStatus.FAILED), any(Instant.class))).thenReturn(0L);
         when(executionRegistry.getPendingApprovalCount()).thenReturn(0);
         when(dockerExpectation.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
-        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
-        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
+        when(instanceMonitor.collect()).thenReturn(List.of());
 
         assertThat(service.collectStatus().dockerOk()).isTrue();
     }
 
     @Test
-    void checkFrontend_falseWhenUnreachable() {
-        when(trayConfig.getWebUiUrl()).thenReturn("http://localhost:99999");
-        assertThat(service.checkFrontend()).isFalse();
-    }
-
-    @Test
-    void determineIconColor_greenWhenAllOk() {
-        TrayState state = new TrayState(1, 5, 0, 0, true, true, true);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.GREEN);
-    }
-
-    @Test
-    void determineIconColor_yellowWhenDockerOffline() {
-        TrayState state = new TrayState(0, 5, 0, 0, false, true, true);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
-    }
-
-    @Test
-    void determineIconColor_yellowWhenFrontendOffline() {
-        TrayState state = new TrayState(0, 5, 0, 0, true, false, true);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
-    }
-
-    @Test
-    void determineIconColor_yellowWhenApprovalsPending() {
-        TrayState state = new TrayState(1, 5, 0, 2, true, true, true);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
-    }
-
-    @Test
-    void determineIconColor_redWhenNewFailure() {
-        TrayState state = new TrayState(0, 5, 2, 0, true, true, true);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.RED);
+    void statusText_describesTechnicalHealthOnly() {
+        assertThat(SystemTrayService.statusText(LightColor.GREEN)).isEqualTo("OK");
+        assertThat(SystemTrayService.statusText(LightColor.YELLOW)).isEqualTo("startet");
+        assertThat(SystemTrayService.statusText(LightColor.RED)).isEqualTo("offline");
+        assertThat(SystemTrayService.statusText(LightColor.GRAY)).isEqualTo("wird geprueft");
     }
 
     @Test
     void successPercent_calculatesCorrectly() {
-        TrayState state = new TrayState(0, 20, 2, 0, true, true, true);
+        TrayState state = new TrayState(0, 20, 2, 0, true, List.of());
         assertThat(state.successPercent()).isEqualTo(90);
     }
 
     @Test
     void successPercent_100WhenNoRuns() {
-        TrayState state = new TrayState(0, 0, 0, 0, true, true, true);
+        TrayState state = new TrayState(0, 0, 0, 0, true, List.of());
         assertThat(state.successPercent()).isEqualTo(100);
-    }
-
-    @Test
-    void checkStable_falseWhenUnreachable() {
-        when(trayConfig.getStableUrl()).thenReturn("http://localhost:99998");
-        assertThat(service.checkStable()).isFalse();
-    }
-
-    @Test
-    void determineIconColor_yellowWhenStableOffline() {
-        TrayState state = new TrayState(0, 5, 0, 0, true, true, false);
-        assertThat(service.determineIconColor(state)).isEqualTo(IconColor.YELLOW);
     }
 
     @Test

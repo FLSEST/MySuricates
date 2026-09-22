@@ -4,6 +4,7 @@ export interface NavSection {
   id: string;
   label: string;
   visible: boolean;
+  parentId?: string;
 }
 
 interface SettingsNavProps {
@@ -62,7 +63,7 @@ export function SettingsNav({ sections, onNavigate }: SettingsNavProps) {
             <button
               key={s.id}
               onClick={() => handleClick(s.id)}
-              className={`block w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`block w-full text-left py-1.5 rounded-lg transition-colors ${s.parentId ? 'pl-7 pr-3 text-xs' : 'px-3 text-sm'} ${
                 activeId === s.id
                   ? 'bg-accent/10 text-accent font-medium'
                   : 'text-text-secondary hover:text-text hover:bg-surface-hover'
@@ -80,7 +81,7 @@ export function SettingsNav({ sections, onNavigate }: SettingsNavProps) {
           <button
             key={s.id}
             onClick={() => handleClick(s.id)}
-            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+            className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-colors ${s.parentId ? 'ml-1' : ''} ${
               activeId === s.id
                 ? 'bg-accent text-text-inverse'
                 : 'bg-surface-hover text-text-secondary'

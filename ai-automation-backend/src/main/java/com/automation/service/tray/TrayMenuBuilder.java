@@ -4,27 +4,23 @@ import com.automation.config.TrayConfig;
 import com.automation.service.project.DockerExpectation;
 
 import java.awt.CheckboxMenuItem;
-import java.awt.EventQueue;
 import java.awt.Menu;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
-import java.util.function.Consumer;
 
-/** Builds the native tray menu, including directly editable notification preferences. */
+/** Builds the native tray menu with status details and a quick popup switch. */
 final class TrayMenuBuilder {
 
     private TrayMenuBuilder() { }
 
     static PopupMenu build(SystemTrayService.TrayState state,
                            String version,
-                           String stableVersion,
                            TrayConfig trayConfig,
                            DockerExpectation dockerExpectation,
                            TraySettingsService traySettings,
-                           Runnable rebuildMenu,
                            Runnable exitApplication) {
         PopupMenu menu = new PopupMenu();
-        addStatus(menu, state, version, stableVersion, dockerExpectation);
+        addStatus(menu, state, version, dockerExpectation);
 
         String browserBaseUrl = traySettings.browserBaseUrl();
         if (state.pendingApprovals() > 0) {
@@ -38,12 +34,14 @@ final class TrayMenuBuilder {
         open.addActionListener(e -> TrayLinks.open(browserBaseUrl));
         menu.add(open);
 
-        Menu notifications = notificationMenu(traySettings, rebuildMenu);
-        menu.add(notifications);
+        TraySettingsService.Preferences preferences = traySettings.current();
+        CheckboxMenuItem popups = new CheckboxMenuItem("Desktop-Pop-ups", preferences.popupsEnabled());
+        popups.addItemListener(e -> traySettings.setPopupsEnabled(popups.getState()));
+        menu.add(popups);
 
         MenuItem traySettingsItem = new MenuItem("Tray-Einstellungen ...");
         traySettingsItem.addActionListener(e ->
-                TrayLinks.open(TrayLinks.route(browserBaseUrl, "/settings#tray-settings")));
+                TrayLinks.open(TrayLinks.route(browserBaseUrl, "/settings#tray")));
         menu.add(traySettingsItem);
 
         MenuItem activity = new MenuItem("Activity Log");
@@ -66,52 +64,26 @@ final class TrayMenuBuilder {
         return menu;
     }
 
-    private static Menu notificationMenu(TraySettingsService traySettings, Runnable rebuildMenu) {
-        TraySettingsService.Preferences preferences = traySettings.current();
-        Menu notifications = new Menu("Benachrichtigungen");
-        notifications.add(toggle("Alle Desktop-Pop-ups", preferences.popupsEnabled(), true,
-                traySettings::setPopupsEnabled, rebuildMenu));
-        notifications.addSeparator();
-        notifications.add(toggle("Wartende Freigaben", preferences.notifyApprovals(),
-                preferences.popupsEnabled(), traySettings::setNotifyApprovals, rebuildMenu));
-        notifications.add(toggle("Fehlgeschlagene Workflows", preferences.notifyFailures(),
-                preferences.popupsEnabled(), traySettings::setNotifyFailures, rebuildMenu));
-        notifications.add(toggle("Erfolgreiche Workflows", preferences.notifySuccess(),
-                preferences.popupsEnabled(), traySettings::setNotifySuccess, rebuildMenu));
-        return notifications;
-    }
-
-    private static CheckboxMenuItem toggle(String label,
-                                           boolean selected,
-                                           boolean enabled,
-                                           Consumer<Boolean> save,
-                                           Runnable rebuildMenu) {
-        CheckboxMenuItem item = new CheckboxMenuItem(label, selected);
-        item.setEnabled(enabled);
-        item.addItemListener(e -> {
-            save.accept(item.getState());
-            EventQueue.invokeLater(rebuildMenu);
-        });
-        return item;
-    }
-
     private static void addStatus(PopupMenu menu,
                                   SystemTrayService.TrayState state,
                                   String version,
-                                  String stableVersion,
                                   DockerExpectation dockerExpectation) {
         MenuItem header = new MenuItem("MySuricates v" + version);
         header.setEnabled(false);
         menu.add(header);
         menu.addSeparator();
 
-        String stable = state.stableOk()
-                ? "UP" + (stableVersion != null ? " (v" + stableVersion + ")" : "")
-                : "Offline";
-        MenuItem status = new MenuItem(String.format("Dev: UP | Stable: %s | %d aktiv | %d%% Erfolg",
-                stable, state.activeRuns(), state.successPercent()));
-        status.setEnabled(false);
-        menu.add(status);
+        state.instances().forEach(light -> {
+            MenuItem status = new MenuItem(light.kind().label() + ": "
+                    + SystemTrayService.statusText(light.color()));
+            status.setEnabled(false);
+            menu.add(status);
+        });
+
+        MenuItem runs = new MenuItem(String.format("%d aktiv | %d%% Erfolg",
+                state.activeRuns(), state.successPercent()));
+        runs.setEnabled(false);
+        menu.add(runs);
 
         MenuItem docker = new MenuItem("Docker: " + (!state.dockerOk()
                 ? "Offline" : dockerExpectation.isConfigured() ? "OK" : "nicht eingerichtet"));
