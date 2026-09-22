@@ -58,6 +58,9 @@ class SkillControllerTest {
     private SkillMapper skillMapper;
 
     @MockitoBean
+    private com.automation.service.workflow.WorkflowSealStatusService sealStatusService;
+
+    @MockitoBean
     private ApiKeyService apiKeyService;
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
@@ -234,5 +237,14 @@ class SkillControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void sealPins_returnsSealedWorkflowsPerSkill() throws Exception {
+        when(sealStatusService.sealedWorkflowsBySkill()).thenReturn(java.util.Map.of("skill-1", java.util.List.of("Deploy")));
+
+        mockMvc.perform(get("/api/v1/skills/seal-pins"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['skill-1'][0]").value("Deploy"));
     }
 }

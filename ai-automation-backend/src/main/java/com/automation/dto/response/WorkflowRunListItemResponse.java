@@ -34,6 +34,8 @@ import java.util.Map;
  * @param lastStepStatus  Status des letzten Schritts, {@code null} wenn es keinen gibt
  * @param lastStepPreview Ausgabe des letzten Schritts, gekürzt auf {@value #PREVIEW_LENGTH}
  *                        Zeichen; der Volltext steht in der Detail-Route
+ * @param sealed          Siegelstand beim Start (true = versiegelt und geprüft, false = nicht
+ *                        versiegelt, null = Run von vor der Aufzeichnung)
  */
 public record WorkflowRunListItemResponse(
         String id,
@@ -55,8 +57,22 @@ public record WorkflowRunListItemResponse(
         TriggerSource triggerSource,
         int stepCount,
         StepStatus lastStepStatus,
-        String lastStepPreview
+        String lastStepPreview,
+        Boolean sealed
 ) {
+    /** Kompatibilitäts-Konstruktor für Aufrufer von vor der Siegel-Aufzeichnung am Run. */
+    public WorkflowRunListItemResponse(String id, String workflowId, String workflowName, String projectName,
+                                       String projectPath, RunStatus status, Instant startedAt, Instant completedAt,
+                                       Long durationMs, Integer userRating, Map<String, Object> error,
+                                       Map<String, Object> metadata, Map<String, Object> inputContext,
+                                       String triggeredByScheduleId, String definitionHash, String definitionVersionId,
+                                       TriggerSource triggerSource, int stepCount, StepStatus lastStepStatus,
+                                       String lastStepPreview) {
+        this(id, workflowId, workflowName, projectName, projectPath, status, startedAt, completedAt, durationMs,
+                userRating, error, metadata, inputContext, triggeredByScheduleId, definitionHash, definitionVersionId,
+                triggerSource, stepCount, lastStepStatus, lastStepPreview, null);
+    }
+
     /**
      * Länge der Vorschau. 500 Zeichen, weil die Liste den Wert ohnehin auf 300&nbsp;px kürzt und
      * der Tooltip damit noch einen Satz mehr zeigt als die Zeile — mehr wäre wieder das Problem,

@@ -57,6 +57,8 @@ class ControllerModuleGateTest {
             // verschwinden. Er meldet nur und greift in keinen Schreibweg ein (182bd224).
             "WorkflowAnalyzerController",
             "WorkflowPoolController",
+            // Siegelstatus lesen: ein Siegel bleibt wirksam, wenn der Schalter aus ist — also sichtbar
+            "WorkflowSealStatusController",
             "WorkflowTemplateController");
 
     /** Method-level assignments inside core controllers — pinned so they cannot be dropped unnoticed. */

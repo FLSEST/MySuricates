@@ -341,6 +341,28 @@ export interface WorkflowRun {
   definitionHash?: string | null;
   definitionVersionId?: string | null;
   triggerSource?: TriggerSource | null;
+  /** Seal state recorded at start: true = sealed and verified, false = not sealed, null/absent = older run */
+  sealed?: boolean | null;
+  /** Skill content hashes verified at start (detail route only) */
+  sealedSkillPins?: Record<string, string> | null;
+}
+
+/** Seal state of a workflow, checked without a run (`GET /workflows/seal-status`). */
+export interface WorkflowSealStatus {
+  workflowId: string;
+  workflowName: string;
+  state: 'INTACT' | 'VIOLATED' | 'NOT_SEALED';
+  problem: 'NONE' | 'DEFINITION_CHANGED' | 'SKILLS_CHANGED' | 'UNVERIFIABLE';
+  detail: string | null;
+  changedSkills: { id: string; name: string | null }[];
+  /** false for seals made before skills were pinned */
+  skillsPinned: boolean;
+  pinnedSkillCount: number;
+  sealedAt: string | null;
+  /** Starts refused in the last seven days — they leave no run row */
+  refusedStarts: number;
+  lastRefusedAt: string | null;
+  lastRefusal: string | null;
 }
 
 /**

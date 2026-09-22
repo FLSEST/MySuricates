@@ -1254,6 +1254,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unaufgelöste zweisprachige Schritte, `?locale=` löst beim Lesen auf) |
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; Blaupausen aus templates/blueprints/) |
 | V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (Skill-Inhalt unter dem Siegel), neue Tabelle `skill_versions` (Änderungshistorie je Skill, ohne Fremdschlüssel) |
+| V81 | `V81__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
 
 ## SQLite-Besonderheiten
 

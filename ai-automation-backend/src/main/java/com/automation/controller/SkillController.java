@@ -11,6 +11,7 @@ import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.skill.SkillImportExportService;
 import com.automation.service.skill.SkillService;
+import com.automation.service.workflow.WorkflowSealStatusService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RequiresModule(ModuleCatalog.SKILLS)
 @RestController
@@ -28,10 +30,17 @@ public class SkillController {
     private final SkillService skillService;
     private final SkillImportExportService importExportService;
     private final SkillMapper skillMapper;
+    private final WorkflowSealStatusService sealStatusService;
 
     @GetMapping
     public List<SkillResponse> listSkills() {
         return skillMapper.toResponseList(skillService.findAll());
+    }
+
+    /** skill id → names of the sealed workflows that use it; such skills cannot be changed or deleted. */
+    @GetMapping("/seal-pins")
+    public Map<String, List<String>> sealPins() {
+        return sealStatusService.sealedWorkflowsBySkill();
     }
 
     @GetMapping("/{id}")

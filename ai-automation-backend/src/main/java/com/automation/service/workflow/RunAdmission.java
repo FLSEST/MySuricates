@@ -12,10 +12,12 @@ import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
+import java.util.List;
 
 /**
  * Single gate every workflow run passes before its run row exists (called by
@@ -32,39 +34,43 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RunAdmission {
 
-    /** What the run row records about its origin. Fields are null when provenance is off. */
-    public record Ticket(String definitionHash, String definitionVersionId) {
-        static Ticket none() {
-            return new Ticket(null, null);
+    /**
+     * What the run row records about its origin. Hash and version are null when provenance is off;
+     * the seal state is recorded regardless — it is never derived later from the workflow's current
+     * state. {@code sealedSkillPins} are the skill hashes verified at start (JSON), if the seal pins any.
+     */
+    public record Ticket(String definitionHash, String definitionVersionId, Boolean sealed, String sealedSkillPins) {
+        public Ticket(String definitionHash, String definitionVersionId) {
+            this(definitionHash, definitionVersionId, null, null);
         }
     }
 
     private final ModuleRegistry modules;
     private final WorkflowDefinitionHasher hasher;
-    private final WorkflowSkillPins skillPins;
+    private final WorkflowSealVerifier sealVerifier;
     private final WorkflowVersionService versionService;
     private final ActivityLogService activityLog;
 
     public Ticket admit(Workflow workflow, TriggerSource source, Map<String, Object> inputContext) {
         // Seals are checked regardless of the switches: a seal must not lapse because a flag changed.
-        String hash = workflow.isSealed() ? verifySeal(workflow, source) : null;
+        WorkflowSealVerifier.Verdict verdict = workflow.isSealed() ? verifySeal(workflow, source) : null;
         if (!workflow.isSealed() && modules.isEnabled(ModuleCatalog.REQUIRE_SEALED_FOR_UNATTENDED)) {
             requireAttended(workflow, source, inputContext);
         }
+        Boolean sealed = workflow.isSealed();
+        String pins = verdict != null && verdict.pins() != null ? WorkflowSkillPins.toJson(verdict.pins()) : null;
         if (!modules.isEnabled(ModuleCatalog.PROVENANCE)) {
-            return Ticket.none();
+            return new Ticket(null, null, sealed, pins);
         }
         try {
-            if (hash == null) {
-                hash = hasher.hash(workflow);
-            }
+            String hash = verdict != null ? verdict.actualHash() : hasher.hash(workflow);
             String versionId = versionService.findVersionIdByHash(workflow.getId(), hash).orElse(null);
-            return new Ticket(hash, versionId);
+            return new Ticket(hash, versionId, sealed, pins);
         } catch (RuntimeException e) {
             // Provenance is metadata: a definition that cannot be hashed (e.g. lazy data outside a
             // session) must not stop the run — the executor fails such runs on its own if needed.
             log.warn("Could not compute definition hash for workflow {} ({}): {}", workflow.getId(), source, e.getMessage());
-            return Ticket.none();
+            return new Ticket(null, null, sealed, pins);
         }
     }
 
@@ -77,58 +83,69 @@ public class RunAdmission {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("triggerSource", source.name());
         metadata.put("effectiveSource", origin);
-        activityLog.log(LogLevel.WARN, LogCategory.SECURITY,
+        logRefusal(LogLevel.WARN,
                 "Run refused — unattended run (" + origin + ") of unsealed workflow '" + workflow.getName() + "'",
-                "RunAdmission", workflow.getId(), metadata, workflow.getId());
+                workflow.getId(), metadata);
         throw new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
                 "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin
                         + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)");
     }
 
-    /** Returns the verified hash or refuses the run (fail closed: an unverifiable seal is a broken seal). */
-    private String verifySeal(Workflow workflow, TriggerSource source) {
-        String actual;
-        try {
-            actual = hasher.hash(workflow);
-        } catch (RuntimeException e) {
-            throw refuse(workflow, source, null, "its definition could not be verified (" + e.getMessage() + ")");
+    /** Returns the verdict of an intact seal or refuses the run (fail closed: an unverifiable seal is a broken seal). */
+    private WorkflowSealVerifier.Verdict verifySeal(Workflow workflow, TriggerSource source) {
+        WorkflowSealVerifier.Verdict verdict = sealVerifier.verify(workflow);
+        if (!verdict.intact()) {
+            throw refuse(workflow, source, verdict);
         }
-        if (!actual.equals(workflow.getSealedHash())) {
-            throw refuse(workflow, source, actual, "its definition no longer matches the seal");
-        }
-        verifySkillPins(workflow, source, actual);
-        return actual;
-    }
-
-    /** The skills a sealed workflow uses must still have the content they had when it was sealed. */
-    private void verifySkillPins(Workflow workflow, TriggerSource source, String definitionHash) {
-        if (workflow.getSealedSkillHashes() == null) {
+        if (!verdict.skillsPinned()) {
             log.warn("Sealed workflow {} ({}) predates skill pinning — seal it again to pin its skills",
                     workflow.getName(), workflow.getId());
-            return;
         }
-        Set<String> changed;
-        try {
-            changed = WorkflowSkillPins.changed(WorkflowSkillPins.fromJson(workflow.getSealedSkillHashes()),
-                    skillPins.pins(workflow));
-        } catch (RuntimeException e) {
-            throw refuse(workflow, source, definitionHash, "its skills could not be verified (" + e.getMessage() + ")");
-        }
-        if (!changed.isEmpty()) {
-            throw refuse(workflow, source, definitionHash,
-                    "skill(s) " + String.join(", ", changed) + " changed since sealing — review them and seal again");
-        }
+        return verdict;
     }
 
-    private HardeningException refuse(Workflow workflow, TriggerSource source, String actualHash, String reason) {
+    private HardeningException refuse(Workflow workflow, TriggerSource source, WorkflowSealVerifier.Verdict verdict) {
+        String reason = verdict.detail();
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("expectedHash", workflow.getSealedHash());
-        metadata.put("actualHash", actualHash);
+        metadata.put("actualHash", verdict.actualHash());
         metadata.put("triggerSource", source.name());
-        activityLog.log(LogLevel.ERROR, LogCategory.SECURITY,
-                "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
-                "RunAdmission", workflow.getId(), metadata, workflow.getId());
+        metadata.put("problem", verdict.problem().name());
+        if (!verdict.changedSkills().isEmpty()) {
+            metadata.put("changedSkills", List.copyOf(verdict.changedSkills()));
+        }
+        logRefusal(LogLevel.ERROR, "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
+                workflow.getId(), metadata);
         return new HardeningException(ErrorCode.WORKFLOW_TAMPERED,
                 "Sealed workflow '" + workflow.getName() + "' was not started: " + reason);
+    }
+
+    /**
+     * Writes the SECURITY entry of a refused start. The refusal is an exception, so inside a
+     * caller's transaction (webhook, schedule, chain) the entry would be rolled back with it and
+     * the refusal would leave no trace at all. It is therefore written after that transaction has
+     * ended, on its own virtual thread: with pool-size 1 the caller still holds the only
+     * connection until its transaction is cleaned up, so the writer waits for it instead of the
+     * caller's thread blocking on itself (which REQUIRES_NEW would do).
+     */
+    private void logRefusal(LogLevel level, String message, String workflowId, Map<String, Object> metadata) {
+        Runnable write = () -> activityLog.log(level, LogCategory.SECURITY, message, "RunAdmission", workflowId,
+                metadata, workflowId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            write.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                Thread.ofVirtual().name("run-refusal-log").start(() -> {
+                    try {
+                        write.run();
+                    } catch (RuntimeException e) {
+                        log.warn("Could not record refused start of workflow {}: {}", workflowId, e.getMessage());
+                    }
+                });
+            }
+        });
     }
 }

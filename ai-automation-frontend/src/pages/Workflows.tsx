@@ -133,20 +133,23 @@ export function Workflows() {
     try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* ignore */ }
   }, [viewMode]);
 
+  const [sealedOnly, setSealedOnly] = useState(false);
+  const hasSealed = useMemo(() => (workflows ?? []).some((w) => w.sealed), [workflows]);
   const filtered = useMemo(
     () => {
-      if (!search) return workflows ?? [];
+      const base = sealedOnly && hasSealed ? (workflows ?? []).filter((w) => w.sealed) : (workflows ?? []);
+      if (!search) return base;
       const q = search.toLowerCase();
       return (
-        workflows?.filter(
+        base.filter(
           (w) =>
             w.name.toLowerCase().includes(q) ||
             w.projectName.toLowerCase().includes(q) ||
             (w.description?.toLowerCase().includes(q) ?? false),
-        ) ?? []
+        )
       );
     },
-    [workflows, search],
+    [workflows, search, sealedOnly, hasSealed],
   );
 
   const groupedByProject = useMemo(() => {
@@ -445,6 +448,9 @@ export function Workflows() {
               onBulkToggleAutoTodo={handleBulkToggleAutoTodo}
               showDetails={showDetails}
               onToggleShowDetails={() => setShowDetails((v) => !v)}
+              hasSealed={hasSealed}
+              sealedOnly={sealedOnly}
+              onToggleSealedOnly={() => setSealedOnly((v) => !v)}
             />
 
             <div className="flex items-center gap-1 mb-2 text-xs" role="tablist">

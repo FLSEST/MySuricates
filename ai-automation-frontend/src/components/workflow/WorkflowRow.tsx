@@ -6,12 +6,13 @@ import {
   Bell,
   FlaskConical,
   Cloud,
-  Lock,
   Workflow as WorkflowFlowIcon,
 } from 'lucide-react';
 import { useT } from '../../i18n';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
+import { SealStateIcon } from './SealStateIcon';
+import { useSealStatus } from '../../hooks/useSealStatus';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 
@@ -41,6 +42,7 @@ export function WorkflowRow({
   showDetails = false,
 }: WorkflowRowProps) {
   const t = useT();
+  const sealStatus = useSealStatus(workflow.id);
   const handleClick = () => {
     if (selectMode) {
       onToggleCheck();
@@ -84,9 +86,9 @@ export function WorkflowRow({
       ) : (
         <span className="text-sm truncate flex-1">{workflow.name}</span>
       )}
-      {!selectMode && workflow.sealed && (
-        <span title={t.workflows.sealedHint} className="shrink-0" data-testid="row-sealed">
-          <Lock className="w-3 h-3 text-accent" />
+      {!selectMode && (workflow.sealed || sealStatus?.state === 'VIOLATED') && (
+        <span className="shrink-0 inline-flex" data-testid="row-sealed">
+          <SealStateIcon sealed={workflow.sealed} status={sealStatus} />
         </span>
       )}
       {!selectMode && !!workflow.metadata?.autoTodo?.enabled && (

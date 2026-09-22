@@ -6,6 +6,8 @@ import { useT } from '../../i18n';
 import { formatDuration, formatRelativeTime } from '../../utils/formatTime';
 import type { WorkflowChain } from '../../types';
 import { ChainStatusBadge } from './ChainStatusBadge';
+import { SealStateIcon } from '../workflow/SealStateIcon';
+import { useSealStatuses } from '../../hooks/useSealStatus';
 
 export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
   chain: WorkflowChain;
@@ -16,6 +18,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
   const t = useT();
   const navigate = useNavigate();
   const { data: runs } = useChainRuns(chain.id);
+  const { byWorkflow: sealStatuses } = useSealStatuses();
 
   return (
     <div className="space-y-4">
@@ -68,8 +71,13 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-raised border border-border">
                       <span className="text-xs font-mono text-text-tertiary w-6 text-center">{i + 1}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-text-primary truncate">
-                          {entry.label || entry.workflowName || entry.workflowId}
+                        <p className="font-medium text-text-primary flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{entry.label || entry.workflowName || entry.workflowId}</span>
+                          {sealStatuses.get(entry.workflowId) && (
+                            <span title={t.workflows.sealView.chainEntrySealed} className="inline-flex">
+                              <SealStateIcon sealed status={sealStatuses.get(entry.workflowId)} />
+                            </span>
+                          )}
                         </p>
                         {entry.projectName && (
                           <p className="text-xs text-text-tertiary">{entry.projectName}</p>

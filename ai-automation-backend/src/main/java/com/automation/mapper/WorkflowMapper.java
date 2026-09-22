@@ -12,6 +12,7 @@ import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowDefinitionHasher;
+import com.automation.service.workflow.WorkflowSkillPins;
 import org.mapstruct.Context;
 import org.mapstruct.IterableMapping;
 import org.mapstruct.Mapper;
@@ -92,6 +93,7 @@ public abstract class WorkflowMapper {
     @Mapping(target = "workflowName", expression = "java(safeWorkflowName(run))")
     @Mapping(target = "projectName", expression = "java(safeProjectName(run))")
     @Mapping(target = "projectPath", expression = "java(safeProjectPath(run))")
+    @Mapping(target = "sealedSkillPins", expression = "java(sealedSkillPinsOf(run))")
     @Named("runSingle")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run);
 
@@ -110,6 +112,7 @@ public abstract class WorkflowMapper {
     @Mapping(target = "workflowName", expression = "java(batchedWorkflowName(run, owners))")
     @Mapping(target = "projectName", expression = "java(ownerOf(run, owners).projectName())")
     @Mapping(target = "projectPath", expression = "java(ownerOf(run, owners).projectPath())")
+    @Mapping(target = "sealedSkillPins", expression = "java(sealedSkillPinsOf(run))")
     @Named("runWithOwners")
     public abstract WorkflowRunResponse toRunResponse(WorkflowRun run, @Context Map<String, RunOwner> owners);
 
@@ -177,7 +180,20 @@ public abstract class WorkflowMapper {
                 run.getTriggerSource(),
                 steps.size(),
                 last == null ? null : last.getStatus(),
-                preview(last == null ? null : last.getOutput()));
+                preview(last == null ? null : last.getOutput()),
+                run.getSealed());
+    }
+
+    /** Skill pins verified at start; unreadable JSON is shown as none rather than failing the whole response. */
+    protected Map<String, String> sealedSkillPinsOf(WorkflowRun run) {
+        if (run.getSealedSkillPins() == null) {
+            return null;
+        }
+        try {
+            return WorkflowSkillPins.fromJson(run.getSealedSkillPins());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** Gekuerzte Vorschau; {@code null} bleibt {@code null}, damit "kein Wert" nicht wie "leer" aussieht. */

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 
 public interface ActivityLogRepository extends JpaRepository<ActivityLog, String> {
 
@@ -37,4 +38,7 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, String
     @Modifying
     @Query("DELETE FROM ActivityLog a WHERE a.level IN :levels AND a.createdAt < :before")
     int deleteByLevelsOlderThan(@Param("levels") java.util.Collection<LogLevel> levels, @Param("before") Instant before);
+
+    /** Entries of one source since a point in time, newest first — e.g. the refused starts of RunAdmission. */
+    List<ActivityLog> findBySourceAndTimestampAfterOrderByTimestampDesc(String source, Instant after);
 }

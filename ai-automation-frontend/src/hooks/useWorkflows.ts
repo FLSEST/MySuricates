@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { SEAL_STATUS_KEY, SKILL_SEAL_PINS_KEY } from './useSealStatus';
 import { api, apiErrorMessage, fetchWorkflowBpmn, importWorkflowBpmn } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
@@ -176,6 +177,8 @@ export function useSealWorkflow() {
       api.post<Workflow>(`/workflows/${id}/${lock ? 'seal' : 'unseal'}`),
     onSuccess: (_, { lock }) => {
       qc.invalidateQueries({ queryKey: ['workflows'] });
+      qc.invalidateQueries({ queryKey: SEAL_STATUS_KEY });
+      qc.invalidateQueries({ queryKey: SKILL_SEAL_PINS_KEY });
       toast.success(lock ? t.workflows.sealedToast : t.workflows.unsealedToast);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.workflows.sealFailed)),
@@ -209,7 +212,11 @@ export function useExecuteWorkflow() {
       qc.invalidateQueries({ queryKey: ['learning', 'dashboard'] });
       toast.success(t.toast.workflowExecuted);
     },
-    onError: (err) => toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed)),
+    onError: (err) => {
+      // a refused start leaves no run — the seal status is where it shows up
+      qc.invalidateQueries({ queryKey: SEAL_STATUS_KEY });
+      toast.error(apiErrorMessage(err, t.toast.workflowExecuteFailed));
+    },
   });
 }
 
