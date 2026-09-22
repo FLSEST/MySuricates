@@ -70,11 +70,20 @@ const DATA_OBJECT_GAP = 10;
 function verticalLayout(d: Diagram): Diagram {
   // 1) Kästen transponieren — über die MITTE (nicht die Ecke), sonst wandern nicht-quadratische
   //    Kästen (100×80) um (w-h)/2 seitlich weg und die Hauptlinie bekommt einen Zickzack.
-  let shapes = d.shapes.map((s) => ({
-    ...s,
-    x: s.y + s.h / 2 - s.w / 2,
-    y: s.x + s.w / 2 - s.h / 2,
-  }));
+  //    Ausnahme Subprozess (Schleife): er ist kein Kasten mit Text, sondern ein Rahmen um seinen
+  //    Inhalt. Dessen Kinder liegen transponiert entlang seiner alten Breite; behielte der Rahmen
+  //    seine Größe, lägen Start und Ende der Schleife über bzw. unter ihm. Er tauscht daher Breite
+  //    und Höhe — und bleibt im Schritt 2 ein belegtes Intervall, das seinen Inhalt einschließt.
+  let shapes = d.shapes.map((s) => {
+    const [w, h] = s.kind === 'subProcess' ? [s.h, s.w] : [s.w, s.h];
+    return {
+      ...s,
+      w,
+      h,
+      x: s.y + s.h / 2 - w / 2,
+      y: s.x + s.w / 2 - h / 2,
+    };
+  });
 
   // 2) Leerräume stauchen: belegte y-Intervalle mergen, überschüssige Lücken kürzen
   const intervals = shapes.map((s) => [s.y, s.y + s.h] as [number, number]).sort((a, b) => a[0] - b[0]);
