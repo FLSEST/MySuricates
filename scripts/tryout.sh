@@ -93,6 +93,7 @@ cmd_start() {
       -p "127.0.0.1:$PORT:9090" \
       -v "$DATA_VOLUME:/app/data" -v "$SECRETS_VOLUME:/app/secrets" \
       -e "AUTOMATION_CORS_ORIGINS=http://localhost:$PORT,http://127.0.0.1:$PORT" \
+      -e "AUTOMATION_INSTANCE_URL=http://localhost:$PORT" -e "AUTOMATION_INSTANCE_CONTAINER=$CONTAINER" \
       "$IMAGE" >/dev/null || { docker rm -f "$CONTAINER" >/dev/null 2>&1; die "Start fehlgeschlagen"; }  # kein halb angelegter Container
   fi
   echo "Warte auf $CONTAINER …"

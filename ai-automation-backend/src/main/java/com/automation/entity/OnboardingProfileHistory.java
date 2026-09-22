@@ -1,9 +1,12 @@
 package com.automation.entity;
 
+import com.automation.util.JsonStringMapConverter;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -31,8 +34,11 @@ public class OnboardingProfileHistory {
     @Column(nullable = false)
     private int version;
 
+    /** The content before the change, per language (V81). */
+    @Convert(converter = JsonStringMapConverter.class)
     @Column(nullable = false, columnDefinition = "text")
-    private String content;
+    @Builder.Default
+    private Map<String, String> content = new HashMap<>();
 
     @Column(nullable = false)
     private String changedBy;

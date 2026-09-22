@@ -36,6 +36,9 @@ services:
       - ${AUTOTRIGGER_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}:${AUTOTRIGGER_DEV_PROJECT_ROOT:-${HOME}/Entwicklung}
     environment:
       - AUTOMATION_DB_PATH=/app/data/automation.db
+      # Onboarding-Texte: veröffentlichter Port und Container, in dem der API-Key liegt
+      - AUTOMATION_INSTANCE_URL=http://localhost:${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}
+      - AUTOMATION_INSTANCE_CONTAINER=${AUTOTRIGGER_DEV_CONTAINER_NAME:-autotrigger-dev-container}
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AUTOMATION_SECURITY_ENABLED=true
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}

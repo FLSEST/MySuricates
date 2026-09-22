@@ -32,7 +32,7 @@ class OnboardingProfileRepositoryTest {
         return OnboardingProfile.builder()
                 .key(key)
                 .name(Map.of("en", "Name " + key))
-                .content("Content for " + key)
+                .content(Map.of("de", "Content for " + key))
                 .type(type)
                 .builtIn(builtIn)
                 .sortOrder(sortOrder)

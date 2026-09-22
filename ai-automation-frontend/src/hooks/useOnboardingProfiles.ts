@@ -9,7 +9,8 @@ export interface OnboardingProfile {
   key: string;
   name: Record<string, string>;
   description: Record<string, string>;
-  content: string;
+  /** Markdown per language (`de`, `en`); a missing language falls back to the other when written. */
+  content: Record<string, string>;
   type: 'BASE' | 'PROFILE';
   builtIn: boolean;
   sortOrder: number;
@@ -22,7 +23,7 @@ export interface OnboardingProfile {
 export interface OnboardingProfileHistory {
   id: string;
   version: number;
-  content: string;
+  content: Record<string, string>;
   changedBy: string;
   changedAt: string;
 }
@@ -49,7 +50,7 @@ export function useCreateOnboardingProfile() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: (data: { key: string; name: Record<string, string>; description: Record<string, string>; content: string; type: 'BASE' | 'PROFILE' }) =>
+    mutationFn: (data: { key: string; name: Record<string, string>; description: Record<string, string>; content: Record<string, string>; type: 'BASE' | 'PROFILE' }) =>
       api.post<OnboardingProfile>('/onboarding-profiles', data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['onboarding-profiles'] });
@@ -64,7 +65,7 @@ export function useUpdateOnboardingProfile() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name?: Record<string, string>; description?: Record<string, string>; content?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { name?: Record<string, string>; description?: Record<string, string>; content?: Record<string, string> } }) =>
       api.put<OnboardingProfile>(`/onboarding-profiles/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['onboarding-profiles'] });

@@ -10,7 +10,7 @@ public record OnboardingProfileResponse(
         String key,
         Map<String, String> name,
         Map<String, String> description,
-        String content,
+        Map<String, String> content,
         OnboardingProfileType type,
         boolean builtIn,
         int sortOrder,

@@ -82,7 +82,7 @@ class OnboardingProfileServiceTest {
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             var request = new CreateOnboardingProfileRequest(
-                    "new-key", Map.of("de", "Neu"), Map.of(), "content", OnboardingProfileType.PROFILE);
+                    "new-key", Map.of("de", "Neu"), Map.of(), Map.of("de", "content"), OnboardingProfileType.PROFILE);
 
             OnboardingProfile result = service.create(request);
 
@@ -98,7 +98,7 @@ class OnboardingProfileServiceTest {
                     OnboardingProfile.builder().key("existing").build()));
 
             var request = new CreateOnboardingProfileRequest(
-                    "existing", Map.of(), Map.of(), "content", OnboardingProfileType.PROFILE);
+                    "existing", Map.of(), Map.of(), Map.of("de", "content"), OnboardingProfileType.PROFILE);
 
             assertThatThrownBy(() -> service.create(request))
                     .isInstanceOf(IllegalArgumentException.class)
@@ -112,15 +112,15 @@ class OnboardingProfileServiceTest {
         @Test
         void update_contentChanged_createsHistoryAndIncrementsVersion() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").content("old content").version(2).build();
+                    .id("p1").key("base").content(Map.of("de", "old content")).version(2).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateOnboardingProfileRequest(null, null, "new content");
+            var request = new UpdateOnboardingProfileRequest(null, null, Map.of("de", "new content"));
 
             OnboardingProfile result = service.update("p1", request);
 
-            assertThat(result.getContent()).isEqualTo("new content");
+            assertThat(result.getContent()).isEqualTo(Map.of("de", "new content"));
             assertThat(result.getVersion()).isEqualTo(3);
             verify(historyRepository).save(any(OnboardingProfileHistory.class));
         }
@@ -128,11 +128,11 @@ class OnboardingProfileServiceTest {
         @Test
         void update_contentUnchanged_noHistoryNoVersionBump() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").content("same").version(2).build();
+                    .id("p1").key("base").content(Map.of("de", "same")).version(2).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateOnboardingProfileRequest(Map.of("de", "Neuer Name"), null, "same");
+            var request = new UpdateOnboardingProfileRequest(Map.of("de", "Neuer Name"), null, Map.of("de", "same"));
 
             OnboardingProfile result = service.update("p1", request);
 
@@ -144,7 +144,7 @@ class OnboardingProfileServiceTest {
         @Test
         void update_onlyName_noHistoryCreated() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").content("content").version(1).build();
+                    .id("p1").key("base").content(Map.of("de", "content")).version(1).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -159,16 +159,16 @@ class OnboardingProfileServiceTest {
         @Test
         void update_historyContainsOldContent() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").content("old").version(5).build();
+                    .id("p1").key("base").content(Map.of("de", "old")).version(5).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateOnboardingProfileRequest(null, null, "new");
+            var request = new UpdateOnboardingProfileRequest(null, null, Map.of("de", "new"));
             service.update("p1", request);
 
             ArgumentCaptor<OnboardingProfileHistory> captor = ArgumentCaptor.forClass(OnboardingProfileHistory.class);
             verify(historyRepository).save(captor.capture());
-            assertThat(captor.getValue().getContent()).isEqualTo("old");
+            assertThat(captor.getValue().getContent()).isEqualTo(Map.of("de", "old"));
             assertThat(captor.getValue().getVersion()).isEqualTo(5);
         }
     }
@@ -206,14 +206,14 @@ class OnboardingProfileServiceTest {
         @Test
         void reset_builtInProfile_resetsContent() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").builtIn(true).content("modified").version(3).build();
+                    .id("p1").key("base").builtIn(true).content(Map.of("de", "modified")).version(3).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
-            when(seeder.getDefaultContent("base")).thenReturn("default content");
+            when(seeder.getDefaultContent("base")).thenReturn(Map.of("de", "default content"));
             when(profileRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             OnboardingProfile result = service.resetToDefault("p1");
 
-            assertThat(result.getContent()).isEqualTo("default content");
+            assertThat(result.getContent()).isEqualTo(Map.of("de", "default content"));
             assertThat(result.getVersion()).isEqualTo(4);
             verify(historyRepository).save(any(OnboardingProfileHistory.class));
         }
@@ -221,9 +221,9 @@ class OnboardingProfileServiceTest {
         @Test
         void reset_alreadyDefault_noChange() {
             OnboardingProfile profile = OnboardingProfile.builder()
-                    .id("p1").key("base").builtIn(true).content("default content").version(1).build();
+                    .id("p1").key("base").builtIn(true).content(Map.of("de", "default content")).version(1).build();
             when(profileRepository.findById("p1")).thenReturn(Optional.of(profile));
-            when(seeder.getDefaultContent("base")).thenReturn("default content");
+            when(seeder.getDefaultContent("base")).thenReturn(Map.of("de", "default content"));
 
             OnboardingProfile result = service.resetToDefault("p1");
 

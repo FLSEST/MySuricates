@@ -12,7 +12,7 @@ class UpdateOnboardingProfileRequestTest {
     @Test
     void should_returnName_when_constructedWithPopulatedMap() {
         var request = new UpdateOnboardingProfileRequest(
-                Map.of("en", "Profile", "de", "Profil"), Map.of(), "some content");
+                Map.of("en", "Profile", "de", "Profil"), Map.of(), Map.of("de", "some content"));
 
         assertThat(request.name()).containsEntry("en", "Profile").containsEntry("de", "Profil");
     }
@@ -20,7 +20,7 @@ class UpdateOnboardingProfileRequestTest {
     @Test
     void should_returnDescription_when_constructedWithPopulatedMap() {
         var request = new UpdateOnboardingProfileRequest(
-                Map.of(), Map.of("en", "A description", "de", "Eine Beschreibung"), "some content");
+                Map.of(), Map.of("en", "A description", "de", "Eine Beschreibung"), Map.of("de", "some content"));
 
         assertThat(request.description())
                 .containsEntry("en", "A description")
@@ -29,32 +29,32 @@ class UpdateOnboardingProfileRequestTest {
 
     @Test
     void should_returnContent_when_constructedWithValue() {
-        var request = new UpdateOnboardingProfileRequest(Map.of(), Map.of(), "my content");
+        var request = new UpdateOnboardingProfileRequest(Map.of(), Map.of(), Map.of("de", "my content"));
 
-        assertThat(request.content()).isEqualTo("my content");
+        assertThat(request.content()).isEqualTo(Map.of("de", "my content"));
     }
 
     @Test
     void should_returnAllFields_when_fullyPopulated() {
         var name = Map.of("en", "Name");
         var description = Map.of("en", "Desc");
-        var request = new UpdateOnboardingProfileRequest(name, description, "content");
+        var request = new UpdateOnboardingProfileRequest(name, description, Map.of("de", "content"));
 
         assertThat(request.name()).isEqualTo(name);
         assertThat(request.description()).isEqualTo(description);
-        assertThat(request.content()).isEqualTo("content");
+        assertThat(request.content()).isEqualTo(Map.of("de", "content"));
     }
 
     @Test
     void should_returnNull_when_nameIsNull() {
-        var request = new UpdateOnboardingProfileRequest(null, Map.of(), "content");
+        var request = new UpdateOnboardingProfileRequest(null, Map.of(), Map.of("de", "content"));
 
         assertThat(request.name()).isNull();
     }
 
     @Test
     void should_returnNull_when_descriptionIsNull() {
-        var request = new UpdateOnboardingProfileRequest(Map.of(), null, "content");
+        var request = new UpdateOnboardingProfileRequest(Map.of(), null, Map.of("de", "content"));
 
         assertThat(request.description()).isNull();
     }
@@ -77,17 +77,17 @@ class UpdateOnboardingProfileRequestTest {
 
     @Test
     void should_allowMixedNullAndPopulatedFields() {
-        var request = new UpdateOnboardingProfileRequest(Map.of("en", "Name"), null, "content");
+        var request = new UpdateOnboardingProfileRequest(Map.of("en", "Name"), null, Map.of("de", "content"));
 
         assertThat(request.name()).containsEntry("en", "Name");
         assertThat(request.description()).isNull();
-        assertThat(request.content()).isEqualTo("content");
+        assertThat(request.content()).isEqualTo(Map.of("de", "content"));
     }
 
     @Test
     void should_beEqual_when_allFieldsMatch() {
-        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c");
-        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c");
+        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c"));
+        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c"));
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -104,38 +104,38 @@ class UpdateOnboardingProfileRequestTest {
 
     @Test
     void should_notBeEqual_when_nameDiffers() {
-        var a = new UpdateOnboardingProfileRequest(Map.of("en", "A"), Map.of("en", "D"), "c");
-        var b = new UpdateOnboardingProfileRequest(Map.of("en", "B"), Map.of("en", "D"), "c");
+        var a = new UpdateOnboardingProfileRequest(Map.of("en", "A"), Map.of("en", "D"), Map.of("de", "c"));
+        var b = new UpdateOnboardingProfileRequest(Map.of("en", "B"), Map.of("en", "D"), Map.of("de", "c"));
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_descriptionDiffers() {
-        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D1"), "c");
-        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D2"), "c");
+        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D1"), Map.of("de", "c"));
+        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D2"), Map.of("de", "c"));
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_contentDiffers() {
-        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c1");
-        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c2");
+        var a = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c1"));
+        var b = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c2"));
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_comparedToNull() {
-        var request = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c");
+        var request = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c"));
 
         assertThat(request).isNotEqualTo(null);
     }
 
     @Test
     void should_containFieldNamesInToString() {
-        var request = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), "c");
+        var request = new UpdateOnboardingProfileRequest(Map.of("en", "N"), Map.of("en", "D"), Map.of("de", "c"));
 
         assertThat(request.toString()).contains("name");
         assertThat(request.toString()).contains("description");
@@ -144,7 +144,7 @@ class UpdateOnboardingProfileRequestTest {
 
     @Test
     void should_containValuesInToString() {
-        var request = new UpdateOnboardingProfileRequest(Map.of("en", "MyName"), Map.of("en", "MyDesc"), "MyContent");
+        var request = new UpdateOnboardingProfileRequest(Map.of("en", "MyName"), Map.of("en", "MyDesc"), Map.of("de", "MyContent"));
 
         assertThat(request.toString()).contains("MyName");
         assertThat(request.toString()).contains("MyDesc");

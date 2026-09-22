@@ -2,6 +2,7 @@ package com.automation.config;
 
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
+import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import com.automation.service.project.ProjectOnboardingService;
 import com.automation.service.project.ProjectService;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.*;
 class OnboardingProfileSeederTest {
 
     @Mock private OnboardingProfileRepository profileRepository;
+    @Mock private OnboardingProfileHistoryRepository historyRepository;
     @Mock private ProjectService projectService;
     @Mock private ProjectOnboardingService projectOnboardingService;
 
@@ -32,7 +34,7 @@ class OnboardingProfileSeederTest {
 
     @BeforeEach
     void setUp() {
-        seeder = new OnboardingProfileSeeder(profileRepository, projectService, projectOnboardingService);
+        seeder = new OnboardingProfileSeeder(profileRepository, historyRepository, projectService, projectOnboardingService);
     }
 
     @Test
@@ -111,7 +113,8 @@ class OnboardingProfileSeederTest {
         captor.getAllValues().forEach(profile -> {
             assertThat(profile.isBuiltIn()).isTrue();
             assertThat(profile.getVersion()).isGreaterThanOrEqualTo(1);
-            assertThat(profile.getContent()).isNotNull().isNotBlank();
+            assertThat(profile.getContent()).containsOnlyKeys("de", "en");
+            assertThat(profile.getContent().values()).allSatisfy(text -> assertThat(text).isNotBlank());
         });
     }
 
@@ -154,7 +157,7 @@ class OnboardingProfileSeederTest {
     @Test
     void run_updatesProfileWhenVersionIsLower() throws Exception {
         OnboardingProfile outdated = OnboardingProfile.builder()
-                .id("onboarding-base").key("base").version(1).content("old content").build();
+                .id("onboarding-base").key("base").version(1).content(Map.of("de", "old content")).build();
         when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(outdated));
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
@@ -162,17 +165,17 @@ class OnboardingProfileSeederTest {
 
         seeder.run(null);
 
-        // base updated (version 1 < 3) + 5 others seeded = 6 saves
+        // base updated (version 1 < 4) + 5 others seeded = 6 saves
         verify(profileRepository, times(6)).save(any());
-        assertThat(outdated.getVersion()).isEqualTo(3);
-        assertThat(outdated.getContent()).isNotEqualTo("old content");
-        assertThat(outdated.getContent()).contains("TODOs immer mit Titel nennen");
+        assertThat(outdated.getVersion()).isEqualTo(4);
+        assertThat(outdated.getContent()).isNotEqualTo(Map.of("de", "old content"));
+        assertThat(outdated.getContent().get("de")).contains("TODOs immer mit Titel nennen");
     }
 
     @Test
     void run_refreshesEnabledProjectsAfterUpdate() throws Exception {
         OnboardingProfile outdated = OnboardingProfile.builder()
-                .id("onboarding-base").key("base").version(1).content("old").build();
+                .id("onboarding-base").key("base").version(1).content(Map.of("de", "old")).build();
         when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(outdated));
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
@@ -188,13 +191,14 @@ class OnboardingProfileSeederTest {
 
     @Test
     void getDefaultContent_existingKey_returnsContent() {
-        String content = seeder.getDefaultContent("base");
-        assertThat(content).isNotNull().isNotBlank();
+        Map<String, String> content = seeder.getDefaultContent("base");
+        assertThat(content).containsOnlyKeys("de", "en");
+        assertThat(content.values()).allSatisfy(text -> assertThat(text).isNotBlank());
     }
 
     @Test
     void getDefaultContent_unknownKey_returnsNull() {
-        String content = seeder.getDefaultContent("nonexistent");
+        Map<String, String> content = seeder.getDefaultContent("nonexistent");
         assertThat(content).isNull();
     }
 }

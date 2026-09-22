@@ -23,7 +23,7 @@ class OnboardingProfileResponseTest {
             "profile-a",
             name,
             description,
-            "Some content here",
+            Map.of("de", "Some content here"),
             OnboardingProfileType.PROFILE,
             true,
             5,
@@ -37,7 +37,7 @@ class OnboardingProfileResponseTest {
         assertThat(response.key()).isEqualTo("profile-a");
         assertThat(response.name()).isEqualTo(name);
         assertThat(response.description()).isEqualTo(description);
-        assertThat(response.content()).isEqualTo("Some content here");
+        assertThat(response.content()).isEqualTo(Map.of("de", "Some content here"));
         assertThat(response.type()).isEqualTo(OnboardingProfileType.PROFILE);
         assertThat(response.builtIn()).isTrue();
         assertThat(response.sortOrder()).isEqualTo(5);
@@ -85,7 +85,7 @@ class OnboardingProfileResponseTest {
             "empty-key",
             Map.of(),
             Map.of(),
-            "content",
+            Map.of("de", "content"),
             OnboardingProfileType.BASE,
             false,
             1,
@@ -106,7 +106,7 @@ class OnboardingProfileResponseTest {
             "base",
             null,
             null,
-            "base content",
+            Map.of("de", "base content"),
             OnboardingProfileType.BASE,
             true,
             0,
@@ -129,11 +129,11 @@ class OnboardingProfileResponseTest {
         Map<String, String> desc = Map.of("en", "Desc");
 
         OnboardingProfileResponse a = new OnboardingProfileResponse(
-            "id", "key", name, desc, "content",
+            "id", "key", name, desc, Map.of("de", "content"),
             OnboardingProfileType.PROFILE, true, 1, 1, 2, ts, ts
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
-            "id", "key", name, desc, "content",
+            "id", "key", name, desc, Map.of("de", "content"),
             OnboardingProfileType.PROFILE, true, 1, 1, 2, ts, ts
         );
 
@@ -207,7 +207,7 @@ class OnboardingProfileResponseTest {
             "ts-key",
             Map.of("en", "TS Profile"),
             null,
-            "ts content",
+            Map.of("de", "ts content"),
             OnboardingProfileType.PROFILE,
             true,
             3,

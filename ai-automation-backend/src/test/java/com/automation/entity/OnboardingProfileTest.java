@@ -68,7 +68,7 @@ class OnboardingProfileTest {
     void should_initializeNameAsEmptyMap_when_usingBuilderDefaults() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("test-key")
-                .content("test content")
+                .content(Map.of("de", "test content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -79,7 +79,7 @@ class OnboardingProfileTest {
     void should_initializeDescriptionAsEmptyMap_when_usingBuilderDefaults() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("test-key")
-                .content("test content")
+                .content(Map.of("de", "test content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -90,7 +90,7 @@ class OnboardingProfileTest {
     void should_defaultBuiltInToFalse_when_usingBuilderDefaults() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("test-key")
-                .content("test content")
+                .content(Map.of("de", "test content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -101,7 +101,7 @@ class OnboardingProfileTest {
     void should_defaultSortOrderToZero_when_usingBuilderDefaults() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("test-key")
-                .content("test content")
+                .content(Map.of("de", "test content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -112,7 +112,7 @@ class OnboardingProfileTest {
     void should_defaultVersionToOne_when_usingBuilderDefaults() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("test-key")
-                .content("test content")
+                .content(Map.of("de", "test content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -125,7 +125,7 @@ class OnboardingProfileTest {
 
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("beginner")
-                .content("content")
+                .content(Map.of("de", "content"))
                 .type(OnboardingProfileType.PROFILE)
                 .name(nameMap)
                 .build();
@@ -141,7 +141,7 @@ class OnboardingProfileTest {
 
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("beginner")
-                .content("content")
+                .content(Map.of("de", "content"))
                 .type(OnboardingProfileType.PROFILE)
                 .description(descMap)
                 .build();
@@ -159,7 +159,7 @@ class OnboardingProfileTest {
                 "test-id", "test-key",
                 new HashMap<>(Map.of("en", "Test")),
                 new HashMap<>(Map.of("en", "Desc")),
-                "content", OnboardingProfileType.BASE,
+                Map.of("de", "content"), OnboardingProfileType.BASE,
                 true, 5, 2,
                 now, now
         );
@@ -168,7 +168,7 @@ class OnboardingProfileTest {
         assertThat(profile.getKey()).isEqualTo("test-key");
         assertThat(profile.getName()).containsEntry("en", "Test");
         assertThat(profile.getDescription()).containsEntry("en", "Desc");
-        assertThat(profile.getContent()).isEqualTo("content");
+        assertThat(profile.getContent()).isEqualTo(Map.of("de", "content"));
         assertThat(profile.getType()).isEqualTo(OnboardingProfileType.BASE);
         assertThat(profile.isBuiltIn()).isTrue();
         assertThat(profile.getSortOrder()).isEqualTo(5);
@@ -194,7 +194,7 @@ class OnboardingProfileTest {
     void should_setTypeToBase_when_typeIsBase() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("base-key")
-                .content("content")
+                .content(Map.of("de", "content"))
                 .type(OnboardingProfileType.BASE)
                 .build();
 
@@ -205,7 +205,7 @@ class OnboardingProfileTest {
     void should_setTypeToProfile_when_typeIsProfile() {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key("profile-key")
-                .content("content")
+                .content(Map.of("de", "content"))
                 .type(OnboardingProfileType.PROFILE)
                 .build();
 

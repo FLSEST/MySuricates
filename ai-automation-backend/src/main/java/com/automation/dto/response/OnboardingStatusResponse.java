@@ -7,5 +7,9 @@ public record OnboardingStatusResponse(
         String format,
         List<String> profileIds,
         boolean fileExists,
-        String filePath
+        String filePath,
+        /** Language of the written text. */
+        String language,
+        /** A file without the MySuricates marker is in the way — it is never overwritten. */
+        boolean fileForeign
 ) {}

@@ -13,6 +13,8 @@ services:
       - "9091:9091"
     environment:
       - SPRING_PROFILES_ACTIVE=stable
+      # Onboarding-Texte: API-Key liegt nur im Container (Port innen = außen, Adresse stimmt ohne URL)
+      - AUTOMATION_INSTANCE_CONTAINER=mysuricates-stable
       - HOME=${HOME}
       - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
