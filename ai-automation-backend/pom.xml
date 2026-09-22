@@ -27,7 +27,41 @@
         <tika.version>3.3.0</tika.version>
         <!-- Boot 3.5.16 verwaltet Tomcat 10.1.55, noch mit CRITICAL-Advisories (Fix ab 10.1.58), e15bb23d -->
         <tomcat.version>10.1.60</tomcat.version>
+        <!-- Transitive Pins (nicht von Boot verwaltet), siehe <dependencyManagement> -->
+        <bouncycastle.version>1.86</bouncycastle.version>
+        <commons-io.version>2.22.0</commons-io.version>
     </properties>
+
+    <!--
+        Versions-Pins fuer transitive Abhaengigkeiten, die Spring Boot nicht verwaltet.
+        Keine neuen Pakete: nur hoehere Versionen der Artefakte, die ohnehin im Baum liegen.
+        217863b8 (bcprov (ueber Tika) und commons-io (ueber docker-java) auf Versionen ohne high/critical heben):
+          - bcprov/bcjmail 1.83 kommen ueber tika-parser-pdf-module 3.3.0 (OSV: 2x CRITICAL, 2x HIGH).
+            Auch Tika 3.3.2 bringt erst 1.85, daher Pin statt Tika-Update.
+          - commons-io 2.13.0 kommt ueber docker-java-core 3.4.1 (OSV: HIGH) und gewinnt, weil
+            docker-java im pom vor Tika steht (Tika selbst will 2.20+).
+        Beim Heben von Tika/docker-java pruefen, ob die Pins noch noetig sind:
+        mvn dependency:tree -Dincludes=org.bouncycastle,commons-io
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcjmail-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Spring Boot Starters -->
