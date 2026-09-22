@@ -100,8 +100,8 @@ public class TodoController {
     }
 
     @GetMapping("/count")
-    public TodoCountResponse countTodos() {
-        return todoService.count();
+    public TodoCountResponse countTodos(@RequestParam(required = false) String projectId) {
+        return todoService.count(projectId);
     }
 
     /** Cross-project cockpit overview: per-project rollups + a global "Braucht dich" lane. */

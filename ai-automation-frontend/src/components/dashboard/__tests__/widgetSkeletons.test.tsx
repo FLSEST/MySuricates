@@ -7,6 +7,16 @@ import { useI18nStore } from '../../../i18n';
 import { TodosWidget } from '../TodosWidget';
 import { TodosDonutChart } from '../TodosDonutChart';
 import { UpcomingSchedulesCard } from '../UpcomingSchedulesCard';
+import { DashboardDataContext, type DashboardDataValue } from '../dashboardDataContext';
+
+/** The todo widgets read the view's project filter from the dashboard context. */
+const NO_FILTER: DashboardDataValue = {
+  data: undefined, isLoading: false, error: null, refetch: () => {},
+  filter: {}, days: 30, isPlaceholderData: false, dataDays: 30,
+};
+const inDashboard = (ui: React.ReactElement) => (
+  <DashboardDataContext.Provider value={NO_FILTER}>{ui}</DashboardDataContext.Provider>
+);
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -26,25 +36,25 @@ describe('widget skeletons', () => {
     ['open todos', '/api/v1/todos'],
   ])('TodosWidget shows a skeleton while the %s load', async (_what, path) => {
     server.use(hang(path));
-    renderWithProviders(<TodosWidget />);
+    renderWithProviders(inDashboard(<TodosWidget />));
     expect(await screen.findByTestId('widget-skeleton')).toBeInTheDocument();
     expect(screen.queryByText('Todos')).not.toBeInTheDocument();
   });
 
   it('TodosWidget shows its todos once loaded', async () => {
-    renderWithProviders(<TodosWidget />);
+    renderWithProviders(inDashboard(<TodosWidget />));
     expect(await screen.findByText('Test Todo')).toBeInTheDocument();
     expect(screen.queryByTestId('widget-skeleton')).not.toBeInTheDocument();
   });
 
   it('TodosDonutChart shows a skeleton while the counts load, then the total', async () => {
     server.use(hang('/api/v1/todos/count'));
-    const { unmount } = renderWithProviders(<TodosDonutChart />);
+    const { unmount } = renderWithProviders(inDashboard(<TodosDonutChart />));
     expect(await screen.findByTestId('widget-skeleton')).toBeInTheDocument();
     unmount();
 
     server.resetHandlers();
-    renderWithProviders(<TodosDonutChart />);
+    renderWithProviders(inDashboard(<TodosDonutChart />));
     expect(await screen.findByText('9')).toBeInTheDocument();
     expect(screen.queryByTestId('widget-skeleton')).not.toBeInTheDocument();
   });

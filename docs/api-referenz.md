@@ -102,7 +102,8 @@ Alle Projekte auflisten.
     "container": null,
     "archivedAt": null,
     "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z"
+    "updatedAt": "2025-01-15T10:00:00Z",
+    "workflowCount": 3
   }
 ]
 ```
@@ -2786,7 +2787,7 @@ TODO löschen.
 
 ### `GET /api/v1/todos/count`
 
-Anzahl TODOs nach Status.
+Anzahl TODOs nach Status. Optionaler Query-Parameter `projectId` zählt nur die TODOs dieses Projekts (Dashboard-Projektfilter).
 
 **Response:** `TodoCountResponse` mit `open`, `inProgress`, `done`, `backlog`, `archived`
 

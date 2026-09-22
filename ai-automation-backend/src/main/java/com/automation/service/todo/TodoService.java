@@ -165,8 +165,10 @@ public class TodoService {
     }
 
     @Transactional(readOnly = true)
-    public TodoCountResponse count() {
-        return todoRepository.countGroupedByStatus();
+    public TodoCountResponse count(String projectId) {
+        return projectId == null || projectId.isBlank()
+                ? todoRepository.countGroupedByStatus()
+                : todoRepository.countGroupedByStatusForProject(projectId);
     }
 
     /**

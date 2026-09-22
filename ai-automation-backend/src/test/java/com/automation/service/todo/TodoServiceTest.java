@@ -332,13 +332,31 @@ class TodoServiceTest {
     void count_returnsCounts() {
         when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(5L, 3L, 12L, 2L, 0L));
 
-        TodoCountResponse counts = todoService.count();
+        TodoCountResponse counts = todoService.count(null);
 
         assertThat(counts.open()).isEqualTo(5L);
         assertThat(counts.inProgress()).isEqualTo(3L);
         assertThat(counts.done()).isEqualTo(12L);
         assertThat(counts.backlog()).isEqualTo(2L);
         assertThat(counts.archived()).isZero();
+    }
+
+    @Test
+    void count_withProjectId_usesProjectQuery() {
+        when(todoRepository.countGroupedByStatusForProject("p-1")).thenReturn(new TodoCountResponse(1L, 0L, 2L, 0L, 0L));
+
+        TodoCountResponse counts = todoService.count("p-1");
+
+        assertThat(counts.open()).isEqualTo(1L);
+        assertThat(counts.done()).isEqualTo(2L);
+        verify(todoRepository, never()).countGroupedByStatus();
+    }
+
+    @Test
+    void count_blankProjectId_countsAll() {
+        when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(4L, 0L, 0L, 0L, 0L));
+
+        assertThat(todoService.count(" ").open()).isEqualTo(4L);
     }
 
     // --- bulkUpdateStatus ---

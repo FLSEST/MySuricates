@@ -45,7 +45,8 @@ class ProjectResponseTest {
                 container,
                 archivedAt,
                 createdAt,
-                updatedAt
+                updatedAt,
+                7L
         );
 
         assertThat(response.id()).isEqualTo("id-1");
@@ -61,12 +62,13 @@ class ProjectResponseTest {
         assertThat(response.archivedAt()).isEqualTo(archivedAt);
         assertThat(response.createdAt()).isEqualTo(createdAt);
         assertThat(response.updatedAt()).isEqualTo(updatedAt);
+        assertThat(response.workflowCount()).isEqualTo(7L);
     }
 
     @Test
     void should_acceptAllNullValues_when_constructed() {
         var response = new ProjectResponse(
-                null, null, null, null, null, null, null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null, null, null, null, null, null, 0L
         );
 
         assertThat(response.id()).isNull();
@@ -88,7 +90,7 @@ class ProjectResponseTest {
     void should_returnEmptyConfig_when_constructedWithEmptyMap() {
         var response = new ProjectResponse(
                 "id", "name", null, null, anyType(), null,
-                Map.of(), null, anyStatus(), null, null, null, null
+                Map.of(), null, anyStatus(), null, null, null, null, 0L
         );
 
         assertThat(response.config()).isEmpty();
@@ -100,7 +102,7 @@ class ProjectResponseTest {
 
         var response = new ProjectResponse(
                 "id", "name", null, null, anyType(), null,
-                config, null, anyStatus(), null, null, null, null
+                config, null, anyStatus(), null, null, null, null, 0L
         );
 
         assertThat(response.config()).hasSize(3)
@@ -115,7 +117,7 @@ class ProjectResponseTest {
 
         var response = new ProjectResponse(
                 "id", "name", null, null, anyType(), null,
-                null, null, anyStatus(), container, null, null, null
+                null, null, anyStatus(), container, null, null, null, 0L
         );
 
         assertThat(response.container()).isSameAs(container);
@@ -125,8 +127,8 @@ class ProjectResponseTest {
 
     @Test
     void should_beEqual_when_allFieldsAreNull() {
-        var a = new ProjectResponse(null, null, null, null, null, null, null, null, null, null, null, null, null);
-        var b = new ProjectResponse(null, null, null, null, null, null, null, null, null, null, null, null, null);
+        var a = new ProjectResponse(null, null, null, null, null, null, null, null, null, null, null, null, null, 0L);
+        var b = new ProjectResponse(null, null, null, null, null, null, null, null, null, null, null, null, null, 0L);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -142,8 +144,8 @@ class ProjectResponseTest {
         var t2 = Instant.parse("2024-02-01T00:00:00Z");
         var t3 = Instant.parse("2024-03-01T00:00:00Z");
 
-        var a = new ProjectResponse("id", "n", "s", "d", type, "/p", config, "ctx", status, container, t1, t2, t3);
-        var b = new ProjectResponse("id", "n", "s", "d", type, "/p", config, "ctx", status, container, t1, t2, t3);
+        var a = new ProjectResponse("id", "n", "s", "d", type, "/p", config, "ctx", status, container, t1, t2, t3, 0L);
+        var b = new ProjectResponse("id", "n", "s", "d", type, "/p", config, "ctx", status, container, t1, t2, t3, 0L);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -151,24 +153,24 @@ class ProjectResponseTest {
 
     @Test
     void should_notBeEqual_when_idDiffers() {
-        var a = new ProjectResponse("id-1", "n", null, null, null, null, null, null, null, null, null, null, null);
-        var b = new ProjectResponse("id-2", "n", null, null, null, null, null, null, null, null, null, null, null);
+        var a = new ProjectResponse("id-1", "n", null, null, null, null, null, null, null, null, null, null, null, 0L);
+        var b = new ProjectResponse("id-2", "n", null, null, null, null, null, null, null, null, null, null, null, 0L);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_nameDiffers() {
-        var a = new ProjectResponse("id", "name-A", null, null, null, null, null, null, null, null, null, null, null);
-        var b = new ProjectResponse("id", "name-B", null, null, null, null, null, null, null, null, null, null, null);
+        var a = new ProjectResponse("id", "name-A", null, null, null, null, null, null, null, null, null, null, null, 0L);
+        var b = new ProjectResponse("id", "name-B", null, null, null, null, null, null, null, null, null, null, null, 0L);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_pathDiffers() {
-        var a = new ProjectResponse("id", "n", null, null, null, "/path-a", null, null, null, null, null, null, null);
-        var b = new ProjectResponse("id", "n", null, null, null, "/path-b", null, null, null, null, null, null, null);
+        var a = new ProjectResponse("id", "n", null, null, null, "/path-a", null, null, null, null, null, null, null, 0L);
+        var b = new ProjectResponse("id", "n", null, null, null, "/path-b", null, null, null, null, null, null, null, 0L);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -178,8 +180,8 @@ class ProjectResponseTest {
         var c1 = mock(ContainerResponse.class);
         var c2 = mock(ContainerResponse.class);
 
-        var a = new ProjectResponse("id", "n", null, null, null, null, null, null, null, c1, null, null, null);
-        var b = new ProjectResponse("id", "n", null, null, null, null, null, null, null, c2, null, null, null);
+        var a = new ProjectResponse("id", "n", null, null, null, null, null, null, null, c1, null, null, null, 0L);
+        var b = new ProjectResponse("id", "n", null, null, null, null, null, null, null, c2, null, null, null, 0L);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -189,8 +191,8 @@ class ProjectResponseTest {
         var t1 = Instant.parse("2024-01-01T00:00:00Z");
         var t2 = Instant.parse("2025-01-01T00:00:00Z");
 
-        var a = new ProjectResponse("id", "n", null, null, null, null, null, null, null, null, null, t1, null);
-        var b = new ProjectResponse("id", "n", null, null, null, null, null, null, null, null, null, t2, null);
+        var a = new ProjectResponse("id", "n", null, null, null, null, null, null, null, null, null, t1, null, 0L);
+        var b = new ProjectResponse("id", "n", null, null, null, null, null, null, null, null, null, t2, null, 0L);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -204,7 +206,8 @@ class ProjectResponseTest {
                 Map.of(), "ctx-x", anyStatus(), null,
                 Instant.parse("2024-01-01T00:00:00Z"),
                 Instant.parse("2024-02-01T00:00:00Z"),
-                Instant.parse("2024-03-01T00:00:00Z")
+                Instant.parse("2024-03-01T00:00:00Z"),
+                0L
         );
 
         assertThat(response.toString())

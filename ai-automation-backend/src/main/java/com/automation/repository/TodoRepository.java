@@ -34,6 +34,16 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + "COALESCE(SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END), 0)) FROM Todo t")
     TodoCountResponse countGroupedByStatus();
 
+    /** {@link #countGroupedByStatus()} for one project (dashboard project filter). */
+    @Query("SELECT new com.automation.dto.response.TodoCountResponse("
+         + "COALESCE(SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END), 0), "
+         + "COALESCE(SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END), 0)) "
+         + "FROM Todo t WHERE t.projectId = :projectId")
+    TodoCountResponse countGroupedByStatusForProject(@Param("projectId") String projectId);
+
     /**
      * Find an open auto-todo by a tag composite key (for example, an item tag).
      * Gate writers must use {@link #findOpenGateByCompositeKey} to exclude granular findings.

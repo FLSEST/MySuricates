@@ -110,7 +110,10 @@ class RequestCostRatchetTest {
      *       {@code ProjectRepository.findActiveWithContainer()} with a LEFT JOIN FETCH (TODO
      *       6d0ab09f). The ceiling of 4 had been green all along while the same route cost 37
      *       statements on the dev database — which is why this class now also measures growth,
-     *       see {@link #statementCountMustNotGrowWithTheNumberOfRows}.</li>
+     *       see {@link #statementCountMustNotGrowWithTheNumberOfRows}. 1 → 2 on purpose: the
+     *       response carries {@code workflowCount}, counted for all projects by ONE GROUP-BY
+     *       query ({@code WorkflowRepository.countWorkflowsGroupedByProject}, TODO 8dabaca8) —
+     *       a constant extra statement, not one per project.</li>
      *   <li>{@code /executions}: fixed. The list response dropped from 3 061 816 to 51 716 bytes
      *       when the route stopped serialising every step (TODO a05c9504) — it now answers with
      *       {@code WorkflowRunListItemResponse}, which carries the step count and the last step's
@@ -135,7 +138,7 @@ class RequestCostRatchetTest {
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
             "/api/v1/todos", new Cost(2, 32_000),
-            "/api/v1/projects", new Cost(1, 1_200),
+            "/api/v1/projects", new Cost(2, 1_200),
             "/api/v1/workflows", new Cost(32, 26_000),
             "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),

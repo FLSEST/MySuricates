@@ -4,6 +4,7 @@ import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.response.ContainerResponse;
 import com.automation.dto.response.ProjectResponse;
 import com.automation.entity.*;
+import com.automation.repository.WorkflowRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +27,9 @@ class ProjectMapperTest {
 
     @Mock
     private ContainerMapper containerMapper;
+
+    @Mock
+    private WorkflowRepository workflowRepository;
 
     @InjectMocks
     private ProjectMapperImpl mapper;
@@ -181,5 +187,20 @@ class ProjectMapperTest {
         assertThat(responses).hasSize(2);
         assertThat(responses.get(0).id()).isEqualTo("p1");
         assertThat(responses.get(1).id()).isEqualTo("p2");
+    }
+
+    @Test
+    void toResponseList_workflowCountsFromOneGroupedQuery() {
+        when(containerMapper.toResponse(null)).thenReturn(null);
+        when(workflowRepository.countWorkflowsGroupedByProject())
+                .thenReturn(List.<Object[]>of(new Object[]{"p1", 5L}));
+        Project p1 = Project.builder().id("p1").name("A").type(ProjectType.CODE).path("/a").status(ProjectStatus.STOPPED).build();
+        Project p2 = Project.builder().id("p2").name("B").type(ProjectType.CODE).path("/b").status(ProjectStatus.STOPPED).build();
+
+        List<ProjectResponse> responses = mapper.toResponseList(List.of(p1, p2));
+
+        assertThat(responses.get(0).workflowCount()).isEqualTo(5L);
+        assertThat(responses.get(1).workflowCount()).isZero();
+        verify(workflowRepository, never()).countByProjectId(org.mockito.ArgumentMatchers.anyString());
     }
 }

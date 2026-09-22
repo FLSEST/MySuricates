@@ -7,6 +7,7 @@ import { formatRelativeTime } from '../../utils/formatTime';
 import { todoDeepLink } from '../../utils/todoLinks';
 import type { Todo, TodoPriority } from '../../types';
 import { WidgetSkeleton } from './WidgetSkeleton';
+import { useDashboardData } from './dashboardDataContext';
 
 const priorityColor: Record<TodoPriority, string> = {
   CRITICAL: 'bg-red-700 dark:bg-red-600',
@@ -71,8 +72,12 @@ function TodoRow({ todo }: { todo: Todo }) {
 export function TodosWidget() {
   const t = useT();
   const navigate = useNavigate();
-  const { data: counts, isLoading: countsLoading } = useTodoCount();
-  const { data: recentTodosPage, isLoading: todosLoading } = useTodos({ status: 'OPEN' }, 0, 5);
+  // The view's project filter; counts and list follow it like the learning-dashboard widgets.
+  const { projectId } = useDashboardData().filter;
+  const { data: counts, isLoading: countsLoading } = useTodoCount(projectId);
+  const { data: recentTodosPage, isLoading: todosLoading } = useTodos(
+    projectId ? { status: 'OPEN', projectId } : { status: 'OPEN' }, 0, 5,
+  );
   if (countsLoading || todosLoading) return <WidgetSkeleton size="full" />;
 
   const open = counts?.open ?? 0;
