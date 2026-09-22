@@ -92,7 +92,7 @@ Die Schulden sind nicht versteckt, sondern gezaehlt. Das Audit Center — eine S
 in der die Befunde der Audit-Workflows ueber die Zeit gefuehrt werden — zaehlte am 2026-09-22 fuer
 MySuricates selbst **322 Befunde** seit dem 2026-07-19: 29 offen (davon 1 kritisch, 4 hoch),
 7 warten auf Gegenpruefung, 267 sind behoben, 18 als Risiko akzeptiert, 1 verworfen. Die offenen
-betreffen vor allem drei Felder: Struktur (eine zu grosse zentrale Ausfuehrungsklasse, stark
+betrafen an diesem Tag vor allem drei Felder: Struktur (eine zu grosse zentrale Ausfuehrungsklasse, stark
 gekoppelte Services, Controller mit direktem Repository-Zugriff), Performance und Speicher
 (Datenbankgroesse ohne Vacuum-Strategie, N+1-Kandidaten, Bundle-Groesse) und die Reife fuer eine
 Veroeffentlichung. Wie diese Befunde entstehen und was die Statusse bedeuten, steht im
@@ -103,8 +103,9 @@ Bekannte harte Grenzen:
 - **SQLite mit genau einer Verbindung.** Der Connection-Pool ist bewusst auf 1 gesetzt, weil SQLite
   nur einen Schreiber kennt. Das serialisiert alle Datenbankzugriffe und begrenzt die Parallelitaet.
 - **Keine Mandantenfaehigkeit.** Ein API-Key, ein Benutzer, keine Rollen.
-- **Die KI-Aufrufe haengen an lokal installierten CLIs** (`claude`, `codex`, `pi`) samt deren
-  Anmeldung — es gibt keinen API-Schluessel-Pfad als Alternative.
+- **Die KI-Aufrufe haengen an lokal installierten CLIs** (`claude`, `codex`, `pi`) — es gibt
+  keinen Weg an der CLI vorbei. Die CLIs selbst nehmen statt der Anmeldung auch einen
+  API-Schluessel per Umgebungsvariable.
 
 ## Bevor du es startest
 
