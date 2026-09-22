@@ -22,6 +22,8 @@ export interface SystemCapabilities {
   modulesUiEditable?: boolean;
   modules?: ModuleInfo[];
   blockTypes?: Array<{ type?: string }>;
+  /** `automation.executions.allow-delete` (startup-only); absent on older backends = allowed. */
+  runDeletionAllowed?: boolean;
 }
 
 export const SYSTEM_CAPABILITIES_KEY = ['system', 'capabilities'] as const;
@@ -117,4 +119,15 @@ export function useSystemCapabilities<T>(
     // settings switches below, block types with a backend deploy.
     staleTime: 60 * 60 * 1000,
   });
+}
+
+const selectRunDeletionAllowed = (caps: SystemCapabilities) => caps.runDeletionAllowed !== false;
+
+/**
+ * Whether this instance lets runs be deleted (`automation.executions.allow-delete`). Only hides the
+ * delete buttons — the backend refuses with 403 RUN_DELETION_DISABLED regardless.
+ */
+export function useRunDeletionAllowed(): boolean {
+  const { data } = useSystemCapabilities(selectRunDeletionAllowed);
+  return data ?? true;
 }

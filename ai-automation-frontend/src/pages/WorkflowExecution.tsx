@@ -31,6 +31,7 @@ import { useCreateTodo } from '../hooks/useTodos';
 import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useRunDeletionAllowed } from '../hooks/useSystemCapabilities';
 import { useToast } from '../hooks/useToast';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
@@ -56,6 +57,7 @@ export function WorkflowExecution() {
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
   const deleteRun = useDeleteRun();
+  const runDeletionAllowed = useRunDeletionAllowed();
   const resumeFromStep = useResumeFromStep();
   const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
@@ -247,7 +249,7 @@ export function WorkflowExecution() {
           </div>
         )}
         <ExecutionRerunButton run={run} />
-        {!isRunning && (
+        {!isRunning && runDeletionAllowed && (
           <Button
             variant="secondary" size="sm"
             icon={<Trash2 className="w-4 h-4" />}

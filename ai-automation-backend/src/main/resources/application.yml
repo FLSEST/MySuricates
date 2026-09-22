@@ -179,6 +179,11 @@ automation:
     # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
     # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
     ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}
+  executions:
+    # false = DELETE /api/v1/executions/{id} answers 403 RUN_DELETION_DISABLED and the UI hides the
+    # delete buttons. Startup-only (no REST/settings switch). Retention/cleanup jobs are not affected
+    # (set automation.run.retention.retention-days to 0 to keep every finished run).
+    allow-delete: ${AUTOMATION_EXECUTIONS_ALLOW_DELETE:true}
   # Live-Output laufender Blöcke (Shell-Zeilen, KI-Tool-Aufrufe) im Run-Log; nur im Speicher (LiveLogConfig)
   live-log:
     enabled: ${AUTOMATION_LIVE_LOG_ENABLED:true}

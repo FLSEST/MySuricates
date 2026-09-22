@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(21)
+        assertThat(ErrorCode.values()).hasSize(22)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.MODULE_DISABLED,
@@ -37,6 +37,7 @@ class ErrorCodeTest {
                         ErrorCode.TOKEN_BUDGET_EXCEEDED,
                         ErrorCode.OPERATION_TIMEOUT,
                         ErrorCode.METHOD_NOT_ALLOWED,
+                        ErrorCode.RUN_DELETION_DISABLED,
                         ErrorCode.INTERNAL_ERROR
                 );
     }
@@ -112,6 +113,7 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.TOKEN_BUDGET_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS, "Token budget exceeded"),
                 Arguments.of(ErrorCode.OPERATION_TIMEOUT, HttpStatus.GATEWAY_TIMEOUT, "Operation timed out"),
                 Arguments.of(ErrorCode.METHOD_NOT_ALLOWED, HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed"),
+                Arguments.of(ErrorCode.RUN_DELETION_DISABLED, HttpStatus.FORBIDDEN, "Deleting runs is disabled"),
                 Arguments.of(ErrorCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error")
         );
     }

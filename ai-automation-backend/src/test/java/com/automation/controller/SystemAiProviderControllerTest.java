@@ -11,6 +11,7 @@ import com.automation.service.ai.catalog.ModelCatalog;
 import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.workflow.RunDeletionPolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -60,6 +61,9 @@ class SystemAiProviderControllerTest {
 
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
+
+    @MockitoBean
+    private RunDeletionPolicy runDeletionPolicy;
 
     /**
      * Real registry, not a mock: preset research with webhooks switched on by override, and
@@ -194,5 +198,18 @@ class SystemAiProviderControllerTest {
 
         mockMvc.perform(get("/api/v1/system/ai-providers/GEMINI/models"))
                 .andExpect(status().isNotFound());
+    }
+
+    /** automation.executions.allow-delete reaches the UI through the capabilities response. */
+    @Test
+    void capabilities_reportsWhetherRunsMayBeDeleted() throws Exception {
+        when(runDeletionPolicy.isAllowed()).thenReturn(false);
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runDeletionAllowed").value(false));
+
+        when(runDeletionPolicy.isAllowed()).thenReturn(true);
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(jsonPath("$.runDeletionAllowed").value(true));
     }
 }

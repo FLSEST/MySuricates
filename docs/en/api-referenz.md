@@ -43,6 +43,7 @@ The `details` field is only included when needed (`@JsonInclude(NON_NULL)`).
 | `SERVICE_UNAVAILABLE` | 503 |
 | `TOKEN_BUDGET_EXCEEDED` | 429 |
 | `OPERATION_TIMEOUT` | 504 |
+| `RUN_DELETION_DISABLED` | 403 |
 | `INTERNAL_ERROR` | 500 |
 
 For validation errors (`VALIDATION_FAILED`, 400) additionally:
@@ -865,6 +866,8 @@ Query: `afterSeq` (default `-1` = everything). Without a buffer `200` with `avai
 ### `DELETE /api/v1/executions/{id}`
 
 Delete a run together with its steps and loose references to it. `409` if the run is still active or an audit report is attached to it. TODOs and audit data are never deleted along with it.
+
+`403 RUN_DELETION_DISABLED` if the instance was started with `automation.executions.allow-delete: false` (env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, default `true`) — checked before any lookup, for every id. Startup configuration only, no REST or settings switch. `GET /api/v1/system/capabilities` reports it as `runDeletionAllowed`; the UI then hides the delete buttons. Run retention (`run-retention-days`) and the nightly INTERRUPTED sweep still apply — to lose nothing, also set `run-retention-days` to `0`.
 
 **Response:** `204 No Content`
 

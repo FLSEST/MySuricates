@@ -45,6 +45,7 @@ Das Feld `details` wird nur bei Bedarf mitgeliefert (`@JsonInclude(NON_NULL)`).
 | `SERVICE_UNAVAILABLE` | 503 |
 | `TOKEN_BUDGET_EXCEEDED` | 429 |
 | `OPERATION_TIMEOUT` | 504 |
+| `RUN_DELETION_DISABLED` | 403 |
 | `INTERNAL_ERROR` | 500 |
 
 Bei Validierungsfehlern (`VALIDATION_FAILED`, 400) zusätzlich:
@@ -870,6 +871,8 @@ Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `avai
 ### `DELETE /api/v1/executions/{id}`
 
 Lauf samt Schritten und den losen Verweisen darauf löschen. `409`, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm hängt. TODOs und Audit-Daten werden nie mitgelöscht.
+
+`403 RUN_DELETION_DISABLED`, wenn die Instanz mit `automation.executions.allow-delete: false` (Env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, Default `true`) gestartet wurde — geprüft vor jedem Lookup, für jede ID. Nur Startkonfiguration, kein REST- oder Settings-Schalter. `GET /api/v1/system/capabilities` meldet den Stand als `runDeletionAllowed`; die UI blendet die Löschknöpfe dann aus. Die Run-Retention (`run-retention-days`) und das nächtliche Aufräumen von INTERRUPTED-Läufen gelten weiter — wer gar nichts verlieren will, setzt zusätzlich `run-retention-days` auf `0`.
 
 **Response:** `204 No Content`
 
