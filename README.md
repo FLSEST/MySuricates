@@ -1,6 +1,6 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="ai-automation-frontend/public/icons/icon.svg" alt="MySuricates logo: meerkats on a hill" width="120"></p>
+<p align="center"><img src="ai-automation-frontend/public/icons/tray-meerkat.svg" alt="MySuricates logo: a meerkat" width="120"></p>
 
 # MySuricates
 

@@ -1,6 +1,6 @@
 **Deutsch** | [English](README.md)
 
-<p align="center"><img src="ai-automation-frontend/public/icons/icon.svg" alt="MySuricates-Logo: Erdmännchen auf einem Hügel" width="120"></p>
+<p align="center"><img src="ai-automation-frontend/public/icons/tray-meerkat.svg" alt="MySuricates-Logo: ein Erdmännchen" width="120"></p>
 
 # MySuricates
 
