@@ -5,11 +5,13 @@ import { useI18nStore, type Locale } from '../../i18n';
 import { useT } from '../../i18n';
 import { useUpdateSystemSetting, useAiProviders, useAssistantModelSetting, useSuggestionsModelSetting, useAutoRepairModeSetting } from '../../hooks/useSystem';
 import { ModelField } from '../shared/ModelField';
+import { useToast } from '../../hooks/useToast';
 import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled, setWalkthroughSeen } = useSettingsStore();
+  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled, setWalkthroughSeen, hintsEnabled, setHintsEnabled, resetHints } = useSettingsStore();
+  const toast = useToast();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
   const { data: aiProviders } = useAiProviders();
@@ -61,6 +63,26 @@ export function GeneralSettingsCard() {
           <Button size="sm" variant="secondary" onClick={() => setWalkthroughSeen(false)}>
             {t.walkthrough.showAction}
           </Button>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-text">{t.hints.settingsTitle}</p>
+            <p className="text-xs text-text-tertiary">{t.hints.settingsHint}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                resetHints();
+                toast.success(t.hints.resetDone);
+              }}
+            >
+              {t.hints.resetAction}
+            </Button>
+            <Toggle enabled={hintsEnabled} onChange={setHintsEnabled} ariaLabel={t.hints.settingsTitle} />
+          </div>
         </div>
 
         <div className="flex items-center justify-between">

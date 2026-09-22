@@ -1,0 +1,50 @@
+{
+  "dashboard-views": {
+    "title": "Ein Dashboard, mehrere Ansichten",
+    "points": [
+      "Lege Ansichten nebeneinander an: Betrieb, Kosten, Qualität oder eine je Projekt",
+      "Jede Ansicht lässt sich auf ein Projekt und einen Zeitraum filtern",
+      "Neue Ansichten entstehen beim Bearbeiten des Dashboards: leer, als Kopie oder aus einer Vorlage"
+    ]
+  },
+  "workflows-start": {
+    "title": "Drei Orte zum Anfangen",
+    "points": [
+      "Blaupausen sind leere Gerüste, die zeigen, wie sich Blöcke verknüpfen: starten, ansehen, Platzhalter ersetzen",
+      "Vorlagen sind fertige Abläufe für einen Zweck, der Pool bringt fertige Workflows aus einem lokalen Ordner",
+      "Jeder davon ist nur ein Anfang: Jeder Schritt lässt sich ändern, und ein leerer Workflow geht auch"
+    ]
+  },
+  "run-steps": {
+    "title": "Jeder Schritt sagt, was er war",
+    "points": [
+      "Deterministische Schritte liefern bei gleicher Eingabe dasselbe, KI-Schritte können abweichen, Mensch-Schritte warten auf eine Entscheidung",
+      "Verfolge den Lauf live und lies danach jeden Schritt mit seiner Ausgabe nach",
+      "Der Definitions-Hash zeigt, welche Fassung des Workflows genau gelaufen ist"
+    ]
+  },
+  "run-failed": {
+    "title": "Ein fehlgeschlagener Lauf behält, was er getan hat",
+    "points": [
+      "Der gescheiterte Schritt ist markiert, mit seiner Ausgabe und dem Grund",
+      "Die Schritte davor behalten ihre Ergebnisse, du siehst also, wie weit er gekommen ist",
+      "Mach aus dem Fehlschlag ein TODO, damit er nicht verloren geht; beim nächsten Mal fängt ein Retry-Block oder ein Plan B einen wackligen Schritt ab"
+    ]
+  },
+  "approval-waiting": {
+    "title": "Der Lauf wartet auf dich",
+    "points": [
+      "Nichts hängt: Der Workflow hält an dieser Stelle mit Absicht an",
+      "Nach deiner Antwort geht es hier weiter, nicht von vorn",
+      "Du kannst den Dialog schließen und später antworten, der Lauf wartet weiter"
+    ]
+  },
+  "todos-sources": {
+    "title": "Woher TODOs kommen",
+    "points": [
+      "Schreib sie selbst auf oder lass einen Workflow sie anlegen: mit einem Block oder aus seinem Prüfergebnis",
+      "Ein fehlgeschlagener Lauf wird mit einem Klick zum TODO",
+      "Coding-Agenten legen sie über die API an, damit Nebenbefunde nicht verloren gehen"
+    ]
+  }
+}

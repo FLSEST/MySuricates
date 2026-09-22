@@ -1785,6 +1785,16 @@ export const de: TranslationKeys = {
     reopenHint: 'Die Panels mit den Grundkonzepten — jederzeit wieder aufrufbar.',
     showAction: 'Zeigen',
   },
+  hints: {
+    understood: 'Verstanden',
+    hideAll: 'Alle Hinweise ausblenden',
+    hiddenToast: 'Hinweise ausgeblendet. In den Einstellungen lassen sie sich wieder einschalten.',
+    show: 'Hinweis zeigen',
+    settingsTitle: 'Hinweise anzeigen',
+    settingsHint: 'Kurze Erklärungen an der Stelle, an der man etwas zum ersten Mal sieht.',
+    resetAction: 'Alle wieder zeigen',
+    resetDone: 'Alle Hinweise werden wieder gezeigt.',
+  },
   auditCenter: {
     acceptedCount: 'davon {count} akzeptiert',
     acceptedAt: 'Akzeptiert am',

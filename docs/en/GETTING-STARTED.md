@@ -99,11 +99,16 @@ The application is running. A first way in, without building anything:
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
    your machine (in the container: inside the projects folder). To try things out there is the
    **example project**: the dashboard, workflows and projects offer it while no project exists yet.
-   One click, and its example workflows run without AI and without any setup.
+   One click, and its example workflows run without AI and without any setup. The dashboard gets
+   a view of its own that shows only this project.
 2. **Take a template** — *Templates* holds 67 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens.
 3. **Look at the run** — the detail view shows per block its duration, its status and whether it was
    deterministic or called a model.
+
+Along the way, short **hints** explain the pages and states you meet for the first time, such as a
+waiting approval or a failed run. Each can be dismissed and brought back in its place; *Settings →
+General* switches them all off.
 
 Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to you.
 
