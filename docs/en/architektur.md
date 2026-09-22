@@ -616,7 +616,7 @@ Claude Code sessions can also serve as templates for workflows:
 ## Workflow Templates
 
 - Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
-- **67 built-in templates** are seeded at startup by `WorkflowTemplateSeeder` (idempotent, inserts missing ones, updates on version bump)
+- **66 built-in templates** are seeded at startup by `WorkflowTemplateSeeder` (idempotent, inserts missing ones, updates on version bump)
 - Template definitions are stored as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
 - Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
 - Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` are updatable
@@ -1054,6 +1054,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V76 | Agent session provenance on the todo (`agent_session_ref`) |
 | V77 | Evidence check on the audit finding (`unverified_evidence`) |
 | V78 | Bilingual steps in templates (`workflow_templates.i18n_source`) |
+| V79 | Blueprints as a kind of their own next to templates (`workflow_templates.kind`) |
 
 ## Architecture Gates
 
@@ -1098,7 +1099,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 78 Flyway migrations (V1–V78)
+│           └── db/migration/          ← 79 Flyway migrations (V1–V79)
 │
 └── ai-automation-frontend/
     ├── package.json

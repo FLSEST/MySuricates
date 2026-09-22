@@ -1,0 +1,70 @@
+{
+  "id": "blueprint-fallback",
+  "icon": "🛟",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Plan B",
+    "en": "Fallback"
+  },
+  "description": {
+    "de": "Weg A wird mehrmals versucht (retry); scheitert er, läuft der Lauf dank on_failure weiter und eine Prüfung schaltet auf Weg B um. Ersetze Weg A, die Prüfung und Weg B.",
+    "en": "Route A is tried several times (retry); if it fails, the run carries on thanks to on_failure and a check switches to route B. Replace route A, the check and route B."
+  },
+  "category": "COMBINATIONS",
+  "sortOrder": 16,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n\necho prepared"
+      },
+      "name": {
+        "de": "vorbereiten",
+        "en": "prepare"
+      }
+    },
+    {
+      "type": "retry",
+      "name": {
+        "de": "weg_a",
+        "en": "route_a"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "max_retries": 2,
+        "delay": 1,
+        "on_failure": "continue",
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n# placeholder - route A; on success it would run: touch \"$D/route_a_ok\"\necho 'route A unavailable' >&2\nexit 1"
+      }
+    },
+    {
+      "type": "conditional",
+      "name": {
+        "de": "pruefen",
+        "en": "check"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "condition": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\ntest -f \"$D/route_a_ok\"",
+        "then_command": "printf 'route A worked\\n'",
+        "else_command": "# placeholder - route B\nprintf 'route B done\\n'"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+      },
+      "name": {
+        "de": "aufraeumen",
+        "en": "cleanup"
+      }
+    }
+  ]
+}

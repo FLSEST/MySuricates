@@ -1,0 +1,92 @@
+import { useState } from 'react';
+import { Search } from 'lucide-react';
+import { Card, Input } from '../ui';
+import { useI18nStore, useT } from '../../i18n';
+import { resolveTemplateName } from '../../utils/templateUtils';
+import { ExecutionBadges } from '../shared/ExecutionBadges';
+import type { WorkflowTemplate } from '../../types';
+
+/** Gallery order of the blueprint groups; a group the backend doesn't know yet goes last. */
+const GROUPS = ['BASICS', 'COMBINATIONS', 'AI'] as const;
+type Group = (typeof GROUPS)[number];
+
+interface BlueprintBrowserProps {
+  blueprints: WorkflowTemplate[];
+  onSelect: (blueprint: WorkflowTemplate) => void;
+}
+
+/**
+ * Third tab next to templates and pool (TODO 268ae0db): empty scaffolds with runnable placeholders
+ * that show how block types connect. Selecting one starts the same creation flow as a template.
+ */
+export function BlueprintBrowser({ blueprints, onSelect }: BlueprintBrowserProps) {
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
+  const [search, setSearch] = useState('');
+
+  const q = search.trim().toLowerCase();
+  const matching = blueprints.filter((bp) => !q
+    || resolveTemplateName(bp.name, locale).toLowerCase().includes(q)
+    || resolveTemplateName(bp.description, locale).toLowerCase().includes(q));
+
+  const groupOf = (bp: WorkflowTemplate): string => bp.category ?? '';
+  const known = new Set<string>(GROUPS);
+  const groups = [...GROUPS, ...new Set(matching.map(groupOf).filter((g) => !known.has(g)))];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold text-text">{t.blueprints.title}</h3>
+        <p className="text-sm text-text-secondary mt-1">{t.blueprints.subtitle}</p>
+      </div>
+
+      <Input
+        placeholder={t.blueprints.searchPlaceholder}
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        icon={<Search className="w-4 h-4 text-text-tertiary" />}
+      />
+
+      <div className="max-h-[60vh] overflow-y-auto space-y-5">
+        {matching.length === 0 && (
+          <div className="py-8 text-center text-sm text-text-tertiary">{t.common.noResults}</div>
+        )}
+        {groups.map((group) => {
+          const inGroup = matching.filter((bp) => groupOf(bp) === group)
+            .sort((a, b) => a.sortOrder - b.sortOrder);
+          if (inGroup.length === 0) return null;
+          return (
+            <section key={group} aria-label={t.blueprints.groups[group as Group] ?? group}>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                {t.blueprints.groups[group as Group] ?? group}
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {inGroup.map((bp) => (
+                  <Card
+                    key={bp.id}
+                    className="cursor-pointer hover:border-border-strong transition-colors"
+                    onClick={() => onSelect(bp)}
+                  >
+                    <div className="flex items-start gap-3 mb-2">
+                      <span className="text-2xl mt-0.5">{bp.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <h5 className="font-semibold text-text truncate">{resolveTemplateName(bp.name, locale)}</h5>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-text-tertiary">
+                            {bp.blocks.length} {t.workflows.blocks.toLowerCase()}
+                          </span>
+                          <ExecutionBadges blocks={bp.blocks} />
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary">{resolveTemplateName(bp.description, locale)}</p>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

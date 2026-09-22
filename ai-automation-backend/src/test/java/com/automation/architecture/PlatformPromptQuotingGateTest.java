@@ -155,9 +155,7 @@ class PlatformPromptQuotingGateTest {
 
     /** Built-in-Templates immer; {@code workflow-pool/} nur, wenn das Repo-Verzeichnis erreichbar ist. */
     private static List<Path> definitionFiles() throws IOException {
-        List<Path> files = new ArrayList<>(jsonFiles(firstExisting(
-                Paths.get("src/main/resources/templates/builtin"),
-                Paths.get("ai-automation-backend/src/main/resources/templates/builtin"))));
+        List<Path> files = new ArrayList<>(ShippedDefinitions.templateFiles());
         Path pool = firstExistingOrNull(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
         if (pool != null) {
             files.addAll(jsonFiles(pool));
@@ -170,12 +168,6 @@ class PlatformPromptQuotingGateTest {
         try (Stream<Path> stream = Files.list(dir)) {
             return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
         }
-    }
-
-    private static Path firstExisting(Path... candidates) {
-        Path found = firstExistingOrNull(candidates);
-        assertThat(found).as("Verzeichnis nicht gefunden: " + candidates[0]).isNotNull();
-        return found;
     }
 
     private static Path firstExistingOrNull(Path... candidates) {

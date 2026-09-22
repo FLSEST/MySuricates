@@ -1664,7 +1664,6 @@ All 65+ built-in templates with their primary pattern:
 | `test-matrix` | Shell Scan + ForEach + Skill | CODE |
 | `todo-creator` | Agentic | UTILITY |
 | `topic-deep-dive` | Sequential Simple Chain | RESEARCH |
-| `example-approval` | Measure + Approval (bilingual example) | EXAMPLE |
 
 ### Bilingual templates
 
@@ -1687,11 +1686,20 @@ A template's name and description are always `{"de": …, "en": …}`. A templat
 
 - **Every map carries exactly the declared languages, none left blank.** Without the marker nothing is resolved.
 - **These stay single-language:** shell fields (`command`, `condition` …; otherwise two commands would need review) **and everything that is compared or evaluated:** `type`, `variable_name`, `auto_answer`, `reject_options`, `mode`, `on_no`, `execution_mode`, `model`, `provider`, and `metadata`.
-- **Step names can be translated but must stay consistent within each language.** `{{ block.X.output }}` and compress `source` must point to an existing name in every variant. An audit's report block (`metadata.audit.reportBlock`) stays single-language.
+- **Step names can be translated but must stay consistent within each language.** `{{ block.X.output }}` and compress `source` must point to an existing name in every variant. An audit's report block (`metadata.audit.reportBlock`) stays single-language. A block referenced from a **shell field** gets a language-neutral name (e.g. `data`), because the shell field itself stays single-language.
 - **Translated approval `options` must not be compared anywhere.** The answer variable must not appear in any shell, conditional, switch or while field, because in German the answer would be `Nein` instead of `No`. The approval block recognises the rejection itself (`reject_options`, default `No`/`Nein`).
 - **Existing databases get a changed built-in template only through a version bump** (`version`), like any change to a built-in template.
 
 The API returns the steps in the requested language: `GET /api/v1/workflow-templates?locale=de`. Pool and chain installs take `"locale"` in the body.
+
+### Blueprints
+
+Besides **templates** (finished tasks) and the **pool** there are **blueprints**: empty scaffolds with runnable placeholders that show how block types connect – form → branch, loop with approval, fallback on errors. They have their own tab in the create dialog, grouped into *Basic connections*, *Combinations* and *With AI*. You run a blueprint, see in the run how the steps work together, then replace the placeholders with your own commands.
+
+- **Location:** `src/main/resources/templates/blueprints/*.json`, same format and loader as templates, `kind: BLUEPRINT` (column `workflow_templates.kind`). The API returns both kinds together with the field `kind`.
+- **Always bilingual** (`"i18n": ["de","en"]`), `id` prefixed `blueprint-`, category `BASICS`, `COMBINATIONS` or `AI`.
+- **Placeholders:** shell steps do something harmless and carry a comment `# placeholder - …`. Scratch files live in `/tmp/mysuricates-blueprints/<run id>`, the last step removes them.
+- **0 tokens outside `AI`:** no AI block types; `foreach`, `while`, `conditional` and `retry` need `"execution_mode": "shell"`, otherwise they ask the AI. `BlueprintGateTest` checks this.
 
 ---
 

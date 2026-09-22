@@ -582,7 +582,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-67 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
+66 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -1252,6 +1252,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V76 | `V76__todo_agent_session_ref.sql` | agent_session_ref in todos + Index (Konversation der Agenten-Sitzung; Einmal-Uebernahme der `--resume`-UUIDs aus den Beschreibungen) |
 | V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (Beleg nennt keinen Messwert des Laufs; solche Findings erzeugen kein verwaltetes TODO) |
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unaufgelöste zweisprachige Schritte, `?locale=` löst beim Lesen auf) |
+| V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; Blaupausen aus templates/blueprints/) |
 
 ## SQLite-Besonderheiten
 

@@ -1,0 +1,47 @@
+{
+  "id": "blueprint-if",
+  "icon": "🔀",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Wenn – dann – sonst",
+    "en": "If – then – else"
+  },
+  "description": {
+    "de": "Eine Prüfung entscheidet über den Weg: Exit 0 führt zu „then“, alles andere zu „else“. Ersetze die Bedingung (hier: mehr als 1 GB frei) und die beiden Befehle.",
+    "en": "A check decides the path: exit 0 leads to “then”, anything else to “else”. Replace the condition (here: more than 1 GB free) and both commands."
+  },
+  "category": "BASICS",
+  "sortOrder": 3,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "conditional",
+      "name": {
+        "de": "genug_platz",
+        "en": "enough_space"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "condition": "# placeholder - replace with your own test (exit 0 = then, otherwise else)\n[ \"$(df -Pk . | awk 'NR==2 {print $4}')\" -gt 1048576 ]",
+        "then_command": "printf 'enough space\\n'",
+        "else_command": "printf 'low on space\\n'"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\nprintf 'decision: %s\\n' \"$1\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "abschluss",
+        "en": "finish"
+      }
+    }
+  ]
+}

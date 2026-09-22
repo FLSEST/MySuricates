@@ -42,7 +42,9 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
                 throw new IllegalArgumentException("todo-create requires 'title' in config");
             }
             String description = TodoBlockSupport.resolved(context, config.get("description"));
-            Todo.Priority priority = TodoBlockSupport.parsePriority(config.get("priority"), Todo.Priority.MEDIUM);
+            // Template-fähig wie title: eine Verzweigung kann die Priorität liefern (Blaupause intake)
+            Todo.Priority priority = TodoBlockSupport.parsePriority(
+                    TodoBlockSupport.resolved(context, config.get("priority")), Todo.Priority.MEDIUM);
             List<String> tags = TodoBlockSupport.parseTags(config.get("tags"));
             String projectId = TodoBlockSupport.resolved(context, config.get("project_id"));
             if (projectId == null || projectId.isBlank()) {

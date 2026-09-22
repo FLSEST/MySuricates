@@ -1,0 +1,57 @@
+{
+  "id": "blueprint-document",
+  "icon": "📄",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Dokument einlesen",
+    "en": "Reading a document"
+  },
+  "description": {
+    "de": "Liest den Text einer Datei in eine Variable ({{ document_text }}) und verarbeitet ihn weiter. Hier wird eine Beispieldatei erzeugt; ersetze file_path durch dein Dokument (PDF, DOCX, TXT …).",
+    "en": "Reads the text of a file into a variable ({{ document_text }}) and processes it further. A sample file is created here; replace file_path with your document (PDF, DOCX, TXT …)."
+  },
+  "category": "BASICS",
+  "sortOrder": 10,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n# placeholder - stands in for your document\nprintf 'MySuricates blueprint\\n\\nThis sample file stands in for your document.\\n' > \"$D/sample.txt\"\necho \"$D/sample.txt\""
+      },
+      "name": {
+        "de": "datei_anlegen",
+        "en": "write_file"
+      }
+    },
+    {
+      "type": "document",
+      "name": {
+        "de": "einlesen",
+        "en": "read"
+      },
+      "config": {
+        "file_path": "/tmp/mysuricates-blueprints/{{ workflow_run_id }}/sample.txt",
+        "variable_name": "document_text",
+        "min_characters": 10,
+        "fail_on_empty": true
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ document_text }}\nW=$(printf '%s' \"$1\" | wc -w | tr -d ' ')\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\nprintf 'words=%s\\n' \"$W\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "auswerten",
+        "en": "evaluate"
+      }
+    }
+  ]
+}

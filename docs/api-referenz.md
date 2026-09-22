@@ -604,7 +604,7 @@ Siegel lösen (gleicher Schalter). Protokolliert einen `SECURITY`-Eintrag mit de
 
 ### `GET /api/v1/workflow-templates`
 
-Alle Workflow-Templates auflisten (sortiert nach `sortOrder`).
+Alle Workflow-Templates auflisten, sortiert nach Art und `sortOrder`. Das Feld `kind` unterscheidet Vorlagen (`TEMPLATE`) von Blaupausen (`BLUEPRINT`: leere Gerüste, die Block-Verknüpfungen zeigen, siehe [WORKFLOW-GUIDE → Blaupausen](WORKFLOW-GUIDE.md#blaupausen)).
 
 **Query:** `locale` (optional, `de`/`en`): Sprache der Schritte (`blocks`, `instructions`) zweisprachiger Templates. Ohne Angabe gilt Englisch. `name` und `description` bleiben Maps. Siehe [WORKFLOW-GUIDE → Zweisprachige Vorlagen](WORKFLOW-GUIDE.md#zweisprachige-vorlagen).
 

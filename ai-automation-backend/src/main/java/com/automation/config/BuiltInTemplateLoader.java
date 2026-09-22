@@ -1,5 +1,6 @@
 package com.automation.config;
 
+import com.automation.entity.TemplateKind;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.util.LocalizedJson;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,10 +15,12 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Loads built-in workflow template definitions from JSON files
- * in classpath:templates/builtin/*.json.
+ * in classpath:templates/builtin/*.json (templates) and classpath:templates/blueprints/*.json
+ * (blueprints: empty scaffolds that show how block types connect, TODO 268ae0db).
  *
  * Each JSON file maps to a single {@link BuiltInTemplateDefinition}
  * which is then converted to a {@link WorkflowTemplate} entity.
@@ -26,7 +29,10 @@ import java.util.List;
 @Slf4j
 public class BuiltInTemplateLoader {
 
-    private static final String TEMPLATE_PATTERN = "classpath:templates/builtin/*.json";
+    /** Where each kind ships; same format, same loader, same gates. */
+    static final Map<TemplateKind, String> PATTERNS = Map.of(
+            TemplateKind.TEMPLATE, "classpath:templates/builtin/*.json",
+            TemplateKind.BLUEPRINT, "classpath:templates/blueprints/*.json");
 
     private final ObjectMapper objectMapper;
 
@@ -37,14 +43,24 @@ public class BuiltInTemplateLoader {
     /**
      * Loads all built-in templates from JSON resource files.
      *
-     * @return list of WorkflowTemplate entities sorted by sortOrder, with builtIn=true
+     * @return list of WorkflowTemplate entities sorted by kind, then sortOrder, with builtIn=true
      */
     public List<WorkflowTemplate> loadAll() {
         List<WorkflowTemplate> templates = new ArrayList<>();
+        for (TemplateKind kind : TemplateKind.values()) {
+            templates.addAll(load(kind));
+        }
+        templates.sort(Comparator.comparing(WorkflowTemplate::getKind)
+                .thenComparingInt(WorkflowTemplate::getSortOrder));
+        log.debug("Loaded {} built-in templates from JSON files", templates.size());
+        return templates;
+    }
 
+    private List<WorkflowTemplate> load(TemplateKind kind) {
+        List<WorkflowTemplate> templates = new ArrayList<>();
         try {
             Resource[] resources = new PathMatchingResourcePatternResolver()
-                    .getResources(TEMPLATE_PATTERN);
+                    .getResources(PATTERNS.get(kind));
 
             for (Resource resource : resources) {
                 try (InputStream is = resource.getInputStream()) {
@@ -56,17 +72,15 @@ public class BuiltInTemplateLoader {
                             BuiltInTemplateDefinition.class);
                     WorkflowTemplate template = toEntity(def);
                     template.setI18nSource(LocalizedJson.localizedSource(root));
+                    template.setKind(kind);
                     templates.add(template);
                 } catch (IOException | IllegalArgumentException e) {
                     log.error("Failed to load built-in template from {}: {}", resource.getFilename(), e.getMessage());
                 }
             }
         } catch (IOException e) {
-            log.error("Failed to scan for built-in template files: {}", e.getMessage());
+            log.error("Failed to scan for built-in {} files: {}", kind, e.getMessage());
         }
-
-        templates.sort(Comparator.comparingInt(WorkflowTemplate::getSortOrder));
-        log.debug("Loaded {} built-in templates from JSON files", templates.size());
         return templates;
     }
 

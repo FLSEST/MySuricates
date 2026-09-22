@@ -7,9 +7,10 @@ import { useTemplates, exportTemplate } from '../../hooks/useTemplates';
 import { resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { PoolBrowser } from './PoolBrowser';
+import { BlueprintBrowser } from './BlueprintBrowser';
 import type { WorkflowTemplate, PoolWorkflowEntry } from '../../types';
 
-type Tab = 'templates' | 'pool';
+type Tab = 'templates' | 'pool' | 'blueprints';
 
 interface TemplateSelectorProps {
   onSelect: (template: WorkflowTemplate | null) => void;
@@ -24,11 +25,15 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
   const [activeTab, setActiveTab] = useState<Tab>('templates');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Blueprints share the endpoint but have their own tab
+  const taskTemplates = (templates ?? []).filter((tmpl) => tmpl.kind !== 'BLUEPRINT');
+  const blueprints = (templates ?? []).filter((tmpl) => tmpl.kind === 'BLUEPRINT');
+
   const allCategories = Array.from(
-    new Set((templates ?? []).map((tmpl) => tmpl.category).filter(Boolean) as string[]),
+    new Set(taskTemplates.map((tmpl) => tmpl.category).filter(Boolean) as string[]),
   ).sort();
 
-  const filtered = (templates ?? []).filter((tmpl) => {
+  const filtered = taskTemplates.filter((tmpl) => {
     if (selectedCategory && tmpl.category !== selectedCategory) return false;
     if (!search.trim()) return true;
     const name = resolveTemplateName(tmpl.name, locale).toLowerCase();
@@ -61,10 +66,28 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
         >
           {t.pool.tab}
         </button>
+        <button
+          onClick={() => setActiveTab('blueprints')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'blueprints'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-secondary hover:text-text'
+          }`}
+        >
+          {t.blueprints.tab}
+        </button>
       </div>
 
       {activeTab === 'pool' ? (
         <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} />
+      ) : activeTab === 'blueprints' ? (
+        isLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner text={t.common.loading} />
+          </div>
+        ) : (
+          <BlueprintBrowser blueprints={blueprints} onSelect={onSelect} />
+        )
       ) : (
         <>
           <div>

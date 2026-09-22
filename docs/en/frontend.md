@@ -86,7 +86,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 ### Workflows (`/workflows`, `/workflows/:id`)
 
 - 2-step creation: template selection → form (project, name, description)
-- 67 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
+- 66 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
 - Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: add block (type + JSON config via Monaco Editor), activate skill

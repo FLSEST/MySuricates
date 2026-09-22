@@ -1,0 +1,82 @@
+{
+  "id": "blueprint-batch-approval",
+  "icon": "🗂️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Liste freigeben, dann handeln",
+    "en": "Approve a list, then act"
+  },
+  "description": {
+    "de": "Eine Liste wird gesammelt, einmal als Ganzes freigegeben und erst dann abgearbeitet. Eine Freigabe pro Element kann foreach nicht – so geht es trotzdem mit einer Entscheidung. Ersetze Liste und Befehle.",
+    "en": "A list is collected, approved once as a whole and only then processed. foreach can't ask per item – this way it takes one decision. Replace the list and the commands."
+  },
+  "category": "COMBINATIONS",
+  "sortOrder": 15,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "foreach",
+      "name": {
+        "de": "sammeln",
+        "en": "collect"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "items": [
+          "report-a.txt",
+          "report-b.txt",
+          "report-c.txt"
+        ],
+        "shell_escape_variables": true,
+        "command": "# placeholder - how a candidate is described\nprintf -- '- %s\\n' {{ item }}"
+      }
+    },
+    {
+      "type": "approval",
+      "name": {
+        "de": "freigabe",
+        "en": "approval"
+      },
+      "config": {
+        "question": {
+          "de": "## Kandidaten\n\n{{ block.sammeln.output }}\n\nAlle bearbeiten?",
+          "en": "## Candidates\n\n{{ block.collect.output }}\n\nProcess all of them?"
+        },
+        "options": [
+          {
+            "de": "Ja",
+            "en": "Yes"
+          },
+          {
+            "de": "Nein",
+            "en": "No"
+          }
+        ],
+        "on_no": "fail",
+        "timeout_minutes": 60
+      }
+    },
+    {
+      "type": "foreach",
+      "name": {
+        "de": "handeln",
+        "en": "act"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "items": [
+          "report-a.txt",
+          "report-b.txt",
+          "report-c.txt"
+        ],
+        "shell_escape_variables": true,
+        "command": "# placeholder - what happens per item after approval\nprintf 'processed: %s\\n' {{ item }}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "id": "blueprint-guarded-loop",
+  "icon": "🔐",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Schleife mit Freigabe",
+    "en": "Loop with a gate"
+  },
+  "description": {
+    "de": "Eine Schleife bereitet etwas vor, danach entscheidet ein Mensch, ob es weitergeht. So bleibt der automatische Teil unbeaufsichtigt und der riskante Schritt freigegeben. Ersetze Schleife und Abschluss.",
+    "en": "A loop prepares something, then a person decides whether to continue. The automatic part stays unattended and the risky step approved. Replace the loop and the final step."
+  },
+  "category": "COMBINATIONS",
+  "sortOrder": 17,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+      },
+      "name": {
+        "de": "vorbereiten",
+        "en": "prepare"
+      }
+    },
+    {
+      "type": "while",
+      "name": {
+        "de": "runden",
+        "en": "rounds"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "max_iterations": 10,
+        "condition_command": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt 3 ]",
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - preparation per round\nprintf 'prepared part %s\\n' \"$N\""
+      }
+    },
+    {
+      "type": "approval",
+      "name": {
+        "de": "freigabe",
+        "en": "approval"
+      },
+      "config": {
+        "question": {
+          "de": "## Vorbereitet\n\n{{ block.runden.output }}\n\nJetzt abschließen?",
+          "en": "## Prepared\n\n{{ block.rounds.output }}\n\nFinish now?"
+        },
+        "options": [
+          {
+            "de": "Ja",
+            "en": "Yes"
+          },
+          {
+            "de": "Nein",
+            "en": "No"
+          }
+        ],
+        "on_no": "fail",
+        "timeout_minutes": 60
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\n# placeholder - the approved step\necho finished"
+      },
+      "name": {
+        "de": "abschliessen",
+        "en": "finish"
+      }
+    }
+  ]
+}

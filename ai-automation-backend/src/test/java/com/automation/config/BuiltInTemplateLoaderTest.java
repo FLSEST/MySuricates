@@ -3,6 +3,7 @@ package com.automation.config;
 import com.automation.util.LocalizedJson;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.TemplateKind;
 import com.automation.entity.WorkflowTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,15 +36,20 @@ class BuiltInTemplateLoaderTest {
     /** The loader skips a file it can't read with only a log line — here that has to fail the build. */
     @Test
     void loadAll_loadsEveryTemplateFile() throws Exception {
-        int files = new PathMatchingResourcePatternResolver().getResources("classpath:templates/builtin/*.json").length;
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        int templateFiles = resolver.getResources("classpath:templates/builtin/*.json").length;
+        int blueprintFiles = resolver.getResources("classpath:templates/blueprints/*.json").length;
 
-        assertThat(templates).hasSize(files);
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.TEMPLATE)).hasSize(templateFiles);
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT)).hasSize(blueprintFiles);
+        assertThat(blueprintFiles).as("Blaupausen werden ausgeliefert").isPositive();
     }
 
     @Test
     void bilingualTemplate_keepsEnglishBlocks_andResolvesGermanFromItsSource() {
-        WorkflowTemplate example = templates.stream().filter(t -> "example-approval".equals(t.getId()))
+        WorkflowTemplate example = templates.stream().filter(t -> "blueprint-approval".equals(t.getId()))
                 .findFirst().orElseThrow();
+        assertThat(example.getKind()).isEqualTo(TemplateKind.BLUEPRINT);
 
         assertThat(example.getBlocks()).extracting(BlockDefinition::getName)
                 .containsExactly("measure", "approval", "finish");
@@ -57,9 +63,11 @@ class BuiltInTemplateLoaderTest {
     }
 
     @Test
-    void singleLanguageTemplates_haveNoBilingualSource() {
-        assertThat(templates.stream().filter(t -> !"example-approval".equals(t.getId())))
+    void templatesAreSingleLanguage_blueprintsBilingual() {
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.TEMPLATE))
                 .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNull());
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT))
+                .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNotBlank());
     }
 
     @Test
@@ -95,7 +103,8 @@ class BuiltInTemplateLoaderTest {
                 "simple", "shell", "retry", "conditional", "foreach",
                 "while", "switch", "agentic", "approval",
                 "sub-workflow", "skill-capability", "human-input",
-                "document", "integration");
+                "document", "integration", "todo-create", "todo-update", "todo-close",
+                "compress", "compress-ai", "dashboard-report");
 
         for (WorkflowTemplate t : templates) {
             for (BlockDefinition block : t.getBlocks()) {
@@ -141,7 +150,14 @@ class BuiltInTemplateLoaderTest {
 
     @Test
     void allTemplates_haveSequentialSortOrder() {
-        List<Integer> sortOrders = templates.stream()
+        for (TemplateKind kind : TemplateKind.values()) {
+            assertSequentialSortOrder(templates.stream().filter(t -> t.getKind() == kind).toList());
+        }
+    }
+
+    /** Templates and blueprints each count from 0 — they are shown in separate gallery tabs. */
+    private static void assertSequentialSortOrder(List<WorkflowTemplate> ofOneKind) {
+        List<Integer> sortOrders = ofOneKind.stream()
                 .map(WorkflowTemplate::getSortOrder)
                 .sorted()
                 .toList();

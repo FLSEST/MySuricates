@@ -1,0 +1,70 @@
+{
+  "id": "blueprint-condense",
+  "icon": "🗜️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Ausgabe verdichten",
+    "en": "Condensing output"
+  },
+  "description": {
+    "de": "Verdichtet die lange Ausgabe eines Schritts regelbasiert (0 Tokens), bevor sie weitergeht: normalisieren, Zeilen filtern, kürzen. Das Original bleibt unter {{ block.long_output.output }} erhalten. Ersetze den Befehl in „long_output“ und die Filterregeln.",
+    "en": "Condenses a step's long output by rules (0 tokens) before it moves on: normalise, filter lines, truncate. The original stays available as {{ block.long_output.output }}. Replace the command in “long_output” and the filter rules."
+  },
+  "category": "BASICS",
+  "sortOrder": 11,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\n# placeholder - replace with a command that prints a lot\ni=1\nwhile [ \"$i\" -le 200 ]; do printf 'line %s: status ok\\n' \"$i\"; i=$((i+1)); done\nprintf 'line 201: WARNING disk almost full\\n'"
+      },
+      "name": "long_output"
+    },
+    {
+      "type": "compress",
+      "name": {
+        "de": "verdichten",
+        "en": "condense"
+      },
+      "config": {
+        "source": "long_output",
+        "stages": [
+          {
+            "op": "text.normalize"
+          },
+          {
+            "op": "lines.filter",
+            "include": [
+              "WARNING",
+              "ERROR"
+            ],
+            "before": 1
+          },
+          {
+            "op": "text.truncate",
+            "max_chars": 2000,
+            "keep": "head_tail"
+          }
+        ],
+        "max_chars": 4000
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\nprintf 'condensed_chars=%s\\n' \"$(printf '%s' \"$1\" | wc -c | tr -d ' ')\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "weiter",
+        "en": "next"
+      }
+    }
+  ]
+}

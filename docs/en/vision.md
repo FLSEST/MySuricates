@@ -126,7 +126,7 @@ Workflows accumulate knowledge across runs:
 | Pre-flight Verification + Auto-Fix + AutoRepair Config | Done |
 | Learning Feedback in Prompts | Done |
 | Cross-Project Workflow Recognition | Done |
-| 67 Built-in Templates (Dev + Office + Everyday) | Done |
+| 66 Built-in Templates (Dev + Office + Everyday) | Done |
 | 19 Built-in Skills (Code Review, Test Generator, Security Analyzer, etc.) | Done |
 | Staging (Dev + Stable + Test) | Done |
 | Multi-Provider (Claude + Codex + Pi) | Done |

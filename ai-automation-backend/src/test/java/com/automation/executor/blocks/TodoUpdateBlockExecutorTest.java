@@ -89,6 +89,23 @@ class TodoUpdateBlockExecutorTest {
     }
 
     @Test
+    void execute_priorityPlaceholder_isResolved() {
+        when(todoService.update(eq("todo-77"), any()))
+                .thenReturn(Todo.builder().id("todo-77").title("T").build());
+
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("todo_id", "todo-77");
+        ctx.setVariable("new_priority", "HIGH");
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "{{ todo_id }}");
+        config.put("priority", "{{ new_priority }}");
+
+        executor.execute(block(config), ctx);
+
+        verify(todoService).update(eq("todo-77"), argThat(req -> req.priority() == Todo.Priority.HIGH));
+    }
+
+    @Test
     void execute_missingId_failsWithoutServiceCall() {
         Map<String, Object> config = new HashMap<>();
         config.put("title", "x");

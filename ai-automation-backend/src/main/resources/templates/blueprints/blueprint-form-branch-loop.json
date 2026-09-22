@@ -1,0 +1,129 @@
+{
+  "id": "blueprint-form-branch-loop",
+  "icon": "🧩",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Formular, Verzweigung, Schleife",
+    "en": "Form, branch, loop"
+  },
+  "description": {
+    "de": "Zeigt, wie Formularwerte durch mehrere Stufen laufen: {{ mode }} steuert eine Verzweigung, {{ rounds }} die Anzahl der Schleifendurchläufe. Ersetze die Befehle, behalte die Verknüpfung.",
+    "en": "Shows how form values flow through several stages: {{ mode }} drives a branch, {{ rounds }} the number of loop rounds. Replace the commands, keep the wiring."
+  },
+  "category": "COMBINATIONS",
+  "sortOrder": 18,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "human-input",
+      "name": {
+        "de": "einstellungen",
+        "en": "settings"
+      },
+      "config": {
+        "prompt": {
+          "de": "Wie soll der Lauf arbeiten?",
+          "en": "How should the run work?"
+        },
+        "fields": [
+          {
+            "variable_name": "mode",
+            "label": {
+              "de": "Modus",
+              "en": "Mode"
+            },
+            "input_type": "select",
+            "options": [
+              "quiet",
+              "verbose"
+            ],
+            "default_value": "quiet",
+            "required": true
+          },
+          {
+            "variable_name": "rounds",
+            "label": {
+              "de": "Durchläufe (1–5)",
+              "en": "Rounds (1–5)"
+            },
+            "input_type": "number",
+            "default_value": "2",
+            "validation_pattern": "^[1-5]$",
+            "required": true
+          }
+        ],
+        "timeout_minutes": 30
+      }
+    },
+    {
+      "type": "switch",
+      "name": {
+        "de": "modus",
+        "en": "mode_branch"
+      },
+      "config": {
+        "expression": "{{ mode }}",
+        "cases": [
+          {
+            "value": "verbose",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "# placeholder - verbose setup\nprintf 'mode: verbose\\n'"
+                }
+              }
+            ]
+          }
+        ],
+        "default": [
+          {
+            "type": "shell",
+            "config": {
+              "command": "# placeholder - quiet setup\nprintf 'mode: quiet\\n'"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+      },
+      "name": {
+        "de": "vorbereiten",
+        "en": "prepare"
+      }
+    },
+    {
+      "type": "while",
+      "name": {
+        "de": "durchlaeufe",
+        "en": "rounds_loop"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "max_iterations": 5,
+        "shell_escape_variables": true,
+        "condition_command": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt {{ rounds }} ]",
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - work per round\nprintf 'round %s\\n' \"$N\""
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+      },
+      "name": {
+        "de": "aufraeumen",
+        "en": "cleanup"
+      }
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "id": "blueprint-intake",
+  "icon": "📥",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Meldung aufnehmen",
+    "en": "Taking in a report"
+  },
+  "description": {
+    "de": "Formular → Verzweigung → TODO: Die Dringlichkeit wird per switch in eine Priorität übersetzt und das TODO damit angelegt. Achtung: legt ein echtes, offenes TODO im Projekt an.",
+    "en": "Form → branch → TODO: the urgency is turned into a priority by a switch and the TODO is created with it. Note: creates a real, open TODO in the project."
+  },
+  "category": "COMBINATIONS",
+  "sortOrder": 14,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "human-input",
+      "name": {
+        "de": "meldung",
+        "en": "report"
+      },
+      "config": {
+        "prompt": {
+          "de": "Was soll aufgenommen werden?",
+          "en": "What should be recorded?"
+        },
+        "fields": [
+          {
+            "variable_name": "title",
+            "label": {
+              "de": "Titel",
+              "en": "Title"
+            },
+            "input_type": "text",
+            "required": true
+          },
+          {
+            "variable_name": "urgency",
+            "label": {
+              "de": "Dringlichkeit",
+              "en": "Urgency"
+            },
+            "input_type": "select",
+            "options": [
+              "low",
+              "normal",
+              "urgent"
+            ],
+            "default_value": "normal",
+            "required": true
+          }
+        ],
+        "timeout_minutes": 30
+      }
+    },
+    {
+      "type": "switch",
+      "name": {
+        "de": "prioritaet",
+        "en": "priority"
+      },
+      "config": {
+        "expression": "{{ urgency }}",
+        "cases": [
+          {
+            "value": "low",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "printf LOW"
+                }
+              }
+            ]
+          },
+          {
+            "value": "urgent",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "printf HIGH"
+                }
+              }
+            ]
+          }
+        ],
+        "default": [
+          {
+            "type": "shell",
+            "config": {
+              "command": "printf MEDIUM"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "todo-create",
+      "name": {
+        "de": "todo_anlegen",
+        "en": "create_todo"
+      },
+      "config": {
+        "title": "{{ title }}",
+        "description": {
+          "de": "Aufgenommen mit der Blaupause „Meldung aufnehmen“ (Dringlichkeit: {{ urgency }}).",
+          "en": "Recorded with the blueprint “Taking in a report” (urgency: {{ urgency }})."
+        },
+        "priority": "{{ previous_output }}",
+        "tags": [
+          "blueprint"
+        ]
+      }
+    }
+  ]
+}

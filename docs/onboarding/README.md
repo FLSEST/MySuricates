@@ -21,7 +21,7 @@ MySuricates ist eine **KI-gesteuerte Workflow-Automatisierungsplattform** mit vi
 | **Docker-basierte Ausfuehrung** | Isolierte Container (Python, Node.js, Go) fuer sichere Skill-Ausfuehrung |
 | **Skill-System** | 19 eingebaute Skills + benutzerdefinierte Skills fuer wiederverwendbare Automatisierungsbausteine |
 | **Scheduling & Webhooks** | Zeitgesteuerte (Cron) und HTTP-getriggerte Workflow-Ausfuehrungen |
-| **Workflow-Templates** | 67 vorgefertigte Templates als Startpunkt fuer neue Workflows |
+| **Workflow-Templates** | 66 vorgefertigte Templates als Startpunkt fuer neue Workflows |
 | **Echtzeit-Updates** | WebSocket-basierte Live-Updates waehrend der Ausfuehrung |
 | **Approval Gates** | Manueller Freigabe-Mechanismus fuer kritische Schritte |
 | **Workflow-Konvertierung** | Erfolgreiche agentische Laeufe koennen in deterministische Workflows umgewandelt werden |

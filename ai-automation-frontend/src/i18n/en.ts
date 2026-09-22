@@ -1504,6 +1504,17 @@ export const en = {
     testedIn: 'Tested in:',
     exportTemplate: 'Export template',
   },
+  blueprints: {
+    tab: 'Blueprints',
+    title: 'Blueprints',
+    subtitle: 'Empty scaffolds that show how block types connect: form → branch, loop with approval, fallback on errors … Run them, look, replace the placeholders.',
+    searchPlaceholder: 'Search blueprints...',
+    groups: {
+      BASICS: 'Basic connections',
+      COMBINATIONS: 'Combinations',
+      AI: 'With AI (uses tokens)',
+    },
+  },
   pool: {
     title: 'Workflow Pool',
     subtitle: 'Ready-to-use workflows from the local pool',

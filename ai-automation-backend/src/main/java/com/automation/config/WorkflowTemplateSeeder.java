@@ -51,6 +51,7 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
                 dbTemplate.setBlocks(template.getBlocks());
                 dbTemplate.setInstructions(template.getInstructions());
                 dbTemplate.setI18nSource(template.getI18nSource());
+                dbTemplate.setKind(template.getKind());
                 dbTemplate.setModel(template.getModel());
                 dbTemplate.setIcon(template.getIcon());
                 dbTemplate.setName(template.getName());
