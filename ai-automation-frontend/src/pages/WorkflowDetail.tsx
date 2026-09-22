@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useRef, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, History, PanelRightClose, PanelRightOpen } from 'lucide-react';
@@ -309,6 +310,8 @@ export function WorkflowDetail() {
         executeLoading={executeWorkflow.isPending}
         optimizeLoading={optimizeWorkflow.isPending}
       />
+
+      <Hint id="workflow-versions" />
 
       <ResizableSplit
         storageKey="workflow-detail-sidebar-width"

@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import {
   CheckCircle, AlertTriangle, Clock, DollarSign, Zap, TrendingUp,
@@ -110,6 +111,8 @@ export function Insights() {
           <TimeRangeSelector value={days} onChange={setDays} />
         </div>
       </div>
+
+      <Hint id="insights-numbers" />
 
       {/* Execution KPIs */}
       {stats && (

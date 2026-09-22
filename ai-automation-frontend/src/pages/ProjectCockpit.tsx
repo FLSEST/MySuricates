@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, FolderKanban, Archive, AlertTriangle, ChevronRight, Clock, ArrowUpRight } from 'lucide-react';
@@ -48,6 +49,8 @@ export function ProjectCockpit() {
           <p className="text-sm text-text-secondary mt-0.5">{t.cockpit.subtitle}</p>
         </div>
       </div>
+
+      <Hint id="cockpit-overview" />
 
       {/* "Braucht dich" focus lane */}
       <section>

@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -182,6 +183,8 @@ export function WorkflowFactory() {
         </div>
         <p className="text-sm text-text-secondary mt-1">{t.factory.subtitle}</p>
       </div>
+
+      <Hint id="factory-create" />
 
       <FactoryFlowDiagram
         autoFix={autoFix}

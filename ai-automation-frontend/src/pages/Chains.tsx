@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link2, Plus, Play, Layers } from 'lucide-react';
@@ -150,6 +151,8 @@ export function Chains() {
           </Button>
         </div>
       </div>
+
+      <Hint id="chains-sequence" />
 
       {(!chains || chains.length === 0) ? (
         <EmptyState

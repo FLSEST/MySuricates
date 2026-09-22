@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Hand } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
@@ -24,6 +25,8 @@ export function Approvals() {
         </h1>
         <p className="text-sm text-text-secondary mt-1">{t.approvals.subtitle}</p>
       </header>
+
+      <Hint id="approvals-inbox" />
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner /></div>

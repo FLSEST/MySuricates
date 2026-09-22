@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Webhook, Plus, Trash2, RefreshCw, KeyRound, ShieldCheck, ShieldOff } from 'lucide-react';
 import { Card, Button, Input, Select, Modal, ModalFooter, Spinner, Table, Toggle, Badge } from '../components/ui';
@@ -226,6 +227,8 @@ export function Webhooks() {
           {t.webhooks.create}
         </Button>
       </div>
+
+      <Hint id="webhooks-trigger" />
 
       {/* Table */}
       {!webhooks?.length ? (

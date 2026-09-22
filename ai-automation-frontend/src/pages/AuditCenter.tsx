@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -61,6 +62,8 @@ export function AuditCenter() {
           <NavButton active={view === 'legacy'} onClick={() => setView('legacy')} icon={<FileClock className="w-4 h-4" />}>Legacy</NavButton>
         </nav>
       </header>
+
+      <Hint id="audit-findings" className="shrink-0" />
 
       {view === 'overview' && (
         <AuditOverview audits={audits ?? []} loading={isLoading} projectNames={projectNames} locale={locale} onOpen={openAudit} />

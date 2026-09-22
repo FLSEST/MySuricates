@@ -36,7 +36,7 @@
     "points": [
       "Nichts hängt: Der Workflow hält an dieser Stelle mit Absicht an",
       "Nach deiner Antwort geht es hier weiter, nicht von vorn",
-      "Du kannst den Dialog schließen und später antworten, der Lauf wartet weiter"
+      "Du kannst den Dialog schließen und später antworten, bis die Frist des Schritts abläuft (30 Minuten, sofern der Schritt nichts anderes festlegt)"
     ]
   },
   "todos-sources": {
@@ -45,6 +45,156 @@
       "Schreib sie selbst auf oder lass einen Workflow sie anlegen: mit einem Block oder aus seinem Prüfergebnis",
       "Ein fehlgeschlagener Lauf wird mit einem Klick zum TODO",
       "Coding-Agenten legen sie über die API an, damit Nebenbefunde nicht verloren gehen"
+    ]
+  },
+  "projects-directory": {
+    "title": "Ein Projekt ist ein Verzeichnis",
+    "points": [
+      "Jeder Workflow gehört zu genau einem Projekt, seine Schritte arbeiten mit dessen Dateien",
+      "KI-Aufrufe laufen auf diesem Rechner, ein Container fürs Projekt ist optional",
+      "Archivieren lässt sich rückgängig machen: Projekt und Workflows bleiben erhalten"
+    ]
+  },
+  "project-context": {
+    "title": "Was jeder Lauf über dieses Projekt weiß",
+    "points": [
+      "Der KI-Kontext ist ein Text, den jeder KI-Schritt eines Laufs in diesem Projekt mitbekommt, bei jedem Anbieter",
+      "Er lässt sich aus einem Scan des Verzeichnisses erzeugen und danach von Hand anpassen",
+      "Darunter stehen alle Workflows des Projekts mit ihren Blöcken und Läufen"
+    ]
+  },
+  "workflow-versions": {
+    "title": "Jede Änderung wird zur Version",
+    "points": [
+      "Änderungen am Ablauf (Blöcke, Anweisungen, Modell, Anbieter) legen eine neue Version an, Name und Beschreibung nicht",
+      "Eine alte Version wiederherzustellen legt sie als neueste an, spätere bleiben im Verlauf",
+      "Anbieter und Modell gelten für den ganzen Workflow, ein einzelner KI-Block kann sie für sich überschreiben"
+    ]
+  },
+  "runs-list": {
+    "title": "Alle Läufe an einem Ort",
+    "points": [
+      "Die Läufe aller Workflows, die neuesten zuerst; deine Filter bleiben gespeichert",
+      "Ein Lauf lässt sich wiederholen: mit dem aktuellen Stand des Workflows und den Eingaben von damals",
+      "Abgeschlossene Läufe werden standardmäßig nach 90 Tagen gelöscht, die Frist ist einstellbar"
+    ]
+  },
+  "approvals-inbox": {
+    "title": "Alles, was auf dich wartet",
+    "points": [
+      "Läufe, die auf eine Freigabe oder Eingabe warten, über alle Workflows, die ältesten zuerst",
+      "Jede Frage hat eine Frist; läuft sie ab, scheitert der Schritt oder nimmt seinen Standardwert",
+      "Wartende Fragen überstehen keinen Neustart der Instanz, der Lauf gilt dann als unterbrochen"
+    ]
+  },
+  "schedules-timing": {
+    "title": "Workflows zu festen Zeiten",
+    "points": [
+      "Wiederkehrend per Cron (sechs Felder, Sekunden zuerst), einmalig zu einem Zeitpunkt oder nach einer Wartezeit",
+      "Termine, die in Standby oder Neustart fallen, werden standardmäßig einmal nachgeholt, nicht jeder einzeln",
+      "Läuft der Workflow noch, startet der nächste Termin standardmäßig keinen zweiten Lauf daneben"
+    ]
+  },
+  "calendar-overview": {
+    "title": "Was geplant war und was gelaufen ist",
+    "points": [
+      "Der nächste Termin jedes aktiven Zeitplans und die vergangenen Läufe aller Workflows",
+      "Rot heißt fehlgeschlagen; der Kalender zeigt nur an, Termine änderst du am Zeitplan selbst"
+    ]
+  },
+  "cockpit-overview": {
+    "title": "TODOs über alle Projekte",
+    "points": [
+      "Oben steht, was dich braucht: selbst notierte, kritische und überfällige TODOs aus allen Projekten",
+      "Je Projekt eine Karte, getrennt nach deinen und denen von Maschinen: Workflows und Agenten",
+      "Automatische TODOs, die lange niemand angefasst hat, lassen sich gesammelt archivieren"
+    ]
+  },
+  "activity-events": {
+    "title": "Was auf dieser Instanz passiert ist",
+    "points": [
+      "Ereignisse der Plattform: Läufe beendet oder gescheitert, Zeitpläne ausgelöst oder übersprungen, abgewiesene Anmeldungen",
+      "Die Ausgaben einzelner Schritte stehen im jeweiligen Lauf, nicht hier",
+      "Einträge verfallen von selbst: Infos nach 7 Tagen, Warnungen und Fehler nach 30"
+    ]
+  },
+  "dlq-retry": {
+    "title": "Gescheiterte Läufe zum Nacharbeiten",
+    "points": [
+      "Läufe, die an einem fehlgeschlagenen Schritt enden, landen hier; abgebrochene und unterbrochene nicht",
+      "Wiederholen startet den aktuellen Stand des Workflows von vorn, mit den Eingaben von damals",
+      "Verwerfen markiert den Eintrag nur als erledigt, der Lauf bleibt erhalten"
+    ]
+  },
+  "wishes-loop": {
+    "title": "Ein Ziel beschreiben, Workflows bekommen",
+    "points": [
+      "Ein Wunsch ist freier Text zu einem Projekt: Die KI zerlegt ihn in neue Workflows, mehrere davon in eine Kette",
+      "Sie führt sie aus, bewertet das Ergebnis und bessert nach, bis zu fünf Runden",
+      "Ohne automatisches Nachbessern gibst du zweimal frei: die Zerlegung und das Ergebnis"
+    ]
+  },
+  "factory-create": {
+    "title": "Workflows aus einer Beschreibung",
+    "points": [
+      "Beschreib, was ein Workflow tun soll, und die KI baut ihn im gewählten Projekt",
+      "Eine Reparatur schreibt die Definition als neue Version, jede Korrektur bleibt nachvollziehbar",
+      "Die automatische Reparatur fehlschlagender Workflows bleibt aus, bis sie in den Einstellungen oder für einen Workflow eingeschaltet wird"
+    ]
+  },
+  "chains-sequence": {
+    "title": "Fertige Workflows hintereinander",
+    "points": [
+      "Eine Kette führt ihre Workflows streng nacheinander aus, nie parallel, und darf Projekte mischen",
+      "Jeder Workflow bekommt das Ergebnis des letzten Schritts seines Vorgängers als {{ previous_chain_output }}",
+      "Ob ein Fehlschlag die Kette anhält, legst du für die Kette und für jeden ihrer Schritte fest"
+    ]
+  },
+  "skills-packages": {
+    "title": "Skills: gebündeltes Können",
+    "points": [
+      "Ein Skill bündelt Fähigkeiten mit einem eigenen KI-Kontext; ein Workflow aktiviert ihn und nutzt ihn über einen Skill-Capability-Block",
+      "Fähigkeiten, die schreiben, bleiben gesperrt, solange der Block das Schreiben nicht ausdrücklich erlaubt",
+      "Eingebaute Skills lassen sich nicht löschen"
+    ]
+  },
+  "webhooks-trigger": {
+    "title": "Einen Workflow von außen starten",
+    "points": [
+      "Jeder Webhook startet einen Workflow; das Token in seiner URL ist der einzige Schlüssel, behandle die URL wie ein Passwort",
+      "Felder des JSON-Bodys werden zu Variablen des Laufs und gelten als nicht vertrauenswürdige Eingabe",
+      "Höchstens 10 Aufrufe pro Minute von einer Adresse; ein deaktivierter Webhook weist jeden Aufruf ab"
+    ]
+  },
+  "integrations-connect": {
+    "title": "Externe Dienste anbinden",
+    "points": [
+      "Workflows nutzen Verbindungen über den Integrations-Block; TODOs lassen sich außerdem nach GitHub, Jira oder Trello exportieren",
+      "Manche Dienste melden sich per OAuth mit einer selbst registrierten App an, andere mit einem Token oder ganz ohne Zugangsdaten",
+      "Zugangsdaten liegen verschlüsselt; ein Verbindungstest führt eine echte Aktion beim Dienst aus"
+    ]
+  },
+  "debug-failing": {
+    "title": "Workflows, deren letzter Lauf schiefging",
+    "points": [
+      "Jeder Workflow, dessen jüngster Lauf gescheitert oder mit Fehlern beendet ist; nach dem nächsten erfolgreichen Lauf verschwindet er",
+      "Ein Neustart führt den aktuellen Stand des Workflows ab dem ersten Schritt aus, mit den ursprünglichen Eingaben"
+    ]
+  },
+  "audit-findings": {
+    "title": "Befunde mit Gedächtnis",
+    "points": [
+      "Befunde stammen aus Audit-Workflows: Wer nicht wieder auftaucht, gilt als behoben; wer zurückkommt, öffnet sich als Regression",
+      "Ein akzeptiertes Risiko behält einen Schnappschuss seiner Belege; verschlechtert sich der Messwert spürbar, öffnet es sich wieder",
+      "Kritische und hohe Befunde mit geprüften Belegen bekommen automatisch ein TODO"
+    ]
+  },
+  "insights-numbers": {
+    "title": "Wie es deinen Läufen geht",
+    "points": [
+      "Dauer, Kosten, Tokens, Block-Typen und Fehlergründe deiner Läufe, auch je Modell und Anbieter",
+      "Projekt- und Zeitfilter gelten für Dauer, Kosten und Verläufe; Erfolgsquote und Gesamtzahlen zählen immer alle Läufe",
+      "Kosten sind teils Schätzungen, je nachdem, was der Anbieter meldet"
     ]
   }
 }
