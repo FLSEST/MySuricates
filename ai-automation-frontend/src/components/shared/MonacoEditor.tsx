@@ -4,6 +4,8 @@ import { AlignLeft } from 'lucide-react';
 import { useThemeAppearance } from '../../stores/themeStore';
 import { useT } from '../../i18n';
 import { ensureLocalMonaco, registerJsonSchema } from './monacoSetup';
+import { attachPlaceholders } from './monacoPlaceholders';
+import type { PlaceholderContext } from '../workflow/placeholderContext';
 
 interface MonacoEditorProps {
   value: string;
@@ -22,6 +24,8 @@ interface MonacoEditorProps {
   jsonSchema?: object;
   /** Fill the parent's height instead of a fixed `height` (parent must give the editor a height). */
   fill?: boolean;
+  /** `{{ … }}` bound at this block: suggestions after `{{`, origin hint and hover, warnings. */
+  placeholders?: PlaceholderContext;
 }
 
 // Monaco-Editor-Instanz (locker typisiert, um keine monaco-Typen zu importieren)
@@ -63,6 +67,7 @@ export function MonacoEditor({
   revealNonce = 0,
   jsonSchema,
   fill = false,
+  placeholders,
 }: MonacoEditorProps) {
   const t = useT();
   const appearance = useThemeAppearance();
@@ -71,6 +76,9 @@ export function MonacoEditor({
   const modelPath = `editor-${useId().replace(/[^a-zA-Z0-9]/g, '')}.json`;
   const [problemCount, setProblemCount] = useState(0);
   const markerListener = useRef<{ dispose: () => void } | null>(null);
+  const placeholderHandle = useRef<ReturnType<typeof attachPlaceholders> | null>(null);
+  // Latest context for the mount callback, which may run a render later than it was created
+  const placeholdersRef = useRef(placeholders);
   // Monaco comes from our bundle (no CDN, see monacoSetup) — mount the editor only once it is configured
   const [monacoReady, setMonacoReady] = useState(false);
 
@@ -101,16 +109,30 @@ export function MonacoEditor({
     return registerJsonSchema(modelPath, jsonSchema);
   }, [jsonSchema, monacoReady, modelPath]);
 
-  useEffect(() => () => markerListener.current?.dispose(), []);
+  useEffect(() => () => {
+    markerListener.current?.dispose();
+    placeholderHandle.current?.dispose();
+  }, []);
+
+  useEffect(() => {
+    placeholdersRef.current = placeholders;
+    if (placeholders) placeholderHandle.current?.update(placeholders);
+  }, [placeholders]);
 
   const handleMount: OnMount = (editor, monaco) => {
     if (jsonSchema) {
       const api = monaco as unknown as MonacoApi;
       const model = editor.getModel();
-      const count = () => setProblemCount(model ? api.editor.getModelMarkers({ resource: model.uri }).length : 0);
+      // Warnings and errors only (severity ≥ 4) — hints like "previous_output is empty here" stay uncounted
+      const count = () => setProblemCount(model ? api.editor.getModelMarkers({ resource: model.uri }).filter((m) => m.severity >= 4).length : 0);
       markerListener.current?.dispose();
       markerListener.current = api.editor.onDidChangeMarkers(count);
       count();
+    }
+    const model = editor.getModel();
+    if (placeholdersRef.current && model) {
+      placeholderHandle.current?.dispose();
+      placeholderHandle.current = attachPlaceholders(monaco, model as unknown as Parameters<typeof attachPlaceholders>[1], placeholdersRef.current);
     }
     editor.updateOptions({
       minimap: { enabled: false },
