@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useRef, useState, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, History, PanelRightClose, PanelRightOpen } from 'lucide-react';
 
@@ -66,9 +66,11 @@ export function WorkflowDetail() {
   const [selectedSkillId, setSelectedSkillId] = useState('');
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'blocks' | 'versions' | 'diagram'>(
-    initialTab === 'diagram' || initialTab === 'versions' ? initialTab : 'blocks',
+  // The diagram sits below the blocks; the legacy `?tab=diagram` link opens the blocks and scrolls to it
+  const [activeTab, setActiveTab] = useState<'blocks' | 'versions'>(
+    initialTab === 'versions' ? 'versions' : 'blocks',
   );
+  const diagramScrollPending = useRef(initialTab === 'diagram');
   const [blockReveal, setBlockReveal] = useState<{ text: string; nonce: number } | null>(null);
   const [showExecuteDialog, setShowExecuteDialog] = useState(false);
   const [showClone, setShowClone] = useState(false);
@@ -337,18 +339,6 @@ export function WorkflowDetail() {
               <History className="w-3.5 h-3.5" />
               {t.workflows.versionsTab}
             </button>
-            {bpmnModule && (
-              <button
-                onClick={() => setActiveTab('diagram')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'diagram'
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-text-secondary hover:text-text hover:border-border'
-                }`}
-              >
-                {t.workflows.diagramTab}
-              </button>
-            )}
             <button
               type="button"
               onClick={() => setSidebarCollapsed((c) => !c)}
@@ -399,23 +389,35 @@ export function WorkflowDetail() {
             </Card>
           )}
 
+          {activeTab === 'blocks' && bpmnModule && id && workflow.blocks.length > 0 && (
+            <section
+              aria-label={t.workflows.diagramTab}
+              ref={(el) => {
+                if (el && diagramScrollPending.current) {
+                  diagramScrollPending.current = false;
+                  el.scrollIntoView({ block: 'start' });
+                }
+              }}
+            >
+              <h2 className="text-sm font-semibold text-text mb-2">{t.workflows.diagramTab}</h2>
+              <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
+                <WorkflowDiagramTab
+                  workflowId={id}
+                  workflowName={workflow.name}
+                  definitionText={definitionText}
+                  lineRanges={definitionLineRanges}
+                  onSelectBlock={handleSelectFromDiagram}
+                />
+              </Suspense>
+            </section>
+          )}
+
           {activeTab === 'versions' && (
             <Suspense fallback={<div className="py-8 text-center text-text-secondary">{t.common.loading}</div>}>
               <WorkflowVersionsTab workflowId={workflow.id} currentHash={workflow.definitionHash} />
             </Suspense>
           )}
 
-          {activeTab === 'diagram' && bpmnModule && id && (
-            <Suspense fallback={<div className="p-6 text-sm text-text-secondary">{t.common.loading}</div>}>
-              <WorkflowDiagramTab
-                workflowId={id}
-                workflowName={workflow.name}
-                definitionText={definitionText}
-                lineRanges={definitionLineRanges}
-                onSelectBlock={handleSelectFromDiagram}
-              />
-            </Suspense>
-          )}
         </div>
         }
         side={
