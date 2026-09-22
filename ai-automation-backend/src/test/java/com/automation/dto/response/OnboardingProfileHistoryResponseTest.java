@@ -3,6 +3,7 @@ package com.automation.dto.response;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,52 +15,52 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_setAllFields_when_constructed() {
-        var response = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
+        var response = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
 
         assertThat(response.id()).isEqualTo("hist-1");
         assertThat(response.version()).isEqualTo(3);
-        assertThat(response.content()).isEqualTo("Profile updated");
+        assertThat(response.content()).isEqualTo(Map.of("de", "Profile updated"));
         assertThat(response.changedBy()).isEqualTo("admin");
         assertThat(response.changedAt()).isEqualTo(CHANGED_AT);
     }
 
     @Test
     void should_acceptZeroVersion_when_constructed() {
-        var response = new OnboardingProfileHistoryResponse("hist-0", 0, "Initial", "system", CHANGED_AT);
+        var response = new OnboardingProfileHistoryResponse("hist-0", 0, Map.of("de", "Initial"), "system", CHANGED_AT);
 
         assertThat(response.version()).isZero();
     }
 
     @Test
     void should_acceptNullChangedBy_when_constructed() {
-        var response = new OnboardingProfileHistoryResponse("hist-2", 1, "Auto change", null, CHANGED_AT);
+        var response = new OnboardingProfileHistoryResponse("hist-2", 1, Map.of("de", "Auto change"), null, CHANGED_AT);
 
         assertThat(response.id()).isEqualTo("hist-2");
         assertThat(response.version()).isEqualTo(1);
-        assertThat(response.content()).isEqualTo("Auto change");
+        assertThat(response.content()).isEqualTo(Map.of("de", "Auto change"));
         assertThat(response.changedBy()).isNull();
         assertThat(response.changedAt()).isEqualTo(CHANGED_AT);
     }
 
     @Test
     void should_acceptNullChangedAt_when_constructed() {
-        var response = new OnboardingProfileHistoryResponse("hist-3", 2, "Legacy entry", "user1", null);
+        var response = new OnboardingProfileHistoryResponse("hist-3", 2, Map.of("de", "Legacy entry"), "user1", null);
 
         assertThat(response.id()).isEqualTo("hist-3");
         assertThat(response.version()).isEqualTo(2);
-        assertThat(response.content()).isEqualTo("Legacy entry");
+        assertThat(response.content()).isEqualTo(Map.of("de", "Legacy entry"));
         assertThat(response.changedBy()).isEqualTo("user1");
         assertThat(response.changedAt()).isNull();
     }
 
     @Test
     void should_acceptBothNullOptionalFields_when_constructed() {
-        var response = new OnboardingProfileHistoryResponse("hist-4", 1, "Unknown origin", null, null);
+        var response = new OnboardingProfileHistoryResponse("hist-4", 1, Map.of("de", "Unknown origin"), null, null);
 
         assertThat(response.changedBy()).isNull();
         assertThat(response.changedAt()).isNull();
         assertThat(response.id()).isEqualTo("hist-4");
-        assertThat(response.content()).isEqualTo("Unknown origin");
+        assertThat(response.content()).isEqualTo(Map.of("de", "Unknown origin"));
     }
 
     @Test
@@ -77,8 +78,8 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_beEqual_when_sameFieldValues() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -86,48 +87,48 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_notBeEqual_when_differentId() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-2", 3, "Profile updated", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-2", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentVersion() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 4, "Profile updated", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 4, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentContent() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 3, "Name changed", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Name changed"), "admin", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentChangedBy() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "user2", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "user2", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentChangedAt() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", Instant.parse("2026-01-01T00:00:00Z"));
+        var a = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", Instant.parse("2026-01-01T00:00:00Z"));
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_beEqual_when_bothHaveNullOptionalFields() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 1, "content", null, null);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 1, "content", null, null);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), null, null);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), null, null);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -135,16 +136,16 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_notBeEqual_when_nullVsNonNullChangedBy() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 1, "content", null, CHANGED_AT);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 1, "content", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), null, CHANGED_AT);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), "admin", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_nullVsNonNullChangedAt() {
-        var a = new OnboardingProfileHistoryResponse("hist-1", 1, "content", "admin", null);
-        var b = new OnboardingProfileHistoryResponse("hist-1", 1, "content", "admin", CHANGED_AT);
+        var a = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), "admin", null);
+        var b = new OnboardingProfileHistoryResponse("hist-1", 1, Map.of("de", "content"), "admin", CHANGED_AT);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -153,7 +154,7 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_containFieldValues_when_toStringCalled() {
-        var response = new OnboardingProfileHistoryResponse("hist-1", 3, "Profile updated", "admin", CHANGED_AT);
+        var response = new OnboardingProfileHistoryResponse("hist-1", 3, Map.of("de", "Profile updated"), "admin", CHANGED_AT);
         var str = response.toString();
 
         assertThat(str).contains("hist-1");
@@ -165,7 +166,7 @@ class OnboardingProfileHistoryResponseTest {
 
     @Test
     void should_handleNullsInToString_when_optionalFieldsAreNull() {
-        var response = new OnboardingProfileHistoryResponse("hist-5", 1, "entry", null, null);
+        var response = new OnboardingProfileHistoryResponse("hist-5", 1, Map.of("de", "entry"), null, null);
         var str = response.toString();
 
         assertThat(str).contains("hist-5");

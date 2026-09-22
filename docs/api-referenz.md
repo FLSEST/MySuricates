@@ -2214,9 +2214,9 @@ Datei oder Verzeichnis im nativen Dateimanager öffnen (Linux: `xdg-open`).
 
 ### `GET /api/v1/system/integration-snippet`
 
-Markdown-Integration-Snippet für ein Projekt rendern (für AGENTS.md o.ä.).
+Markdown-Integration-Snippet für ein Projekt rendern (für AGENTS.md o.ä.): Basis-Onboarding-Profil mit Adresse und Key-Befehl dieser Instanz, dazu die Workflows des Projekts.
 
-**Query-Parameter:** `projectPath` (optional)
+**Query-Parameter:** `projectPath` (optional), `locale` (`de`/`en`, optional; Standard `en`)
 
 **Response:** `String` (Content-Type: `text/markdown`)
 

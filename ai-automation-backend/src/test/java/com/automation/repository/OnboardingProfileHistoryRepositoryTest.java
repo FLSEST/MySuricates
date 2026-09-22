@@ -37,7 +37,8 @@ class OnboardingProfileHistoryRepositoryTest {
 
         assertThat(result).hasSize(3);
         assertThat(result).extracting(OnboardingProfileHistory::getVersion).containsExactly(3, 2, 1);
-        assertThat(result).extracting(OnboardingProfileHistory::getContent).containsExactly("v3", "v2", "v1");
+        assertThat(result).extracting(OnboardingProfileHistory::getContent)
+                .containsExactly(Map.of("de", "v3"), Map.of("de", "v2"), Map.of("de", "v1"));
     }
 
     @Test
@@ -115,7 +116,7 @@ class OnboardingProfileHistoryRepositoryTest {
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key(key)
                 .name(Map.of("de", key))
-                .content("{}")
+                .content(Map.of("de", "{}"))
                 .type(OnboardingProfileType.PROFILE)
                 .build();
         return profileRepository.saveAndFlush(profile);
@@ -125,7 +126,7 @@ class OnboardingProfileHistoryRepositoryTest {
         OnboardingProfileHistory history = OnboardingProfileHistory.builder()
                 .profileId(profileId)
                 .version(version)
-                .content(content)
+                .content(Map.of("de", content))
                 .changedBy("test-user")
                 .changedAt(Instant.now())
                 .build();

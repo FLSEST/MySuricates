@@ -67,7 +67,7 @@ describe('useCreateOnboardingProfile', () => {
     );
     const { result } = renderHook(() => useCreateOnboardingProfile(), { wrapper: createWrapper() });
     await act(async () => {
-      result.current.mutate({ key: 'new', name: { en: 'New' }, description: { en: 'Desc' }, content: '# test', type: 'PROFILE' });
+      result.current.mutate({ key: 'new', name: { en: 'New' }, description: { en: 'Desc' }, content: { de: '# Test', en: '# test' }, type: 'PROFILE' });
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data!.id).toBe('op2');
@@ -92,7 +92,7 @@ describe('useOnboardingProfileHistory', () => {
   it('fetches history for a profile', async () => {
     server.use(
       http.get('/api/v1/onboarding-profiles/:id/history', () =>
-        HttpResponse.json([{ id: 'h1', version: 1, content: 'v1', changedBy: 'user' }])),
+        HttpResponse.json([{ id: 'h1', version: 1, content: { de: 'v1' }, changedBy: 'user' }])),
     );
     const { result } = renderHook(() => useOnboardingProfileHistory('op1'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

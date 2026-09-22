@@ -1065,6 +1065,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V78 | Bilingual steps in templates (`workflow_templates.i18n_source`) |
 | V79 | Blueprints as a kind of their own next to templates (`workflow_templates.kind`) |
 | V80 | Skills under the seal: `workflows.sealed_skill_hashes`, change history `skill_versions` |
+| V81 | Bilingual onboarding profiles: content as a `{de, en}` map |
 
 ## Architecture Gates
 
@@ -1109,7 +1110,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 80 Flyway migrations (V1–V80)
+│           └── db/migration/          ← 81 Flyway migrations (V1–V81)
 │
 └── ai-automation-frontend/
     ├── package.json

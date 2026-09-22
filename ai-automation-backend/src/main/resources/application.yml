@@ -74,6 +74,13 @@ app:
   build-timestamp: @maven.build.timestamp@
 
 automation:
+  # Wie Agenten auf diesem Rechner die Instanz erreichen — landet in den Texten, die MySuricates in
+  # Projekte schreibt (Onboarding-Profile). Der Installer setzt beides aus deploy/instances/<name>.env
+  # (scripts/instance.sh, deploy/compose.yml). Leer: http://localhost:<server.port>, Key-Datei direkt.
+  instance:
+    url: ${AUTOMATION_INSTANCE_URL:}
+    # Name des Containers, in dem das Backend läuft — die Key-Datei gibt es dann nur darin.
+    container: ${AUTOMATION_INSTANCE_CONTAINER:}
   # Optionale Module — nur beim Start gelesen, bewusst nicht per REST umschaltbar.
   # preset: core (nur Kern) | research (+ chains, assistant, learning, memory, audit, bpmn) | full (alles)
   # Einzel-Override schlägt das Preset: automation.modules.<name>: true|false

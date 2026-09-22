@@ -6,7 +6,7 @@ import { useOnboardingProfiles, type OnboardingProfile } from '../../hooks/useOn
 import { Card, CardHeader } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
-import { RefreshCw, Eye, Check, X } from 'lucide-react';
+import { RefreshCw, Eye, Check, X, AlertTriangle } from 'lucide-react';
 import { useI18nStore } from '../../i18n';
 
 interface OnboardingCardProps {
@@ -35,6 +35,10 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
   const [selectedProfileIds, setSelectedProfileIds] = useSyncedState<string[], typeof status>(
     status, (s, prev) => (s ? s.profileIds || [] : prev ?? []),
   );
+  // Language of the written text: the project's, or the UI language when onboarding is switched on.
+  const [selectedLanguage, setSelectedLanguage] = useSyncedState<string, typeof status>(
+    status, (s, prev) => (s?.enabled && s.language ? s.language : prev ?? locale),
+  );
 
   const enabled = status?.enabled ?? false;
   const availableProfiles = profiles?.filter(p => p.type === 'PROFILE') ?? [];
@@ -45,7 +49,7 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
     } else {
       enableOnboarding.mutate({
         id: projectId,
-        config: { format: selectedFormat, profileIds: selectedProfileIds },
+        config: { format: selectedFormat, profileIds: selectedProfileIds, language: selectedLanguage },
       });
     }
   };
@@ -59,7 +63,7 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
     if (enabled) {
       enableOnboarding.mutate({
         id: projectId,
-        config: { format: selectedFormat, profileIds: newIds },
+        config: { format: selectedFormat, profileIds: newIds, language: selectedLanguage },
       });
     }
   };
@@ -69,7 +73,17 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
     if (enabled) {
       enableOnboarding.mutate({
         id: projectId,
-        config: { format, profileIds: selectedProfileIds },
+        config: { format, profileIds: selectedProfileIds, language: selectedLanguage },
+      });
+    }
+  };
+
+  const handleLanguageChange = (language: string) => {
+    setSelectedLanguage(language);
+    if (enabled) {
+      enableOnboarding.mutate({
+        id: projectId,
+        config: { format: selectedFormat, profileIds: selectedProfileIds, language },
       });
     }
   };
@@ -88,6 +102,10 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
           title={t.projects.onboarding.title}
           action={
             <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              aria-label={t.projects.onboarding.title}
               onClick={handleToggle}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                 enabled ? 'bg-accent' : 'bg-border'
@@ -136,26 +154,50 @@ export function OnboardingCard({ projectId }: OnboardingCardProps) {
               </div>
             </div>
 
-            {/* Format selection */}
-            <div>
-              <label className="text-xs font-medium text-text-secondary mb-1.5 block">
-                {t.projects.onboarding.format}
-              </label>
-              <select
-                value={selectedFormat}
-                onChange={e => handleFormatChange(e.target.value)}
-                className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-text"
-              >
-                <option value="CLAUDE_RULES">{t.projects.onboarding.formatClaudeRules}</option>
-                <option value="AGENTS_MD">{t.projects.onboarding.formatAgentsMd}</option>
-              </select>
+            {/* Format and language */}
+            <div className="flex flex-wrap gap-4">
+              <div>
+                <label htmlFor="onboarding-format" className="text-xs font-medium text-text-secondary mb-1.5 block">
+                  {t.projects.onboarding.format}
+                </label>
+                <select
+                  id="onboarding-format"
+                  value={selectedFormat}
+                  onChange={e => handleFormatChange(e.target.value)}
+                  className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-text"
+                >
+                  <option value="CLAUDE_RULES">{t.projects.onboarding.formatClaudeRules}</option>
+                  <option value="AGENTS_MD">{t.projects.onboarding.formatAgentsMd}</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="onboarding-language" className="text-xs font-medium text-text-secondary mb-1.5 block">
+                  {t.projects.onboarding.language}
+                </label>
+                <select
+                  id="onboarding-language"
+                  value={selectedLanguage}
+                  onChange={e => handleLanguageChange(e.target.value)}
+                  className="text-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-text"
+                >
+                  <option value="de">Deutsch</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
             </div>
+
+            {status?.fileForeign && (
+              <div role="alert" className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{t.projects.onboarding.fileForeign.replace('{path}', () => status.filePath)}</span>
+              </div>
+            )}
 
             {/* Status & Actions */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs">
-                {status?.fileExists ? (
-                  <span className="flex items-center gap-1 text-green-500">
+                {status?.fileExists && !status.fileForeign ? (
+                  <span className="flex items-center gap-1 text-success">
                     <Check className="w-3.5 h-3.5" />
                     {t.projects.onboarding.installed}
                   </span>

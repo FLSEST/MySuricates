@@ -12,18 +12,20 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_setAllFields_when_constructed() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of("profile-1", "profile-2"), true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(true, "yaml", List.of("profile-1", "profile-2"), true, "/etc/onboarding.yaml", "de", false);
 
         assertThat(response.enabled()).isTrue();
         assertThat(response.format()).isEqualTo("yaml");
         assertThat(response.profileIds()).containsExactly("profile-1", "profile-2");
         assertThat(response.fileExists()).isTrue();
         assertThat(response.filePath()).isEqualTo("/etc/onboarding.yaml");
+        assertThat(response.language()).isEqualTo("de");
+        assertThat(response.fileForeign()).isFalse();
     }
 
     @Test
     void should_reflectFalseFlags_when_constructedWithFalseValues() {
-        var response = new OnboardingStatusResponse(false, "json", List.of("p1"), false, "/tmp/onboarding.json");
+        var response = new OnboardingStatusResponse(false, "json", List.of("p1"), false, "/tmp/onboarding.json", "de", false);
 
         assertThat(response.enabled()).isFalse();
         assertThat(response.format()).isEqualTo("json");
@@ -34,7 +36,7 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_allowMixedFlags_when_enabledButFileNotExists() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of(), false, null);
+        var response = new OnboardingStatusResponse(true, "yaml", List.of(), false, null, "de", false);
 
         assertThat(response.enabled()).isTrue();
         assertThat(response.fileExists()).isFalse();
@@ -42,7 +44,7 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_allowMixedFlags_when_notEnabledButFileExists() {
-        var response = new OnboardingStatusResponse(false, "yaml", List.of(), true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(false, "yaml", List.of(), true, "/etc/onboarding.yaml", "de", false);
 
         assertThat(response.enabled()).isFalse();
         assertThat(response.fileExists()).isTrue();
@@ -52,14 +54,14 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_returnEmptyList_when_profileIdsIsEmpty() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/etc/onboarding.yaml", "de", false);
 
         assertThat(response.profileIds()).isEmpty();
     }
 
     @Test
     void should_acceptNullProfileIds_when_constructed() {
-        var response = new OnboardingStatusResponse(true, "yaml", null, true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(true, "yaml", null, true, "/etc/onboarding.yaml", "de", false);
 
         assertThat(response.profileIds()).isNull();
     }
@@ -67,7 +69,7 @@ class OnboardingStatusResponseTest {
     @Test
     void should_returnMultipleProfileIds_when_constructedWithMultiple() {
         var ids = List.of("id-1", "id-2", "id-3");
-        var response = new OnboardingStatusResponse(true, "yaml", ids, true, "/path");
+        var response = new OnboardingStatusResponse(true, "yaml", ids, true, "/path", "de", false);
 
         assertThat(response.profileIds()).hasSize(3).containsExactly("id-1", "id-2", "id-3");
     }
@@ -76,35 +78,36 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_acceptNullFormat_when_constructed() {
-        var response = new OnboardingStatusResponse(true, null, List.of(), true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(true, null, List.of(), true, "/etc/onboarding.yaml", "de", false);
 
         assertThat(response.format()).isNull();
     }
 
     @Test
     void should_acceptNullFilePath_when_constructed() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of(), false, null);
+        var response = new OnboardingStatusResponse(true, "yaml", List.of(), false, null, "de", false);
 
         assertThat(response.filePath()).isNull();
     }
 
     @Test
     void should_acceptAllNullableFieldsNull_when_constructed() {
-        var response = new OnboardingStatusResponse(false, null, null, false, null);
+        var response = new OnboardingStatusResponse(false, null, null, false, null, null, false);
 
         assertThat(response.enabled()).isFalse();
         assertThat(response.format()).isNull();
         assertThat(response.profileIds()).isNull();
         assertThat(response.fileExists()).isFalse();
         assertThat(response.filePath()).isNull();
+        assertThat(response.language()).isNull();
     }
 
     // --- Record equality ---
 
     @Test
     void should_beEqual_when_sameFieldValues() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path", "de", false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -112,8 +115,8 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_beEqual_when_bothHaveEmptyProfileIds() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -121,8 +124,8 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_beEqual_when_allNullableFieldsNull() {
-        var a = new OnboardingStatusResponse(false, null, null, false, null);
-        var b = new OnboardingStatusResponse(false, null, null, false, null);
+        var a = new OnboardingStatusResponse(false, null, null, false, null, null, false);
+        var b = new OnboardingStatusResponse(false, null, null, false, null, null, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -130,55 +133,55 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_notBeEqual_when_differentEnabled() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
-        var b = new OnboardingStatusResponse(false, "yaml", List.of(), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(false, "yaml", List.of(), true, "/path", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentFormat() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
-        var b = new OnboardingStatusResponse(true, "json", List.of(), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "json", List.of(), true, "/path", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentProfileIds() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of("p2"), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of("p1"), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of("p2"), true, "/path", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentFileExists() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of(), false, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of(), false, "/path", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_differentFilePath() {
-        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path/a");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path/b");
+        var a = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path/a", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path/b", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_profileIdsNullVsEmpty() {
-        var a = new OnboardingStatusResponse(true, "yaml", null, true, "/path");
-        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
+        var a = new OnboardingStatusResponse(true, "yaml", null, true, "/path", "de", false);
+        var b = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_notBeEqual_when_comparedToNull() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path");
+        var response = new OnboardingStatusResponse(true, "yaml", List.of(), true, "/path", "de", false);
 
         assertThat(response).isNotEqualTo(null);
     }
@@ -187,7 +190,7 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_containFieldValues_when_toStringCalled() {
-        var response = new OnboardingStatusResponse(true, "yaml", List.of("profile-1"), true, "/etc/onboarding.yaml");
+        var response = new OnboardingStatusResponse(true, "yaml", List.of("profile-1"), true, "/etc/onboarding.yaml", "de", false);
         var str = response.toString();
 
         assertThat(str).contains("true");
@@ -198,7 +201,7 @@ class OnboardingStatusResponseTest {
 
     @Test
     void should_handleNullsInToString_when_fieldsAreNull() {
-        var response = new OnboardingStatusResponse(false, null, null, false, null);
+        var response = new OnboardingStatusResponse(false, null, null, false, null, null, false);
         var str = response.toString();
 
         assertThat(str).contains("false");

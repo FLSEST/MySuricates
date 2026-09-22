@@ -148,6 +148,10 @@ export interface OnboardingStatus {
   profileIds: string[];
   fileExists: boolean;
   filePath: string;
+  /** Language of the written text. */
+  language: string;
+  /** A file without the MySuricates marker is in the way; it is never overwritten. */
+  fileForeign: boolean;
 }
 
 export function useOnboardingStatus(projectId: string) {
@@ -163,7 +167,7 @@ export function useEnableOnboarding() {
   const toast = useToast();
   const t = useT();
   return useMutation({
-    mutationFn: ({ id, config }: { id: string; config: { format?: string; profileIds?: string[] } }) =>
+    mutationFn: ({ id, config }: { id: string; config: { format?: string; profileIds?: string[]; language?: string } }) =>
       api.post<OnboardingStatus>(`/projects/${id}/onboarding/enable`, config),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['projects', vars.id, 'onboarding'] });

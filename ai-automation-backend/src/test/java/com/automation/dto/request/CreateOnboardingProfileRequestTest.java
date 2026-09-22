@@ -22,20 +22,20 @@ class CreateOnboardingProfileRequestTest {
         var name = Map.of("de", "Profil A", "en", "Profile A");
         var description = Map.of("de", "Beschreibung", "en", "Description");
         var request = new CreateOnboardingProfileRequest(
-                "my-profile", name, description, "some content", OnboardingProfileType.PROFILE
+                "my-profile", name, description, Map.of("de", "some content"), OnboardingProfileType.PROFILE
         );
 
         assertThat(request.key()).isEqualTo("my-profile");
         assertThat(request.name()).isEqualTo(name);
         assertThat(request.description()).isEqualTo(description);
-        assertThat(request.content()).isEqualTo("some content");
+        assertThat(request.content()).isEqualTo(Map.of("de", "some content"));
         assertThat(request.type()).isEqualTo(OnboardingProfileType.PROFILE);
     }
 
     @Test
     void should_returnBaseType_when_constructedWithBase() {
         var request = new CreateOnboardingProfileRequest(
-                "base-profile", Map.of("de", "Basis"), null, "content", OnboardingProfileType.BASE
+                "base-profile", Map.of("de", "Basis"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         assertThat(request.type()).isEqualTo(OnboardingProfileType.BASE);
@@ -46,7 +46,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_allowNullDescription_when_notProvided() {
         var request = new CreateOnboardingProfileRequest(
-                "my-key", Map.of("de", "Name"), null, "content", OnboardingProfileType.PROFILE
+                "my-key", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.PROFILE
         );
 
         assertThat(request.description()).isNull();
@@ -57,7 +57,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_passValidation_when_allRequiredFieldsAreValid() {
         var request = new CreateOnboardingProfileRequest(
-                "valid-key", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "valid-key", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -70,7 +70,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyIsNull() {
         var request = new CreateOnboardingProfileRequest(
-                null, Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                null, Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -83,7 +83,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyIsEmpty() {
         var request = new CreateOnboardingProfileRequest(
-                "", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -96,7 +96,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyIsBlank() {
         var request = new CreateOnboardingProfileRequest(
-                "   ", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "   ", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -109,7 +109,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyContainsUppercase() {
         var request = new CreateOnboardingProfileRequest(
-                "My-Profile", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "My-Profile", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -121,7 +121,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyContainsSpaces() {
         var request = new CreateOnboardingProfileRequest(
-                "my profile", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "my profile", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -133,7 +133,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_keyContainsSpecialChars() {
         var request = new CreateOnboardingProfileRequest(
-                "my_profile!", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "my_profile!", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -145,7 +145,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_passValidation_when_keyContainsOnlyLowercaseNumbersAndHyphens() {
         var request = new CreateOnboardingProfileRequest(
-                "my-profile-123", Map.of("de", "Name"), null, "content", OnboardingProfileType.BASE
+                "my-profile-123", Map.of("de", "Name"), null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -158,7 +158,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_nameIsNull() {
         var request = new CreateOnboardingProfileRequest(
-                "my-key", null, null, "content", OnboardingProfileType.BASE
+                "my-key", null, null, Map.of("de", "content"), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -167,7 +167,7 @@ class CreateOnboardingProfileRequestTest {
         assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("name");
     }
 
-    // --- Validation: @NotBlank content ---
+    // --- Validation: @NotEmpty content ---
 
     @Test
     void should_failValidation_when_contentIsNull() {
@@ -185,7 +185,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_contentIsEmpty() {
         var request = new CreateOnboardingProfileRequest(
-                "my-key", Map.of("de", "Name"), null, "", OnboardingProfileType.BASE
+                "my-key", Map.of("de", "Name"), null, Map.of(), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -195,15 +195,16 @@ class CreateOnboardingProfileRequestTest {
     }
 
     @Test
-    void should_failValidation_when_contentIsBlank() {
+    void should_leaveBlankLanguagesToTheService_when_contentHasOnlyBlankTexts() {
+        // @NotEmpty only sees the map's size; a map whose texts are all blank is rejected by
+        // OnboardingProfileService.create ("needs at least one language"), not by bean validation.
         var request = new CreateOnboardingProfileRequest(
-                "my-key", Map.of("de", "Name"), null, "   ", OnboardingProfileType.BASE
+                "my-key", Map.of("de", "Name"), null, Map.of("de", "   "), OnboardingProfileType.BASE
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
 
-        assertThat(violations).hasSize(1);
-        assertThat(violations.iterator().next().getPropertyPath().toString()).isEqualTo("content");
+        assertThat(violations).isEmpty();
     }
 
     // --- Validation: @NotNull type ---
@@ -211,7 +212,7 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_failValidation_when_typeIsNull() {
         var request = new CreateOnboardingProfileRequest(
-                "my-key", Map.of("de", "Name"), null, "content", null
+                "my-key", Map.of("de", "Name"), null, Map.of("de", "content"), null
         );
 
         Set<ConstraintViolation<CreateOnboardingProfileRequest>> violations = validator.validate(request);
@@ -241,8 +242,8 @@ class CreateOnboardingProfileRequestTest {
     void should_beEqual_when_allFieldsMatch() {
         var name = Map.of("de", "Name");
         var desc = Map.of("de", "Beschreibung");
-        var a = new CreateOnboardingProfileRequest("key-1", name, desc, "content", OnboardingProfileType.PROFILE);
-        var b = new CreateOnboardingProfileRequest("key-1", name, desc, "content", OnboardingProfileType.PROFILE);
+        var a = new CreateOnboardingProfileRequest("key-1", name, desc, Map.of("de", "content"), OnboardingProfileType.PROFILE);
+        var b = new CreateOnboardingProfileRequest("key-1", name, desc, Map.of("de", "content"), OnboardingProfileType.PROFILE);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -251,8 +252,8 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_notBeEqual_when_keyDiffers() {
         var name = Map.of("de", "Name");
-        var a = new CreateOnboardingProfileRequest("key-a", name, null, "content", OnboardingProfileType.BASE);
-        var b = new CreateOnboardingProfileRequest("key-b", name, null, "content", OnboardingProfileType.BASE);
+        var a = new CreateOnboardingProfileRequest("key-a", name, null, Map.of("de", "content"), OnboardingProfileType.BASE);
+        var b = new CreateOnboardingProfileRequest("key-b", name, null, Map.of("de", "content"), OnboardingProfileType.BASE);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -260,8 +261,8 @@ class CreateOnboardingProfileRequestTest {
     @Test
     void should_notBeEqual_when_typeDiffers() {
         var name = Map.of("de", "Name");
-        var a = new CreateOnboardingProfileRequest("key-1", name, null, "content", OnboardingProfileType.BASE);
-        var b = new CreateOnboardingProfileRequest("key-1", name, null, "content", OnboardingProfileType.PROFILE);
+        var a = new CreateOnboardingProfileRequest("key-1", name, null, Map.of("de", "content"), OnboardingProfileType.BASE);
+        var b = new CreateOnboardingProfileRequest("key-1", name, null, Map.of("de", "content"), OnboardingProfileType.PROFILE);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -270,7 +271,7 @@ class CreateOnboardingProfileRequestTest {
     void should_containFieldsInToString() {
         var request = new CreateOnboardingProfileRequest(
                 "my-key", Map.of("de", "Mein Profil"), Map.of("de", "Beschreibung"),
-                "some content", OnboardingProfileType.PROFILE
+                Map.of("de", "some content"), OnboardingProfileType.PROFILE
         );
 
         String str = request.toString();

@@ -1123,6 +1123,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V78 | Zweisprachige Schritte in Vorlagen (`workflow_templates.i18n_source`) |
 | V79 | Blaupausen als eigene Art neben Vorlagen (`workflow_templates.kind`) |
 | V80 | Skills unter dem Siegel: `workflows.sealed_skill_hashes`, Änderungshistorie `skill_versions` |
+| V81 | Onboarding-Profile zweisprachig: Inhalt als `{de, en}`-Map |
 
 ## Architektur-Gates
 
@@ -1167,7 +1168,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 80 Flyway-Migrationen (V1–V80)
+│           └── db/migration/          ← 81 Flyway-Migrationen (V1–V81)
 │
 └── ai-automation-frontend/
     ├── package.json

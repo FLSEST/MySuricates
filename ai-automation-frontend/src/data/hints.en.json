@@ -91,7 +91,7 @@
     "title": "Workflows at set times",
     "points": [
       "Recurring by cron (six fields, seconds first), once at a point in time, or after a delay",
-      "Times missed during standby or a restart are caught up once by default, not one by one",
+      "Times that fall into standby or a restart are caught up once or skipped, depending on the setting",
       "While the workflow is still running, the next time starts no second run next to it by default"
     ]
   },
@@ -195,6 +195,14 @@
       "Duration, cost, tokens, block types and failure reasons of your runs, also per model and provider",
       "Project and time filters apply to durations, costs and trends; success rate and totals always count all runs",
       "Costs are partly estimates, depending on what the provider reports"
+    ]
+  },
+  "onboarding-profiles": {
+    "title": "Instructions for coding agents",
+    "points": [
+      "MySuricates writes these texts into projects, as .claude/rules/mysuricates.md or AGENTS.md, so agents such as Claude Code or Codex can talk to the instance",
+      "The base always comes along; which profiles are added and in which language is set per project",
+      "The instance fills in its own address and how to read the API key; a foreign AGENTS.md is never overwritten"
     ]
   }
 }

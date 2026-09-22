@@ -113,7 +113,7 @@ class SystemAccessControllerTest {
 
     @Test
     void integrationSnippet_returnsMarkdown() throws Exception {
-        when(integrationSnippetService.render(null))
+        when(integrationSnippetService.render(null, null))
                 .thenReturn("# MySuricates Integration\n\n## MySuricates API\n");
 
         mockMvc.perform(get("/api/v1/system/integration-snippet"))
@@ -124,13 +124,13 @@ class SystemAccessControllerTest {
 
     @Test
     void integrationSnippet_withProjectPath_passesParam() throws Exception {
-        when(integrationSnippetService.render("/home/user/project"))
+        when(integrationSnippetService.render("/home/user/project", null))
                 .thenReturn("# MySuricates Integration\n");
 
         mockMvc.perform(get("/api/v1/system/integration-snippet")
                         .param("projectPath", "/home/user/project"))
                 .andExpect(status().isOk());
 
-        verify(integrationSnippetService).render("/home/user/project");
+        verify(integrationSnippetService).render("/home/user/project", null);
     }
 }

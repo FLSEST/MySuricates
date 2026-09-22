@@ -91,7 +91,7 @@
     "title": "Workflows zu festen Zeiten",
     "points": [
       "Wiederkehrend per Cron (sechs Felder, Sekunden zuerst), einmalig zu einem Zeitpunkt oder nach einer Wartezeit",
-      "Termine, die in Standby oder Neustart fallen, werden standardmäßig einmal nachgeholt, nicht jeder einzeln",
+      "Termine, die in Standby oder einen Neustart fallen, werden je nach Einstellung einmal nachgeholt oder übersprungen",
       "Läuft der Workflow noch, startet der nächste Termin standardmäßig keinen zweiten Lauf daneben"
     ]
   },
@@ -195,6 +195,14 @@
       "Dauer, Kosten, Tokens, Block-Typen und Fehlergründe deiner Läufe, auch je Modell und Anbieter",
       "Projekt- und Zeitfilter gelten für Dauer, Kosten und Verläufe; Erfolgsquote und Gesamtzahlen zählen immer alle Läufe",
       "Kosten sind teils Schätzungen, je nachdem, was der Anbieter meldet"
+    ]
+  },
+  "onboarding-profiles": {
+    "title": "Anleitungen für Coding-Agenten",
+    "points": [
+      "MySuricates schreibt diese Texte in Projekte, als .claude/rules/mysuricates.md oder AGENTS.md, damit Agenten wie Claude Code oder Codex die Instanz ansprechen können",
+      "Die Basis kommt immer mit; welche Profile dazukommen und in welcher Sprache, legt jedes Projekt fest",
+      "Adresse und Weg zum API-Key setzt die Instanz selbst ein; eine fremde AGENTS.md wird nie überschrieben"
     ]
   }
 }

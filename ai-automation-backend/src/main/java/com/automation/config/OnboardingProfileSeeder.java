@@ -1,8 +1,10 @@
 package com.automation.config;
 
 import com.automation.entity.OnboardingProfile;
+import com.automation.entity.OnboardingProfileHistory;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
+import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import com.automation.service.project.ProjectOnboardingService;
 import com.automation.service.project.ProjectService;
@@ -16,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,34 +29,39 @@ import java.util.Map;
 public class OnboardingProfileSeeder implements ApplicationRunner {
 
     private final OnboardingProfileRepository profileRepository;
+    private final OnboardingProfileHistoryRepository historyRepository;
     private final ProjectService projectService;
     private final ProjectOnboardingService projectOnboardingService;
 
+    /** Languages the built-in texts are shipped in: {@code onboarding/<lang>/<file>}. */
+    static final List<String> LANGUAGES = List.of("de", "en");
+
+    // Versions: raise one to ship a changed text. v4/v3/v2 = bilingual rewrite (TODO a805d0a7).
     private static final List<ProfileDefinition> BUILT_IN_PROFILES = List.of(
             new ProfileDefinition("onboarding-base", "base",
                     Map.of("de", "Basis", "en", "Base"),
                     Map.of("de", "MySuricates API-Referenz und Grundregeln", "en", "MySuricates API reference and basic rules"),
-                    "onboarding/base.md", OnboardingProfileType.BASE, 0, 3),
+                    "base.md", OnboardingProfileType.BASE, 0, 4),
             new ProfileDefinition("onboarding-developer", "developer",
                     Map.of("de", "Entwickler", "en", "Developer"),
                     Map.of("de", "Code-Review, Test-Pipelines, Auto-Fix, Quality Gates, vollständige API-Referenz", "en", "Code review, test pipelines, auto-fix, quality gates, full API reference"),
-                    "onboarding/profiles/developer.md", OnboardingProfileType.PROFILE, 1, 2),
+                    "profiles/developer.md", OnboardingProfileType.PROFILE, 1, 3),
             new ProfileDefinition("onboarding-research", "research",
                     Map.of("de", "Forschung", "en", "Research"),
                     Map.of("de", "Analyse-Workflows, Zusammenfassungen, Daten-Pipelines, Run-History, Workflow Memory", "en", "Analysis workflows, summaries, data pipelines, run history, workflow memory"),
-                    "onboarding/profiles/research.md", OnboardingProfileType.PROFILE, 2, 2),
+                    "profiles/research.md", OnboardingProfileType.PROFILE, 2, 3),
             new ProfileDefinition("onboarding-content", "content",
                     Map.of("de", "Content", "en", "Content"),
                     Map.of("de", "Content-Generierung, Review, Batch-Verarbeitung, Run-History", "en", "Content generation, review, batch processing, run history"),
-                    "onboarding/profiles/content.md", OnboardingProfileType.PROFILE, 3, 2),
+                    "profiles/content.md", OnboardingProfileType.PROFILE, 3, 3),
             new ProfileDefinition("onboarding-ops", "ops",
                     Map.of("de", "Operations", "en", "Operations"),
                     Map.of("de", "Monitoring, Log-Analyse, Deployment-Chains, Schedules, Webhooks, Activity Log", "en", "Monitoring, log analysis, deployment chains, schedules, webhooks, activity log"),
-                    "onboarding/profiles/ops.md", OnboardingProfileType.PROFILE, 4, 2),
+                    "profiles/ops.md", OnboardingProfileType.PROFILE, 4, 3),
             new ProfileDefinition("onboarding-platform", "platform",
                     Map.of("de", "Plattform", "en", "Platform"),
                     Map.of("de", "Gate-Status, AutoTodo, TodoTrigger, Modelle, Variablen, Agentic-Safety", "en", "Gate status, auto-todo, todo triggers, models, variables, agentic safety"),
-                    "onboarding/profiles/platform.md", OnboardingProfileType.PROFILE, 5, 1)
+                    "profiles/platform.md", OnboardingProfileType.PROFILE, 5, 2)
     );
 
     @Override
@@ -66,8 +75,17 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
             if (existing.isPresent()) {
                 OnboardingProfile profile = existing.get();
                 if (profile.getVersion() < def.version()) {
-                    String content = loadResource(def.resourcePath());
-                    if (content != null) {
+                    Map<String, String> content = loadContent(def.resourcePath());
+                    if (!content.isEmpty()) {
+                        // Keep what was there — possibly a user edit — in the history instead of
+                        // overwriting it without a trace.
+                        historyRepository.save(OnboardingProfileHistory.builder()
+                                .profileId(profile.getId())
+                                .version(profile.getVersion())
+                                .content(profile.getContent())
+                                .changedBy("system")
+                                .changedAt(Instant.now())
+                                .build());
                         profile.setContent(content);
                         profile.setVersion(def.version());
                         profile.setDescription(def.description());
@@ -82,8 +100,8 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
                 continue;
             }
 
-            String content = loadResource(def.resourcePath());
-            if (content == null) {
+            Map<String, String> content = loadContent(def.resourcePath());
+            if (content.isEmpty()) {
                 log.warn("Could not load onboarding profile resource: {}", def.resourcePath());
                 continue;
             }
@@ -134,12 +152,24 @@ public class OnboardingProfileSeeder implements ApplicationRunner {
         }
     }
 
-    public String getDefaultContent(String key) {
+    /** The shipped text of a built-in profile per language, or {@code null} for an unknown key. */
+    public Map<String, String> getDefaultContent(String key) {
         return BUILT_IN_PROFILES.stream()
                 .filter(d -> d.key().equals(key))
                 .findFirst()
-                .map(d -> loadResource(d.resourcePath()))
+                .map(d -> loadContent(d.resourcePath()))
                 .orElse(null);
+    }
+
+    private Map<String, String> loadContent(String file) {
+        Map<String, String> content = new HashMap<>();
+        for (String lang : LANGUAGES) {
+            String text = loadResource("onboarding/" + lang + "/" + file);
+            if (text != null) {
+                content.put(lang, text);
+            }
+        }
+        return content;
     }
 
     private String loadResource(String path) {

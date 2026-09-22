@@ -5,5 +5,6 @@ import java.util.Map;
 public record UpdateOnboardingProfileRequest(
         Map<String, String> name,
         Map<String, String> description,
-        String content
+        /** Markdown per language; only the languages sent are replaced. */
+        Map<String, String> content
 ) {}
