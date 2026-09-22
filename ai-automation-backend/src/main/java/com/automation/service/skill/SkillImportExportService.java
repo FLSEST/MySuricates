@@ -4,6 +4,7 @@ import com.automation.dto.request.ImportSkillRequest;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
+import com.automation.entity.SkillChangeSource;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.SkillRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class SkillImportExportService {
 
     private final SkillRepository skillRepository;
     private final SkillRegistry skillRegistry;
+    private final SkillMutationGateway mutationGateway;
 
     @Transactional(readOnly = true)
     public ExportSkillResponse exportSkill(String skillId) {
@@ -82,7 +84,7 @@ public class SkillImportExportService {
             }
         }
 
-        Skill saved = skillRepository.save(skill);
+        Skill saved = mutationGateway.save(skill, SkillChangeSource.IMPORT);
         skillRegistry.register(saved);
 
         log.info("Imported skill: {} ({}) with {} capabilities",

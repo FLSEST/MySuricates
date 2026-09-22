@@ -173,9 +173,9 @@ Todo (unabhaengig)
 ActivityLog (unabhaengig)
 ```
 
-### Datenbank-Migrationen (Flyway, aktuell V1-V79)
+### Datenbank-Migrationen (Flyway, aktuell V1-V80)
 
-Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V79 ergaenzen ueberwiegend Spalten und Indizes an diesen Tabellen sowie einzelne neue Tabellen; die vollstaendige Liste steht unter `src/main/resources/db/migration/`.
+Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V80 ergaenzen ueberwiegend Spalten und Indizes an diesen Tabellen sowie einzelne neue Tabellen; die vollstaendige Liste steht unter `src/main/resources/db/migration/`.
 
 | Migration | Tabelle | Beschreibung |
 |---|---|---|

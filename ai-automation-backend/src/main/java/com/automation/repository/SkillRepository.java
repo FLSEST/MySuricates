@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +25,7 @@ public interface SkillRepository extends JpaRepository<Skill, String> {
 
     @Query("SELECT s FROM Skill s LEFT JOIN FETCH s.capabilities WHERE s.id = :id")
     Optional<Skill> findByIdWithCapabilities(@Param("id") String id);
+
+    @Query("SELECT DISTINCT s FROM Skill s LEFT JOIN FETCH s.capabilities WHERE s.id IN :ids")
+    List<Skill> findAllByIdInWithCapabilities(@Param("ids") Collection<String> ids);
 }

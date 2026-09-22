@@ -34,6 +34,7 @@ class RunAdmissionTest {
 
     @Mock private WorkflowVersionService versionService;
     @Mock private ActivityLogService activityLog;
+    @Mock private WorkflowSkillPins skillPins;
 
     private final WorkflowDefinitionHasher hasher = new WorkflowDefinitionHasher();
 
@@ -50,7 +51,7 @@ class RunAdmissionTest {
         String hash = hasher.hash(wf);
         when(versionService.findVersionIdByHash("wf-1", hash)).thenReturn(Optional.of("ver-7"));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, skillPins, versionService, activityLog)
                 .admit(wf, TriggerSource.SCHEDULE, Map.of());
 
         assertThat(ticket.definitionHash()).isEqualTo(hash);
@@ -61,7 +62,7 @@ class RunAdmissionTest {
     void hashWithoutVersionWhenNoRowMatches() {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher, versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.allEnabled(), hasher, skillPins, versionService, activityLog)
                 .admit(workflow(), TriggerSource.MANUAL, Map.of());
 
         assertThat(ticket.definitionHash()).hasSize(64);
@@ -71,7 +72,7 @@ class RunAdmissionTest {
     @Test
     void recordsNothingWhenProvenanceIsOff() {
         RunAdmission admission = new RunAdmission(
-                ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, versionService, activityLog);
+                ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, skillPins, versionService, activityLog);
 
         RunAdmission.Ticket ticket = admission.admit(workflow(), TriggerSource.MANUAL, Map.of());
 
@@ -84,7 +85,7 @@ class RunAdmissionTest {
         Workflow broken = Workflow.builder().id("wf-x").blocks(new ArrayList<>()).activatedSkills(null).build();
         when(versionService.findVersionIdByHash(anyString(), any())).thenThrow(new IllegalStateException("db down"));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, skillPins, versionService, activityLog)
                 .admit(broken, TriggerSource.WEBHOOK, Map.of());
 
         assertThat(ticket.definitionHash()).isNull();
@@ -96,7 +97,7 @@ class RunAdmissionTest {
         wf.setSealed(true);
         wf.setSealedHash(hasher.hash(wf));
 
-        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, versionService, activityLog)
+        RunAdmission.Ticket ticket = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, skillPins, versionService, activityLog)
                 .admit(wf, TriggerSource.SCHEDULE, Map.of());
 
         assertThat(ticket.definitionHash()).isNull(); // provenance off — but the seal was still verified
@@ -108,7 +109,7 @@ class RunAdmissionTest {
         Workflow wf = workflow();
         wf.setSealed(true);
         wf.setSealedHash("0".repeat(64));
-        RunAdmission admission = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, versionService, activityLog);
+        RunAdmission admission = new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, skillPins, versionService, activityLog);
 
         assertThatThrownBy(() -> admission.admit(wf, TriggerSource.WEBHOOK, Map.of()))
                 .isInstanceOf(HardeningException.class)
@@ -121,7 +122,7 @@ class RunAdmissionTest {
 
     private RunAdmission policyOn() {
         return new RunAdmission(ModuleRegistry.of(Map.of(),
-                Map.of("sealing", "true", "require-sealed-for-unattended", "true")), hasher, versionService, activityLog);
+                Map.of("sealing", "true", "require-sealed-for-unattended", "true")), hasher, skillPins, versionService, activityLog);
     }
 
     @Test
@@ -152,7 +153,7 @@ class RunAdmissionTest {
     void policyOffLetsUnattendedRunsOfUnsealedWorkflowsThrough() {
         when(versionService.findVersionIdByHash(anyString(), anyString())).thenReturn(Optional.empty());
 
-        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, versionService, activityLog)
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), hasher, skillPins, versionService, activityLog)
                 .admit(workflow(), TriggerSource.TODO_TRIGGER, Map.of());
 
         verifyNoInteractions(activityLog);
@@ -180,9 +181,75 @@ class RunAdmissionTest {
         Workflow spy = org.mockito.Mockito.spy(broken);
         org.mockito.Mockito.doThrow(new IllegalStateException("lazy")).when(spy).getActivatedSkills();
 
-        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, versionService, activityLog)
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, skillPins, versionService, activityLog)
                 .admit(spy, TriggerSource.MANUAL, Map.of()))
                 .isInstanceOf(HardeningException.class)
                 .hasMessageContaining("could not be verified");
+    }
+
+    private Workflow sealedWithPins(Map<String, String> pins) {
+        Workflow sealed = workflow();
+        sealed.setSealed(true);
+        sealed.setSealedHash(hasher.hash(sealed));
+        sealed.setSealedSkillHashes(WorkflowSkillPins.toJson(pins));
+        return sealed;
+    }
+
+    @Test
+    void sealedWorkflowWhoseSkillsStillMatchRuns() {
+        Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
+        when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", "h1"));
+
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, skillPins, versionService, activityLog)
+                .admit(sealed, TriggerSource.SCHEDULE, Map.of());
+
+        verifyNoInteractions(activityLog);
+    }
+
+    @Test
+    void sealedWorkflowWithAChangedSkillIsRefused() {
+        Workflow sealed = sealedWithPins(Map.of("skill-a", "h1", "skill-b", "h2"));
+        when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", "h1", "skill-b", "tampered"));
+
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, skillPins, versionService, activityLog)
+                .admit(sealed, TriggerSource.MANUAL, Map.of()))
+                .isInstanceOf(HardeningException.class)
+                .satisfies(e -> assertThat(((HardeningException) e).getCode()).isEqualTo(ErrorCode.WORKFLOW_TAMPERED))
+                .hasMessageContaining("skill-b").hasMessageNotContaining("skill-a");
+        verify(activityLog).log(eq(LogLevel.ERROR), eq(LogCategory.SECURITY), anyString(), eq("RunAdmission"), eq("wf-1"),
+                any(), eq("wf-1"));
+        verifyNoInteractions(versionService);
+    }
+
+    @Test
+    void deletedSkillOfASealedWorkflowIsRefused() {
+        Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
+        when(skillPins.pins(sealed)).thenReturn(Map.of("skill-a", WorkflowSkillPins.MISSING));
+
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, skillPins, versionService, activityLog)
+                .admit(sealed, TriggerSource.MANUAL, Map.of()))
+                .isInstanceOf(HardeningException.class).hasMessageContaining("skill-a");
+    }
+
+    @Test
+    void unverifiableSkillPinsAreRefused() {
+        Workflow sealed = sealedWithPins(Map.of("skill-a", "h1"));
+        when(skillPins.pins(sealed)).thenThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> new RunAdmission(ModuleRegistry.allEnabled(), hasher, skillPins, versionService, activityLog)
+                .admit(sealed, TriggerSource.MANUAL, Map.of()))
+                .isInstanceOf(HardeningException.class).hasMessageContaining("skills could not be verified");
+    }
+
+    @Test
+    void sealWithoutSkillPinsStillRunsButDoesNotCheckSkills() {
+        Workflow legacy = workflow();
+        legacy.setSealed(true);
+        legacy.setSealedHash(hasher.hash(legacy));
+
+        new RunAdmission(ModuleRegistry.of(Map.of(), Map.of("provenance", "false")), hasher, skillPins, versionService, activityLog)
+                .admit(legacy, TriggerSource.MANUAL, Map.of());
+
+        verifyNoInteractions(skillPins, activityLog);
     }
 }

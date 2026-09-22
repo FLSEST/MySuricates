@@ -30,6 +30,7 @@ class WorkflowSealServiceTest {
 
     @Mock private WorkflowRepository workflowRepository;
     @Mock private ActivityLogService activityLog;
+    @Mock private WorkflowSkillPins skillPins;
 
     private final WorkflowDefinitionHasher hasher = new WorkflowDefinitionHasher();
     private WorkflowSealService service;
@@ -37,29 +38,72 @@ class WorkflowSealServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkflowSealService(workflowRepository, hasher, activityLog);
+        service = new WorkflowSealService(workflowRepository, hasher, skillPins, activityLog);
         workflow = Workflow.builder().id("wf-1").name("Deploy").blocks(new ArrayList<>()).instructions("go")
                 .activatedSkills(new ArrayList<>()).build();
     }
 
     @Test
-    void sealPinsTheCurrentHashAndLogsASecurityEvent() {
+    void sealPinsTheCurrentHashAndSkillsAndLogsASecurityEvent() {
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(skillPins.pins(workflow)).thenReturn(Map.of("skill-a", "h1"));
 
         Workflow sealed = service.seal("wf-1");
 
         assertThat(sealed.isSealed()).isTrue();
         assertThat(sealed.getSealedHash()).isEqualTo(hasher.hash(workflow));
         assertThat(sealed.getSealedAt()).isNotNull();
+        assertThat(sealed.getSealedSkillHashes()).isEqualTo("{\"skill-a\":\"h1\"}");
         verify(activityLog).log(LogLevel.WARN, LogCategory.SECURITY, "Workflow sealed: Deploy", "WorkflowSealService",
-                "wf-1", Map.of("sealedHash", sealed.getSealedHash()), "wf-1");
+                "wf-1", Map.of("sealedHash", sealed.getSealedHash(), "skillHashes", Map.of("skill-a", "h1")), "wf-1");
+    }
+
+    @Test
+    void workflowWithoutSkillsIsSealedWithAnEmptyPinSet() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(skillPins.pins(workflow)).thenReturn(Map.of());
+
+        assertThat(service.seal("wf-1").getSealedSkillHashes()).isEqualTo("{}");
+    }
+
+    @Test
+    void sealingASealPredatingSkillPinsAddsThePinsAndKeepsTheSeal() {
+        java.time.Instant sealedAt = java.time.Instant.parse("2026-09-01T10:00:00Z");
+        workflow.setSealed(true);
+        workflow.setSealedHash(hasher.hash(workflow));
+        workflow.setSealedAt(sealedAt);
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(skillPins.pins(workflow)).thenReturn(Map.of("skill-a", "h1"));
+
+        Workflow resealed = service.seal("wf-1");
+
+        assertThat(resealed.getSealedSkillHashes()).isEqualTo("{\"skill-a\":\"h1\"}");
+        assertThat(resealed.getSealedAt()).isEqualTo(sealedAt);
+        verify(activityLog).log(eq(LogLevel.WARN), eq(LogCategory.SECURITY),
+                eq("Workflow seal extended to its skills: Deploy"), anyString(), eq("wf-1"), any(), eq("wf-1"));
+    }
+
+    @Test
+    void sealPredatingSkillPinsIsNotExtendedWhenTheDefinitionNoLongerMatches() {
+        workflow.setSealed(true);
+        workflow.setSealedHash("tampered-away");
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
+
+        assertThatThrownBy(() -> service.seal("wf-1"))
+                .isInstanceOf(com.automation.exception.HardeningException.class)
+                .hasMessageContaining("no longer matches its seal");
+        verify(workflowRepository, never()).save(any());
+        verify(skillPins, never()).pins(any());
     }
 
     @Test
     void sealingTwiceKeepsTheOriginalSeal() {
         workflow.setSealed(true);
         workflow.setSealedHash("original");
+        workflow.setSealedSkillHashes("{}");
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
 
         assertThat(service.seal("wf-1").getSealedHash()).isEqualTo("original");
@@ -70,6 +114,7 @@ class WorkflowSealServiceTest {
     void unsealClearsTheSealAndLogsThePreviousHash() {
         workflow.setSealed(true);
         workflow.setSealedHash("abc");
+        workflow.setSealedSkillHashes("{}");
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(workflow));
         when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -77,6 +122,7 @@ class WorkflowSealServiceTest {
 
         assertThat(unsealed.isSealed()).isFalse();
         assertThat(unsealed.getSealedHash()).isNull();
+        assertThat(unsealed.getSealedSkillHashes()).isNull();
         verify(activityLog).log(eq(LogLevel.WARN), eq(LogCategory.SECURITY), anyString(), anyString(), eq("wf-1"),
                 eq(Map.of("previousSealedHash", "abc")), eq("wf-1"));
     }

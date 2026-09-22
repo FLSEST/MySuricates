@@ -1253,6 +1253,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (evidence names no measurement of the run; such findings create no managed todo) |
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unresolved bilingual steps, resolved on read via `?locale=`) |
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; blueprints from templates/blueprints/) |
+| V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (skill content under the seal), new table `skill_versions` (change history per skill, no foreign key) |
 
 ## SQLite Specifics
 

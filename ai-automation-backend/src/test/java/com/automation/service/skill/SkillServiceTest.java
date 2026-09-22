@@ -3,6 +3,7 @@ package com.automation.service.skill;
 import com.automation.dto.request.CreateSkillRequest;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
+import com.automation.entity.SkillChangeSource;
 import com.automation.entity.SkillCategory;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.CapabilityRepository;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,9 @@ class SkillServiceTest {
 
     @Mock
     private SkillRegistry skillRegistry;
+
+    @Mock
+    private SkillMutationGateway mutationGateway;
 
     @InjectMocks
     private SkillService skillService;
@@ -119,7 +124,7 @@ class SkillServiceTest {
                 "Custom Skill", "A custom skill", "icon", SkillCategory.CODE,
                 "You are a custom skill.", Map.of("key", "schema")
         );
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> {
+        when(mutationGateway.save(any(Skill.class), eq(SkillChangeSource.USER))).thenAnswer(inv -> {
             Skill s = inv.getArgument(0);
             s.setId("skill-new");
             return s;
@@ -144,7 +149,7 @@ class SkillServiceTest {
 
         skillService.delete("skill-custom");
 
-        verify(skillRepository).delete(customSkill);
+        verify(mutationGateway).delete(customSkill, SkillChangeSource.USER);
         verify(skillRegistry).unregister("skill-custom");
     }
 
@@ -156,6 +161,6 @@ class SkillServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("built-in");
 
-        verify(skillRepository, never()).delete(any());
+        verify(mutationGateway, never()).delete(any(), any());
     }
 }
