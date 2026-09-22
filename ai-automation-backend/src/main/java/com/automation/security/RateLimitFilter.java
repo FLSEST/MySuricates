@@ -14,8 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -26,7 +24,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ClientIpResolver clientIpResolver;
     private final ApiKeyService apiKeyService;
 
-    private final Map<String, ClientBucket> buckets = new ConcurrentHashMap<>();
+    /** Bounded and swept on access — one entry per client, not per request (ba6a91a6). */
+    private final ClientBucketStore<ClientBucket> buckets = new ClientBucketStore<>();
 
     @Autowired
     public RateLimitFilter(
@@ -74,7 +73,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         int limit = rateLimitConfig.getRequestsPerMinute();
         String clientId = clientIpResolver.resolve(request);
-        ClientBucket bucket = buckets.computeIfAbsent(clientId, k -> new ClientBucket());
+        ClientBucket bucket = buckets.get(clientId, ClientBucket::new, System.currentTimeMillis());
 
         if (bucket.tryConsume(limit)) {
             response.setHeader("X-RateLimit-Remaining", String.valueOf(bucket.getRemaining(limit)));
@@ -93,7 +92,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /** Package-private, damit {@code RateLimitFilterTest} das Fenster mit festen Zeitpunkten prüfen kann. */
-    static class ClientBucket {
+    static class ClientBucket implements ClientBucketStore.Windowed {
         private final AtomicInteger count = new AtomicInteger(0);
         private volatile long windowStart;
         private final Object windowLock = new Object();
@@ -104,6 +103,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         ClientBucket(long windowStart) {
             this.windowStart = windowStart;
+        }
+
+        @Override
+        public long windowStart() {
+            return windowStart;
         }
 
         boolean tryConsume(int limit) {

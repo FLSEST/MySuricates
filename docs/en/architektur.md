@@ -904,6 +904,8 @@ Response (DTO) → React Query Cache → UI Update
 - **Env override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 - **Client backoff budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) and `client-default-retry-after-seconds` (10) — see below
 - **Webhook rate limiter:** `WebhookRateLimiter` — separate per-IP limiter for `/api/v1/webhook/trigger/**`, always active
+- **Client IP (`ClientIpResolver`):** `X-Forwarded-For` only counts when the direct peer is listed in `automation.security.trusted-proxies` (default `127.0.0.1,::1`), and is then read **from the right**: the client id is the right-most entry that is not a trusted proxy (all header lines form one chain). The left part comes from the client itself and would otherwise give every request a bucket of its own.
+- **Bucket store (`ClientBucketStore`):** both limiters sweep expired buckets on access (at most once a minute) and cap the map at 10,000 clients — beyond that, the buckets with the oldest window go first.
 - **Webhook signatures (optional):** per-webhook HMAC-SHA256, see [Workflow Hardening](#workflow-hardening-optional)
 
 **Global server bucket, per-path client lock — the asymmetry is deliberate.** The server counts in

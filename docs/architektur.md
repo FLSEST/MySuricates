@@ -959,6 +959,8 @@ Response (DTO) → React Query Cache → UI-Update
 - **Env-Override:** `AUTOMATION_RATE_LIMIT_ENABLED` / `AUTOMATION_RATE_LIMIT_RPM`
 - **Client-Backoff-Budget:** `automation.security.rate-limit.client-global-backoff-seconds` (2) und `client-default-retry-after-seconds` (10) — siehe unten
 - **Webhook Rate Limiter:** `WebhookRateLimiter` — separater Per-IP-Limiter für `/api/v1/webhook/trigger/**`, immer aktiv
+- **Client-IP (`ClientIpResolver`):** `X-Forwarded-For` zählt nur, wenn der direkte Peer in `automation.security.trusted-proxies` steht (Default `127.0.0.1,::1`), und wird dann **von rechts** gelesen: Client-ID ist der rechteste Eintrag, der kein Trusted Proxy ist (alle Header-Zeilen als eine Kette). Der linke Teil stammt vom Client selbst und würde sonst jedem Request einen eigenen Eimer geben.
+- **Eimer-Speicher (`ClientBucketStore`):** beide Limiter fegen beim Zugriff abgelaufene Eimer aus (höchstens einmal pro Minute) und deckeln die Map bei 10 000 Clients — darüber fliegen die Eimer mit dem ältesten Fenster zuerst.
 - **Webhook-Signaturen (optional):** HMAC-SHA256 pro Webhook, siehe [Workflow-Härtung](#workflow-härtung-optional)
 
 **Server-Eimer global, Client-Sperre pro Pfad — die Asymmetrie ist Absicht.** Der Server zählt in
