@@ -26,19 +26,16 @@ const templates = [
 ];
 
 describe('TemplateSelector — blueprints', () => {
-  it('keeps blueprints out of the templates tab and lists them grouped in their own tab', async () => {
+  it('opens on blueprints, the first tab, grouped; templates keep their own tab', async () => {
     server.use(http.get('/api/v1/workflow-templates', () => HttpResponse.json(templates)));
     const onSelect = vi.fn();
 
     renderWithProviders(<TemplateSelector onSelect={onSelect} />);
 
-    expect(await screen.findByText('Code Quality')).toBeInTheDocument();
-    expect(screen.queryByText('Approval before acting')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Blueprints' }));
-
+    const tabs = screen.getAllByRole('button').slice(0, 3).map((b) => b.textContent);
+    expect(tabs).toEqual(['Blueprints', 'Templates', 'Pool']);
+    const basics = await screen.findByRole('region', { name: 'Basic connections' });
     expect(screen.getByText(/Empty scaffolds that show how block types connect/)).toBeInTheDocument();
-    const basics = screen.getByRole('region', { name: 'Basic connections' });
     const combinations = screen.getByRole('region', { name: 'Combinations' });
     expect(within(basics).getByText('Approval before acting')).toBeInTheDocument();
     expect(within(combinations).getByText('Taking in a report')).toBeInTheDocument();
@@ -46,6 +43,21 @@ describe('TemplateSelector — blueprints', () => {
 
     fireEvent.click(within(basics).getByText('Approval before acting'));
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'blueprint-approval' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
+    expect(screen.getByText('Code Quality')).toBeInTheDocument();
+    expect(screen.queryByText('Approval before acting')).not.toBeInTheDocument();
+  });
+
+  it('offers the blank workflow on top of the blueprints', async () => {
+    server.use(http.get('/api/v1/workflow-templates', () => HttpResponse.json(templates)));
+    const onSelect = vi.fn();
+
+    renderWithProviders(<TemplateSelector onSelect={onSelect} />);
+    await screen.findByRole('region', { name: 'Basic connections' });
+    fireEvent.click(screen.getByText('Blank Workflow'));
+
+    expect(onSelect).toHaveBeenCalledWith(null);
   });
 
   it('shows the German names and groups in German', async () => {
@@ -53,9 +65,9 @@ describe('TemplateSelector — blueprints', () => {
     server.use(http.get('/api/v1/workflow-templates', () => HttpResponse.json(templates)));
 
     renderWithProviders(<TemplateSelector onSelect={() => {}} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Blaupausen' }));
 
     expect(await screen.findByRole('region', { name: 'Grundverknüpfungen' })).toBeInTheDocument();
     expect(screen.getByText('Freigabe vor dem Handeln')).toBeInTheDocument();
+    expect(screen.getAllByRole('button').slice(0, 3).map((b) => b.textContent)).toEqual(['Blaupausen', 'Vorlagen', 'Pool']);
   });
 });

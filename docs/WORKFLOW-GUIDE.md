@@ -1716,7 +1716,7 @@ Die API liefert die Schritte in der gewünschten Sprache: `GET /api/v1/workflow-
 
 ### Blaupausen
 
-Neben **Vorlagen** (fertige Aufgaben) und dem **Pool** gibt es **Blaupausen**: leere Gerüste mit lauffähigen Platzhaltern, die zeigen, wie sich Block-Typen verknüpfen lassen – Formular → Verzweigung, Schleife mit Freigabe, Plan B bei Fehlern. Im Anlege-Dialog haben sie einen eigenen Reiter, gruppiert nach *Grundverknüpfungen*, *Kombinationen* und *Mit KI*. Man startet eine Blaupause, sieht im Lauf, wie die Schritte zusammenspielen, und ersetzt dann die Platzhalter durch eigene Befehle.
+Neben **Vorlagen** (fertige Aufgaben) und dem **Pool** gibt es **Blaupausen**: leere Gerüste mit lauffähigen Platzhaltern, die zeigen, wie sich Block-Typen verknüpfen lassen – Formular → Verzweigung, Schleife mit Freigabe, Plan B bei Fehlern. Im Anlege-Dialog sind sie der erste Reiter (vor Vorlagen und Pool), gruppiert nach *Grundverknüpfungen*, *Kombinationen* und *Mit KI*; ganz oben steht der leere Workflow. Man startet eine Blaupause, sieht im Lauf, wie die Schritte zusammenspielen, und ersetzt dann die Platzhalter durch eigene Befehle.
 
 - **Ablage:** `src/main/resources/templates/blueprints/*.json`, gleiches Format und gleicher Loader wie Vorlagen, `kind: BLUEPRINT` (Spalte `workflow_templates.kind`). Die API liefert beide Arten gemeinsam mit dem Feld `kind`.
 - **Immer zweisprachig** (`"i18n": ["de","en"]`), `id` mit Präfix `blueprint-`, Kategorie `BASICS`, `COMBINATIONS` oder `AI`.

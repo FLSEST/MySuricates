@@ -21,14 +21,16 @@ describe('Workflows', () => {
     cy.get('h1').should('contain.text', 'Workflows');
   });
 
-  it('opens the template selection modal on New Workflow', () => {
+  it('opens the create modal on the blueprints tab', () => {
     cy.contains('button', 'New Workflow').click();
-    cy.contains('Choose a Template').should('be.visible');
+    cy.contains('h3', 'Blueprints').should('be.visible');
   });
 
   it('shows blank and template options', () => {
     cy.contains('button', 'New Workflow').click();
+    // the blank workflow sits on top of the blueprints, templates have their own tab
     cy.contains('Blank Workflow').should('be.visible');
+    cy.get('[role="dialog"]').contains('button', 'Templates').click();
     cy.contains('Code Quality').should('be.visible');
   });
 
@@ -62,6 +64,7 @@ describe('Workflows', () => {
     const name = `Cypress Template Workflow ${Date.now()}`;
 
     cy.contains('button', 'New Workflow').click();
+    cy.get('[role="dialog"]').contains('button', 'Templates').click();
     // Search for the template, then click the card (not the search input)
     cy.get('[role="dialog"]').find('input[placeholder*="Search"]').type('Code Quality');
     cy.get('[role="dialog"]').find('.cursor-pointer').contains('Code Quality').click();

@@ -22,7 +22,8 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
   const locale = useI18nStore((s) => s.locale);
   const { data: templates, isLoading } = useTemplates();
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<Tab>('templates');
+  // Blueprints come first: they show what the building blocks can do (TODO 268ae0db)
+  const [activeTab, setActiveTab] = useState<Tab>('blueprints');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Blueprints share the endpoint but have their own tab
@@ -47,6 +48,16 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
       {/* Tabs */}
       <div className="flex border-b border-border">
         <button
+          onClick={() => setActiveTab('blueprints')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'blueprints'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-text-secondary hover:text-text'
+          }`}
+        >
+          {t.blueprints.tab}
+        </button>
+        <button
           onClick={() => setActiveTab('templates')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'templates'
@@ -65,16 +76,6 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
           }`}
         >
           {t.pool.tab}
-        </button>
-        <button
-          onClick={() => setActiveTab('blueprints')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'blueprints'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-secondary hover:text-text'
-          }`}
-        >
-          {t.blueprints.tab}
         </button>
       </div>
 
