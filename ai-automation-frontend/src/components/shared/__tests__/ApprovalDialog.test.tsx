@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { ApprovalDialog } from '../ApprovalDialog';
@@ -15,9 +15,11 @@ describe('ApprovalDialog', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Measurement' })).toBeInTheDocument();
-    expect(screen.getByRole('listitem')).toHaveTextContent('12 images');
-    expect(screen.getByTestId('approval-question').className).toContain('overflow-y-auto');
+    // Scoped to the question: the dialog also carries a hint (approval-waiting) with a list of its own.
+    const question = screen.getByTestId('approval-question');
+    expect(within(question).getByRole('heading', { name: 'Measurement' })).toBeInTheDocument();
+    expect(within(question).getByRole('listitem')).toHaveTextContent('12 images');
+    expect(question.className).toContain('overflow-y-auto');
   });
 
   it('marks the options the backend names as rejections', () => {

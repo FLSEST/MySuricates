@@ -102,10 +102,15 @@ Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
    Verzeichnis auf deinem Rechner (beim Container: innerhalb des Projektordners). Zum Ausprobieren
    gibt es das **Beispielprojekt**: Dashboard, Workflows und Projekte bieten es an, solange noch kein
    Projekt existiert. Ein Klick, und die Beispiel-Workflows laufen ohne KI und ohne Einrichtung.
+   Das Dashboard bekommt dazu eine eigene Ansicht, die nur dieses Projekt zeigt.
 2. **Eine Vorlage übernehmen** — unter *Templates* liegen 67 fertige Workflows. Eine auswählen,
    ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert.
 3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch
    war oder ein Modell gerufen hat.
+
+Unterwegs erklären kurze **Hinweise** die Seiten und Zustände, die man zum ersten Mal sieht, etwa
+eine wartende Freigabe oder einen fehlgeschlagenen Lauf. Jeder lässt sich wegklicken und an seiner
+Stelle zurückholen; unter *Einstellungen → Allgemein* lassen sich alle abschalten.
 
 Eigene Workflows baut man danach am besten mit dem
 [Workflow-Leitfaden](WORKFLOW-GUIDE.md) daneben.

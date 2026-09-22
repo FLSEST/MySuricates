@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Spinner, TagInput } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
+import { Hint } from '../components/hints/Hint';
 import { ErrorState } from '../components/shared/ErrorState';
 import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
@@ -311,6 +312,8 @@ export function Todos() {
           <p className="text-sm text-text-secondary mt-1">{t.todos.subtitle}</p>
         </div>
       </div>
+
+      <Hint id="todos-sources" />
 
       {/* Progress Bar */}
       {(todos && todos.length > 0) && (

@@ -13,6 +13,7 @@ import { ProjectGroup } from '../components/workflow/ProjectGroup';
 import { DiscoveryView } from '../components/workflow/DiscoveryView';
 import { WorkflowDetailPanel } from '../components/workflow/WorkflowDetailPanel';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
+import { Hint } from '../components/hints/Hint';
 import {
   useWorkflows,
   useCreateWorkflow,
@@ -405,6 +406,7 @@ export function Workflows() {
   return (
     <div className="flex flex-col h-full animate-fade-in">
       <WorkflowListHeader t={t} onOpenCreate={openCreate} onImportReady={handleImportReady} />
+      <Hint id="workflows-start" className="mb-4" />
 
       {!search && projects?.length === 0 ? (
         <EmptyState

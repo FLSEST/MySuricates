@@ -1788,6 +1788,16 @@ export const en = {
     reopenHint: 'The panels on the core concepts — available any time.',
     showAction: 'Show',
   },
+  hints: {
+    understood: 'Got it',
+    hideAll: 'Hide all hints',
+    hiddenToast: 'Hints hidden. You can switch them back on in the settings.',
+    show: 'Show hint',
+    settingsTitle: 'Show hints',
+    settingsHint: 'Short explanations in the place where you first meet something.',
+    resetAction: 'Show all again',
+    resetDone: 'All hints are shown again.',
+  },
   auditCenter: {
     acceptedCount: 'of which {count} accepted',
     acceptedAt: 'Accepted on',

@@ -75,9 +75,9 @@ class ExampleProjectServiceTest {
         when(projectService.create(any())).thenAnswer(inv -> project("new", ((CreateProjectRequest) inv.getArgument(0)).path()));
         when(workflowService.findByProjectId("new")).thenReturn(List.of());
         when(templateService.findAll()).thenReturn(List.of(
-                template("example-approval", "EXAMPLE", true),
                 template("code-review", "CODE", true),
-                template("example-own", "EXAMPLE", false)));
+                template("blueprint-approval", "BASICS", true),
+                template("blueprint-form", "BASICS", true)));
 
         ExampleProjectService.Result result = service.ensure("de");
 
@@ -94,22 +94,20 @@ class ExampleProjectServiceTest {
         ArgumentCaptor<CreateWorkflowRequest> workflowRequest = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
         verify(workflowService).create(workflowRequest.capture(), eq(ChangeSource.EXAMPLE_PROJECT));
         assertThat(workflowRequest.getValue().projectId()).isEqualTo("new");
-        assertThat(workflowRequest.getValue().templateId()).isEqualTo("example-approval");
-        assertThat(workflowRequest.getValue().name()).isEqualTo("Beispiel example-approval");
-        assertThat(workflowRequest.getValue().description()).isEqualTo("Zeigt example-approval");
+        assertThat(workflowRequest.getValue().templateId()).isEqualTo("blueprint-approval");
+        assertThat(workflowRequest.getValue().name()).isEqualTo("Beispiel blueprint-approval");
+        assertThat(workflowRequest.getValue().description()).isEqualTo("Zeigt blueprint-approval");
         assertThat(workflowRequest.getValue().blocks()).hasSize(1);
     }
 
     @Test
-    void secondCall_returnsTheExistingProject_andAddsOnlyMissingExamples() throws Exception {
+    void secondCall_returnsTheExistingProject_andAddsAMissingExample() throws Exception {
         Files.createDirectories(target());
         Project existing = project("ex", target().toString());
         when(projectService.findAll()).thenReturn(List.of(project("other", "/somewhere/else"), existing));
-        Workflow present = Workflow.builder().id("wf").templateId("example-approval").build();
-        when(workflowService.findByProjectId("ex")).thenReturn(List.of(present));
-        when(templateService.findAll()).thenReturn(List.of(
-                template("example-approval", "EXAMPLE", true),
-                template("example-switch", "EXAMPLE", true)));
+        Workflow own = Workflow.builder().id("wf").templateId("code-review").build();
+        when(workflowService.findByProjectId("ex")).thenReturn(List.of(own));
+        when(templateService.findAll()).thenReturn(List.of(template("blueprint-approval", "BASICS", true)));
 
         ExampleProjectService.Result result = service.ensure("en");
 
@@ -119,8 +117,35 @@ class ExampleProjectServiceTest {
         verify(projectService, never()).create(any());
         ArgumentCaptor<CreateWorkflowRequest> workflowRequest = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
         verify(workflowService).create(workflowRequest.capture(), eq(ChangeSource.EXAMPLE_PROJECT));
-        assertThat(workflowRequest.getValue().templateId()).isEqualTo("example-switch");
-        assertThat(workflowRequest.getValue().name()).isEqualTo("Example example-switch");
+        assertThat(workflowRequest.getValue().templateId()).isEqualTo("blueprint-approval");
+        assertThat(workflowRequest.getValue().name()).isEqualTo("Example blueprint-approval");
+    }
+
+    @Test
+    void anExampleThatIsAlreadyThere_isNotAddedTwice() throws Exception {
+        Files.createDirectories(target());
+        Project existing = project("ex", target().toString());
+        when(projectService.findAll()).thenReturn(List.of(existing));
+        Workflow present = Workflow.builder().id("wf").templateId("blueprint-approval").build();
+        when(workflowService.findByProjectId("ex")).thenReturn(List.of(present));
+        when(templateService.findAll()).thenReturn(List.of(template("blueprint-approval", "BASICS", true)));
+
+        assertThat(service.ensure("de").workflowsAdded()).isZero();
+        verify(workflowService, never()).create(any(), any());
+    }
+
+    @Test
+    void onlyShippedTemplatesCount_andAMissingOneIsSkipped() {
+        when(projectService.findAll()).thenReturn(List.of());
+        when(projectService.create(any())).thenReturn(project("new", target().toString()));
+        when(workflowService.findByProjectId("new")).thenReturn(List.of());
+        when(templateService.findAll()).thenReturn(List.of(template("blueprint-approval", "BASICS", false)));
+
+        ExampleProjectService.Result result = service.ensure("de");
+
+        assertThat(result.created()).isTrue();
+        assertThat(result.workflowsAdded()).isZero();
+        verify(workflowService, never()).create(any(), any());
     }
 
     @Test

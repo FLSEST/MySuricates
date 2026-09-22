@@ -7,6 +7,9 @@ import { useI18nStore } from '../../../i18n';
 import { de } from '../../../i18n/de';
 import { FirstProjectActions } from '../FirstProjectActions';
 import { FirstStepsCard } from '../../dashboard/FirstStepsCard';
+import { useDashboardLayoutStore } from '../../../stores/dashboardLayoutStore';
+import { createDefaultLayout } from '../../dashboard/dashboardLayout';
+import { exampleProjectViewId } from '../../dashboard/exampleProjectView';
 
 const example = {
   id: 'ex', name: 'Beispielprojekt', type: 'PERSONAL', path: '/data/examples/example-project', status: 'STOPPED',
@@ -16,7 +19,10 @@ const example = {
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
-beforeEach(() => useI18nStore.setState({ locale: 'de' }));
+beforeEach(() => {
+  useI18nStore.setState({ locale: 'de' });
+  useDashboardLayoutStore.setState(createDefaultLayout());
+});
 
 describe('FirstProjectActions', () => {
   it('creates the example project in the UI language and hands it on', async () => {
@@ -32,6 +38,30 @@ describe('FirstProjectActions', () => {
 
     await waitFor(() => expect(onProjectReady).toHaveBeenCalledWith(expect.objectContaining({ id: 'ex' })));
     expect(new URL(requested).searchParams.get('locale')).toBe('de');
+  });
+
+  it('adds a dashboard view for the example project once, without switching to it', async () => {
+    server.use(
+      http.post('/api/v1/projects/example', () => HttpResponse.json(example, { status: 201 })),
+      http.get('/api/v1/workflows', () => HttpResponse.json([
+        { id: 'wf-other', projectId: 'other' },
+        { id: 'wf-example', projectId: 'ex' },
+      ])),
+    );
+    renderWithProviders(<FirstProjectActions />);
+    const button = screen.getByRole('button', { name: de.projects.firstProject.createExample });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(useDashboardLayoutStore.getState().views).toHaveLength(2));
+
+    const { activeViewId, views } = useDashboardLayoutStore.getState();
+    expect(activeViewId).toBe('default');
+    expect(views[1]).toMatchObject({ id: exampleProjectViewId('ex'), name: 'Beispielprojekt', filter: { projectId: 'ex' } });
+    expect(views[1]?.widgets[0]).toMatchObject({ type: 'workflow-status', config: { workflowId: 'wf-example' } });
+
+    fireEvent.click(button);
+    await waitFor(() => expect(button.hasAttribute('disabled')).toBe(false));
+    expect(useDashboardLayoutStore.getState().views).toHaveLength(2);
   });
 
   it('leaves the own project to the caller when it passes a form of its own', async () => {

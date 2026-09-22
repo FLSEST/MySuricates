@@ -139,7 +139,7 @@ Create a new project.
 Create the bundled example project, meant for a fresh installation. The UI offers it while there is no project yet.
 
 - **Directory:** The template `classpath:examples/example-project/` is copied to `<automation.examples.directory>/example-project`. The default is `mysuricates-examples` below the workspace root, or `./data/examples` next to the database without a workspace root. The environment variable for it is `AUTOMATION_EXAMPLES_DIR`. An existing directory is never overwritten.
-- **Workflows:** one workflow per built-in template of category `EXAMPLE`, with `changeSource` `example-project`.
+- **Workflows:** one workflow per shipped template listed in `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` (currently the blueprint `blueprint-approval`), with `changeSource` `example-project`.
 - **Idempotent:** An active project that already points at the directory is returned, and missing example workflows are added.
 
 | Parameter | Type | Required | Values |

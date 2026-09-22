@@ -31,6 +31,10 @@ interface SettingsState {
   simpleOnboardingSeen: boolean;
   /** Welcome walkthrough dismissed; set back to false to show it again. */
   walkthroughSeen: boolean;
+  /** Hints in place (components/hints/Hint) shown at all. */
+  hintsEnabled: boolean;
+  /** Dismissed hints: id → the hint version that was dismissed (a raised version shows it again). */
+  dismissedHints: Record<string, number>;
   /** Todos list view: rows per page. */
   listPageSize: number;
   /** Todos board view: cards loaded per kanban column (one query per column). */
@@ -52,6 +56,11 @@ interface SettingsState {
   togglePinnedWorkflow: (id: string) => void;
   setSimpleOnboardingSeen: (seen: boolean) => void;
   setWalkthroughSeen: (seen: boolean) => void;
+  setHintsEnabled: (enabled: boolean) => void;
+  dismissHint: (id: string, version: number) => void;
+  restoreHint: (id: string) => void;
+  /** Shows every hint again and switches hints on. */
+  resetHints: () => void;
   setListPageSize: (size: number) => void;
   setKanbanColumnSize: (size: number) => void;
 }
@@ -75,6 +84,8 @@ export const useSettingsStore = create<SettingsState>()(
       pinnedWorkflowIds: [],
       simpleOnboardingSeen: false,
       walkthroughSeen: false,
+      hintsEnabled: true,
+      dismissedHints: {},
       listPageSize: 30,
       kanbanColumnSize: 50,
       setApiKey: (apiKey) => set({ apiKey }),
@@ -104,6 +115,14 @@ export const useSettingsStore = create<SettingsState>()(
         })),
       setSimpleOnboardingSeen: (simpleOnboardingSeen) => set({ simpleOnboardingSeen }),
       setWalkthroughSeen: (walkthroughSeen) => set({ walkthroughSeen }),
+      setHintsEnabled: (hintsEnabled) => set({ hintsEnabled }),
+      dismissHint: (id, version) => set((state) => ({ dismissedHints: { ...state.dismissedHints, [id]: version } })),
+      restoreHint: (id) =>
+        set((state) => {
+          const { [id]: _dismissed, ...rest } = state.dismissedHints;
+          return { dismissedHints: rest };
+        }),
+      resetHints: () => set({ hintsEnabled: true, dismissedHints: {} }),
       setListPageSize: (size) => set({ listPageSize: clampPageSize(size) }),
       setKanbanColumnSize: (size) => set({ kanbanColumnSize: clampPageSize(size) }),
     }),

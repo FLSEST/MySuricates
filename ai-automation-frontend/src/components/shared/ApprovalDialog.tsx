@@ -4,6 +4,7 @@ import { useT } from '../../i18n';
 import type { PendingApproval } from '../../hooks/useWebSocket';
 import { isRejectOption } from '../../hooks/usePendingInputs';
 import { ApprovalQuestion } from './ApprovalQuestion';
+import { Hint } from '../hints/Hint';
 
 interface ApprovalDialogProps {
   approval: PendingApproval;
@@ -38,6 +39,8 @@ export function ApprovalDialog({ approval, onSubmit, onDismiss, loading }: Appro
         <p className="text-sm text-text-secondary mb-4">
           {t.workflows.execution.approval.description}
         </p>
+
+        <Hint id="approval-waiting" className="mb-4" />
 
         <div className="mb-6 min-h-0 flex flex-col">
           <ApprovalQuestion question={approval.question} maxHeightClass="max-h-[60vh]" />

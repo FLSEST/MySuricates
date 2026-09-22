@@ -1,0 +1,50 @@
+{
+  "dashboard-views": {
+    "title": "One dashboard, several views",
+    "points": [
+      "Keep views side by side: operations, costs, quality, or one per project",
+      "Each view can be filtered to a project and a time range",
+      "New views are made while editing the dashboard: empty, as a copy, or from a template"
+    ]
+  },
+  "workflows-start": {
+    "title": "Three places to start from",
+    "points": [
+      "Blueprints are empty frames that show how blocks connect: run one, look at it, replace the placeholders",
+      "Templates are finished flows for one purpose; the pool offers ready-made workflows from a local folder",
+      "Each is only a starting point: every step can be changed, and a blank workflow works too"
+    ]
+  },
+  "run-steps": {
+    "title": "Every step says what it was",
+    "points": [
+      "Deterministic steps give the same result for the same input, AI steps can vary, human steps wait for a decision",
+      "Follow the run live, then read back every step with its output",
+      "The definition hash shows exactly which version of the workflow ran"
+    ]
+  },
+  "run-failed": {
+    "title": "A failed run keeps what it did",
+    "points": [
+      "The step that failed is marked, with its output and the reason",
+      "The steps before it keep their results, so you can see how far it got",
+      "Turn the failure into a TODO so it isn't lost; next time a retry block or a plan B can catch a shaky step"
+    ]
+  },
+  "approval-waiting": {
+    "title": "The run is waiting for you",
+    "points": [
+      "Nothing is stuck: the workflow stops at this step on purpose",
+      "After your answer it continues from here, not from the top",
+      "You can close this dialog and answer later; the run keeps waiting"
+    ]
+  },
+  "todos-sources": {
+    "title": "Where TODOs come from",
+    "points": [
+      "Write them down yourself, or let a workflow create them: with a block or from its gate result",
+      "A failed run becomes a TODO with one click",
+      "Coding agents add them through the API, so side findings don't evaporate"
+    ]
+  }
+}

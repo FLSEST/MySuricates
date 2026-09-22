@@ -11,6 +11,7 @@ import { GateStatusBanner } from '../components/shared/GateStatusBanner';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
+import { Hint } from '../components/hints/Hint';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
 import { ForEachStepCard } from '../components/shared/ForEachStepCard';
@@ -299,6 +300,8 @@ export function WorkflowExecution() {
 
       <GateStatusBanner run={run} />
 
+      {run.status === 'FAILED' && <Hint id="run-failed" />}
+
       {/* Duration + rating */}
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2 text-text-secondary">
@@ -422,6 +425,8 @@ export function WorkflowExecution() {
           </div>
         );
       })()}
+
+      <Hint id="run-steps" />
 
       {/* Ablauf-Diagramm mit Live-Status je Block */}
       {bpmnXml && run.steps.length > 0 && (
