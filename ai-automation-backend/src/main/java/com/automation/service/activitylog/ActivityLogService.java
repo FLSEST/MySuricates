@@ -11,6 +11,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -29,6 +31,35 @@ public class ActivityLogService {
     public ActivityLog log(LogLevel level, LogCategory category, String message,
                            String source, String referenceId, Map<String, Object> metadata) {
         return log(level, category, message, source, referenceId, metadata, null);
+    }
+
+    /**
+     * For an entry that records a <b>refusal</b>. The refusal is an exception, so inside a caller's
+     * transaction (webhook, schedule, chain, a REST call that fails) the entry would be rolled back
+     * with it and the refusal would leave no trace at all. It is therefore written after that
+     * transaction has ended, on its own virtual thread: with pool-size 1 the caller still holds the
+     * only connection until its transaction is cleaned up, so the writer waits for it instead of the
+     * caller's thread blocking on itself (which {@code REQUIRES_NEW} would do).
+     */
+    public void logRefusal(LogLevel level, LogCategory category, String message, String source,
+                           String referenceId, Map<String, Object> metadata, String workflowId) {
+        Runnable write = () -> log(level, category, message, source, referenceId, metadata, workflowId);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            write.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                Thread.ofVirtual().name("refusal-log").start(() -> {
+                    try {
+                        write.run();
+                    } catch (RuntimeException e) {
+                        log.warn("Could not record refusal '{}': {}", message, e.getMessage());
+                    }
+                });
+            }
+        });
     }
 
     public ActivityLog log(LogLevel level, LogCategory category, String message,

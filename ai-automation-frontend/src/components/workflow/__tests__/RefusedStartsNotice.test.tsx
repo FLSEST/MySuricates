@@ -11,7 +11,7 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 beforeEach(() => { localStorage.clear(); useI18nStore.setState({ locale: 'en' }); });
 
-const base = { problem: 'NONE', detail: null, changedSkills: [], skillsPinned: true, pinnedSkillCount: 0, sealedAt: null, lastRefusal: null };
+const base = { problem: 'NONE', detail: null, changedSkills: [], skillsPinned: true, signed: true, pinnedSkillCount: 0, sealedAt: null, lastRefusal: null };
 
 describe('RefusedStartsNotice', () => {
   it('lists workflows whose starts were refused, since those leave no run row', async () => {

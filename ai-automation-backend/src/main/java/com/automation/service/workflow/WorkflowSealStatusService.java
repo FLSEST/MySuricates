@@ -62,7 +62,7 @@ public class WorkflowSealStatusService {
                     .collect(Collectors.toMap(row -> (String) row[0], row -> (String) row[1]));
             for (String id : unsealedWithRefusals) {
                 if (names.containsKey(id)) { // deleted workflows drop out
-                    result.add(withRefusals(id, names.get(id), "NOT_SEALED", "NONE", null, List.of(), false, 0,
+                    result.add(withRefusals(id, names.get(id), "NOT_SEALED", "NONE", null, List.of(), false, false, 0,
                             null, refusals.get(id)));
                 }
             }
@@ -96,16 +96,18 @@ public class WorkflowSealStatusService {
             }
         }
         return withRefusals(workflow.getId(), workflow.getName(), verdict.intact() ? "INTACT" : "VIOLATED",
-                verdict.problem().name(), verdict.detail(), changed, verdict.skillsPinned(), pinned,
+                verdict.problem().name(), verdict.detail(), changed, verdict.skillsPinned(), verdict.signed(), pinned,
                 workflow.getSealedAt(), refusals);
     }
 
     private static WorkflowSealStatusResponse withRefusals(String id, String name, String state, String problem,
                                                            String detail, List<SkillRef> changed, boolean skillsPinned,
-                                                           int pinned, Instant sealedAt, List<ActivityLog> refusals) {
+                                                           boolean signed, int pinned, Instant sealedAt,
+                                                           List<ActivityLog> refusals) {
         ActivityLog last = refusals.isEmpty() ? null : refusals.get(0);
-        return new WorkflowSealStatusResponse(id, name, state, problem, detail, changed, skillsPinned, pinned, sealedAt,
-                refusals.size(), last != null ? last.getTimestamp() : null, last != null ? last.getMessage() : null);
+        return new WorkflowSealStatusResponse(id, name, state, problem, detail, changed, skillsPinned, signed, pinned,
+                sealedAt, refusals.size(), last != null ? last.getTimestamp() : null,
+                last != null ? last.getMessage() : null);
     }
 
     private List<SkillRef> skillRefs(java.util.Set<String> ids) {

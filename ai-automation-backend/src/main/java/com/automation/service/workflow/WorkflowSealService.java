@@ -3,9 +3,12 @@ package com.automation.service.workflow;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowSealEvent;
 import com.automation.exception.ErrorCode;
 import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,9 @@ public class WorkflowSealService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowDefinitionHasher hasher;
     private final WorkflowSkillPins skillPins;
+    private final WorkflowSealSigner signer;
+    private final WorkflowSealHistory history;
+    private final ModuleRegistry modules;
     private final ActivityLogService activityLog;
 
     @Transactional
@@ -55,10 +61,15 @@ public class WorkflowSealService {
         }
         Map<String, String> pins = skillPins.pins(workflow);
         workflow.setSealedSkillHashes(WorkflowSkillPins.toJson(pins));
+        String signature = signer.sign(workflow.getId(), hash, pins);
+        workflow.setSealedSignature(signature);
         Workflow saved = workflowRepository.save(workflow);
+        history.record(saved, legacySeal ? WorkflowSealEvent.Action.PINS_ADDED : WorkflowSealEvent.Action.SEALED,
+                hash, pins, signature);
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("sealedHash", hash);
         metadata.put("skillHashes", pins);
+        metadata.put("signed", signature != null);
         String title = legacySeal ? "Workflow seal extended to its skills: " : "Workflow sealed: ";
         activityLog.log(LogLevel.WARN, LogCategory.SECURITY, title + saved.getName(),
                 "WorkflowSealService", saved.getId(), metadata, saved.getId());
@@ -72,12 +83,23 @@ public class WorkflowSealService {
         if (!workflow.isSealed()) {
             return workflow;
         }
+        if (modules.isEnabled(ModuleCatalog.SEAL_IMMUTABLE)) {
+            // Deliberately no REST path around this: the switch is startup-only, so a leaked API key
+            // (or an agent holding it) cannot release a seal — only someone with the configuration can.
+            activityLog.logRefusal(LogLevel.WARN, LogCategory.SECURITY,
+                    "Unseal refused — sealing is immutable: " + workflow.getName(),
+                    "WorkflowSealService", workflow.getId(), Map.of(), workflow.getId());
+            throw new HardeningException(ErrorCode.SEAL_IMMUTABLE, "Workflow '" + workflow.getName()
+                    + "' cannot be unsealed: automation.hardening.seal-immutable is on (startup configuration)");
+        }
         String previousHash = workflow.getSealedHash();
         workflow.setSealed(false);
         workflow.setSealedHash(null);
         workflow.setSealedAt(null);
         workflow.setSealedSkillHashes(null);
+        workflow.setSealedSignature(null);
         Workflow saved = workflowRepository.save(workflow);
+        history.record(saved, WorkflowSealEvent.Action.UNSEALED, previousHash, null, null);
         activityLog.log(LogLevel.WARN, LogCategory.SECURITY, "Workflow unsealed: " + saved.getName(),
                 "WorkflowSealService", saved.getId(), Map.of("previousSealedHash", previousHash), saved.getId());
         log.info("Unsealed workflow {} ({})", saved.getName(), saved.getId());

@@ -352,11 +352,13 @@ export interface WorkflowSealStatus {
   workflowId: string;
   workflowName: string;
   state: 'INTACT' | 'VIOLATED' | 'NOT_SEALED';
-  problem: 'NONE' | 'DEFINITION_CHANGED' | 'SKILLS_CHANGED' | 'UNVERIFIABLE';
+  problem: 'NONE' | 'DEFINITION_CHANGED' | 'SKILLS_CHANGED' | 'SIGNATURE_INVALID' | 'SIGNATURE_MISSING' | 'UNVERIFIABLE';
   detail: string | null;
   changedSkills: { id: string; name: string | null }[];
   /** false for seals made before skills were pinned */
   skillsPinned: boolean;
+  /** whether the seal carries a signature (key outside the database) */
+  signed: boolean;
   pinnedSkillCount: number;
   sealedAt: string | null;
   /** Starts refused in the last seven days — they leave no run row */
@@ -1454,7 +1456,8 @@ export type FeatureModuleName =
   | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';
 
 export type HardeningModuleName =
-  | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'webhook-signatures';
+  | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'require-signed-seal' | 'seal-immutable'
+  | 'webhook-signatures';
 
 export type ModuleName = FeatureModuleName | HardeningModuleName;
 

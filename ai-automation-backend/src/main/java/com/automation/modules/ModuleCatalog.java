@@ -82,6 +82,13 @@ public enum ModuleCatalog {
             List.of("sealing"),
             "Unattended runs (schedules, webhooks, triggers, auto-repair, wishes and the chains or "
                     + "sub-workflows they start) only start sealed workflows."),
+    REQUIRE_SIGNED_SEAL("require-signed-seal", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("sealing"),
+            "Sealed workflows must carry a valid signature (key outside the database) — an unsigned "
+                    + "seal, or one whose signature does not match, refuses its runs."),
+    SEAL_IMMUTABLE("seal-immutable", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("sealing"),
+            "Unsealing is no longer possible over REST — a seal is then released only by turning this "
+                    + "switch off in the startup configuration and restarting. Protects against anyone "
+                    + "(including an agent) who holds the API key."),
     WEBHOOK_SIGNATURES("webhook-signatures", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("webhooks"),
             "Per-webhook HMAC-SHA256 signing secret (X-Signature). A stored secret is always enforced; "
                     + "the switch gates setting and removing it.");

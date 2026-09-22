@@ -95,9 +95,12 @@ automation:
     # instances. Templates: config-examples/application-minimal.yml / application-maximal.yml
     ui-editable: ${AUTOMATION_MODULES_UI_EDITABLE:false}
   # Optionale Workflow-Härtung — unabhängig vom Preset, gleiche Regeln (nur Startkonfig).
-  # provenance (Default true) · sealing · require-sealed-for-unattended · webhook-signatures
+  # provenance (Default true) · sealing · require-sealed-for-unattended · require-signed-seal · webhook-signatures
   # hardening:
   #   sealing: true
+  #   require-signed-seal: true    # Siegel ohne gültige Signatur lehnen ihre Runs ab
+  seal:
+    key-file: ${AUTOMATION_SEAL_KEY_FILE:${user.home}/.autotrigger/seal-signing.key}    # HMAC-Key für Siegel — nie in der DB neben dem Siegelwert
   discovery:
     auto-tagging-enabled: ${AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED:true}
     semantic-enabled: ${AUTOMATION_DISCOVERY_SEMANTIC_ENABLED:true}

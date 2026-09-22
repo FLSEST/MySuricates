@@ -33,11 +33,11 @@ import java.nio.file.Path;
  *
  * <p>Registered via {@code META-INF/services/org.junit.platform.launcher.LauncherSessionListener},
  * so it runs once per test JVM before any Spring context starts. It publishes per-process
- * unique paths as the {@code integration.db.path}, {@code integration.key.path} and
+ * unique paths as the {@code integration.db.path}, {@code integration.key.path}, {@code integration.seal.key.path} and
  * {@code integration.backup.dir} system properties, which {@code application-integration.yml}
  * resolves in the datasource/Flyway URLs, the integration-encryption key-file location and the
  * backup directory respectively. On session close it deletes the DB files (including
- * {@code -wal}/{@code -shm}), the key file and the backup directory, so no stale files survive
+ * {@code -wal}/{@code -shm}), the key files and the backup directory, so no stale files survive
  * for the next run. Externally provided values for any property are respected and left
  * untouched (each is independent — one being external does not suppress the others).
  */
@@ -45,6 +45,7 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
 
     static final String DB_PROPERTY = "integration.db.path";
     static final String KEY_PROPERTY = "integration.key.path";
+    static final String SEAL_KEY_PROPERTY = "integration.seal.key.path";
     static final String BACKUP_DIR_PROPERTY = "integration.backup.dir";
 
     /** Path owned by this listener; null when the property was set externally. */
@@ -52,6 +53,9 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
 
     /** Path owned by this listener; null when the property was set externally. */
     private Path ownedKeyPath;
+
+    /** Path owned by this listener; null when the property was set externally. */
+    private Path ownedSealKeyPath;
 
     /** Directory owned by this listener; null when the property was set externally. */
     private Path ownedBackupDir;
@@ -72,6 +76,11 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
             System.setProperty(KEY_PROPERTY, ownedKeyPath.toString());
         }
 
+        if (System.getProperty(SEAL_KEY_PROPERTY) == null) {
+            ownedSealKeyPath = Path.of(tmpDir, "autotrigger-it-seal-key-" + pid + "-" + nanos + ".key");
+            System.setProperty(SEAL_KEY_PROPERTY, ownedSealKeyPath.toString());
+        }
+
         if (System.getProperty(BACKUP_DIR_PROPERTY) == null) {
             ownedBackupDir = Path.of(tmpDir, "autotrigger-it-backups-" + pid + "-" + nanos);
             System.setProperty(BACKUP_DIR_PROPERTY, ownedBackupDir.toString());
@@ -90,6 +99,12 @@ public class IntegrationTestDbSessionListener implements LauncherSessionListener
             deleteIfExists(ownedKeyPath);
             System.clearProperty(KEY_PROPERTY);
             ownedKeyPath = null;
+        }
+
+        if (ownedSealKeyPath != null) {
+            deleteIfExists(ownedSealKeyPath);
+            System.clearProperty(SEAL_KEY_PROPERTY);
+            ownedSealKeyPath = null;
         }
 
         if (ownedBackupDir != null) {

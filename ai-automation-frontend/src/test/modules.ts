@@ -26,6 +26,8 @@ const HARDENING: Array<Pick<ModuleInfo, 'name' | 'requires'>> = [
   { name: 'provenance', requires: [] },
   { name: 'sealing', requires: ['provenance'] },
   { name: 'require-sealed-for-unattended', requires: ['sealing'] },
+  { name: 'require-signed-seal', requires: ['sealing'] },
+  { name: 'seal-immutable', requires: ['sealing'] },
   { name: 'webhook-signatures', requires: ['webhooks'] },
 ];
 

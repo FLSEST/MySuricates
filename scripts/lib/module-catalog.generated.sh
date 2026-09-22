@@ -37,6 +37,8 @@ MODULE_CATALOG_KEYS=(
   provenance
   sealing
   require-sealed-for-unattended
+  require-signed-seal
+  seal-immutable
   webhook-signatures
 )
 
@@ -66,6 +68,8 @@ MODULE_CATALOG_HARDENING_KEYS=(
   provenance
   sealing
   require-sealed-for-unattended
+  require-signed-seal
+  seal-immutable
   webhook-signatures
 )
 
@@ -92,6 +96,8 @@ MODULE_CATALOG_TIER__wishes="advanced"
 MODULE_CATALOG_TIER__provenance="hardening"
 MODULE_CATALOG_TIER__sealing="hardening"
 MODULE_CATALOG_TIER__require_sealed_for_unattended="hardening"
+MODULE_CATALOG_TIER__require_signed_seal="hardening"
+MODULE_CATALOG_TIER__seal_immutable="hardening"
 MODULE_CATALOG_TIER__webhook_signatures="hardening"
 
 # MODULE_CATALOG_MATURITY
@@ -117,6 +123,8 @@ MODULE_CATALOG_MATURITY__wishes="experimental"
 MODULE_CATALOG_MATURITY__provenance="experimental"
 MODULE_CATALOG_MATURITY__sealing="experimental"
 MODULE_CATALOG_MATURITY__require_sealed_for_unattended="experimental"
+MODULE_CATALOG_MATURITY__require_signed_seal="experimental"
+MODULE_CATALOG_MATURITY__seal_immutable="experimental"
 MODULE_CATALOG_MATURITY__webhook_signatures="experimental"
 
 # MODULE_CATALOG_DEFAULT
@@ -142,6 +150,8 @@ MODULE_CATALOG_DEFAULT__wishes="false"
 MODULE_CATALOG_DEFAULT__provenance="true"
 MODULE_CATALOG_DEFAULT__sealing="false"
 MODULE_CATALOG_DEFAULT__require_sealed_for_unattended="false"
+MODULE_CATALOG_DEFAULT__require_signed_seal="false"
+MODULE_CATALOG_DEFAULT__seal_immutable="false"
 MODULE_CATALOG_DEFAULT__webhook_signatures="false"
 
 # MODULE_CATALOG_PROPERTY
@@ -167,6 +177,8 @@ MODULE_CATALOG_PROPERTY__wishes="automation.modules.wishes"
 MODULE_CATALOG_PROPERTY__provenance="automation.hardening.provenance"
 MODULE_CATALOG_PROPERTY__sealing="automation.hardening.sealing"
 MODULE_CATALOG_PROPERTY__require_sealed_for_unattended="automation.hardening.require-sealed-for-unattended"
+MODULE_CATALOG_PROPERTY__require_signed_seal="automation.hardening.require-signed-seal"
+MODULE_CATALOG_PROPERTY__seal_immutable="automation.hardening.seal-immutable"
 MODULE_CATALOG_PROPERTY__webhook_signatures="automation.hardening.webhook-signatures"
 
 # MODULE_CATALOG_RISKS
@@ -192,6 +204,8 @@ MODULE_CATALOG_RISKS__wishes=""
 MODULE_CATALOG_RISKS__provenance=""
 MODULE_CATALOG_RISKS__sealing=""
 MODULE_CATALOG_RISKS__require_sealed_for_unattended=""
+MODULE_CATALOG_RISKS__require_signed_seal=""
+MODULE_CATALOG_RISKS__seal_immutable=""
 MODULE_CATALOG_RISKS__webhook_signatures=""
 
 # MODULE_CATALOG_REQUIRES
@@ -217,6 +231,8 @@ MODULE_CATALOG_REQUIRES__wishes="chains"
 MODULE_CATALOG_REQUIRES__provenance=""
 MODULE_CATALOG_REQUIRES__sealing="provenance"
 MODULE_CATALOG_REQUIRES__require_sealed_for_unattended="sealing"
+MODULE_CATALOG_REQUIRES__require_signed_seal="sealing"
+MODULE_CATALOG_REQUIRES__seal_immutable="sealing"
 MODULE_CATALOG_REQUIRES__webhook_signatures="webhooks"
 
 # MODULE_TEXT_NAME
@@ -242,6 +258,8 @@ MODULE_TEXT_NAME__de__wishes="Wünsche"
 MODULE_TEXT_NAME__de__provenance="Definitions-Hash & Run-Herkunft"
 MODULE_TEXT_NAME__de__sealing="Versiegelte Workflows"
 MODULE_TEXT_NAME__de__require_sealed_for_unattended="Unbeaufsichtigt nur versiegelt"
+MODULE_TEXT_NAME__de__require_signed_seal="Siegel müssen signiert sein"
+MODULE_TEXT_NAME__de__seal_immutable="Entsiegeln gesperrt"
 MODULE_TEXT_NAME__de__webhook_signatures="Webhook-Signaturen (HMAC)"
 MODULE_TEXT_NAME__en__dashboard_report="Dashboard report"
 MODULE_TEXT_NAME__en__chains="Chains"
@@ -265,6 +283,8 @@ MODULE_TEXT_NAME__en__wishes="Wishes"
 MODULE_TEXT_NAME__en__provenance="Definition hash & run provenance"
 MODULE_TEXT_NAME__en__sealing="Sealed workflows"
 MODULE_TEXT_NAME__en__require_sealed_for_unattended="Unattended runs only when sealed"
+MODULE_TEXT_NAME__en__require_signed_seal="Seals must be signed"
+MODULE_TEXT_NAME__en__seal_immutable="Unsealing locked"
 MODULE_TEXT_NAME__en__webhook_signatures="Webhook signatures (HMAC)"
 
 # MODULE_TEXT_DESC
@@ -290,6 +310,8 @@ MODULE_TEXT_DESC__de__wishes="Zerlegt frei formulierte Ziele in Workflows und Ch
 MODULE_TEXT_DESC__de__provenance="Jeder Run speichert einen SHA-256-Hash der Workflow-Definition, deren Version und die Auslösequelle."
 MODULE_TEXT_DESC__de__sealing="Versiegelte Definitionen lehnen Änderungen ab und starten nicht, wenn sie verändert wurden."
 MODULE_TEXT_DESC__de__require_sealed_for_unattended="Unbeaufsichtigte Runs (Schedules, Webhooks, Trigger, Auto-Reparatur, Wünsche und die davon gestarteten Chains oder Sub-Workflows) starten nur versiegelte Workflows."
+MODULE_TEXT_DESC__de__require_signed_seal="Versiegelte Workflows brauchen eine gültige Signatur (Schlüssel außerhalb der Datenbank). Ein Siegel ohne oder mit falscher Signatur lehnt seine Runs ab."
+MODULE_TEXT_DESC__de__seal_immutable="Entsiegeln ist über die Oberfläche und die API nicht mehr möglich; ein Siegel löst nur, wer die Startkonfiguration ändern kann."
 MODULE_TEXT_DESC__de__webhook_signatures="Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
 MODULE_TEXT_DESC__en__dashboard_report="Block type that lets a workflow fill the dashboard result from config fields, plus the editor's AI proposal for those fields."
 MODULE_TEXT_DESC__en__chains="Chains several workflows into a pipeline that runs one after another."
@@ -313,4 +335,6 @@ MODULE_TEXT_DESC__en__wishes="Decomposes free-text goals into workflows and chai
 MODULE_TEXT_DESC__en__provenance="Every run records a SHA-256 hash of the workflow definition, its version and the trigger source."
 MODULE_TEXT_DESC__en__sealing="Sealed definitions reject edits and refuse to run once they have been tampered with."
 MODULE_TEXT_DESC__en__require_sealed_for_unattended="Unattended runs (schedules, webhooks, triggers, auto-repair, wishes and the chains or sub-workflows they start) only start sealed workflows."
+MODULE_TEXT_DESC__en__require_signed_seal="Sealed workflows need a valid signature (key outside the database). A seal without one, or with a wrong one, refuses its runs."
+MODULE_TEXT_DESC__en__seal_immutable="Unsealing is no longer possible through the UI or the API; a seal is released only by someone who can change the startup configuration."
 MODULE_TEXT_DESC__en__webhook_signatures="Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."

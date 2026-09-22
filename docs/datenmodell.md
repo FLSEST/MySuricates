@@ -1259,6 +1259,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V81 | `V81__onboarding_profile_content_i18n.sql` | content in onboarding_profiles und onboarding_profile_history als JSON-Map `{de, en}`; Bestand wird `de` |
 | V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
 | V83 | `V83__onboarding_profile_shipped_version.sql` | `customized`, `shipped_version` in onboarding_profiles (bearbeitete Built-in-Profile bekommen neue Fassungen angeboten statt überschrieben) |
+| V84 | `V84__seal_signature_and_history.sql` | `sealed_signature` in workflows (HMAC mit Schlüssel außerhalb der DB), neue Tabelle `workflow_seal_events` (verkettete Historie von Versiegeln und Entsiegeln, ohne Fremdschlüssel) |
 
 ## SQLite-Besonderheiten
 

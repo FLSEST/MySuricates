@@ -12,8 +12,6 @@ import com.automation.service.activitylog.ActivityLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -83,9 +81,9 @@ public class RunAdmission {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("triggerSource", source.name());
         metadata.put("effectiveSource", origin);
-        logRefusal(LogLevel.WARN,
+        activityLog.logRefusal(LogLevel.WARN, LogCategory.SECURITY,
                 "Run refused — unattended run (" + origin + ") of unsealed workflow '" + workflow.getName() + "'",
-                workflow.getId(), metadata);
+                "RunAdmission", workflow.getId(), metadata, workflow.getId());
         throw new HardeningException(ErrorCode.UNATTENDED_REQUIRES_SEAL,
                 "Workflow '" + workflow.getName() + "' was not started: unattended runs (" + origin
                         + ") require a sealed workflow (automation.hardening.require-sealed-for-unattended)");
@@ -114,38 +112,11 @@ public class RunAdmission {
         if (!verdict.changedSkills().isEmpty()) {
             metadata.put("changedSkills", List.copyOf(verdict.changedSkills()));
         }
-        logRefusal(LogLevel.ERROR, "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
-                workflow.getId(), metadata);
+        activityLog.logRefusal(LogLevel.ERROR, LogCategory.SECURITY,
+                "Run refused — sealed workflow '" + workflow.getName() + "': " + reason,
+                "RunAdmission", workflow.getId(), metadata, workflow.getId());
         return new HardeningException(ErrorCode.WORKFLOW_TAMPERED,
                 "Sealed workflow '" + workflow.getName() + "' was not started: " + reason);
     }
 
-    /**
-     * Writes the SECURITY entry of a refused start. The refusal is an exception, so inside a
-     * caller's transaction (webhook, schedule, chain) the entry would be rolled back with it and
-     * the refusal would leave no trace at all. It is therefore written after that transaction has
-     * ended, on its own virtual thread: with pool-size 1 the caller still holds the only
-     * connection until its transaction is cleaned up, so the writer waits for it instead of the
-     * caller's thread blocking on itself (which REQUIRES_NEW would do).
-     */
-    private void logRefusal(LogLevel level, String message, String workflowId, Map<String, Object> metadata) {
-        Runnable write = () -> activityLog.log(level, LogCategory.SECURITY, message, "RunAdmission", workflowId,
-                metadata, workflowId);
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            write.run();
-            return;
-        }
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCompletion(int status) {
-                Thread.ofVirtual().name("run-refusal-log").start(() -> {
-                    try {
-                        write.run();
-                    } catch (RuntimeException e) {
-                        log.warn("Could not record refused start of workflow {}: {}", workflowId, e.getMessage());
-                    }
-                });
-            }
-        });
-    }
 }

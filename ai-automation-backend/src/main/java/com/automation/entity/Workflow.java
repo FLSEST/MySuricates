@@ -139,6 +139,13 @@ public class Workflow {
     @Column(name = "sealed_skill_hashes", columnDefinition = "text")
     private String sealedSkillHashes;
 
+    /**
+     * HMAC over id, definition hash and skill pins with a key outside the database
+     * ({@code WorkflowSealSigner}); {@code null} for seals made before signing or without a key.
+     */
+    @Column(name = "sealed_signature")
+    private String sealedSignature;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

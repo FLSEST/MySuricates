@@ -11,6 +11,7 @@ import java.util.List;
  * @param state           {@code INTACT}, {@code VIOLATED} or {@code NOT_SEALED}
  * @param problem         {@code NONE}, {@code DEFINITION_CHANGED}, {@code SKILLS_CHANGED} or {@code UNVERIFIABLE}
  * @param skillsPinned    whether the seal covers skill content ({@code false} for seals from before V80)
+ * @param signed          whether the seal carries a signature (key outside the database)
  * @param refusedStarts   starts refused by RunAdmission in the last seven days
  * @param lastRefusal     activity-log message of the latest refusal, {@code null} if none
  */
@@ -22,6 +23,7 @@ public record WorkflowSealStatusResponse(
         String detail,
         List<SkillRef> changedSkills,
         boolean skillsPinned,
+        boolean signed,
         int pinnedSkillCount,
         Instant sealedAt,
         int refusedStarts,

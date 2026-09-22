@@ -8,6 +8,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
 import com.automation.entity.Workflow;
+import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ActivityLogRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
@@ -43,7 +44,7 @@ class WorkflowSealStatusServiceTest {
     @BeforeEach
     void setUp() {
         service = new WorkflowSealStatusService(workflowRepository, skillRepository, activityLogRepository,
-                new WorkflowSealVerifier(hasher, skillPins));
+                new WorkflowSealVerifier(hasher, skillPins, RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())));
         lenient().when(activityLogRepository.findBySourceAndTimestampAfterOrderByTimestampDesc(eq("RunAdmission"), any()))
                 .thenReturn(List.of());
     }
