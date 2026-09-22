@@ -40,6 +40,16 @@ check "container without compose label counts as foreign" '[ "$RC" = 2 ]'
 check "own container is fine"                   'OWNER=mysuricates-demo INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name demo --no-wait >/dev/null 2>&1'
 check "down stays inside its compose project"   'OWNER=ai-automation-backend bash "$SCRIPT" down --name demo >/dev/null 2>&1; tail -1 "$DOCKER_LOG" | grep -- "-p mysuricates-demo" >/dev/null'
 
+echo "1c) bound to the network: the address of this machine is named (b8aa3866)"
+printf '#!/bin/sh\n[ "$1" = -I ] && echo "192.168.7.7 127.0.0.1"\n' > "$TMP/bin/hostname"; chmod +x "$TMP/bin/hostname"
+printf 'MYSURICATES_PORT=19402\nMYSURICATES_BIND=0.0.0.0\nMYSURICATES_LANG=en\n' > "$TMP/inst/lan.env"
+OUT="$(OWNER=mysuricates-lan INSTANCE_HEALTH_TIMEOUT=5 bash "$SCRIPT" up --name lan 2>&1)"
+check "0.0.0.0: localhost and network address"  'printf "%s" "$OUT" | grep -F "http://localhost:19402" >/dev/null && printf "%s" "$OUT" | grep -F "http://192.168.7.7:19402" >/dev/null'
+check "0.0.0.0: VPN hint"                       'printf "%s" "$OUT" | grep "VPN in front" >/dev/null'
+OUT="$(OWNER=mysuricates-demo INSTANCE_HEALTH_TIMEOUT=5 bash "$SCRIPT" up --name demo 2>&1)"
+check "127.0.0.1: one line, no network address" 'printf "%s" "$OUT" | tail -n 1 | grep -x "mysuricates-demo läuft: http://localhost:19400" >/dev/null && ! printf "%s" "$OUT" | grep VPN >/dev/null'
+rm -f "$TMP/bin/hostname"
+
 echo "2) AUTOMATION_* lines reach the instance"
 check "compose passes the instance file as env_file" 'grep -q "env_file:" "$HERE/../../deploy/compose.yml" && grep -q "MYSURICATES_ENV_FILE" "$HERE/../../deploy/compose.yml"'
 

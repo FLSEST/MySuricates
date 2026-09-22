@@ -10,7 +10,10 @@ mkdir -p "$TMP/home" "$TMP/bin" "$TMP/tools"
 # Eigener PATH ohne echte KI-CLIs: nur die Werkzeuge, die providers.sh braucht (auf dem Host liegen
 # codex/pi evtl. in /usr/bin und wuerden "present" vortaeuschen).
 for t in dirname tr grep cat; do ln -s "$(command -v "$t")" "$TMP/tools/$t"; done
-run() { ( HOME="$TMP/home" PATH="$TMP/bin:$TMP/tools"; export HOME PATH; . "$HERE/../lib/providers.sh"; eval "$1" ); }
+# Anmelde-Variablen des Hosts (z. B. ANTHROPIC_API_KEY) duerfen die Tests nicht beeinflussen.
+run() { ( HOME="$TMP/home" PATH="$TMP/bin:$TMP/tools"; export HOME PATH; . "$HERE/../lib/providers.sh"
+  for _id in "${PROVIDER_IDS[@]}"; do for _v in $(provider_get "$_id" login_env); do unset "$_v"; done; done
+  eval "$1" ); }
 # grep ohne -q: -q beendet sich beim ersten Treffer, der Schreiber bekommt SIGPIPE, und
 # pipefail wertet die Pipeline dann als Fehler.
 has() { run "providers_status" | grep -x -- "$1" >/dev/null; }
@@ -43,7 +46,19 @@ check "an empty credentials file is not"        'has "claude present logged-out"
 echo '{"claudeAiOauth":{}}' > "$TMP/home/.claude/.credentials.json"
 check "claude via .credentials.json"            'has "claude present logged-in"'
 
-echo "4) bash 3.2 hygiene"
+echo "4) login via environment variable (0b1a3ae7)"
+rm -f "$TMP/home/.claude/.credentials.json" "$TMP/home/.codex/auth.json"; echo '{}' > "$TMP/home/.pi/agent/auth.json"
+check "catalog names login variables"           '[ "$(run "provider_get claude login_env")" = "CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY" ]'
+check "without files and variables: logged out" 'has "claude present logged-out" && has "codex present logged-out" && has "pi present logged-out"'
+check "CLAUDE_CODE_OAUTH_TOKEN logs claude in"  '[ "$(run "CLAUDE_CODE_OAUTH_TOKEN=sk-secret-123; export CLAUDE_CODE_OAUTH_TOKEN; providers_status")" = "claude present logged-in
+codex present logged-out
+pi present logged-out" ]'
+check "ANTHROPIC_API_KEY: claude and pi"        '[ "$(run "export ANTHROPIC_API_KEY=x; providers_status" | grep -c " logged-in$")" = 2 ]'
+check "OPENAI_API_KEY logs codex in"            'run "export OPENAI_API_KEY=x; providers_status" | grep -x "codex present logged-in" >/dev/null'
+check "an empty variable is not a login"        'run "export CLAUDE_CODE_OAUTH_TOKEN=; providers_status" | grep -x "claude present logged-out" >/dev/null'
+check "the value is never printed"              '! run "export CLAUDE_CODE_OAUTH_TOKEN=sk-secret-123; providers_status; provider_logged_in claude" 2>&1 | grep -q sk-secret'
+
+echo "5) bash 3.2 hygiene"
 check "no bash-4-only syntax"                   '! grep -nE "declare -g?A|mapfile|readarray" "$HERE/../lib/providers.sh" "$HERE/../lib/provider-catalog.generated.sh"'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

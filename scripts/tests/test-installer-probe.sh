@@ -61,6 +61,27 @@ else
   echo "  skip (no usable script command)"
 fi
 
+echo "5) screenshot helper: a missing browser is named, not a stack trace (65164c57)"
+if command -v node >/dev/null 2>&1; then
+  SCREENS="$HERE/../lib/installer_probe_screens.mjs"
+  # Fake-Playwright: launch() wirft, wie Playwright es nach einem Update ohne Browser-Download tut
+  cat > "$TMP/pw-missing.mjs" <<'MJS'
+export const chromium = { launch: async () => { throw new Error("browserType.launch: Executable doesn't exist at /pw/chromium_headless_shell-9999/chrome-headless-shell\n╔══╗\n║ Looks like Playwright was just installed or updated. ║\n║ Please run the following command to download new browsers: npx playwright install ║"); } };
+MJS
+  cat > "$TMP/pw-broken.mjs" <<'MJS'
+export const chromium = { launch: async () => { throw new Error("browserType.launch: Target page, context or browser has been closed\nmore"); } };
+MJS
+  PLAYWRIGHT_MODULE="$TMP/pw-missing.mjs" node "$SCREENS" http://127.0.0.1:1/ "$TMP" >"$TMP/shots" 2>&1; RC=$?
+  check "missing browser exits 3"                       '[ "$RC" = 3 ]'
+  check "names the path and npm run pw:install"         'grep -F "browser missing: /pw/chromium_headless_shell-9999/chrome-headless-shell" "$TMP/shots" >/dev/null && grep -F "npm run pw:install" "$TMP/shots" >/dev/null'
+  check "one line, no stack trace"                      '[ "$(wc -l < "$TMP/shots")" -eq 1 ]'
+  PLAYWRIGHT_MODULE="$TMP/pw-broken.mjs" node "$SCREENS" http://127.0.0.1:1/ "$TMP" >"$TMP/shots" 2>&1; RC=$?
+  check "other launch errors stay a failure (exit 1)"   '[ "$RC" = 1 ] && grep -F "login failed: browser did not start" "$TMP/shots" >/dev/null'
+  check "the probe turns exit 3 into the hint"          'grep -F "Browser fehlt — im Frontend" "$PROBE" >/dev/null && grep -F "SHOTS_RC\" = 3" "$PROBE" >/dev/null'
+else
+  echo "  skip (no node)"
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

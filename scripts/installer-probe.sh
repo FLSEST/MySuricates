@@ -261,7 +261,12 @@ else
     timeout 180 node "$SCRIPT_DIR/lib/installer_probe_screens.mjs" "http://127.0.0.1:${FPORT}/" "$OUT/screens" 2>&1)"
   SHOTS_RC=$?
   unset KEY
-  if [ "$SHOTS_RC" = 0 ]; then
+  if [ "$SHOTS_RC" = 3 ]; then
+    # Browser zur installierten Playwright-Version fehlt (nach einem Update, 65164c57). Rot statt
+    # skip, weil der Login dann ungeprueft ist und GREEN "bis Login durch" behaupten wuerde — aber mit
+    # der Abhilfe statt eines Stacktraces. Nachladen ist Flos Entscheidung, die Probe laedt nichts.
+    check "Login im Browser mit dem erzeugten API-Key" fail "Browser fehlt — im Frontend \`npm run pw:install\` ausführen ($(grep -o '^browser missing: [^ ]*' <<<"$SHOTS" | head -n1 | sed 's/^browser missing: //'))"
+  elif [ "$SHOTS_RC" = 0 ]; then
     check "Login im Browser mit dem erzeugten API-Key" ok "$(grep -o 'console-errors [0-9]*' <<<"$SHOTS" | sed 's/console-errors /Konsolenfehler: /')$(grep '^console-error ' <<<"$SHOTS" | sed 's/^console-error / · /' | tr -d '\n')"
   else
     check "Login im Browser mit dem erzeugten API-Key" fail "$(grep -E 'failed' <<<"$SHOTS" | head -n1)"

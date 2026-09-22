@@ -402,6 +402,10 @@ page with terminal transcript and screenshots under
 `~/.local/state/mysuricates/installer-probe/<time>-<sha>/report.html` (`latest` points to the last
 run). A run downloads JDK, Node, npm packages and Maven dependencies fresh every time. The container
 way (Docker inside the container) is not part of the probe yet.
+The screenshots are taken by Playwright from `ai-automation-frontend/node_modules` on the host. If
+the browser for the installed Playwright version is missing (typically after an update), the login
+check turns red with "Browser fehlt — im Frontend `npm run pw:install` ausführen" (browser missing,
+run `npm run pw:install` in the frontend); the probe downloads nothing.
 
 Before a release it runs as the workflow **Installer probe** (pool entry
 `mysuricates-installer-probe`, variable `ref`, default `main`). The workflow takes the probe script

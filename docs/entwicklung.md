@@ -419,6 +419,9 @@ Das Ergebnis ist eine einzelne HTML-Seite mit Terminal-Mitschnitt und Screenshot
 `~/.local/state/mysuricates/installer-probe/<zeit>-<sha>/report.html` (`latest` zeigt auf den letzten
 Lauf). Ein Lauf lädt JDK, Node, npm-Pakete und Maven-Abhängigkeiten jedes Mal frisch. Der
 Container-Weg (Docker im Container) ist noch nicht Teil der Probe.
+Die Screenshots macht Playwright aus `ai-automation-frontend/node_modules` auf dem Rechner. Fehlt
+der Browser zur installierten Playwright-Version (typisch nach einem Update), wird die Login-Prüfung
+rot mit „Browser fehlt — im Frontend `npm run pw:install` ausführen“; die Probe lädt nichts nach.
 
 Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
 `mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript

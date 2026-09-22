@@ -47,6 +47,9 @@ class ProviderCatalogTest {
             assertThat(setup.login()).as(provider.getId() + ": login").isNotBlank();
             assertThat(setup.loginFiles()).as(provider.getId() + ": loginFiles").isNotEmpty()
                     .allSatisfy(f -> assertThat(f).as("relativ zu $HOME").doesNotStartWith("/").doesNotStartWith("~"));
+            // Namen landen unquotiert in ${!name} des Installers — nur Grossbuchstaben, Ziffern, _
+            assertThat(setup.loginEnv()).as(provider.getId() + ": loginEnv")
+                    .allSatisfy(v -> assertThat(v).matches("[A-Z][A-Z0-9_]*"));
         });
     }
 
@@ -97,6 +100,8 @@ class ProviderCatalogTest {
                 # Reine Daten, keine Funktionen; Skalare statt assoziativer Arrays (bash 3.2, macOS).
                 # login_files: relativ zu $HOME, durch Leerzeichen getrennt; "datei:muster" heisst, die Datei
                 # muss das Muster enthalten. Die erste zutreffende zaehlt als angemeldet.
+                # login_env: Umgebungsvariablen, durch Leerzeichen getrennt; eine gesetzte, nicht leere
+                # zaehlt ebenfalls als angemeldet (der Wert wird nie ausgegeben).
 
                 PROVIDER_IDS=(
                 """);
@@ -110,6 +115,7 @@ class ProviderCatalogTest {
             out.append(prefix).append("install=\"").append(quote(setup.install())).append("\"\n");
             out.append(prefix).append("login=\"").append(quote(setup.login())).append("\"\n");
             out.append(prefix).append("login_files=\"").append(quote(String.join(" ", setup.loginFiles()))).append("\"\n");
+            out.append(prefix).append("login_env=\"").append(quote(String.join(" ", setup.loginEnv()))).append("\"\n");
         }
         return out.toString();
     }

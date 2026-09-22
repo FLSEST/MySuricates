@@ -40,6 +40,7 @@ jobs:
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
         run: |
           bash scripts/tests/test-providers.sh
+          bash scripts/tests/test-netaddr.sh
           bash scripts/tests/test-i18n.sh
           bash scripts/tests/test-tui.sh
           bash scripts/tests/test-deps.sh

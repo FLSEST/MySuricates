@@ -34,7 +34,9 @@ public class ClaudeAiProvider implements AiProvider {
         return new ProviderSetup("claude",
                 "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
                 "claude auth login",
-                java.util.List.of(".claude/.credentials.json", ".claude.json:oauthAccount"));
+                java.util.List.of(".claude/.credentials.json", ".claude.json:oauthAccount"),
+                // claude setup-token bzw. API-Schluessel statt Anmeldedatei
+                java.util.List.of("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"));
     }
 
     @Override

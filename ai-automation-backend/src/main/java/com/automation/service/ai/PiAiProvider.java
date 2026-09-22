@@ -35,7 +35,11 @@ public class PiAiProvider implements AiProvider {
         // Anfuehrungszeichen heisst "mindestens ein Schluessel", ein leeres {} zaehlt nicht
         return new ProviderSetup("pi", "npm install -g @earendil-works/pi-coding-agent",
                 "pi, then /login   (or an API key as environment variable, see pi --help)",
-                java.util.List.of(".pi/agent/auth.json:\""));
+                java.util.List.of(".pi/agent/auth.json:\""),
+                // die gaengigen Backends aus "pi --help" (Environment Variables); jeder Schluessel
+                // reicht, weil pi das Backend je Modell waehlt (<backend>/<model>)
+                java.util.List.of("ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN", "OPENAI_API_KEY",
+                        "GEMINI_API_KEY", "OPENROUTER_API_KEY"));
     }
 
     @Override

@@ -7,11 +7,29 @@
 //
 // Prints one line per result ("login ok", "dashboard ok", "console-errors N") and exits 1 when
 // the login field never shows up or the login does not lead away from the login screen.
+// Exits 3 with "browser missing: <path>" when the Chromium that this Playwright version expects is
+// not downloaded — typical right after a Playwright update (65164c57). Fix: `npm run pw:install` in
+// ai-automation-frontend; this script never downloads anything itself.
+const BROWSER_MISSING_EXIT = 3;
 const [url, outDir] = process.argv.slice(2);
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
 const key = process.env.PROBE_API_KEY ?? '';
 
-const browser = await chromium.launch();
+// Detected from launch() itself, not by checking executablePath() up front: headless runs use the
+// separate headless shell, so a missing full Chromium alone would be a false alarm.
+let browser;
+try {
+  browser = await chromium.launch();
+} catch (err) {
+  const text = String(err);
+  if (/Executable doesn't exist|playwright install/i.test(text)) {
+    const path = (text.match(/Executable doesn't exist at (\S+)/) || [])[1] || 'unknown path';
+    console.log(`browser missing: ${path} — run \`npm run pw:install\` in ai-automation-frontend`);
+    process.exit(BROWSER_MISSING_EXIT);
+  }
+  console.log(`login failed: browser did not start: ${text.split('\n')[0]}`);
+  process.exit(1);
+}
 let failed = false;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
