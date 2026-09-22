@@ -81,12 +81,11 @@ public class ConditionalBlockExecutor implements BlockExecutor {
                     : context.resolvePromptTemplate(commandToExecute);
             StepResult stepResult;
             if (isShell) {
+                // Like retry/foreach/while/switch: container_image, mount_docker_socket and mounts
+                // reach the branch command — before ee37f4c8 it silently ran on the host.
                 stepResult = commandExecutor.executeStepAsShell(
                         context.getProjectPath(),
-                        BlockDefinition.builder()
-                                .type("shell")
-                                .config(Map.of("command", resolved))
-                                .build(),
+                        CommandExecutorService.buildResolvedShellBlock(config, resolved, context),
                         context.nextStepIndex(),
                         shellTimeout
                 );

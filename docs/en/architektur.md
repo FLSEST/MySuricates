@@ -43,7 +43,7 @@ This page describes its internal structure. For getting started see
 │                  Docker Engine                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
 │  │agent-node│  │agent-py  │  │agent-go  │              │
-│  │(Node 21) │  │(Python   │  │(Go 1.22) │              │
+│  │(Node 22) │  │(Python   │  │(Go 1.24) │              │
 │  │          │  │ 3.12)    │  │          │              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └─────────────────────────────────────────────────────────┘

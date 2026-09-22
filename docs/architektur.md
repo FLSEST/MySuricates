@@ -46,7 +46,7 @@ Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
 │                  Docker Engine                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
 │  │agent-node│  │agent-py  │  │agent-go  │              │
-│  │(Node 21) │  │(Python   │  │(Go 1.22) │              │
+│  │(Node 22) │  │(Python   │  │(Go 1.24) │              │
 │  │          │  │ 3.12)    │  │          │              │
 │  └──────────┘  └──────────┘  └──────────┘              │
 └─────────────────────────────────────────────────────────┘

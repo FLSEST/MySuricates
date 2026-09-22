@@ -241,6 +241,53 @@ class ConditionalBlockExecutorTest {
         verify(commandExecutor, never()).executeOnHost(any(HostExecutionRequest.class));
     }
 
+    /** ee37f4c8: the branch command honours container_image like retry/foreach/while/switch. */
+    @Test
+    void execute_shellMode_passesContainerImageAndMountsToTheBranchCommand() {
+        when(commandExecutor.executeShellCommandOnHost(anyString(), anyString(), anyInt()))
+                .thenReturn(new CliSession.CommandResult("", 0));
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("execution_mode", "shell");
+        config.put("condition", "true");
+        config.put("then_command", "node --version");
+        config.put("container_image", "automation-agent-node:latest");
+        config.put("mount_docker_socket", false);
+        config.put("mounts", java.util.List.of("/data:/data:ro"));
+
+        executor.execute(BlockDefinition.builder().type("conditional").config(config).build(), context);
+
+        ArgumentCaptor<BlockDefinition> shellBlock = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(eq("/test/project"), shellBlock.capture(), anyInt(), anyInt());
+        assertThat(shellBlock.getValue().getType()).isEqualTo("shell");
+        assertThat(shellBlock.getValue().getConfig())
+                .containsEntry("command", "node --version")
+                .containsEntry("container_image", "automation-agent-node:latest")
+                .containsEntry("mount_docker_socket", false)
+                .containsEntry("mounts", java.util.List.of("/data:/data:ro"));
+    }
+
+    @Test
+    void execute_shellMode_withoutContainerImage_staysOnTheHost() {
+        when(commandExecutor.executeShellCommandOnHost(anyString(), anyString(), anyInt()))
+                .thenReturn(new CliSession.CommandResult("", 0));
+        when(commandExecutor.executeStepAsShell(anyString(), any(BlockDefinition.class), anyInt(), anyInt()))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("execution_mode", "shell");
+        config.put("condition", "true");
+        config.put("then_command", "echo then");
+
+        executor.execute(BlockDefinition.builder().type("conditional").config(config).build(), context);
+
+        ArgumentCaptor<BlockDefinition> shellBlock = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(anyString(), shellBlock.capture(), anyInt(), anyInt());
+        assertThat(shellBlock.getValue().getConfig()).containsOnlyKeys("command");
+    }
+
     @Test
     void execute_shellMode_nonZeroExit_executesElseBranch() {
         when(commandExecutor.executeShellCommandOnHost(anyString(), anyString(), anyInt()))
