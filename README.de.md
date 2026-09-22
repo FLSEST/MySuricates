@@ -67,20 +67,20 @@ darunter Integrationen, Webhooks und Fernzugriff. Der Installer fragt danach.
 
 Stand 2026-09-22 (Commit `d23a09ed`, Release v0.7.6 plus Nacharbeit), Commit-Zaehler und Zeilen
 aus dem Arbeitsbaum an diesem Tag (Zeilen per `wc -l`, inkl. Leer- und Kommentarzeilen; Backend
-`src/main/java`, Frontend `src` inkl. Tests). Testzahlen aus einem Lauf in einem isolierten
-Worktree, datiert in der Tabelle:
+`src/main/java`, Frontend `src` inkl. Tests). Testzahlen aus dem CI-Lauf zu diesem Commit,
+datiert in der Tabelle:
 
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, rund 1 800 Commits, ein Autor |
 | Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 48 REST-Controller, 84 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
-| Tests | Backend 10 313 (0 Fehler, 1 uebersprungen), Frontend 1 436 — Lauf vom 2026-09-21 |
+| Tests | Backend 10 476, Frontend 1 580 (192 Dateien) — 0 Fehler, 0 uebersprungen, CI-Lauf 35777382298 vom 2026-09-22 |
 | Bausteine | 20 Block-Typen, 66 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 7 Integrations-Provider |
 
-Die Testzahlen sind ein datierter Befund aus einem lokalen Lauf. Die CI-Definition
-(`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push, zusaetzlich
-zu Hygiene-Gate und Secret-Scan; die Zahlen oben stammen aber nicht aus einem CI-Lauf.
+Die Testzahlen stammen aus dem CI-Lauf zu genau diesem Commit und sind damit nachpruefbar. Die
+CI-Definition (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push,
+zusaetzlich zu Hygiene-Gate und Secret-Scan; seit dem 2026-09-21 auf Ubuntu 26.04.
 
 ## Reifegrad und bekannte Schulden
 

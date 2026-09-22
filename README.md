@@ -67,20 +67,20 @@ including integrations, webhooks, and remote access. The installer asks about th
 
 Status as of 2026-09-22 (commit `d23a09ed`, release v0.7.6 plus follow-up work), commit counter and lines
 from the working tree on that day (lines via `wc -l`, including blank and comment lines; backend
-`src/main/java`, frontend `src` including tests). Test numbers from a run in an isolated
-worktree, dated in the table:
+`src/main/java`, frontend `src` including tests). Test numbers from the CI run for this commit,
+dated in the table:
 
 | | |
 |---|---|
 | Created since | 2026-02-15, around 1,800 commits, one author |
 | Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 48 REST controllers, 84 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
-| Tests | Backend 10,313 (0 failures, 1 skipped), frontend 1,436 — run from 2026-09-21 |
+| Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 of 2026-09-22 |
 | Building blocks | 20 block types, 66 workflow templates, 20 blueprints (basic structures to fill in), 19 built-in skills, 7 integration providers |
 
-The test numbers are a dated finding from a local run. The CI definition
-(`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12, in addition
-to the hygiene gate and secret scan; however, the numbers above do not come from a CI run.
+The test numbers come from the CI run for exactly this commit and are therefore verifiable. The
+CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12, in
+addition to the hygiene gate and secret scan; since 2026-09-21 on Ubuntu 26.04.
 
 ## Maturity and known debt
 
