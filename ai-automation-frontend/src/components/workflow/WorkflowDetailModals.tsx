@@ -6,6 +6,7 @@ import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import { DashboardReportFields } from './DashboardReportFields';
 import { BlockSkillPicker } from './BlockSkillPicker';
 import { BLOCK_DEFAULT_CONFIG, buildBlockConfigSchema } from './blockConfigSchema';
+import { buildPlaceholderContext } from './placeholderContext';
 import type { BlockDraft } from './blockEdit';
 import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
 import { useI18nStore, useT } from '../../i18n';
@@ -171,6 +172,15 @@ export function WorkflowDetailModals({
   // Stable per type/locale: a new object would re-register the schema on every keystroke
   const newBlockSchema = useMemo(() => buildBlockConfigSchema(newBlock.type, locale), [newBlock.type, locale]);
   const editBlockSchema = useMemo(() => buildBlockConfigSchema(editBlock.type, locale), [editBlock.type, locale]);
+  // Which {{ }} are bound where the block sits: a new block is appended, an edited one keeps its position
+  const newBlockPlaceholders = useMemo(
+    () => buildPlaceholderContext(workflow.blocks, workflow.blocks.length, { type: newBlock.type, configJson: newBlock.config }, { defaultContext: workflow.defaultContext, locale }),
+    [workflow.blocks, workflow.defaultContext, newBlock.type, newBlock.config, locale],
+  );
+  const editBlockPlaceholders = useMemo(
+    () => buildPlaceholderContext(workflow.blocks, editBlockIndex, { type: editBlock.type, configJson: editBlock.config }, { defaultContext: workflow.defaultContext, locale }),
+    [workflow.blocks, workflow.defaultContext, editBlockIndex, editBlock.type, editBlock.config, locale],
+  );
   // What THIS backend can execute (BlockTypeRegistry); the static list is only the fallback
   const blockTypes = useBlockTypes();
   // A type only the server knows has no icon and no label in this build — offer its raw name
@@ -295,6 +305,7 @@ export function WorkflowDetailModals({
               onChange={(val) => setNewBlock({ ...newBlock, config: val })}
               language="json"
               jsonSchema={newBlockSchema}
+              placeholders={newBlockPlaceholders}
               fill
             />
           </div>
@@ -387,6 +398,7 @@ export function WorkflowDetailModals({
               onChange={(val) => setEditBlock({ ...editBlock, config: val })}
               language="json"
               jsonSchema={editBlockSchema}
+              placeholders={editBlockPlaceholders}
               fill
               revealText={editBlockRevealText}
               revealNonce={editBlockRevealNonce}

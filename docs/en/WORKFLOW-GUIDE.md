@@ -744,7 +744,9 @@ Module: `dashboard-report` (standard on, can be switched off). When off, the blo
 
 ### Variable Syntax
 
-Variables use double braces: `{{ variable_name }}` (spaces optional: `{{variable_name}}` works too).
+Variables use double braces: `{{ variable_name }}` or `{{variable_name}}`. The space must be the same on both sides: `{{ variable_name}}` is **not** resolved and stays literally.
+
+**Help in the block editor:** After `{{` the config field suggests exactly the variables bound at that position: outputs of earlier blocks, their `variable_name`, system variables and start values. Behind each placeholder it shows where the value comes from (`{{ previous_output }} ← #3 backend_tests`), and the hover explains it. Underlined in yellow: references to blocks that do not exist or run later, uneven spaces, and quoted output placeholders in shell commands. The logic lives in `ai-automation-frontend/src/components/workflow/placeholderContext.ts` and follows `BlockStepRunner`/`ExecutionContextFactory`: whoever adds a variable there adds it here too.
 
 ### Built-in Variables
 
