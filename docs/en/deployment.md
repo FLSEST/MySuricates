@@ -510,6 +510,24 @@ covers the bundled frontend and any unmapped path.
 counts as authenticated. An empty key therefore switches authentication off entirely rather than
 tightening it.
 
+### Host-reaching endpoints behind the API key
+
+Some endpoints reach the host or hand out operational data. They are not in the exemption list
+above and require the API key like every other path under `/api/**`:
+
+| Endpoint | What it does | Additional guard |
+|---|---|---|
+| `GET /api/v1/debug/failed-workflows` | Lists workflows whose latest run failed (read-only) | Module `debug`, off in the default preset `core` (`@RequiresModule`, `WorkflowDebugController`) |
+| `POST /api/v1/system/open-path` | Opens a path via `xdg-open` on the host desktop | Path is normalized, `/etc`, `/proc`, `/sys`, `/dev`, `/var/run` are blocked (`FileBrowserService`) |
+| `GET /api/v1/system/browse` | Lists the subdirectories of a path (names only, no hidden ones) | Root and the same system directories blocked (`FileBrowserService`) |
+| `GET /api/v1/system/backups/{filename}` | Downloads a database backup | Only file names from the backup directory, `..`, `/` and `\` yield 404 (`DatabaseBackupService.getBackupFile`) |
+
+The boundary here is the API key, not the individual endpoint. Whoever holds the key can already
+start shell workflows with the user's rights ([What a workflow is allowed to do](#what-a-workflow-is-allowed-to-do)).
+These endpoints do not extend that, they are more convenient routes to things a workflow can do
+anyway. A database backup does, however, contain every run, output and setting of the instance and
+is as confidential as the key itself.
+
 ### Webhooks
 
 The trigger endpoint is guarded solely by a token in the path (32 random bytes from `SecureRandom`).

@@ -46,6 +46,16 @@ for f in AGENTS.md API.md docs/api.md README.md; do
   fi
 done
 
+# Endpunkte, die bis auf den Host reichen oder Betriebsdaten herausgeben (TODO
+# bcfec862): Ihre Absicherung steht im Vertrauensmodell von docs/deployment.md.
+# Hier wird nur deterministisch belegt, dass jeder dort genannt ist.
+inventory_section "Host-reaching endpoints documented in the trust model (docs/deployment.md)"
+for ep in '/api/v1/debug/' '/api/v1/system/open-path' '/api/v1/system/browse' '/api/v1/system/backups/{filename}'; do
+  if grep -qF -- "$ep" docs/deployment.md 2>/dev/null; then doc=yes; else doc=no; fi
+  printf '%s: documented=%s\n' "$ep" "$doc"
+done
+echo "note: all of them require the API key (ApiKeyAuthFilter); guards per endpoint in docs/deployment.md, section 'Host-nahe Endpunkte hinter dem API-Key'"
+
 section "Gate status"
 echo "gate_status: YELLOW"
 echo "gate_category: public-surface"

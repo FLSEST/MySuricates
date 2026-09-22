@@ -514,6 +514,24 @@ das betrifft das ausgelieferte Frontend und jeden nicht gemappten Pfad.
 als authentifiziert. Ein leerer Schlüssel schaltet die Authentifizierung also vollständig ab, statt
 sie zu verschärfen.
 
+### Host-nahe Endpunkte hinter dem API-Key
+
+Einige Endpunkte reichen bis auf den Host oder geben Betriebsdaten heraus. Sie stehen nicht in der
+Ausnahmeliste oben und verlangen den API-Key wie jeder andere Pfad unter `/api/**`:
+
+| Endpunkt | Was er tut | Zusätzliche Absicherung |
+|---|---|---|
+| `GET /api/v1/debug/failed-workflows` | Listet Workflows, deren letzter Run fehlschlug (nur lesend) | Modul `debug`, im Standard-Preset `core` aus (`@RequiresModule`, `WorkflowDebugController`) |
+| `POST /api/v1/system/open-path` | Öffnet einen Pfad per `xdg-open` auf dem Host-Desktop | Pfad wird normalisiert, `/etc`, `/proc`, `/sys`, `/dev`, `/var/run` sind gesperrt (`FileBrowserService`) |
+| `GET /api/v1/system/browse` | Listet Unterverzeichnisse eines Pfads (nur Namen, ohne versteckte) | Wurzel und dieselben Systemverzeichnisse gesperrt (`FileBrowserService`) |
+| `GET /api/v1/system/backups/{filename}` | Lädt eine Datenbanksicherung herunter | Nur Dateinamen aus dem Backup-Verzeichnis, `..`, `/` und `\` ergeben 404 (`DatabaseBackupService.getBackupFile`) |
+
+Die Grenze ist hier der API-Key, nicht der einzelne Endpunkt. Wer den Key hat, kann ohnehin
+Shell-Workflows mit den Rechten des Benutzers starten ([Was ein Workflow darf](#was-ein-workflow-darf)).
+Diese Endpunkte erweitern das nicht, sie sind bequemere Wege zu Dingen, die ein Workflow auch kann. Eine
+Datenbanksicherung enthält allerdings alle Runs, Ausgaben und Einstellungen der Instanz und ist so
+vertraulich zu behandeln wie der Key selbst.
+
 ### Webhooks
 
 Der Trigger-Endpunkt wird allein durch ein Token im Pfad geschützt (32 Zufallsbytes aus
