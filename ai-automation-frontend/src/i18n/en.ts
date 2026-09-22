@@ -2131,6 +2131,8 @@ export const en = {
     flowResult: 'Result',
     flowTemplate: 'Template',
     flowOff: 'auto-fix off',
+    flowPlay: 'Play flow',
+    flowPause: 'Pause',
     flowEdgeSync: 'Sync',
     flowEdgeFail: 'failure',
     flowEdgeRetry: 'sync + new test',

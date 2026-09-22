@@ -1,10 +1,10 @@
-import { useState, useSyncExternalStore } from 'react';
-import { ChevronDown, ChevronRight, Info, AlertTriangle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { ChevronDown, ChevronRight, Info, AlertTriangle, Play, Pause } from 'lucide-react';
 import { Card } from '../ui';
 import { useT } from '../../i18n';
 import {
   NODES, EDGES, VIEW_W, VIEW_H, LANE_SPLIT,
-  activeParts, tokenRoute, routeDuration, pointsToPath,
+  activeParts, buildTimeline, timelineDuration, frameAt, pointsToPath,
   type FactoryMode, type FlowNode, type FlowNodeId, type FlowEdgeId,
 } from './factoryFlow';
 
@@ -52,6 +52,8 @@ interface FactoryFlowDiagramProps {
  * Explains what the factory does — and in which mode. Only "Create & test" runs the
  * DEV → TEST → repair loop; plain "Create workflow" stops after generating on DEV.
  * An explanation, not live progress: /factory/run is one blocking call without events.
+ * The token pauses at every station; that node and its step in the list are highlighted.
+ * Under prefers-reduced-motion it waits for "Play" and runs a single pass.
  */
 export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealthy }: FactoryFlowDiagramProps) {
   const t = useT();
@@ -66,10 +68,48 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
     try { localStorage.setItem(OPEN_KEY, String(next)); } catch { /* per-viewer convenience only */ }
   };
 
-  const options = { mode, autoFix, autoPromote };
-  const active = activeParts(options);
-  const route = tokenRoute(options);
+  const active = activeParts({ mode, autoFix, autoPromote });
+  const legs = useMemo(() => buildTimeline({ mode, autoFix, autoPromote }), [mode, autoFix, autoPromote]);
+  const total = timelineDuration(legs);
   const isOn = (id: FlowNodeId | FlowEdgeId) => active.has(id);
+
+  // Clock of the animation; a changed switch restarts the story from the beginning.
+  const timelineKey = `${mode}|${autoFix}|${autoPromote}`;
+  const [playing, setPlaying] = useState(() => !prefersReducedMotion());
+  const [clock, setClock] = useState({ key: timelineKey, t: 0 });
+  const clockRef = useRef(clock);
+  const elapsed = clock.key === timelineKey ? clock.t : 0;
+
+  useEffect(() => {
+    if (!playing || !open || legs.length === 0) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const prev = clockRef.current;
+      let next = (prev.key === timelineKey ? prev.t : 0) + (now - last) / 1000;
+      last = now;
+      const finished = next >= total && reducedMotion;
+      if (next >= total) next = reducedMotion ? total : next % total;
+      clockRef.current = { key: timelineKey, t: next };
+      setClock(clockRef.current);
+      if (finished) setPlaying(false);
+      else raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, open, legs.length, timelineKey, total, reducedMotion]);
+
+  const togglePlaying = () => {
+    if (!playing && elapsed >= total) {
+      clockRef.current = { key: timelineKey, t: 0 };
+      setClock(clockRef.current);
+    }
+    setPlaying(!playing);
+  };
+
+  const frame = frameAt(legs, elapsed);
+  const currentPart: FlowNodeId | FlowEdgeId = frame?.part ?? 'generate';
+  const currentStep = frame?.step ?? 0;
 
   const nodeText: Record<FlowNodeId, { title: string; sub?: string }> = {
     generate: { title: f.flowGenerate, sub: f.flowGenerateSub },
@@ -126,6 +166,16 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
               {modeButton('create', f.createWorkflow)}
               {modeButton('createAndTest', f.createAndTest)}
             </div>
+            {mode === 'createAndTest' && (
+              <button
+                type="button"
+                onClick={togglePlaying}
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border-strong text-text-primary hover:bg-surface-hover transition-colors"
+              >
+                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {playing ? f.flowPause : f.flowPlay}
+              </button>
+            )}
           </div>
 
           <div className={`flex gap-2 rounded-lg p-3 text-sm ${
@@ -174,10 +224,11 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
                   key={id}
                   data-edge={id}
                   data-active={isOn(id)}
+                  data-current={currentPart === id}
                   d={pointsToPath(EDGES[id])}
                   fill="none"
                   stroke={EDGE_COLORS[id]}
-                  strokeWidth={2}
+                  strokeWidth={currentPart === id ? 3 : 2}
                   strokeDasharray={isOn(id) ? undefined : '4 4'}
                   opacity={isOn(id) ? 0.9 : 0.25}
                   markerEnd={`url(#factory-arrow-${id})`}
@@ -197,25 +248,26 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
                 </text>
               </g>
 
-              {/* Token travels the route of the current settings, drawn under the nodes so it
-                  only shows on the arrows and never covers a label */}
-              {route && !reducedMotion && (
-                <circle key={pointsToPath(route)} r={6} fill="var(--color-accent)" data-token="moving">
-                  <animateMotion dur={`${routeDuration(route)}s`} repeatCount="indefinite" path={pointsToPath(route)} />
-                </circle>
+              {/* Token on the arrows, drawn under the nodes so it never covers a label; while it
+                  dwells in a node, the node's highlight shows where it is */}
+              {frame && !frame.inNode && (
+                <circle cx={frame.x} cy={frame.y} r={6} fill="var(--color-accent)" data-token="moving" />
               )}
 
               {/* Nodes */}
               {(Object.values(NODES)).map(node => {
                 const tone = TONES[node.tone];
                 const on = isOn(node.id);
+                const current = currentPart === node.id;
                 const text = nodeText[node.id];
                 const cx = node.x + node.w / 2;
                 return (
-                  <g key={node.id} data-node={node.id} data-active={on} opacity={on ? 1 : 0.35}>
+                  <g key={node.id} data-node={node.id} data-active={on} data-current={current}
+                    opacity={on ? 1 : 0.35}>
                     <rect x={node.x} y={node.y} width={node.w} height={node.h} rx={10}
-                      fill={tone.fill} stroke={tone.stroke} strokeWidth={1.5}
-                      strokeDasharray={on ? undefined : '4 4'} />
+                      fill={tone.fill} stroke={tone.stroke} strokeWidth={current ? 3 : 1.5}
+                      strokeDasharray={on ? undefined : '4 4'}
+                      style={current ? { filter: `drop-shadow(0 0 6px ${tone.stroke})` } : undefined} />
                     <text x={cx} y={text.sub ? node.y + 20 : node.y + node.h / 2 + 4} textAnchor="middle"
                       fontSize={13} fontWeight={600} fill="var(--color-text)">{text.title}</text>
                     {text.sub && (
@@ -225,17 +277,27 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
                   </g>
                 );
               })}
-
-              {/* "Create" mode (or reduced motion): nothing travels, the dot marks where it starts */}
-              {(!route || reducedMotion) && (
-                <circle cx={NODES.generate.x + 14} cy={NODES.generate.y + NODES.generate.h / 2} r={5}
-                  fill="var(--color-accent)" data-token="static" />
-              )}
             </svg>
           </div>
 
-          <ol className="space-y-1.5 text-sm text-text-secondary list-decimal pl-5">
-            {steps.map((step, i) => <li key={i}>{step}</li>)}
+          <ol className="space-y-1 text-sm">
+            {steps.map((step, i) => {
+              const current = i === currentStep;
+              return (
+                <li
+                  key={i}
+                  aria-current={current ? 'step' : undefined}
+                  className={`flex gap-2.5 rounded-md px-2 py-1 transition-colors ${
+                    current ? 'bg-accent-subtle text-text-primary' : 'text-text-secondary'
+                  }`}
+                >
+                  <span className={`shrink-0 w-5 h-5 mt-px rounded-full text-xs font-semibold flex items-center justify-center ${
+                    current ? 'bg-accent text-text-inverse' : 'bg-surface-secondary text-text-secondary'
+                  }`}>{i + 1}</span>
+                  <span>{step}</span>
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}

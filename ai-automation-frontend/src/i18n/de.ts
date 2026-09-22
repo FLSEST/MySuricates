@@ -2128,6 +2128,8 @@ export const de: TranslationKeys = {
     flowResult: 'Ergebnis',
     flowTemplate: 'Template',
     flowOff: 'Auto-Fix aus',
+    flowPlay: 'Ablauf abspielen',
+    flowPause: 'Pause',
     flowEdgeSync: 'Sync',
     flowEdgeFail: 'Fehler',
     flowEdgeRetry: 'Sync + neuer Test',

@@ -67,27 +67,94 @@ export function activeParts({ mode, autoFix, autoPromote }: FlowOptions): Set<Fl
   return parts;
 }
 
-/**
- * The route the animated token takes: one failing test that gets repaired (if auto-fix is
- * on), then a passing test. Returns null in "create" mode — nothing travels there.
- */
-export function tokenRoute({ mode, autoFix, autoPromote }: FlowOptions): Point[] | null {
-  if (mode === 'create') return null;
-  const route: Point[] = [center('generate'), ...EDGES.sync, center('test')];
-  if (autoFix) {
-    route.push(...EDGES.fail, center('repair'), ...EDGES.retry, center('test'));
-  }
-  route.push(...EDGES.pass, center('result'));
-  if (autoPromote) route.push(...EDGES.promote, center('template'));
-  return route;
+/** One stretch of the animation: the token dwells in a node or travels along an edge. */
+export interface FlowLeg {
+  part: FlowNodeId | FlowEdgeId;
+  /** Index into the numbered step list below the diagram. */
+  step: number;
+  points: readonly Point[];
+  seconds: number;
 }
 
-/** Seconds per route; each segment gets roughly the same share so the pace stays even. */
-export function routeDuration(route: readonly Point[]): number {
+const DWELL_SECONDS = 1.2;
+const PX_PER_SECOND = 170;
+
+function pathLength(points: readonly Point[]): number {
   let length = 0;
-  route.forEach(([x, y], i) => {
-    const prev = route[i - 1];
+  points.forEach(([x, y], i) => {
+    const prev = points[i - 1];
     if (prev) length += Math.hypot(x - prev[0], y - prev[1]);
   });
-  return Math.max(3, Math.round(length / 160));
+  return length;
+}
+
+function dwell(id: FlowNodeId, step: number): FlowLeg {
+  return { part: id, step, points: [center(id)], seconds: DWELL_SECONDS };
+}
+
+function travel(id: FlowEdgeId, from: FlowNodeId, to: FlowNodeId, step: number): FlowLeg {
+  const points = [center(from), ...EDGES[id], center(to)];
+  return { part: id, step, points, seconds: pathLength(points) / PX_PER_SECOND };
+}
+
+/**
+ * The story the token tells with the current switches: one failing test that gets repaired
+ * (if auto-fix is on), then a passing one. Steps match the list in createAndTest mode:
+ * 0 generate, 1 sync, 2 test run, 3 repair loop, 4 result/template. Empty in "create" mode.
+ */
+export function buildTimeline({ mode, autoFix, autoPromote }: FlowOptions): FlowLeg[] {
+  if (mode === 'create') return [];
+  const legs = [dwell('generate', 0), travel('sync', 'generate', 'test', 1), dwell('test', 2)];
+  if (autoFix) {
+    legs.push(
+      travel('fail', 'test', 'repair', 3), dwell('repair', 3),
+      travel('retry', 'repair', 'test', 3), dwell('test', 2),
+    );
+  }
+  legs.push(travel('pass', 'test', 'result', 4), dwell('result', 4));
+  if (autoPromote) legs.push(travel('promote', 'result', 'template', 4), dwell('template', 4));
+  return legs;
+}
+
+export function timelineDuration(legs: readonly FlowLeg[]): number {
+  return legs.reduce((sum, leg) => sum + leg.seconds, 0);
+}
+
+export interface FlowFrame {
+  part: FlowNodeId | FlowEdgeId;
+  step: number;
+  x: number;
+  y: number;
+  /** True while the token dwells in a node (it is hidden under the node then). */
+  inNode: boolean;
+}
+
+function pointAlong(points: readonly Point[], fraction: number): Point {
+  const first = points[0] ?? [0, 0];
+  let remaining = pathLength(points) * fraction;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1] ?? first;
+    const b = points[i] ?? a;
+    const seg = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (remaining <= seg && seg > 0) {
+      const f = remaining / seg;
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    }
+    remaining -= seg;
+  }
+  return points[points.length - 1] ?? first;
+}
+
+/** Where the token is and which step is current at `seconds` into the timeline. */
+export function frameAt(legs: readonly FlowLeg[], seconds: number): FlowFrame | null {
+  let elapsed = 0;
+  for (const leg of legs) {
+    if (seconds < elapsed + leg.seconds || leg === legs[legs.length - 1]) {
+      const fraction = Math.min(1, Math.max(0, (seconds - elapsed) / leg.seconds));
+      const [x, y] = pointAlong(leg.points, fraction);
+      return { part: leg.part, step: leg.step, x, y, inNode: leg.points.length === 1 };
+    }
+    elapsed += leg.seconds;
+  }
+  return null;
 }
