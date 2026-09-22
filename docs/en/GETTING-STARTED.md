@@ -7,7 +7,7 @@ WSL2 (Ubuntu), see section 5.
 > **Before you start — the trust model in three sentences.** Shell blocks and AI calls run with
 > *your* permissions (on the machine, or with your mounted folders in the container); the AI CLIs do
 > not ask before using tools by default. The instance set up by the installer listens on
-> `127.0.0.1` only (only `--bind` opens it to the network), and some endpoints (health checks,
+> `127.0.0.1` only (only `--bind` opens it to the network; the installer then also names the machine's network address), and some endpoints (health checks,
 > WebSocket handshake, webhook inbox, OAuth callbacks) need no API key. MySuricates is built for
 > local use by one trusted person — for remote access put a VPN in front, not an open port.
 > Full text: [Trust model and network exposure](deployment.md#trust-model-and-network-exposure).

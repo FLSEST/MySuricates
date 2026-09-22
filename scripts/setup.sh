@@ -22,6 +22,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 . "$LIB/providers.sh"
 # shellcheck source=lib/module-preset.sh
 . "$LIB/module-preset.sh"
+# shellcheck source=lib/netaddr.sh
+. "$LIB/netaddr.sh"
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
 
 # --- Flags ------------------------------------------------------------------------------------------
@@ -436,13 +438,24 @@ step_build() {
 
 # --- Schritt 8: Fertig ------------------------------------------------------------------------------
 step_done() {
-  local n port key lines l_key l_manage l_change w l
+  local n port bind key lines l_key l_manage l_change w l first addr
   section 7
   lines=()
   for n in $INSTANCES; do
     port="$(grep '^MYSURICATES_PORT=' "$INSTANCES_DIR/$n.env" | cut -d= -f2)"
+    # Aus der Datei, nicht aus --bind: eine behaltene Instanz-Datei kann anders binden (b8aa3866)
+    bind="$(grep '^MYSURICATES_BIND=' "$INSTANCES_DIR/$n.env" | tail -n 1 | cut -d= -f2)"
     if [ "$STARTED" = 1 ] && [ "$DRY" = 0 ]; then
-      lines[${#lines[@]}]="${C_BOLD}$(printf '%-5s' "$n")${C_RESET} $(msg done_open "http://localhost:$port")"
+      first=1
+      while IFS= read -r addr; do
+        if [ "$first" = 1 ]; then
+          lines[${#lines[@]}]="${C_BOLD}$(printf '%-5s' "$n")${C_RESET} $addr"; first=0
+        else
+          lines[${#lines[@]}]="      $addr"
+        fi
+      done <<ADDR
+$(netaddr_lines "${bind:-127.0.0.1}" "$port")
+ADDR
       key="$(bash "$SCRIPT_DIR/instance.sh" key --name "$n" 2>/dev/null)"
       if [ -n "$key" ]; then
         [ "$SHOW_KEY" = 1 ] || key="…${key: -4}"

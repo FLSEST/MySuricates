@@ -7,7 +7,7 @@ Unter **Windows** läuft derselbe Weg in WSL2 (Ubuntu), siehe Abschnitt 5.
 > **Bevor du startest — das Vertrauensmodell in drei Sätzen.** Shell-Blöcke und KI-Aufrufe laufen
 > mit *deinen* Rechten (auf dem Rechner bzw. mit deinen eingebundenen Ordnern im Container); die
 > KI-CLIs fragen dabei standardmäßig nicht vor Werkzeugnutzung nach. Die vom Installer eingerichtete
-> Instanz lauscht nur auf `127.0.0.1` (erst `--bind` öffnet sie ins Netz), einige Endpunkte
+> Instanz lauscht nur auf `127.0.0.1` (erst `--bind` öffnet sie ins Netz; dann nennt der Installer auch die Netzadresse des Rechners), einige Endpunkte
 > (Healthchecks, WebSocket-Handshake, Webhook-Eingang, OAuth-Rückleitungen) brauchen keinen API-Key.
 > MySuricates ist für den lokalen Betrieb durch eine vertrauenswürdige Person gebaut — für
 > Fernzugriff gehört ein VPN davor, kein offener Port.

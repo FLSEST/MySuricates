@@ -13,7 +13,7 @@
 # Commands: up|down|status|logs|key|list
 #
 # Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
-# (core|research|full), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
+# (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
 # Klon, nie ganz $HOME), DOCKER_SOCKET 0|1 (volle Kontrolle ueber Docker!), HARDENING_SEALING,
 # HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename). Jede AUTOMATION_*-Zeile geht
 # unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
@@ -26,6 +26,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=lib/host-mounts.sh
 . "${SCRIPT_DIR}/lib/host-mounts.sh"
+# shellcheck source=lib/i18n.sh
+. "${SCRIPT_DIR}/lib/i18n.sh"
+# shellcheck source=lib/netaddr.sh
+. "${SCRIPT_DIR}/lib/netaddr.sh"
 INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-${REPO_ROOT}/deploy/instances}"
 COMPOSE_FILE="${REPO_ROOT}/deploy/compose.yml"
 # Werkzeuge aus dem Download des Installers (Java/Node ohne Paketmanager), falls vorhanden
@@ -78,6 +82,15 @@ export MYSURICATES_NAME="$NAME" MYSURICATES_ENV_FILE="$ENV_FILE"
 HOST_UID="$(id -u)"; HOST_GID="$(id -g)"; HOST_USER="$(id -un)"; HOST_HOME="$HOME"
 export HOST_UID HOST_GID HOST_USER HOST_HOME
 
+# "läuft"-Meldung: lokal eine Zeile wie bisher; bindet die Instanz ins Netz (--bind 0.0.0.0), dazu
+# die Netzadresse(n) dieses Rechners und der VPN-Hinweis (b8aa3866, scripts/lib/netaddr.sh)
+say_running() {  # WORT
+  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: http://localhost:$PORT"; return 0; fi
+  i18n_load "${MYSURICATES_LANG:-de}"
+  echo "mysuricates-$NAME $1:"
+  netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
+}
+
 health_ok() { curl -fsS --max-time 3 "http://127.0.0.1:$PORT/api/v1/system/health" >/dev/null 2>&1; }
 # Belegt = irgendetwas nimmt Verbindungen an (nicht: antwortet wie MySuricates)
 port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
@@ -109,7 +122,7 @@ container_cmd() {
       host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" > "$override"
       compose up -d --build || exit 1
       [ "$WAIT" = 1 ] || exit 0
-      if wait_health container_healthy; then echo "mysuricates-$NAME läuft: http://localhost:$PORT"; exit 0; fi
+      if wait_health container_healthy; then say_running läuft; exit 0; fi
       echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)   compose down ;;
     status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null || echo "nicht gestartet" ;;
@@ -145,7 +158,7 @@ host_cmd() {
   local pid
   case "$CMD" in
     up)
-      if host_running; then echo "mysuricates-$NAME läuft bereits: http://localhost:$PORT"; exit 0; fi
+      if host_running; then say_running "läuft bereits"; exit 0; fi
       if [ "$REBUILD" = 1 ] || [ ! -s "$STATE/app.jar" ]; then host_build || exit 1; fi
       if port_busy; then die "Port $PORT ist schon belegt — anderen Port in $ENV_FILE eintragen"; fi
       mkdir -p "$STATE/data/logs" "$STATE/home"
@@ -175,7 +188,7 @@ host_cmd() {
         echo "$!" > "$PID_FILE"
       ) || exit 1
       [ "$WAIT" = 1 ] || exit 0
-      if wait_health health_ok; then echo "mysuricates-$NAME läuft: http://localhost:$PORT"; exit 0; fi
+      if wait_health health_ok; then say_running läuft; exit 0; fi
       echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
       if ! host_running; then echo "mysuricates-$NAME läuft nicht"; rm -f "$PID_FILE"; exit 0; fi
