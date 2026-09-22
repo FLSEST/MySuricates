@@ -1253,6 +1253,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V77 | `V77__audit_finding_unverified_evidence.sql` | unverified_evidence in audit_findings (Beleg nennt keinen Messwert des Laufs; solche Findings erzeugen kein verwaltetes TODO) |
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unaufgelöste zweisprachige Schritte, `?locale=` löst beim Lesen auf) |
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; Blaupausen aus templates/blueprints/) |
+| V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (Skill-Inhalt unter dem Siegel), neue Tabelle `skill_versions` (Änderungshistorie je Skill, ohne Fremdschlüssel) |
 
 ## SQLite-Besonderheiten
 

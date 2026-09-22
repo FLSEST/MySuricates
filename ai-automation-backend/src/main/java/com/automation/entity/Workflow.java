@@ -131,6 +131,14 @@ public class Workflow {
     @Column(name = "sealed_at")
     private Instant sealedAt;
 
+    /**
+     * Content hash per used skill at sealing time ({@code WorkflowSkillPins}); {@code null} on seals
+     * made before skills were pinned — sealing again fills it in. Raw JSON on purpose: a sealed
+     * workflow without skills stores {@code {}}, which must stay distinguishable from {@code null}.
+     */
+    @Column(name = "sealed_skill_hashes", columnDefinition = "text")
+    private String sealedSkillHashes;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

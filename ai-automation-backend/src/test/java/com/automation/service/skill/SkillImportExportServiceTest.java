@@ -4,6 +4,7 @@ import com.automation.dto.request.ImportSkillRequest;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
+import com.automation.entity.SkillChangeSource;
 import com.automation.entity.SkillCategory;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.SkillRepository;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +34,9 @@ class SkillImportExportServiceTest {
 
     @Mock
     private SkillRegistry skillRegistry;
+
+    @Mock
+    private SkillMutationGateway mutationGateway;
 
     @InjectMocks
     private SkillImportExportService importExportService;
@@ -99,7 +104,7 @@ class SkillImportExportServiceTest {
                 List.of(capReq)
         );
 
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> {
+        when(mutationGateway.save(any(Skill.class), eq(SkillChangeSource.IMPORT))).thenAnswer(inv -> {
             Skill s = inv.getArgument(0);
             s.setId("skill-imported");
             return s;
@@ -122,7 +127,7 @@ class SkillImportExportServiceTest {
                 null
         );
 
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> {
+        when(mutationGateway.save(any(Skill.class), eq(SkillChangeSource.IMPORT))).thenAnswer(inv -> {
             Skill s = inv.getArgument(0);
             s.setId("skill-simple");
             return s;
@@ -146,7 +151,7 @@ class SkillImportExportServiceTest {
                 null, null, null, List.of(capReq)
         );
 
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> {
+        when(mutationGateway.save(any(Skill.class), eq(SkillChangeSource.IMPORT))).thenAnswer(inv -> {
             Skill s = inv.getArgument(0);
             s.setId("skill-id");
             return s;

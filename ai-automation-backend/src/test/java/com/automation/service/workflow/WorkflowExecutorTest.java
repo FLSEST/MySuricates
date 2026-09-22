@@ -197,7 +197,7 @@ class WorkflowExecutorTest {
                         activityLogService, containerRepository, mock(RunLiveLogService.class)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), workflowVersionService, activityLogService)
         );
     }
 
@@ -1278,7 +1278,7 @@ class WorkflowExecutorTest {
                         activityLogService, containerRepository, mock(RunLiveLogService.class)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
-                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), workflowVersionService, activityLogService)
+                new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), workflowVersionService, activityLogService)
         );
     }
 

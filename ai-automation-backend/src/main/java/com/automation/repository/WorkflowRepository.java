@@ -105,4 +105,15 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
      */
     @Query("SELECT w.id, w.name FROM Workflow w WHERE w.id IN :ids")
     List<Object[]> findIdAndNameByIdIn(@Param("ids") Collection<String> ids);
+
+    /**
+     * Names of sealed, not deleted workflows that use a skill — pinned at sealing, activated, or
+     * referenced from a block. Conservative on purpose (substring match on the JSON columns): a
+     * false positive only asks for an unseal, a false negative would let a sealed workflow change.
+     */
+    @Query(value = "SELECT w.name FROM workflows w WHERE w.sealed = 1 AND w.deleted_at IS NULL AND ("
+            + "instr(coalesce(w.sealed_skill_hashes, ''), :skillId) > 0 OR instr(coalesce(w.blocks, ''), :skillId) > 0 "
+            + "OR EXISTS (SELECT 1 FROM workflow_skills ws WHERE ws.workflow_id = w.id AND ws.skill_id = :skillId)) "
+            + "ORDER BY w.name", nativeQuery = true)
+    List<String> findSealedWorkflowNamesUsingSkill(@Param("skillId") String skillId);
 }

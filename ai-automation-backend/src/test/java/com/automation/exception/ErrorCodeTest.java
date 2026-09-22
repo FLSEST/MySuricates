@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(22)
+        assertThat(ErrorCode.values()).hasSize(23)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.MODULE_DISABLED,
@@ -28,6 +28,7 @@ class ErrorCodeTest {
                         ErrorCode.STATE_CONFLICT,
                         ErrorCode.WORKFLOW_SEALED,
                         ErrorCode.WORKFLOW_TAMPERED,
+                        ErrorCode.SKILL_PINNED_BY_SEAL,
                         ErrorCode.UNATTENDED_REQUIRES_SEAL,
                         ErrorCode.WEBHOOK_SIGNATURE_INVALID,
                         ErrorCode.NO_TASK_TARGET,
@@ -104,6 +105,7 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.STATE_CONFLICT, HttpStatus.CONFLICT, "State conflict"),
                 Arguments.of(ErrorCode.WORKFLOW_SEALED, HttpStatus.CONFLICT, "Workflow is sealed"),
                 Arguments.of(ErrorCode.WORKFLOW_TAMPERED, HttpStatus.CONFLICT, "Sealed workflow definition was modified"),
+                Arguments.of(ErrorCode.SKILL_PINNED_BY_SEAL, HttpStatus.CONFLICT, "Skill is used by a sealed workflow"),
                 Arguments.of(ErrorCode.UNATTENDED_REQUIRES_SEAL, HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
                 Arguments.of(ErrorCode.WEBHOOK_SIGNATURE_INVALID, HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
                 Arguments.of(ErrorCode.NO_TASK_TARGET, HttpStatus.BAD_REQUEST, "No task export target configured"),

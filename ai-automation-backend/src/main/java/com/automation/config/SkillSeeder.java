@@ -2,7 +2,9 @@ package com.automation.config;
 
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
+import com.automation.entity.SkillChangeSource;
 import com.automation.repository.SkillRepository;
+import com.automation.service.skill.SkillMutationGateway;
 import com.automation.service.skill.SkillRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class SkillSeeder implements ApplicationRunner {
 
     private final SkillRepository skillRepository;
     private final SkillRegistry skillRegistry;
+    private final SkillMutationGateway mutationGateway;
     private final BuiltInSkillLoader skillLoader;
 
     @Override
@@ -53,11 +56,11 @@ public class SkillSeeder implements ApplicationRunner {
             Skill dbSkill = existingById.get(fresh.getId());
 
             if (dbSkill == null) {
-                skillRegistry.register(skillRepository.save(fresh));
+                skillRegistry.register(mutationGateway.save(fresh, SkillChangeSource.BUILTIN_SEED));
                 seeded++;
             } else if (SeedVersions.isNewer(fresh.getVersion(), dbSkill.getVersion())) {
                 applyResourceState(dbSkill, fresh);
-                skillRegistry.register(skillRepository.save(dbSkill));
+                skillRegistry.register(mutationGateway.save(dbSkill, SkillChangeSource.BUILTIN_SEED));
                 updated++;
             } else {
                 skillRegistry.register(dbSkill);

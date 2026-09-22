@@ -15,13 +15,15 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Single gate every workflow run passes before its run row exists (called by
  * {@link WorkflowExecutor}). Records provenance — the definition hash and the matching version —
  * and refuses runs that violate a hardening rule. A refused run leaves no run row behind.
  *
- * <p>Rules, in order: a sealed definition must match its seal (always); with
+ * <p>Rules, in order: a sealed definition must match its seal, and so must the content of every
+ * skill it uses (always); with
  * {@code automation.hardening.require-sealed-for-unattended} an unattended run — or a chain /
  * sub-workflow run whose origin is unattended or unknown — needs a sealed workflow.
  */
@@ -39,6 +41,7 @@ public class RunAdmission {
 
     private final ModuleRegistry modules;
     private final WorkflowDefinitionHasher hasher;
+    private final WorkflowSkillPins skillPins;
     private final WorkflowVersionService versionService;
     private final ActivityLogService activityLog;
 
@@ -93,7 +96,28 @@ public class RunAdmission {
         if (!actual.equals(workflow.getSealedHash())) {
             throw refuse(workflow, source, actual, "its definition no longer matches the seal");
         }
+        verifySkillPins(workflow, source, actual);
         return actual;
+    }
+
+    /** The skills a sealed workflow uses must still have the content they had when it was sealed. */
+    private void verifySkillPins(Workflow workflow, TriggerSource source, String definitionHash) {
+        if (workflow.getSealedSkillHashes() == null) {
+            log.warn("Sealed workflow {} ({}) predates skill pinning — seal it again to pin its skills",
+                    workflow.getName(), workflow.getId());
+            return;
+        }
+        Set<String> changed;
+        try {
+            changed = WorkflowSkillPins.changed(WorkflowSkillPins.fromJson(workflow.getSealedSkillHashes()),
+                    skillPins.pins(workflow));
+        } catch (RuntimeException e) {
+            throw refuse(workflow, source, definitionHash, "its skills could not be verified (" + e.getMessage() + ")");
+        }
+        if (!changed.isEmpty()) {
+            throw refuse(workflow, source, definitionHash,
+                    "skill(s) " + String.join(", ", changed) + " changed since sealing — review them and seal again");
+        }
     }
 
     private HardeningException refuse(Workflow workflow, TriggerSource source, String actualHash, String reason) {

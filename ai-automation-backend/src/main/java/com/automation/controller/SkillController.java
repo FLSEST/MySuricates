@@ -5,6 +5,7 @@ import com.automation.dto.request.ImportSkillRequest;
 import com.automation.dto.response.CapabilityResponse;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.dto.response.SkillResponse;
+import com.automation.dto.response.SkillVersionResponse;
 import com.automation.mapper.SkillMapper;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
@@ -41,6 +42,11 @@ public class SkillController {
     @GetMapping("/{id}/capabilities")
     public List<CapabilityResponse> getCapabilities(@PathVariable String id) {
         return skillMapper.toCapabilityResponseList(skillService.findCapabilities(id));
+    }
+
+    @GetMapping("/{id}/versions")
+    public List<SkillVersionResponse> getVersions(@PathVariable String id) {
+        return skillService.findVersions(id).stream().map(SkillVersionResponse::from).toList();
     }
 
     @PostMapping

@@ -4,9 +4,12 @@ import com.automation.dto.request.CreateSkillRequest;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
+import com.automation.entity.SkillChangeSource;
+import com.automation.entity.SkillVersion;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.CapabilityRepository;
 import com.automation.repository.SkillRepository;
+import com.automation.repository.SkillVersionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,8 @@ public class SkillService {
     private final SkillRepository skillRepository;
     private final CapabilityRepository capabilityRepository;
     private final SkillRegistry skillRegistry;
+    private final SkillMutationGateway mutationGateway;
+    private final SkillVersionRepository versionRepository;
 
     @Transactional(readOnly = true)
     public List<Skill> findAll() {
@@ -62,10 +67,16 @@ public class SkillService {
                 .builtin(false)
                 .build();
 
-        Skill saved = skillRepository.save(skill);
+        Skill saved = mutationGateway.save(skill, SkillChangeSource.USER);
         skillRegistry.register(saved);
         log.info("Created custom skill: {} ({})", saved.getName(), saved.getId());
         return saved;
+    }
+
+    /** Change history, newest first — also for skills that have since been deleted. */
+    @Transactional(readOnly = true)
+    public List<SkillVersion> findVersions(String skillId) {
+        return versionRepository.findBySkillIdOrderByVersionNumberDesc(skillId);
     }
 
     @Transactional
@@ -74,7 +85,7 @@ public class SkillService {
         if (skill.isBuiltin()) {
             throw new IllegalStateException("Cannot delete built-in skill: " + skill.getName());
         }
-        skillRepository.delete(skill);
+        mutationGateway.delete(skill, SkillChangeSource.USER);
         skillRegistry.unregister(id);
         log.info("Deleted skill: {} ({})", skill.getName(), skill.getId());
     }

@@ -130,11 +130,15 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 
 **Definition hash** — `WorkflowDefinitionHasher` hashes the `WorkflowSnapshot` (blocks, instructions, model, provider, effort, metadata, defaultContext, sorted skill IDs) as canonical JSON (sorted keys, empty values omitted) with its own `ObjectMapper`, so Jackson customizing never changes the hash. Name, description, icon and tags are labels and are not hashed. Old version rows get their hash at startup (`WorkflowVersionHashBackfillService`). Context variables: `{{ workflow_definition_hash }}`, `{{ trigger_source }}`.
 
-**Run admission** — Every run trigger calls `WorkflowExecutor.execute(…, TriggerSource)` and therefore passes `RunAdmission` before a run row exists. Rules in this order: (1) a sealed workflow must match its seal, (2) with `require-sealed-for-unattended` an unattended run needs a sealed workflow. A refused run leaves **no run row and no DLQ entry**, only a `SECURITY` entry in the activity log; REST callers get the error code.
+**Run admission** — Every run trigger calls `WorkflowExecutor.execute(…, TriggerSource)` and therefore passes `RunAdmission` before a run row exists. Rules in this order: (1) a sealed workflow must match its seal — definition and the content of its skills —, (2) with `require-sealed-for-unattended` an unattended run needs a sealed workflow. A refused run leaves **no run row and no DLQ entry**, only a `SECURITY` entry in the activity log; REST callers get the error code.
 
 **Change provenance (always on)** — Every writer of definition fields goes through `WorkflowService` → `WorkflowMutationGateway`. Each change writes a version row with the state **after** the change (number = MAX+1) and a `changeSource` chosen by the calling server code, never by the request (`user`, `assistant`, `factory`, `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `import`, `bpmn-import`, `restore`). If the newest row's hash does not match the current state (legacy data, a change that bypassed the service), that state is first saved as `untracked`. Label-only changes create no version. `WorkflowWriterAllowlistTest` pins who else may call `WorkflowRepository.save`. The same place refuses unknown block types: `BlockTypeValidator` checks every block type — nested ones in `switch` `cases[].blocks` and `default` included — against the executor registry (`BlockTypeRegistry`, fed by all `BlockExecutor` beans) and throws **400 `INVALID_ARGUMENT`** naming the unknown type and the allowed ones. The check runs inside the caller's transaction, so the save is rolled back.
 
 **Sealing** — `seal` records the current hash in `sealed_hash` (with `sealed_at` and a WARN `SECURITY` entry). Sealed workflows reject definition changes and deletion with **409 `WORKFLOW_SEALED`**; renaming still works. Repair (`POST …/repair`) is refused right away as well, automatic auto-repair skips sealed workflows before any AI call, and the UI disables "Optimize" and "Repair". If the definition no longer matches the seal at start (e.g. after a change made directly in the database) or cannot be verified, the run does not start: **409 `WORKFLOW_TAMPERED`**, ERROR `SECURITY` entry with expected and actual hash. Both checks apply regardless of the switch — `sealing` only gates setting and removing seals, so switching it off never silently unseals.
+
+**Skills under the seal** — The definition hash only contains the skill **IDs**; what a skill brings into a run (name and `aiContext` in the prompt, config schema, per capability name, description, schemas, handler, `async`/`writes`) is not part of it. So `seal` additionally records a content hash for every skill the workflow uses — activated skills and the blocks' `skillIds` — (`SkillContentHasher`, canonical JSON as for the definition hash; labels such as description, icon, category and version do not count) and stores the mapping as JSON in `workflows.sealed_skill_hashes` (`WorkflowSkillPins`). `RunAdmission` compares it before every run: a changed, added or deleted skill yields **409 `WORKFLOW_TAMPERED`** naming the affected skill IDs; if the state cannot be verified, the run is refused as well. The definition hash itself is unchanged, so existing seals and the runs' version mapping stay valid. Seals from before V80 have `sealed_skill_hashes = NULL`: they keep running (with a log warning) but check no skills — sealing again adds the hashes, but only while the definition still matches its seal.
+
+**Write path for skills (always on)** — Every skill writer goes through `SkillMutationGateway` (the counterpart of `WorkflowMutationGateway`): creation (`user`), import (`import`) and built-in updates at startup (`builtin-seed`). Each change writes a row to `skill_versions` (operation `CREATE`/`UPDATE`/`DELETE`, canonical snapshot, content hash, server-side source; no foreign key, so the history survives deletion) and an activity-log entry — an import is a WARN `SECURITY` event. `GET /api/v1/skills/{id}/versions` lists the history, also for deleted skills. If a sealed workflow uses the skill, the gateway refuses changes and deletion by a person with **409 `SKILL_PINNED_BY_SEAL`**. Built-in updates from the resources cannot be refused; if they change the content under a sealed workflow, the gateway writes a WARN `SECURITY` entry naming the affected workflows, and their runs are refused until they are sealed again. `SkillWriterAllowlistTest` pins that only the gateway calls `skillRepository.save/delete`.
 
 **Unattended runs** — `TriggerSource` classifies triggers:
 
@@ -1060,6 +1064,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V77 | Evidence check on the audit finding (`unverified_evidence`) |
 | V78 | Bilingual steps in templates (`workflow_templates.i18n_source`) |
 | V79 | Blueprints as a kind of their own next to templates (`workflow_templates.kind`) |
+| V80 | Skills under the seal: `workflows.sealed_skill_hashes`, change history `skill_versions` |
 
 ## Architecture Gates
 
@@ -1104,7 +1109,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 79 Flyway migrations (V1–V79)
+│           └── db/migration/          ← 80 Flyway migrations (V1–V80)
 │
 └── ai-automation-frontend/
     ├── package.json

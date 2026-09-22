@@ -3,7 +3,9 @@ package com.automation.config;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
+import com.automation.entity.SkillChangeSource;
 import com.automation.repository.SkillRepository;
+import com.automation.service.skill.SkillMutationGateway;
 import com.automation.service.skill.SkillRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,13 +35,16 @@ class SkillSeederTest {
     @Mock
     private SkillRegistry skillRegistry;
 
+    @Mock
+    private SkillMutationGateway gateway;
+
     private BuiltInSkillLoader loader;
     private SkillSeeder seeder;
 
     @BeforeEach
     void setUp() {
         loader = new BuiltInSkillLoader(new ObjectMapper());
-        seeder = new SkillSeeder(skillRepository, skillRegistry, loader);
+        seeder = new SkillSeeder(skillRepository, skillRegistry, gateway, loader);
     }
 
     private Skill firstBuiltIn() {
@@ -64,12 +70,12 @@ class SkillSeederTest {
     @Test
     void run_emptyDb_seedsAllSkills() {
         when(skillRepository.findByBuiltin(true)).thenReturn(List.of());
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         int expected = loader.loadAll().size();
-        verify(skillRepository, times(expected)).save(any(Skill.class));
+        verify(gateway, times(expected)).save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED));
         verify(skillRegistry, times(expected)).register(any(Skill.class));
     }
 
@@ -82,7 +88,7 @@ class SkillSeederTest {
 
         seeder.run(null);
 
-        verify(skillRepository, never()).save(any(Skill.class));
+        verify(gateway, never()).save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED));
         verify(skillRegistry, times(existing.size())).register(any(Skill.class));
     }
 
@@ -91,12 +97,12 @@ class SkillSeederTest {
         Skill fresh = firstBuiltIn();
         Skill stale = dbCopy(fresh, "0.9.0");
         when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(stale)));
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
-        verify(skillRepository, times(loader.loadAll().size())).save(captor.capture());
+        verify(gateway, times(loader.loadAll().size())).save(captor.capture(), eq(SkillChangeSource.BUILTIN_SEED));
 
         Skill updated = captor.getAllValues().stream()
                 .filter(s -> s.getId().equals(fresh.getId()))
@@ -120,12 +126,12 @@ class SkillSeederTest {
         Skill fresh = firstBuiltIn();
         Skill newer = dbCopy(fresh, "2.0.0");
         when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(newer)));
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
-        verify(skillRepository, times(loader.loadAll().size() - 1)).save(captor.capture());
+        verify(gateway, times(loader.loadAll().size() - 1)).save(captor.capture(), eq(SkillChangeSource.BUILTIN_SEED));
         assertThat(captor.getAllValues()).extracting(Skill::getId).doesNotContain(fresh.getId());
         assertThat(newer.getName()).isEqualTo("Alter Name");
         assertThat(newer.getVersion()).isEqualTo("2.0.0");
@@ -135,11 +141,11 @@ class SkillSeederTest {
     void run_partialState_seedsOnlyMissing() {
         Skill existing = dbCopy(firstBuiltIn(), "1.0.0");
         when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(existing)));
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
-        verify(skillRepository, times(loader.loadAll().size() - 1)).save(any(Skill.class));
+        verify(gateway, times(loader.loadAll().size() - 1)).save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED));
         verify(skillRegistry, times(loader.loadAll().size())).register(any(Skill.class));
     }
 
@@ -147,17 +153,17 @@ class SkillSeederTest {
     void run_neverTouchesUserSkills() {
         // Nutzer-Skills sind builtin=false und tauchen in findByBuiltin(true) nicht auf.
         when(skillRepository.findByBuiltin(true)).thenReturn(List.of());
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
-        verify(skillRepository, times(loader.loadAll().size())).save(captor.capture());
+        verify(gateway, times(loader.loadAll().size())).save(captor.capture(), eq(SkillChangeSource.BUILTIN_SEED));
         assertThat(captor.getAllValues()).allSatisfy(s -> {
             assertThat(s.isBuiltin()).isTrue();
             assertThat(s.getId()).startsWith("builtin-");
         });
-        verify(skillRepository, never()).delete(any(Skill.class));
+        verify(gateway, never()).delete(any(Skill.class), any());
         verify(skillRepository, never()).deleteAll();
     }
 
@@ -172,13 +178,13 @@ class SkillSeederTest {
                 .version("1.0.0")
                 .build();
         when(skillRepository.findByBuiltin(true)).thenReturn(new ArrayList<>(List.of(orphan)));
-        when(skillRepository.save(any(Skill.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.save(any(Skill.class), eq(SkillChangeSource.BUILTIN_SEED))).thenAnswer(inv -> inv.getArgument(0));
 
         seeder.run(null);
 
         ArgumentCaptor<Skill> captor = ArgumentCaptor.forClass(Skill.class);
         verify(skillRegistry, times(loader.loadAll().size() + 1)).register(captor.capture());
         assertThat(captor.getAllValues()).extracting(Skill::getId).contains("builtin-retired");
-        verify(skillRepository, never()).delete(any(Skill.class));
+        verify(gateway, never()).delete(any(Skill.class), any());
     }
 }
