@@ -19,6 +19,40 @@ export function activeViewOf(layout: DashboardLayout): DashboardView | undefined
   return layout.views.find((v) => v.id === layout.activeViewId) ?? layout.views[0];
 }
 
+/**
+ * What each view is called on screen: its own name, else one no other view shows — the first
+ * unnamed view is the overview, every further one is numbered by its position. Two unnamed views
+ * used to both read "Overview" and could not be told apart (TODO 565adc37).
+ */
+export function viewLabels(
+  views: readonly DashboardView[],
+  overview: string,
+  numbered: (n: number) => string,
+): Map<string, string> {
+  const taken = new Set(views.map((v) => v.name).filter(Boolean));
+  const labels = new Map<string, string>();
+  views.forEach((view, index) => {
+    let label = view.name;
+    if (!label && !taken.has(overview)) label = overview;
+    if (!label) {
+      let n = index + 1;
+      while (taken.has(numbered(n))) n++;
+      label = numbered(n);
+    }
+    taken.add(label);
+    labels.set(view.id, label);
+  });
+  return labels;
+}
+
+/** Name for a new view: the next number no view shows yet ("View 3"). */
+export function nextViewName(views: readonly DashboardView[], overview: string, numbered: (n: number) => string): string {
+  const shown = new Set(viewLabels(views, overview, numbered).values());
+  let n = views.length + 1;
+  while (shown.has(numbered(n))) n++;
+  return numbered(n);
+}
+
 /** Appends a view (empty, or with the widgets of a template) and makes it the active one. */
 export function addLayoutView(layout: DashboardLayout, name: string, id: string, widgets: WidgetInstance[] = []): DashboardLayout {
   if (layout.views.length >= LAYOUT_LIMITS.views || layout.views.some((v) => v.id === id)) return layout;

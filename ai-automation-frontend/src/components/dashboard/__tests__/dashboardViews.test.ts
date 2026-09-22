@@ -12,6 +12,8 @@ import {
 import {
   activeViewOf,
   addLayoutView,
+  nextViewName,
+  viewLabels,
   duplicateLayoutView,
   moveLayoutView,
   removeLayoutView,
@@ -112,5 +114,30 @@ describe('view operations', () => {
   it('compares layout content without the active view', () => {
     expect(layoutContentKey({ ...twoViews, activeViewId: 'ops' })).toBe(layoutContentKey(twoViews));
     expect(layoutContentKey(renameLayoutView(twoViews, 'ops', 'Betrieb'))).not.toBe(layoutContentKey(twoViews));
+  });
+});
+
+describe('view labels (565adc37)', () => {
+  const v = (id: string, name = ''): DashboardView => ({ id, name, widgets: [] });
+  const numbered = (n: number) => `View ${n}`;
+  const labels = (views: DashboardView[]) => [...viewLabels(views, 'Overview', numbered).values()];
+
+  it('calls the first unnamed view the overview and numbers further unnamed ones by position', () => {
+    expect(labels([v('a'), v('b'), v('c', 'Ops'), v('d')])).toEqual(['Overview', 'View 2', 'Ops', 'View 4']);
+  });
+
+  it('never shows two views under the same generated label', () => {
+    expect(labels([v('a', 'View 2'), v('b'), v('c')])).toEqual(['View 2', 'Overview', 'View 3']);
+    expect(labels([v('a', 'Overview'), v('b')])).toEqual(['Overview', 'View 2']);
+  });
+
+  it('keeps names the user gave, even the same one twice', () => {
+    expect(labels([v('a', 'Ops'), v('b', 'Ops')])).toEqual(['Ops', 'Ops']);
+  });
+
+  it('names a new view with the next free number', () => {
+    expect(nextViewName([v('a')], 'Overview', numbered)).toBe('View 2');
+    expect(nextViewName([v('a'), v('b', 'View 3')], 'Overview', numbered)).toBe('View 4');
+    expect(nextViewName([v('a'), v('b')], 'Overview', numbered)).toBe('View 3');
   });
 });

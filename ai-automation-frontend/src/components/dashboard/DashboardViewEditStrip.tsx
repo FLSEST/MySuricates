@@ -58,6 +58,8 @@ function RenameField({ initialName, label, placeholder, onCommit, onCancel }: Re
         }
       }}
       onBlur={() => finish(true)}
+      // The field starts with the view's name ("View 3"): selected, so typing replaces it.
+      onFocus={(e) => e.currentTarget.select()}
       className="input-base w-40 shrink-0 py-1 text-sm"
     />
   );
@@ -103,7 +105,7 @@ function SortableView({ view, label, active, disabled, renaming, onSelect, onRen
         <RenameField
           initialName={view.name}
           label={t.dashboard.views.nameLabel}
-          placeholder={t.dashboard.views.defaultName}
+          placeholder={label}
           onCommit={onRename}
           onCancel={onCancelRename}
         />

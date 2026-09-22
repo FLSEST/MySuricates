@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { DASHBOARD_FIXTURE, setupDashboardPageTests, widgetOrder } from '../../test/dashboardPage';
 import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { Dashboard } from '../Dashboard';
+import { templateWidgets } from '../../components/dashboard/dashboardWidgets';
+import { DASHBOARD_WIDGETS } from '../../components/dashboard/widgetRegistry';
 
 setupDashboardPageTests();
 
@@ -36,6 +38,37 @@ describe('Dashboard views', { timeout: 20_000 }, () => {
     expect(screen.queryByTestId('widget-skeleton')).not.toBeInTheDocument();
     release();
     await waitFor(() => expect(screen.getByTestId('dashboard-widgets')).not.toHaveAttribute('aria-busy'));
+  });
+
+  it('puts the view tabs into the page header instead of a row of their own (565adc37)', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'default',
+      views: [{ id: 'default', name: '', widgets: [] }, { id: 'week', name: 'Week', widgets: [] }],
+    });
+    renderWithProviders(<Dashboard />);
+    expect(await screen.findByText('Recent Runs')).toBeInTheDocument();
+
+    const header = screen.getByRole('heading', { level: 1, name: 'Dashboard' }).parentElement?.parentElement;
+    expect(header).toContainElement(screen.getByRole('tablist'));
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Edit dashboard' }));
+  });
+
+  it('shows an empty view as such and opens the widget catalog from there (565adc37)', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'empty',
+      views: [
+        { id: 'default', name: '', widgets: [] },
+        { id: 'empty', name: 'View 2', widgets: templateWidgets([], DASHBOARD_WIDGETS) },
+      ],
+    });
+    renderWithProviders(<Dashboard />);
+
+    expect(await screen.findByText('This view has no widgets yet')).toBeInTheDocument();
+    expect(screen.queryByText('Recent Runs')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add widget' }));
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(await screen.findByRole('dialog')).getByText('Runs Over Time')).toBeInTheDocument();
   });
 
   it('marks the widget area as the panel of the shown view’s tab, but not in edit mode', async () => {

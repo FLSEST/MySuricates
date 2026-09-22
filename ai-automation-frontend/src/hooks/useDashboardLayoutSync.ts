@@ -13,6 +13,7 @@ import {
   type DashboardLayout,
 } from '../components/dashboard/dashboardLayout';
 import { migrateLayout, sanitizeLayout } from '../components/dashboard/dashboardLayoutSanitize';
+import { viewLabels } from '../components/dashboard/dashboardViews';
 import {
   DASHBOARD_LAYOUT_VERSIONS_KEY,
   exceedsLayoutRequestLimit,
@@ -224,7 +225,8 @@ export function useDashboardLayoutSync() {
       const local = useDashboardLayoutStore.getState().views.find((v) => v.id === viewId);
       // Replacing a view can be undone from the history — unless this device has unsaved changes.
       if (local && hasLocalLayoutChanges()) {
-        const name = local.name || t.dashboard.views.defaultName;
+        const views = useDashboardLayoutStore.getState().views;
+        const name = viewLabels(views, t.dashboard.views.defaultName, (n) => t.dashboard.views.numbered.replace('{n}', () => String(n))).get(local.id) ?? local.name;
         if (!window.confirm(t.dashboard.history.adoptViewConfirm.replace('{name}', () => name))) return;
       }
       if (!useDashboardLayoutStore.getState().upsertView(view)) {

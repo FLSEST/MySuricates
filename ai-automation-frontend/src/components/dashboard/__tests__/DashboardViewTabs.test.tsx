@@ -62,12 +62,34 @@ describe('DashboardViewTabs', () => {
     expect(layout().activeViewId).toBe(layout().views[2]?.id);
     const field = nameField();
     expect(field).toHaveFocus();
-    expect(field).toHaveAttribute('placeholder', 'Overview');
+    // The new view comes with a name of its own — never a second "Overview" (565adc37)
+    expect(field).toHaveValue('View 3');
 
     fireEvent.change(field, { target: { value: 'Third' } });
     fireEvent.keyDown(field, { key: 'Enter' });
     expect(editNames()).toEqual(['Overview', 'Overview (copy)', 'Third']);
     expect(layout().views[0]?.name).toBe('');
+  });
+
+  it('keeps the new view apart from the others when renaming is cancelled, and starts it empty (565adc37)', () => {
+    render(<DashboardViewTabs editMode disabled={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add view' }));
+    fireEvent.keyDown(nameField(), { key: 'Escape' });
+
+    expect(editNames()).toEqual(['Overview', 'View 2']);
+    const added = layout().views[1];
+    expect(added?.name).toBe('View 2');
+    // Empty: every standard widget is stored hidden, so none is appended on display
+    expect(added?.widgets.length).toBeGreaterThan(0);
+    expect(added?.widgets.every((w) => w.hidden)).toBe(true);
+  });
+
+  it('never shows two unnamed views under the same tab name (565adc37)', () => {
+    useDashboardLayoutStore.setState({ activeViewId: 'default', views: [view('default'), view('second')] });
+    render(<DashboardViewTabs editMode={false} disabled={false} />);
+
+    expect(tabNames()).toEqual(['Overview', 'View 2']);
   });
 
   it('renames the active view inline, trimmed and cut by code points', () => {

@@ -253,6 +253,7 @@ export const en = {
     views: {
       label: 'Dashboard views',
       defaultName: 'Overview',
+      numbered: 'View {n}',
       add: 'Add view',
       limitReached: 'At most {max} views',
       rename: 'Rename view',
@@ -294,6 +295,11 @@ export const en = {
       trendUp: 'rising',
       trendDown: 'falling',
       trendFlat: 'unchanged',
+    },
+    emptyView: {
+      title: 'This view has no widgets yet',
+      hint: 'Add the widgets you want to see here.',
+      hintEdit: 'Pick widgets from the catalog — hidden ones can be shown again there too.',
     },
     catalog: {
       open: 'Add widget',

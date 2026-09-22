@@ -6,6 +6,7 @@ import { selectActiveView, useDashboardLayoutStore } from '../../stores/dashboar
 import { LAYOUT_LIMITS, type DashboardView } from './dashboardLayout';
 import { templateWidgets } from './dashboardWidgets';
 import { DASHBOARD_TEMPLATES } from './dashboardTemplates';
+import { nextViewName, viewLabels } from './dashboardViews';
 import { DashboardMenu } from './DashboardMenu';
 import { DashboardViewEditStrip } from './DashboardViewEditStrip';
 import { DashboardViewTabList } from './DashboardViewTabList';
@@ -33,11 +34,13 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
   const removeView = useDashboardLayoutStore((s) => s.removeView);
   const moveView = useDashboardLayoutStore((s) => s.moveView);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const numbered = (n: number) => t.dashboard.views.numbered.replace('{n}', () => String(n));
+  const labels = viewLabels(views, t.dashboard.views.defaultName, numbered);
 
   // One view outside edit mode: no tab strip, the dashboard looks as it did before views existed.
   if (!editMode && views.length < 2) return null;
 
-  const labelOf = (view: DashboardView) => view.name || t.dashboard.views.defaultName;
+  const labelOf = (view: DashboardView) => labels.get(view.id) ?? (view.name || t.dashboard.views.defaultName);
 
   if (!editMode) {
     return <DashboardViewTabList views={views} activeViewId={activeView?.id} labelOf={labelOf} onSelect={setActiveView} />;
@@ -112,7 +115,9 @@ export function DashboardViewTabs({ editMode, disabled }: DashboardViewTabsProps
             icon={<Plus className="h-3.5 w-3.5" />}
             disabled={disabled || atLimit}
             onClick={() => {
-              const id = addView();
+              // A new view starts empty (every standard widget hidden, the catalog shows them again)
+              // and under a name no other view shows — before, it read "Overview" twice (565adc37).
+              const id = addView(nextViewName(views, t.dashboard.views.defaultName, numbered), templateWidgets([], DASHBOARD_WIDGETS));
               if (id) setRenamingId(id);
             }}
             aria-label={t.dashboard.views.add}

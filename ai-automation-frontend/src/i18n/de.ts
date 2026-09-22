@@ -255,6 +255,7 @@ export const de: TranslationKeys = {
     views: {
       label: 'Dashboard-Ansichten',
       defaultName: 'Übersicht',
+      numbered: 'Ansicht {n}',
       add: 'Ansicht hinzufügen',
       limitReached: 'Höchstens {max} Ansichten',
       rename: 'Ansicht umbenennen',
@@ -296,6 +297,11 @@ export const de: TranslationKeys = {
       trendUp: 'steigend',
       trendDown: 'fallend',
       trendFlat: 'unverändert',
+    },
+    emptyView: {
+      title: 'Diese Ansicht hat noch keine Widgets',
+      hint: 'Füge die Widgets hinzu, die du hier sehen willst.',
+      hintEdit: 'Widgets aus dem Katalog wählen — ausgeblendete lassen sich dort auch wieder einblenden.',
     },
     catalog: {
       open: 'Widget hinzufügen',

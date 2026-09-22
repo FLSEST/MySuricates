@@ -13,6 +13,7 @@ import { useDashboardData } from '../components/dashboard/dashboardDataContext';
 import { DASHBOARD_VIEW_PANEL_ID, viewTabId } from '../components/dashboard/viewTabA11y';
 import { DashboardViewFilterBar } from '../components/dashboard/DashboardViewFilterBar';
 import { DashboardViewTabs } from '../components/dashboard/DashboardViewTabs';
+import { EmptyViewState } from '../components/dashboard/EmptyViewState';
 import { LayoutHistoryDialog } from '../components/dashboard/LayoutHistoryDialog';
 import { LayoutSyncConflictBanner } from '../components/dashboard/LayoutSyncConflictBanner';
 import { selectActiveView, useDashboardLayoutStore } from '../stores/dashboardLayoutStore';
@@ -79,12 +80,19 @@ function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+      {/* Page header — outside edit mode the view tabs sit in it instead of taking a row of their
+          own (565adc37); on narrow screens they wrap below the title. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 sm:flex-nowrap">
+        {/* basis-0: on narrow screens the title shrinks next to the buttons instead of pushing them down */}
+        <div className="min-w-0 flex-1 basis-0 sm:flex-none sm:basis-auto">
           <h1 className="text-2xl font-bold text-text">{t.dashboard.title}</h1>
           <p className="text-sm text-text-secondary mt-1 truncate">{t.dashboard.subtitle}</p>
         </div>
+        {!editMode && (
+          <div className="order-last flex w-full min-w-0 empty:hidden sm:order-none sm:w-auto sm:flex-1 sm:pt-0.5">
+            <DashboardViewTabs editMode={false} disabled={locked} />
+          </div>
+        )}
         <div className="flex items-start gap-3 shrink-0">
           <div className="flex items-center gap-2 pt-1">
             {editMode && (
@@ -143,9 +151,9 @@ function DashboardPage() {
 
       <Hint id="dashboard-views" />
 
-      {/* Collapses when there is a single view and no filter to show. */}
+      {/* Collapses when there is no filter to show (and, in edit mode, carries the view list). */}
       <div className="space-y-3 empty:hidden">
-        <DashboardViewTabs editMode={editMode} disabled={locked} />
+        {editMode && <DashboardViewTabs editMode disabled={locked} />}
         <DashboardViewFilterBar editMode={editMode} disabled={locked} />
       </div>
 
@@ -162,18 +170,29 @@ function DashboardPage() {
         aria-busy={isPlaceholderData || undefined}
         className={`transition-opacity ${isPlaceholderData ? 'opacity-60' : ''}`}
       >
-        {/* Workflow widgets of this view share one request and one run-completed subscription. */}
-        <WorkflowWidgetProvider widgets={layout.visible}>
-          <DashboardGrid
-            widgets={layout.visible}
+        {layout.visible.length === 0 ? (
+          <EmptyViewState
             editMode={editMode}
             disabled={locked}
-            onMove={layout.move}
-            onHide={(instanceId) => layout.setHidden(instanceId, true)}
-            onResize={layout.setSize}
-            onRemove={layout.remove}
+            onAdd={() => {
+              setEditMode(true);
+              setCatalogOpen(true);
+            }}
           />
-        </WorkflowWidgetProvider>
+        ) : (
+          /* Workflow widgets of this view share one request and one run-completed subscription. */
+          <WorkflowWidgetProvider widgets={layout.visible}>
+            <DashboardGrid
+              widgets={layout.visible}
+              editMode={editMode}
+              disabled={locked}
+              onMove={layout.move}
+              onHide={(instanceId) => layout.setHidden(instanceId, true)}
+              onResize={layout.setSize}
+              onRemove={layout.remove}
+            />
+          </WorkflowWidgetProvider>
+        )}
       </div>
 
       <WidgetCatalogDialog
