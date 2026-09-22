@@ -16,6 +16,10 @@ export interface OnboardingProfile {
   sortOrder: number;
   version: number;
   historyCount: number;
+  /** Built-in profile whose text was changed by hand. */
+  customized: boolean;
+  /** A newer shipped text exists than the one this profile is based on. */
+  updateAvailable: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +104,15 @@ export function useResetOnboardingProfile() {
       toast.success(t.toast.profileReset);
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.toast.profileResetFailed)),
+  });
+}
+
+/** The current shipped text of a built-in profile, to compare before taking it over. */
+export function useShippedOnboardingProfile(profileId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['onboarding-profiles', profileId, 'shipped'],
+    queryFn: () => api.get<{ version: number; content: Record<string, string> }>(`/onboarding-profiles/${profileId}/shipped`),
+    enabled: enabled && !!profileId,
   });
 }
 

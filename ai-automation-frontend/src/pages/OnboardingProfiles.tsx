@@ -7,6 +7,7 @@ import {
   useDeleteOnboardingProfile,
   useResetOnboardingProfile,
   useOnboardingProfileHistory,
+  useShippedOnboardingProfile,
   type OnboardingProfile,
 } from '../hooks/useOnboardingProfiles';
 import { Card } from '../components/ui/Card';
@@ -15,10 +16,11 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { ModalFooter } from '../components/ui/ModalFooter';
 import { Spinner } from '../components/ui/Spinner';
-import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield, ArrowUpCircle, PencilLine } from 'lucide-react';
 import { useI18nStore } from '../i18n';
 import { ensureLocalMonaco } from '../components/shared/monacoSetup';
 import { Hint } from '../components/hints/Hint';
+import { useThemeAppearance } from '../stores/themeStore';
 
 // Monaco from our own bundle, never the CDN (see monacoSetup)
 const MonacoEditor = lazy(() =>
@@ -53,6 +55,8 @@ export function OnboardingProfiles() {
   const [showDelete, setShowDelete] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showShipped, setShowShipped] = useState(false);
+  const appearance = useThemeAppearance();
   const [editContent, setEditContent] = useState<ContentByLanguage>({ de: '', en: '' });
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(locale === 'de' ? 'de' : 'en');
   const [editName, setEditName] = useState({ de: '', en: '' });
@@ -128,7 +132,12 @@ export function OnboardingProfiles() {
   const handleReset = () => {
     if (!selected) return;
     resetProfile.mutate(selected.id, {
-      onSuccess: () => setShowReset(false),
+      onSuccess: (profile) => {
+        setShowReset(false);
+        setShowShipped(false);
+        // The editor shows the taken-over text, not the one it had before.
+        if (profile) handleSelect(profile);
+      },
     });
   };
 
@@ -183,15 +192,26 @@ export function OnboardingProfiles() {
                       <span className="text-xs text-text-tertiary font-mono">{profile.key}</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
                         profile.type === 'BASE'
-                          ? 'bg-blue-500/10 text-blue-400'
+                          ? 'bg-accent/10 text-accent'
                           : 'bg-surface-raised text-text-tertiary'
                       }`}>
                         {profile.type === 'BASE' ? t.onboardingProfiles.typeBase : t.onboardingProfiles.typeProfile}
                       </span>
                       {profile.builtIn && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 flex items-center gap-0.5">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-raised text-text-secondary flex items-center gap-0.5">
                           <Shield className="w-3 h-3" />
                           {t.onboardingProfiles.builtIn}
+                        </span>
+                      )}
+                      {profile.updateAvailable ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-info-subtle text-info flex items-center gap-0.5">
+                          <ArrowUpCircle className="w-3 h-3" />
+                          {t.onboardingProfiles.updateAvailable}
+                        </span>
+                      ) : profile.customized && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-human-subtle text-human flex items-center gap-0.5">
+                          <PencilLine className="w-3 h-3" />
+                          {t.onboardingProfiles.customized}
                         </span>
                       )}
                     </div>
@@ -233,17 +253,39 @@ export function OnboardingProfiles() {
                 </div>
               </div>
 
-              {/* Name fields */}
+              {selected.updateAvailable && (
+                <div role="status" className="flex flex-wrap items-start gap-3 rounded-lg border border-info/30 bg-info-subtle px-3 py-2">
+                  <ArrowUpCircle className="w-4 h-4 mt-0.5 shrink-0 text-info" />
+                  <p className="flex-1 min-w-[12rem] text-sm text-text-secondary">
+                    {t.onboardingProfiles.updateAvailableHint}
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={() => setShowShipped(true)}>
+                    {t.onboardingProfiles.showShipped}
+                  </Button>
+                </div>
+              )}
+
+              {/* Name and description fields */}
               <div className="grid grid-cols-2 gap-3">
                 <Input
-                  label="Name (DE)"
+                  label={t.onboardingProfiles.nameDe}
                   value={editName.de}
                   onChange={e => { setEditName(n => ({ ...n, de: e.target.value })); setHasChanges(true); }}
                 />
                 <Input
-                  label="Name (EN)"
+                  label={t.onboardingProfiles.nameEn}
                   value={editName.en}
                   onChange={e => { setEditName(n => ({ ...n, en: e.target.value })); setHasChanges(true); }}
+                />
+                <Input
+                  label={t.onboardingProfiles.descriptionDe}
+                  value={editDescription.de}
+                  onChange={e => { setEditDescription(d => ({ ...d, de: e.target.value })); setHasChanges(true); }}
+                />
+                <Input
+                  label={t.onboardingProfiles.descriptionEn}
+                  value={editDescription.en}
+                  onChange={e => { setEditDescription(d => ({ ...d, en: e.target.value })); setHasChanges(true); }}
                 />
               </div>
 
@@ -273,7 +315,7 @@ export function OnboardingProfiles() {
                     <MonacoEditor
                       height="400px"
                       language="markdown"
-                      theme="vs-dark"
+                      theme={appearance === 'dark' ? 'vs-dark' : 'light'}
                       path={`onboarding-profile-${selected.id}-${contentLanguage}.md`}
                       value={editContent[contentLanguage]}
                       onChange={value => { setEditContent(c => ({ ...c, [contentLanguage]: value || '' })); setHasChanges(true); }}
@@ -358,12 +400,12 @@ export function OnboardingProfiles() {
           />
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Name (DE)"
+              label={t.onboardingProfiles.nameDe}
               value={createForm.nameDe}
               onChange={e => setCreateForm(f => ({ ...f, nameDe: e.target.value }))}
             />
             <Input
-              label="Name (EN)"
+              label={t.onboardingProfiles.nameEn}
               value={createForm.nameEn}
               onChange={e => setCreateForm(f => ({ ...f, nameEn: e.target.value }))}
             />
@@ -410,6 +452,17 @@ export function OnboardingProfiles() {
         <p className="text-sm text-text-secondary">{t.onboardingProfiles.resetConfirm}</p>
       </Modal>
 
+      {/* Shipped text of a built-in profile with an update */}
+      {selected && showShipped && (
+        <ShippedModal
+          profileId={selected.id}
+          open={showShipped}
+          onClose={() => setShowShipped(false)}
+          onTakeOver={handleReset}
+          takingOver={resetProfile.isPending}
+        />
+      )}
+
       {/* History Modal */}
       {selected && showHistory && (
         <HistoryModal
@@ -419,6 +472,60 @@ export function OnboardingProfiles() {
         />
       )}
     </div>
+  );
+}
+
+function ShippedModal({ profileId, open, onClose, onTakeOver, takingOver }: {
+  profileId: string; open: boolean; onClose: () => void; onTakeOver: () => void; takingOver: boolean;
+}) {
+  const t = useT();
+  const locale = useI18nStore(s => s.locale);
+  const { data: shipped, isLoading } = useShippedOnboardingProfile(profileId, open);
+  const [lang, setLang] = useState<ContentLanguage>(locale === 'de' ? 'de' : 'en');
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t.onboardingProfiles.shippedTitle.replace('{version}', () => String(shipped?.version ?? ''))}
+      size="lg"
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onAction={onTakeOver}
+          cancelLabel={t.common.close}
+          actionLabel={t.onboardingProfiles.takeOver}
+          actionLoading={takingOver}
+          actionDisabled={!shipped}
+        />
+      }
+    >
+      {isLoading || !shipped ? (
+        <Spinner />
+      ) : (
+        <div className="space-y-2">
+          <div role="group" aria-label={t.onboardingProfiles.contentLanguage} className="inline-flex rounded-lg border border-border p-0.5">
+            {CONTENT_LANGUAGES.map(l => (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={lang === l}
+                onClick={() => setLang(l)}
+                className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                  lang === l ? 'bg-accent text-text-inverse' : 'text-text-secondary hover:text-text'
+                }`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-text-tertiary">{t.onboardingProfiles.resetConfirm}</p>
+          <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded p-3 max-h-[55vh] overflow-y-auto">
+            {shipped.content[lang] ?? ''}
+          </pre>
+        </div>
+      )}
+    </Modal>
   );
 }
 

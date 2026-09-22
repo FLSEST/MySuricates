@@ -1629,9 +1629,15 @@ Delete a profile.
 
 ### `POST /api/v1/onboarding-profiles/{id}/reset`
 
-Reset a built-in profile to its original content.
+Set a built-in profile to the current shipped text; the previous text goes into the history, `customized` becomes `false`.
 
-**Response:** `OnboardingProfileResponse`
+**Response:** `OnboardingProfileResponse` (includes `customized` — changed by hand — and `updateAvailable` — a newer shipped text exists than the one the profile is based on)
+
+### `GET /api/v1/onboarding-profiles/{id}/shipped`
+
+The current shipped text of a built-in profile, to compare before taking it over.
+
+**Response:** `{ "version": 4, "content": { "de": "...", "en": "..." } }` · 404 for custom profiles
 
 ### `GET /api/v1/onboarding-profiles/{id}/history`
 

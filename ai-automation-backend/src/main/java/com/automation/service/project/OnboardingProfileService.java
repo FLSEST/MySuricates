@@ -10,6 +10,7 @@ import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ public class OnboardingProfileService {
     private final OnboardingProfileRepository profileRepository;
     private final OnboardingProfileHistoryRepository historyRepository;
     private final OnboardingProfileSeeder seeder;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<OnboardingProfile> findAll() {
@@ -97,10 +99,14 @@ public class OnboardingProfileService {
         if (contentChanged) {
             profile.setContent(content);
             profile.setVersion(profile.getVersion() + 1);
+            profile.setCustomized(true);
         }
 
         OnboardingProfile saved = profileRepository.save(profile);
         log.info("Updated onboarding profile: {} (v{})", saved.getKey(), saved.getVersion());
+        if (contentChanged) {
+            publishChanged(saved);
+        }
         return saved;
     }
 
@@ -113,6 +119,7 @@ public class OnboardingProfileService {
         historyRepository.deleteByProfileId(id);
         profileRepository.delete(profile);
         log.info("Deleted onboarding profile: {}", profile.getKey());
+        publishChanged(profile);
     }
 
     @Transactional
@@ -127,7 +134,13 @@ public class OnboardingProfileService {
             throw new IllegalStateException("No default content found for profile: " + profile.getKey());
         }
 
+        int shippedVersion = seeder.shippedVersion(profile.getKey());
         if (defaultContent.equals(profile.getContent())) {
+            if (profile.isCustomized() || profile.getShippedVersion() != shippedVersion) {
+                profile.setCustomized(false);
+                profile.setShippedVersion(shippedVersion);
+                return profileRepository.save(profile);
+            }
             return profile;
         }
 
@@ -142,10 +155,37 @@ public class OnboardingProfileService {
 
         profile.setContent(defaultContent);
         profile.setVersion(profile.getVersion() + 1);
+        profile.setCustomized(false);
+        profile.setShippedVersion(shippedVersion);
 
         OnboardingProfile saved = profileRepository.save(profile);
         log.info("Reset onboarding profile to default: {} (v{})", saved.getKey(), saved.getVersion());
+        publishChanged(saved);
         return saved;
+    }
+
+    /** Whether a newer shipped text exists for this built-in profile than the one it is based on. */
+    public boolean isUpdateAvailable(OnboardingProfile profile) {
+        return seeder.isUpdateAvailable(profile);
+    }
+
+    /** The current shipped text of a built-in profile (to compare before taking it over). */
+    public Map<String, String> shippedContent(OnboardingProfile profile) {
+        Map<String, String> shipped = profile.isBuiltIn() ? seeder.getDefaultContent(profile.getKey()) : null;
+        if (shipped == null || shipped.isEmpty()) {
+            throw new ResourceNotFoundException("Shipped onboarding text", profile.getKey());
+        }
+        return shipped;
+    }
+
+    public int shippedVersion(OnboardingProfile profile) {
+        return seeder.shippedVersion(profile.getKey());
+    }
+
+    /** Project files that include the profile are written again once the change is committed. */
+    private void publishChanged(OnboardingProfile profile) {
+        eventPublisher.publishEvent(new OnboardingProfileChangedEvent(
+                profile.getId(), profile.getType() == com.automation.entity.OnboardingProfileType.BASE));
     }
 
     /**

@@ -64,6 +64,14 @@ public class OnboardingProfile {
     @Builder.Default
     private int version = 1;
 
+    /** The text was changed by hand; a newer shipped text is then offered, not applied (V83). */
+    @Builder.Default
+    private boolean customized = false;
+
+    /** Version of the shipped text this profile is based on; 0 = unknown (V83). Built-in profiles only. */
+    @Builder.Default
+    private int shippedVersion = 0;
+
     @CreatedDate
     @Column(updatable = false)
     private Instant createdAt;

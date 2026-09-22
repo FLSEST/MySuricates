@@ -66,6 +66,7 @@ public class SystemAccessController {
         }
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @GetMapping(value = "/integration-snippet", produces = "text/markdown")
     public ResponseEntity<String> integrationSnippet(
             @RequestParam(required = false) String projectPath,

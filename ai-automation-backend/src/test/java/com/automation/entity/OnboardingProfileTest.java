@@ -160,7 +160,7 @@ class OnboardingProfileTest {
                 new HashMap<>(Map.of("en", "Test")),
                 new HashMap<>(Map.of("en", "Desc")),
                 Map.of("de", "content"), OnboardingProfileType.BASE,
-                true, 5, 2,
+                true, 5, 2, false, 2,
                 now, now
         );
 

@@ -37,8 +37,10 @@ class ProjectOnboardingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjectOnboardingService(profileRepository, workflowService,
-                new InstanceAddress("", "", 9090), projectService);
+        var modules = com.automation.modules.ModuleRegistry.allEnabled();
+        service = new ProjectOnboardingService(
+                new OnboardingRenderer(profileRepository, workflowService, new InstanceAddress("", "", 9090), modules),
+                modules, projectService);
     }
 
     private Project buildProject(String id, String path) {

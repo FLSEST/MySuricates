@@ -25,7 +25,8 @@ class OnboardingProfileContentRejectionTest {
 
     private final OnboardingProfileRepository profileRepository = mock(OnboardingProfileRepository.class);
     private final OnboardingProfileService service = new OnboardingProfileService(
-            profileRepository, mock(OnboardingProfileHistoryRepository.class), mock(OnboardingProfileSeeder.class));
+            profileRepository, mock(OnboardingProfileHistoryRepository.class), mock(OnboardingProfileSeeder.class),
+            mock(org.springframework.context.ApplicationEventPublisher.class));
 
     @Test
     void creatingWithOnlyBlankLanguagesIsRefused() {

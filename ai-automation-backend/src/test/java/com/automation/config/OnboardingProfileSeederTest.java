@@ -5,7 +5,6 @@ import com.automation.entity.OnboardingProfileType;
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import com.automation.service.project.ProjectOnboardingService;
-import com.automation.service.project.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,14 +26,13 @@ class OnboardingProfileSeederTest {
 
     @Mock private OnboardingProfileRepository profileRepository;
     @Mock private OnboardingProfileHistoryRepository historyRepository;
-    @Mock private ProjectService projectService;
     @Mock private ProjectOnboardingService projectOnboardingService;
 
     private OnboardingProfileSeeder seeder;
 
     @BeforeEach
     void setUp() {
-        seeder = new OnboardingProfileSeeder(profileRepository, historyRepository, projectService, projectOnboardingService);
+        seeder = new OnboardingProfileSeeder(profileRepository, historyRepository, projectOnboardingService);
     }
 
     @Test
@@ -51,7 +49,7 @@ class OnboardingProfileSeederTest {
     @Test
     void run_skipsExistingProfileById_whenVersionCurrent() throws Exception {
         OnboardingProfile existing = OnboardingProfile.builder()
-                .id("onboarding-base").key("base").version(99).build();
+                .id("onboarding-base").key("base").version(99).shippedVersion(99).build();
         when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(existing));
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
@@ -78,7 +76,7 @@ class OnboardingProfileSeederTest {
     @Test
     void run_allExist_atCurrentVersion_seedsNothing() throws Exception {
         when(profileRepository.findById(anyString())).thenReturn(Optional.of(
-                OnboardingProfile.builder().version(99).build()));
+                OnboardingProfile.builder().version(99).shippedVersion(99).build()));
 
         seeder.run(null);
 
@@ -96,7 +94,7 @@ class OnboardingProfileSeederTest {
         // Second call: all exist at current version
         reset(profileRepository);
         when(profileRepository.findById(anyString())).thenReturn(Optional.of(
-                OnboardingProfile.builder().version(99).build()));
+                OnboardingProfile.builder().version(99).shippedVersion(99).build()));
         seeder.run(null);
         verify(profileRepository, never()).save(any());
     }
@@ -161,13 +159,14 @@ class OnboardingProfileSeederTest {
         when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(outdated));
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
-        when(projectService.findAll()).thenReturn(List.of());
 
         seeder.run(null);
 
-        // base updated (version 1 < 4) + 5 others seeded = 6 saves
+        // base updated (stored before V83, not edited by hand) + 5 others seeded = 6 saves
         verify(profileRepository, times(6)).save(any());
-        assertThat(outdated.getVersion()).isEqualTo(4);
+        assertThat(outdated.getVersion()).isEqualTo(2);
+        assertThat(outdated.getShippedVersion()).isEqualTo(seeder.shippedVersion("base"));
+        assertThat(outdated.isCustomized()).isFalse();
         assertThat(outdated.getContent()).isNotEqualTo(Map.of("de", "old content"));
         assertThat(outdated.getContent().get("de")).contains("TODOs immer mit Titel nennen");
     }
@@ -180,13 +179,10 @@ class OnboardingProfileSeederTest {
         when(profileRepository.findById(argThat(id -> !"onboarding-base".equals(id)))).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.empty());
 
-        var project = mock(com.automation.entity.Project.class);
-        when(project.getConfig()).thenReturn(Map.of("onboarding", Map.of("enabled", true)));
-        when(projectService.findAll()).thenReturn(List.of(project));
-
         seeder.run(null);
 
-        verify(projectOnboardingService).refresh(project);
+        // The renderer decides which projects (onboarding on) and whether at all (module on).
+        verify(projectOnboardingService).refreshEnabled(any());
     }
 
     @Test

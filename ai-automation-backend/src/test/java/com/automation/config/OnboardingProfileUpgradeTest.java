@@ -6,11 +6,11 @@ import com.automation.entity.OnboardingProfileType;
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import com.automation.service.project.ProjectOnboardingService;
-import com.automation.service.project.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,54 +24,100 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Shipping the bilingual texts (TODO a805d0a7) must not wipe out what was stored before without a trace. */
+/**
+ * Shipping a newer text (TODOs a805d0a7, 644fd5ad): an unchanged profile takes it over, an edited
+ * one keeps its text and shows "update available" — never skipped silently, never overwritten.
+ */
 class OnboardingProfileUpgradeTest {
 
     private final OnboardingProfileRepository profileRepository = mock(OnboardingProfileRepository.class);
     private final OnboardingProfileHistoryRepository historyRepository = mock(OnboardingProfileHistoryRepository.class);
-    private final ProjectService projectService = mock(ProjectService.class);
+    private final ProjectOnboardingService projectOnboardingService = mock(ProjectOnboardingService.class);
     private OnboardingProfileSeeder seeder;
+    private int shipped;
 
     @BeforeEach
     void setUp() {
-        seeder = new OnboardingProfileSeeder(profileRepository, historyRepository, projectService,
-                mock(ProjectOnboardingService.class));
+        seeder = new OnboardingProfileSeeder(profileRepository, historyRepository, projectOnboardingService);
+        shipped = seeder.shippedVersion("developer");
         when(profileRepository.findById(anyString())).thenReturn(Optional.empty());
         when(profileRepository.findByKey(anyString())).thenReturn(Optional.of(new OnboardingProfile()));
-        when(projectService.findAll()).thenReturn(List.of());
     }
 
-    private OnboardingProfile storedBase(int version, String content) {
-        OnboardingProfile base = OnboardingProfile.builder().id("onboarding-base").key("base")
-                .type(OnboardingProfileType.BASE).builtIn(true).version(version)
-                .content(new HashMap<>(Map.of("de", content))).build();
-        when(profileRepository.findById("onboarding-base")).thenReturn(Optional.of(base));
-        return base;
+    private OnboardingProfile stored(int shippedVersion, boolean customized, Map<String, String> content) {
+        OnboardingProfile profile = OnboardingProfile.builder().id("onboarding-developer").key("developer")
+                .type(OnboardingProfileType.PROFILE).builtIn(true).version(7)
+                .shippedVersion(shippedVersion).customized(customized).content(new HashMap<>(content)).build();
+        when(profileRepository.findById("onboarding-developer")).thenReturn(Optional.of(profile));
+        return profile;
+    }
+
+    private void latestChangeBy(String who) {
+        OnboardingProfileHistory latest = OnboardingProfileHistory.builder().profileId("onboarding-developer")
+                .version(6).content(Map.of("de", "before")).changedBy(who).changedAt(Instant.now()).build();
+        when(historyRepository.findByProfileIdOrderByVersionDesc("onboarding-developer")).thenReturn(List.of(latest));
     }
 
     @Test
-    void anOlderVersionGetsBothLanguages_andTheOldTextGoesIntoTheHistory() {
-        OnboardingProfile base = storedBase(3, "alter deutscher Text");
+    void anUnchangedProfileTakesOverTheNewerText_withTheOldOneInTheHistory() {
+        OnboardingProfile profile = stored(shipped - 1, false, Map.of("de", "alte mitgelieferte Fassung"));
 
         seeder.run(null);
 
-        assertThat(base.getVersion()).isEqualTo(4);
-        assertThat(base.getContent()).containsOnlyKeys("de", "en");
-        assertThat(base.getContent().get("en")).contains("{{BASE_URL}}");
+        assertThat(profile.getContent()).isEqualTo(seeder.getDefaultContent("developer"));
+        assertThat(profile.getShippedVersion()).isEqualTo(shipped);
+        assertThat(profile.getVersion()).isEqualTo(8);
+        assertThat(seeder.isUpdateAvailable(profile)).isFalse();
         ArgumentCaptor<OnboardingProfileHistory> history = ArgumentCaptor.forClass(OnboardingProfileHistory.class);
         verify(historyRepository).save(history.capture());
-        assertThat(history.getValue().getContent()).containsEntry("de", "alter deutscher Text");
-        assertThat(history.getValue().getVersion()).isEqualTo(3);
+        assertThat(history.getValue().getContent()).containsEntry("de", "alte mitgelieferte Fassung");
         assertThat(history.getValue().getChangedBy()).isEqualTo("system");
+        verify(projectOnboardingService).refreshEnabled(any());
     }
 
     @Test
-    void aProfileAtTheShippedVersionOrAboveIsLeftAlone() {
-        OnboardingProfile base = storedBase(5, "von Hand bearbeitet");
+    void anEditedProfileKeepsItsText_andAnUpdateIsOffered() {
+        OnboardingProfile profile = stored(shipped - 1, true, Map.of("de", "von Hand"));
 
         seeder.run(null);
 
-        assertThat(base.getContent()).containsOnlyKeys("de").containsEntry("de", "von Hand bearbeitet");
+        assertThat(profile.getContent()).containsOnlyKeys("de").containsEntry("de", "von Hand");
+        assertThat(seeder.isUpdateAvailable(profile)).isTrue();
         verify(historyRepository, never()).save(any());
+    }
+
+    @Test
+    void beforeV83_aProfileEqualToTheShippedTextIsRecordedAsCurrent() {
+        OnboardingProfile profile = stored(0, false, seeder.getDefaultContent("developer"));
+
+        seeder.run(null);
+
+        assertThat(profile.getShippedVersion()).isEqualTo(shipped);
+        assertThat(profile.isCustomized()).isFalse();
+        verify(historyRepository, never()).save(any());
+    }
+
+    @Test
+    void beforeV83_aProfileLastChangedByHandCountsAsEdited() {
+        OnboardingProfile profile = stored(0, false, Map.of("de", "von Hand geändert"));
+        latestChangeBy("user");
+
+        seeder.run(null);
+
+        assertThat(profile.isCustomized()).isTrue();
+        assertThat(profile.getContent()).containsEntry("de", "von Hand geändert");
+        assertThat(seeder.isUpdateAvailable(profile)).isTrue();
+    }
+
+    @Test
+    void beforeV83_anOlderShippedTextNobodyEditedIsReplaced() {
+        OnboardingProfile profile = stored(0, false, Map.of("de", "Fassung aus V81"));
+        latestChangeBy("system");
+
+        seeder.run(null);
+
+        assertThat(profile.isCustomized()).isFalse();
+        assertThat(profile.getContent()).isEqualTo(seeder.getDefaultContent("developer"));
+        assertThat(profile.getShippedVersion()).isEqualTo(shipped);
     }
 }

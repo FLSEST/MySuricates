@@ -1634,9 +1634,15 @@ Profil löschen.
 
 ### `POST /api/v1/onboarding-profiles/{id}/reset`
 
-Built-in-Profil auf Originalinhalt zurücksetzen.
+Built-in-Profil auf die aktuelle mitgelieferte Fassung setzen; der bisherige Text landet im Verlauf, `customized` wird `false`.
 
-**Response:** `OnboardingProfileResponse`
+**Response:** `OnboardingProfileResponse` (enthält `customized` — von Hand geändert — und `updateAvailable` — es gibt eine neuere mitgelieferte Fassung als die, auf der das Profil beruht)
+
+### `GET /api/v1/onboarding-profiles/{id}/shipped`
+
+Aktuelle mitgelieferte Fassung eines Built-in-Profils, zum Vergleichen vor dem Übernehmen.
+
+**Response:** `{ "version": 4, "content": { "de": "...", "en": "..." } }` · 404 für eigene Profile
 
 ### `GET /api/v1/onboarding-profiles/{id}/history`
 

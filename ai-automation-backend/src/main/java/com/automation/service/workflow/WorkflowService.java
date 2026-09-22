@@ -108,6 +108,7 @@ public class WorkflowService {
         log.info("Created workflow: {} ({})", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow created: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         eventPublisher.publishEvent(new WorkflowContentChangedEvent(saved.getId()));
+        eventPublisher.publishEvent(new ProjectWorkflowsChangedEvent(project.getId()));
         return saved;
     }
 
@@ -171,6 +172,9 @@ public class WorkflowService {
         activityLogService.info(LogCategory.SYSTEM, "Workflow updated: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         if (contentChanged) {
             eventPublisher.publishEvent(new WorkflowContentChangedEvent(saved.getId()));
+            if (saved.getProject() != null) {
+                eventPublisher.publishEvent(new ProjectWorkflowsChangedEvent(saved.getProject().getId()));
+            }
         }
         return saved;
     }
@@ -221,6 +225,9 @@ public class WorkflowService {
         workflow.setDeletedAt(java.time.Instant.now());
         workflowRepository.save(workflow);
         log.info("Soft-deleted workflow: {} ({})", workflow.getName(), workflow.getId());
+        if (workflow.getProject() != null) {
+            eventPublisher.publishEvent(new ProjectWorkflowsChangedEvent(workflow.getProject().getId()));
+        }
         activityLogService.warn(LogCategory.SYSTEM, "Workflow deleted: " + workflow.getName(), "WorkflowService", workflow.getId(), workflow.getId());
     }
 

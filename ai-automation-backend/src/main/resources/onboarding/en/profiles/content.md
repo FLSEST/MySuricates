@@ -4,7 +4,9 @@
 - **Review:** `simple` for copy-editing, `approval` before publishing.
 - **Files:** rename and convert with `shell`, which costs no tokens.
 - **Translate:** `foreach` over the list of languages.
-- **Draft → review → revision** as a chain (only with the `chains` module).
+<!-- module: chains -->
+- **Draft → review → revision** as a chain.
+<!-- /module -->
 
 Suggested variables: `content_type`, `target_audience`, `tone`, `output_format`.
 

@@ -3,7 +3,6 @@ package com.automation.config;
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
 import com.automation.service.project.ProjectOnboardingService;
-import com.automation.service.project.ProjectService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -29,7 +28,7 @@ class OnboardingTextsShippedTest {
 
     private final OnboardingProfileSeeder seeder = new OnboardingProfileSeeder(
             mock(OnboardingProfileRepository.class), mock(OnboardingProfileHistoryRepository.class),
-            mock(ProjectService.class), mock(ProjectOnboardingService.class));
+            mock(ProjectOnboardingService.class));
 
     @Test
     void everyBuiltInProfileIsShippedInGermanAndEnglish() {
@@ -76,6 +75,46 @@ class OnboardingTextsShippedTest {
                     assertThat(cron.group(1).trim().split("\\s+")).as(key + "/" + lang + ": " + cron.group(1)).hasSize(6);
                 }
             });
+        }
+    }
+
+    @Test
+    void moduleSectionsAreBalanced_nameRealModules_andMatchInBothLanguages() {
+        Pattern marker = Pattern.compile("<!-- (module: ([a-z0-9-]+)|/module) -->");
+        for (String key : KEYS) {
+            Map<String, List<String>> sequences = new java.util.HashMap<>();
+            seeder.getDefaultContent(key).forEach((lang, text) -> {
+                List<String> sequence = new ArrayList<>();
+                String open = null;
+                for (String line : text.split("\n")) {
+                    Matcher m = marker.matcher(line);
+                    if (!m.find()) {
+                        continue;
+                    }
+                    assertThat(m.group(0)).as(key + "/" + lang + ": marker on its own line").isEqualTo(line);
+                    if (m.group(2) != null) {
+                        assertThat(open).as(key + "/" + lang + ": nested module section").isNull();
+                        assertThat(com.automation.modules.ModuleCatalog.byKey(m.group(2)))
+                                .as(key + "/" + lang + ": module " + m.group(2)).isPresent();
+                        open = m.group(2);
+                        sequence.add(open);
+                    } else {
+                        assertThat(open).as(key + "/" + lang + ": /module without module").isNotNull();
+                        open = null;
+                    }
+                }
+                assertThat(open).as(key + "/" + lang + ": unclosed module section").isNull();
+                sequences.put(lang, sequence);
+            });
+            assertThat(sequences.get("en")).as(key + " module sections").isEqualTo(sequences.get("de"));
+        }
+    }
+
+    @Test
+    void moduleDependenceIsExpressedBySections_notByRemarks() {
+        for (String key : KEYS) {
+            seeder.getDefaultContent(key).forEach((lang, text) ->
+                    assertThat(text).as(key + "/" + lang).doesNotContain("nur mit Modul").doesNotContain("only with the"));
         }
     }
 

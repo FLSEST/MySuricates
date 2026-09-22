@@ -2,6 +2,8 @@ package com.automation.controller;
 
 import com.automation.dto.request.CreateProjectRequest;
 import com.automation.dto.request.OnboardingConfigRequest;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.RequiresModule;
 import com.automation.dto.request.UpdateProjectRequest;
 import com.automation.dto.response.OnboardingStatusResponse;
 import com.automation.dto.response.ProjectResponse;
@@ -108,6 +110,7 @@ public class ProjectController {
         return ResponseEntity.ok(Map.of("context", generated));
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @PostMapping("/{id}/onboarding/enable")
     public OnboardingStatusResponse enableOnboarding(@PathVariable String id, @RequestBody OnboardingConfigRequest config) {
         var project = projectService.findById(id);
@@ -115,6 +118,7 @@ public class ProjectController {
         return projectOnboardingService.getStatus(projectService.findById(id));
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @PostMapping("/{id}/onboarding/disable")
     public OnboardingStatusResponse disableOnboarding(@PathVariable String id) {
         var project = projectService.findById(id);
@@ -122,6 +126,7 @@ public class ProjectController {
         return projectOnboardingService.getStatus(projectService.findById(id));
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @PostMapping("/{id}/onboarding/refresh")
     public OnboardingStatusResponse refreshOnboarding(@PathVariable String id) {
         var project = projectService.findById(id);
@@ -129,12 +134,14 @@ public class ProjectController {
         return projectOnboardingService.getStatus(project);
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @GetMapping("/{id}/onboarding/status")
     public OnboardingStatusResponse getOnboardingStatus(@PathVariable String id) {
         var project = projectService.findById(id);
         return projectOnboardingService.getStatus(project);
     }
 
+    @RequiresModule(ModuleCatalog.ONBOARDING_PROFILES)
     @GetMapping("/{id}/onboarding/preview")
     public ResponseEntity<Map<String, String>> getOnboardingPreview(@PathVariable String id) {
         var project = projectService.findById(id);

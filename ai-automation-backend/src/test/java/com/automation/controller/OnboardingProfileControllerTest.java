@@ -58,6 +58,8 @@ class OnboardingProfileControllerTest {
     private OnboardingProfileResponse buildResponse(String id, String key) {
         return new OnboardingProfileResponse(id, key, Map.of("de", "Test"), Map.of(),
                 Map.of("de", "content"), OnboardingProfileType.PROFILE, false, 0, 1, 0,
+                false,
+                false,
                 Instant.now(), Instant.now());
     }
 

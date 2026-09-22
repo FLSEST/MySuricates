@@ -16,6 +16,10 @@ public record OnboardingProfileResponse(
         int sortOrder,
         int version,
         int historyCount,
+        /** The text was changed by hand (built-in profiles). */
+        boolean customized,
+        /** A newer shipped text exists than the one this profile is based on. */
+        boolean updateAvailable,
         Instant createdAt,
         Instant updatedAt
 ) {}

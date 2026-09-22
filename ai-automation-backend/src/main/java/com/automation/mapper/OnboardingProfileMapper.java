@@ -13,6 +13,7 @@ import java.util.List;
 public interface OnboardingProfileMapper {
 
     @Mapping(target = "historyCount", ignore = true)
+    @Mapping(target = "updateAvailable", ignore = true)
     OnboardingProfileResponse toResponse(OnboardingProfile profile);
 
     List<OnboardingProfileResponse> toResponseList(List<OnboardingProfile> profiles);

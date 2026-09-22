@@ -69,6 +69,13 @@ class ControllerModuleGateTest {
             Map.entry("WorkflowController#activateSkills", ModuleCatalog.SKILLS),
             Map.entry("WorkflowController#deactivateSkill", ModuleCatalog.SKILLS),
             Map.entry("SystemAccessController#enableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),
+            // Onboarding files in projects belong to the onboarding-profiles module (TODO 644fd5ad).
+            Map.entry("ProjectController#enableOnboarding", ModuleCatalog.ONBOARDING_PROFILES),
+            Map.entry("ProjectController#disableOnboarding", ModuleCatalog.ONBOARDING_PROFILES),
+            Map.entry("ProjectController#refreshOnboarding", ModuleCatalog.ONBOARDING_PROFILES),
+            Map.entry("ProjectController#getOnboardingStatus", ModuleCatalog.ONBOARDING_PROFILES),
+            Map.entry("ProjectController#getOnboardingPreview", ModuleCatalog.ONBOARDING_PROFILES),
+            Map.entry("SystemAccessController#integrationSnippet", ModuleCatalog.ONBOARDING_PROFILES),
             Map.entry("SystemAccessController#disableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),
             Map.entry("SystemAccessController#remoteAccessStatus", ModuleCatalog.REMOTE_ACCESS),
             Map.entry("SystemMaintenanceController#repairAllFailed", ModuleCatalog.FACTORY),

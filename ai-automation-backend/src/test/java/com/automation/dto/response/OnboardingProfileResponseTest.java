@@ -29,6 +29,8 @@ class OnboardingProfileResponseTest {
             5,
             2,
             3,
+            false,
+            false,
             createdAt,
             updatedAt
         );
@@ -60,6 +62,8 @@ class OnboardingProfileResponseTest {
             0,
             1,
             0,
+            false,
+            false,
             null,
             null
         );
@@ -91,6 +95,8 @@ class OnboardingProfileResponseTest {
             1,
             1,
             0,
+            false,
+            false,
             Instant.now(),
             Instant.now()
         );
@@ -112,6 +118,8 @@ class OnboardingProfileResponseTest {
             0,
             1,
             0,
+            false,
+            false,
             null,
             null
         );
@@ -130,11 +138,11 @@ class OnboardingProfileResponseTest {
 
         OnboardingProfileResponse a = new OnboardingProfileResponse(
             "id", "key", name, desc, Map.of("de", "content"),
-            OnboardingProfileType.PROFILE, true, 1, 1, 2, ts, ts
+            OnboardingProfileType.PROFILE, true, 1, 1, 2, false, false, ts, ts
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
             "id", "key", name, desc, Map.of("de", "content"),
-            OnboardingProfileType.PROFILE, true, 1, 1, 2, ts, ts
+            OnboardingProfileType.PROFILE, true, 1, 1, 2, false, false, ts, ts
         );
 
         assertThat(a).isEqualTo(b);
@@ -145,11 +153,11 @@ class OnboardingProfileResponseTest {
     void should_not_be_equal_when_id_differs() {
         OnboardingProfileResponse a = new OnboardingProfileResponse(
             "id-a", "key", null, null, null,
-            OnboardingProfileType.BASE, false, 0, 1, 0, null, null
+            OnboardingProfileType.BASE, false, 0, 1, 0, false, false, null, null
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
             "id-b", "key", null, null, null,
-            OnboardingProfileType.BASE, false, 0, 1, 0, null, null
+            OnboardingProfileType.BASE, false, 0, 1, 0, false, false, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -159,11 +167,11 @@ class OnboardingProfileResponseTest {
     void should_not_be_equal_when_type_differs() {
         OnboardingProfileResponse a = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.BASE, false, 0, 1, 0, null, null
+            OnboardingProfileType.BASE, false, 0, 1, 0, false, false, null, null
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.PROFILE, false, 0, 1, 0, null, null
+            OnboardingProfileType.PROFILE, false, 0, 1, 0, false, false, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -173,11 +181,11 @@ class OnboardingProfileResponseTest {
     void should_not_be_equal_when_builtin_differs() {
         OnboardingProfileResponse a = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.PROFILE, true, 0, 1, 0, null, null
+            OnboardingProfileType.PROFILE, true, 0, 1, 0, false, false, null, null
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.PROFILE, false, 0, 1, 0, null, null
+            OnboardingProfileType.PROFILE, false, 0, 1, 0, false, false, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -187,11 +195,11 @@ class OnboardingProfileResponseTest {
     void should_not_be_equal_when_sort_order_differs() {
         OnboardingProfileResponse a = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.BASE, false, 1, 1, 0, null, null
+            OnboardingProfileType.BASE, false, 1, 1, 0, false, false, null, null
         );
         OnboardingProfileResponse b = new OnboardingProfileResponse(
             "id", "key", null, null, null,
-            OnboardingProfileType.BASE, false, 2, 1, 0, null, null
+            OnboardingProfileType.BASE, false, 2, 1, 0, false, false, null, null
         );
 
         assertThat(a).isNotEqualTo(b);
@@ -213,6 +221,8 @@ class OnboardingProfileResponseTest {
             3,
             5,
             7,
+            false,
+            false,
             ts,
             ts
         );
