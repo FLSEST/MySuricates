@@ -13,9 +13,14 @@ import java.util.List;
  * @param loginFiles Dateien relativ zu {@code $HOME}, deren Vorhandensein eine Anmeldung anzeigt;
  *                   {@code datei:muster} heisst, die Datei muss das Muster enthalten. Heuristik fuer
  *                   den Installer — das Backend selbst prueft keine Anmeldung.
+ * @param loginEnv   Umgebungsvariablen, von denen eine gesetzte (nicht leere) ebenfalls als Anmeldung
+ *                   zaehlt, etwa ein API-Schluessel oder OAuth-Token (0b1a3ae7). Der Installer prueft
+ *                   nur, ob sie gesetzt ist, und gibt den Wert nie aus.
  */
-public record ProviderSetup(String cli, String install, String login, List<String> loginFiles) {
+public record ProviderSetup(String cli, String install, String login, List<String> loginFiles,
+                            List<String> loginEnv) {
     public ProviderSetup {
         loginFiles = List.copyOf(loginFiles);
+        loginEnv = List.copyOf(loginEnv);
     }
 }

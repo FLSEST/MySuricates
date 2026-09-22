@@ -27,7 +27,8 @@ without sudo when the package manager is too old).
 | **Staged — Dev · Test · Prod** | Docker |
 
 For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
-logged in to. MySuricates starts without one; the installer shows which it finds.
+logged in to — via its login file or an environment variable (`CLAUDE_CODE_OAUTH_TOKEN`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates starts without one; the installer shows which it finds.
 
 ---
 

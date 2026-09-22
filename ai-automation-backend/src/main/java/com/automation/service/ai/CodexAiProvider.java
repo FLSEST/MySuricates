@@ -38,7 +38,8 @@ public class CodexAiProvider implements AiProvider {
     @Override
     public ProviderSetup setup() {
         return new ProviderSetup("codex", "npm install -g @openai/codex", "codex login",
-                java.util.List.of(".codex/auth.json"));
+                java.util.List.of(".codex/auth.json"),
+                java.util.List.of("OPENAI_API_KEY", "CODEX_API_KEY"));
     }
 
     @Override

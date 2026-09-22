@@ -28,7 +28,8 @@ geprüfter Download ohne sudo).
 | **Gestaffelt — Dev · Test · Prod** | Docker |
 
 Für KI-Workflows brauchst du **eine KI-CLI deiner Wahl** — `claude`, `codex` oder `pi` —, bei der
-du angemeldet bist. MySuricates startet auch ohne; der Installer zeigt, welche er findet.
+du angemeldet bist — per Anmeldedatei oder per Umgebungsvariable (`CLAUDE_CODE_OAUTH_TOKEN`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates startet auch ohne; der Installer zeigt, welche er findet.
 
 ---
 
