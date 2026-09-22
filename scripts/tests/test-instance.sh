@@ -78,6 +78,11 @@ AUTOMATION_AI_DEFAULT_PROVIDER=PI
 ENV
 export JAVA_ENV_OUT="$TMP/java.env" XDG_STATE_HOME="$TMP/state"
 PATH="$TMP/hostbin:$PATH" INSTANCE_HEALTH_TIMEOUT=10 bash "$SCRIPT" up --name hostdemo >"$TMP/host-up.out" 2>&1
+# Der java-Stub schreibt seine Umgebung erst, wenn er laeuft; `up` kehrt vorher zurueck, weil
+# der curl-Stub sofort "UP" meldet. Die .args-Datei entsteht nach der env-Datei und belegt, dass
+# beide vollstaendig sind. Ohne dieses Warten verlor am 2026-09-22 auf dem CI-Runner die erste
+# Pruefung das Rennen ("java started with the port"), die Millisekunden spaeteren nicht mehr.
+for _ in $(seq 1 100); do [ -s "$JAVA_ENV_OUT.args" ] && break; sleep 0.05; done
 check "host up reports the address"           'grep "localhost:19401" "$TMP/host-up.out" >/dev/null'
 check "java started with the port"            'grep -x "AUTOMATION_PORT=19401" "$JAVA_ENV_OUT" >/dev/null'
 check "backend serves the built frontend"     'grep -x "AUTOMATION_SERVEFRONTEND=true" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_FRONTENDPATH=$STATE/frontend" "$JAVA_ENV_OUT" >/dev/null'
