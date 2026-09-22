@@ -67,6 +67,77 @@ const DATA_FLOW_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
+/** foreach-Schleife mit der Geometrie des Backend-Exports (BpmnModelBuilder: SUB_PAD 40, GAP 150). */
+const FOREACH_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <process id="p1" name="Schleife" isExecutable="false">
+    <startEvent id="start" name="Start" />
+    <subProcess id="b_0_loop" name="Schleife: items">
+      <multiInstanceLoopCharacteristics />
+      <startEvent id="b_0_body_start" />
+      <scriptTask id="b_0_body" name="pro Element" />
+      <endEvent id="b_0_body_end" />
+      <sequenceFlow id="fi1" sourceRef="b_0_body_start" targetRef="b_0_body" />
+      <sequenceFlow id="fi2" sourceRef="b_0_body" targetRef="b_0_body_end" />
+    </subProcess>
+    <endEvent id="end" name="Ende" />
+    <sequenceFlow id="f1" sourceRef="start" targetRef="b_0_loop" />
+    <sequenceFlow id="f2" sourceRef="b_0_loop" targetRef="end" />
+  </process>
+  <bpmndi:BPMNDiagram id="d1">
+    <bpmndi:BPMNPlane id="pl1" bpmnElement="p1">
+      <bpmndi:BPMNShape id="sh1" bpmnElement="start"><dc:Bounds x="100" y="182" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh2" bpmnElement="b_0_loop" isExpanded="true"><dc:Bounds x="286" y="120" width="552" height="160"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh3" bpmnElement="b_0_body_start"><dc:Bounds x="326" y="182" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh4" bpmnElement="b_0_body"><dc:Bounds x="512" y="160" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh5" bpmnElement="b_0_body_end"><dc:Bounds x="762" y="182" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sh6" bpmnElement="end"><dc:Bounds x="988" y="182" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="ed1" bpmnElement="f1"><di:waypoint x="136" y="200"/><di:waypoint x="286" y="200"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ed2" bpmnElement="fi1"><di:waypoint x="362" y="200"/><di:waypoint x="512" y="200"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ed3" bpmnElement="fi2"><di:waypoint x="612" y="200"/><di:waypoint x="762" y="200"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ed4" bpmnElement="f2"><di:waypoint x="838" y="200"/><di:waypoint x="988" y="200"/></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+describe('BpmnDiagramView Schleifen-Subprozess', () => {
+  const box = (el: Element) => {
+    if (el.tagName === 'circle') {
+      const [cx, cy, r] = ['cx', 'cy', 'r'].map((a) => Number(el.getAttribute(a)));
+      return { x: cx! - r!, y: cy! - r!, w: 2 * r!, h: 2 * r! };
+    }
+    const [x, y, w, h] = ['x', 'y', 'width', 'height'].map((a) => Number(el.getAttribute(a)));
+    return { x: x!, y: y!, w: w!, h: h! };
+  };
+  const inside = (inner: ReturnType<typeof box>, outer: ReturnType<typeof box>) =>
+    inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+
+  it.each(['horizontal', 'vertical'] as const)('legt Start, Inhalt und Ende der Schleife in ihren Kasten (%s)', (orientation) => {
+    const { container } = render(<BpmnDiagramView xml={FOREACH_XML} orientation={orientation} />);
+    const frame = box(container.querySelector('rect[rx="12"]')!);
+    const circles = Array.from(container.querySelectorAll('circle')).map(box);
+    const task = box(container.querySelector('rect[rx="10"]')!);
+
+    // Innen: Start und Ende der Schleife plus deren Rumpf; außen: Start und Ende des Workflows.
+    expect(circles.filter((c) => inside(c, frame))).toHaveLength(2);
+    expect(circles.filter((c) => !inside(c, frame))).toHaveLength(2);
+    expect(inside(task, frame)).toBe(true);
+  });
+
+  it('läuft im vertikalen Layout oben in den Kasten hinein und unten heraus', () => {
+    const { container } = render(<BpmnDiagramView xml={FOREACH_XML} orientation="vertical" />);
+    const frame = box(container.querySelector('rect[rx="12"]')!);
+    const circles = Array.from(container.querySelectorAll('circle')).map(box).sort((a, b) => a.y - b.y);
+    // Reihenfolge von oben nach unten: Start, [Schleifen-Start, Schleifen-Ende], Ende.
+    expect(circles[0]!.y + circles[0]!.h).toBeLessThanOrEqual(frame.y);
+    expect(circles[3]!.y).toBeGreaterThanOrEqual(frame.y + frame.h);
+  });
+});
+
 describe('BpmnDiagramView Datenfluss', () => {
   it('zeichnet das Datenobjekt und zwei gestrichelte Assoziationen', () => {
     useI18nStore.setState({ locale: 'de' });

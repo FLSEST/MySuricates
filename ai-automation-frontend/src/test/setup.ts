@@ -1,7 +1,13 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 import { resetAuthStatusCache, resetRateLimitBackoff } from '../api/client';
+
+// findBy*/waitFor wait 1 s by default. Under the load of the full suite a MSW answer plus the
+// re-render of a whole page regularly takes longer (reproduced with CPU load: a findByRole on the
+// projects list failed after 1.7 s, bf4c8b03/4d5d4825). Waiting longer only costs time when a test
+// fails anyway; it stays below Vitest's 5 s test timeout so the DOM dump of a real failure still shows.
+configure({ asyncUtilTimeout: 4000 });
 
 afterEach(() => {
   cleanup();
