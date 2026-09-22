@@ -11,14 +11,34 @@ done
 
 section "Dead code and unused surface scan"
 
-inventory_section "TODO/FIXME/HACK/deprecated marker counts"
-for pat in TODO FIXME HACK deprecated; do
-  count=$(pgrep_count_total "$pat" .)
-  printf '%s_marker_count: %s\n' "$pat" "$count"
-done
+# "TODO" ist in diesem Repository auch die Fachentitaet (TodoService, "TODO anlegen"),
+# und Kommentare verweisen per "TODO <8-hex-id>" auf ein erfasstes TODO. Gezaehlt
+# werden deshalb nur Kommentar-Marker ("// TODO:", "# FIXME", "<!-- HACK"), getrennt
+# nach "mit TODO-ID" (verfolgt) und "blank" (unverfolgt). Das eigene Verzeichnis
+# faellt heraus: die Scanner nennen die Marker, nach denen sie suchen (TODO 16e172a2).
+MARKER_PREFIX='(//|#|/\*|\*|<!--)[[:space:]]*'
+TODO_ID='TODO[[:space:]:(]*[0-9a-f]{8}([^0-9a-zA-Z]|$)'
+marker_hits() {  # $1 = ERE hinter dem Kommentarpraefix
+  pgrep -n --exclude-dir=public-readiness --exclude='*.md' "${MARKER_PREFIX}$1" .
+}
 
-inventory_section "TODO/FIXME marker locations (top 50)"
-pgrep -n 'TODO|FIXME|HACK' . | redact | head -50 || true
+inventory_section "Comment marker counts (TODO/FIXME/HACK/XXX)"
+echo "note: 'TODO' is also a domain entity here; only comment markers are counted, TODO-ID references are tracked in the TODO system"
+todo_all=$(marker_hits "TODO([[:space:]]*[:(]|[[:space:]]+[0-9a-f]{8})")
+todo_with_id=$(printf '%s\n' "$todo_all" | grep -cE "$TODO_ID" || true)
+todo_bare=$(printf '%s\n' "$todo_all" | grep -vE "$TODO_ID" | grep -c . || true)
+printf 'TODO_marker_with_todo_id: %s\n' "$todo_with_id"
+printf 'TODO_marker_bare: %s\n' "$todo_bare"
+for pat in FIXME HACK XXX; do
+  printf '%s_marker_bare: %s\n' "$pat" "$(marker_hits "${pat}([^A-Za-z0-9_]|$)" | grep -vcE "$TODO_ID" || true)"
+done
+printf 'deprecated_marker_count: %s\n' "$(pgrep_count_total deprecated .)"
+printf 'TODO_id_references_total: %s\n' "$(pgrep -o --exclude-dir=public-readiness "$TODO_ID" . | wc -l | tr -d ' ')"
+
+inventory_section "Bare comment markers without TODO-ID (top 50)"
+bare_list=$( { printf '%s\n' "$todo_all"; marker_hits "(FIXME|HACK|XXX)([^A-Za-z0-9_]|$)"; } \
+  | grep -vE "$TODO_ID" | grep . )
+if [ -n "$bare_list" ]; then printf '%s\n' "$bare_list" | redact | head -50; else echo "(none)"; fi
 
 inventory_section "Backup/old/generated-looking files"
 candidates=$(find . -type f \( -name '*.bak' -o -name '*.old' -o -name '*~' -o -name '*.orig' -o -name '*.tmp' \) ! -path '*/node_modules/*' ! -path '*/.git/*' | wc -l | tr -d ' ')

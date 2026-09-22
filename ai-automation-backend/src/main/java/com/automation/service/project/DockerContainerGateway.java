@@ -66,7 +66,8 @@ public class DockerContainerGateway {
                                         Bind.parse(hostHome + "/.local/bin/claude:" + CONTAINER_HOME + "/.local/bin/claude:ro"),
                                         Bind.parse(hostHome + "/.local/share/claude:" + CONTAINER_HOME + "/.local/share/claude:ro"),
                                         // Claude config (read-write, CLI needs to write session state/todos)
-                                        // TODO: Consider copying only auth credentials read-only and letting CLI manage its own state
+                                        // TODO b983520f (KI-Ausführung im Container kapseln): only copy the auth credentials read-only
+                                        // and let the CLI manage its own state
                                         Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude"),
                                         Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
                                 )
