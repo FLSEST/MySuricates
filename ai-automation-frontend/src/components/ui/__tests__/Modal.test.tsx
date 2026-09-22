@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Modal } from '../Modal';
+import { useI18nStore } from '../../../i18n';
 
 describe('Modal', () => {
   it('renders nothing when open is false', () => {
@@ -69,5 +70,32 @@ describe('Modal', () => {
   it('sets body overflow to hidden when open', () => {
     render(<Modal open={true} onClose={vi.fn()} title="T">Content</Modal>);
     expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('stays fixed-size without resizable (no maximise button)', () => {
+    render(<Modal open={true} onClose={vi.fn()} title="Test">Content</Modal>);
+    expect(screen.queryByRole('button', { name: /maxim/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog').className).not.toMatch(/\bresize\b/);
+  });
+
+  it('can be dragged to a new size and maximised when resizable', () => {
+    useI18nStore.setState({ locale: 'en' });
+    const { rerender } = render(<Modal open={true} onClose={vi.fn()} title="Test" resizable>Content</Modal>);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.className).toMatch(/\bresize\b/);
+
+    dialog.style.width = '900px';
+    fireEvent.click(screen.getByRole('button', { name: 'Maximize' }));
+    expect(dialog.className).toMatch(/w-\[96vw\]/);
+    expect(dialog.style.width).toBe('');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore size' }));
+    expect(dialog.className).toMatch(/\bresize\b/);
+
+    // Closing and reopening starts at the normal size again
+    fireEvent.click(screen.getByRole('button', { name: 'Maximize' }));
+    rerender(<Modal open={false} onClose={vi.fn()} title="Test" resizable>Content</Modal>);
+    rerender(<Modal open={true} onClose={vi.fn()} title="Test" resizable>Content</Modal>);
+    expect(screen.getByRole('button', { name: 'Maximize' })).toBeInTheDocument();
   });
 });

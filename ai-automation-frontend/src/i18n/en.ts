@@ -1,5 +1,7 @@
 export const en = {
   common: {
+    maximize: 'Maximize',
+    restore: 'Restore size',
     save: 'Save',
     cancel: 'Cancel',
     delete: 'Delete',
@@ -485,6 +487,12 @@ export const en = {
     blockConfig: 'Configuration (JSON)',
     blockSkills: 'Block Skills',
     blockSkillsHint: 'Additional skills activated for this block only (added to workflow-level skills).',
+    blockSkillsNoEffect: 'This block type makes no AI call, so these skills have no effect. Click a skill to remove it.',
+    configEditor: {
+      hint: 'Ctrl+Space: suggestions (again: with explanation) · hover a key for its explanation',
+      problems: '{count} warning(s)',
+      format: 'Format',
+    },
     blockAiOverride: 'AI provider and model for this block',
     blockAiOverrideHint: 'Overrides the workflow setting for this block only (config keys provider/model). Empty = workflow setting, then system default.',
     blockProvider: 'Provider',

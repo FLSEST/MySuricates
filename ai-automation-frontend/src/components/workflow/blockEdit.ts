@@ -40,3 +40,25 @@ export function blockFromDraft(draft: BlockDraft, previous?: BlockDefinition): B
     ...(draft.skillIds.length > 0 ? { skillIds: draft.skillIds } : {}),
   };
 }
+
+/** Block types that always make an AI call in the project directory. */
+const SKILL_BLOCK_TYPES: readonly string[] = ['simple', 'agentic', 'skill-capability'];
+/** Wrapper blocks: AI calls unless `execution_mode` is `shell`. */
+const MODE_BLOCK_TYPES: readonly string[] = ['retry', 'foreach', 'while', 'conditional', 'switch'];
+
+/**
+ * Whether per-block skills change anything for this block. Skills reach a block only through
+ * `.claude/rules/skills-context.md`, which only AI calls in the project directory read
+ * (BlockSkillContext) — a shell, approval or todo block ignores them, and `compress-ai` runs in its own
+ * temp directory. `config` may be the editor's JSON text; unparseable text counts as the default mode.
+ */
+export function blockUsesSkills(type: string, config: Record<string, unknown> | string): boolean {
+  if (SKILL_BLOCK_TYPES.includes(type)) return true;
+  if (!MODE_BLOCK_TYPES.includes(type)) return false;
+  let parsed: unknown = config;
+  if (typeof config === 'string') {
+    try { parsed = JSON.parse(config); } catch { return true; }
+  }
+  const mode = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).execution_mode : undefined;
+  return mode !== 'shell';
+}
