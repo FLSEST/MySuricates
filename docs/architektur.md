@@ -717,6 +717,8 @@ Automatisches Generieren und Verifizieren von Workflows aus einem Topic:
   - `POST /promote/{id}` — Workflow in Produktion promoten
   - `GET /topics` — verfügbare Topics auflisten
 - Nutzt die Test-Instanz (Port 8090) für sichere Ausführung
+- Ablauf von `POST /run` („Erstellen & Testen“): generieren auf DEV → `syncDefinitions()` → Testlauf auf der Test-Instanz (Polling) → bei `FAILED` und `autoFix` KI-Reparatur auf DEV aus der Fehlermeldung (neue Version), erneut syncen und testen, bis `maxRetries` → Testergebnis auf DEV vermerken → bei `autoPromote` und bestandenem Test Template. `POST /generate` („Workflow erstellen“) führt nur den ersten Schritt aus.
+- Die UI erklärt das mit einem animierten Ablaufdiagramm (`components/factory/FactoryFlowDiagram`, Geometrie und Zustände in `factoryFlow.ts`). Es folgt den Schaltern Auto-Fix/Auto-Promote und ist eine Erklärung, keine Live-Anzeige: `/run` ist ein blockierender Aufruf ohne Zwischenereignisse.
 
 ## Workflow Pool
 

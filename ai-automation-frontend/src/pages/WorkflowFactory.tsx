@@ -15,6 +15,7 @@ import { useT } from '../i18n';
 import { useToast } from '../hooks/useToast';
 import { formatDuration } from '../utils/formatTime';
 import { ExportToPoolModal } from '../components/factory/ExportToPoolModal';
+import { FactoryFlowDiagram } from '../components/factory/FactoryFlowDiagram';
 import type { WorkflowFactoryResult } from '../types';
 
 function StatusIcon({ status }: { status: string }) {
@@ -182,6 +183,13 @@ export function WorkflowFactory() {
         <p className="text-sm text-text-secondary mt-1">{t.factory.subtitle}</p>
       </div>
 
+      <FactoryFlowDiagram
+        autoFix={autoFix}
+        autoPromote={autoPromote}
+        maxRetries={maxRetries}
+        testHealthy={isTestHealthy}
+      />
+
       {/* Creation Form */}
       <Card className="p-6">
         <div className="space-y-4">
@@ -243,6 +251,7 @@ export function WorkflowFactory() {
             {generateMutation.isPending ? <Spinner size="sm" /> : <Sparkles className="w-4 h-4" />}
             {generateMutation.isPending ? t.factory.generating : t.factory.createWorkflow}
           </Button>
+          <span className="text-xs text-text-secondary">{t.factory.createHint}</span>
         </div>
 
         {/* Advanced Options */}
@@ -297,14 +306,17 @@ export function WorkflowFactory() {
                 )}
               </div>
 
-              <Button
-                onClick={handleCreateAndTest}
-                disabled={isRunning || !topic.trim() || !projectId || !isTestHealthy}
-                variant="secondary"
-              >
-                {runMutation.isPending ? <Spinner size="sm" /> : <Play className="w-4 h-4" />}
-                {runMutation.isPending ? t.factory.testing : t.factory.createAndTest}
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={handleCreateAndTest}
+                  disabled={isRunning || !topic.trim() || !projectId || !isTestHealthy}
+                  variant="secondary"
+                >
+                  {runMutation.isPending ? <Spinner size="sm" /> : <Play className="w-4 h-4" />}
+                  {runMutation.isPending ? t.factory.testing : t.factory.createAndTest}
+                </Button>
+                <span className="text-xs text-text-secondary">{t.factory.createAndTestHint}</span>
+              </div>
             </div>
           )}
         </div>
