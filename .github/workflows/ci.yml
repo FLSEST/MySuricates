@@ -73,6 +73,10 @@ jobs:
         run: bash scripts/tests/test-coverage-snapshot.sh
       - name: Schwachstellen-Scan Selbsttest (ohne Netz)
         run: bash scripts/tests/test-dependency-risk-scan.sh
+      # Faehrt release.sh wirklich, aber in einem Wegwerf-Repo: der getaggte Commit muss die
+      # Version ohne -SNAPSHOT tragen (TODO dd82775b), sonst meldet jede Installation SNAPSHOT.
+      - name: Release-Skript Selbsttest
+        run: bash scripts/tests/test-release.sh
 
   gitleaks:
     name: Gitleaks Secret Scan

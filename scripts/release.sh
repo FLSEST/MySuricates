@@ -20,14 +20,21 @@ err()  { echo -e "${RED}[release]${NC} $*" >&2; }
 usage() {
     echo "Usage: $(basename "$0") [patch|minor|major]"
     echo ""
-    echo "Bumps the version in pom.xml, package.json and package-lock.json, commits, and tags."
+    echo "Releases the next version from the last tag: writes it into pom.xml, package.json and"
+    echo "package-lock.json, commits, tags it, and then sets pom.xml to the next -SNAPSHOT."
     echo ""
-    echo "  patch  (default)  0.1.0 → 0.1.1"
-    echo "  minor             0.1.1 → 0.2.0"
-    echo "  major             0.2.0 → 1.0.0"
+    echo "  patch  (default)  v0.1.0 → v0.1.1   (afterwards pom 0.1.2-SNAPSHOT)"
+    echo "  minor             v0.1.1 → v0.2.0   (afterwards pom 0.2.1-SNAPSHOT)"
+    echo "  major             v0.2.0 → v1.0.0   (afterwards pom 1.0.1-SNAPSHOT)"
 }
 
-# ── Read current version from pom.xml ─────────────────────
+# ── Read current version ──────────────────────────────────
+# The last tag, not the pom: since the tagged commit carries the release version and the commit
+# after it the next -SNAPSHOT, reading the pom would count one version too far (TODO dd82775b).
+last_tag_version() {
+    git -C "$PROJECT_ROOT" tag --list 'v[0-9]*' --sort=-v:refname | head -1 | sed 's/^v//'
+}
+
 
 read_version() {
     # Match the project-level <version> (first <version> after </parent>), strip -SNAPSHOT
@@ -56,13 +63,17 @@ bump_version() {
 
 # ── Update files ──────────────────────────────────────────
 
+# update_pom VERSION [release|snapshot] — release writes the bare number. The backend derives its
+# build type from the suffix (SystemIdentityService), so a tag with -SNAPSHOT would report a
+# release as SNAPSHOT for good.
 update_pom() {
-    local new_version="$1"
+    local new_version="$1" suffix=""
+    [ "${2:-release}" = "snapshot" ] && suffix="-SNAPSHOT"
     # Replace the project-level <version> (first <version> after </parent>)
     local line_num
     line_num=$(sed -n '/<\/parent>/,$ { /[0-9]*\.[0-9]*\.[0-9]*/ { =; q; } }' "$POM_FILE")
     if [ -n "$line_num" ]; then
-        sed -i "${line_num}s|<version>.*</version>|<version>${new_version}-SNAPSHOT</version>|" "$POM_FILE"
+        sed -i "${line_num}s|<version>.*</version>|<version>${new_version}${suffix}</version>|" "$POM_FILE"
     fi
 }
 
@@ -90,22 +101,28 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     exit 1
 fi
 
-CURRENT=$(read_version)
+CURRENT=$(last_tag_version)
+[ -n "$CURRENT" ] || CURRENT=$(read_version)
 NEXT=$(bump_version "$CURRENT" "$BUMP")
+DEV=$(bump_version "$NEXT" patch)
 
-log "Current version: $CURRENT"
+if git rev-parse -q --verify "refs/tags/v${NEXT}" >/dev/null; then
+    err "Tag v${NEXT} exists already."
+    exit 1
+fi
+
+log "Last release:    ${CURRENT}"
 log "Bump type:       $BUMP"
 log "New version:     $NEXT"
 echo ""
 
-# Update files
-log "Updating pom.xml → ${NEXT}-SNAPSHOT"
-update_pom "$NEXT"
+# Release commit: the version without a suffix — this is what the tag carries
+log "Updating pom.xml → ${NEXT}"
+update_pom "$NEXT" release
 
 log "Updating package.json + package-lock.json → ${NEXT}"
 update_package_json "$NEXT"
 
-# Commit and tag
 log "Committing..."
 git add "$POM_FILE" "$PACKAGE_JSON" "$PACKAGE_LOCK"
 git commit -m "Release v${NEXT}"
@@ -113,10 +130,15 @@ git commit -m "Release v${NEXT}"
 log "Tagging v${NEXT}..."
 git tag "v${NEXT}"
 
+# Back to development: without this, every later commit would carry the release number
+log "Continuing on ${DEV}-SNAPSHOT"
+update_pom "$DEV" snapshot
+git add "$POM_FILE"
+git commit -m "Weiter an v${DEV}"
+
 echo ""
-log "Done! Version bumped to ${NEXT}"
-log "  pom.xml:      ${NEXT}-SNAPSHOT"
-log "  package.json: ${NEXT} (package-lock.json mitgezogen)"
-log "  Git tag:      v${NEXT}"
+log "Done! Released ${NEXT}"
+log "  Git tag v${NEXT}:  pom ${NEXT}, package.json ${NEXT} (package-lock.json mitgezogen)"
+log "  danach:            pom ${DEV}-SNAPSHOT"
 echo ""
 log "To push: git push && git push --tags"
