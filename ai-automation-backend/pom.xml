@@ -30,6 +30,8 @@
         <!-- Transitive Pins (nicht von Boot verwaltet), siehe <dependencyManagement> -->
         <bouncycastle.version>1.86</bouncycastle.version>
         <commons-io.version>2.22.0</commons-io.version>
+        <commons-compress.version>1.28.0</commons-compress.version>
+        <guava.version>33.7.1-jre</guava.version>
     </properties>
 
     <!--
@@ -40,8 +42,14 @@
             Auch Tika 3.3.2 bringt erst 1.85, daher Pin statt Tika-Update.
           - commons-io 2.13.0 kommt ueber docker-java-core 3.4.1 (OSV: HIGH) und gewinnt, weil
             docker-java im pom vor Tika steht (Tika selbst will 2.20+).
+        17b79580 (Veraltete transitive Abhaengigkeiten ueber docker-java (commons-compress 1.21, guava 19.0, bcpkix 1.76)):
+          - commons-compress 1.21 (CVE-2024-25710, CVE-2024-26308) gewann ueber docker-java und brach
+            OOXML-Schreiben/-Lesen in POI 5.5.1/Tika 3.3.0 (NoSuchMethodError; die erwarten 1.27+).
+          - guava 19.0 (docker-java) auf 33; die reinen Annotations-Artefakte von guava 33 sind
+            ausgeschlossen (zur Laufzeit nicht noetig), nur failureaccess (aus guava ausgelagert) kommt hinzu.
+          - bcpkix/bcutil 1.76 (docker-java) auf dieselbe BC-Version wie bcprov, kein Versions-Mix.
         Beim Heben von Tika/docker-java pruefen, ob die Pins noch noetig sind:
-        mvn dependency:tree -Dincludes=org.bouncycastle,commons-io
+        mvn dependency:tree -Dincludes=org.bouncycastle,commons-io,org.apache.commons:commons-compress,com.google.guava
     -->
     <dependencyManagement>
         <dependencies>
@@ -54,6 +62,44 @@
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcjmail-jdk18on</artifactId>
                 <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>listenablefuture</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.jspecify</groupId>
+                        <artifactId>jspecify</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.errorprone</groupId>
+                        <artifactId>error_prone_annotations</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.j2objc</groupId>
+                        <artifactId>j2objc-annotations</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>commons-io</groupId>
