@@ -94,7 +94,7 @@ class ProjectControllerTest {
         testResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), null, ProjectStatus.STOPPED, null,
-                null, Instant.now(), Instant.now()
+                null, Instant.now(), Instant.now(), 0L
         );
     }
 
@@ -243,7 +243,7 @@ class ProjectControllerTest {
         ProjectResponse archivedResponse = new ProjectResponse(
                 "proj-2", "Archived Project", null, null, ProjectType.CODE, "/workspace/archived",
                 Map.of(), null, ProjectStatus.STOPPED, null,
-                Instant.now(), Instant.now(), Instant.now()
+                Instant.now(), Instant.now(), Instant.now(), 0L
         );
         when(projectService.findArchived()).thenReturn(List.of(testProject));
         when(projectMapper.toResponseList(any())).thenReturn(List.of(archivedResponse));
@@ -279,7 +279,7 @@ class ProjectControllerTest {
         ProjectResponse runningResponse = new ProjectResponse(
                 "proj-1", "Test Project", null, null, ProjectType.CODE, "/workspace/test",
                 Map.of(), null, ProjectStatus.RUNNING, null,
-                null, Instant.now(), Instant.now()
+                null, Instant.now(), Instant.now(), 0L
         );
         when(projectService.startContainer("proj-1")).thenReturn(testProject);
         when(projectMapper.toResponse(testProject)).thenReturn(runningResponse);

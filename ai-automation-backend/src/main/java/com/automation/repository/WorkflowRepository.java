@@ -34,6 +34,17 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     List<Object[]> findAllIdNameBlockTypes(@Param("excludeId") String excludeId);
 
     /**
+     * Workflow count per project in ONE query — for the project list ({@code workflowCount}).
+     * JPQL on purpose: {@code @SQLRestriction("deleted_at IS NULL")} applies, so soft-deleted
+     * workflows do not count (a native query would count them).
+     */
+    @Query("SELECT w.project.id, COUNT(w) FROM Workflow w GROUP BY w.project.id")
+    List<Object[]> countWorkflowsGroupedByProject();
+
+    /** Workflow count of one project; soft-deleted workflows excluded via {@code @SQLRestriction}. */
+    long countByProjectId(String projectId);
+
+    /**
      * Finds all workflows whose project is not archived.
      * Eagerly fetches activatedSkills to avoid LazyInitializationException (OSIV disabled).
      */

@@ -19,5 +19,6 @@ public record ProjectResponse(
         ContainerResponse container,
         Instant archivedAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        long workflowCount
 ) {}
