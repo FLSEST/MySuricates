@@ -3,7 +3,16 @@ package com.automation.service.document;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -119,5 +128,64 @@ class DocumentExtractionServiceTest {
                 truncating.extract(file.toString(), tmp.toString());
 
         assertThat(result.text().length()).isLessThanOrEqualTo(100);
+    }
+    // Binaerformate: sichern die transitiven Versionen ab, die im pom per
+    // dependencyManagement gepinnt sind (commons-compress fuer OOXML-Zip,
+    // bcprov fuer PDFBox). Die Fixtures entstehen im Test selbst.
+
+    @Test
+    void extract_pdfFile_extractsText(@TempDir Path tmp) throws IOException {
+        Path file = tmp.resolve("report.pdf");
+        try (PDDocument doc = new PDDocument()) {
+            PDPage page = new PDPage();
+            doc.addPage(page);
+            try (PDPageContentStream content = new PDPageContentStream(doc, page)) {
+                content.beginText();
+                content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                content.newLineAtOffset(72, 700);
+                content.showText("Hello PDF extraction");
+                content.endText();
+            }
+            doc.save(file.toFile());
+        }
+
+        DocumentExtractionService.ExtractionResult result =
+                service.extract(file.toString(), tmp.toString());
+
+        assertThat(result.text()).contains("Hello PDF extraction");
+        assertThat(result.contentType()).isEqualTo("application/pdf");
+    }
+
+    @Test
+    void extract_docxFile_extractsParagraphs(@TempDir Path tmp) throws IOException {
+        Path file = tmp.resolve("letter.docx");
+        try (XWPFDocument doc = new XWPFDocument(); OutputStream out = Files.newOutputStream(file)) {
+            doc.createParagraph().createRun().setText("Hello DOCX extraction");
+            doc.createParagraph().createRun().setText("Second paragraph");
+            doc.write(out);
+        }
+
+        DocumentExtractionService.ExtractionResult result =
+                service.extract(file.toString(), tmp.toString());
+
+        assertThat(result.text()).contains("Hello DOCX extraction").contains("Second paragraph");
+        assertThat(result.contentType()).contains("wordprocessingml");
+    }
+
+    @Test
+    void extract_xlsxFile_extractsCellValues(@TempDir Path tmp) throws IOException {
+        Path file = tmp.resolve("table.xlsx");
+        try (XSSFWorkbook wb = new XSSFWorkbook(); OutputStream out = Files.newOutputStream(file)) {
+            var row = wb.createSheet("Data").createRow(0);
+            row.createCell(0).setCellValue("Hello XLSX extraction");
+            row.createCell(1).setCellValue(42);
+            wb.write(out);
+        }
+
+        DocumentExtractionService.ExtractionResult result =
+                service.extract(file.toString(), tmp.toString());
+
+        assertThat(result.text()).contains("Hello XLSX extraction").contains("42");
+        assertThat(result.contentType()).contains("spreadsheetml");
     }
 }
