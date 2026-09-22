@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Card, Button, Input, Modal, Spinner } from '../components/ui';
@@ -76,6 +77,8 @@ export function Wishes() {
         <h1 className="text-2xl font-bold text-text-primary">{t.wishes.title}</h1>
         <p className="text-text-secondary mt-1">{t.wishes.subtitle}</p>
       </div>
+
+      <Hint id="wishes-loop" />
 
       {/* Analytics */}
       <WishAnalytics />

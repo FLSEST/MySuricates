@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, RotateCcw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -56,6 +57,8 @@ export function DeadLetterQueue() {
           <p className="text-sm text-text-secondary mt-1">{t.dlq.subtitle}</p>
         </div>
       </header>
+
+      <Hint id="dlq-retry" />
 
       <div className="flex items-center gap-2">
         {(['OPEN', 'RETRIED', 'DISCARDED', 'ALL'] as const).map(s => (

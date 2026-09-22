@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Archive, ArchiveRestore, FolderKanban, Pencil, Plus, Search } from 'lucide-react';
@@ -85,6 +86,8 @@ export function Projects() {
           {t.projects.create}
         </Button>
       </div>
+
+      <Hint id="projects-directory" />
 
       {/* Search + Archive toggle */}
       <div className="flex items-center gap-3">

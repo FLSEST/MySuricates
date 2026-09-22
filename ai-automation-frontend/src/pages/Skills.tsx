@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Zap, Search } from 'lucide-react';
 import { Card, Button, Input, Badge, Spinner } from '../components/ui';
@@ -139,6 +140,8 @@ export function Skills() {
         <h1 className="text-2xl font-bold text-text">{t.skills.title}</h1>
         <p className="text-sm text-text-secondary mt-1">{t.skills.subtitle}</p>
       </div>
+
+      <Hint id="skills-packages" />
 
       {/* Filters */}
       <div className="flex items-center gap-4 flex-wrap">

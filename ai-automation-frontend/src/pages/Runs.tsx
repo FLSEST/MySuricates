@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, useEffect } from 'react';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { useNavigate } from 'react-router-dom';
@@ -229,6 +230,8 @@ export function Runs() {
         <h1 className="text-2xl font-bold text-text">{t.runs.title}</h1>
         <p className="text-sm text-text-secondary mt-1">{t.runs.subtitle}</p>
       </div>
+
+      <Hint id="runs-list" />
 
       {/* Tabs */}
       <div className="flex border-b border-border">

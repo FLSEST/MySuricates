@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, Fragment } from 'react';
 import { Calendar, Plus, List, ChevronDown, ChevronRight, Pause, Play, AlertTriangle, Search } from 'lucide-react';
 import { Card, Button, Spinner } from '../components/ui';
@@ -104,6 +105,8 @@ export function Schedules() {
           </Button>
         </div>
       </div>
+
+      <Hint id="schedules-timing" />
 
       {/* Maintenance mode banner */}
       {isMaintenanceMode && (

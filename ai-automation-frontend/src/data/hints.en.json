@@ -36,7 +36,7 @@
     "points": [
       "Nothing is stuck: the workflow stops at this step on purpose",
       "After your answer it continues from here, not from the top",
-      "You can close this dialog and answer later; the run keeps waiting"
+      "You can close this dialog and answer later, until the step's time limit runs out (30 minutes unless the step sets another)"
     ]
   },
   "todos-sources": {
@@ -45,6 +45,156 @@
       "Write them down yourself, or let a workflow create them: with a block or from its gate result",
       "A failed run becomes a TODO with one click",
       "Coding agents add them through the API, so side findings don't evaporate"
+    ]
+  },
+  "projects-directory": {
+    "title": "A project is a directory",
+    "points": [
+      "Every workflow belongs to exactly one project, and its steps work with that project's files",
+      "AI calls run on this machine; a container for the project is optional",
+      "Archiving can be undone: the project and its workflows are kept"
+    ]
+  },
+  "project-context": {
+    "title": "What every run knows about this project",
+    "points": [
+      "The AI context is a text that every AI step of a run in this project receives, with every provider",
+      "It can be generated from a scan of the directory and then edited by hand",
+      "Below are all workflows of the project with their blocks and runs"
+    ]
+  },
+  "workflow-versions": {
+    "title": "Every change becomes a version",
+    "points": [
+      "Changes to the flow (blocks, instructions, model, provider) create a new version; name and description don't",
+      "Restoring an old version adds it as the newest one; later versions stay in the history",
+      "Provider and model apply to the whole workflow; a single AI block can override them for itself"
+    ]
+  },
+  "runs-list": {
+    "title": "All runs in one place",
+    "points": [
+      "The runs of every workflow, newest first; your filters are remembered",
+      "A run can be repeated: with the workflow's current version and the inputs it had back then",
+      "Finished runs are deleted after 90 days by default; the period can be changed"
+    ]
+  },
+  "approvals-inbox": {
+    "title": "Everything that is waiting for you",
+    "points": [
+      "Runs waiting for an approval or an input, across all workflows, oldest first",
+      "Each question has a time limit; when it runs out, the step fails or takes its default value",
+      "Waiting questions don't survive a restart of the instance: the run then counts as interrupted"
+    ]
+  },
+  "schedules-timing": {
+    "title": "Workflows at set times",
+    "points": [
+      "Recurring by cron (six fields, seconds first), once at a point in time, or after a delay",
+      "Times missed during standby or a restart are caught up once by default, not one by one",
+      "While the workflow is still running, the next time starts no second run next to it by default"
+    ]
+  },
+  "calendar-overview": {
+    "title": "What was planned and what ran",
+    "points": [
+      "The next time of every active schedule and the past runs of all workflows",
+      "Red means failed; the calendar only shows, schedules are changed on the schedule itself"
+    ]
+  },
+  "cockpit-overview": {
+    "title": "TODOs across all projects",
+    "points": [
+      "At the top is what needs you: TODOs you wrote down, critical ones and overdue ones, from every project",
+      "One card per project, split into yours and those from machines: workflows and agents",
+      "Automatic TODOs nobody has touched for a long time can be archived in one go"
+    ]
+  },
+  "activity-events": {
+    "title": "What happened on this instance",
+    "points": [
+      "Platform events: runs finished or failed, schedules fired or skipped, rejected sign-ins",
+      "The output of single steps is in the run itself, not here",
+      "Entries expire on their own: information after 7 days, warnings and errors after 30"
+    ]
+  },
+  "dlq-retry": {
+    "title": "Failed runs to follow up",
+    "points": [
+      "Runs that end on a failed step land here; cancelled and interrupted ones don't",
+      "Retry starts the workflow's current version from the top, with the inputs from back then",
+      "Discard only marks the entry as handled; the run is kept"
+    ]
+  },
+  "wishes-loop": {
+    "title": "Describe a goal, get workflows",
+    "points": [
+      "A wish is free text for a project: the AI breaks it down into new workflows, and several of them into a chain",
+      "It runs them, judges the result and improves it, for up to five rounds",
+      "Without automatic improvement you approve twice: the breakdown and the result"
+    ]
+  },
+  "factory-create": {
+    "title": "Workflows from a description",
+    "points": [
+      "Describe what a workflow should do, and the AI builds it in the chosen project",
+      "A repair rewrites the definition as a new version, so every fix stays traceable",
+      "Automatic repair of failing workflows stays off until it is switched on in the settings or for a workflow"
+    ]
+  },
+  "chains-sequence": {
+    "title": "Finished workflows, one after another",
+    "points": [
+      "A chain runs its workflows strictly in order, never in parallel, and may mix projects",
+      "Each workflow receives the result of the previous one's last step as {{ previous_chain_output }}",
+      "Whether a failure stops the chain is set for the chain and for each of its steps"
+    ]
+  },
+  "skills-packages": {
+    "title": "Skills: packaged know-how",
+    "points": [
+      "A skill bundles capabilities with an AI context of its own; a workflow activates it and uses it through a skill-capability block",
+      "Capabilities that write stay blocked unless the block explicitly allows writing",
+      "Built-in skills can't be deleted"
+    ]
+  },
+  "webhooks-trigger": {
+    "title": "Start a workflow from outside",
+    "points": [
+      "Each webhook starts one workflow; the token in its URL is the only credential, so treat the URL like a password",
+      "Fields of the JSON body become variables of the run and are treated as untrusted input",
+      "At most 10 calls per minute from one address; a disabled webhook rejects every call"
+    ]
+  },
+  "integrations-connect": {
+    "title": "Connect external services",
+    "points": [
+      "Workflows use connections through the integration block; TODOs can also be exported to GitHub, Jira or Trello",
+      "Some services sign in via OAuth with an app you register yourself, others with a token or without credentials",
+      "Credentials are stored encrypted; testing a connection runs a real action against the service"
+    ]
+  },
+  "debug-failing": {
+    "title": "Workflows whose last run went wrong",
+    "points": [
+      "Every workflow whose latest run failed or finished with errors; it drops off after its next successful run",
+      "A restart runs the workflow's current version from the first step, with the original inputs"
+    ]
+  },
+  "audit-findings": {
+    "title": "Findings with a memory",
+    "points": [
+      "Findings come from audit workflows: one that isn't seen again is resolved, one that comes back reopens as a regression",
+      "An accepted risk keeps a snapshot of its evidence; if the measured value gets noticeably worse, it opens again",
+      "Critical and high findings with verified evidence get a TODO automatically"
+    ]
+  },
+  "insights-numbers": {
+    "title": "How your runs are doing",
+    "points": [
+      "Duration, cost, tokens, block types and failure reasons of your runs, also per model and provider",
+      "Project and time filters apply to durations, costs and trends; success rate and totals always count all runs",
+      "Costs are partly estimates, depending on what the provider reports"
     ]
   }
 }

@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { ScrollText, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
@@ -65,6 +66,8 @@ export function ActivityLog() {
         <h1 className="text-2xl font-bold">{t.activityLog.title}</h1>
         <p className="text-text-secondary mt-1">{t.activityLog.subtitle}</p>
       </div>
+
+      <Hint id="activity-events" />
 
       {/* Filters */}
       <div className="flex gap-3">

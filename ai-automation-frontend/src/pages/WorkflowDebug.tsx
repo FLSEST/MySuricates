@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bug, RotateCcw, Stethoscope, ArrowRight, Clock, CalendarClock } from 'lucide-react';
@@ -34,6 +35,8 @@ export function WorkflowDebug() {
         </h1>
         <p className="text-sm text-text-secondary mt-1">{t.workflowDebug.subtitle}</p>
       </header>
+
+      <Hint id="debug-failing" />
 
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner /></div>

@@ -1,3 +1,4 @@
+import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo } from 'lucide-react';
 import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
@@ -151,6 +152,8 @@ export function Integrations() {
         <h1 className="text-2xl font-bold text-text">{t.integrations.title}</h1>
       </div>
       <p className="text-text-secondary">{t.integrations.subtitle}</p>
+
+      <Hint id="integrations-connect" />
 
       {/* Provider Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
