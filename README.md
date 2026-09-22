@@ -1,5 +1,7 @@
 [Deutsch](README.de.md) | **English**
 
+<p align="center"><img src="ai-automation-frontend/public/icons/icon.svg" alt="MySuricates logo: meerkats on a hill" width="120"></p>
+
 # MySuricates
 
 A research project on the question of how far software development can be operated under control with AI agents — and a runnable system in which this can be observed.

@@ -1,5 +1,7 @@
 **Deutsch** | [English](README.md)
 
+<p align="center"><img src="ai-automation-frontend/public/icons/icon.svg" alt="MySuricates-Logo: Erdmännchen auf einem Hügel" width="120"></p>
+
 # MySuricates
 
 Ein Forschungsprojekt zur Frage, wie weit sich Softwareentwicklung mit KI-Agenten kontrolliert
