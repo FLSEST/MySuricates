@@ -994,6 +994,12 @@ elsewhere: `COMPLETED_WITH_ERRORS` is set when a step with `checked_command` fai
 (`RunCompletionHandler`), and `FAILED` when the execution itself breaks off. An earlier version of
 this table carried a "run status" column that implied a causality the code does not have.
 
+**Merely mentioning the key orders a verdict.** If `gate_status` (or `gate-status`) appears anywhere
+in a block config — even in a prohibition such as "do not use the word gate_status" — the run
+expects a verdict (`GateExpectation`). If none arrives, it turns YELLOW `gate-missing` and creates a
+follow-up TODO. Word AI prompts that must not write markers without the key ("no status lines") and
+set the verdict in the closing shell block. Seen 2026-09-20 in the documentation review.
+
 **Shell block example** with gate emission:
 ```bash
 set -euo pipefail

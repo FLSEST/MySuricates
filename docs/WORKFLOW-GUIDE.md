@@ -1011,6 +1011,13 @@ Run-Status bestimmt etwas anderes: `COMPLETED_WITH_ERRORS` entsteht, wenn ein Sc
 abbricht. Eine frühere Fassung dieser Tabelle führte eine Spalte „Run-Status", die eine
 Kausalität behauptete, die es im Code nicht gibt.
 
+**Schon die Erwähnung bestellt ein Urteil.** Steht `gate_status` (oder `gate-status`) irgendwo in
+einer Block-Config — auch in einem Verbot wie „Verwende das Wort gate_status nicht" —, erwartet
+der Lauf ein Urteil (`GateExpectation`). Bleibt es aus, wird er YELLOW `gate-missing` und erzeugt
+ein Follow-up-TODO. KI-Prompts, die keine Marker schreiben sollen, deshalb ohne das Wort
+formulieren („keine Statuszeilen") und das Urteil im abschließenden Shell-Block setzen. Gesehen
+2026-09-20 bei der Doku-Durchsicht.
+
 **Shell-Block-Beispiel** mit Gate-Emission:
 ```bash
 set -euo pipefail
