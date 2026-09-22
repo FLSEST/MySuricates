@@ -26,5 +26,9 @@ automation:
     sealing: true
     # Unattended runs only for sealed workflows. Requires sealing.
     require-sealed-for-unattended: true
+    # A sealed workflow must carry a valid signature (key outside the database). Requires sealing.
+    require-signed-seal: true
+    # Unsealing is not possible over the API any more — only by changing this file. Requires sealing.
+    seal-immutable: true
     # HMAC-SHA256 signing secret per webhook (header X-Signature). Requires the webhooks module.
     webhook-signatures: true

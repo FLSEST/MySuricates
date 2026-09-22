@@ -49,6 +49,8 @@ automation:
     provenance: true
     sealing: false
     require-sealed-for-unattended: false
+    require-signed-seal: false
+    seal-immutable: false
     webhook-signatures: false
   scheduler:
     # The dev config parks skip-until on a future instant to pause the triggers and turns
@@ -84,6 +86,11 @@ automation:
     # 2026-08-06, shadowing the real key on every test run). The fallback path only
     # applies when the listener did not run (e.g. exotic runners).
     key-file: ${integration.key.path:${java.io.tmpdir}/autotrigger-integrationtest.key}
+  seal:
+    # Same reason as integration.key.path above: without this the seal signing key would be written
+    # to the developer's real home (${user.home}/.autotrigger/seal-signing.key) on every test run.
+    key-file: ${integration.seal.key.path:${java.io.tmpdir}/autotrigger-integrationtest-seal.key}
+
 
 server:
   port: 0

@@ -1,6 +1,8 @@
 package com.automation.service.workflow;
 
 import com.automation.entity.Workflow;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,10 @@ public class WorkflowSealVerifier {
         DEFINITION_CHANGED,
         /** A pinned skill was changed, added or deleted. */
         SKILLS_CHANGED,
+        /** The seal carries a signature that does not match (forged or moved seal). */
+        SIGNATURE_INVALID,
+        /** With {@code require-signed-seal}: the seal carries no signature at all. */
+        SIGNATURE_MISSING,
         /** The definition or the skills could not be hashed — treated as broken (fail closed). */
         UNVERIFIABLE
     }
@@ -36,7 +42,7 @@ public class WorkflowSealVerifier {
      * @param detail        human-readable reason for a broken seal, {@code null} when it holds
      */
     public record Verdict(Problem problem, String actualHash, Set<String> changedSkills, boolean skillsPinned,
-                          Map<String, String> pins, String detail) {
+                          Map<String, String> pins, String detail, boolean signed) {
         public boolean intact() {
             return problem == Problem.NONE;
         }
@@ -44,6 +50,8 @@ public class WorkflowSealVerifier {
 
     private final WorkflowDefinitionHasher hasher;
     private final WorkflowSkillPins skillPins;
+    private final WorkflowSealSigner signer;
+    private final ModuleRegistry modules;
 
     /** Only meaningful for sealed workflows; the caller checks {@link Workflow#isSealed()}. */
     public Verdict verify(Workflow workflow) {
@@ -60,7 +68,7 @@ public class WorkflowSealVerifier {
                     "its definition no longer matches the seal");
         }
         if (!skillsPinned) {
-            return new Verdict(Problem.NONE, actual, Set.of(), false, null, null);
+            return withSignature(workflow, actual, null, false);
         }
         Map<String, String> sealed;
         Set<String> changed;
@@ -75,11 +83,32 @@ public class WorkflowSealVerifier {
             return broken(Problem.SKILLS_CHANGED, actual, changed, true,
                     "skill(s) " + String.join(", ", changed) + " changed since sealing — review them and seal again");
         }
-        return new Verdict(Problem.NONE, actual, Set.of(), true, sealed, null);
+        return withSignature(workflow, actual, sealed, true);
+    }
+
+    /**
+     * Last check: a signature that is there must match — always, like the seal itself. Whether a
+     * missing signature is accepted is what {@code require-signed-seal} decides, so seals from
+     * before signing keep working until that switch is turned on.
+     */
+    private Verdict withSignature(Workflow workflow, String actualHash, Map<String, String> pins, boolean skillsPinned) {
+        String signature = workflow.getSealedSignature();
+        if (signature != null) {
+            if (!signer.verify(workflow.getId(), actualHash, pins, signature)) {
+                return new Verdict(Problem.SIGNATURE_INVALID, actualHash, Set.of(), skillsPinned, null,
+                        "its signature does not match — the seal was forged or copied from another workflow", true);
+            }
+            return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, true);
+        }
+        if (modules.isEnabled(ModuleCatalog.REQUIRE_SIGNED_SEAL)) {
+            return new Verdict(Problem.SIGNATURE_MISSING, actualHash, Set.of(), skillsPinned, null,
+                    "it carries no signature (automation.hardening.require-signed-seal) — seal it again", false);
+        }
+        return new Verdict(Problem.NONE, actualHash, Set.of(), skillsPinned, pins, null, false);
     }
 
     private static Verdict broken(Problem problem, String actualHash, Set<String> changed, boolean skillsPinned,
                                   String detail) {
-        return new Verdict(problem, actualHash, changed, skillsPinned, null, detail);
+        return new Verdict(problem, actualHash, changed, skillsPinned, null, detail, false);
     }
 }

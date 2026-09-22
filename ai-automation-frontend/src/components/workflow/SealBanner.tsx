@@ -38,7 +38,9 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
   if (status?.state === 'VIOLATED') {
     const reason = status.problem === 'SKILLS_CHANGED'
       ? s.problemSkills.replace('{skills}', status.changedSkills.map((k) => k.name ?? `${s.deletedSkill} (${k.id.slice(0, 8)})`).join(', '))
-      : status.problem === 'DEFINITION_CHANGED' ? s.problemDefinition : s.problemUnverifiable;
+      : status.problem === 'DEFINITION_CHANGED' ? s.problemDefinition
+      : status.problem === 'SIGNATURE_INVALID' ? s.problemSignature
+      : status.problem === 'SIGNATURE_MISSING' ? s.problemSignatureMissing : s.problemUnverifiable;
     return (
       <div role="alert" data-testid="seal-banner" data-state="violated"
            className="flex items-start gap-3 p-3 rounded-lg border border-danger/40 bg-danger-subtle text-danger">
@@ -69,6 +71,9 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
           </p>
           <p className="text-sm text-text-secondary mt-0.5">{body}</p>
           {!pinned && <p className="text-xs text-warning mt-1" data-testid="seal-legacy">{s.legacyBody}</p>}
+          {status && !status.signed && (
+            <p className="text-xs text-warning mt-1" data-testid="seal-unsigned">{s.unsignedBody}</p>
+          )}
         </div>
         {!pinned && sealingModule && (
           <Button variant="secondary" size="sm" icon={<Lock className="w-4 h-4" />} loading={sealWorkflow.isPending}

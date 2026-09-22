@@ -18,6 +18,7 @@ public enum ErrorCode {
     WORKFLOW_SEALED(HttpStatus.CONFLICT, "Workflow is sealed"),
     WORKFLOW_TAMPERED(HttpStatus.CONFLICT, "Sealed workflow definition was modified"),
     SKILL_PINNED_BY_SEAL(HttpStatus.CONFLICT, "Skill is used by a sealed workflow"),
+    SEAL_IMMUTABLE(HttpStatus.FORBIDDEN, "Unsealing is disabled in the startup configuration"),
     UNATTENDED_REQUIRES_SEAL(HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
     WEBHOOK_SIGNATURE_INVALID(HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
     NO_TASK_TARGET(HttpStatus.BAD_REQUEST, "No task export target configured"),

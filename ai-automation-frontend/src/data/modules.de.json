@@ -87,6 +87,14 @@
     "name": "Unbeaufsichtigt nur versiegelt",
     "description": "Unbeaufsichtigte Runs (Schedules, Webhooks, Trigger, Auto-Reparatur, Wünsche und die davon gestarteten Chains oder Sub-Workflows) starten nur versiegelte Workflows."
   },
+  "require-signed-seal": {
+    "name": "Siegel müssen signiert sein",
+    "description": "Versiegelte Workflows brauchen eine gültige Signatur (Schlüssel außerhalb der Datenbank). Ein Siegel ohne oder mit falscher Signatur lehnt seine Runs ab."
+  },
+  "seal-immutable": {
+    "name": "Entsiegeln gesperrt",
+    "description": "Entsiegeln ist über die Oberfläche und die API nicht mehr möglich; ein Siegel löst nur, wer die Startkonfiguration ändern kann."
+  },
   "webhook-signatures": {
     "name": "Webhook-Signaturen (HMAC)",
     "description": "Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."

@@ -23,7 +23,7 @@ function workflow(overrides: Partial<Workflow> = {}): Workflow {
 function status(overrides: Partial<WorkflowSealStatus> = {}): WorkflowSealStatus {
   return {
     workflowId: 'wf-1', workflowName: 'Deploy', state: 'INTACT', problem: 'NONE', detail: null, changedSkills: [],
-    skillsPinned: true, pinnedSkillCount: 2, sealedAt: '2026-09-20T08:00:00Z', refusedStarts: 0,
+    skillsPinned: true, signed: true, pinnedSkillCount: 2, sealedAt: '2026-09-20T08:00:00Z', refusedStarts: 0,
     lastRefusedAt: null, lastRefusal: null, ...overrides,
   };
 }
@@ -75,5 +75,19 @@ describe('SealBanner', () => {
 
     expect(screen.getByTestId('seal-banner')).toHaveAttribute('data-state', 'refused');
     expect(screen.getByTestId('seal-banner')).toHaveTextContent('unattended run (SCHEDULE)');
+  });
+
+  it('says when a seal is not signed', () => {
+    renderWithProviders(<SealBanner workflow={workflow({ sealed: true })} status={status({ signed: false })} />);
+
+    expect(screen.getByTestId('seal-unsigned')).toHaveTextContent(en.workflows.sealView.unsignedBody);
+  });
+
+  it('names a forged signature as the reason', () => {
+    renderWithProviders(<SealBanner workflow={workflow({ sealed: true })} status={status({
+      state: 'VIOLATED', problem: 'SIGNATURE_INVALID', signed: true,
+    })} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(en.workflows.sealView.problemSignature);
   });
 });

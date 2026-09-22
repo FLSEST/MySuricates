@@ -87,6 +87,14 @@
     "name": "Unattended runs only when sealed",
     "description": "Unattended runs (schedules, webhooks, triggers, auto-repair, wishes and the chains or sub-workflows they start) only start sealed workflows."
   },
+  "require-signed-seal": {
+    "name": "Seals must be signed",
+    "description": "Sealed workflows need a valid signature (key outside the database). A seal without one, or with a wrong one, refuses its runs."
+  },
+  "seal-immutable": {
+    "name": "Unsealing locked",
+    "description": "Unsealing is no longer possible through the UI or the API; a seal is released only by someone who can change the startup configuration."
+  },
   "webhook-signatures": {
     "name": "Webhook signatures (HMAC)",
     "description": "Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."
