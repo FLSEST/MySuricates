@@ -4,7 +4,12 @@
 # auf dem Host gebautes JAR). Die Benutzer-ID kommt erst beim Start (deploy/entrypoint.sh), damit
 # ein Image fuer alle taugt (TODO fc9de67b, spaeter Registry-Image 4c992a25).
 #
-#   docker build -f deploy/Dockerfile -t mysuricates:local .      (Kontext = Repo-Wurzel)
+#   docker build -f deploy/Dockerfile --target runtime -t mysuricates:local .   (Kontext = Repo-Wurzel)
+#
+# Zwei Ziele: `runtime` ist das Image fuer eine eingerichtete Instanz (Werkzeuge und KI-Logins kommen
+# vom Rechner), `tryout` baut darauf auf und bringt alles selbst mit — zum Ausprobieren ohne
+# Installation (scripts/tryout.sh, 40c31211). `runtime` steht vor `tryout`: der klassische Builder
+# baut jede Stufe bis zum Ziel, `--target runtime` laesst die Tryout-Stufe also aus.
 #
 # Bewusst ohne BuildKit-Syntax (Cache-Mounts): ohne das buildx-Plugin baut Docker klassisch, und das
 # fehlt vielen Installationen (Distributionspaket docker.io). Den Cache fuer Maven/npm liefern die
@@ -28,7 +33,7 @@ RUN npm ci --no-audit --no-fund
 COPY ai-automation-frontend/ ./
 RUN npm run build
 
-FROM eclipse-temurin:21-jre-noble
+FROM eclipse-temurin:21-jre-noble AS runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl git gosu python3 jq ca-certificates gnupg \
  && rm -rf /var/lib/apt/lists/*
@@ -79,3 +84,30 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-Xms256m", "-Xmx1g", "-Djava.awt.headless=true", \
      "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=/app/data/logs/", \
      "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]
+
+# ---------------------------------------------------------------------------------------------------
+# Tryout: ausprobieren ohne Installation. Nichts vom Rechner wird eingebunden, also bringt das Image
+# mit, was die mitgelieferten Vorlagen und der Pool brauchen: python3 (+ pip/venv), Node, JDK + Maven,
+# dazu die KI-CLIs. Angemeldet wird im Container (scripts/tryout.sh login). Kein gcc/Go/Rust/Gradle —
+# wer mehr braucht, baut `FROM mysuricates:tryout` oder nimmt den Installer.
+# ---------------------------------------------------------------------------------------------------
+FROM runtime AS tryout
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3-pip python3-venv \
+ && rm -rf /var/lib/apt/lists/*
+# JDK und Maven aus der Build-Stufe: dieselben Versionen, kein weiterer Download
+COPY --from=backend /opt/java/openjdk /opt/java/jdk
+COPY --from=backend /usr/share/maven /usr/share/maven
+RUN ln -s /usr/share/maven/bin/mvn /usr/local/bin/mvn
+# Die Links auf codex/pi aus der runtime-Stufe zeigen genau auf diese Pakete
+RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent \
+ && npm cache clean --force
+# HOME auf dem Daten-Volume: KI-Logins, API-Key und eigene Projekte ueberstehen einen Neuaufbau.
+# Preset research: Chains, Memory, Assistent … ja; Netz- und Host-Module (Fernzugriff, Staging,
+# Terminal) bleiben aus — die ergeben ohne eingebundenen Rechner keinen Sinn.
+ENV JAVA_HOME=/opt/java/jdk \
+    PATH=/opt/java/jdk/bin:$PATH \
+    HOST_HOME=/app/data/home \
+    AUTOMATION_MODULES_PRESET=research \
+    AUTOMATION_ENVIRONMENT=Tryout \
+    DISABLE_AUTOUPDATER=1
