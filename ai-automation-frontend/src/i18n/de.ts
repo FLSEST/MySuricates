@@ -1152,6 +1152,18 @@ export const de: TranslationKeys = {
     targetWorkflow: 'Ziel-Workflow',
     description: 'Beschreibung (optional)',
   },
+  incomingTriggers: {
+    schedules: 'Zeitpläne',
+    webhooks: 'Webhooks',
+    todoTriggers: 'TODO-Trigger',
+    workflows: 'Nach Abschluss von',
+    inactive: 'pausiert',
+    nextRun: 'nächster Lauf',
+    webhookUnnamed: 'Webhook ohne Beschreibung',
+    tag: 'Tag',
+    none: 'Kein Zeitplan, Webhook, TODO-Trigger oder anderer Workflow startet diesen Workflow — er läuft nur, wenn man ihn startet.',
+    notListed: 'Nicht aufgeführt: Chains und Sub-Workflow-Blöcke, die diesen Workflow aufrufen.',
+  },
   settings: {
     title: 'Einstellungen',
     subtitle: 'Plattform-Konfiguration',

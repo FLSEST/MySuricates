@@ -11,6 +11,15 @@ export function useWebhooks() {
   });
 }
 
+/** Webhooks that start this workflow; `enabled` = false while the webhooks module is off. */
+export function useWebhooksForWorkflow(workflowId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['webhooks', 'workflow', workflowId],
+    queryFn: () => api.get<WebhookTrigger[]>(`/webhooks/workflow/${workflowId}`),
+    enabled: !!workflowId && enabled,
+  });
+}
+
 export function useCreateWebhook() {
   const qc = useQueryClient();
   const toast = useToast();

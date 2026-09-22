@@ -11,6 +11,15 @@ export function useSchedules() {
   });
 }
 
+/** Schedules that start this workflow (chain schedules are not included). */
+export function useSchedulesForWorkflow(workflowId: string) {
+  return useQuery({
+    queryKey: ['schedules', 'workflow', workflowId],
+    queryFn: () => api.get<ScheduledWorkflow[]>(`/schedules/workflow/${workflowId}`),
+    enabled: !!workflowId,
+  });
+}
+
 export function useMaintenanceMode() {
   return useQuery({
     queryKey: ['schedules', 'maintenance'],

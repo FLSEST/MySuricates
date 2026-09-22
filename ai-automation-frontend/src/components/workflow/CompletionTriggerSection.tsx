@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Plus, Trash2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Card, CardHeader, Button, Modal, Select, Input, Toggle, Badge, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import {
   useCompletionTriggersAsSource,
-  useCompletionTriggersAsTarget,
   useCreateCompletionTrigger,
   useToggleCompletionTrigger,
   useDeleteCompletionTrigger,
 } from '../../hooks/useCompletionTriggers';
+import { IncomingTriggersCard } from './IncomingTriggersCard';
 import type { Workflow, CreateCompletionTriggerRequest } from '../../types';
 
 interface Props {
@@ -29,7 +29,6 @@ export function CompletionTriggerSection({ workflowId, allWorkflows }: Props) {
   const ct = t.completionTriggers;
 
   const { data: asSource = [], isLoading: loadingSource } = useCompletionTriggersAsSource(workflowId);
-  const { data: asTarget = [], isLoading: loadingTarget } = useCompletionTriggersAsTarget(workflowId);
   const createTrigger = useCreateCompletionTrigger();
   const toggleTrigger = useToggleCompletionTrigger(workflowId);
   const deleteTrigger = useDeleteCompletionTrigger(workflowId);
@@ -111,30 +110,8 @@ export function CompletionTriggerSection({ workflowId, allWorkflows }: Props) {
           </div>
         </Card>
 
-        {/* Triggers that fire THIS workflow */}
-        <Card padding={false}>
-          <div className="p-5 pb-0">
-            <CardHeader title={ct.asTarget} />
-          </div>
-          <div className="p-5 pt-0 space-y-2">
-            {loadingTarget ? (
-              <div className="flex justify-center py-4"><Spinner /></div>
-            ) : asTarget.length === 0 ? (
-              <p className="text-sm text-text-tertiary py-2">{ct.noTriggersAsTarget}</p>
-            ) : (
-              asTarget.map((trigger) => (
-                <div key={trigger.id} className="flex items-center gap-2 py-1.5">
-                  <ArrowLeft className="w-4 h-4 text-text-secondary shrink-0" />
-                  <span className="text-sm text-text truncate">{trigger.sourceWorkflowName}</span>
-                  <Badge>{conditionLabel(trigger.triggerOnSuccess, trigger.triggerOnFailure, trigger.triggerAlways)}</Badge>
-                  {!trigger.enabled && (
-                    <Badge>disabled</Badge>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
+        {/* Everything that starts THIS workflow */}
+        <IncomingTriggersCard workflowId={workflowId} conditionLabel={conditionLabel} />
       </div>
 
       <Modal

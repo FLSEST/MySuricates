@@ -11,6 +11,15 @@ export function useTodoTriggers() {
   });
 }
 
+/** TODO triggers whose target is this workflow. */
+export function useTodoTriggersForWorkflow(workflowId: string) {
+  return useQuery({
+    queryKey: ['todo-triggers', 'workflow', workflowId],
+    queryFn: () => api.get<TodoTrigger[]>(`/todo-triggers/workflow/${workflowId}`),
+    enabled: !!workflowId,
+  });
+}
+
 export function useCreateTodoTrigger() {
   const qc = useQueryClient();
   const toast = useToast();

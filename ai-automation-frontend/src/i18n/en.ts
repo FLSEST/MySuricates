@@ -1150,6 +1150,18 @@ export const en = {
     targetWorkflow: 'Target Workflow',
     description: 'Description (optional)',
   },
+  incomingTriggers: {
+    schedules: 'Schedules',
+    webhooks: 'Webhooks',
+    todoTriggers: 'TODO triggers',
+    workflows: 'After completion of',
+    inactive: 'paused',
+    nextRun: 'next run',
+    webhookUnnamed: 'Webhook without description',
+    tag: 'Tag',
+    none: 'No schedule, webhook, TODO trigger or other workflow starts this workflow — it only runs when started by hand.',
+    notListed: 'Not listed: chains and sub-workflow blocks that call this workflow.',
+  },
   settings: {
     title: 'Settings',
     subtitle: 'Platform configuration',
