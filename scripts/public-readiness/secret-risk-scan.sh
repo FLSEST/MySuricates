@@ -29,9 +29,24 @@ sensitive_filename_candidates | while IFS= read -r file; do
   fi
 done | head -180 | redact
 
+# Die eigentliche Handpruefung der Stichwort-Treffer (TODO 48f4ef25): echte
+# Schluesselbloecke im getrackten Bestand. Nur Dateinamen, nie Inhalte.
+section "PEM private key blocks in tracked files"
+pem_files=$(git grep -lIE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' 2>/dev/null || true)
+printf 'pem_private_key_files: %s\n' "$(printf '%s' "$pem_files" | grep -c . || true)"
+[ -n "$pem_files" ] && printf '%s\n' "$pem_files" | head -50 | redact
+
+section "Secret scanners in CI"
+if grep -qE 'gitleaks' .github/workflows/*.yml 2>/dev/null; then
+  echo "ci_secret_scanner: gitleaks ($(grep -lE 'gitleaks' .github/workflows/*.yml | tr '\n' ' ' | sed 's/ $//'))"
+else
+  echo "ci_secret_scanner: none"
+fi
+
 section "Keyword occurrence counts by category"
+echo "note: counts are raw keyword hits (the product manages API keys, tokens and secrets), scanner scripts excluded; real key material is covered by the PEM check above and CI secret scanning"
 for pat in 'api[_-]?key' 'secret' 'token' 'password|passwd' 'bearer' 'private[_ -]?key' 'localhost:[0-9]+' '/home/[A-Za-z0-9_-]+'; do
-  count=$(pgrep_count_total -i "$pat" .)
+  count=$(pgrep_count_total -i --exclude-dir=public-readiness "$pat" .)
   printf '%s: %s\n' "$pat" "$count"
 done
 
@@ -43,6 +58,8 @@ echo "INFO if sensitive-looking files are ignored local runtime artifacts."
 
 section "Gate status"
 sensitive_count=$(tracked_high_risk_files | wc -l | tr -d ' ')
+pem_count=$(printf '%s' "$pem_files" | grep -c . || true)
+sensitive_count=$(( ${sensitive_count:-0} + ${pem_count:-0} ))
 if [ "${sensitive_count:-0}" -gt 0 ]; then
   echo "gate_status: RED"
   echo "gate_category: secret-hygiene"
@@ -51,5 +68,5 @@ if [ "${sensitive_count:-0}" -gt 0 ]; then
 else
   echo "gate_status: GREEN"
   echo "gate_category: secret-hygiene"
-  echo "gate_description: No tracked high-risk filename indicators detected by the safe scan."
+  echo "gate_description: No tracked high-risk filename indicators and no PEM private key blocks in tracked files."
 fi
