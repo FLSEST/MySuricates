@@ -1,5 +1,6 @@
 package com.automation.service.system;
 
+import com.automation.config.InstanceAddress;
 import com.automation.repository.AppSettingsRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -61,7 +62,7 @@ public class ApiKeyService {
     }
 
     private static Path apiKeyFile() {
-        return Path.of(System.getProperty("user.home"), ".autotrigger", "api-key");
+        return InstanceAddress.apiKeyFile();
     }
 
     private void writeApiKeyFile(String key) {

@@ -866,7 +866,7 @@ Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. A
 | `key` | TEXT | NOT NULL, UNIQUE | Profil-Schlüssel (z.B. `developer`, `research`) |
 | `name` | TEXT | NOT NULL | JSON i18n-Map: `{"de":"...","en":"..."}` |
 | `description` | TEXT | | JSON i18n-Map |
-| `content` | TEXT | NOT NULL | Markdown-Content des AI-Kontext-Templates |
+| `content` | TEXT | NOT NULL | JSON i18n-Map `{"de":"...","en":"..."}` mit dem Markdown-Text (seit V81) |
 | `type` | TEXT | NOT NULL | Enum: OnboardingProfileType |
 | `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Ob Built-in (nicht löschbar) |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sortierreihenfolge |
@@ -883,7 +883,7 @@ AI-Kontext-Templates für Projekt-Onboarding. Built-in-Profile + benutzerdefinie
 | `id` | TEXT | PK | UUID |
 | `profile_id` | TEXT | FK NOT NULL | Referenz auf `onboarding_profiles.id` |
 | `version` | INTEGER | NOT NULL | Versionsnummer |
-| `content` | TEXT | NOT NULL | Profil-Content dieser Version |
+| `content` | TEXT | NOT NULL | Profil-Content dieser Version, JSON i18n-Map (seit V81) |
 | `changed_by` | TEXT | NOT NULL | Wer die Änderung vorgenommen hat |
 | `changed_at` | TEXT | NOT NULL | Zeitpunkt der Änderung |
 
@@ -1254,7 +1254,8 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unaufgelöste zweisprachige Schritte, `?locale=` löst beim Lesen auf) |
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; Blaupausen aus templates/blueprints/) |
 | V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (Skill-Inhalt unter dem Siegel), neue Tabelle `skill_versions` (Änderungshistorie je Skill, ohne Fremdschlüssel) |
-| V81 | `V81__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
+| V81 | `V81__onboarding_profile_content_i18n.sql` | content in onboarding_profiles und onboarding_profile_history als JSON-Map `{de, en}`; Bestand wird `de` |
+| V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
 
 ## SQLite-Besonderheiten
 

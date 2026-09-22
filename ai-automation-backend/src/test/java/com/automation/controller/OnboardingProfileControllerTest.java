@@ -49,7 +49,7 @@ class OnboardingProfileControllerTest {
         return OnboardingProfile.builder()
                 .id(id).key(key)
                 .name(Map.of("de", "Test"))
-                .content("content")
+                .content(Map.of("de", "content"))
                 .type(OnboardingProfileType.PROFILE)
                 .builtIn(false).sortOrder(0).version(1)
                 .build();
@@ -57,7 +57,7 @@ class OnboardingProfileControllerTest {
 
     private OnboardingProfileResponse buildResponse(String id, String key) {
         return new OnboardingProfileResponse(id, key, Map.of("de", "Test"), Map.of(),
-                "content", OnboardingProfileType.PROFILE, false, 0, 1, 0,
+                Map.of("de", "content"), OnboardingProfileType.PROFILE, false, 0, 1, 0,
                 Instant.now(), Instant.now());
     }
 
@@ -102,7 +102,7 @@ class OnboardingProfileControllerTest {
         when(profileService.getHistoryCount("p-new")).thenReturn(0);
 
         String body = """
-                {"key": "new-key", "name": {"de": "Neu"}, "content": "test content", "type": "PROFILE"}
+                {"key": "new-key", "name": {"de": "Neu"}, "content": {"de": "test content"}, "type": "PROFILE"}
                 """;
 
         mockMvc.perform(post("/api/v1/onboarding-profiles")
@@ -120,7 +120,7 @@ class OnboardingProfileControllerTest {
         when(profileService.getHistoryCount("p1")).thenReturn(0);
 
         String body = """
-                {"name": {"de": "Aktualisiert"}, "content": "new content"}
+                {"name": {"de": "Aktualisiert"}, "content": {"de": "new content"}}
                 """;
 
         mockMvc.perform(put("/api/v1/onboarding-profiles/p1")

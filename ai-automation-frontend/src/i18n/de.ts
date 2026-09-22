@@ -2,6 +2,8 @@ import type { TranslationKeys } from './en';
 
 export const de: TranslationKeys = {
   common: {
+    maximize: 'Maximieren',
+    restore: 'Größe zurücksetzen',
     save: 'Speichern',
     cancel: 'Abbrechen',
     delete: 'Löschen',
@@ -445,7 +447,9 @@ export const de: TranslationKeys = {
       installed: 'Geschrieben',
       notInstalled: 'Nicht geschrieben',
       hint: 'Generiert KI-Instruktionsdateien im Projektverzeichnis, damit AI-Agents (Claude Code, Codex, etc.) wissen wie sie MySuricates nutzen.',
-      noProfiles: 'Keine Profile ausgewählt',
+      noProfiles: 'Keine Profile vorhanden',
+      language: 'Sprache',
+      fileForeign: '{path} gibt es schon und stammt nicht von MySuricates – die Datei wird nicht überschrieben. Umbenennen oder das andere Format wählen.',
     },
     types: {
       CODE: 'Code',
@@ -485,6 +489,12 @@ export const de: TranslationKeys = {
     blockConfig: 'Konfiguration (JSON)',
     blockSkills: 'Block-Skills',
     blockSkillsHint: 'Zusätzliche Skills, die nur für diesen Block aktiviert werden (ergänzend zu Workflow-Skills).',
+    blockSkillsNoEffect: 'Dieser Blocktyp ruft keine KI auf, die Skills wirken hier nicht. Zum Entfernen anklicken.',
+    configEditor: {
+      hint: 'Strg+Leertaste: Vorschläge (nochmal: mit Erklärung) · Maus über einen Schlüssel: Erklärung',
+      problems: '{count} Warnung(en)',
+      format: 'Formatieren',
+    },
     blockAiOverride: 'KI-Anbieter und Modell für diesen Block',
     blockAiOverrideHint: 'Überschreibt die Workflow-Einstellung nur für diesen Block (Config-Schlüssel provider/model). Leer = Workflow-Einstellung, dann System-Standard.',
     blockProvider: 'Anbieter',
@@ -2038,10 +2048,12 @@ export const de: TranslationKeys = {
     key: 'Schlüssel',
     keyHint: 'Eindeutiger Bezeichner (a-z, 0-9, -)',
     content: 'Inhalt',
+    contentLanguage: 'Sprache des Inhalts',
+    contentFallback: 'Fehlt eine Sprache, schreibt MySuricates den Text der anderen.',
     type: 'Typ',
     typeBase: 'Basis',
     typeProfile: 'Profil',
-    builtIn: 'Built-in',
+    builtIn: 'Mitgeliefert',
     custom: 'Benutzerdefiniert',
     version: 'Version',
     history: 'Versionen',

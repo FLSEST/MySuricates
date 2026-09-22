@@ -72,6 +72,8 @@ MySuricates unterstützt 20 Block-Typen. Jeder Block hat einen `type` und eine `
 
 Auch das **Wiederherstellen einer alten Version** (`POST /api/v1/workflows/{id}/versions/{versionId}/restore`) geht durch diese Prüfung: enthält die alte Definition einen Typ, den es heute nicht mehr gibt, scheitert die Wiederherstellung mit 400 — eine nicht mehr ausführbare Definition kommt nicht zurück.
 
+**Hilfe im Block-Editor:** Das Konfigurationsfeld kennt die Schlüssel jedes Block-Typs. Strg+Leertaste schlägt Schlüssel und erlaubte Werte vor (z. B. `on_failure` → `stop`/`continue`), ein zweites Strg+Leertaste zeigt die Erklärung dazu, und der Hover über einen Schlüssel erklärt ihn samt seinen Werten. Unbekannte Schlüssel, falsche Werte und fehlende Pflichtfelder werden gelb markiert, das Speichern bleibt trotzdem möglich. Der Dialog lässt sich an der rechten unteren Ecke aufziehen und maximieren. Die Block-Skills erscheinen nur bei Blöcken, die die KI im Projektverzeichnis aufrufen. Quelle der Texte ist `ai-automation-frontend/src/components/workflow/blockConfigSchema.ts`: Wer einem Executor einen neuen Config-Schlüssel beibringt, trägt ihn dort ein. `blockConfigSchema.test.ts` gleicht das Schema mit allen mitgelieferten Vorlagen, Blaupausen und Pool-Workflows ab.
+
 ### Allgemeine Block-Eigenschaften
 
 Jeder Block unterstützt neben seinen typspezifischen Config-Feldern auch diese allgemeinen Eigenschaften:

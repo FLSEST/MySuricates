@@ -35,7 +35,7 @@ class OnboardingProfileMapperTest {
                     .key("default")
                     .name(Map.of("de", "Standard", "en", "Default"))
                     .description(Map.of("de", "Standard-Profil"))
-                    .content("# Welcome\nThis is the content")
+                    .content(Map.of("de", "# Welcome\nThis is the content"))
                     .type(OnboardingProfileType.PROFILE)
                     .builtIn(true)
                     .sortOrder(1)
@@ -50,7 +50,7 @@ class OnboardingProfileMapperTest {
             assertThat(response.key()).isEqualTo("default");
             assertThat(response.name()).containsEntry("de", "Standard").containsEntry("en", "Default");
             assertThat(response.description()).containsEntry("de", "Standard-Profil");
-            assertThat(response.content()).isEqualTo("# Welcome\nThis is the content");
+            assertThat(response.content()).isEqualTo(Map.of("de", "# Welcome\nThis is the content"));
             assertThat(response.type()).isEqualTo(OnboardingProfileType.PROFILE);
             assertThat(response.builtIn()).isTrue();
             assertThat(response.sortOrder()).isEqualTo(1);
@@ -64,7 +64,7 @@ class OnboardingProfileMapperTest {
             OnboardingProfile profile = OnboardingProfile.builder()
                     .id("op-2")
                     .key("custom")
-                    .content("content")
+                    .content(Map.of("de", "content"))
                     .type(OnboardingProfileType.PROFILE)
                     .build();
 
@@ -78,7 +78,7 @@ class OnboardingProfileMapperTest {
             OnboardingProfile profile = OnboardingProfile.builder()
                     .id("op-3")
                     .key("minimal")
-                    .content("content")
+                    .content(Map.of("de", "content"))
                     .type(OnboardingProfileType.PROFILE)
                     .build();
 
@@ -91,8 +91,8 @@ class OnboardingProfileMapperTest {
 
     @Test
     void toResponseList_mapsMultiple() {
-        OnboardingProfile p1 = OnboardingProfile.builder().id("p1").key("k1").content("c1").type(OnboardingProfileType.PROFILE).build();
-        OnboardingProfile p2 = OnboardingProfile.builder().id("p2").key("k2").content("c2").type(OnboardingProfileType.PROFILE).build();
+        OnboardingProfile p1 = OnboardingProfile.builder().id("p1").key("k1").content(Map.of("de", "c1")).type(OnboardingProfileType.PROFILE).build();
+        OnboardingProfile p2 = OnboardingProfile.builder().id("p2").key("k2").content(Map.of("de", "c2")).type(OnboardingProfileType.PROFILE).build();
 
         List<OnboardingProfileResponse> responses = mapper.toResponseList(List.of(p1, p2));
 
@@ -110,7 +110,7 @@ class OnboardingProfileMapperTest {
             OnboardingProfileHistory history = OnboardingProfileHistory.builder()
                     .id("h-1")
                     .version(2)
-                    .content("old content")
+                    .content(Map.of("de", "old content"))
                     .changedBy("admin")
                     .changedAt(changedAt)
                     .build();
@@ -119,7 +119,7 @@ class OnboardingProfileMapperTest {
 
             assertThat(response.id()).isEqualTo("h-1");
             assertThat(response.version()).isEqualTo(2);
-            assertThat(response.content()).isEqualTo("old content");
+            assertThat(response.content()).isEqualTo(Map.of("de", "old content"));
             assertThat(response.changedBy()).isEqualTo("admin");
             assertThat(response.changedAt()).isEqualTo(changedAt);
         }
@@ -127,8 +127,8 @@ class OnboardingProfileMapperTest {
 
     @Test
     void toHistoryResponseList_mapsMultiple() {
-        OnboardingProfileHistory h1 = OnboardingProfileHistory.builder().id("h1").version(1).content("c1").changedBy("user").changedAt(Instant.now()).build();
-        OnboardingProfileHistory h2 = OnboardingProfileHistory.builder().id("h2").version(2).content("c2").changedBy("admin").changedAt(Instant.now()).build();
+        OnboardingProfileHistory h1 = OnboardingProfileHistory.builder().id("h1").version(1).content(Map.of("de", "c1")).changedBy("user").changedAt(Instant.now()).build();
+        OnboardingProfileHistory h2 = OnboardingProfileHistory.builder().id("h2").version(2).content(Map.of("de", "c2")).changedBy("admin").changedAt(Instant.now()).build();
 
         List<OnboardingProfileHistoryResponse> responses = mapper.toHistoryResponseList(List.of(h1, h2));
 

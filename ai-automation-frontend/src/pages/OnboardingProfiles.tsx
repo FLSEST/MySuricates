@@ -18,6 +18,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield } from 'lucide-react';
 import { useI18nStore } from '../i18n';
 import { ensureLocalMonaco } from '../components/shared/monacoSetup';
+import { Hint } from '../components/hints/Hint';
 
 // Monaco from our own bundle, never the CDN (see monacoSetup)
 const MonacoEditor = lazy(() =>
@@ -26,6 +27,15 @@ const MonacoEditor = lazy(() =>
 
 function resolveProfileName(profile: OnboardingProfile, locale: string): string {
   return profile.name[locale] || profile.name['en'] || profile.key;
+}
+
+/** Languages a profile's content is written in; a missing one falls back to the other when rendered. */
+const CONTENT_LANGUAGES = ['de', 'en'] as const;
+type ContentLanguage = (typeof CONTENT_LANGUAGES)[number];
+type ContentByLanguage = Record<ContentLanguage, string>;
+
+function contentOf(profile: OnboardingProfile): ContentByLanguage {
+  return { de: profile.content?.de ?? '', en: profile.content?.en ?? '' };
 }
 
 export function OnboardingProfiles() {
@@ -43,7 +53,8 @@ export function OnboardingProfiles() {
   const [showDelete, setShowDelete] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [editContent, setEditContent] = useState('');
+  const [editContent, setEditContent] = useState<ContentByLanguage>({ de: '', en: '' });
+  const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(locale === 'de' ? 'de' : 'en');
   const [editName, setEditName] = useState({ de: '', en: '' });
   const [editDescription, setEditDescription] = useState({ de: '', en: '' });
   const [createForm, setCreateForm] = useState({ key: '', nameDe: '', nameEn: '', content: '' });
@@ -66,7 +77,7 @@ export function OnboardingProfiles() {
 
   const handleSelect = (profile: OnboardingProfile) => {
     setSelectedId(profile.id);
-    setEditContent(profile.content);
+    setEditContent(contentOf(profile));
     setEditName({ de: profile.name.de || '', en: profile.name.en || '' });
     setEditDescription({ de: profile.description?.de || '', en: profile.description?.en || '' });
     setHasChanges(false);
@@ -91,7 +102,10 @@ export function OnboardingProfiles() {
       key: createForm.key,
       name: { de: createForm.nameDe, en: createForm.nameEn },
       description: { de: '', en: '' },
-      content: createForm.content || '## ' + createForm.nameEn + '\n\n',
+      content: {
+        de: '## ' + (createForm.nameDe || createForm.nameEn) + '\n\n',
+        en: '## ' + createForm.nameEn + '\n\n',
+      },
       type: 'PROFILE',
     }, {
       onSuccess: () => {
@@ -137,6 +151,8 @@ export function OnboardingProfiles() {
           {t.onboardingProfiles.create}
         </Button>
       </div>
+
+      <Hint id="onboarding-profiles" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Profile List */}
@@ -231,19 +247,36 @@ export function OnboardingProfiles() {
                 />
               </div>
 
-              {/* Content editor */}
+              {/* Content editor, one language at a time */}
               <div>
-                <label className="text-xs font-medium text-text-secondary mb-1.5 block">
-                  {t.onboardingProfiles.content}
-                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                  <span className="text-xs font-medium text-text-secondary">{t.onboardingProfiles.content}</span>
+                  <div role="group" aria-label={t.onboardingProfiles.contentLanguage} className="inline-flex rounded-lg border border-border p-0.5">
+                    {CONTENT_LANGUAGES.map(lang => (
+                      <button
+                        key={lang}
+                        type="button"
+                        aria-pressed={contentLanguage === lang}
+                        onClick={() => setContentLanguage(lang)}
+                        className={`px-2.5 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                          contentLanguage === lang ? 'bg-accent text-text-inverse' : 'text-text-secondary hover:text-text'
+                        }`}
+                      >
+                        {lang.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-text-tertiary mb-1.5">{t.onboardingProfiles.contentFallback}</p>
                 <div className="border border-border rounded-lg overflow-hidden" style={{ height: '400px' }}>
                   <Suspense fallback={<div className="flex items-center justify-center h-full"><Spinner /></div>}>
                     <MonacoEditor
                       height="400px"
                       language="markdown"
                       theme="vs-dark"
-                      value={editContent}
-                      onChange={value => { setEditContent(value || ''); setHasChanges(true); }}
+                      path={`onboarding-profile-${selected.id}-${contentLanguage}.md`}
+                      value={editContent[contentLanguage]}
+                      onChange={value => { setEditContent(c => ({ ...c, [contentLanguage]: value || '' })); setHasChanges(true); }}
                       options={{
                         minimap: { enabled: false },
                         wordWrap: 'on',
@@ -414,9 +447,14 @@ function HistoryModal({ profileId, open, onClose }: { profileId: string; open: b
                   <span>{new Date(h.changedAt).toLocaleString()}</span>
                 </div>
               </div>
-              <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded p-2 max-h-32 overflow-y-auto">
-                {h.content}
-              </pre>
+              {Object.entries(h.content ?? {}).map(([lang, text]) => (
+                <div key={lang} className="mt-1">
+                  <span className="text-[10px] font-semibold uppercase text-text-tertiary">{lang}</span>
+                  <pre className="text-xs text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded p-2 max-h-32 overflow-y-auto">
+                    {text}
+                  </pre>
+                </div>
+              ))}
             </Card>
           ))}
         </div>

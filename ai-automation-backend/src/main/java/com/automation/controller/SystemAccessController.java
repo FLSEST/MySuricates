@@ -68,8 +68,9 @@ public class SystemAccessController {
 
     @GetMapping(value = "/integration-snippet", produces = "text/markdown")
     public ResponseEntity<String> integrationSnippet(
-            @RequestParam(required = false) String projectPath) {
-        return ResponseEntity.ok(integrationSnippetService.render(projectPath));
+            @RequestParam(required = false) String projectPath,
+            @RequestParam(required = false) String locale) {
+        return ResponseEntity.ok(integrationSnippetService.render(projectPath, locale));
     }
 
     @GetMapping("/browse")

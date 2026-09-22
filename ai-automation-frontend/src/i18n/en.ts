@@ -1,5 +1,7 @@
 export const en = {
   common: {
+    maximize: 'Maximize',
+    restore: 'Restore size',
     save: 'Save',
     cancel: 'Cancel',
     delete: 'Delete',
@@ -443,7 +445,9 @@ export const en = {
       installed: 'Written',
       notInstalled: 'Not written',
       hint: 'Generates AI instruction files in the project directory so AI agents (Claude Code, Codex, etc.) know how to use MySuricates.',
-      noProfiles: 'No profiles selected',
+      noProfiles: 'No profiles available',
+      language: 'Language',
+      fileForeign: '{path} already exists and was not written by MySuricates – the file is not overwritten. Rename it or choose the other format.',
     },
     types: {
       CODE: 'Code',
@@ -483,6 +487,12 @@ export const en = {
     blockConfig: 'Configuration (JSON)',
     blockSkills: 'Block Skills',
     blockSkillsHint: 'Additional skills activated for this block only (added to workflow-level skills).',
+    blockSkillsNoEffect: 'This block type makes no AI call, so these skills have no effect. Click a skill to remove it.',
+    configEditor: {
+      hint: 'Ctrl+Space: suggestions (again: with explanation) · hover a key for its explanation',
+      problems: '{count} warning(s)',
+      format: 'Format',
+    },
     blockAiOverride: 'AI provider and model for this block',
     blockAiOverrideHint: 'Overrides the workflow setting for this block only (config keys provider/model). Empty = workflow setting, then system default.',
     blockProvider: 'Provider',
@@ -2041,6 +2051,8 @@ export const en = {
     key: 'Key',
     keyHint: 'Unique identifier (a-z, 0-9, -)',
     content: 'Content',
+    contentLanguage: 'Language of the content',
+    contentFallback: 'If a language is missing, MySuricates writes the text of the other one.',
     type: 'Type',
     typeBase: 'Base',
     typeProfile: 'Profile',

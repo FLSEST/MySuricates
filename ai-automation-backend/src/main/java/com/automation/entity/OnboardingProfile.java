@@ -45,8 +45,11 @@ public class OnboardingProfile {
     @Builder.Default
     private Map<String, String> description = new HashMap<>();
 
+    /** Markdown per language ({@code de}, {@code en}), like name and description (V81, TODO a805d0a7). */
+    @Convert(converter = JsonStringMapConverter.class)
     @Column(nullable = false, columnDefinition = "text")
-    private String content;
+    @Builder.Default
+    private Map<String, String> content = new HashMap<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

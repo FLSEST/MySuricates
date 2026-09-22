@@ -27,7 +27,8 @@ export const HINTS = {
   'workflow-versions': { version: 1 },
   'runs-list': { version: 1 },
   'approvals-inbox': { version: 1 },
-  'schedules-timing': { version: 1 },
+  // v2: catching up missed times depends on a setting (on by default, off on some instances) — no default claimed.
+  'schedules-timing': { version: 2 },
   'calendar-overview': { version: 1 },
   'cockpit-overview': { version: 1 },
   'activity-events': { version: 1 },
@@ -41,6 +42,7 @@ export const HINTS = {
   'debug-failing': { version: 1 },
   'audit-findings': { version: 1 },
   'insights-numbers': { version: 1 },
+  'onboarding-profiles': { version: 1 },
 } as const satisfies Record<string, { version: number }>;
 
 export type HintId = keyof typeof HINTS;

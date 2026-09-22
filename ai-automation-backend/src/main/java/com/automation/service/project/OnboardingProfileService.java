@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -42,11 +44,16 @@ public class OnboardingProfileService {
             throw new IllegalArgumentException("Profile with key '" + request.key() + "' already exists");
         }
 
+        Map<String, String> content = mergeContent(Map.of(), request.content());
+        if (content.isEmpty()) {
+            throw new IllegalArgumentException("Profile content needs at least one language");
+        }
+
         OnboardingProfile profile = OnboardingProfile.builder()
                 .key(request.key())
                 .name(request.name())
                 .description(request.description())
-                .content(request.content())
+                .content(content)
                 .type(request.type())
                 .builtIn(false)
                 .sortOrder(100)
@@ -62,7 +69,13 @@ public class OnboardingProfileService {
     public OnboardingProfile update(String id, UpdateOnboardingProfileRequest request) {
         OnboardingProfile profile = findById(id);
 
-        boolean contentChanged = request.content() != null && !request.content().equals(profile.getContent());
+        Map<String, String> content = request.content() == null
+                ? profile.getContent()
+                : mergeContent(profile.getContent(), request.content());
+        if (content.isEmpty()) {
+            throw new IllegalArgumentException("Profile content needs at least one language");
+        }
+        boolean contentChanged = !content.equals(profile.getContent());
 
         if (contentChanged) {
             OnboardingProfileHistory history = OnboardingProfileHistory.builder()
@@ -82,7 +95,7 @@ public class OnboardingProfileService {
             profile.setDescription(request.description());
         }
         if (contentChanged) {
-            profile.setContent(request.content());
+            profile.setContent(content);
             profile.setVersion(profile.getVersion() + 1);
         }
 
@@ -109,8 +122,8 @@ public class OnboardingProfileService {
             throw new IllegalArgumentException("Only built-in profiles can be reset");
         }
 
-        String defaultContent = seeder.getDefaultContent(profile.getKey());
-        if (defaultContent == null) {
+        Map<String, String> defaultContent = seeder.getDefaultContent(profile.getKey());
+        if (defaultContent == null || defaultContent.isEmpty()) {
             throw new IllegalStateException("No default content found for profile: " + profile.getKey());
         }
 
@@ -133,6 +146,31 @@ public class OnboardingProfileService {
         OnboardingProfile saved = profileRepository.save(profile);
         log.info("Reset onboarding profile to default: {} (v{})", saved.getKey(), saved.getVersion());
         return saved;
+    }
+
+    /**
+     * The stored content with the sent languages applied: a filled value replaces that language, a
+     * blank one removes it; languages not sent stay as they are.
+     */
+    static Map<String, String> mergeContent(Map<String, String> current, Map<String, String> changes) {
+        Map<String, String> merged = new HashMap<>();
+        if (current != null) {
+            current.forEach((lang, text) -> {
+                if (text != null && !text.isBlank()) {
+                    merged.put(lang, text);
+                }
+            });
+        }
+        if (changes != null) {
+            changes.forEach((lang, text) -> {
+                if (text == null || text.isBlank()) {
+                    merged.remove(lang);
+                } else {
+                    merged.put(lang, text);
+                }
+            });
+        }
+        return merged;
     }
 
     @Transactional(readOnly = true)

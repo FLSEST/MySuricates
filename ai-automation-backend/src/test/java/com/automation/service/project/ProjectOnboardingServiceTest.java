@@ -1,5 +1,6 @@
 package com.automation.service.project;
 
+import com.automation.config.InstanceAddress;
 import com.automation.dto.request.OnboardingConfigRequest;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
@@ -36,7 +37,8 @@ class ProjectOnboardingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjectOnboardingService(profileRepository, workflowService, projectService);
+        service = new ProjectOnboardingService(profileRepository, workflowService,
+                new InstanceAddress("", "", 9090), projectService);
     }
 
     private Project buildProject(String id, String path) {
@@ -54,11 +56,11 @@ class ProjectOnboardingServiceTest {
         void enable_writesFile(@TempDir Path tempDir) throws Exception {
             Project project = buildProject("p1", tempDir.toString());
             OnboardingProfile base = OnboardingProfile.builder()
-                    .key("base").type(OnboardingProfileType.BASE).content("Base content {{PROJECT_ID}}").build();
+                    .key("base").type(OnboardingProfileType.BASE).content(Map.of("de", "Base content {{PROJECT_ID}}")).build();
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of(base));
             when(workflowService.findByProjectId("p1")).thenReturn(List.of());
 
-            var config = new OnboardingConfigRequest("CLAUDE_RULES", List.of());
+            var config = new OnboardingConfigRequest("CLAUDE_RULES", List.of(), null);
             service.enable(project, config);
 
             Path expectedFile = tempDir.resolve(".claude/rules/mysuricates.md");
@@ -73,7 +75,7 @@ class ProjectOnboardingServiceTest {
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
             when(workflowService.findByProjectId("p1")).thenReturn(List.of());
 
-            var config = new OnboardingConfigRequest("AGENTS_MD", List.of());
+            var config = new OnboardingConfigRequest("AGENTS_MD", List.of(), null);
             service.enable(project, config);
 
             assertThat(tempDir.resolve("AGENTS.md")).exists();
@@ -84,7 +86,7 @@ class ProjectOnboardingServiceTest {
             Project project = buildProject("p1", null);
             // writeOnboardingFile returns early for null path, so renderAll is never called
 
-            var config = new OnboardingConfigRequest("CLAUDE_RULES", List.of());
+            var config = new OnboardingConfigRequest("CLAUDE_RULES", List.of(), null);
             service.enable(project, config);
 
             verify(projectService).updateConfig(eq("p1"), any());
@@ -210,7 +212,7 @@ class ProjectOnboardingServiceTest {
 
             OnboardingProfile base = OnboardingProfile.builder()
                     .key("base").type(OnboardingProfileType.BASE)
-                    .content("API reference for {{PROJECT_ID}}").build();
+                    .content(Map.of("de", "API reference for {{PROJECT_ID}}")).build();
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of(base));
 
             Workflow wf = Workflow.builder().id("wf-1").name("Test WF").description("Does things")
@@ -232,7 +234,7 @@ class ProjectOnboardingServiceTest {
 
             when(profileRepository.findByType(OnboardingProfileType.BASE)).thenReturn(List.of());
             OnboardingProfile devProfile = OnboardingProfile.builder()
-                    .id("prof-dev").key("developer").content("Developer profile content").build();
+                    .id("prof-dev").key("developer").content(Map.of("de", "Developer profile content")).build();
             when(profileRepository.findAllById(List.of("prof-dev"))).thenReturn(List.of(devProfile));
             when(workflowService.findByProjectId("p1")).thenReturn(List.of());
 

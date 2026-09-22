@@ -2188,9 +2188,9 @@ Open a file or directory in the native file manager (Linux: `xdg-open`).
 
 ### `GET /api/v1/system/integration-snippet`
 
-Render a Markdown integration snippet for a project (for AGENTS.md etc.).
+Render a Markdown integration snippet for a project (for AGENTS.md etc.): the base onboarding profile with this instance's address and key command, plus the project's workflows.
 
-**Query Parameters:** `projectPath` (optional)
+**Query Parameters:** `projectPath` (optional), `locale` (`de`/`en`, optional; default `en`)
 
 **Response:** `String` (Content-Type: `text/markdown`)
 

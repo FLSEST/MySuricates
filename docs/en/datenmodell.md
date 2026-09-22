@@ -866,7 +866,7 @@ Stores OAuth connections and client credentials for integration providers. All s
 | `key` | TEXT | NOT NULL, UNIQUE | Profile key (e.g. `developer`, `research`) |
 | `name` | TEXT | NOT NULL | JSON i18n map: `{"de":"...","en":"..."}` |
 | `description` | TEXT | | JSON i18n map |
-| `content` | TEXT | NOT NULL | Markdown content of the AI context template |
+| `content` | TEXT | NOT NULL | JSON i18n map `{"de":"...","en":"..."}` with the Markdown text (since V81) |
 | `type` | TEXT | NOT NULL | Enum: OnboardingProfileType |
 | `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Whether built-in (not deletable) |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sort order |
@@ -883,7 +883,7 @@ AI context templates for project onboarding. Built-in profiles + user-defined pr
 | `id` | TEXT | PK | UUID |
 | `profile_id` | TEXT | FK NOT NULL | Reference to `onboarding_profiles.id` |
 | `version` | INTEGER | NOT NULL | Version number |
-| `content` | TEXT | NOT NULL | Profile content of this version |
+| `content` | TEXT | NOT NULL | Profile content of this version, JSON i18n map (since V81) |
 | `changed_by` | TEXT | NOT NULL | Who made the change |
 | `changed_at` | TEXT | NOT NULL | Timestamp of the change |
 
@@ -1254,7 +1254,8 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V78 | `V78__workflow_template_i18n_source.sql` | i18n_source in workflow_templates (unresolved bilingual steps, resolved on read via `?locale=`) |
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; blueprints from templates/blueprints/) |
 | V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (skill content under the seal), new table `skill_versions` (change history per skill, no foreign key) |
-| V81 | `V81__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (seal state at start, never derived later) |
+| V81 | `V81__onboarding_profile_content_i18n.sql` | content in onboarding_profiles and onboarding_profile_history as a JSON map `{de, en}`; existing content becomes `de` |
+| V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (seal state at start, never derived later) |
 
 ## SQLite Specifics
 

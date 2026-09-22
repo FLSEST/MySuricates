@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,10 +34,10 @@ class OnboardingProfileHistoryTest {
     }
 
     @Test
-    void should_defaultContentToNull_when_usingNoArgsConstructor() {
+    void should_defaultContentToEmptyMap_when_usingNoArgsConstructor() {
         OnboardingProfileHistory history = new OnboardingProfileHistory();
 
-        assertThat(history.getContent()).isNull();
+        assertThat(history.getContent()).isNotNull().isEmpty();
     }
 
     @Test
@@ -86,9 +87,9 @@ class OnboardingProfileHistoryTest {
     void should_storeContent_when_setViaSetter() {
         OnboardingProfileHistory history = new OnboardingProfileHistory();
 
-        history.setContent("{\"name\": \"Test Profile\"}");
+        history.setContent(Map.of("de", "{\"name\": \"Test Profile\"}"));
 
-        assertThat(history.getContent()).isEqualTo("{\"name\": \"Test Profile\"}");
+        assertThat(history.getContent()).isEqualTo(Map.of("de", "{\"name\": \"Test Profile\"}"));
     }
 
     @Test
@@ -120,7 +121,7 @@ class OnboardingProfileHistoryTest {
                 .id("hist-1")
                 .profileId("profile-1")
                 .version(2)
-                .content("{\"skills\": [\"java\"]}")
+                .content(Map.of("de", "{\"skills\": [\"java\"]}"))
                 .changedBy("system")
                 .changedAt(changedAt)
                 .build();
@@ -128,7 +129,7 @@ class OnboardingProfileHistoryTest {
         assertThat(history.getId()).isEqualTo("hist-1");
         assertThat(history.getProfileId()).isEqualTo("profile-1");
         assertThat(history.getVersion()).isEqualTo(2);
-        assertThat(history.getContent()).isEqualTo("{\"skills\": [\"java\"]}");
+        assertThat(history.getContent()).isEqualTo(Map.of("de", "{\"skills\": [\"java\"]}"));
         assertThat(history.getChangedBy()).isEqualTo("system");
         assertThat(history.getChangedAt()).isEqualTo(changedAt);
     }
@@ -140,7 +141,7 @@ class OnboardingProfileHistoryTest {
         assertThat(history.getId()).isNull();
         assertThat(history.getProfileId()).isNull();
         assertThat(history.getVersion()).isZero();
-        assertThat(history.getContent()).isNull();
+        assertThat(history.getContent()).isNotNull().isEmpty(); // @Builder.Default, per-language map
         assertThat(history.getChangedBy()).isNull();
         assertThat(history.getChangedAt()).isNull();
     }
@@ -153,13 +154,13 @@ class OnboardingProfileHistoryTest {
 
         OnboardingProfileHistory history = new OnboardingProfileHistory(
                 "hist-all", "profile-all", 5,
-                "{\"full\": true}", "migration-script", changedAt
+                Map.of("de", "{\"full\": true}"), "migration-script", changedAt
         );
 
         assertThat(history.getId()).isEqualTo("hist-all");
         assertThat(history.getProfileId()).isEqualTo("profile-all");
         assertThat(history.getVersion()).isEqualTo(5);
-        assertThat(history.getContent()).isEqualTo("{\"full\": true}");
+        assertThat(history.getContent()).isEqualTo(Map.of("de", "{\"full\": true}"));
         assertThat(history.getChangedBy()).isEqualTo("migration-script");
         assertThat(history.getChangedAt()).isEqualTo(changedAt);
     }

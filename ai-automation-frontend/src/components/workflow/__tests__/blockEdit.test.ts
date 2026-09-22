@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { blockFromDraft, draftFromBlock, emptyDraft } from '../blockEdit';
-import type { BlockDefinition } from '../../../types';
+import { blockFromDraft, blockUsesSkills, draftFromBlock, emptyDraft } from '../blockEdit';
+import { BLOCK_TYPES, type BlockDefinition } from '../../../types';
 
 describe('blockEdit', () => {
   const stored: BlockDefinition = {
@@ -42,5 +42,29 @@ describe('blockEdit', () => {
 
   it('throws on invalid JSON so the caller keeps the modal open', () => {
     expect(() => blockFromDraft({ ...emptyDraft(), config: '{kaputt' })).toThrow();
+  });
+});
+
+describe('blockUsesSkills', () => {
+  it('offers skills for blocks that always call the AI in the project directory', () => {
+    for (const type of ['simple', 'agentic', 'skill-capability']) expect(blockUsesSkills(type, {}), type).toBe(true);
+  });
+
+  it('offers skills for wrapper blocks unless they run in shell mode', () => {
+    for (const type of ['retry', 'foreach', 'while', 'conditional', 'switch']) {
+      expect(blockUsesSkills(type, {}), type).toBe(true);
+      expect(blockUsesSkills(type, { execution_mode: 'ai' }), type).toBe(true);
+      expect(blockUsesSkills(type, '{"execution_mode": "shell"}'), type).toBe(false);
+    }
+  });
+
+  it('hides skills for blocks without an AI call in the project directory', () => {
+    const noSkills = BLOCK_TYPES.filter((t) => !['simple', 'agentic', 'skill-capability', 'retry', 'foreach', 'while', 'conditional', 'switch'].includes(t));
+    expect(noSkills).toEqual(expect.arrayContaining(['shell', 'approval', 'compress-ai', 'todo-create']));
+    for (const type of noSkills) expect(blockUsesSkills(type, {}), type).toBe(false);
+  });
+
+  it('treats half-typed JSON as the default mode', () => {
+    expect(blockUsesSkills('foreach', '{"execution_mode": "sh')).toBe(true);
   });
 });

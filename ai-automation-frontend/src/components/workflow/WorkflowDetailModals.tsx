@@ -1,11 +1,14 @@
+import { useMemo } from 'react';
 import { Button, Input, Select, Modal, ModalFooter } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { ExecuteDialog } from './ExecuteDialog';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import { DashboardReportFields } from './DashboardReportFields';
+import { BlockSkillPicker } from './BlockSkillPicker';
+import { BLOCK_DEFAULT_CONFIG, buildBlockConfigSchema } from './blockConfigSchema';
 import type { BlockDraft } from './blockEdit';
 import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { useBlockTypes } from '../../hooks/useBlockTypes';
 import type {
   BlockType, Workflow, OptimizeResult, Project,
@@ -164,6 +167,10 @@ export function WorkflowDetailModals({
   onApplyOptimize,
 }: WorkflowDetailModalsProps) {
   const t = useT();
+  const locale = useI18nStore((state) => state.locale);
+  // Stable per type/locale: a new object would re-register the schema on every keystroke
+  const newBlockSchema = useMemo(() => buildBlockConfigSchema(newBlock.type, locale), [newBlock.type, locale]);
+  const editBlockSchema = useMemo(() => buildBlockConfigSchema(editBlock.type, locale), [editBlock.type, locale]);
   // What THIS backend can execute (BlockTypeRegistry); the static list is only the fallback
   const blockTypes = useBlockTypes();
   // A type only the server knows has no icon and no label in this build — offer its raw name
@@ -213,6 +220,7 @@ export function WorkflowDetailModals({
         onClose={() => setShowAddBlock(false)}
         title={t.workflows.addBlock}
         size="lg"
+        resizable
         footer={
           <ModalFooter
             onCancel={() => setShowAddBlock(false)}
@@ -223,36 +231,14 @@ export function WorkflowDetailModals({
           />
         }
       >
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4 flex-1">
           <Select
             label={t.workflows.blockType}
             value={newBlock.type}
             onChange={(e) => {
               const type = e.target.value as BlockType;
-              const defaultConfig: Record<BlockType, object> = {
-                simple: { command: '' },
-                shell: { command: '', timeout_seconds: 300 },
-                retry: { command: '', max_retries: 3, delay: 5 },
-                foreach: { items_command: '', variable_name: 'item', command: '' },
-                while: { condition_command: '', command: '', max_iterations: 10 },
-                conditional: { condition: '', then_command: '', else_command: '' },
-                'skill-capability': { capability: '', input: '{{ previous_output }}' },
-                approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
-                'human-input': { prompt: '', input_type: 'text', variable_name: 'user_input', options: [], default_value: '', required: true, timeout_minutes: 30, use_default_on_timeout: true },
-                agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
-                'sub-workflow': { workflow_id: '' },
-                switch: { expression: '', cases: [{ value: 'default', blocks: [] }] },
-                document: { file_path: '', variable_name: 'extracted_text', fail_on_empty: false, min_characters: 1 },
-                integration: { provider: '', action: '', params: {} },
-                'todo-create': { title: '', description: '', priority: 'MEDIUM', tags: [], variable_name: 'todo_id' },
-                'todo-update': { id: '{{ todo_id }}', title: '', description: '' },
-                'todo-close': { id: '{{ todo_id }}' },
-                compress: { source: '', stages: [{ op: 'text.normalize' }, { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' }], max_chars: 20000 },
-                'compress-ai': { source: '', instruction: '', max_chars: 4000, provider: 'CLAUDE' },
-                'dashboard-report': { status: 'GREEN', title: '', summary: '', kpis: [], items: [] },
-              };
               // A type only the server knows has no default config here — start from an empty one
-              setNewBlock({ ...newBlock, type, config: JSON.stringify(defaultConfig[type] ?? {}, null, 2) });
+              setNewBlock({ ...newBlock, type, config: JSON.stringify(BLOCK_DEFAULT_CONFIG[type] ?? {}, null, 2) });
             }}
             options={blockTypeOptions}
           />
@@ -302,43 +288,23 @@ export function WorkflowDetailModals({
             workflowProvider={workflow.provider}
             idSuffix="-new-block"
           />
-          <div>
+          <div className="flex flex-col flex-1 min-h-[280px]">
             <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
             <MonacoEditor
               value={newBlock.config}
               onChange={(val) => setNewBlock({ ...newBlock, config: val })}
               language="json"
-              height="200px"
+              jsonSchema={newBlockSchema}
+              fill
             />
           </div>
-          {allSkills.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-text mb-1">{t.workflows.blockSkills}</label>
-              <p className="text-xs text-text-tertiary mb-2">{t.workflows.blockSkillsHint}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {allSkills.map((skill) => (
-                  <button
-                    key={skill.id}
-                    type="button"
-                    onClick={() => {
-                      const ids = newBlock.skillIds;
-                      const next = ids.includes(skill.id)
-                        ? ids.filter((id) => id !== skill.id)
-                        : [...ids, skill.id];
-                      setNewBlock({ ...newBlock, skillIds: next });
-                    }}
-                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
-                      newBlock.skillIds.includes(skill.id)
-                        ? 'bg-accent/10 border-accent text-accent'
-                        : 'border-border text-text-tertiary hover:border-accent/50'
-                    }`}
-                  >
-                    {skill.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <BlockSkillPicker
+            blockType={newBlock.type}
+            configJson={newBlock.config}
+            skills={allSkills}
+            selected={newBlock.skillIds}
+            onChange={(skillIds) => setNewBlock({ ...newBlock, skillIds })}
+          />
         </div>
       </Modal>
 
@@ -347,6 +313,7 @@ export function WorkflowDetailModals({
         onClose={() => setShowEditBlock(false)}
         title={`${t.workflows.editBlock} #${editBlockIndex + 1}`}
         size="lg"
+        resizable
         footer={
           <ModalFooter
             onCancel={() => setShowEditBlock(false)}
@@ -357,7 +324,7 @@ export function WorkflowDetailModals({
           />
         }
       >
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4 flex-1">
           <Select
             label={t.workflows.blockType}
             value={editBlock.type}
@@ -413,45 +380,25 @@ export function WorkflowDetailModals({
             workflowProvider={workflow.provider}
             idSuffix="-edit-block"
           />
-          <div>
+          <div className="flex flex-col flex-1 min-h-[360px]">
             <label className="block text-sm font-medium text-text mb-1.5">{t.workflows.blockConfig}</label>
             <MonacoEditor
               value={editBlock.config}
               onChange={(val) => setEditBlock({ ...editBlock, config: val })}
               language="json"
-              height="250px"
+              jsonSchema={editBlockSchema}
+              fill
               revealText={editBlockRevealText}
               revealNonce={editBlockRevealNonce}
             />
           </div>
-          {allSkills.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-text mb-1">{t.workflows.blockSkills}</label>
-              <p className="text-xs text-text-tertiary mb-2">{t.workflows.blockSkillsHint}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {allSkills.map((skill) => (
-                  <button
-                    key={skill.id}
-                    type="button"
-                    onClick={() => {
-                      const ids = editBlock.skillIds;
-                      const next = ids.includes(skill.id)
-                        ? ids.filter((id) => id !== skill.id)
-                        : [...ids, skill.id];
-                      setEditBlock({ ...editBlock, skillIds: next });
-                    }}
-                    className={`px-2 py-1 rounded-md text-xs border transition-colors ${
-                      editBlock.skillIds.includes(skill.id)
-                        ? 'bg-accent/10 border-accent text-accent'
-                        : 'border-border text-text-tertiary hover:border-accent/50'
-                    }`}
-                  >
-                    {skill.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <BlockSkillPicker
+            blockType={editBlock.type}
+            configJson={editBlock.config}
+            skills={allSkills}
+            selected={editBlock.skillIds}
+            onChange={(skillIds) => setEditBlock({ ...editBlock, skillIds })}
+          />
         </div>
       </Modal>
 
