@@ -22,6 +22,8 @@ import { usePersistedState } from '../hooks/usePersistedState';
 import { useProjects } from '../hooks/useProjects';
 import { SortableBlockList } from '../components/workflow/SortableBlockList';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
+import { SealBanner } from '../components/workflow/SealBanner';
+import { useSealStatus } from '../hooks/useSealStatus';
 import { WorkflowDetailSidebar } from '../components/workflow/WorkflowDetailSidebar';
 import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModals';
 import { CompletionTriggerSection } from '../components/workflow/CompletionTriggerSection';
@@ -37,6 +39,7 @@ export function WorkflowDetail() {
   const navigate = useNavigate();
   const t = useT();
   const { data: workflow, isLoading, error, refetch } = useWorkflow(id!);
+  const sealStatus = useSealStatus(id);
   const { data: runs } = useWorkflowRuns(id!);
   const { data: allSkills } = useSkills();
   const { data: allWorkflows } = useWorkflowsList();
@@ -314,6 +317,8 @@ export function WorkflowDetail() {
         executeLoading={executeWorkflow.isPending}
         optimizeLoading={optimizeWorkflow.isPending}
       />
+
+      <SealBanner workflow={workflow} status={sealStatus} />
 
       <Hint id="workflow-versions" />
 

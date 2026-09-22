@@ -1255,6 +1255,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 | V79 | `V79__workflow_template_kind.sql` | kind in workflow_templates (TEMPLATE / BLUEPRINT; blueprints from templates/blueprints/) |
 | V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (skill content under the seal), new table `skill_versions` (change history per skill, no foreign key) |
 | V81 | `V81__onboarding_profile_content_i18n.sql` | content in onboarding_profiles and onboarding_profile_history as a JSON map `{de, en}`; existing content becomes `de` |
+| V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (seal state at start, never derived later) |
 
 ## SQLite Specifics
 

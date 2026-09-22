@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { History, Link2, Trash2 } from 'lucide-react';
 import { Card, Select, Spinner, Table } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { SealStateIcon } from '../components/workflow/SealStateIcon';
+import { RefusedStartsNotice } from '../components/workflow/RefusedStartsNotice';
 import { Pagination } from '../components/shared/Pagination';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -122,7 +124,10 @@ export function Runs() {
       header: t.common.workflow,
       render: (r: WorkflowRunListItem) => (
         <div className="min-w-0">
-          <span className="font-medium text-text block truncate">{r.workflowName}</span>
+          <span className="font-medium text-text flex items-center gap-1.5 min-w-0">
+            <span className="truncate">{r.workflowName}</span>
+            {r.sealed && <SealStateIcon sealed />}
+          </span>
           {r.projectName && (
             <span className="text-xs text-accent/70 block truncate">{r.projectName}</span>
           )}
@@ -232,6 +237,8 @@ export function Runs() {
       </div>
 
       <Hint id="runs-list" />
+
+      <RefusedStartsNotice />
 
       {/* Tabs */}
       <div className="flex border-b border-border">

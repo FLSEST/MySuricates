@@ -105,6 +105,7 @@ public class WorkflowExecutor {
                 .startedAt(Instant.now())
                 .triggeredByScheduleId(triggeredByScheduleId)
                 .triggerSource(triggerSource).definitionHash(ticket.definitionHash()).definitionVersionId(ticket.definitionVersionId())
+                .sealed(ticket.sealed()).sealedSkillPins(ticket.sealedSkillPins())
                 .build();
         if (initialRunMetadata != null && !initialRunMetadata.isEmpty()) {
             run.setMetadata(new HashMap<>(initialRunMetadata));
@@ -437,6 +438,7 @@ public class WorkflowExecutor {
         // Reset run to RUNNING — the resumed segment runs today's definition, so provenance is re-taken
         RunAdmission.Ticket ticket = admission.admit(workflow, TriggerSource.RESUME, contextForResume);
         run.setTriggerSource(TriggerSource.RESUME); run.setDefinitionHash(ticket.definitionHash()); run.setDefinitionVersionId(ticket.definitionVersionId());
+        run.setSealed(ticket.sealed()); run.setSealedSkillPins(ticket.sealedSkillPins());
         run.setStatus(RunStatus.RUNNING);
         run.setError(null);
         run.setCompletedAt(null);

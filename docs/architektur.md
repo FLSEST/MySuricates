@@ -144,6 +144,8 @@ Vier Schalter unter `automation.hardening.*` — derselbe Mechanismus wie bei de
 
 **Schreibpfad für Skills (immer an)** — Alle Schreiber von Skills gehen durch `SkillMutationGateway` (Gegenstück zu `WorkflowMutationGateway`): Anlegen (`user`), Import (`import`) und Built-in-Aktualisierung beim Start (`builtin-seed`). Jede Änderung schreibt eine Zeile in `skill_versions` (Operation `CREATE`/`UPDATE`/`DELETE`, kanonischer Snapshot, Inhalts-Hash, serverseitige Herkunft; ohne Fremdschlüssel, die Historie überlebt das Löschen) und einen Activity-Log-Eintrag — ein Import ist ein WARN-`SECURITY`-Ereignis. `GET /api/v1/skills/{id}/versions` listet die Historie, auch für gelöschte Skills. Nutzt ein versiegelter Workflow den Skill, lehnt das Gateway Ändern und Löschen durch eine Person mit **409 `SKILL_PINNED_BY_SEAL`** ab. Built-in-Updates aus den Ressourcen lassen sich nicht ablehnen; ändert sich dabei der Inhalt unter einem versiegelten Workflow, schreibt das Gateway einen WARN-`SECURITY`-Eintrag mit den betroffenen Workflows, und deren Runs werden bis zum erneuten Siegeln abgelehnt. `SkillWriterAllowlistTest` legt fest, dass nur das Gateway `skillRepository.save/delete` aufruft.
 
+**Siegel sichtbar** — `WorkflowSealVerifier` ist die eine Prüfung, die `RunAdmission` vor dem Start und `GET /api/v1/workflows/seal-status` ohne Run ausführen (`INTACT`, `VIOLATED` mit Grund `DEFINITION_CHANGED`/`SKILLS_CHANGED`/`UNVERIFIABLE` und den betroffenen Skills, `NOT_SEALED`). Die Antwort enthält auch die in den letzten 7 Tagen abgelehnten Starts aus dem Activity-Log, denn ein abgelehnter Start legt keine Run-Zeile an. Der Endpunkt ist Kern, nicht Teil des `sealing`-Moduls: Ein Siegel bleibt wirksam, wenn der Schalter aus ist, also muss es sichtbar bleiben. `GET /api/v1/skills/seal-pins` ordnet jedem Skill die versiegelten Workflows zu, die ihn nutzen. Jeder Run hält beim Start fest, ob er versiegelt und geprüft lief (`workflow_runs.sealed`, `sealed_skill_pins`); das wird nie aus dem heutigen Zustand des Workflows abgeleitet. Die Oberfläche zeigt das als Hinweisleiste auf der Detailseite, als rotes Badge und Symbol bei verletztem Siegel, als Filter „Nur versiegelte“ in der Liste, als Schloss in Run-Liste, Run-Detail, Chain-Einträgen und Skill-Karten und als Hinweis „Starts abgelehnt“ über der Run-Liste. Der SECURITY-Eintrag eines abgelehnten Starts wird bei laufender Transaktion des Aufrufers (Webhook, Zeitplan, Chain) erst nach deren Ende geschrieben, auf einem eigenen virtuellen Thread — sonst rollte die Ablehnung ihn mit zurück, und `REQUIRES_NEW` würde sich bei Pool-Größe 1 selbst blockieren.
+
 **Unbeaufsichtigte Runs** — `TriggerSource` teilt die Auslöser ein:
 
 | Beaufsichtigt | Unbeaufsichtigt | Erbt vom Auslöser |
@@ -178,7 +180,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 47 Controller)
+Controller (REST API, 48 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -198,7 +200,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          47 REST-Controller
+├── controller/          48 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -256,7 +258,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 47 REST-Controller
+### Alle 48 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -306,6 +308,7 @@ com.automation
 | `DashboardReportAssistController` | `/api/v1/dashboard/report-assist` | Schlaegt im Editor per KI eine `dashboard-report`-Konfiguration aus einem vorhandenen Run vor (Modul `dashboard-report`; `POST`, weil der Aufruf Token kostet und kein Browser ihn vorladen darf) |
 | `SystemRequestMetricsController` | `/api/v1/system/request-metrics` | Gemessene Kosten je Route: laufende Momentaufnahme (`GET`) und Tageswerte (`GET /daily`, optional je Route) |
 | `WorkflowSealController` | `/api/v1/workflows/{id}` | Siegeln/Entsiegeln eines Workflows (nur bei `automation.hardening.sealing=true`; bestehende Siegel bleiben auch bei ausgeschaltetem Schalter wirksam) |
+| `WorkflowSealStatusController` | `/api/v1/workflows/seal-status` | Siegelzustand aller versiegelten Workflows und abgelehnte Starts der letzten 7 Tage (nur lesend, Kern — auch bei ausgeschaltetem `sealing`) |
 | `WebSocketTicketController` | `/api/v1/ws-ticket` | Vergibt kurzlebige Einmal-Tickets für den WebSocket-Handshake (kein Modul-Gate, gewöhnliches API-Rate-Limit gilt) |
 
 ### Workflow-Ausführung
@@ -1124,6 +1127,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V79 | Blaupausen als eigene Art neben Vorlagen (`workflow_templates.kind`) |
 | V80 | Skills unter dem Siegel: `workflows.sealed_skill_hashes`, Änderungshistorie `skill_versions` |
 | V81 | Onboarding-Profile zweisprachig: Inhalt als `{de, en}`-Map |
+| V82 | Siegelstand am Run: `workflow_runs.sealed`, `sealed_skill_pins` |
 
 ## Architektur-Gates
 
@@ -1168,7 +1172,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 81 Flyway-Migrationen (V1–V81)
+│           └── db/migration/          ← 82 Flyway-Migrationen (V1–V82)
 │
 └── ai-automation-frontend/
     ├── package.json

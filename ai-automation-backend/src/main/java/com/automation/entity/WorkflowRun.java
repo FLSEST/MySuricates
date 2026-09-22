@@ -85,6 +85,18 @@ public class WorkflowRun {
     @Column(name = "trigger_source")
     private TriggerSource triggerSource;
 
+    /**
+     * Seal state at start, recorded by RunAdmission: {@code true} = sealed and verified, {@code false}
+     * = not sealed, {@code null} = run from before this was recorded. Never derived from the
+     * workflow's current state, which may have changed since.
+     */
+    @Column(name = "sealed")
+    private Boolean sealed;
+
+    /** Skill content hashes verified at start (JSON {skillId: sha256}); null when none were pinned. */
+    @Column(name = "sealed_skill_pins", columnDefinition = "text")
+    private String sealedSkillPins;
+
     public void addStep(StepResult step) {
         step.setWorkflowRun(this);
         if (step.getStepIndex() <= 0) {

@@ -1,9 +1,10 @@
 import {
-  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen,
+  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen, ShieldAlert,
 } from 'lucide-react';
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
 import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
+import { useSealStatus } from '../../hooks/useSealStatus';
 import { apiErrorMessage, fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
@@ -46,6 +47,7 @@ export function WorkflowDetailHeader({
   const sealingModule = useModuleEnabled('sealing');
   const sealWorkflow = useSealWorkflow();
   const sealed = !!workflow.sealed;
+  const sealStatus = useSealStatus(workflow.id);
   const toggleSeal = () => {
     if (confirm(sealed ? t.workflows.unsealConfirm : t.workflows.sealConfirm)) {
       sealWorkflow.mutate({ id: workflow.id, lock: !sealed });
@@ -75,7 +77,17 @@ export function WorkflowDetailHeader({
         <div className="flex items-center gap-3">
           <span className="text-2xl">{workflow.icon || '📋'}</span>
           <h1 className="text-2xl font-bold text-text truncate">{workflow.name}</h1>
-          {sealed && (
+          {sealStatus?.state === 'VIOLATED' ? (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger-subtle text-danger text-xs font-medium shrink-0"
+              title={t.workflows.sealView.violatedHint}
+              data-testid="sealed-badge"
+              data-state="violated"
+            >
+              <ShieldAlert className="w-3 h-3" />
+              {t.workflows.sealView.violated}
+            </span>
+          ) : sealed && (
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium shrink-0"
               title={t.workflows.sealedHint}

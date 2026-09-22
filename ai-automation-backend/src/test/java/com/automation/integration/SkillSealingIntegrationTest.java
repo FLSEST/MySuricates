@@ -4,7 +4,9 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
+import com.automation.exception.HardeningException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
@@ -28,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -53,6 +56,8 @@ class SkillSealingIntegrationTest {
     @Autowired private SkillRepository skillRepository;
     @Autowired private WorkflowRunRepository runRepository;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+    @Autowired private com.automation.service.workflow.RunAdmission runAdmission;
 
     private String projectId;
     private String skillId;
@@ -74,6 +79,9 @@ class SkillSealingIntegrationTest {
     @AfterEach
     void tearDown() {
         for (String id : workflowIds) {
+            awaitNoRunningRuns(id);
+            jdbc.update("DELETE FROM step_results WHERE workflow_run_id IN (SELECT id FROM workflow_runs WHERE workflow_id = ?)", id);
+            jdbc.update("DELETE FROM workflow_runs WHERE workflow_id = ?", id);
             jdbc.update("DELETE FROM workflow_skills WHERE workflow_id = ?", id);
             jdbc.update("DELETE FROM workflow_versions WHERE workflow_id = ?", id);
             jdbc.update("DELETE FROM activity_log WHERE workflow_id = ?", id);
@@ -84,6 +92,19 @@ class SkillSealingIntegrationTest {
         jdbc.update("DELETE FROM capabilities WHERE skill_id = ?", skillId);
         jdbc.update("DELETE FROM skills WHERE id = ?", skillId);
         jdbc.update("DELETE FROM projects WHERE id = ?", projectId);
+    }
+
+    private void awaitNoRunningRuns(String workflowId) {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline && jdbc.queryForObject(
+                "SELECT COUNT(*) FROM workflow_runs WHERE workflow_id = ? AND status = 'RUNNING'", Integer.class, workflowId) > 0) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     private String workflowActivating() {
@@ -168,5 +189,69 @@ class SkillSealingIntegrationTest {
 
         assertThat(jdbc.queryForObject("SELECT sealed_skill_hashes FROM workflows WHERE id = ?", String.class, workflowId))
                 .contains(skillId);
+    }
+
+    @Test
+    void sealStatusAndSkillPinsShowTheSealAndItsViolation() throws Exception {
+        String workflowId = workflowActivating();
+        mockMvc.perform(post("/api/v1/workflows/{id}/seal", workflowId)).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/workflows/seal-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].state").value("INTACT"))
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].pinnedSkillCount").value(1));
+        mockMvc.perform(get("/api/v1/skills/seal-pins"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['" + skillId + "'][0]").value("Sealed review"));
+
+        jdbc.update("UPDATE skills SET ai_context = ? WHERE id = ?", "changed behind the back", skillId);
+        mockMvc.perform(post("/api/v1/workflows/{id}/execute", workflowId)
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isConflict());
+
+        mockMvc.perform(get("/api/v1/workflows/seal-status"))
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].state").value("VIOLATED"))
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].problem").value("SKILLS_CHANGED"))
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].changedSkills[0].id").value(skillId))
+                .andExpect(jsonPath("$[?(@.workflowId == '" + workflowId + "')].refusedStarts").value(1));
+    }
+
+    @Test
+    void runOfASealedWorkflowRecordsTheSealStateOnItsRow() throws Exception {
+        String workflowId = workflowActivating();
+        mockMvc.perform(post("/api/v1/workflows/{id}/seal", workflowId)).andExpect(status().isOk());
+
+        String body = mockMvc.perform(post("/api/v1/workflows/{id}/execute", workflowId)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().is2xxSuccessful())
+                .andReturn().getResponse().getContentAsString();
+        String runId = objectMapper.readTree(body).get("id").asText();
+
+        assertThat(jdbc.queryForObject("SELECT sealed FROM workflow_runs WHERE id = ?", Boolean.class, runId)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT sealed_skill_pins FROM workflow_runs WHERE id = ?", String.class, runId))
+                .contains(skillId);
+        mockMvc.perform(get("/api/v1/executions/{id}", runId))
+                .andExpect(jsonPath("$.sealed").value(true))
+                .andExpect(jsonPath("$.sealedSkillPins['" + skillId + "']").isString());
+    }
+
+    @Test
+    void refusalInsideACallersTransactionIsStillLogged() throws Exception {
+        // webhooks, schedules and chains start runs from inside a transaction; the refusal
+        // exception rolls that transaction back and used to take the SECURITY entry with it
+        String workflowId = workflowActivating();
+        mockMvc.perform(post("/api/v1/workflows/{id}/seal", workflowId)).andExpect(status().isOk());
+        jdbc.update("UPDATE skills SET ai_context = ? WHERE id = ?", "changed behind the back", skillId);
+
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(tx -> runAdmission.admit(
+                workflowRepository.findByIdWithSkills(workflowId).orElseThrow(), TriggerSource.WEBHOOK, Map.of())))
+                .isInstanceOf(HardeningException.class);
+
+        long deadline = System.currentTimeMillis() + 5_000;
+        int logged = 0;
+        while (System.currentTimeMillis() < deadline && (logged = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM activity_log WHERE workflow_id = ? AND source = 'RunAdmission'", Integer.class, workflowId)) == 0) {
+            Thread.sleep(50);
+        }
+        assertThat(logged).isEqualTo(1);
     }
 }

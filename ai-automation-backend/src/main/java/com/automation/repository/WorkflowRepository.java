@@ -116,4 +116,9 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
             + "OR EXISTS (SELECT 1 FROM workflow_skills ws WHERE ws.workflow_id = w.id AND ws.skill_id = :skillId)) "
             + "ORDER BY w.name", nativeQuery = true)
     List<String> findSealedWorkflowNamesUsingSkill(@Param("skillId") String skillId);
+
+    /** Sealed, not deleted workflows with their activated skills — the seal status view and skill pins. */
+    @EntityGraph(attributePaths = {"activatedSkills"})
+    @Query("SELECT w FROM Workflow w WHERE w.sealed = true ORDER BY w.name")
+    List<Workflow> findSealedWithSkills();
 }

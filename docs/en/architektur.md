@@ -140,6 +140,8 @@ Four switches under `automation.hardening.*` — the same mechanism as modules (
 
 **Write path for skills (always on)** — Every skill writer goes through `SkillMutationGateway` (the counterpart of `WorkflowMutationGateway`): creation (`user`), import (`import`) and built-in updates at startup (`builtin-seed`). Each change writes a row to `skill_versions` (operation `CREATE`/`UPDATE`/`DELETE`, canonical snapshot, content hash, server-side source; no foreign key, so the history survives deletion) and an activity-log entry — an import is a WARN `SECURITY` event. `GET /api/v1/skills/{id}/versions` lists the history, also for deleted skills. If a sealed workflow uses the skill, the gateway refuses changes and deletion by a person with **409 `SKILL_PINNED_BY_SEAL`**. Built-in updates from the resources cannot be refused; if they change the content under a sealed workflow, the gateway writes a WARN `SECURITY` entry naming the affected workflows, and their runs are refused until they are sealed again. `SkillWriterAllowlistTest` pins that only the gateway calls `skillRepository.save/delete`.
 
+**Seals made visible** — `WorkflowSealVerifier` is the one check that `RunAdmission` runs before a start and `GET /api/v1/workflows/seal-status` runs without a run (`INTACT`, `VIOLATED` with reason `DEFINITION_CHANGED`/`SKILLS_CHANGED`/`UNVERIFIABLE` and the affected skills, `NOT_SEALED`). The response also carries the starts refused in the last 7 days from the activity log, because a refused start creates no run row. The endpoint is core, not part of the `sealing` module: a seal stays in force when the switch is off, so it must stay visible. `GET /api/v1/skills/seal-pins` maps every skill to the sealed workflows that use it. Every run records at start whether it ran sealed and verified (`workflow_runs.sealed`, `sealed_skill_pins`); this is never derived from the workflow's current state. The UI shows it as a banner on the detail page, a red badge and icon for a broken seal, a "Sealed only" filter in the list, a lock in the run list, run detail, chain entries and skill cards, and a "Starts refused" notice above the run list. The SECURITY entry of a refused start is written after the caller's transaction (webhook, schedule, chain) has ended, on its own virtual thread — otherwise the refusal would roll it back, and `REQUIRES_NEW` would block itself with pool size 1.
+
 **Unattended runs** — `TriggerSource` classifies triggers:
 
 | Attended | Unattended | Inherits from its starter |
@@ -174,7 +176,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 47 Controllers)
+Controller (REST API, 48 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -194,7 +196,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          47 REST Controllers
+├── controller/          48 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -251,7 +253,7 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 47 REST Controllers
+### All 48 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
@@ -301,6 +303,7 @@ com.automation
 | `DashboardReportAssistController` | `/api/v1/dashboard/report-assist` | Proposes a `dashboard-report` configuration from an existing run via AI, for the editor (module `dashboard-report`; `POST`, because the call costs tokens and no browser may prefetch it) |
 | `SystemRequestMetricsController` | `/api/v1/system/request-metrics` | Measured cost per route: the running snapshot (`GET`) and daily values (`GET /daily`, optionally per route) |
 | `WorkflowSealController` | `/api/v1/workflows/{id}` | Seal/unseal a workflow (only when `automation.hardening.sealing=true`; existing seals stay effective even if the switch is turned off) |
+| `WorkflowSealStatusController` | `/api/v1/workflows/seal-status` | Seal state of every sealed workflow and starts refused in the last 7 days (read-only, core — also with `sealing` off) |
 | `WebSocketTicketController` | `/api/v1/ws-ticket` | Issues short-lived, single-use tickets for the WebSocket handshake (no module gate, ordinary API rate limit applies) |
 
 ### Workflow Execution
@@ -1066,6 +1069,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V79 | Blueprints as a kind of their own next to templates (`workflow_templates.kind`) |
 | V80 | Skills under the seal: `workflows.sealed_skill_hashes`, change history `skill_versions` |
 | V81 | Bilingual onboarding profiles: content as a `{de, en}` map |
+| V82 | Seal state on runs: `workflow_runs.sealed`, `sealed_skill_pins` |
 
 ## Architecture Gates
 
@@ -1110,7 +1114,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 81 Flyway migrations (V1–V81)
+│           └── db/migration/          ← 82 Flyway migrations (V1–V82)
 │
 └── ai-automation-frontend/
     ├── package.json

@@ -65,4 +65,17 @@ describe('WorkflowDetailHeader sealing', () => {
 
     await waitFor(() => expect(sealedCalls).toBe(1));
   });
+
+  it('turns the badge red when the seal is broken', async () => {
+    server.use(http.get('/api/v1/workflows/seal-status', () => HttpResponse.json([{
+      workflowId: 'wf-1', workflowName: 'Deploy', state: 'VIOLATED', problem: 'DEFINITION_CHANGED', detail: 'x',
+      changedSkills: [], skillsPinned: true, pinnedSkillCount: 0, sealedAt: null, refusedStarts: 1,
+      lastRefusedAt: null, lastRefusal: null,
+    }])));
+
+    renderHeader(workflow({ sealed: true, sealedHash: 'a'.repeat(64) }));
+
+    await waitFor(() => expect(screen.getByTestId('sealed-badge')).toHaveAttribute('data-state', 'violated'));
+    expect(screen.getByTestId('sealed-badge')).toHaveTextContent(en.workflows.sealView.violated);
+  });
 });

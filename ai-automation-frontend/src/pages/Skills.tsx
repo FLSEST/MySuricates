@@ -1,16 +1,19 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
-import { Zap, Search } from 'lucide-react';
+import { Zap, Search, Lock } from 'lucide-react';
 import { Card, Button, Input, Badge, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useSkills, useSkillCapabilities } from '../hooks/useSkills';
+import { useSkillSealPins } from '../hooks/useSealStatus';
 import { useT } from '../i18n';
 import { CATEGORY_ICONS, CATEGORY_COLORS, SKILL_CATEGORIES } from '../data/skillConstants';
 import type { Skill, SkillCategory } from '../types';
 
 function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => void }) {
   const t = useT();
+  const { data: sealPins } = useSkillSealPins();
+  const sealedBy = sealPins?.[skill.id] ?? [];
   return (
     <Card
       className="cursor-pointer hover:border-border-strong transition-all group"
@@ -25,6 +28,12 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
             <h3 className="font-semibold text-text truncate">{skill.name}</h3>
             {skill.builtin && (
               <Badge variant="accent">{t.skills.builtin}</Badge>
+            )}
+            {sealedBy.length > 0 && (
+              <span title={t.skills.sealedByHint.replace('{names}', sealedBy.join(', '))} data-testid="skill-sealed"
+                    className="shrink-0 inline-flex">
+                <Lock className="w-3.5 h-3.5 text-accent" aria-label={t.skills.sealedBy} />
+              </span>
             )}
           </div>
           <p className="text-xs text-text-tertiary mt-0.5">
@@ -44,6 +53,8 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
 function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) {
   const t = useT();
   const { data: capabilities, isLoading } = useSkillCapabilities(skill.id);
+  const { data: sealPins } = useSkillSealPins();
+  const sealedBy = sealPins?.[skill.id] ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -66,6 +77,17 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
           </div>
 
           <p className="text-sm text-text-secondary">{skill.description}</p>
+
+          {sealedBy.length > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-lg border border-border-strong bg-surface-raised"
+                 data-testid="skill-sealed-detail">
+              <Lock className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
+              <div className="text-sm">
+                <p className="font-semibold text-text">{t.skills.sealedBy}</p>
+                <p className="text-text-secondary">{t.skills.sealedByHint.replace('{names}', sealedBy.join(', '))}</p>
+              </div>
+            </div>
+          )}
 
           {/* Capabilities */}
           <div>

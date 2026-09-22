@@ -18,6 +18,10 @@ export const handlers = [
   // Runs waiting for an answer — none by default (the sidebar polls this on every page)
   http.get(`${BASE}/executions/pending-input`, () => HttpResponse.json([])),
 
+  // Seal status — nothing sealed, nothing refused by default (before the /workflows/:id handler)
+  http.get(`${BASE}/workflows/seal-status`, () => HttpResponse.json([])),
+  http.get(`${BASE}/skills/seal-pins`, () => HttpResponse.json({})),
+
   // Workflows
   http.get(`${BASE}/workflows`, () =>
     HttpResponse.json([
