@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="44" fill="#1a1410"/>
   <g stroke-linecap="round" stroke-linejoin="round">
     <ellipse cx="63" cy="62" rx="24" ry="32" fill="#a87840"/>
     <ellipse cx="193" cy="62" rx="24" ry="32" fill="#a87840"/>

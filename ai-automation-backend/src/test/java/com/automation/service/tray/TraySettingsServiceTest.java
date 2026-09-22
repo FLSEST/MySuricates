@@ -35,7 +35,7 @@ class TraySettingsServiceTest {
     void current_usesQuietDefaults() {
         TraySettingsService.Preferences result = service.current();
 
-        assertThat(result.popupsEnabled()).isTrue();
+        assertThat(result.popupsEnabled()).isFalse();
         assertThat(result.notifyApprovals()).isTrue();
         assertThat(result.notifyFailures()).isTrue();
         assertThat(result.notifySuccess()).isFalse();
@@ -72,6 +72,19 @@ class TraySettingsServiceTest {
         verify(settings).set(TraySettingsService.NOTIFY_FAILURES, "true");
         verify(settings).set(TraySettingsService.NOTIFY_SUCCESS, "false");
         verify(settings).set(TraySettingsService.PUBLIC_URL, "https://mysuricates.example.com");
+    }
+
+    @Test
+    void trayMenuSettersPersistEachNotificationChoiceDirectly() {
+        service.setPopupsEnabled(false);
+        service.setNotifyApprovals(false);
+        service.setNotifyFailures(false);
+        service.setNotifySuccess(true);
+
+        verify(settings).set(TraySettingsService.POPUPS_ENABLED, "false");
+        verify(settings).set(TraySettingsService.NOTIFY_APPROVALS, "false");
+        verify(settings).set(TraySettingsService.NOTIFY_FAILURES, "false");
+        verify(settings).set(TraySettingsService.NOTIFY_SUCCESS, "true");
     }
 
     @Test

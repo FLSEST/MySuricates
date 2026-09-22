@@ -11,6 +11,7 @@ import java.awt.image.BufferedImage;
 /** Draws the website's bespectacled sentinel meerkat with a small status badge. */
 final class TrayIconRenderer {
     private static final int ARTBOARD = 256;
+    private static final Color BACKGROUND = new Color(0x1A1410);
     private static final Color FUR = new Color(0xD4A060);
     private static final Color FUR_DARK = new Color(0xA87840);
     private static final Color BELLY = new Color(0xECD4A8);
@@ -21,8 +22,13 @@ final class TrayIconRenderer {
 
     static BufferedImage render(SystemTrayService.IconColor status, int size) {
         int renderSize = Math.max(ARTBOARD, size * 4);
-        BufferedImage canvas = new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_ARGB);
+        // X11/AWT tray implementations do not consistently preserve alpha. A transparent
+        // canvas was therefore flattened to a white square on some Linux desktops. The
+        // website icon already uses this dark background, so render it explicitly.
+        BufferedImage canvas = new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = canvas.createGraphics();
+        g.setColor(BACKGROUND);
+        g.fillRect(0, 0, renderSize, renderSize);
         g.scale(renderSize / (double) ARTBOARD, renderSize / (double) ARTBOARD);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
@@ -99,8 +105,10 @@ final class TrayIconRenderer {
     }
 
     private static BufferedImage downscale(BufferedImage source, int size) {
-        BufferedImage result = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage result = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = result.createGraphics();
+        g.setColor(BACKGROUND);
+        g.fillRect(0, 0, size, size);
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g.drawImage(source, 0, 0, size, size, null);

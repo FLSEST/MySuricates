@@ -180,74 +180,20 @@ public class SystemTrayService {
     }
 
     private PopupMenu buildMenu(TrayState state) {
-        PopupMenu menu = new PopupMenu();
+        return TrayMenuBuilder.build(state, systemIdentity.getVersion(), stableVersion, trayConfig,
+                dockerExpectation, traySettings, () -> rebuildMenu(state), this::exitFromTray);
+    }
 
-        MenuItem header = new MenuItem("MySuricates v" + systemIdentity.getVersion());
-        header.setEnabled(false);
-        menu.add(header);
-
-        menu.addSeparator();
-
-        String devStatus = String.format("Dev  [localhost:3000]  %s", "UP");
-        MenuItem devItem = new MenuItem(devStatus);
-        devItem.setEnabled(false);
-        menu.add(devItem);
-
-        String stableInfo = state.stableOk
-                ? "UP" + (stableVersion != null ? " (v" + stableVersion + ")" : "")
-                : "Offline";
-        String stableStatus = String.format("Stable [localhost:9091]  %s", stableInfo);
-        MenuItem stableItem = new MenuItem(stableStatus);
-        stableItem.setEnabled(false);
-        menu.add(stableItem);
-
-        menu.addSeparator();
-
-        MenuItem dockerItem = new MenuItem(String.format("Docker: %s | %d aktiv | %d%% Erfolg",
-                !state.dockerOk ? "Offline" : dockerExpectation.isConfigured() ? "OK" : "nicht eingerichtet",
-                state.activeRuns,
-                state.successPercent()));
-        dockerItem.setEnabled(false);
-        menu.add(dockerItem);
-
-        menu.addSeparator();
-
-        String browserBaseUrl = traySettings.browserBaseUrl();
-
-        if (state.pendingApprovals > 0) {
-            MenuItem approvalItem = new MenuItem(state.pendingApprovals + " Freigabe(n) wartend");
-            approvalItem.addActionListener(e -> TrayLinks.open(TrayLinks.approvals(browserBaseUrl)));
-            menu.add(approvalItem);
-            menu.addSeparator();
+    private void rebuildMenu(TrayState fallbackState) {
+        if (trayIcon != null) {
+            trayIcon.setPopupMenu(buildMenu(previousState != null ? previousState : fallbackState));
         }
+    }
 
-        MenuItem openItem = new MenuItem("MySuricates oeffnen");
-        openItem.addActionListener(e -> TrayLinks.open(browserBaseUrl));
-        menu.add(openItem);
-
-        MenuItem devUiItem = new MenuItem("Dev Web-UI oeffnen");
-        devUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getWebUiUrl()));
-        menu.add(devUiItem);
-
-        MenuItem stableUiItem = new MenuItem("Stable Web-UI oeffnen");
-        stableUiItem.addActionListener(e -> TrayLinks.open(trayConfig.getStableUrl()));
-        menu.add(stableUiItem);
-
-        MenuItem activityItem = new MenuItem("Activity Log");
-        activityItem.addActionListener(e -> TrayLinks.open(TrayLinks.route(browserBaseUrl, "/activity")));
-        menu.add(activityItem);
-
-        menu.addSeparator();
-
-        MenuItem exitItem = new MenuItem("Beenden");
-        exitItem.addActionListener(e -> {
-            log.info("Shutdown requested via system tray");
-            cleanup();
-            System.exit(0);
-        });
-        menu.add(exitItem);
-
-        return menu;
+    private void exitFromTray() {
+        log.info("Shutdown requested via system tray");
+        cleanup();
+        System.exit(0);
     }
 
     private void emitNotifications(TrayState state) {

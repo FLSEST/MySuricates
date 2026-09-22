@@ -5,7 +5,7 @@ import { useTraySettings, useUpdateTraySettings, type TraySettings } from '../..
 import { Button, Card, CardHeader, Input, Spinner, Toggle } from '../ui';
 
 const DEFAULTS: TraySettings = {
-  popupsEnabled: true,
+  popupsEnabled: false,
   notifyApprovals: true,
   notifyFailures: true,
   notifySuccess: false,
@@ -27,7 +27,7 @@ export function TraySettingsCard() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card id="tray-settings">
         <CardHeader title={t.settings.trayTitle} subtitle={t.settings.traySubtitle} />
         <div className="flex justify-center py-6"><Spinner /></div>
       </Card>
@@ -35,7 +35,7 @@ export function TraySettingsCard() {
   }
 
   return (
-    <Card>
+    <Card id="tray-settings">
       <CardHeader title={t.settings.trayTitle} subtitle={t.settings.traySubtitle} />
       <div className="space-y-5">
         <div className="flex items-center gap-4 rounded-xl border border-border bg-surface-raised/40 p-4">

@@ -32,7 +32,7 @@ public class TraySettingsService {
 
     public Preferences current() {
         return new Preferences(
-                booleanSetting(POPUPS_ENABLED, true),
+                booleanSetting(POPUPS_ENABLED, false),
                 booleanSetting(NOTIFY_APPROVALS, true),
                 booleanSetting(NOTIFY_FAILURES, true),
                 booleanSetting(NOTIFY_SUCCESS, false),
@@ -72,6 +72,22 @@ public class TraySettingsService {
         String configured = config.getPublicUrl() == null ? "" : config.getPublicUrl().trim();
         String fallback = config.getWebUiUrl() == null ? "" : config.getWebUiUrl().trim();
         return stripTrailingSlash(!stored.isEmpty() ? stored : !configured.isEmpty() ? configured : fallback);
+    }
+
+    void setPopupsEnabled(boolean enabled) {
+        settings.set(POPUPS_ENABLED, Boolean.toString(enabled));
+    }
+
+    void setNotifyApprovals(boolean enabled) {
+        settings.set(NOTIFY_APPROVALS, Boolean.toString(enabled));
+    }
+
+    void setNotifyFailures(boolean enabled) {
+        settings.set(NOTIFY_FAILURES, Boolean.toString(enabled));
+    }
+
+    void setNotifySuccess(boolean enabled) {
+        settings.set(NOTIFY_SUCCESS, Boolean.toString(enabled));
     }
 
     private boolean booleanSetting(String key, boolean defaultValue) {

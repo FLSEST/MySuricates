@@ -9,12 +9,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TrayIconRendererTest {
 
     @Test
-    void render_createsTransparentSquareIcon() {
+    void render_createsOpaqueDarkSquareIconForTrayImplementationsWithoutAlpha() {
         BufferedImage icon = TrayIconRenderer.render(SystemTrayService.IconColor.GREEN, 32);
 
         assertThat(icon.getWidth()).isEqualTo(32);
         assertThat(icon.getHeight()).isEqualTo(32);
-        assertThat((icon.getRGB(0, 0) >>> 24) & 0xff).isZero();
+        assertThat((icon.getRGB(0, 0) >>> 24) & 0xff).isEqualTo(255);
+        assertThat(icon.getRGB(0, 0) & 0xffffff).isEqualTo(0x1A1410);
         assertThat((icon.getRGB(16, 12) >>> 24) & 0xff).isGreaterThan(0);
     }
 
