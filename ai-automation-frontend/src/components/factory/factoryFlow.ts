@@ -100,10 +100,13 @@ function travel(id: FlowEdgeId, from: FlowNodeId, to: FlowNodeId, step: number):
 /**
  * The story the token tells with the current switches: one failing test that gets repaired
  * (if auto-fix is on), then a passing one. Steps match the list in createAndTest mode:
- * 0 generate, 1 sync, 2 test run, 3 repair loop, 4 result/template. Empty in "create" mode.
+ * 0 generate, 1 sync, 2 test run, 3 repair loop, 4 result/template. In "create" mode the
+ * token only dwells in "generate" and then stops there (step 1: end, no test).
  */
 export function buildTimeline({ mode, autoFix, autoPromote }: FlowOptions): FlowLeg[] {
-  if (mode === 'create') return [];
+  if (mode === 'create') {
+    return [dwell('generate', 0), { ...dwell('generate', 1), seconds: DWELL_SECONDS * 1.5 }];
+  }
   const legs = [dwell('generate', 0), travel('sync', 'generate', 'test', 1), dwell('test', 2)];
   if (autoFix) {
     legs.push(

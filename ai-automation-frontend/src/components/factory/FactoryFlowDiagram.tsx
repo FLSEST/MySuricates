@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ChevronDown, ChevronRight, Info, AlertTriangle, Play, Pause } from 'lucide-react';
-import { Card } from '../ui';
+import { Card, Toggle } from '../ui';
 import { useT } from '../../i18n';
 import {
   NODES, EDGES, VIEW_W, VIEW_H, LANE_SPLIT,
@@ -44,6 +44,9 @@ function prefersReducedMotion(): boolean {
 interface FactoryFlowDiagramProps {
   autoFix: boolean;
   autoPromote: boolean;
+  /** Same state as the form's switches, so the variants can be tried right at the diagram. */
+  onAutoFixChange: (enabled: boolean) => void;
+  onAutoPromoteChange: (enabled: boolean) => void;
   maxRetries: number;
   testHealthy: boolean;
 }
@@ -55,7 +58,9 @@ interface FactoryFlowDiagramProps {
  * The token pauses at every station; that node and its step in the list are highlighted.
  * Under prefers-reduced-motion it waits for "Play" and runs a single pass.
  */
-export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealthy }: FactoryFlowDiagramProps) {
+export function FactoryFlowDiagram({
+  autoFix, autoPromote, onAutoFixChange, onAutoPromoteChange, maxRetries, testHealthy,
+}: FactoryFlowDiagramProps) {
   const t = useT();
   const f = t.factory;
   const [open, setOpen] = useState(readOpen);
@@ -114,7 +119,7 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
   const nodeText: Record<FlowNodeId, { title: string; sub?: string }> = {
     generate: { title: f.flowGenerate, sub: f.flowGenerateSub },
     test: { title: f.flowTest, sub: f.flowTestSub },
-    repair: { title: f.flowRepair, sub: autoFix ? f.flowRepairSub : f.flowOff },
+    repair: { title: f.flowRepair, sub: autoFix ? f.flowRepairSub : f.flowRepairOnlyWithFix },
     result: { title: f.flowResult },
     template: { title: f.flowTemplate },
   };
@@ -166,17 +171,23 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
               {modeButton('create', f.createWorkflow)}
               {modeButton('createAndTest', f.createAndTest)}
             </div>
-            {mode === 'createAndTest' && (
-              <button
-                type="button"
-                onClick={togglePlaying}
-                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border-strong text-text-primary hover:bg-surface-hover transition-colors"
-              >
-                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {playing ? f.flowPause : f.flowPlay}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={togglePlaying}
+              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-border-strong text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {playing ? f.flowPause : f.flowPlay}
+            </button>
           </div>
+
+          {mode === 'createAndTest' && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <Toggle label={f.flowSwitchAutoFix} enabled={autoFix} onChange={onAutoFixChange} />
+              <Toggle label={f.flowSwitchAutoPromote} enabled={autoPromote} onChange={onAutoPromoteChange} />
+              <span className="text-xs text-text-secondary">{f.flowSwitchHint}</span>
+            </div>
+          )}
 
           <div className={`flex gap-2 rounded-lg p-3 text-sm ${
             mode === 'create' ? 'bg-surface-secondary text-text-secondary' : 'bg-info-subtle text-info'
@@ -247,6 +258,13 @@ export function FactoryFlowDiagram({ autoFix, autoPromote, maxRetries, testHealt
                   {f.flowEdgePass}
                 </text>
               </g>
+              {mode === 'create' && (
+                <text x={NODES.generate.x + NODES.generate.w / 2} y={NODES.generate.y + NODES.generate.h + 26}
+                  textAnchor="middle" fontSize={12} fontWeight={600} data-end="create"
+                  fill={currentStep === 1 ? 'var(--color-accent)' : 'var(--color-text-secondary)'}>
+                  {f.flowEndNoTest}
+                </text>
+              )}
 
               {/* Token on the arrows, drawn under the nodes so it never covers a label; while it
                   dwells in a node, the node's highlight shows where it is */}

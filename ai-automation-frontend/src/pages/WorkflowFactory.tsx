@@ -186,6 +186,8 @@ export function WorkflowFactory() {
       <FactoryFlowDiagram
         autoFix={autoFix}
         autoPromote={autoPromote}
+        onAutoFixChange={setAutoFix}
+        onAutoPromoteChange={setAutoPromote}
         maxRetries={maxRetries}
         testHealthy={isTestHealthy}
       />

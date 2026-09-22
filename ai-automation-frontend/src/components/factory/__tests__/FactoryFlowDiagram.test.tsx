@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FactoryFlowDiagram } from '../FactoryFlowDiagram';
 import { activeParts, buildTimeline, frameAt, timelineDuration } from '../factoryFlow';
@@ -13,10 +13,11 @@ function edgeActive(container: HTMLElement, id: string) {
 }
 
 describe('factoryFlow', () => {
-  it('create mode only generates and has no animation', () => {
+  it('create mode only generates, then stops at "end, no test"', () => {
     const parts = activeParts({ mode: 'create', autoFix: true, autoPromote: true });
     expect([...parts]).toEqual(['generate']);
-    expect(buildTimeline({ mode: 'create', autoFix: true, autoPromote: true })).toEqual([]);
+    const legs = buildTimeline({ mode: 'create', autoFix: true, autoPromote: true });
+    expect(legs.map(l => [l.part, l.step])).toEqual([['generate', 0], ['generate', 1]]);
   });
 
   it('create & test without switches skips repair and template', () => {
@@ -49,6 +50,18 @@ describe('factoryFlow', () => {
   });
 });
 
+type Props = React.ComponentProps<typeof FactoryFlowDiagram>;
+
+function renderDiagram(props: Partial<Props> = {}) {
+  return render(
+    <FactoryFlowDiagram
+      autoFix={false} autoPromote={false} maxRetries={2} testHealthy
+      onAutoFixChange={vi.fn()} onAutoPromoteChange={vi.fn()}
+      {...props}
+    />,
+  );
+}
+
 describe('FactoryFlowDiagram', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -56,7 +69,7 @@ describe('FactoryFlowDiagram', () => {
   });
 
   it('defaults to create & test and states that only this mode tests', () => {
-    const { container } = render(<FactoryFlowDiagram autoFix autoPromote={false} maxRetries={3} testHealthy />);
+    const { container } = renderDiagram({ autoFix: true, autoPromote: false, maxRetries: 3, testHealthy: true });
     expect(screen.getByRole('tab', { name: 'Create & Test' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText(/Only "Create & Test"/)).toBeInTheDocument();
     expect(nodeActive(container, 'repair')).toBe('true');
@@ -66,7 +79,7 @@ describe('FactoryFlowDiagram', () => {
   });
 
   it('dims the repair loop when auto-fix is off', () => {
-    const { container } = render(<FactoryFlowDiagram autoFix={false} autoPromote maxRetries={2} testHealthy />);
+    const { container } = renderDiagram({ autoFix: false, autoPromote: true, maxRetries: 2, testHealthy: true });
     expect(nodeActive(container, 'repair')).toBe('false');
     expect(edgeActive(container, 'retry')).toBe('false');
     expect(nodeActive(container, 'template')).toBe('true');
@@ -74,17 +87,18 @@ describe('FactoryFlowDiagram', () => {
   });
 
   it('create mode shows that nothing runs on the Test instance', () => {
-    const { container } = render(<FactoryFlowDiagram autoFix autoPromote maxRetries={2} testHealthy />);
+    const { container } = renderDiagram({ autoFix: true, autoPromote: true, maxRetries: 2, testHealthy: true });
     fireEvent.click(screen.getByRole('tab', { name: 'Create Workflow' }));
     expect(screen.getByText(/runs step 1 only/)).toBeInTheDocument();
     expect(nodeActive(container, 'test')).toBe('false');
     expect(container.querySelector('[data-node="generate"]')?.getAttribute('data-current')).toBe('true');
-    expect(screen.queryByRole('button', { name: 'Play flow' })).toBeNull();
+    expect(container.querySelector('[data-end="create"]')).toHaveTextContent('End · no test');
+    expect(screen.queryByRole('switch')).toBeNull();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('highlights the first step before anything has played', () => {
-    render(<FactoryFlowDiagram autoFix autoPromote maxRetries={2} testHealthy />);
+    renderDiagram({ autoFix: true, autoPromote: true, maxRetries: 2, testHealthy: true });
     const items = screen.getAllByRole('listitem');
     expect(items[0]).toHaveAttribute('aria-current', 'step');
     expect(items[1]).not.toHaveAttribute('aria-current');
@@ -97,7 +111,7 @@ describe('FactoryFlowDiagram', () => {
       addEventListener: () => {}, removeEventListener: () => {},
     })) as unknown as typeof window.matchMedia;
     try {
-      render(<FactoryFlowDiagram autoFix autoPromote maxRetries={2} testHealthy />);
+      renderDiagram({ autoFix: true, autoPromote: true, maxRetries: 2, testHealthy: true });
       fireEvent.click(screen.getByRole('button', { name: 'Play flow' }));
       expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
     } finally {
@@ -105,17 +119,29 @@ describe('FactoryFlowDiagram', () => {
     }
   });
 
+  it('switches in the card drive the same state as the form', () => {
+    const onAutoFixChange = vi.fn();
+    const onAutoPromoteChange = vi.fn();
+    renderDiagram({ onAutoFixChange, onAutoPromoteChange, autoPromote: true });
+    const [fix, promote] = screen.getAllByRole('switch');
+    fireEvent.click(fix!);
+    fireEvent.click(promote!);
+    expect(onAutoFixChange).toHaveBeenCalledWith(true);
+    expect(onAutoPromoteChange).toHaveBeenCalledWith(false);
+    expect(screen.getByText('only with auto-fix')).toBeInTheDocument();
+  });
+
   it('warns when the Test instance is offline', () => {
-    render(<FactoryFlowDiagram autoFix={false} autoPromote={false} maxRetries={2} testHealthy={false} />);
+    renderDiagram({ autoFix: false, autoPromote: false, maxRetries: 2, testHealthy: false });
     expect(screen.getByText(/offline right now/)).toBeInTheDocument();
   });
 
   it('remembers the collapsed state', () => {
-    const { unmount } = render(<FactoryFlowDiagram autoFix={false} autoPromote={false} maxRetries={2} testHealthy />);
+    const { unmount } = renderDiagram({ autoFix: false, autoPromote: false, maxRetries: 2, testHealthy: true });
     fireEvent.click(screen.getByRole('button', { name: /How the factory works/ }));
     expect(screen.queryByRole('tablist')).toBeNull();
     unmount();
-    render(<FactoryFlowDiagram autoFix={false} autoPromote={false} maxRetries={2} testHealthy />);
+    renderDiagram({ autoFix: false, autoPromote: false, maxRetries: 2, testHealthy: true });
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
