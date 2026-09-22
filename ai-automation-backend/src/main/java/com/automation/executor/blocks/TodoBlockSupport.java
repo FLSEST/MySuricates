@@ -33,7 +33,7 @@ final class TodoBlockSupport {
     static Todo.Priority parsePriority(Object value, Todo.Priority fallback) {
         if (value == null) return fallback;
         try {
-            return Todo.Priority.valueOf(value.toString().toUpperCase());
+            return Todo.Priority.valueOf(value.toString().strip().toUpperCase());
         } catch (IllegalArgumentException e) {
             return fallback;
         }

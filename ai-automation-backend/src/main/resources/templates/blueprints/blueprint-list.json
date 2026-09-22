@@ -1,0 +1,53 @@
+{
+  "id": "blueprint-list",
+  "icon": "📋",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Liste abarbeiten",
+    "en": "Working through a list"
+  },
+  "description": {
+    "de": "Führt einen Befehl für jedes Element einer Liste aus; ein Element scheitert absichtlich und continue_on_error zeigt, dass der Rest trotzdem läuft. Ersetze die Liste (oder nimm items_command) und den Befehl pro Element.",
+    "en": "Runs a command for every item of a list; one item fails on purpose and continue_on_error shows the rest still runs. Replace the list (or use items_command) and the per-item command."
+  },
+  "category": "BASICS",
+  "sortOrder": 5,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "foreach",
+      "name": {
+        "de": "liste",
+        "en": "list"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "items": [
+          "alpha",
+          "beta",
+          "gamma"
+        ],
+        "variable_name": "item",
+        "continue_on_error": true,
+        "shell_escape_variables": true,
+        "command": "set -eu\n# placeholder - replace with what should happen per item\nif [ {{ item }} = beta ]; then echo 'fails on purpose: beta' >&2; exit 1; fi\nprintf 'done: %s\\n' {{ item }}"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\n# foreach prefixes every line with [item]:\nprintf 'items done: %s\\n' \"$(printf '%s\\n' \"$1\" | grep -c ': done: ' || true)\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "zusammenfassen",
+        "en": "summary"
+      }
+    }
+  ]
+}

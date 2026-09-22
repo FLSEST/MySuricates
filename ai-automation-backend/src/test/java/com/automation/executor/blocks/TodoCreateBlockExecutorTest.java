@@ -78,6 +78,21 @@ class TodoCreateBlockExecutorTest {
         assertThat(ctx.getVariable("todo_id")).isEqualTo("todo-9");
     }
 
+    /** A branch before the block can deliver the priority, e.g. switch output "HIGH\n" (blueprint intake). */
+    @Test
+    void execute_priorityPlaceholder_isResolved() {
+        when(todoService.create(any())).thenReturn(Todo.builder().id("todo-2").title("T").build());
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("urgency_priority", "high\n");
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("title", "T");
+        config.put("priority", "{{ urgency_priority }}");
+        executor.execute(block(config), ctx);
+
+        verify(todoService).create(argThat(req -> req.priority() == Todo.Priority.HIGH));
+    }
+
     @Test
     void execute_explicitProjectIdAndPriority_overrideDefaults() {
         when(todoService.create(any())).thenReturn(Todo.builder().id("todo-1").title("T").build());

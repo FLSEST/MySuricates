@@ -1506,6 +1506,17 @@ export const de: TranslationKeys = {
     testedIn: 'Getestet in:',
     exportTemplate: 'Vorlage exportieren',
   },
+  blueprints: {
+    tab: 'Blaupausen',
+    title: 'Blaupausen',
+    subtitle: 'Leere Gerüste, die zeigen, wie sich Block-Typen verknüpfen lassen: Formular → Verzweigung, Schleife mit Freigabe, Plan B bei Fehlern … Starten, ansehen, Platzhalter ersetzen.',
+    searchPlaceholder: 'Blaupausen durchsuchen...',
+    groups: {
+      BASICS: 'Grundverknüpfungen',
+      COMBINATIONS: 'Kombinationen',
+      AI: 'Mit KI (verbraucht Tokens)',
+    },
+  },
   pool: {
     title: 'Workflow-Pool',
     subtitle: 'Fertige Workflows aus dem lokalen Pool',

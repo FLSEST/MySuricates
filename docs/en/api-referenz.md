@@ -599,7 +599,7 @@ Remove the seal (same switch). Logs a `SECURITY` entry with the previous hash.
 
 ### `GET /api/v1/workflow-templates`
 
-List all workflow templates (sorted by `sortOrder`).
+List all workflow templates, sorted by kind and `sortOrder`. The field `kind` separates templates (`TEMPLATE`) from blueprints (`BLUEPRINT`: empty scaffolds that show how block types connect, see [WORKFLOW-GUIDE → Blueprints](WORKFLOW-GUIDE.md#blueprints)).
 
 **Query:** `locale` (optional, `de`/`en`): language of the steps (`blocks`, `instructions`) of bilingual templates. English when omitted. `name` and `description` stay maps. See [WORKFLOW-GUIDE → Bilingual templates](WORKFLOW-GUIDE.md#bilingual-templates).
 

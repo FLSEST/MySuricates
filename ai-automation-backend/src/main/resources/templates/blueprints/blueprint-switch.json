@@ -1,0 +1,100 @@
+{
+  "id": "blueprint-switch",
+  "icon": "🧭",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Mehrweg-Verzweigung",
+    "en": "Multi-way branch"
+  },
+  "description": {
+    "de": "Eine Auswahl steuert, welcher von mehreren Fällen läuft; „high|critical“ zeigt zwei Werte für einen Fall, default fängt den Rest. Ersetze die Befehle in den Fällen durch deine eigenen.",
+    "en": "A choice controls which of several cases runs; “high|critical” shows two values for one case, default catches the rest. Replace the commands in the cases with your own."
+  },
+  "category": "BASICS",
+  "sortOrder": 4,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "human-input",
+      "name": {
+        "de": "auswahl",
+        "en": "choice"
+      },
+      "config": {
+        "prompt": {
+          "de": "Welcher Fall soll laufen?",
+          "en": "Which case should run?"
+        },
+        "input_type": "select",
+        "options": [
+          "low",
+          "medium",
+          "high",
+          "critical",
+          "other"
+        ],
+        "default_value": "low",
+        "variable_name": "level",
+        "timeout_minutes": 30
+      }
+    },
+    {
+      "type": "switch",
+      "name": {
+        "de": "verzweigen",
+        "en": "branch"
+      },
+      "config": {
+        "expression": "{{ level }}",
+        "cases": [
+          {
+            "value": "low",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "# placeholder - case low\nprintf 'case: low\\n'"
+                }
+              }
+            ]
+          },
+          {
+            "value": "medium",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "# placeholder - case medium\nprintf 'case: medium\\n'"
+                }
+              }
+            ]
+          },
+          {
+            "value": "high|critical",
+            "blocks": [
+              {
+                "type": "shell",
+                "config": {
+                  "command": "# placeholder - case high or critical\nprintf 'case: high or critical\\n'"
+                }
+              }
+            ]
+          }
+        ],
+        "default": [
+          {
+            "type": "shell",
+            "config": {
+              "command": "# placeholder - no case matched\nprintf 'case: default\\n'"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

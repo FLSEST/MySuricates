@@ -1,0 +1,99 @@
+{
+  "id": "blueprint-form",
+  "icon": "📝",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Formular und Verwendung",
+    "en": "Form and its use"
+  },
+  "description": {
+    "de": "Ein Formular mit Auswahl, Text, Zahl und Häkchen; jedes Feld steht danach als Variable bereit ({{ environment }}, {{ count }} …). Passe die Felder an und nutze die Variablen in deinen Schritten.",
+    "en": "A form with a choice, text, number and checkbox; afterwards every field is available as a variable ({{ environment }}, {{ count }} …). Adapt the fields and use the variables in your steps."
+  },
+  "category": "BASICS",
+  "sortOrder": 2,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "human-input",
+      "name": {
+        "de": "eingabe",
+        "en": "input"
+      },
+      "config": {
+        "prompt": {
+          "de": "Fülle das Formular aus – die Werte stehen danach als Variablen bereit.",
+          "en": "Fill in the form – the values are then available as variables."
+        },
+        "fields": [
+          {
+            "variable_name": "environment",
+            "label": {
+              "de": "Umgebung",
+              "en": "Environment"
+            },
+            "input_type": "select",
+            "options": [
+              "dev",
+              "staging",
+              "prod"
+            ],
+            "default_value": "dev",
+            "required": true
+          },
+          {
+            "variable_name": "reason",
+            "label": {
+              "de": "Grund",
+              "en": "Reason"
+            },
+            "input_type": "text",
+            "required": false,
+            "placeholder": {
+              "de": "z. B. Test",
+              "en": "e.g. testing"
+            }
+          },
+          {
+            "variable_name": "count",
+            "label": {
+              "de": "Anzahl",
+              "en": "Count"
+            },
+            "input_type": "number",
+            "default_value": "3",
+            "validation_pattern": "^[0-9]+$",
+            "required": true
+          },
+          {
+            "variable_name": "dry_run",
+            "label": {
+              "de": "Nur Probelauf",
+              "en": "Dry run only"
+            },
+            "input_type": "checkbox",
+            "default_value": "true",
+            "required": false
+          }
+        ],
+        "timeout_minutes": 30
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ environment }} {{ reason }} {{ count }} {{ dry_run }}\nprintf 'environment=%s\\nreason=%s\\ncount=%s\\ndry_run=%s\\n' \"$1\" \"$2\" \"$3\" \"$4\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "verwenden",
+        "en": "use"
+      }
+    }
+  ]
+}

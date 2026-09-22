@@ -1,0 +1,57 @@
+{
+  "id": "blueprint-retry",
+  "icon": "🔄",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Wiederholen bei Fehler",
+    "en": "Retry on failure"
+  },
+  "description": {
+    "de": "Versucht einen Befehl erneut, bis er klappt; delay und exponential_backoff steuern die Pausen. Der Platzhalter scheitert zweimal absichtlich und klappt beim dritten Versuch. Ersetze ihn durch einen unzuverlässigen Befehl (Netzwerk, Dienst …).",
+    "en": "Retries a command until it succeeds; delay and exponential_backoff control the pauses. The placeholder fails twice on purpose and succeeds on the third attempt. Replace it with an unreliable command (network, service …)."
+  },
+  "category": "BASICS",
+  "sortOrder": 7,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/attempts\"\necho prepared"
+      },
+      "name": {
+        "de": "vorbereiten",
+        "en": "prepare"
+      }
+    },
+    {
+      "type": "retry",
+      "name": {
+        "de": "versuchen",
+        "en": "attempt"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "max_retries": 3,
+        "delay": 1,
+        "exponential_backoff": true,
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/attempts\") + 1 ))\necho \"$N\" > \"$D/attempts\"\n# placeholder - fails twice on purpose, then succeeds\nif [ \"$N\" -lt 3 ]; then echo \"attempt $N failed\" >&2; exit 1; fi\nprintf 'attempt %s succeeded\\n' \"$N\""
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+      },
+      "name": {
+        "de": "aufraeumen",
+        "en": "cleanup"
+      }
+    }
+  ]
+}

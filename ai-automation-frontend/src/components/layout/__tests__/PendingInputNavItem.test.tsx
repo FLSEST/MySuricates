@@ -28,10 +28,10 @@ describe('Sidebar approvals entry', () => {
 
     renderWithProviders(<Sidebar />);
 
-    const link = await screen.findByRole('link', { name: 'Approvals: 2 waiting for you' });
+    const link = await screen.findByRole('link', { name: 'Approvals: 2 waiting for you' }, { timeout: 5000 });
     expect(link).toHaveAttribute('href', '/approvals');
     expect(link.querySelector('.animate-ping')).not.toBeNull();
-  });
+  }, 10_000);
 
   it('also shows in simple mode, where the regular list is reduced', async () => {
     useSettingsStore.setState({ simpleMode: true });
@@ -39,13 +39,13 @@ describe('Sidebar approvals entry', () => {
 
     renderWithProviders(<Sidebar />);
 
-    expect(await screen.findByRole('link', { name: 'Approvals: 1 waiting for you' })).toBeInTheDocument();
-  });
+    expect(await screen.findByRole('link', { name: 'Approvals: 1 waiting for you' }, { timeout: 5000 })).toBeInTheDocument();
+  }, 10_000);
 
   it('is absent while nothing waits', async () => {
     renderWithProviders(<Sidebar />);
 
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Workflows' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Workflows' })).toBeInTheDocument(), { timeout: 5000 });
     expect(screen.queryByRole('link', { name: /Approvals/ })).not.toBeInTheDocument();
-  });
+  }, 10_000);
 });

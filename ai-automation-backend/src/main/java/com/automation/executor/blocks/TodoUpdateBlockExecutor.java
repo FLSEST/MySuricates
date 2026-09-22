@@ -44,7 +44,7 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
                     TodoBlockSupport.resolved(context, config.get("description")),
                     null,
                     config.containsKey("priority")
-                            ? TodoBlockSupport.parsePriority(config.get("priority"), null)
+                            ? TodoBlockSupport.parsePriority(TodoBlockSupport.resolved(context, config.get("priority")), null)
                             : null,
                     TodoBlockSupport.parseTags(config.get("tags")),
                     null, null, null, null,

@@ -205,6 +205,8 @@ export interface WorkflowTemplate {
   version: string;
   createdAt: string;
   updatedAt: string;
+  /** TEMPLATE = finished task; BLUEPRINT = empty scaffold showing how block types connect */
+  kind?: 'TEMPLATE' | 'BLUEPRINT';
 }
 
 export interface CreateWorkflowTemplateRequest {

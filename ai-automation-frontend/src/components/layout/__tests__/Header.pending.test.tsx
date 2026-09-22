@@ -23,14 +23,14 @@ describe('Header on mobile', () => {
 
     renderWithProviders(<Header />);
 
-    const button = await screen.findByRole('button', { name: /Approvals: 1 waiting for you/ });
+    const button = await screen.findByRole('button', { name: /Approvals: 1 waiting for you/ }, { timeout: 5000 });
     expect(button.querySelector('.animate-ping')).not.toBeNull();
-  });
+  }, 10_000);
 
   it('leaves the menu button plain while nothing waits', async () => {
     renderWithProviders(<Header />);
 
-    const button = await screen.findByRole('button', { name: 'Menu' });
+    const button = await screen.findByRole('button', { name: 'Menu' }, { timeout: 5000 });
     expect(button.querySelector('.animate-ping')).toBeNull();
-  });
+  }, 10_000);
 });

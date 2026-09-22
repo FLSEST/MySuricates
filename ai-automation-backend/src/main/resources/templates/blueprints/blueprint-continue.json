@@ -1,0 +1,44 @@
+{
+  "id": "blueprint-continue",
+  "icon": "⏭️",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Weiter trotz Fehler",
+    "en": "Carry on after an error"
+  },
+  "description": {
+    "de": "Ein Schritt scheitert absichtlich; on_failure: continue lässt den Lauf trotzdem weiterlaufen. Nutze das für Schritte, deren Fehler du melden, aber nicht abbrechen willst.",
+    "en": "A step fails on purpose; on_failure: continue keeps the run going anyway. Use it for steps whose errors you want to report without stopping."
+  },
+  "category": "BASICS",
+  "sortOrder": 8,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "# placeholder - this step fails on purpose\necho 'something went wrong' >&2\nexit 3",
+        "on_failure": "continue"
+      },
+      "name": {
+        "de": "scheitert",
+        "en": "fails"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "printf 'still running after the failed step\\n'"
+      },
+      "name": {
+        "de": "weiter",
+        "en": "carry_on"
+      }
+    }
+  ]
+}

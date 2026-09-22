@@ -1,34 +1,33 @@
 {
-  "id": "example-approval",
+  "id": "blueprint-approval",
   "icon": "✋",
   "i18n": [
     "de",
     "en"
   ],
   "name": {
-    "de": "Beispiel: Freigabe mit Messung",
-    "en": "Example: approval with a measurement"
+    "de": "Freigabe vor dem Handeln",
+    "en": "Approval before acting"
   },
   "description": {
-    "de": "Misst kurz etwas und legt es dir zur Ja/Nein-Freigabe vor. Nein lässt den Lauf scheitern. Ohne KI, ohne Schreibzugriffe.",
-    "en": "Takes a quick measurement and asks you for a yes/no approval. No makes the run fail. No AI, no writes."
+    "de": "Misst kurz etwas und legt es dir zur Ja/Nein-Freigabe vor; Nein lässt den Lauf scheitern (on_no). Ersetze „messen“ durch deine Prüfung und „abschluss“ durch das, was nach der Freigabe passieren soll.",
+    "en": "Takes a quick measurement and asks you for a yes/no approval; No makes the run fail (on_no). Replace “measure” with your check and “finish” with what should happen after approval."
   },
-  "category": "EXAMPLE",
-  "sortOrder": 66,
+  "category": "BASICS",
+  "sortOrder": 1,
   "version": "1.0.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
+      "config": {
+        "command": "set -euo pipefail\n# placeholder - replace with your own measurement\nprintf -- '- %s\\n- %s\\n- %s\\n' \"$(date '+%H:%M:%S')\" \"$(uname -n)\" \"$(df -h . | awk 'NR==2 {print $4}')\""
+      },
       "name": {
         "de": "messen",
         "en": "measure"
-      },
-      "config": {
-        "command": "set -euo pipefail\nprintf -- '- %s\\n- %s\\n- %s\\n' \"$(date '+%H:%M:%S')\" \"$(uname -n)\" \"$(df -h . | awk 'NR==2 {print $4}')\""
-      },
-      "requiredCapabilities": []
+      }
     },
     {
       "type": "approval",
@@ -53,19 +52,17 @@
         ],
         "on_no": "fail",
         "timeout_minutes": 60
-      },
-      "requiredCapabilities": []
+      }
     },
     {
       "type": "shell",
+      "config": {
+        "command": "# placeholder - replace with what should happen after approval\necho OK"
+      },
       "name": {
         "de": "abschluss",
         "en": "finish"
-      },
-      "config": {
-        "command": "echo 'OK'"
-      },
-      "requiredCapabilities": []
+      }
     }
   ]
 }

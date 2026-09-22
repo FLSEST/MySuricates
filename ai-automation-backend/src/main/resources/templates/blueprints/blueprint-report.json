@@ -1,0 +1,69 @@
+{
+  "id": "blueprint-report",
+  "icon": "📊",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Ergebnis melden",
+    "en": "Reporting a result"
+  },
+  "description": {
+    "de": "Meldet ein Ergebnis mit Ampel, Kennzahlen und Punkten direkt ans Dashboard (0 Tokens, kein Marker). Lege danach auf dem Dashboard ein Workflow-Widget für diesen Workflow an. Ersetze die Messung und die Kennzahlen.",
+    "en": "Reports a result with traffic light, key figures and items straight to the dashboard (0 tokens, no marker). Afterwards add a workflow widget for this workflow on the dashboard. Replace the measurement and the key figures."
+  },
+  "category": "BASICS",
+  "sortOrder": 12,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\n# placeholder - replace with your own measurement\nprintf '%s' \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\""
+      },
+      "name": {
+        "de": "messen",
+        "en": "measure"
+      }
+    },
+    {
+      "type": "dashboard-report",
+      "name": {
+        "de": "melden",
+        "en": "report"
+      },
+      "config": {
+        "status": "GREEN",
+        "title": {
+          "de": "Freier Platz",
+          "en": "Free space"
+        },
+        "summary": {
+          "de": "Beispiel aus der Blaupause „Ergebnis melden“.",
+          "en": "Example from the blueprint “Reporting a result”."
+        },
+        "kpis": [
+          {
+            "label": {
+              "de": "Frei (MB)",
+              "en": "Free (MB)"
+            },
+            "value": {
+              "de": "{{ block.messen.output }}",
+              "en": "{{ block.measure.output }}"
+            }
+          }
+        ],
+        "items": [
+          {
+            "de": "Ersetze Messung und Kennzahlen durch deine eigenen.",
+            "en": "Replace the measurement and key figures with your own."
+          }
+        ]
+      }
+    }
+  ]
+}

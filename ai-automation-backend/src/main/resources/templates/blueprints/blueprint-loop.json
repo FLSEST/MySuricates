@@ -1,0 +1,56 @@
+{
+  "id": "blueprint-loop",
+  "icon": "🔁",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Schleife bis zum Ziel",
+    "en": "Loop until done"
+  },
+  "description": {
+    "de": "Wiederholt einen Schritt, solange die Bedingung gilt (Exit 0); max_iterations ist die Sicherung. Hier zählt ein Zähler bis 3. Ersetze Bedingung und Schleifenbefehl.",
+    "en": "Repeats a step while the condition holds (exit 0); max_iterations is the safety net. Here a counter goes up to 3. Replace the condition and the loop command."
+  },
+  "category": "BASICS",
+  "sortOrder": 6,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+      },
+      "name": {
+        "de": "vorbereiten",
+        "en": "prepare"
+      }
+    },
+    {
+      "type": "while",
+      "name": {
+        "de": "hochzaehlen",
+        "en": "count_up"
+      },
+      "config": {
+        "execution_mode": "shell",
+        "max_iterations": 10,
+        "condition_command": "# placeholder - loop while this exits 0\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt 3 ]",
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\nprintf 'round %s\\n' \"$N\""
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+      },
+      "name": {
+        "de": "aufraeumen",
+        "en": "cleanup"
+      }
+    }
+  ]
+}

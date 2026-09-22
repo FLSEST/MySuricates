@@ -94,8 +94,8 @@ public class TemplateVerificationService {
                 infos,
                 response.version(),
                 response.createdAt(),
-                response.updatedAt()
-        );
+                response.updatedAt(),
+                response.kind());
     }
 
     @Transactional(readOnly = true)
@@ -119,8 +119,7 @@ public class TemplateVerificationService {
                             response.icon(), response.category(), response.blocks(),
                             response.instructions(), response.model(), response.builtIn(),
                             response.sortOrder(), response.qualityStatus(), infos,
-                            response.version(), response.createdAt(), response.updatedAt()
-                    );
+                            response.version(), response.createdAt(), response.updatedAt(), response.kind());
                 })
                 .toList();
     }

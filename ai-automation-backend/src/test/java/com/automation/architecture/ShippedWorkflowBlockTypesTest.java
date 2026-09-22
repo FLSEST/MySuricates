@@ -32,6 +32,7 @@ import static org.mockito.Mockito.withSettings;
 class ShippedWorkflowBlockTypesTest {
 
     private static final Path BUILTIN_TEMPLATES = Path.of("src/main/resources/templates/builtin");
+    private static final Path BLUEPRINTS = Path.of("src/main/resources/templates/blueprints");
     /** The pool lives next to the backend module, in the repository root. */
     private static final Path WORKFLOW_POOL = Path.of("../workflow-pool");
     private static final String EXECUTOR_PACKAGE = "com.automation.executor";
@@ -42,6 +43,11 @@ class ShippedWorkflowBlockTypesTest {
     @Test
     void everyBuiltinTemplateUsesKnownBlockTypes() throws IOException {
         assertKnownTypes(BUILTIN_TEMPLATES);
+    }
+
+    @Test
+    void everyBlueprintUsesKnownBlockTypes() throws IOException {
+        assertKnownTypes(BLUEPRINTS);
     }
 
     @Test

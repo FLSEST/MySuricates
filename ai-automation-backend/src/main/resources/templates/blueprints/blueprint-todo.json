@@ -1,0 +1,66 @@
+{
+  "id": "blueprint-todo",
+  "icon": "✅",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "TODO-Lebenszyklus",
+    "en": "TODO lifecycle"
+  },
+  "description": {
+    "de": "Legt ein TODO an, ändert es und schließt es wieder – ohne REST-Aufruf, 0 Tokens; {{ todo_id }} verbindet die Schritte. Achtung: legt ein echtes TODO im Projekt an (am Ende erledigt).",
+    "en": "Creates a TODO, changes it and closes it again – no REST call, 0 tokens; {{ todo_id }} links the steps. Note: creates a real TODO in the project (done at the end)."
+  },
+  "category": "BASICS",
+  "sortOrder": 9,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "todo-create",
+      "name": {
+        "de": "anlegen",
+        "en": "create"
+      },
+      "config": {
+        "title": {
+          "de": "Beispiel-TODO aus einer Blaupause ({{ workflow_run_id }})",
+          "en": "Example TODO from a blueprint ({{ workflow_run_id }})"
+        },
+        "description": {
+          "de": "Angelegt von der Blaupause „TODO-Lebenszyklus“; wird im selben Lauf wieder geschlossen.",
+          "en": "Created by the blueprint “TODO lifecycle”; closed again in the same run."
+        },
+        "priority": "LOW",
+        "tags": [
+          "blueprint"
+        ],
+        "variable_name": "todo_id"
+      }
+    },
+    {
+      "type": "todo-update",
+      "name": {
+        "de": "aendern",
+        "en": "update"
+      },
+      "config": {
+        "id": "{{ todo_id }}",
+        "priority": "MEDIUM"
+      }
+    },
+    {
+      "type": "todo-close",
+      "name": {
+        "de": "schliessen",
+        "en": "close"
+      },
+      "config": {
+        "id": "{{ todo_id }}"
+      }
+    }
+  ]
+}

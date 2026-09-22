@@ -97,7 +97,7 @@ Alle KI-Aufrufe laufen ueber `HostClaudeService`:
 
 ### Wie funktioniert das Template-System?
 
-- 67 Built-in Templates als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`)
+- 66 Built-in Templates als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`)
 - Werden beim Start durch `WorkflowTemplateSeeder` geseedet (idempotent)
 - Name/Description sind i18n JSON-Maps: `{"de":"...", "en":"..."}`
 - Frontend loest Sprache ueber `resolveTemplateName()` in `utils/templateUtils.ts` auf

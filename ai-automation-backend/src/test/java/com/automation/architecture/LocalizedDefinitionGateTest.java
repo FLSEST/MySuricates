@@ -384,7 +384,7 @@ class LocalizedDefinitionGateTest {
 
     /** Built-in templates always; workflow-pool/ when the repo directory is reachable. */
     private static List<Path> definitionFiles() throws IOException {
-        List<Path> files = new ArrayList<>(jsonFiles(builtInDir()));
+        List<Path> files = new ArrayList<>(ShippedDefinitions.templateFiles());
         for (Path pool : List.of(Paths.get("../workflow-pool"), Paths.get("workflow-pool"))) {
             if (Files.isDirectory(pool)) {
                 files.addAll(jsonFiles(pool));

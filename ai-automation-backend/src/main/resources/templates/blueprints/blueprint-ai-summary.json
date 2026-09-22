@@ -1,0 +1,47 @@
+{
+  "id": "blueprint-ai-summary",
+  "icon": "🤖",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Sammeln → KI fasst zusammen",
+    "en": "Collect → AI summarizes"
+  },
+  "description": {
+    "de": "KI-Blaupause (1 Modellaufruf, effort low): Shell sammelt Fakten, ein simple-Block fasst sie zusammen – das Muster „Shell sammeln + KI analysieren“. Ersetze die Sammlung und den Auftrag an die KI.",
+    "en": "AI blueprint (1 model call, effort low): shell collects facts, a simple block summarizes them – the “shell collects + AI analyses” pattern. Replace the collection and the instruction to the AI."
+  },
+  "category": "AI",
+  "sortOrder": 19,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\n# placeholder - replace with the facts you want summarized\nprintf 'host=%s\\nos=%s\\ntime=%s\\nfree_mb=%s\\n' \"$(uname -n)\" \"$(uname -s)\" \"$(date '+%H:%M')\" \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\""
+      },
+      "name": {
+        "de": "sammeln",
+        "en": "collect"
+      }
+    },
+    {
+      "type": "simple",
+      "name": {
+        "de": "zusammenfassen",
+        "en": "summarize"
+      },
+      "config": {
+        "effort": "low",
+        "command": {
+          "de": "Fasse diese Messwerte in höchstens zwei Sätzen auf Deutsch zusammen. Schreibe keine Dateien und führe keine Befehle aus.\n\n{{ block.sammeln.output }}",
+          "en": "Summarize these readings in at most two sentences in English. Do not write any files and do not run any commands.\n\n{{ block.collect.output }}"
+        }
+      }
+    }
+  ]
+}

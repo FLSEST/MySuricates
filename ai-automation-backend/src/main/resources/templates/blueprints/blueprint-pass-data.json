@@ -1,0 +1,52 @@
+{
+  "id": "blueprint-pass-data",
+  "icon": "📦",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Daten weiterreichen",
+    "en": "Passing data on"
+  },
+  "description": {
+    "de": "Zeigt, wie Schritte Ausgaben weitergeben: über den Blocknamen ({{ block.data.output }}) und über {{ previous_output }}, sicher escaped mit shell_escape_variables. Ersetze den Befehl im Schritt „data“ durch einen eigenen, der Daten liefert.",
+    "en": "Shows how steps pass output on: by block name ({{ block.data.output }}) and via {{ previous_output }}, safely escaped with shell_escape_variables. Replace the command in step “data” with your own."
+  },
+  "category": "BASICS",
+  "sortOrder": 0,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "# placeholder - replace with a command that produces data\nprintf '%s\\n' alpha beta gamma"
+      },
+      "name": "data"
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ block.data.output }}\nprintf 'lines=%s\\n' \"$(printf '%s\\n' \"$1\" | grep -c .)\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "zaehlen",
+        "en": "count"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "set -eu\nset -- {{ previous_output }}\nprintf 'previous step said: %s\\n' \"$1\"",
+        "shell_escape_variables": true
+      },
+      "name": {
+        "de": "ergebnis",
+        "en": "result"
+      }
+    }
+  ]
+}

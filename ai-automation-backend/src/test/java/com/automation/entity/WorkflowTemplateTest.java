@@ -109,6 +109,7 @@ class WorkflowTemplateTest {
                 description,
                 "icon",
                 "category",
+                TemplateKind.BLUEPRINT,
                 blocks,
                 "instructions",
                 "{\"i18n\":[\"de\",\"en\"]}",
@@ -124,6 +125,7 @@ class WorkflowTemplateTest {
         assertThat(template.getId()).isEqualTo("id-123");
         assertThat(template.getName()).isSameAs(name);
         assertThat(template.getDescription()).isSameAs(description);
+        assertThat(template.getKind()).isEqualTo(TemplateKind.BLUEPRINT);
         assertThat(template.getI18nSource()).isEqualTo("{\"i18n\":[\"de\",\"en\"]}");
         assertThat(template.getIcon()).isEqualTo("icon");
         assertThat(template.getCategory()).isEqualTo("category");

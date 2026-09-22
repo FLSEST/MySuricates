@@ -1686,7 +1686,6 @@ Alle 65+ eingebauten Templates mit ihrem primären Pattern:
 | `test-matrix` | Shell scannen + ForEach + Skill | CODE |
 | `todo-creator` | Agentic | UTILITY |
 | `topic-deep-dive` | Sequentielle Simple-Kette | RESEARCH |
-| `example-approval` | Messen + Freigabe (zweisprachiges Beispiel) | EXAMPLE |
 
 ### Zweisprachige Vorlagen
 
@@ -1709,11 +1708,20 @@ Name und Beschreibung einer Vorlage sind immer `{"de": …, "en": …}`. Eine Vo
 
 - **Jede Map trägt genau die deklarierten Sprachen, keine bleibt leer.** Ohne Marker wird nichts aufgelöst.
 - **Einsprachig bleiben Shell-Felder** (`command`, `condition` …, sonst hieße es zwei Befehle prüfen) **und alles, was verglichen oder ausgewertet wird:** `type`, `variable_name`, `auto_answer`, `reject_options`, `mode`, `on_no`, `execution_mode`, `model`, `provider` sowie `metadata`.
-- **Schritt-Namen sind übersetzbar, aber pro Sprache konsistent.** `{{ block.X.output }}` und compress-`source` zeigen in jeder Fassung auf einen vorhandenen Namen. Der Report-Block eines Audits (`metadata.audit.reportBlock`) bleibt einsprachig.
+- **Schritt-Namen sind übersetzbar, aber pro Sprache konsistent.** `{{ block.X.output }}` und compress-`source` zeigen in jeder Fassung auf einen vorhandenen Namen. Der Report-Block eines Audits (`metadata.audit.reportBlock`) bleibt einsprachig. Ein Block, auf den ein **Shell-Feld** verweist, bekommt einen sprachneutralen Namen (z. B. `data`), denn das Shell-Feld selbst bleibt einsprachig.
 - **Übersetzte Approval-`options` dürfen nirgends verglichen werden.** Die Antwortvariable darf in keinem Shell-, conditional-, switch- oder while-Feld vorkommen, denn auf Deutsch wäre die Antwort `Nein` statt `No`. Die Ablehnung erkennt der Approval-Block selbst (`reject_options`, Vorgabe `No`/`Nein`).
 - **Bestehende Datenbanken erhalten geänderte eingebaute Vorlagen nur über einen Versionssprung** (`version`), wie jede Änderung an einer eingebauten Vorlage.
 
 Die API liefert die Schritte in der gewünschten Sprache: `GET /api/v1/workflow-templates?locale=de`. Pool und Ketten installieren mit `"locale"` im Body.
+
+### Blaupausen
+
+Neben **Vorlagen** (fertige Aufgaben) und dem **Pool** gibt es **Blaupausen**: leere Gerüste mit lauffähigen Platzhaltern, die zeigen, wie sich Block-Typen verknüpfen lassen – Formular → Verzweigung, Schleife mit Freigabe, Plan B bei Fehlern. Im Anlege-Dialog haben sie einen eigenen Reiter, gruppiert nach *Grundverknüpfungen*, *Kombinationen* und *Mit KI*. Man startet eine Blaupause, sieht im Lauf, wie die Schritte zusammenspielen, und ersetzt dann die Platzhalter durch eigene Befehle.
+
+- **Ablage:** `src/main/resources/templates/blueprints/*.json`, gleiches Format und gleicher Loader wie Vorlagen, `kind: BLUEPRINT` (Spalte `workflow_templates.kind`). Die API liefert beide Arten gemeinsam mit dem Feld `kind`.
+- **Immer zweisprachig** (`"i18n": ["de","en"]`), `id` mit Präfix `blueprint-`, Kategorie `BASICS`, `COMBINATIONS` oder `AI`.
+- **Platzhalter:** Shell-Schritte tun etwas Harmloses und tragen einen Kommentar `# placeholder - …`. Arbeitsdateien liegen in `/tmp/mysuricates-blueprints/<Run-ID>`, der letzte Schritt räumt sie weg.
+- **0 Tokens außerhalb von `AI`:** keine KI-Block-Typen; `foreach`, `while`, `conditional` und `retry` brauchen `"execution_mode": "shell"`, sonst fragen sie die KI. Das prüft `BlueprintGateTest`.
 
 ---
 

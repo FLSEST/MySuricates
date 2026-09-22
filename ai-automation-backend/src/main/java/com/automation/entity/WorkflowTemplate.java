@@ -49,6 +49,12 @@ public class WorkflowTemplate {
 
     private String category;
 
+    /** {@link TemplateKind#TEMPLATE} or {@link TemplateKind#BLUEPRINT}; decided by the directory it ships in. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private TemplateKind kind = TemplateKind.TEMPLATE;
+
     @Convert(converter = BlockDefinitionListConverter.class)
     @Column(nullable = false, columnDefinition = "text")
     @Builder.Default

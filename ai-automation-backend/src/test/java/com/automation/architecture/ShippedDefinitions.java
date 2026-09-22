@@ -5,8 +5,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Language variants of shipped definitions, for the gates (TODO a129a661).
@@ -45,6 +49,27 @@ public final class ShippedDefinitions {
             return "foreach".equals(type);
         }
         return "shell".equals(type) || "shell".equals(config.path("execution_mode").asText(null));
+    }
+
+    /**
+     * The JSON files of every shipped template directory: {@code templates/builtin} (templates) and
+     * {@code templates/blueprints} (blueprints, TODO 268ae0db). Works from the module and from the
+     * repository root.
+     */
+    public static List<Path> templateFiles() throws IOException {
+        List<Path> files = new ArrayList<>();
+        for (String dir : List.of("builtin", "blueprints")) {
+            for (Path candidate : List.of(Paths.get("src/main/resources/templates", dir),
+                    Paths.get("ai-automation-backend/src/main/resources/templates", dir))) {
+                if (Files.isDirectory(candidate)) {
+                    try (Stream<Path> stream = Files.list(candidate)) {
+                        files.addAll(stream.filter(p -> p.toString().endsWith(".json")).sorted().toList());
+                    }
+                    break;
+                }
+            }
+        }
+        return files;
     }
 
     /** One variant per declared language, or the file itself when it has no {@code i18n} marker. */

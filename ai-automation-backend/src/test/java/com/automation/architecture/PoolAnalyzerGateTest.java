@@ -99,10 +99,7 @@ class PoolAnalyzerGateTest {
      */
     private static List<Path> definitionFiles() throws IOException {
         List<Path> files = new ArrayList<>();
-        Path builtin = firstExistingOrNull(
-                Paths.get("src/main/resources/templates/builtin"),
-                Paths.get("ai-automation-backend/src/main/resources/templates/builtin"));
-        if (builtin != null) files.addAll(jsonFiles(builtin));
+        files.addAll(ShippedDefinitions.templateFiles());
         Path pool = firstExistingOrNull(Paths.get("../workflow-pool"), Paths.get("workflow-pool"));
         if (pool != null) files.addAll(trackedJsonFiles(pool));
         assertThat(files).as("keine Definitionen gefunden ab " + Paths.get("").toAbsolutePath()).isNotEmpty();
@@ -127,12 +124,6 @@ class PoolAnalyzerGateTest {
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return List.of();
-        }
-    }
-
-    private static List<Path> jsonFiles(Path dir) throws IOException {
-        try (Stream<Path> stream = Files.list(dir)) {
-            return stream.filter(p -> p.toString().endsWith(".json")).sorted().toList();
         }
     }
 

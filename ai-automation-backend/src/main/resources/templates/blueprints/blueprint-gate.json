@@ -1,0 +1,45 @@
+{
+  "id": "blueprint-gate",
+  "icon": "🚦",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Ampel",
+    "en": "Traffic light"
+  },
+  "description": {
+    "de": "Zwei Wege zur Ampel eines Laufs: checked_command leitet sie aus dem Exit-Code ab (0 = GREEN), ein Skript kann sie mit gate_status selbst melden. Der strengste Wert gewinnt – hier YELLOW. Ersetze beide Prüfungen.",
+    "en": "Two ways to a run's traffic light: checked_command derives it from the exit code (0 = GREEN), a script can report it itself with gate_status. The strictest value wins – YELLOW here. Replace both checks."
+  },
+  "category": "BASICS",
+  "sortOrder": 13,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "config": {
+        "command": "# placeholder - replace with your own check; exit 0 = GREEN\ntest -d .",
+        "checked_command": true,
+        "check_category": "blueprint-check"
+      },
+      "name": {
+        "de": "pruefung_ok",
+        "en": "check_ok"
+      }
+    },
+    {
+      "type": "shell",
+      "config": {
+        "command": "# placeholder - a script can report its own traffic light\nprintf 'gate_status: YELLOW\\ngate_category: blueprint-warning\\ngate_description: example warning from a blueprint\\n'"
+      },
+      "name": {
+        "de": "pruefung_warnung",
+        "en": "check_warning"
+      }
+    }
+  ]
+}
