@@ -12,11 +12,26 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class RegexGuardTest {
 
+    /**
+     * Die Zeile muss zwischen zwei Grenzen liegen, sonst prueft der Test nichts mehr.
+     *
+     * <p>Nach unten: Der Aufwand waechst quadratisch (gemessen am 2026-09-22 mit
+     * {@code ^(a+)+$} — 2 500 Zeichen 69 ms, 5 000 Zeichen 233 ms, 9 000 Zeichen 797 ms).
+     * Mit den frueheren 5 000 Zeichen lag die Suche nur 17 % ueber der Frist; auf einem
+     * schnelleren Rechner war sie vorher fertig, keine Ausnahme, Test rot (CI-Lauf
+     * 35779550906: 193 ms gegen 200 ms Frist). 9 000 Zeichen geben rund das Vierfache
+     * der Frist und halten auch einen doppelt so schnellen Rechner aus.
+     *
+     * <p>Nach oben: Ab einer Zeile ueber {@link RegexGuard#MAX_MATCH_CHARS} schneidet der
+     * Waechter das abschliessende {@code !} weg — dann passt das Muster sofort, die Suche
+     * ist in 0 ms durch und es kann nie eine Frist greifen.
+     */
     @Test
     void catastrophicPattern_hitsDeadline() {
         RegexGuard guard = RegexGuard.startingNow(Duration.ofMillis(200));
         Pattern evil = RegexGuard.compile("^(a+)+$", 0, "Stufe test");
-        String line = "a".repeat(5000) + "!";
+        String line = "a".repeat(9000) + "!";
+        assertThat(line.length()).isLessThanOrEqualTo(RegexGuard.MAX_MATCH_CHARS);
 
         assertThatThrownBy(() -> guard.find(evil, line))
                 .isInstanceOf(CompressionException.class).hasMessageContaining("Zeitlimit");
