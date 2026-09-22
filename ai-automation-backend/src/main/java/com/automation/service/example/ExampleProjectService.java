@@ -38,8 +38,8 @@ import java.util.stream.Stream;
 
 /**
  * The example project a fresh installation creates with one click (TODO d12c7560): a copy of the
- * bundled {@code classpath:examples/example-project/} plus one workflow per built-in {@code EXAMPLE}
- * template.
+ * bundled {@code classpath:examples/example-project/} plus one workflow per shipped template listed in
+ * {@link #EXAMPLE_TEMPLATE_IDS}.
  *
  * <p>Idempotent: an active project that already points at the copy is returned instead of a second
  * one, missing example workflows are added, and an existing copy is never overwritten — whoever wants
@@ -51,7 +51,13 @@ public class ExampleProjectService {
 
     static final String SOURCE_ROOT = "examples/example-project/";
     static final String DIRECTORY_NAME = "example-project";
-    static final String TEMPLATE_CATEGORY = "EXAMPLE";
+    /**
+     * The shipped templates the example project gets, in this order. Named by id on purpose: the
+     * first version picked them by the category {@code EXAMPLE}, and when its only template moved to
+     * the blueprints (TODO 268ae0db) the example project silently came out empty (TODO 5162bd54).
+     * {@code ExampleTemplatesShippedTest} checks the ids against the shipped files.
+     */
+    static final List<String> EXAMPLE_TEMPLATE_IDS = List.of("blueprint-approval");
 
     private static final Map<String, String> NAME = Map.of(
             "de", "Beispielprojekt",
@@ -148,10 +154,17 @@ public class ExampleProjectService {
                 .map(Workflow::getTemplateId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+        Map<String, WorkflowTemplate> shipped = templateService.findAll().stream()
+                .filter(WorkflowTemplate::isBuiltIn)
+                .collect(Collectors.toMap(WorkflowTemplate::getId, t -> t, (a, b) -> a));
         int added = 0;
-        for (WorkflowTemplate template : templateService.findAll()) {
-            if (!template.isBuiltIn() || !TEMPLATE_CATEGORY.equals(template.getCategory())
-                    || present.contains(template.getId())) {
+        for (String id : EXAMPLE_TEMPLATE_IDS) {
+            WorkflowTemplate template = shipped.get(id);
+            if (template == null) {
+                log.warn("Example template {} is not installed; the example project stays without it", id);
+                continue;
+            }
+            if (present.contains(id)) {
                 continue;
             }
             workflowService.create(new CreateWorkflowRequest(

@@ -141,7 +141,7 @@ Neues Projekt erstellen.
 Das mitgelieferte Beispielprojekt anlegen, gedacht für eine frische Installation. Die Oberfläche bietet es an, solange es kein Projekt gibt.
 
 - **Verzeichnis:** Die Vorlage `classpath:examples/example-project/` wird nach `<automation.examples.directory>/example-project` kopiert. Standard ist `mysuricates-examples` unter dem Workspace-Root, ohne Workspace-Root `./data/examples` neben der Datenbank. Die Umgebungsvariable dafür ist `AUTOMATION_EXAMPLES_DIR`. Ein vorhandenes Verzeichnis wird nie überschrieben.
-- **Workflows:** je ein Workflow pro eingebauter Vorlage der Kategorie `EXAMPLE`, mit `changeSource` `example-project`.
+- **Workflows:** je ein Workflow pro mitgelieferter Vorlage, die `ExampleProjectService.EXAMPLE_TEMPLATE_IDS` nennt (derzeit die Blaupause `blueprint-approval`), mit `changeSource` `example-project`.
 - **Idempotent:** Ein aktives Projekt, das schon auf das Verzeichnis zeigt, wird zurückgegeben, und fehlende Beispiel-Workflows werden ergänzt.
 
 | Parameter | Typ | Pflicht | Werte |

@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The example project against the real context (TODO d12c7560): the seeded built-in
- * {@code example-approval} template, {@code PathValidator} and the version row of the gateway —
+ * {@code blueprint-approval} blueprint, {@code PathValidator} and the version row of the gateway —
  * none of which the unit test sees.
  */
 @SpringBootTest
@@ -73,9 +73,9 @@ class ExampleProjectIntegrationTest {
 
         List<Workflow> workflows = workflowRepository.findByProjectId(projectId);
         Workflow approval = workflows.stream()
-                .filter(w -> "example-approval".equals(w.getTemplateId()))
+                .filter(w -> "blueprint-approval".equals(w.getTemplateId()))
                 .findFirst().orElseThrow();
-        assertThat(approval.getName()).isEqualTo("Beispiel: Freigabe mit Messung");
+        assertThat(approval.getName()).isEqualTo("Freigabe vor dem Handeln");
         assertThat(approval.getBlocks()).extracting(BlockDefinition::getName)
                 .containsExactly("messen", "freigabe", "abschluss");
         WorkflowVersion version = versionRepository
