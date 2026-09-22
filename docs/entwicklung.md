@@ -594,8 +594,8 @@ gate_status: GREEN|YELLOW|RED
 gate_category: <kategorie>
 gate_description: <beschreibung>
 ```
-- YELLOW → RunStatus `COMPLETED_WITH_ERRORS`
-- RED → `AutoTodoService` erstellt ein TODO mit HIGH-Priorität
+- Das Gate ändert den Run-Status nicht; `COMPLETED_WITH_ERRORS` entsteht nur durch einen fehlgeschlagenen `checked_command`-Schritt
+- Mit AutoTodo am Workflow: RED → TODO mit HIGH-, YELLOW → mit MEDIUM-Priorität (`AutoTodoService`)
 - `GateStatusOutputParser` parst die Marker aus Block-Ausgaben
 
 ### Chains

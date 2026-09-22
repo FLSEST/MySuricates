@@ -200,7 +200,7 @@ Headers: Content-Type: application/json, X-API-Key: <dev-key>
 ```
 POST http://localhost:9090/api/v1/workflows/{id}/execute
 Headers: Content-Type: application/json, X-API-Key: <key>
-Response: 201 Created
+Response: 200 OK — der gestartete Lauf (`id` = Run-ID, `status`)
 ```
 
 **Body:**
@@ -219,14 +219,16 @@ Response: 201 Created
 ```
 POST http://localhost:9090/api/v1/chains/{id}/execute
 Headers: Content-Type: application/json, X-API-Key: <key>
+Response: 201 Created — der Chain-Lauf (`id` = Chain-Run-ID)
 ```
 
-**Body (optional):**
+**Body (optional):** die Variablen selbst, ohne Hülle — der Body **ist** der Eingabe-Kontext:
 ```json
-{
-  "inputContext": { "key": "value" }
-}
+{ "key": "value" }
 ```
+
+Ein Body `{"inputContext": {...}}` käme verschachtelt unter dem Schlüssel `inputContext` an; `{{ key }}` bliebe leer.
+Status des Chain-Laufs: `GET /api/v1/chains/{id}/runs/{runId}` (nicht `/executions/{runId}`). Nur mit Modul `chains`.
 
 ### 5. Todo-Resolve-Workflow ausführen
 
@@ -261,10 +263,10 @@ Headers: X-API-Key: <key>
 | `RUNNING` | Nein | Läuft gerade |
 | `PAUSED` | Nein | Pausiert |
 | `COMPLETED` | Ja | Erfolgreich |
-| `COMPLETED_WITH_ERRORS` | Ja | Mit Warnungen (Gate YELLOW) |
+| `COMPLETED_WITH_ERRORS` | Ja | Durchgelaufen, aber ein Schritt mit `checked_command: true` ist fehlgeschlagen (Lauf ging per `on_failure: continue` weiter). Das Gate steht unabhängig davon in `metadata.gate_status` |
 | `FAILED` | Ja | Fehlgeschlagen |
 | `CANCELLED` | Ja | Abgebrochen |
-| `INTERRUPTED` | Ja | Unterbrochen |
+| `INTERRUPTED` | Ja | Unterbrochen (Neustart der Instanz) |
 
 ### 7. Execution steuern
 
@@ -345,8 +347,8 @@ Body: { "workflowName": "...", "status": "PASSED|FAILED|SKIPPED" }
 # Projekte auflisten
 GET /api/v1/projects
 
-# Workflows eines Projekts
-GET /api/v1/workflows?projectId=<uuid>
+# Workflows eines Projekts (GET /api/v1/workflows kennt keinen projectId-Filter)
+GET /api/v1/projects/<uuid>/workflows
 
 # Definition auf bekannte Baufehler pruefen (deterministisch, kein KI-Aufruf)
 GET /api/v1/workflows/{id}/analyze

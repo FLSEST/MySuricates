@@ -969,7 +969,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `RUNNING` | Wird ausgeführt |
 | `PAUSED` | Pausiert (Approval/HumanInput-Block wartet) |
 | `COMPLETED` | Erfolgreich abgeschlossen |
-| `COMPLETED_WITH_ERRORS` | Abgeschlossen, aber YELLOW Gate-Status |
+| `COMPLETED_WITH_ERRORS` | Abgeschlossen, aber ein Schritt mit `checked_command` ist fehlgeschlagen (Lauf ging per `on_failure: continue` weiter) |
 | `FAILED` | Fehlgeschlagen |
 | `CANCELLED` | Abgebrochen |
 | `INTERRUPTED` | Unterbrochen (z.B. durch Server-Neustart), kann fortgesetzt werden |
@@ -1002,7 +1002,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | Wert | Beschreibung |
 |---|---|
 | `GREEN` | Qualitäts-Gate bestanden |
-| `YELLOW` | Gate bestanden mit Warnungen (Run-Status wird zu `COMPLETED_WITH_ERRORS`) |
+| `YELLOW` | Gate bestanden mit Warnungen (Run-Status bleibt unverändert) |
 | `RED` | Gate nicht bestanden (AutoTodoService erstellt HIGH-Priority-TODO) |
 
 ### WishStatus

@@ -969,7 +969,7 @@ The only persistent system configuration outside of `application.yml`.
 | `RUNNING` | Being executed |
 | `PAUSED` | Paused (approval/human-input block waiting) |
 | `COMPLETED` | Successfully completed |
-| `COMPLETED_WITH_ERRORS` | Completed but with YELLOW gate status |
+| `COMPLETED_WITH_ERRORS` | Completed, but a `checked_command` step failed (the run continued via `on_failure: continue`) |
 | `FAILED` | Failed |
 | `CANCELLED` | Cancelled |
 | `INTERRUPTED` | Interrupted (e.g. by server restart), can be resumed |
@@ -1002,7 +1002,7 @@ The only persistent system configuration outside of `application.yml`.
 | Value | Description |
 |---|---|
 | `GREEN` | Quality gate passed |
-| `YELLOW` | Gate passed with warnings (run status becomes `COMPLETED_WITH_ERRORS`) |
+| `YELLOW` | Gate passed with warnings (the run status is unchanged) |
 | `RED` | Gate not passed (AutoTodoService creates HIGH-priority TODO) |
 
 ### WishStatus
