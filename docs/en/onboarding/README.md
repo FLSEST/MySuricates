@@ -37,7 +37,7 @@ MySuricates is an **AI-driven workflow automation platform** with a visual inter
 | Technology | Version | Purpose |
 |---|---|---|
 | **Java** | 21 (LTS) | Programming language with virtual threads |
-| **Spring Boot** | 3.4.13 | Web framework & dependency injection |
+| **Spring Boot** | 3.5.16 | Web framework & dependency injection |
 | **Spring Data JPA** | 3.4.x (via Spring Boot BOM) | Database abstraction (ORM) |
 | **SQLite** | sqlite-jdbc 3.50.3.0 | Embedded database (WAL mode, HikariCP pool size 1) |
 | **Flyway** | 10.20.1 (via Spring Boot BOM) | Database migration management |

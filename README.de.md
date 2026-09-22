@@ -42,7 +42,7 @@ Worktree, datiert in der Tabelle:
 | | |
 |---|---|
 | Entstanden seit | 2026-02-15, rund 1 750 Commits, ein Autor |
-| Backend | Java 21 / Spring Boot 3.4, rund 71 000 Zeilen, 47 REST-Controller, 78 Flyway-Migrationen |
+| Backend | Java 21 / Spring Boot 3.5, rund 71 000 Zeilen, 47 REST-Controller, 78 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 71 000 Zeilen |
 | Tests | Backend 10 313 (0 Fehler, 1 uebersprungen), Frontend 1 436 — Lauf vom 2026-09-21 |
 | Bausteine | 20 Block-Typen, 67 Workflow-Templates, 19 Built-in Skills, 7 Integrations-Provider |
@@ -88,7 +88,7 @@ ein VPN davor, kein offener Port. Vollstaendig:
 
 | Komponente | Technologie |
 |---|---|
-| Backend | Spring Boot 3.4, Java 21 |
+| Backend | Spring Boot 3.5, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
 | Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Shell-Bloecke mit `container_image` |

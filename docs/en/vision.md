@@ -204,7 +204,7 @@ Workflows accumulate knowledge across runs:
 
 ## Technical Stack
 
-- **Backend**: Spring Boot 3.4, Java 21, SQLite, Flyway
+- **Backend**: Spring Boot 3.5, Java 21, SQLite, Flyway
 - **Frontend**: React 19, TypeScript, TailwindCSS, TanStack Query, Zustand
 - **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI, Host Pi CLI
 - **Deployment**: Dev (source) + Stable (Docker, port 9091) + Test (Docker, port 8090)
