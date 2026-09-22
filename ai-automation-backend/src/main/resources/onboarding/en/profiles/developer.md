@@ -6,7 +6,9 @@ Building blocks for code projects, no fixed order:
 - **Tests:** `shell` with `"checked_command": true` derives a gate from the exit code; `retry` (default: 3 attempts) catches flaky tests.
 - **Auto-fix:** `agentic` with a goal such as "Fix failing tests", preceded by an `approval` when a person should agree.
 - **Quality gate:** a block prints `gate_status: GREEN|YELLOW|RED` (plus `gate_category`, `gate_description`). The gate does not change the status of the run.
-- **Build → test → deploy** as a chain (only with the `chains` module).
+<!-- module: chains -->
+- **Build → test → deploy** as a chain.
+<!-- /module -->
 
 ### Workflows via the API
 
@@ -16,10 +18,16 @@ Building blocks for code projects, no fixed order:
 - Workflows of this project: `GET $MS/projects/{{PROJECT_ID}}/workflows`.
 - Runs: `GET $MS/executions?workflowId=<id>&status=FAILED&page=0&size=10` (without steps; details via `/executions/<runId>`).
 
-### Schedules and webhooks
+### Schedules
 
 - Schedule: `POST $MS/schedules` with `{"workflowId": "<id>", "cronExpression": "0 0 8 * * MON-FRI", "description": "Weekdays at 8"}`.
   More fields: `maxRuns`, `endDate`, `conflictBehavior` (`SKIP` by default, or `OVERLAP`), `inputContext`.
   Switch on/off: `POST $MS/schedules/<id>/enable` or `/disable`.
-- Webhook (only with the `webhooks` module): `POST $MS/webhooks` with `{"workflowId": "<id>", "description": "Push"}`.
-  Token and URL appear in full only in this response. Call it without a key: `POST {{BASE_URL}}/api/v1/webhook/trigger/<token>`; the fields of the JSON body become variables of the run.
+<!-- module: webhooks -->
+
+### Webhooks
+
+- Create: `POST $MS/webhooks` with `{"workflowId": "<id>", "description": "Push"}`.
+  Token and URL appear in full only in this response.
+- Call it without a key: `POST {{BASE_URL}}/api/v1/webhook/trigger/<token>`; the fields of the JSON body become variables of the run.
+<!-- /module -->

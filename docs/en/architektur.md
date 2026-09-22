@@ -1070,6 +1070,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V80 | Skills under the seal: `workflows.sealed_skill_hashes`, change history `skill_versions` |
 | V81 | Bilingual onboarding profiles: content as a `{de, en}` map |
 | V82 | Seal state on runs: `workflow_runs.sealed`, `sealed_skill_pins` |
+| V83 | Edited onboarding profiles: `customized`, `shipped_version` |
 
 ## Architecture Gates
 
@@ -1114,7 +1115,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 82 Flyway migrations (V1–V82)
+│           └── db/migration/          ← 83 Flyway migrations (V1–V83)
 │
 └── ai-automation-frontend/
     ├── package.json

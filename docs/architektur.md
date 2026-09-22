@@ -1128,6 +1128,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V80 | Skills unter dem Siegel: `workflows.sealed_skill_hashes`, Änderungshistorie `skill_versions` |
 | V81 | Onboarding-Profile zweisprachig: Inhalt als `{de, en}`-Map |
 | V82 | Siegelstand am Run: `workflow_runs.sealed`, `sealed_skill_pins` |
+| V83 | Bearbeitete Onboarding-Profile: `customized`, `shipped_version` |
 
 ## Architektur-Gates
 
@@ -1172,7 +1173,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 82 Flyway-Migrationen (V1–V82)
+│           └── db/migration/          ← 83 Flyway-Migrationen (V1–V83)
 │
 └── ai-automation-frontend/
     ├── package.json

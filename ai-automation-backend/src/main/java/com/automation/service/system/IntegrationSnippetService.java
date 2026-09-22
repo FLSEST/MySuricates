@@ -3,7 +3,7 @@ package com.automation.service.system;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.project.ProjectOnboardingService;
+import com.automation.service.project.OnboardingRenderer;
 import com.automation.service.project.ProjectService;
 import com.automation.util.LocalizedJson;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * The base onboarding text as a copyable snippet ({@code GET /system/integration-snippet}). Rendered
- * by {@link ProjectOnboardingService}, so it carries the same corrections, language and instance
+ * by {@link OnboardingRenderer}, so it carries the same corrections, language and instance
  * address as the file written into a project.
  */
 @Service
@@ -20,7 +20,7 @@ public class IntegrationSnippetService {
 
     private final OnboardingProfileRepository profileRepository;
     private final ProjectService projectService;
-    private final ProjectOnboardingService projectOnboardingService;
+    private final OnboardingRenderer renderer;
 
     public String render(String projectPath, String locale) {
         String lang = LocalizedJson.normalize(locale);
@@ -32,9 +32,9 @@ public class IntegrationSnippetService {
         sb.append("# MySuricates Integration\n\n");
         profileRepository.findByType(OnboardingProfileType.BASE).stream()
                 .findFirst()
-                .ifPresent(base -> sb.append(projectOnboardingService.fill(base, lang, projectId)).append("\n\n"));
+                .ifPresent(base -> sb.append(renderer.fill(base, lang, projectId)).append("\n\n"));
         if (project != null) {
-            sb.append(projectOnboardingService.renderWorkflowList(project, lang));
+            sb.append(renderer.renderWorkflowList(project, lang));
         }
         return sb.toString().stripTrailing() + "\n";
     }

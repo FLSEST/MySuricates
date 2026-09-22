@@ -32,12 +32,13 @@ class OnboardingProfileServiceTest {
     @Mock private OnboardingProfileRepository profileRepository;
     @Mock private OnboardingProfileHistoryRepository historyRepository;
     @Mock private OnboardingProfileSeeder seeder;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private OnboardingProfileService service;
 
     @BeforeEach
     void setUp() {
-        service = new OnboardingProfileService(profileRepository, historyRepository, seeder);
+        service = new OnboardingProfileService(profileRepository, historyRepository, seeder, eventPublisher);
     }
 
     @Nested

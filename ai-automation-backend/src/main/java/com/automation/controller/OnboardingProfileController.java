@@ -4,6 +4,7 @@ import com.automation.dto.request.CreateOnboardingProfileRequest;
 import com.automation.dto.request.UpdateOnboardingProfileRequest;
 import com.automation.dto.response.OnboardingProfileHistoryResponse;
 import com.automation.dto.response.OnboardingProfileResponse;
+import com.automation.dto.response.ShippedOnboardingProfileResponse;
 import com.automation.entity.OnboardingProfile;
 import com.automation.mapper.OnboardingProfileMapper;
 import com.automation.modules.ModuleCatalog;
@@ -61,6 +62,13 @@ public class OnboardingProfileController {
         return toResponseWithHistory(profileService.resetToDefault(id));
     }
 
+    /** The current shipped text of a built-in profile, to compare with an edited one before taking it over. */
+    @GetMapping("/{id}/shipped")
+    public ShippedOnboardingProfileResponse getShipped(@PathVariable String id) {
+        OnboardingProfile profile = profileService.findById(id);
+        return new ShippedOnboardingProfileResponse(profileService.shippedVersion(profile), profileService.shippedContent(profile));
+    }
+
     @GetMapping("/{id}/history")
     public List<OnboardingProfileHistoryResponse> getHistory(@PathVariable String id) {
         return profileMapper.toHistoryResponseList(profileService.getHistory(id));
@@ -72,7 +80,8 @@ public class OnboardingProfileController {
         return new OnboardingProfileResponse(
                 base.id(), base.key(), base.name(), base.description(),
                 base.content(), base.type(), base.builtIn(), base.sortOrder(),
-                base.version(), historyCount, base.createdAt(), base.updatedAt()
+                base.version(), historyCount, profile.isBuiltIn() && profile.isCustomized(),
+                profileService.isUpdateAvailable(profile), base.createdAt(), base.updatedAt()
         );
     }
 }

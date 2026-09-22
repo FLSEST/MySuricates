@@ -1,23 +1,24 @@
 package com.automation.service.project;
 
-import com.automation.config.InstanceAddress;
 import com.automation.dto.request.OnboardingConfigRequest;
 import com.automation.dto.response.OnboardingStatusResponse;
-import com.automation.entity.OnboardingProfile;
-import com.automation.entity.OnboardingProfileType;
 import com.automation.entity.Project;
-import com.automation.entity.Workflow;
-import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.workflow.WorkflowService;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
+import com.automation.service.workflow.ProjectWorkflowsChangedEvent;
 import com.automation.util.LocalizedJson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,12 +33,12 @@ public class ProjectOnboardingService {
     /** Language of projects that enabled onboarding before it was bilingual: their text was German. */
     static final String LEGACY_LANGUAGE = "de";
 
-    private final OnboardingProfileRepository profileRepository;
-    private final WorkflowService workflowService;
-    private final InstanceAddress instanceAddress;
+    private final OnboardingRenderer renderer;
+    private final ModuleRegistry modules;
     private final ProjectService projectService;
 
     public void enable(Project project, OnboardingConfigRequest config) {
+        String previousFormat = isEnabled(project) ? getFormat(project) : null;
         Map<String, Object> projectConfig = project.getConfig() != null ? new HashMap<>(project.getConfig()) : new HashMap<>();
 
         Map<String, Object> onboarding = new HashMap<>();
@@ -53,6 +54,10 @@ public class ProjectOnboardingService {
         projectService.updateConfig(project.getId(), projectConfig);
 
         writeOnboardingFile(project);
+        // Switching the format leaves the file of the old one behind otherwise (only ours is removed).
+        if (previousFormat != null && !previousFormat.equals(getFormat(project))) {
+            deleteOwnFile(project, resolveRelativePath(previousFormat));
+        }
     }
 
     public void disable(Project project) {
@@ -95,7 +100,7 @@ public class ProjectOnboardingService {
     }
 
     public String preview(Project project) {
-        return renderAll(project);
+        return renderer.render(project, getLanguage(project), getProfileIds(project));
     }
 
     private void writeOnboardingFile(Project project) {
@@ -106,7 +111,7 @@ public class ProjectOnboardingService {
 
         String format = getFormat(project);
         Path targetFile = Path.of(project.getPath(), resolveRelativePath(format));
-        String content = renderAll(project);
+        String content = renderer.render(project, getLanguage(project), getProfileIds(project));
 
         // A hand-written AGENTS.md (or rules file) is the project's own — never overwritten.
         if (Files.exists(targetFile) && !writtenByUs(targetFile)) {
@@ -129,90 +134,61 @@ public class ProjectOnboardingService {
         }
 
         for (String relativePath : List.of(CLAUDE_RULES_PATH, AGENTS_MD_PATH)) {
-            Path file = Path.of(project.getPath(), relativePath);
-            try {
-                if (Files.exists(file)) {
-                    if (writtenByUs(file)) {
-                        Files.delete(file);
-                        log.info("Deleted onboarding file: {}", file);
-                    }
-                }
-            } catch (IOException e) {
-                log.debug("Failed to delete onboarding file {}: {}", file, e.getMessage());
-            }
+            deleteOwnFile(project, relativePath);
         }
     }
 
-    private String renderAll(Project project) {
-        String lang = getLanguage(project);
-        StringBuilder sb = new StringBuilder();
-        sb.append("<!-- ").append(MARKER).append(" — do not edit -->\n");
-        sb.append("# MySuricates Integration\n\n");
-
-        // Layer 1: Base profile
-        profileRepository.findByType(OnboardingProfileType.BASE).stream()
-                .findFirst()
-                .ifPresent(base -> sb.append(fill(base, lang, project.getId())).append("\n\n"));
-
-        // Layer 2: Selected profiles
-        List<String> profileIds = getProfileIds(project);
-        if (!profileIds.isEmpty()) {
-            for (OnboardingProfile profile : profileRepository.findAllById(profileIds)) {
-                sb.append(fill(profile, lang, project.getId())).append("\n\n");
-            }
+    private void deleteOwnFile(Project project, String relativePath) {
+        if (project.getPath() == null || project.getPath().isBlank()) {
+            return;
         }
+        Path file = Path.of(project.getPath(), relativePath);
+        try {
+            if (Files.exists(file) && writtenByUs(file)) {
+                Files.delete(file);
+                log.info("Deleted onboarding file: {}", file);
+            }
+        } catch (IOException e) {
+            log.debug("Failed to delete onboarding file {}: {}", file, e.getMessage());
+        }
+    }
 
-        // Layer 3: Project workflows
-        sb.append(renderWorkflowList(project, lang));
+    /** A project's workflows changed: its file lists them (TODO 644fd5ad). After the commit, so the list is current. */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onProjectWorkflowsChanged(ProjectWorkflowsChangedEvent event) {
+        refreshEnabled(project -> project.getId().equals(event.projectId()));
+    }
 
-        return sb.toString().stripTrailing() + "\n";
+    /** A profile's text changed: every file that includes it is written again. */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onProfileChanged(OnboardingProfileChangedEvent event) {
+        refreshEnabled(project -> event.base() || getProfileIds(project).contains(event.profileId()));
     }
 
     /**
-     * A profile's text in {@code lang} (falling back to the other language) with the placeholders
-     * filled: project id, and address and key command of this instance as the installer set them.
+     * Writes the file again for every project with onboarding switched on that {@code filter} accepts.
+     * Nothing while the module is off — the files stay as they are, nothing is deleted.
+     *
+     * @return how many projects were refreshed
      */
-    public String fill(OnboardingProfile profile, String lang, String projectId) {
-        String text = LocalizedJson.pick(profile.getContent(), lang);
-        return instanceAddress.fill(text == null ? "" : text).replace("{{PROJECT_ID}}", projectId);
-    }
-
-    /** The table of the project's workflows plus how to start one, in {@code lang}. */
-    public String renderWorkflowList(Project project, String lang) {
-        boolean de = "de".equals(LocalizedJson.normalize(lang));
-        List<Workflow> workflows = workflowService.findByProjectId(project.getId());
-        String heading = de ? "## Projekt-Workflows\n\n" : "## Project workflows\n\n";
-        if (workflows.isEmpty()) {
-            return heading + (de ? "_Noch keine Workflows in diesem Projekt._\n" : "_No workflows in this project yet._\n");
+    public int refreshEnabled(Predicate<Project> filter) {
+        if (!modules.isEnabled(ModuleCatalog.ONBOARDING_PROFILES)) {
+            return 0;
         }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(heading);
-        sb.append(de ? "| Workflow | ID | Blöcke | Beschreibung |\n" : "| Workflow | ID | Blocks | Description |\n");
-        sb.append("|----------|-------|--------|-------------|\n");
-
-        for (Workflow wf : workflows) {
-            String name = wf.getName() != null ? wf.getName() : "—";
-            String desc = wf.getDescription() != null ? wf.getDescription().replace("|", "\\|") : "—";
-            if (desc.length() > 80) {
-                desc = desc.substring(0, 77) + "...";
+        int refreshed = 0;
+        for (Project project : projectService.findAll()) {
+            try {
+                if (isEnabled(project) && filter.test(project)) {
+                    writeOnboardingFile(project);
+                    refreshed++;
+                }
+            } catch (RuntimeException e) {
+                log.warn("Failed to refresh onboarding file of project {}: {}", project.getId(), e.getMessage());
             }
-            int blockCount = wf.getBlocks() != null ? wf.getBlocks().size() : 0;
-            sb.append("| ").append(name)
-                    .append(" | `").append(wf.getId()).append("`")
-                    .append(" | ").append(blockCount)
-                    .append(" | ").append(desc)
-                    .append(" |\n");
         }
-
-        sb.append(de ? "\n### Workflow ausführen\n\n" : "\n### Run a workflow\n\n");
-        sb.append("```bash\n");
-        sb.append("curl -s -X POST ").append(instanceAddress.baseUrl()).append("/api/v1/workflows/<ID>/execute \\\n");
-        sb.append("  -H \"Content-Type: application/json\" -H \"X-API-Key: $API_KEY\" \\\n");
-        sb.append("  -d '{\"context\": {}}'\n");
-        sb.append("```\n");
-
-        return sb.toString();
+        return refreshed;
     }
 
     private boolean isEnabled(Project project) {

@@ -562,7 +562,7 @@ The backend comprises **48 REST controllers** and **20 block types**:
 
 **Block types:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
-**Flyway migrations:** V1–V82 (SQLite)
+**Flyway migrations:** V1–V83 (SQLite)
 
 ### Gate Status System
 
@@ -572,8 +572,8 @@ gate_status: GREEN|YELLOW|RED
 gate_category: <category>
 gate_description: <description>
 ```
-- YELLOW → RunStatus `COMPLETED_WITH_ERRORS`
-- RED → `AutoTodoService` creates a TODO with HIGH priority
+- The gate does not change the run status; `COMPLETED_WITH_ERRORS` only comes from a failed `checked_command` step
+- With AutoTodo on the workflow: RED → TODO with HIGH, YELLOW → with MEDIUM priority (`AutoTodoService`)
 - `GateStatusOutputParser` parses the markers from block outputs
 
 ### Chains

@@ -7,7 +7,7 @@ import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.entity.BlockDefinition;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.project.ProjectOnboardingService;
+import com.automation.service.project.OnboardingRenderer;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,8 +38,8 @@ class IntegrationSnippetServiceTest {
     @BeforeEach
     void setUp() {
         service = new IntegrationSnippetService(profileRepository, projectService,
-                new ProjectOnboardingService(profileRepository, workflowService,
-                        new InstanceAddress("", "", 9090), projectService));
+                new OnboardingRenderer(profileRepository, workflowService, new InstanceAddress("", "", 9090),
+                        com.automation.modules.ModuleRegistry.allEnabled()));
     }
 
     // --- render: no base profile ---

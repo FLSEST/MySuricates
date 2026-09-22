@@ -4,7 +4,9 @@
 - **Prüfen:** `simple` fürs Lektorat, `approval` vor der Veröffentlichung.
 - **Dateien:** Umbenennen und Konvertieren mit `shell`, das kostet keine Tokens.
 - **Übersetzen:** `foreach` über die Sprachliste.
-- **Entwurf → Review → Überarbeitung** als Kette (nur mit Modul `chains`).
+<!-- module: chains -->
+- **Entwurf → Review → Überarbeitung** als Kette.
+<!-- /module -->
 
 Empfohlene Variablen: `content_type`, `target_audience`, `tone`, `output_format`.
 

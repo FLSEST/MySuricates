@@ -871,6 +871,8 @@ Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. A
 | `built_in` | INTEGER | NOT NULL, DEFAULT 0 | Ob Built-in (nicht löschbar) |
 | `sort_order` | INTEGER | NOT NULL, DEFAULT 0 | Sortierreihenfolge |
 | `version` | INTEGER | NOT NULL, DEFAULT 1 | Aktuelle Version |
+| `customized` | INTEGER | NOT NULL, DEFAULT 0 | Text von Hand geändert (V83) |
+| `shipped_version` | INTEGER | NOT NULL, DEFAULT 0 | Mitgelieferte Fassung, auf der das Profil beruht; 0 = unbekannt (V83) |
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
@@ -969,7 +971,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `RUNNING` | Wird ausgeführt |
 | `PAUSED` | Pausiert (Approval/HumanInput-Block wartet) |
 | `COMPLETED` | Erfolgreich abgeschlossen |
-| `COMPLETED_WITH_ERRORS` | Abgeschlossen, aber YELLOW Gate-Status |
+| `COMPLETED_WITH_ERRORS` | Abgeschlossen, aber ein Schritt mit `checked_command` ist fehlgeschlagen (Lauf ging per `on_failure: continue` weiter) |
 | `FAILED` | Fehlgeschlagen |
 | `CANCELLED` | Abgebrochen |
 | `INTERRUPTED` | Unterbrochen (z.B. durch Server-Neustart), kann fortgesetzt werden |
@@ -1002,7 +1004,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | Wert | Beschreibung |
 |---|---|
 | `GREEN` | Qualitäts-Gate bestanden |
-| `YELLOW` | Gate bestanden mit Warnungen (Run-Status wird zu `COMPLETED_WITH_ERRORS`) |
+| `YELLOW` | Gate bestanden mit Warnungen (Run-Status bleibt unverändert) |
 | `RED` | Gate nicht bestanden (AutoTodoService erstellt HIGH-Priority-TODO) |
 
 ### WishStatus
@@ -1256,6 +1258,7 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 | V80 | `V80__skill_hardening.sql` | `sealed_skill_hashes` in workflows (Skill-Inhalt unter dem Siegel), neue Tabelle `skill_versions` (Änderungshistorie je Skill, ohne Fremdschlüssel) |
 | V81 | `V81__onboarding_profile_content_i18n.sql` | content in onboarding_profiles und onboarding_profile_history als JSON-Map `{de, en}`; Bestand wird `de` |
 | V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
+| V83 | `V83__onboarding_profile_shipped_version.sql` | `customized`, `shipped_version` in onboarding_profiles (bearbeitete Built-in-Profile bekommen neue Fassungen angeboten statt überschrieben) |
 
 ## SQLite-Besonderheiten
 

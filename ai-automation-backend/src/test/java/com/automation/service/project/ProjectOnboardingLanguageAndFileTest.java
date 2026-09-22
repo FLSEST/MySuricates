@@ -39,7 +39,9 @@ class ProjectOnboardingLanguageAndFileTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjectOnboardingService(profileRepository, workflowService, address, projectService);
+        var modules = com.automation.modules.ModuleRegistry.allEnabled();
+        service = new ProjectOnboardingService(
+                new OnboardingRenderer(profileRepository, workflowService, address, modules), modules, projectService);
         OnboardingProfile base = OnboardingProfile.builder().key("base").type(OnboardingProfileType.BASE)
                 .content(Map.of(
                         "de", "Deutsch {{BASE_URL}} $({{API_KEY_COMMAND}}) {{PROJECT_ID}}",

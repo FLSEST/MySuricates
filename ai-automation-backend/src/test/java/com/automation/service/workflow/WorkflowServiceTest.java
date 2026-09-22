@@ -128,6 +128,8 @@ class WorkflowServiceTest {
         assertThat(result.getName()).isEqualTo("New Workflow");
         assertThat(result.getProject().getId()).isEqualTo("proj-1");
         assertThat(result.getBlocks()).hasSize(1);        verify(mutations).record(result, null, ChangeSource.USER, null);
+        // The project's onboarding file lists its workflows (TODO 644fd5ad).
+        verify(eventPublisher).publishEvent(new ProjectWorkflowsChangedEvent("proj-1"));
     }
 
     @Test
@@ -285,6 +287,7 @@ class WorkflowServiceTest {
 
         verify(workflowRepository).save(testWorkflow);
         assertThat(testWorkflow.getDeletedAt()).isNotNull();
+        verify(eventPublisher).publishEvent(new ProjectWorkflowsChangedEvent("proj-1"));
     }
 
     @Test
