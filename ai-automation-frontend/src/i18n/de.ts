@@ -76,6 +76,10 @@ export const de: TranslationKeys = {
     simpleHome: 'Was möchtest du tun?',
     myWorkflows: 'Meine Workflows',
     results: 'Ergebnisse',
+    addDivider: 'Unterteiler hinzufügen',
+    dividerNamePlaceholder: 'Name (optional)',
+    moveDivider: 'Unterteiler verschieben',
+    removeDivider: 'Unterteiler entfernen',
   },
   simple: {
     home: {

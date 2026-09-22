@@ -26,10 +26,14 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
+import {
+  collapseDividers, effectiveOrder, newDividerId, resolveEntries, withDefaultDividers,
+} from '../../utils/sidebarLayout';
 import type { TranslationKeys } from '../../i18n/en';
 import type { FeatureModuleName } from '../../types';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';
+import { SidebarDivider, SortableDivider } from './SidebarDivider';
 import { PendingInputNavItem } from './PendingInputNavItem';
 
 const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs', '/projects', '/schedules', '/todos', '/activity']);
@@ -137,9 +141,15 @@ const navItems: NavItemDef[] = [
   { to: '/reports', icon: ClipboardList, labelKey: 'reports', module: 'audit' },
 ];
 
+/** Default order incl. the default dividers — over all pages, so anchors of disabled modules still count. */
+const DEFAULT_ORDER = withDefaultDividers(navItems.map((i) => i.to));
+
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
-  const { simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, setSidebarItemOrder, setSidebarHiddenItems } = useSettingsStore();
+  const {
+    simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, sidebarDividerLabels,
+    setSidebarItemOrder, setSidebarHiddenItems, setSidebarDividerLabel, setSidebarDividerLabels,
+  } = useSettingsStore();
   const isMobile = useIsMobile();
   const { data: systemInfo } = useSystemInfo();
   const { data: systemModules } = useSystemModules();
@@ -171,31 +181,38 @@ export function Sidebar() {
     };
   });
 
-  // Compute ordered nav items (respecting custom order, minus hidden)
-  const orderedNavItems = (() => {
-    if (sidebarItemOrder.length === 0) return navItemsWithLabels;
-    const byRoute = Object.fromEntries(navItemsWithLabels.map((i) => [i.to, i]));
-    const ordered = sidebarItemOrder.map((to) => byRoute[to]).filter((x): x is NonNullable<typeof x> => x != null);
-    // append any new items not yet in custom order
-    const extra = navItemsWithLabels.filter((i) => !sidebarItemOrder.includes(i.to));
-    return [...ordered, ...extra];
-  })();
+  // Full order (custom or default, dividers included); new pages are appended.
+  const fullOrder = effectiveOrder(sidebarItemOrder, DEFAULT_ORDER, navItemsWithLabels.map((i) => i.to));
+  const shownItems = navItemsWithLabels.filter((item) => !sidebarHiddenItems.includes(item.to));
 
-  const visibleNavItems = simpleMode
-    ? orderedNavItems.filter((item) => SIMPLE_MODE_ROUTES.has(item.to))
-    : orderedNavItems.filter((item) => !sidebarHiddenItems.includes(item.to));
+  // Dividers that separate nothing on this installation (disabled modules, hidden pages) drop out.
+  const visibleEntries = simpleMode
+    ? resolveEntries(fullOrder, navItemsWithLabels.filter((item) => SIMPLE_MODE_ROUTES.has(item.to)))
+        .filter((entry) => entry.kind === 'item')
+    : collapseDividers(resolveEntries(fullOrder, shownItems), (id) => Boolean(sidebarDividerLabels[id]));
 
   const hiddenNavItems = navItemsWithLabels.filter((item) => sidebarHiddenItems.includes(item.to));
 
-  const editModeNavItems = orderedNavItems.filter((item) => !sidebarHiddenItems.includes(item.to));
+  // Edit mode shows every divider as stored, so each one can be moved or removed.
+  const editModeEntries = resolveEntries(fullOrder, shownItems);
+  const entryId = (entry: (typeof editModeEntries)[number]) => (entry.kind === 'divider' ? entry.id : entry.item.to);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const currentOrder = orderedNavItems.map((i) => i.to);
-    const oldIndex = currentOrder.indexOf(active.id as string);
-    const newIndex = currentOrder.indexOf(over.id as string);
-    setSidebarItemOrder(arrayMove(currentOrder, oldIndex, newIndex));
+    // Move within the full order so entries not shown here (disabled modules) keep their place.
+    const oldIndex = fullOrder.indexOf(active.id as string);
+    const newIndex = fullOrder.indexOf(over.id as string);
+    setSidebarItemOrder(arrayMove(fullOrder, oldIndex, newIndex));
+  };
+
+  const handleAddDivider = () => {
+    setSidebarItemOrder([...fullOrder, newDividerId()]);
+  };
+
+  const handleRemoveDivider = (id: string) => {
+    setSidebarItemOrder(fullOrder.filter((entry) => entry !== id));
+    setSidebarDividerLabel(id, '');
   };
 
   const handleHide = (to: string) => {
@@ -209,6 +226,7 @@ export function Sidebar() {
   const handleReset = () => {
     setSidebarItemOrder([]);
     setSidebarHiddenItems([]);
+    setSidebarDividerLabels({});
   };
 
   const isOpen = isMobile ? mobileOpen : true;
@@ -288,39 +306,62 @@ export function Sidebar() {
         )}
         {editMode && !collapsed ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={editModeNavItems.map((i) => i.to)} strategy={verticalListSortingStrategy}>
-              {editModeNavItems.map((item) => (
-                <SortableNavItem
-                  key={item.to}
-                  id={item.to}
-                  item={item}
-                  onHide={handleHide}
-                />
-              ))}
+            <SortableContext items={editModeEntries.map(entryId)} strategy={verticalListSortingStrategy}>
+              {editModeEntries.map((entry) =>
+                entry.kind === 'divider' ? (
+                  <SortableDivider
+                    key={entry.id}
+                    id={entry.id}
+                    label={sidebarDividerLabels[entry.id] ?? ''}
+                    onLabelChange={setSidebarDividerLabel}
+                    onRemove={handleRemoveDivider}
+                  />
+                ) : (
+                  <SortableNavItem
+                    key={entry.item.to}
+                    id={entry.item.to}
+                    item={entry.item}
+                    onHide={handleHide}
+                  />
+                ),
+              )}
             </SortableContext>
+            <button
+              onClick={handleAddDivider}
+              className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--color-sidebar-text-muted)] transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
+            >
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.nav.addDivider}</span>
+            </button>
           </DndContext>
         ) : (
-          visibleNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                 ${isActive
-                   ? 'text-[var(--color-sidebar-text)]'
-                   : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
-                 }`
-              }
-              style={({ isActive }) => ({
-                backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
-              })}
-              onClick={() => { if (isMobile) setMobileOpen(false); }}
-            >
-              <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
-              {showLabels && <span className="truncate">{item.label}</span>}
-            </NavLink>
-          ))
+          visibleEntries.map((entry) => {
+            if (entry.kind === 'divider') {
+              return <SidebarDivider key={entry.id} label={sidebarDividerLabels[entry.id]} showLabels={showLabels} />;
+            }
+            const item = entry.item;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                   ${isActive
+                     ? 'text-[var(--color-sidebar-text)]'
+                     : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
+                   }`
+                }
+                style={({ isActive }) => ({
+                  backgroundColor: isActive ? 'var(--color-sidebar-active)' : undefined,
+                })}
+                onClick={() => { if (isMobile) setMobileOpen(false); }}
+              >
+                <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
+                {showLabels && <span className="truncate">{item.label}</span>}
+              </NavLink>
+            );
+          })
         )}
 
         {/* Hidden items — show as "+ add back" in edit mode */}

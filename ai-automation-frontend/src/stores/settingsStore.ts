@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { withDefaultDividers } from '../utils/sidebarLayout';
 
 /** Bounds for the todo page sizes — small enough to stay responsive, large enough to be useful. */
 export const PAGE_SIZE_MIN = 10;
@@ -24,6 +25,8 @@ interface SettingsState {
   suggestionsEnabled: boolean;
   sidebarItemOrder: string[];
   sidebarHiddenItems: string[];
+  /** Optional names of sidebar dividers, keyed by divider id; unnamed dividers have no entry. */
+  sidebarDividerLabels: Record<string, string>;
   pinnedWorkflowIds: string[];
   simpleOnboardingSeen: boolean;
   /** Welcome walkthrough dismissed; set back to false to show it again. */
@@ -44,6 +47,8 @@ interface SettingsState {
   setSuggestionsEnabled: (enabled: boolean) => void;
   setSidebarItemOrder: (order: string[]) => void;
   setSidebarHiddenItems: (hidden: string[]) => void;
+  setSidebarDividerLabel: (id: string, label: string) => void;
+  setSidebarDividerLabels: (labels: Record<string, string>) => void;
   togglePinnedWorkflow: (id: string) => void;
   setSimpleOnboardingSeen: (seen: boolean) => void;
   setWalkthroughSeen: (seen: boolean) => void;
@@ -66,6 +71,7 @@ export const useSettingsStore = create<SettingsState>()(
       suggestionsEnabled: true,
       sidebarItemOrder: [],
       sidebarHiddenItems: [],
+      sidebarDividerLabels: {},
       pinnedWorkflowIds: [],
       simpleOnboardingSeen: false,
       walkthroughSeen: false,
@@ -83,6 +89,13 @@ export const useSettingsStore = create<SettingsState>()(
       setSuggestionsEnabled: (suggestionsEnabled) => set({ suggestionsEnabled }),
       setSidebarItemOrder: (sidebarItemOrder) => set({ sidebarItemOrder }),
       setSidebarHiddenItems: (sidebarHiddenItems) => set({ sidebarHiddenItems }),
+      setSidebarDividerLabel: (id, label) =>
+        set((state) => {
+          const { [id]: _previous, ...rest } = state.sidebarDividerLabels;
+          const trimmed = label.trim();
+          return { sidebarDividerLabels: trimmed ? { ...rest, [id]: label } : rest };
+        }),
+      setSidebarDividerLabels: (sidebarDividerLabels) => set({ sidebarDividerLabels }),
       togglePinnedWorkflow: (id) =>
         set((state) => ({
           pinnedWorkflowIds: state.pinnedWorkflowIds.includes(id)
@@ -94,6 +107,17 @@ export const useSettingsStore = create<SettingsState>()(
       setListPageSize: (size) => set({ listPageSize: clampPageSize(size) }),
       setKanbanColumnSize: (size) => set({ kanbanColumnSize: clampPageSize(size) }),
     }),
-    { name: 'app-settings' }
+    {
+      name: 'app-settings',
+      version: 1,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<SettingsState>;
+        // v1 introduced sidebar dividers: a custom order saved before gets the default dividers.
+        if (version < 1 && state.sidebarItemOrder?.length) {
+          state.sidebarItemOrder = withDefaultDividers(state.sidebarItemOrder);
+        }
+        return state as SettingsState;
+      },
+    }
   )
 );

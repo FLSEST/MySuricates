@@ -81,3 +81,29 @@ describe('settingsStore', () => {
     expect(state.autoTodoDefault).toBe(true);
   });
 });
+
+describe('settingsStore sidebar dividers', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ sidebarItemOrder: [], sidebarDividerLabels: {} });
+  });
+
+  it('gives a custom order saved before dividers existed the default dividers', () => {
+    const migrate = useSettingsStore.persist.getOptions().migrate!;
+    const migrated = migrate({ sidebarItemOrder: ['/', '/cockpit', '/wishes'] }, 0) as { sidebarItemOrder: string[] };
+    expect(migrated.sidebarItemOrder).toEqual(['/', 'divider:default-triggers', '/cockpit', 'divider:default-ideas', '/wishes']);
+  });
+
+  it('leaves an unsaved (default) order empty on migration', () => {
+    const migrate = useSettingsStore.persist.getOptions().migrate!;
+    const migrated = migrate({ sidebarItemOrder: [] }, 0) as { sidebarItemOrder: string[] };
+    expect(migrated.sidebarItemOrder).toEqual([]);
+  });
+
+  it('stores a divider name and removes it again when cleared', () => {
+    const { setSidebarDividerLabel } = useSettingsStore.getState();
+    setSidebarDividerLabel('divider:a', 'Bauen');
+    expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({ 'divider:a': 'Bauen' });
+    setSidebarDividerLabel('divider:a', '   ');
+    expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({});
+  });
+});

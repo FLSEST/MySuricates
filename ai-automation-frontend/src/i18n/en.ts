@@ -74,6 +74,10 @@ export const en = {
     simpleHome: 'What do you want to do?',
     myWorkflows: 'My Workflows',
     results: 'Results',
+    addDivider: 'Add divider',
+    dividerNamePlaceholder: 'Name (optional)',
+    moveDivider: 'Move divider',
+    removeDivider: 'Remove divider',
   },
   simple: {
     home: {

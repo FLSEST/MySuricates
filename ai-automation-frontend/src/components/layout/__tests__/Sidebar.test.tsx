@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -14,7 +14,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   localStorage.clear();
   useI18nStore.setState({ locale: 'en' });
-  useSettingsStore.setState({ simpleMode: false, sidebarItemOrder: [], sidebarHiddenItems: [] });
+  useSettingsStore.setState({ simpleMode: false, sidebarItemOrder: [], sidebarHiddenItems: [], sidebarDividerLabels: {} });
 });
 
 describe('Sidebar modules', () => {
@@ -48,5 +48,80 @@ describe('Sidebar modules', () => {
 
     expect(await screen.findByRole('link', { name: 'Chains' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Webhooks' })).toBeInTheDocument();
+  });
+});
+
+describe('Sidebar dividers', () => {
+  const withModules = (disabled: Parameters<typeof modulesFixture>[1]) =>
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', disabled)));
+
+  it('shows the four default dividers when every module is enabled', () => {
+    withModules([]);
+    renderWithProviders(<Sidebar />);
+    expect(screen.getAllByRole('separator')).toHaveLength(4);
+  });
+
+  it('drops the divider of a group whose only page belongs to a disabled module', () => {
+    withModules(['onboarding-profiles']);
+    renderWithProviders(<Sidebar />);
+    expect(screen.getAllByRole('separator')).toHaveLength(3);
+  });
+
+  it('keeps the groups of an installation with several modules off apart', () => {
+    // wishes gone, factory and dialogs still there: they keep a divider of their own
+    withModules(['wishes']);
+    renderWithProviders(<Sidebar />);
+    expect(screen.getAllByRole('separator')).toHaveLength(4);
+  });
+
+  it('drops the divider of a group the user hid completely', () => {
+    withModules([]);
+    useSettingsStore.setState({ sidebarHiddenItems: ['/onboarding-profiles'] });
+    renderWithProviders(<Sidebar />);
+    expect(screen.getAllByRole('separator')).toHaveLength(3);
+  });
+
+  it('shows no dividers in simple mode', () => {
+    withModules([]);
+    useSettingsStore.setState({ simpleMode: true });
+    renderWithProviders(<Sidebar />);
+    expect(screen.queryAllByRole('separator')).toHaveLength(0);
+  });
+
+  it('adds, names and removes dividers in edit mode', () => {
+    withModules([]);
+    renderWithProviders(<Sidebar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Menü bearbeiten' }));
+
+    expect(screen.getAllByRole('button', { name: 'Remove divider' })).toHaveLength(4);
+    fireEvent.click(screen.getByRole('button', { name: 'Add divider' }));
+    const inputs = screen.getAllByRole('textbox', { name: 'Name (optional)' });
+    expect(inputs).toHaveLength(5);
+
+    // name the first default divider, remove the second
+    fireEvent.change(inputs[0]!, { target: { value: 'Planen' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove divider' })[1]!);
+
+    const { sidebarItemOrder, sidebarDividerLabels } = useSettingsStore.getState();
+    expect(sidebarItemOrder.filter((id) => id.startsWith('divider:'))).toHaveLength(4);
+    expect(sidebarItemOrder).not.toContain('divider:default-onboarding');
+    expect(sidebarDividerLabels).toEqual({ 'divider:default-triggers': 'Planen' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeitung beenden' }));
+    // the new divider sits at the end and separates nothing; the named one is a heading
+    expect(screen.getAllByRole('separator')).toHaveLength(3);
+    expect(screen.getByRole('separator', { name: 'Planen' })).toHaveTextContent('Planen');
+  });
+
+  it('restores the default dividers on reset', () => {
+    withModules([]);
+    useSettingsStore.setState({ sidebarItemOrder: ['/', '/todos'], sidebarDividerLabels: { 'divider:x': 'X' } });
+    renderWithProviders(<Sidebar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Menü bearbeiten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeitung beenden' }));
+
+    expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({});
+    expect(screen.getAllByRole('separator')).toHaveLength(4);
   });
 });
