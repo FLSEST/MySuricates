@@ -22,11 +22,14 @@ import { SettingsSection } from '../components/settings/SettingsSection';
 import { ModulesCard } from '../components/settings/ModulesCard';
 import { StartupConfigCard } from '../components/settings/StartupConfigCard';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useRequestMetrics } from '../hooks/useRequestMetrics';
+import { ApiLatencyCard } from '../components/dashboard/ApiLatencyCard';
 
 export function Settings() {
   const t = useT();
   const { simpleMode, advancedMode } = useSettingsStore();
   const { data: sysInfo } = useSystemInfo();
+  const { data: requestMetrics } = useRequestMetrics();
   const stagingModule = useModuleEnabled('staging');
   const remoteAccessModule = useModuleEnabled('remote-access');
   const wishesModule = useModuleEnabled('wishes');
@@ -164,6 +167,7 @@ export function Settings() {
 
           <SettingsSection id="system" title={t.settings.settingsNavSystem} collapsible open={!!openSections['system']} onToggle={() => toggleSection('system')}>
             <SystemInfoCard />
+            <ApiLatencyCard data={requestMetrics} />
           </SettingsSection>
         </div>
       </div>
