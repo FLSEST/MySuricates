@@ -111,8 +111,8 @@
       "type": "shell",
       "name": "abhaengigkeiten",
       "config": {
-        "description": "Lockfiles und Abhaengigkeits-Inventar (ohne Netzzugriff)",
-        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/dependency-risk-scan.sh\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
+        "description": "Lockfiles, Inventar und Schwachstellenpruefung (npm audit, OSV.dev)",
+        "command": "set -uo pipefail\nexport PUBLIC_READINESS_MAX_LINES=120\ncd \"{{ execution_path }}\" || exit 0\nbash scripts/public-readiness/dependency-risk-scan.sh --with-tools\nrc=$?\n[ \"$rc\" -ne 0 ] && echo \"(Skript-Exitcode: $rc)\"\nexit 0",
         "timeout_seconds": 600,
         "on_failure": "continue"
       }

@@ -38,25 +38,51 @@ else
   echo "backend_pom_xml: absent"
 fi
 
+# Schwachstellenpruefung (TODO 0f6d23b2): nur Zaehlungen und Paketnamen, keine
+# Rohausgabe. npm audit fuer das Frontend, OSV.dev fuer die Maven-Koordinaten
+# (dep_vuln_check.py, nur Python-Stdlib). Eine ausgefallene Pruefung zaehlt als
+# offen, nie als sauber. Fuer Tests ohne Netz: NPM_AUDIT_JSON_FILE,
+# MVN_DEPS_FILE und OSV_FIXTURE ersetzen die Werkzeugaufrufe.
+VULN_OPEN=""
 if [ "$WITH_TOOLS" -eq 1 ]; then
+  TMPD="$(mktemp -d)"; trap 'rm -rf "$TMPD"' EXIT
   if [ -f ai-automation-frontend/package.json ]; then
-    tool_section "npm audit" npm
-    (cd ai-automation-frontend && npm audit --audit-level=moderate 2>&1 | redact | head -180) || true
+    tool_section "npm audit (vulnerability counts)" npm
+    audit_json="${NPM_AUDIT_JSON_FILE:-$TMPD/npm-audit.json}"
+    [ -n "${NPM_AUDIT_JSON_FILE:-}" ] || (cd ai-automation-frontend && timeout 120 npm audit --json >"$audit_json" 2>/dev/null)
+    npm_out=$(python3 "$SCRIPT_DIR/dep_vuln_check.py" npm "$audit_json"); rc=$?
+    printf '%s\n' "$npm_out"
+    if [ "$rc" -ne 0 ]; then VULN_OPEN="$VULN_OPEN npm-audit-unavailable"
+    elif [ "$(printf '%s\n' "$npm_out" | awk -F': ' '/^npm_audit_(high|critical):/ {n+=$2} END {print n+0}')" -gt 0 ]; then
+      VULN_OPEN="$VULN_OPEN npm-high-critical"
+    fi
   fi
   if [ -f ai-automation-backend/pom.xml ]; then
-    tool_section "Maven dependency tree" mvn
-    (cd ai-automation-backend && mvn -q dependency:tree -Dscope=compile 2>&1 | redact | head -220) || true
+    tool_section "OSV.dev (Maven runtime dependencies)" mvn
+    deps_txt="${MVN_DEPS_FILE:-$TMPD/mvn-deps.txt}"
+    [ -n "${MVN_DEPS_FILE:-}" ] || (cd ai-automation-backend && timeout 300 mvn -B -q dependency:list \
+      -DincludeScope=runtime -DoutputFile="$deps_txt" >/dev/null 2>&1)
+    osv_out=$(python3 "$SCRIPT_DIR/dep_vuln_check.py" maven "$deps_txt"); rc=$?
+    printf '%s\n' "$osv_out"
+    if [ "$rc" -ne 0 ]; then VULN_OPEN="$VULN_OPEN osv-unavailable"
+    elif [ "$(printf '%s\n' "$osv_out" | awk -F': ' '/^osv_maven_high_or_unknown_packages:/ {print $2+0}')" -gt 0 ]; then
+      VULN_OPEN="$VULN_OPEN maven-high-critical"
+    fi
   fi
 fi
 
 section "Gate status"
-if [ "$WITH_TOOLS" -eq 1 ]; then
-  echo "gate_status: YELLOW"
-  echo "gate_category: dependency-risk"
-  echo "gate_description: Dependency scan executed (tool-dependent); review audit output and add stronger supply-chain tooling if needed."
-  echo "todo_item: Review dependency and supply-chain scan results | MEDIUM | security,dependencies | Triage npm/Maven findings and decide whether OSV/trivy/gitleaks gates are needed."
-else
+if [ "$WITH_TOOLS" -eq 0 ]; then
   echo "gate_status: GREEN"
   echo "gate_category: dependency-inventory"
-  echo "gate_description: Dependency inventory completed deterministically. Run with --with-tools for npm audit / mvn dependency:tree."
+  echo "gate_description: Dependency inventory completed deterministically. Run with --with-tools for the vulnerability check (npm audit + OSV.dev)."
+elif [ -z "$VULN_OPEN" ]; then
+  echo "gate_status: GREEN"
+  echo "gate_category: dependency-risk"
+  echo "gate_description: Vulnerability check ran (npm audit + OSV.dev): no high/critical findings in frontend or Maven runtime dependencies."
+else
+  echo "gate_status: YELLOW"
+  echo "gate_category: dependency-risk"
+  echo "gate_description: Vulnerability check open:${VULN_OPEN} — see the counts above."
+  echo "todo_item: Abhaengigkeiten mit Schwachstellen pruefen (${VULN_OPEN# }) | MEDIUM | security,dependencies | Befunde aus npm audit / OSV.dev im Evidenz-Lauf sichten; betroffene Pakete aktualisieren oder begruendet zurueckstellen."
 fi

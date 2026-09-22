@@ -70,6 +70,8 @@ jobs:
         run: bash scripts/tests/test-audit-facts.sh
       - name: Coverage-Snapshot Selbsttest
         run: bash scripts/tests/test-coverage-snapshot.sh
+      - name: Schwachstellen-Scan Selbsttest (ohne Netz)
+        run: bash scripts/tests/test-dependency-risk-scan.sh
 
   gitleaks:
     name: Gitleaks Secret Scan
