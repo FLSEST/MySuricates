@@ -11,7 +11,8 @@ MySuricates ist eine lokale Workflow-Plattform: Workflows bestehen aus Bloecken,
 deterministisch sind (Shell, Verzweigung, Schleife) oder eine KI aufrufen. Aus dieser Mischung ist
 ein Regelkreis entstanden, der Befunde ueber die eigene Codebasis erzeugt, daraus TODOs macht,
 Fix-Workflows anstoesst und das Ergebnis wieder prueft. Der Code ist weitgehend in KI-Sitzungen
-entstanden, ein Teil davon ueber diesen Regelkreis selbst.
+entstanden: 1 354 von 1 825 Commits tragen einen KI-Trailer, 340 davon den Trailer des Regelkreises
+selbst (`Generated-By: MySuricates`, Stand 2026-09-23).
 
 **Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
@@ -47,7 +48,7 @@ Es heisst nicht, dass die Frage beantwortet ist.
 
 | Frage | Mechanismus im Code |
 |---|---|
-| Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → Gate-Bewertung → automatisch erzeugtes TODO → `TodoTrigger` startet einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft. |
+| Kann ein System den eigenen Verbesserungsbedarf feststellen und abarbeiten, ohne dass jemand den Anstoss gibt? | **Self-Improvement-Loop**: Audit-Workflow → maschinelle Bewertung durch ein Gate (letzte Zeile dieser Tabelle) → automatisch erzeugtes TODO → der `TodoTrigger` startet dazu einen Fix-Workflow → Verifikation. Drei Schichten verhindern, dass der Loop sich selbst nachlaeuft: ein Fix-Run ist als solcher markiert und darf selbst kein TODO erzeugen, je TODO ist die Zahl der Fix-Versuche begrenzt, und solange ein Fix-Run laeuft, startet kein zweiter. [Details](docs/architektur.md#todo-triggers--self-improvement-loop-v51v52) |
 | Was muss ein Agent ueber ein Projekt wissen, und woher kommt dieses Wissen, wenn niemand es aufschreibt? | **Workflow-Memory**: aus abgeschlossenen Runs wird Wissen extrahiert und vor dem naechsten Lauf als Kontext eingespielt. |
 | Wie behaelt man die Kontrolle ueber einen Agenten, der mehrere Schritte selbst plant? | **Agentische Bloecke** trennen Reason und Act — erst entscheidet ein Aufruf, was zu tun ist, ein zweiter fuehrt es aus — und laufen gegen harte Budgets: Iterationen, Zeit, kumulierte Tokens, Wiederholungserkennung. |
 | Kann man die Qualitaet einer KI-Ausgabe maschinell bewerten, statt sie zu lesen? | **Gates**: Bloecke geben `gate_status: GREEN\|YELLOW\|RED` aus. RED erzeugt ein TODO mit hoher, YELLOW eines mit mittlerer Prioritaet. Die Bewertung steckt im Workflow, nicht in der Plattform. |
@@ -59,9 +60,14 @@ die wiederkehrende Lehre. Die Mechanismen einzeln, je mit Ablaufdiagramm, Codebe
 [Konzepte](docs/konzepte/README.md).
 
 Nicht alles davon ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
-Start festgelegt werden: das Preset `core` (Standard) enthaelt den Kern, `research` ergaenzt
-Chains, Assistent, Learning, Workflow-Memory, Audit Center und BPMN, `full` schaltet alles frei —
-darunter Integrationen, Webhooks und Fernzugriff. Der Installer fragt danach.
+Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
+Zeitplaene, TODOs. `research` ergaenzt die Mechanismen dieses Abschnitts und ihre Oberflaechen:
+Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
+abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
+Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
+die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
+Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
+steht in [docs/architektur.md](docs/architektur.md#module-system-startkonfiguration).
 
 ## Was da steht
 
@@ -145,9 +151,20 @@ Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklic
 > Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
 > fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
+**Voraussetzung fuer KI-Bloecke:** Mindestens eine der unterstuetzten Kommandozeilen muss auf dem
+Rechner installiert und angemeldet sein — `claude` (Anthropic), `codex` (OpenAI) oder `pi`. Ohne
+eine davon laufen nur die deterministischen Bloecke (Shell, Verzweigung, Schleife); der Installer
+prueft das nicht, KI-Bloecke scheitern dann erst zur Laufzeit.
+
+> **Zum Namen:** Das Projekt heisst MySuricates, das Arbeitsverzeichnis und einige Skripte tragen
+> noch den frueheren Namen `autotrigger` (etwa `scripts/start-autotrigger-dev.sh`). Beides meint
+> dasselbe; die Umbenennung steht aus.
+
 Nur ausprobieren: Im geklonten Repository startet `scripts/tryout.sh build && scripts/tryout.sh start`
-einen Container mit allen Werkzeugen auf http://localhost:9095, der nichts vom Rechner einbindet —
-dafuer braucht es nur Docker
+einen Container mit allen Werkzeugen auf http://localhost:9095 — dafuer braucht es nur Docker.
+Der Container bindet keine Ordner und keine Anmeldung vom Rechner ein; fuer KI-Bloecke meldet man
+sich einmal **im Container** an (`scripts/tryout.sh login claude`, ebenso `codex` oder `pi`), die
+Anmeldung bleibt in einem eigenen Docker-Volume
 ([Getting Started](docs/GETTING-STARTED.md#nur-ausprobieren--ohne-installation)).
 
 Dauerhaft einrichten:
@@ -164,30 +181,15 @@ Rueckfrage, baut und startet die Instanz. Danach: http://localhost:9090, den API
 `scripts/instance.sh key --name main`. Die Instanz lauscht nur auf `127.0.0.1`; der Docker-Socket
 wird nur auf ausdruecklichen Wunsch eingebunden.
 
-Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start`, danach
-`./scripts/start-autotrigger-dev.sh` (Backend :9090, Vite mit Hot Reload :3000) — siehe
-[docs/entwicklung.md](docs/entwicklung.md).
+Wer an MySuricates selbst entwickelt: `./scripts/setup.sh --from-source --start` richtet ein, baut
+das Runtime-JAR und startet damit gleich `./scripts/start-autotrigger-dev.sh` — Backend auf :9090
+und Vite mit Hot Reload auf :3000, in einer Instanz. Ohne `--start` endet der Installer mit
+demselben Befehl als Hinweis; von da an ist er der Weg, die Dev-Instanz zu starten, zu stoppen
+(`stop`) und nach einer Aenderung neu zu bauen (`restart`). Er ist idempotent und startet keine
+zweite Instanz. Siehe [docs/entwicklung.md](docs/entwicklung.md).
 
 <!-- Screenshot-Platzhalter -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-
-## Todo-Workflow-Verknuepfung
-
-Todos koennen optional mit einem **Resolver-Workflow** verknuepft werden — dem Workflow, der
-dieses eine Todo erledigen soll. Die Verknuepfung ist bewusst nicht global und startet nichts
-automatisch. Eingestellt wird sie in der Todo-Ansicht der Oberflaeche; die genannten Feldnamen
-sind die der REST-API (`/api/v1/todos`).
-
-- `linkedWorkflowId` am Todo ist optional.
-- Ein verlinkter Workflow wird erst durch die manuelle Aktion `Loesen` gestartet.
-- Beim Start wechselt das Todo auf `IN_PROGRESS` und `resolutionState=RUNNING`.
-- Bei erfolgreichem Workflow-Run wird das Todo automatisch auf `DONE` gesetzt.
-- Bei einem fehlgeschlagenen Run springt das Todo auf den vorherigen Status zurueck und `resolutionState=FAILED`.
-
-Abgrenzung:
-- Das ist nicht dasselbe wie der bestehende `TodoTrigger`-Mechanismus.
-- `TodoTrigger` startet Workflows regelbasiert/automatisch.
-- Die Todo-Workflow-Verknuepfung ist aktuell ein manueller, optionaler Resolve-Flow pro Todo.
 
 ## Beiträge und Support
 
@@ -202,4 +204,4 @@ GitHub).
 
 ---
 
-> 🌍 Die englische `README.md` wird vom Workflow **„README DE↔EN Sync"** aus dieser Datei generiert. Bei inhaltlichen Änderungen diese deutsche Quelle bearbeiten und den Workflow laufen lassen. Der Workflow selbst gehört zur lokalen MySuricates-Instanz und ist nicht Teil dieses Repositories.
+> 🌍 **README.de.md ist die Quelle, `README.md` die Übersetzung.** Inhaltliche Änderungen gehören in diese deutsche Datei. Die englische Fassung erzeugt der Autor daraus in seiner MySuricates-Instanz mit dem Workflow „README DE↔EN Sync"; im Repository liegt nur das Ergebnis, der Workflow selbst nicht. Wer von außen beiträgt, ändert also die deutsche Quelle und passt `README.md` im selben Commit von Hand an — oder ändert nur die deutsche und weist im Pull Request darauf hin, dass die Übersetzung noch nachzuziehen ist.

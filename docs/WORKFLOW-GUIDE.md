@@ -1888,9 +1888,11 @@ Zusätzlich werden alle Einträge aus `contextTemplate` des Triggers als weitere
 
 ### Loop-Prevention (3 Schichten)
 
-1. **Max-Attempts**: Nach `maxAttempts` fehlgeschlagenen Fix-Versuchen wird nicht erneut getriggert
-2. **Source-Filter**: Trigger können auf `sourceFilter: "WORKFLOW"` eingeschränkt werden — manuell erstellte TODOs lösen keinen Fix aus
-3. **Fix-Attempt-Tracking**: `todo.fixAttempts` zählt Versuche, `todo.lastFixRunId` speichert den letzten Run
+1. **Metadata-Flag**: Ein vom TodoTrigger gestarteter Fix-Run trägt `todoTriggerRun` in den Run-Metadaten; für solche Runs erzeugt `AutoTodoService` kein TODO — das kappt die Rekursion TODO → Run → TODO
+2. **Max-Attempts**: `todo.fixAttempts` zählt die Versuche; nach `maxAttempts` (Standard 3) wird zu diesem TODO nicht erneut getriggert
+3. **Running-Check**: Solange der letzte Fix-Run (`todo.lastFixRunId`) noch läuft, startet kein zweiter
+
+Zusätzlich, aber nicht Teil der Schleifenbremse: das Pausenfenster `automation.todo-trigger.skip-until`, ein Kandidat pro Poll-Tick sowie die Source-, Tag-, Projekt- und Prioritätsfilter des Triggers (`sourceFilter: "WORKFLOW"` etwa schließt manuell erstellte TODOs aus).
 
 ### Auto-Close
 

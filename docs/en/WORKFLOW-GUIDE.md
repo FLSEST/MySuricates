@@ -1865,9 +1865,11 @@ Additionally, all entries from the trigger's `contextTemplate` are passed as add
 
 ### Loop Prevention (3 Layers)
 
-1. **Max attempts**: After `maxAttempts` failed fix attempts, no further triggering occurs
-2. **Source filter**: Triggers can be restricted to `sourceFilter: "WORKFLOW"` — manually created TODOs do not trigger a fix
-3. **Fix attempt tracking**: `todo.fixAttempts` counts attempts, `todo.lastFixRunId` stores the last run
+1. **Metadata flag**: A fix run started by the TodoTrigger carries `todoTriggerRun` in its run metadata; `AutoTodoService` creates no TODO for such runs — this cuts the recursion TODO → run → TODO
+2. **Max attempts**: `todo.fixAttempts` counts the attempts; after `maxAttempts` (default 3) this TODO is not triggered again
+3. **Running check**: While the last fix run (`todo.lastFixRunId`) is still running, no second one starts
+
+In addition, but not part of the loop brake: the pause window `automation.todo-trigger.skip-until`, one candidate per poll tick, and the trigger's source, tag, project and priority filters (`sourceFilter: "WORKFLOW"` excludes manually created TODOs, for example).
 
 ### Auto-Close
 

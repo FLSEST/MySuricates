@@ -20,7 +20,7 @@ Ein sinnvoller Einsatz ist die kontrollierte Nacharbeit wiederkehrender Qualitä
 
 ## Vorteile
 
-Der Mechanismus trennt Erkennung, Arbeitsauftrag, Ausführung und Bewertung. Dadurch lassen sich automatische Reaktionen eng konfigurieren statt pauschal auf jeden Befund zu reagieren. Backlog-Verarbeitung verhindert, dass nur neu erzeugte TODOs berücksichtigt werden; pro Poll wird dennoch nur ein passender Kandidat gestartet. Pausenfenster, Maximalversuche und die Prüfung auf noch laufende Fix-Runs begrenzen Endlosschleifen. Gate-Zusammenfassungen in Metadaten erlauben späteren Vergleich, ohne alle Schritt-Ausgaben erneut auszuwerten.
+Der Mechanismus trennt Erkennung, Arbeitsauftrag, Ausführung und Bewertung. Dadurch lassen sich automatische Reaktionen eng konfigurieren statt pauschal auf jeden Befund zu reagieren. Backlog-Verarbeitung verhindert, dass nur neu erzeugte TODOs berücksichtigt werden; pro Poll wird dennoch nur ein passender Kandidat gestartet. Gegen Endlosschleifen wirken drei Schichten: Ein vom Trigger gestarteter Fix-Run ist in den Run-Metadaten als solcher markiert und erzeugt selbst kein TODO, je TODO ist die Zahl der Fix-Versuche begrenzt, und solange ein Fix-Run läuft, startet kein zweiter; das Pausenfenster legt den Mechanismus zusätzlich befristet still. Gate-Zusammenfassungen in Metadaten erlauben späteren Vergleich, ohne alle Schritt-Ausgaben erneut auszuwerten.
 
 ## Nachteile und Kosten
 
