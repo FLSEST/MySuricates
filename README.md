@@ -1,6 +1,6 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="ai-automation-frontend/public/icons/tray-meerkat.svg" alt="MySuricates logo: a meerkat" width="120"></p>
+<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates: fixed steps and AI in one flow. A local control loop finds issues, files TODOs, triggers fixes and checks again – with Claude, Codex or Pi. The picture shows a meerkat circled by the loop Finding, TODO, Fix, Check."></p>
 
 # MySuricates
 

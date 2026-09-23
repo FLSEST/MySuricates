@@ -1,6 +1,6 @@
 **Deutsch** | [English](README.md)
 
-<p align="center"><img src="ai-automation-frontend/public/icons/tray-meerkat.svg" alt="MySuricates-Logo: ein Erdmännchen" width="120"></p>
+<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates: feste Schritte und KI in einem Ablauf. Ein lokaler Regelkreis findet Befunde, legt TODOs an, stößt Fixes an und prüft nach – mit Claude, Codex oder Pi. Im Bild ein Erdmännchen, um das der Regelkreis Befund, TODO, Fix, Prüfung läuft."></p>
 
 # MySuricates
 
