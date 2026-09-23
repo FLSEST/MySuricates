@@ -160,9 +160,12 @@ class SkillSealingIntegrationTest {
         String edit = objectMapper.writeValueAsString(Map.of("name", "Reviewer edited",
                 "category", "RESEARCH", "aiContext", "Review only the tests."));
 
+        String storedName = skillRepository.findById(skillId).orElseThrow().getName();
         mockMvc.perform(put("/api/v1/skills/{id}", skillId).contentType(MediaType.APPLICATION_JSON).content(edit))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("SKILL_PINNED_BY_SEAL"));
+                .andExpect(jsonPath("$.code").value("SKILL_PINNED_BY_SEAL"))
+                // The refusal names the skill as stored, not the requested new name
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("'" + storedName + "'")));
         assertThat(skillRepository.findById(skillId).orElseThrow().getAiContext()).isEqualTo("Review the diff carefully.");
 
         mockMvc.perform(post("/api/v1/workflows/{id}/unseal", workflowId)).andExpect(status().isOk());

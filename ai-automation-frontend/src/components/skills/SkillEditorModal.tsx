@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Input, Modal, ModalFooter, Select } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import { useCreateSkill, useUpdateSkill } from '../../hooks/useSkills';
@@ -53,10 +53,15 @@ export function SkillEditorModal({
   const createSkill = useCreateSkill();
   const updateSkill = useUpdateSkill();
   const [form, setForm] = useState<SkillInput>(() => (skill ? fromSkill(skill) : initial ?? EMPTY));
+  // The AI context is uncontrolled: @monaco-editor/react replaces the whole model whenever `value`
+  // differs from it, so echoing each keystroke back through state lets a slower re-render write an
+  // older text over newer keystrokes (measured: characters lost at 20–40 ms per key). Read on save.
+  const [initialContext] = useState(() => form.aiContext ?? '');
+  const aiContext = useRef(initialContext);
   const pending = createSkill.isPending || updateSkill.isPending;
 
   const save = () => {
-    const data = normalized(form);
+    const data = normalized({ ...form, aiContext: aiContext.current });
     const done = { onSuccess: (saved: Skill) => { onSaved?.(saved); onClose(); } };
     if (skill) updateSkill.mutate({ id: skill.id, data }, done);
     else createSkill.mutate(data, done);
@@ -117,8 +122,8 @@ export function SkillEditorModal({
           <label className="block text-sm font-medium text-text mb-0.5">{t.skills.aiContext}</label>
           <p className="text-xs text-text-tertiary mb-1.5">{t.skills.aiContextHint}</p>
           <MonacoEditor
-            value={form.aiContext ?? ''}
-            onChange={(v) => setForm({ ...form, aiContext: v })}
+            value={initialContext}
+            onChange={(v) => { aiContext.current = v; }}
             language="markdown"
             wordWrap
             fill

@@ -208,7 +208,8 @@ function SkillDetail({ skill, onClose, onEdit, onCopy }: {
             </div>
           )}
 
-          {/* Capabilities */}
+          {/* Capabilities — custom skills usually have none, then the section stays out */}
+          {(isLoading || (capabilities?.length ?? 0) > 0) && (
           <div>
             <h3 className="text-sm font-semibold text-text mb-3">{t.skills.capabilities}</h3>
             {isLoading ? (
@@ -228,6 +229,7 @@ function SkillDetail({ skill, onClose, onEdit, onCopy }: {
               </div>
             )}
           </div>
+          )}
 
           {/* AI Context preview */}
           {skill.aiContext && (

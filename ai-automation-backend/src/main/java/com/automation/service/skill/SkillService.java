@@ -84,6 +84,7 @@ public class SkillService {
         if (skill.isBuiltin()) {
             throw new IllegalStateException("Cannot edit built-in skill: " + skill.getName());
         }
+        mutationGateway.requireNotPinned(skill, "changing it");
         skill.setName(request.name());
         skill.setDescription(request.description());
         skill.setIcon(request.icon());

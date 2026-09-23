@@ -6,6 +6,8 @@ import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillChangeSource;
 import com.automation.entity.SkillCategory;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.CapabilityRepository;
 import com.automation.repository.SkillRepository;
@@ -181,6 +183,24 @@ class SkillServiceTest {
                 .hasMessageContaining("built-in");
 
         assertThat(testSkill.getName()).isEqualTo("Document Analyzer");
+        verify(mutationGateway, never()).save(any(), any());
+        verifyNoInteractions(skillRegistry);
+    }
+
+    @Test
+    void update_skillPinnedBySeal_isRefusedBeforeTheEntityChanges() {
+        Skill customSkill = Skill.builder().id("skill-custom").name("Reviewer")
+                .category(SkillCategory.CODE).aiContext("ctx").builtin(false).build();
+        when(skillRepository.findById("skill-custom")).thenReturn(Optional.of(customSkill));
+        doThrow(new HardeningException(ErrorCode.SKILL_PINNED_BY_SEAL, "pinned"))
+                .when(mutationGateway).requireNotPinned(customSkill, "changing it");
+
+        assertThatThrownBy(() -> skillService.update("skill-custom", new UpdateSkillRequest(
+                "Renamed", null, null, SkillCategory.DATA, "other")))
+                .isInstanceOf(HardeningException.class);
+
+        assertThat(customSkill.getName()).isEqualTo("Reviewer");
+        assertThat(customSkill.getAiContext()).isEqualTo("ctx");
         verify(mutationGateway, never()).save(any(), any());
         verifyNoInteractions(skillRegistry);
     }
