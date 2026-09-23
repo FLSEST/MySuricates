@@ -18,6 +18,7 @@ gate_description: No critical findings
 - AutoTodo on the workflow: `"metadata": {"autoTodo": {"enabled": true, "mode": "auto"}}`. Modes: `auto` (GREEN closes, YELLOW → MEDIUM, RED → HIGH), `track` (always create), `approval` (for confirmation).
 - Single TODOs from the output: `todo_item: Title | HIGH | tag1,tag2 | Description`.
 - TodoTrigger (`GET/POST $MS/todo-triggers`): a rule with `tagPattern` (all tags must match) and `targetWorkflowId` starts a fix workflow for new TODOs; at most `maxAttempts` attempts (default 3).
+- Completion triggers (`$MS/completion-triggers`) start a workflow when another one ends — on success, on failure or always. The card "Gets triggered by" shows every trigger of a workflow.
 - Resolve (`POST $MS/todos/<id>/resolve`) counts as successful when the run ends `COMPLETED` and the gate is `GREEN` or missing; the TODO then becomes `DONE`, otherwise it returns to its previous status.
 
 ### Providers and models

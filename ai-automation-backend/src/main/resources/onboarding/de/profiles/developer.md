@@ -23,6 +23,15 @@ Bausteine für Code-Projekte, keine feste Reihenfolge:
 - Zeitplan: `POST $MS/schedules` mit `{"workflowId": "<id>", "cronExpression": "0 0 8 * * MON-FRI", "description": "Werktags 8 Uhr"}`.
   Weitere Felder: `maxRuns`, `endDate`, `conflictBehavior` (`SKIP` als Standard oder `OVERLAP`), `inputContext`.
   Ein-/ausschalten: `POST $MS/schedules/<id>/enable` bzw. `/disable`.
+
+### Nach Abschluss eines anderen Workflows
+
+- Anlegen: `POST $MS/completion-triggers` mit `{"sourceWorkflowId": "<a>", "targetWorkflowId": "<b>", "triggerOnSuccess": true}` (auch `triggerOnFailure`, `triggerAlways`, `contextVariables`).
+- Was A auslöst: `GET $MS/completion-triggers/workflow/<id>/as-source`; wovon B ausgelöst wird: `…/as-target`.
+
+### Was startet Workflow X?
+
+Die Karte „Wird ausgelöst von“ auf der Workflow-Seite bündelt alles. Per API: `GET $MS/schedules/workflow/<id>`, `GET $MS/todo-triggers/workflow/<id>`, `GET $MS/completion-triggers/workflow/<id>/as-target` und, falls das Modul an ist, `GET $MS/webhooks/workflow/<id>`. Chains und `sub-workflow`-Blöcke, die ihn aufrufen, stehen in keiner dieser Listen.
 <!-- module: webhooks -->
 
 ### Webhooks

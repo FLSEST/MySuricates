@@ -13,6 +13,7 @@
 - Liste: `GET $MS/schedules`; was heute noch läuft: `GET $MS/schedules/remaining-today`.
 - Cron hat sechs Felder: `0 */15 * * * *` heißt alle 15 Minuten.
 - Termine, die in Standby oder einen Neustart fallen, werden je nach Einstellung einmal nachgeholt oder übersprungen.
+- Was einen Workflow sonst noch startet (Webhooks, TODO-Trigger, Abschluss eines anderen Workflows), zeigt die Karte „Wird ausgelöst von“ auf seiner Seite.
 
 ### Fehler finden
 
