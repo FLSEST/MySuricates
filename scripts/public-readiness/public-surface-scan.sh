@@ -34,17 +34,24 @@ if [ -d ai-automation-frontend/src ]; then
 fi
 
 inventory_section ".env.example presence"
-for f in .env.example ai-automation-backend/.env.example ai-automation-frontend/.env.example; do
+# Eine Wurzel-.env gibt es nicht: Container-Instanzen bekommen ihre Umgebung von
+# scripts/instance.sh (deploy/instances/<name>.env), der Rest liest die beiden Dateien hier
+# (TODO 428ee1ec).
+for f in ai-automation-backend/.env.example ai-automation-frontend/.env.example; do
   [ -f "$f" ] && echo "present: $f" || echo "absent: $f"
 done
+[ -f scripts/instance.sh ] && echo "container_env: scripts/instance.sh -> deploy/instances/<name>.env"
 
 inventory_section "Public-API documentation markers"
-for f in AGENTS.md API.md docs/api.md README.md; do
+# grep -c gibt bei null Treffern "0" aus UND endet mit 1 — ein "|| echo 0" schrieb deshalb
+# eine zweite, unbeschriftete Zeile (TODO 428ee1ec). Die API-Referenz zaehlt als API-Doku.
+for f in AGENTS.md docs/api-referenz.md docs/en/api-referenz.md README.md; do
   if [ -f "$f" ]; then
-    endpoint_refs=$(grep -cE '/api/v[0-9]+' "$f" 2>/dev/null || echo 0)
-    printf '%s: api_path_refs=%s\n' "$f" "$endpoint_refs"
+    endpoint_refs=$(grep -cE '/api/v[0-9]+' "$f" 2>/dev/null)
+    printf '%s: api_path_refs=%s\n' "$f" "${endpoint_refs:-0}"
   fi
 done
+echo "note: README.md links the API reference instead of listing paths; api_path_refs=0 there is expected"
 
 # Endpunkte, die bis auf den Host reichen oder Betriebsdaten herausgeben (TODO
 # bcfec862): Ihre Absicherung steht im Vertrauensmodell von docs/deployment.md.

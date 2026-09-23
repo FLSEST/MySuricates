@@ -55,6 +55,8 @@ jobs:
         run: bash scripts/tests/test-doc-facts-check.sh
       - name: Doku-Readiness-Gate Selbsttest
         run: bash scripts/tests/test-docs-check.sh
+      - name: Evidenz-Scans Selbsttest (Oberflaeche, Architektur, Inventar)
+        run: bash scripts/tests/test-readiness-scans.sh
       - name: Doku-Verweise und DE/EN-Gleichstand pruefen
         run: python3 scripts/public-readiness/docs_parity_check.py
       - name: Doku-Verweis-Gate Selbsttest
