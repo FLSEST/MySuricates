@@ -110,6 +110,44 @@ class ClientIpResolverTest {
         assertThat(resolver.resolve(request(null, "203.0.113.8"))).isEqualTo("unknown");
     }
 
+    /** 854490e6: a container reports the IPv6 loopback in full form, the configuration says ::1. */
+    @Test
+    void ipv6LoopbackMatchesInBothSpellings() {
+        ClientIpResolver shortConfig = new ClientIpResolver("127.0.0.1, ::1");
+        ClientIpResolver longConfig = new ClientIpResolver("0:0:0:0:0:0:0:1");
+
+        assertThat(shortConfig.resolve(request("0:0:0:0:0:0:0:1", "198.51.100.4"))).isEqualTo("198.51.100.4");
+        assertThat(shortConfig.resolve(request("::1", "198.51.100.4"))).isEqualTo("198.51.100.4");
+        assertThat(longConfig.resolve(request("::1", "198.51.100.4"))).isEqualTo("198.51.100.4");
+    }
+
+    @Test
+    void trustedHopsInTheChainAreComparedNormalized() {
+        ClientIpResolver resolver = new ClientIpResolver("127.0.0.1, 2001:db8::5");
+
+        assertThat(resolver.resolve(request("127.0.0.1", "198.51.100.4, 2001:0db8:0:0:0:0:0:5")))
+                .isEqualTo("198.51.100.4");
+        assertThat(resolver.resolve(request("::ffff:127.0.0.1", "198.51.100.4"))).isEqualTo("198.51.100.4");
+    }
+
+    @Test
+    void canonical_leavesNamesAndMalformedValuesAlone() {
+        assertThat(ClientIpResolver.canonical("::1")).isEqualTo("0:0:0:0:0:0:0:1");
+        assertThat(ClientIpResolver.canonical("127.0.0.1")).isEqualTo("127.0.0.1");
+        // Not literals by shape: returned unchanged, never handed to a DNS lookup
+        assertThat(ClientIpResolver.canonical("proxy.internal")).isEqualTo("proxy.internal");
+        assertThat(ClientIpResolver.canonical("example.org:80")).isEqualTo("example.org:80");
+        assertThat(ClientIpResolver.canonical("010.0.0.1")).isEqualTo("010.0.0.1");
+        assertThat(ClientIpResolver.canonical("unknown")).isEqualTo("unknown");
+    }
+
+    @Test
+    void untrustedPeerInLongIpv6Form_isNotTrustedByAccident() {
+        ClientIpResolver resolver = new ClientIpResolver("::1");
+
+        assertThat(resolver.resolve(request("0:0:0:0:0:0:0:2", "198.51.100.4"))).isEqualTo("0:0:0:0:0:0:0:2");
+    }
+
     private static HttpServletRequest request(String remoteAddr, String forwardedFor) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn(remoteAddr);
