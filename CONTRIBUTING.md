@@ -74,6 +74,9 @@ Further rules of the house:
   file.
 - **Never access the SQLite database directly.** Not from code, not from shell
   blocks, not from scripts. See [CLAUDE.md](CLAUDE.md) for why.
+- **Eight-character IDs** such as `TODO 1b84ecab` in commit messages, comments
+  and documentation point to the maintainer's own task tracker. They are not
+  issue numbers; the linked text usually says what the task was.
 
 [docs/entwicklung.md](docs/entwicklung.md) has the full build and test
 instructions.
@@ -114,3 +117,5 @@ auf Pull Requests.
 - **Sicherheitslücken** nicht als öffentliches Issue, sondern über den Meldeweg
   in [SECURITY.md](SECURITY.md).
 - Beiträge stehen unter der [Apache-Lizenz 2.0](LICENSE).
+- **Achtstellige Kennungen** wie `TODO 1b84ecab` in Commits, Kommentaren und Doku
+  verweisen auf den Aufgaben-Tracker des Maintainers, nicht auf Issues.
