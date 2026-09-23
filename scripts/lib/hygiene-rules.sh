@@ -90,7 +90,9 @@ HYGIENE_SECURITY_REQUIRED_TERMS=(
 # Erlaubte Werte des Pflichtfelds "scope".
 #   repo     — greift auf die Struktur dieses Repositories zu
 #   portable — über project_path (o. ä.) parametrisiert, läuft in jedem Projekt
-HYGIENE_POOL_SCOPES=("repo" "portable")
+#   external — braucht ein Werkzeug außerhalb dieses Repositories und des gewählten
+#              Projekts; die Voraussetzung steht in der Beschreibung
+HYGIENE_POOL_SCOPES=("repo" "portable" "external")
 
 # Registrierte Blocktypen. Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend
 # (dort selbst gegen die BlockExecutor-Klassen gepinnt, BlockTypeListsGuardTest).

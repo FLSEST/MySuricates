@@ -1,17 +1,18 @@
 {
-  "id" : "saas-auto-fix",
   "icon" : "🩹",
   "name" : {
     "en" : "SaaS — Auto-Fix",
     "de" : "SaaS — Auto-Fix"
   },
   "description" : {
-    "en" : "Triggered by TodoTrigger when tests/lint/build fail. Diagnoses, attempts a fix, re-tests.",
-    "de" : "Wird vom TodoTrigger gefeuert, wenn Tests/Lint/Build fehlschlagen. Diagnostiziert, versucht Fix, testet erneut."
+    "en" : "Triggered by TodoTrigger when tests/lint/build fail. Diagnoses, attempts a fix, re-tests. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Wird vom TodoTrigger gefeuert, wenn Tests/Lint/Build fehlschlagen. Diagnostiziert, versucht Fix, testet erneut. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category" : "CODE",
-  "sortOrder" : 60,
+  "scope" : "external",
+  "tags" : [ "saas-factory", "auto-fix" ],
   "version" : "1.0.0",
+  "author" : "MySuricates",
   "model" : "sonnet",
   "instructions" : "Wird automatisch von TodoTrigger ausgeführt. Hard rules: max 3 Versuche pro Issue (Trigger steuert das), nie Tests deaktivieren, nie Symptome maskieren. Bei Unsicherheit Fix abbrechen — TodoTrigger eskaliert dann auf manuelle Review.",
   "blocks" : [ {

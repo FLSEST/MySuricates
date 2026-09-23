@@ -169,7 +169,7 @@ public class WorkflowPoolService {
     /**
      * Schreibt einen Workflow als Pool-Definition.
      *
-     * @param scope {@code repo} oder {@code portable}; ohne Angabe gilt {@code portable}
+     * @param scope {@code repo}, {@code portable} oder {@code external}; ohne Angabe gilt {@code portable}
      *              (siehe {@link PoolScope}). Der Wert ist ein Pool-Metadatum, kein Feld der
      *              Workflow-Definition.
      * @throws IllegalArgumentException bei einem unbekannten {@code scope}

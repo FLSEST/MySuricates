@@ -18,22 +18,26 @@ class PoolScopeTest {
     }
 
     @Test
-    void parsesBothValuesCaseInsensitively() {
+    void parsesEveryValueCaseInsensitively() {
         assertThat(PoolScope.fromParam("repo")).isEqualTo(PoolScope.REPO);
         assertThat(PoolScope.fromParam("REPO")).isEqualTo(PoolScope.REPO);
         assertThat(PoolScope.fromParam("Portable")).isEqualTo(PoolScope.PORTABLE);
+        assertThat(PoolScope.fromParam("external")).isEqualTo(PoolScope.EXTERNAL);
     }
 
+    /** The message names every allowed value, so a new one cannot be forgotten there (TODO 7ddacd1d). */
     @Test
-    void rejectsUnknownValue() {
+    void rejectsUnknownValue_namingEveryAllowedOne() {
         assertThatThrownBy(() -> PoolScope.fromParam("private"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("scope");
+                .hasMessageContaining("scope")
+                .hasMessageContaining("'repo', 'portable', 'external'");
     }
 
     @Test
     void jsonValueIsLowercase() {
         assertThat(PoolScope.REPO.jsonValue()).isEqualTo("repo");
         assertThat(PoolScope.PORTABLE.jsonValue()).isEqualTo("portable");
+        assertThat(PoolScope.EXTERNAL.jsonValue()).isEqualTo("external");
     }
 }

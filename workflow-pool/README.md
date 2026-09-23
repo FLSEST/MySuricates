@@ -10,20 +10,23 @@ curl -X POST localhost:9090/api/v1/pool/<id>/install -H "X-API-Key: $KEY"
 
 An installed workflow is a **copy**. It lives on independently — changing the file here does
 not change it, and there is no update mechanism. That is the difference from the
-66 built-in templates under `ai-automation-backend/src/main/resources/templates/builtin/`,
+57 built-in templates under `ai-automation-backend/src/main/resources/templates/builtin/`,
 which every instance gets at startup whether it wants them or not.
 
 ## Read `scope` before you install
 
-Every definition carries a `scope` field with one of two values:
+Every definition carries a `scope` field with one of three values:
 
 | `scope` | means | for you |
 |---|---|---|
 | `portable` | parameterised via `project_path` and other context variables | runs in your project |
 | `repo` | reaches into *this* repository's layout (`ai-automation-backend`, `mvnw`, `scripts/`) | will do nothing useful in yours |
+| `external` | needs a tool that is neither in this repository nor in your project; the description names it | runs once you have that tool |
 
-Both are legitimate. The `repo` entries are the self-audits this project runs on itself —
-they are here as worked examples of the mechanism, not as tools for your codebase. The pool
+All three are legitimate. The `repo` entries are the self-audits this project runs on itself —
+they are here as worked examples of the mechanism, not as tools for your codebase. The
+`external` entries (`saas-*`) drive a SaaS factory with its own `factory` CLI, which is not part
+of this repository. The pool
 browser shows the scope as a badge; from the shell:
 
 ```bash

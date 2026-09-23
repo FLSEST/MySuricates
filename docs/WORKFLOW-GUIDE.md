@@ -1646,7 +1646,7 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlägt, wird der Block 
 
 Was in den öffentlichen Workflow-Pool gehört, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
-Alle 65+ eingebauten Templates mit ihrem primären Pattern:
+Alle eingebauten Templates mit ihrem primären Pattern. Die SaaS-Factory-Workflows (`saas-*`) liegen im Pool (Scope `external`), weil sie ein Werkzeug außerhalb des Repositories brauchen:
 
 | Template | Pattern | Kategorie |
 |---|---|---|
@@ -1695,15 +1695,6 @@ Alle 65+ eingebauten Templates mit ihrem primären Pattern:
 | `pool-neutrality-audit` | Audit-Pipeline | QUALITY |
 | `pr-review-summary` | Shell sammeln + KI analysieren | TEAM |
 | `research-enhance` | Sequentielle Simple-Kette | RESEARCH |
-| `saas-auto-fix` | Analysieren + Agentic + Verifizieren | CODE |
-| `saas-containerize` | Shell + Freigabe | DEPLOY |
-| `saas-continuous-improve` | Shell sammeln + KI analysieren | AUTOMATION |
-| `saas-doc-update` | Agentic | DOCS |
-| `saas-feature-implement` | Analysieren + Agentic + Verifizieren | CODE |
-| `saas-feature-loop` | Shell scannen + ForEach | TRANSFORM |
-| `saas-marketing-site` | Analysieren + Agentic | CONTENT |
-| `saas-scaffold` | Shell-Kette | TRANSFORM |
-| `saas-spec-to-buildplan` | Document + Analysieren + Freigabe | BUSINESS |
 | `secret-scanner` | Shell + Conditional | CODE |
 | `service-health-monitor` | Shell scannen + ForEach + KI | INFRA |
 | `sprint-retrospective` | Shell sammeln + KI analysieren | TEAM |

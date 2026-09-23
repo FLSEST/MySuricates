@@ -496,7 +496,7 @@ Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
 
 ### Chain Templates
 
-Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zusammensetzen:
+Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zusammensetzen. Jeder Eintrag muss ein ausgeliefertes Built-in-Template nennen (`ChainTemplateServiceTest`), eine Kette über Pool-Einträge gibt es nicht:
 - `ChainTemplateService` — verwaltet Built-in Chain Templates (`BuiltInChainTemplate` Records)
 - `ChainTemplateController` — `/api/v1/chain-templates` mit List, Get, Install-Endpunkten
 - Install: Erstellt eine neue Chain (ggf. mit zugehörigen Workflows) in einem Zielprojekt
@@ -714,7 +714,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Templates
 
 - Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
-- **66 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
+- **57 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump). Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird (in den Pool verschoben, umbenannt, Altlasten mit Zufalls-ID), entfernt er vorher; maßgeblich sind die Dateinamen (`BuiltInTemplateLoader.shippedIds`), damit eine Datei, die nicht parst, ihre Zeile nicht verliert. Verifikationen fallen per `ON DELETE CASCADE` mit, Workflows aus solchen Vorlagen bleiben und verlieren nur den Rückverweis (`ON DELETE SET NULL`). Nutzer-Vorlagen bleiben unberührt
 - Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
 - Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
 - Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar

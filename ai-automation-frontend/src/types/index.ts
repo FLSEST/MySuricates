@@ -296,7 +296,8 @@ export interface PoolWorkflowEntry {
   category: string | null;
   /**
    * Kategorie des Eintrags: `repo` greift auf die Struktur dieses Repositories zu,
-   * `portable` ist über `project_path` parametrisiert. `null` = nicht deklariert.
+   * `portable` ist über `project_path` parametrisiert, `external` braucht ein Werkzeug außerhalb
+   * von Repo und Projekt (steht in der Beschreibung). `null` = nicht deklariert.
    * Regelwerk: docs/workflow-pool-kuratierung.md
    */
   scope: PoolScope | null;
@@ -310,7 +311,7 @@ export interface PoolWorkflowEntry {
   filename: string;
 }
 
-export type PoolScope = 'repo' | 'portable';
+export type PoolScope = 'repo' | 'portable' | 'external';
 
 // ── Workflow Run ─────────────────────────────────────────
 

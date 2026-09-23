@@ -30,6 +30,11 @@ public class ChainTemplateService {
     private final WorkflowService workflowService;
     private final ChainService chainService;
 
+    /**
+     * Install creates every workflow from a shipped built-in template, so each entry has to name one —
+     * pinned by {@code ChainTemplateServiceTest}. A chain over pool entries does not exist; the SaaS
+     * factory chain left together with its templates (TODO 7ddacd1d).
+     */
     private static final List<BuiltInChainTemplate> TEMPLATES = List.of(
             new BuiltInChainTemplate(
                     "ci-cd-pipeline-chain",
@@ -98,34 +103,6 @@ public class ChainTemplateService {
                                     Map.of("de", "Standup-Report generieren", "en", "Generate standup report")),
                             new BuiltInChainTemplate.Entry("sprint-retrospective",
                                     Map.of("de", "Sprint-Retrospektive durchführen", "en", "Run sprint retrospective"))
-                    )
-            ),
-            new BuiltInChainTemplate(
-                    "saas-spec-to-container",
-                    Map.of("de", "SaaS-Factory: Spec → Container",
-                            "en", "SaaS-Factory: Spec → Container"),
-                    Map.of("de", "End-to-End-Pipeline der SaaS-Factory: aus einer spec.md entsteht eine lokal laufende Container-App inklusive Marketing-Page",
-                            "en", "End-to-end SaaS-Factory pipeline: produces a locally running container app with marketing page from a spec.md"),
-                    "🏭",
-                    List.of(
-                            new BuiltInChainTemplate.Entry("saas-spec-to-buildplan",
-                                    Map.of("de", "Spec validieren + Build-Plan erstellen",
-                                            "en", "Validate spec + build plan")),
-                            new BuiltInChainTemplate.Entry("saas-scaffold",
-                                    Map.of("de", "App-Skelett scaffolden",
-                                            "en", "Scaffold app skeleton")),
-                            new BuiltInChainTemplate.Entry("saas-feature-loop",
-                                    Map.of("de", "Features iterativ implementieren",
-                                            "en", "Iterate features")),
-                            new BuiltInChainTemplate.Entry("saas-marketing-site",
-                                    Map.of("de", "Marketing-Page generieren",
-                                            "en", "Generate marketing page")),
-                            new BuiltInChainTemplate.Entry("saas-doc-update",
-                                    Map.of("de", "README + CHANGELOG aktualisieren",
-                                            "en", "Update README + CHANGELOG")),
-                            new BuiltInChainTemplate.Entry("saas-containerize",
-                                    Map.of("de", "Container bauen + Approval",
-                                            "en", "Build container + approval"))
                     )
             )
     );

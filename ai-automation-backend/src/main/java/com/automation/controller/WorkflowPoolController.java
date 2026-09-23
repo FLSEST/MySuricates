@@ -46,7 +46,7 @@ public class WorkflowPoolController {
     }
 
     /**
-     * @param scope {@code repo} oder {@code portable} — Pool-Metadatum, ohne Angabe {@code portable}.
+     * @param scope {@code repo}, {@code portable} oder {@code external} — Pool-Metadatum, ohne Angabe {@code portable}.
      *              Regelwerk: {@code docs/workflow-pool-kuratierung.md}.
      */
     @PostMapping("/export/{workflowId}")

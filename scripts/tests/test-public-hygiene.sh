@@ -143,6 +143,13 @@ write_pool ok-repo <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "bash scripts/ci/public-hygiene.sh && ./mvnw -q test"}}]}
 JSON
 
+write_pool ok-external <<'JSON'
+{"name": {"de": "Extern", "en": "External"},
+ "description": {"de": "Braucht die factory-CLI im Projekt.", "en": "Needs the factory CLI in the project."},
+ "scope": "external", "tags": ["saas-factory"],
+ "blocks": [{"type": "shell", "config": {"command": "./saas-factory/tools/factory test"}}]}
+JSON
+
 write_pool missing-scope <<'JSON'
 {"name": {"de": "Ohne", "en": "Without"},
  "description": {"de": "Text.", "en": "Text."}, "tags": ["quality"],
@@ -323,6 +330,7 @@ OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
 check "ok-repo darf scripts/ und mvnw nutzen"  '! grep -q "ok-repo" <<<"$OUT"'
+check "scope external ist erlaubt"             '! grep -q "ok-external" <<<"$OUT"'
 check "fehlendes scope erkannt"                'grep -q "missing-scope.*SCOPE" <<<"$OUT"'
 check "ungueltiges scope erkannt"              'grep -q "bad-scope.*SCOPE" <<<"$OUT"'
 check "projectId im Eintrag erkannt"           'grep -q "has-projectid.*PROJECT-ID" <<<"$OUT"'

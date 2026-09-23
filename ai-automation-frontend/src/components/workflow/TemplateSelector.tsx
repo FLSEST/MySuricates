@@ -5,7 +5,7 @@ import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
 import { useTemplates, exportTemplate } from '../../hooks/useTemplates';
 import { useModuleEnabled, useSystemModules } from '../../hooks/useModules';
-import { resolveTemplateName } from '../../utils/templateUtils';
+import { categoryLabel, resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { Hint } from '../hints/Hint';
 import { PoolBrowser } from './PoolBrowser';
@@ -52,11 +52,9 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
   const taskTemplates = (templates ?? []).filter((tmpl) => tmpl.kind !== 'BLUEPRINT');
   const blueprints = (templates ?? []).filter((tmpl) => tmpl.kind === 'BLUEPRINT');
 
-  const categoryLabel = (cat: string) =>
-    t.templates.categories[cat as keyof typeof t.templates.categories] ?? cat;
   const allCategories = Array.from(
     new Set(taskTemplates.map((tmpl) => tmpl.category).filter(Boolean) as string[]),
-  ).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), locale));
+  ).sort((a, b) => categoryLabel(t, a).localeCompare(categoryLabel(t, b), locale));
 
   const filtered = taskTemplates.filter((tmpl) => {
     if (selectedCategory && tmpl.category !== selectedCategory) return false;
@@ -175,7 +173,7 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
                         : 'bg-surface-raised text-text-secondary hover:text-text'
                     }`}
                   >
-                    {categoryLabel(cat)}
+                    {categoryLabel(t, cat)}
                   </button>
                 ))}
               </>

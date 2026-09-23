@@ -15,6 +15,12 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Brings the built-in templates and blueprints of this release into the database at startup: inserts
+ * new ones, updates those whose shipped {@code version} is higher, and removes the built-in rows whose
+ * id no longer ships — moved to the pool, renamed, or left over from before the ids were stable
+ * (TODO 7ddacd1d). User templates ({@code builtIn = false}) are never touched.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -26,7 +32,7 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        List<WorkflowTemplate> existing = templateRepository.findByBuiltInTrue();
+        List<WorkflowTemplate> existing = retireUnshipped(templateRepository.findByBuiltInTrue());
         List<WorkflowTemplate> allBuiltIn = templateLoader.loadAll();
 
         Map<String, WorkflowTemplate> existingById = existing.stream()
@@ -69,6 +75,30 @@ public class WorkflowTemplateSeeder implements ApplicationRunner {
         } else {
             log.debug("All {} built-in workflow templates up to date", existing.size());
         }
+    }
+
+    /**
+     * Removes the built-in rows whose id no longer ships and returns the others. The database takes
+     * care of what hangs on a removed row: its verifications go ({@code ON DELETE CASCADE}), workflows
+     * made from it stay and only lose the back-reference ({@code workflows.template_id ON DELETE SET
+     * NULL}). It runs before seeding: a left-over row with the English name of a shipped template kept
+     * that template out ({@code existingNames}), so both happen in the same start.
+     */
+    private List<WorkflowTemplate> retireUnshipped(List<WorkflowTemplate> existing) {
+        Set<String> shipped = templateLoader.shippedIds();
+        if (shipped.isEmpty()) {
+            // Nothing found is a broken classpath, not a release without templates — remove nothing.
+            log.warn("No built-in template files found — built-in rows are left as they are");
+            return existing;
+        }
+        List<WorkflowTemplate> retired = existing.stream().filter(t -> !shipped.contains(t.getId())).toList();
+        if (retired.isEmpty()) {
+            return existing;
+        }
+        templateRepository.deleteAll(retired);
+        log.info("Built-in templates: removed {} that no longer ship: {}", retired.size(),
+                retired.stream().map(WorkflowTemplate::getId).toList());
+        return existing.stream().filter(t -> shipped.contains(t.getId())).toList();
     }
 
     /**

@@ -1,17 +1,18 @@
 {
-  "id" : "saas-doc-update",
   "icon" : "📚",
   "name" : {
     "en" : "SaaS — Doc Update",
     "de" : "SaaS — Doku aktualisieren"
   },
   "description" : {
-    "en" : "Generates / updates README.md and CHANGELOG.md after feature changes",
-    "de" : "Generiert / aktualisiert README.md und CHANGELOG.md nach Feature-Änderungen"
+    "en" : "Generates / updates README.md and CHANGELOG.md after feature changes. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Generiert / aktualisiert README.md und CHANGELOG.md nach Feature-Änderungen. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
-  "category" : "DOCS",
-  "sortOrder" : 61,
+  "category" : "DOCUMENTATION",
+  "scope" : "external",
+  "tags" : [ "saas-factory", "documentation" ],
   "version" : "1.0.0",
+  "author" : "MySuricates",
   "model" : "haiku",
   "instructions" : "Doku-Update für eine generierte App. Knapp halten — keine Bullet-Listen mit AI-Floskeln. README beschreibt Setup, Run, Architektur. CHANGELOG hat Datum + Liste der Features in diesem Run.",
   "blocks" : [ {

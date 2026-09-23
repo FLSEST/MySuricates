@@ -46,10 +46,20 @@ describe('ExportToPoolModal', () => {
 
   it('sends scope repo when the repo option is selected', () => {
     renderModal();
-    fireEvent.click(screen.getByRole('radio', { name: /repo/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /\(repo\)/i }));
     fireEvent.click(screen.getByRole('button', { name: /export/i }));
     expect(mockMutate).toHaveBeenCalledWith(
       expect.objectContaining({ scope: 'repo' }),
+      expect.anything(),
+    );
+  });
+
+  it('sends scope external for a workflow that needs a tool outside repo and project', () => {
+    renderModal();
+    fireEvent.click(screen.getByRole('radio', { name: /\(external\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /export/i }));
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'external' }),
       expect.anything(),
     );
   });

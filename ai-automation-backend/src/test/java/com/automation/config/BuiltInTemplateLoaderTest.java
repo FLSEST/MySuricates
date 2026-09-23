@@ -99,6 +99,14 @@ class BuiltInTemplateLoaderTest {
         }
     }
 
+    /** The seeder removes built-in rows by file name ({@code shippedIds}), so a file's name is its id. */
+    @Test
+    void shippedIds_areTheFileNames_ofEveryLoadedTemplate() {
+        Set<String> shipped = new BuiltInTemplateLoader(new ObjectMapper()).shippedIds();
+
+        assertThat(shipped).containsExactlyInAnyOrderElementsOf(templates.stream().map(WorkflowTemplate::getId).toList());
+    }
+
     @Test
     void allTemplates_haveUniqueIds() {
         Set<String> ids = new HashSet<>();

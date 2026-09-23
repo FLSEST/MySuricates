@@ -16,10 +16,10 @@ Two mechanisms exist side by side, and they answer different questions.
 
 | | Built-in templates | Workflow pool |
 |---|---|---|
-| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (66) | `workflow-pool/*.json` |
+| Location | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (57) | `workflow-pool/*.json` |
 | Way into an instance | `WorkflowTemplateSeeder` seeds them into the database at startup, comparing semver | manual: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Visible as | a template in the catalogue, present in every instance | an entry in the pool browser, a workflow only after a deliberate install |
-| Updates | the seeder pulls in a higher version | none; an installed workflow is a copy and lives on by itself |
+| Updates | the seeder pulls in a higher version and removes what no longer ships | none; an installed workflow is a copy and lives on by itself |
 | Directory configurable | no | yes, `AUTOMATION_POOL_DIR` (default `workflow-pool`) |
 
 **The distinction in one sentence:** a built-in template is part of the platform and arrives
@@ -40,21 +40,23 @@ the key file (`…/api-key`), `$HOME` and the address `localhost:9090`.
 
 ## 2. The categories: `scope`
 
-Every entry carries a mandatory `scope` field with exactly one of two values:
+Every entry carries a mandatory `scope` field with exactly one of three values:
 
 | Value | Meaning | How to recognise it |
 |---|---|---|
 | `repo` | relies on the layout of **this** repository | mentions `ai-automation-backend`, `ai-automation-frontend`, `mvnw`, `scripts/` or `workflow-pool/` |
 | `portable` | parameterised via `project_path` (or similar context variables) | runs in whichever project the installer picks |
+| `external` | needs a tool outside this repository and the chosen project | the description names the requirement, such as the SaaS factory (`saas-factory/` with the CLI `tools/factory`) |
 
-Both kinds are legitimate, but they are useful in different ways: installing a `repo` entry
-into your own project gets you a workflow with nothing to work on. That is why `scope` is a
-field, not a comment:
+All three are legitimate, but they are useful in different ways: installing a `repo` entry
+into your own project gets you a workflow with nothing to work on, and an `external` entry only
+runs once the named tool is there. That is why `scope` is a field, not a comment:
 
 - in the definition (`"scope": "repo"`),
-- in the pool browser as a small badge next to the version (`repo` in the warning colour,
-  `portable` in the info colour, with an explanation in the tooltip),
-- on export as a query parameter: `POST /api/v1/pool/export/{workflowId}?scope=repo`
+- in the pool browser as a small badge next to the version (`repo` and `external` in the
+  warning colour, `portable` in the info colour, with an explanation in the tooltip),
+- on export as a query parameter: `POST /api/v1/pool/export/{workflowId}?scope=repo` or
+  `?scope=external`
   (without it, `portable` applies — the weaker promise needs no justification, the stronger
   binding to this repository does).
 
@@ -86,7 +88,7 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 
 | Tag | Rule | Check |
 |---|---|---|
-| `SCOPE` | `scope` is present and one of `repo`, `portable` | field comparison |
+| `SCOPE` | `scope` is present and one of `repo`, `portable`, `external` | field comparison |
 | `NAME` | `name` is a `{de, en}` object with at least one non-empty text | without it the entry does not even load |
 | `DESCRIPTION` | `description` is a `{de, en}` object with at least one non-empty text | field comparison |
 | `TAGS` | `tags` is a non-empty list of non-empty strings | field comparison |
@@ -164,7 +166,7 @@ Two criteria remain a reading task and belong to the release step (section 4):
 
 ### Export
 
-`POST /api/v1/pool/export/{workflowId}?scope=repo|portable` writes the workflow as a pool
+`POST /api/v1/pool/export/{workflowId}?scope=repo|portable|external` writes the workflow as a pool
 definition. The export no longer writes **any instance bindings**
 (`service/pool/PoolExportSanitizer`):
 

@@ -1,17 +1,18 @@
 {
-  "id" : "saas-feature-implement",
   "icon" : "🛠️",
   "name" : {
     "en" : "SaaS — Implement One Feature",
     "de" : "SaaS — Feature implementieren"
   },
   "description" : {
-    "en" : "Implements a single feature in a generated SaaS app: snippet-apply, agentic code-gen, factory test, optional auto-fix, code-review",
-    "de" : "Implementiert ein einzelnes Feature: snippet-apply, agentic Code-Gen, factory test, optional Auto-Fix, Code-Review"
+    "en" : "Implements a single feature in a generated SaaS app: snippet-apply, agentic code-gen, factory test, optional auto-fix, code-review. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Implementiert ein einzelnes Feature: snippet-apply, agentic Code-Gen, factory test, optional Auto-Fix, Code-Review. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category" : "CODE",
-  "sortOrder" : 56,
+  "scope" : "external",
+  "tags" : [ "saas-factory", "feature" ],
   "version" : "1.0.1",
+  "author" : "MySuricates",
   "model" : "sonnet",
   "instructions" : "Implementiert genau EIN Feature im Ziel-Projekt. Hard rule: claim NIE Erfolg ohne grünen factory test. Tests fixen statt verstecken. Niemals Bibliotheken erfinden — wenn etwas fehlt, package.json erweitern.",
   "blocks" : [ {

@@ -8,6 +8,9 @@ import { useFactoryTopics } from '../../hooks/useWorkflowFactory';
 import { useT } from '../../i18n';
 import type { PoolScope } from '../../types';
 
+/** Order of the scope options; `external` = needs a tool outside the repo and the project (TODO 7ddacd1d). */
+const SCOPE_OPTIONS: PoolScope[] = ['portable', 'repo', 'external'];
+
 interface ExportToPoolModalProps {
   open: boolean;
   onClose: () => void;
@@ -32,6 +35,11 @@ export function ExportToPoolModal({
   const [tagsInput, setTagsInput] = useState('');
   const [author, setAuthor] = useState('MySuricates');
   const [scope, setScope] = useState<PoolScope>('portable');
+  const scopeTexts: Record<PoolScope, { label: string; hint: string }> = {
+    portable: { label: t.factory.exportScopePortable, hint: t.factory.exportScopePortableHint },
+    repo: { label: t.factory.exportScopeRepo, hint: t.factory.exportScopeRepoHint },
+    external: { label: t.factory.exportScopeExternal, hint: t.factory.exportScopeExternalHint },
+  };
 
   const handleExport = () => {
     const tags = tagsInput.trim()
@@ -87,34 +95,22 @@ export function ExportToPoolModal({
         <div>
           <span className="block text-sm font-medium text-text-secondary mb-1">{t.factory.exportScopeLabel}</span>
           <div className="space-y-2">
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="pool-export-scope"
-                value="portable"
-                checked={scope === 'portable'}
-                onChange={() => setScope('portable')}
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm text-text">{t.factory.exportScopePortable}</span>
-                <span className="block text-xs text-text-secondary">{t.factory.exportScopePortableHint}</span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="pool-export-scope"
-                value="repo"
-                checked={scope === 'repo'}
-                onChange={() => setScope('repo')}
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm text-text">{t.factory.exportScopeRepo}</span>
-                <span className="block text-xs text-text-secondary">{t.factory.exportScopeRepoHint}</span>
-              </span>
-            </label>
+            {SCOPE_OPTIONS.map((value) => (
+              <label key={value} className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="pool-export-scope"
+                  value={value}
+                  checked={scope === value}
+                  onChange={() => setScope(value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm text-text">{scopeTexts[value].label}</span>
+                  <span className="block text-xs text-text-secondary">{scopeTexts[value].hint}</span>
+                </span>
+              </label>
+            ))}
           </div>
         </div>
         <Input

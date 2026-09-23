@@ -4,7 +4,7 @@ import { Card, Input, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
 import { usePoolWorkflows } from '../../hooks/usePool';
-import { resolveTemplateName } from '../../utils/templateUtils';
+import { categoryLabel, resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import type { PoolWorkflowEntry } from '../../types';
 
@@ -17,6 +17,15 @@ interface PoolBrowserProps {
 export function PoolBrowser({ onSelect, variant = 'pro' }: PoolBrowserProps) {
   const simple = variant === 'simple';
   const t = useT();
+  // repo and external both say "not just anywhere" (warning); a value this build does not know shows as is
+  const scopeBadge = (scope: string) => {
+    switch (scope) {
+      case 'repo': return { label: t.pool.scopeRepo, hint: t.pool.scopeRepoHint, className: 'bg-warning-subtle text-warning' };
+      case 'portable': return { label: t.pool.scopePortable, hint: t.pool.scopePortableHint, className: 'bg-info-subtle text-info' };
+      case 'external': return { label: t.pool.scopeExternal, hint: t.pool.scopeExternalHint, className: 'bg-warning-subtle text-warning' };
+      default: return { label: scope, hint: '', className: 'bg-surface-hover text-text-secondary' };
+    }
+  };
   const locale = useI18nStore((s) => s.locale);
   const { data: entries, isLoading } = usePoolWorkflows();
   const [search, setSearch] = useState('');
@@ -24,7 +33,7 @@ export function PoolBrowser({ onSelect, variant = 'pro' }: PoolBrowserProps) {
 
   const allCategories = Array.from(
     new Set((entries ?? []).map((e) => e.category).filter(Boolean) as string[]),
-  ).sort();
+  ).sort((a, b) => categoryLabel(t, a).localeCompare(categoryLabel(t, b), locale));
 
   const filtered = (entries ?? []).filter((entry) => {
     if (selectedCategory && entry.category !== selectedCategory) return false;
@@ -72,7 +81,7 @@ export function PoolBrowser({ onSelect, variant = 'pro' }: PoolBrowserProps) {
                   : 'bg-surface-raised text-text-secondary hover:text-text'
               }`}
             >
-              {cat}
+              {categoryLabel(t, cat)}
             </button>
           ))}
         </div>
@@ -115,14 +124,10 @@ export function PoolBrowser({ onSelect, variant = 'pro' }: PoolBrowserProps) {
                     {entry.scope && (
                       <span
                         data-testid={`pool-scope-${entry.id}`}
-                        title={entry.scope === 'repo' ? t.pool.scopeRepoHint : t.pool.scopePortableHint}
-                        className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium ${
-                          entry.scope === 'repo'
-                            ? 'bg-warning-subtle text-warning'
-                            : 'bg-info-subtle text-info'
-                        }`}
+                        title={scopeBadge(entry.scope).hint}
+                        className={`px-1.5 py-0.5 rounded-sm text-[10px] font-medium ${scopeBadge(entry.scope).className}`}
                       >
-                        {entry.scope === 'repo' ? t.pool.scopeRepo : t.pool.scopePortable}
+                        {scopeBadge(entry.scope).label}
                       </span>
                     )}
                   </div>
