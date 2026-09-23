@@ -4,7 +4,7 @@
 # start-autotrigger-dev.sh and Stable/Test via scripts/staging.sh. This file is the one place that
 # decides what comes from the host (TODO fc9de67b, 262948a4).
 #
-# What comes from the host is chosen per instance (MYSURICATES_AI_FROM_HOST, Flo 2026-09-23):
+# What comes from the host is chosen per instance (MYSURICATES_AI_FROM_HOST, decision of 2026-09-23):
 #   programs  only the AI CLIs, read-only. Every instance logs in on its own and keeps that login on
 #             its data volume.
 #   login     the CLIs plus exactly one login per provider (default). Codex and Pi write their
@@ -17,7 +17,7 @@
 # With programs and login every provider keeps its own directory on the data volume
 # (/app/data/providers/<id>), so nothing the CLIs write there reaches the host.
 #
-# Linux: the CLIs themselves come from the host (Flo, 2026-09-21). macOS: a Mac binary does not run in a
+# Linux: the CLIs themselves come from the host (decision of 2026-09-21). macOS: a Mac binary does not run in a
 # Linux container, so only logins are mounted; the CLIs have to come from the image (not built in yet,
 # TODO 3dd32594). bash 3.2 (macOS).
 
