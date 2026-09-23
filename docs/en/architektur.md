@@ -183,7 +183,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 48 Controllers)
+Controller (REST API, 49 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -203,7 +203,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          48 REST Controllers
+├── controller/          49 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -260,7 +260,7 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 48 REST Controllers
+### All 49 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
@@ -511,6 +511,16 @@ Since ~96% of TODOs are machine-generated and scattered across many projects, th
 - **ARCHIVED status**: Storage alongside BACKLOG for "out of sight." Hidden from the default list (`TodoSpecifications.buildSpec` excludes ARCHIVED when no status filter is set), accessible via the archive tab / edit modal.
 - **Hygiene** (`TodoHygieneService`): `archiveStaleNow(projectId)` moves stale auto-TODOs (OPEN/BACKLOG, source AI/WORKFLOW, tag `auto:workflow`, `updatedAt` older than threshold) to ARCHIVED — via bulk UPDATE in a short transaction. Cockpit button "Archive stale" (`POST /todos/archive-stale?projectId=`) is the primary, human-in-the-loop path. The `@Scheduled` job (daily 03:30) calls the same path but is **OFF** by default (`todo-hygiene-enabled`). Thresholds are runtime-configurable via `ExecutionSettingsService`: `todo-hygiene-enabled` [0,1], `todo-stale-days` [7,365], `todo-hygiene-max-per-run` [10,2000].
 - **Bulk Status** (`POST /todos/bulk-status`): generic bulk UPDATE for many TODO IDs to a single status.
+
+## Goals — ordering TODOs across projects (V85)
+
+A **goal** (`entity/Goal`, `/api/v1/goals`) collects TODOs from several projects that work towards one outcome – for example the open-source launch, which touches the platform and the website at once. It is deliberately lean: no dependency graphs, sprints or time tracking.
+
+- **Planning lives on the TODO:** `goal_id` (at most one goal), `goal_rank` (1 = first, NULL = not ordered yet), `complexity` (S/M/L/XL), `suggested_effort` (`low`…`xhigh`, the same levels as `workflow.effort` and `claude --effort`), `rating_note`, `rated_by` (USER/AI), `rated_at` and `open_question`. Written via `PATCH /api/v1/todos/{id}/planning` (`TodoPlanningService`); `null` leaves a field alone, an empty string clears it.
+- **Order:** rank, then priority, then age (`GoalService.WORK_ORDER`). `PUT /goals/{id}/order` sets rank 1..n for the listed TODOs; all others of the goal lose their rank. Assigning is `POST /goals/{id}/todos` (newly assigned TODOs come last, unranked).
+- **Progress:** ARCHIVED does not count; open questions only count for active TODOs. List and detail read lean projections (`GoalStatusCounts`, `GoalTodoRow`) without descriptions – safe under pool-size=1.
+- **Who plans:** interactively the plugin skill `/mysuricates:plan-goal`, which sees the repository; unattended a workflow later. A person can override any AI assessment in the TODO dialog.
+- **UI:** goal cards in the cockpit (`components/goal/GoalsSection`), goal view `/goals/:goalId` (up next · open questions · done · per project), planning section in a TODO's edit dialog (`TodoPlanningPanel`).
 
 ## Notification System (V40)
 
@@ -1123,7 +1133,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 84 Flyway migrations (V1–V84)
+│           └── db/migration/          ← 85 Flyway migrations (V1–V85)
 │
 └── ai-automation-frontend/
     ├── package.json

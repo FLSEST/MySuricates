@@ -6,6 +6,7 @@ import { useT } from '../../i18n';
 import { useTaskTargets } from '../../hooks/useIntegrations';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { ProviderIcon } from './ProviderIcon';
+import { TodoPlanningPanel } from '../goal/TodoPlanningPanel';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 
 const STATUSES: TodoStatus[] = ['OPEN', 'IN_PROGRESS', 'DONE', 'BACKLOG', 'ARCHIVED'];
@@ -185,6 +186,8 @@ export function TodoEditModal({
           suggestions={allTags}
           placeholder="bug, performance, ux"
         />
+
+        {editTodo && <TodoPlanningPanel todo={editTodo} />}
 
         {/* Übertragung / Verknüpfungen */}
         {editTodo && integrationsModule && (

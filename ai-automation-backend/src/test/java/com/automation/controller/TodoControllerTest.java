@@ -56,6 +56,7 @@ class TodoControllerTest {
     @MockitoBean private WorkflowMapper workflowMapper;
     @MockitoBean private ApiKeyService apiKeyService;
     @MockitoBean private TodoSimilarityService todoSimilarityService;
+    @MockitoBean private com.automation.service.goal.TodoPlanningService todoPlanningService;
     @MockitoBean private RateLimitConfig rateLimitConfig;
 
     private TodoResponse sampleResponse() {
@@ -66,7 +67,7 @@ class TodoControllerTest {
 
     @Test
     void listTodos_returnsPaged() throws Exception {
-        when(todoService.findAll(eq(0), eq(50), isNull(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(todoService.findAll(eq(0), eq(50), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
 
         mockMvc.perform(get("/api/v1/todos"))
@@ -76,7 +77,7 @@ class TodoControllerTest {
 
     @Test
     void listTodos_multiStatus() throws Exception {
-        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN", "IN_PROGRESS")), isNull(), isNull(), isNull(), isNull()))
+        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN", "IN_PROGRESS")), isNull(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
 
         mockMvc.perform(get("/api/v1/todos")
@@ -88,7 +89,7 @@ class TodoControllerTest {
 
     @Test
     void listTodos_singleStatus() throws Exception {
-        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN")), isNull(), isNull(), isNull(), isNull()))
+        when(todoService.findAll(eq(0), eq(50), isNull(), eq(List.of("OPEN")), isNull(), isNull(), isNull(), isNull(), isNull()))
                 .thenReturn(new PageResponse<>(List.of(sampleResponse()), 0, 50, 1, 1));
 
         mockMvc.perform(get("/api/v1/todos").param("status", "OPEN"))

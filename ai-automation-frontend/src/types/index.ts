@@ -1155,6 +1155,98 @@ export interface Todo {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Ziel und Einschätzung (TODO dc0566f8); null/fehlt, solange nichts davon gesetzt ist. */
+  planning?: TodoPlanning | null;
+}
+
+// ── Ziele (TODO dc0566f8) ─────────────────────────────────────────────────────
+
+export type TodoComplexity = 'S' | 'M' | 'L' | 'XL';
+export type ReasoningEffortLevel = 'low' | 'medium' | 'high' | 'xhigh';
+export type RatedBy = 'USER' | 'AI';
+export type GoalStatus = 'ACTIVE' | 'DONE' | 'ARCHIVED';
+
+export interface TodoPlanning {
+  goalId: string | null;
+  goalTitle: string | null;
+  goalRank: number | null;
+  complexity: TodoComplexity | null;
+  suggestedEffort: ReasoningEffortLevel | null;
+  ratingNote: string | null;
+  ratedBy: RatedBy | null;
+  ratedAt: string | null;
+  openQuestion: string | null;
+}
+
+/** `null`/fehlt = unverändert, leerer Text = leeren (`goalId: ''` löst das TODO vom Ziel). */
+export interface UpdateTodoPlanningRequest {
+  goalId?: string;
+  goalRank?: number;
+  complexity?: TodoComplexity | '';
+  suggestedEffort?: ReasoningEffortLevel | '';
+  ratingNote?: string;
+  openQuestion?: string;
+  ratedBy?: RatedBy;
+}
+
+export interface GoalProgress {
+  total: number;
+  open: number;
+  inProgress: number;
+  backlog: number;
+  done: number;
+  openQuestions: number;
+  percentDone: number;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  description: string | null;
+  status: GoalStatus;
+  targetDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  progress: GoalProgress;
+}
+
+export interface GoalTodoItem {
+  id: string;
+  title: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  projectId: string | null;
+  projectName: string | null;
+  tags: string[];
+  goalRank: number | null;
+  complexity: TodoComplexity | null;
+  suggestedEffort: ReasoningEffortLevel | null;
+  ratingNote: string | null;
+  ratedBy: RatedBy | null;
+  ratedAt: string | null;
+  openQuestion: string | null;
+  updatedAt: string;
+}
+
+export interface GoalDetail {
+  goal: Goal;
+  /** Arbeitsreihenfolge: Rang, dann Priorität, dann Alter. */
+  todos: GoalTodoItem[];
+  byProject: { projectId: string | null; projectName: string | null; total: number; done: number }[];
+}
+
+export interface CreateGoalRequest {
+  title: string;
+  description?: string;
+  /** `YYYY-MM-DD` oder ISO-Zeitpunkt. */
+  targetDate?: string;
+}
+
+export interface UpdateGoalRequest {
+  title?: string;
+  description?: string;
+  status?: GoalStatus;
+  targetDate?: string;
 }
 
 export interface CreateTodoRequest {

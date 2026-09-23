@@ -187,7 +187,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 48 Controller)
+Controller (REST API, 49 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -207,7 +207,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          48 REST-Controller
+├── controller/          49 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService, GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -265,7 +265,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 48 REST-Controller
+### Alle 49 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
@@ -566,6 +566,16 @@ Da TODOs zu ~96 % maschinell erzeugt und über viele Projekte verstreut sind, gi
 - **Hygiene** (`TodoHygieneService`): `archiveStaleNow(projectId)` verschiebt verstaubte Auto-Todos (OPEN/BACKLOG, Source AI/WORKFLOW, Tag `auto:workflow`, `updatedAt` älter als Schwelle) nach ARCHIVED — per Bulk-UPDATE in kurzer Transaktion. Cockpit-Knopf „Verstaubtes archivieren" (`POST /todos/archive-stale?projectId=`) ist der primäre, human-in-the-loop Weg. Der `@Scheduled`-Job (täglich 03:30) ruft denselben Pfad, ist aber per Default **AUS** (`todo-hygiene-enabled`). Schwellen runtime-konfigurierbar via `ExecutionSettingsService`: `todo-hygiene-enabled` [0,1], `todo-stale-days` [7,365], `todo-hygiene-max-per-run` [10,2000].
 - **Ghost-Watchdog** (`TodoGhostWatchdogService`): setzt verwaiste IN_PROGRESS-TODOs mit Maschinen-Source (AI/WORKFLOW) zurück auf OPEN, wenn die zugehörige CLI-Session ohne abschließenden Status-PATCH gestorben ist (`updatedAt` älter als Schwelle). Poll alle 5 min (`automation.todo-watchdog.poll-ms`), per Default **AN**; Human-TODOs (Source USER) werden nie angefasst. ActivityLog-WARNING pro Lauf. Runtime-Settings: `todo-watchdog-enabled` [0,1], `todo-watchdog-stale-hours` [1,720] (Default 24h).
 - **Bulk-Status** (`POST /todos/bulk-status`): generischer Bulk-UPDATE für viele TODO-IDs auf einen Status.
+
+## Ziele — TODOs projektübergreifend einordnen (V85)
+
+Ein **Ziel** (`entity/Goal`, `/api/v1/goals`, TODO dc0566f8) sammelt TODOs aus mehreren Projekten, die auf ein Ergebnis einzahlen – etwa den Open-Source-Launch, der AutoPilot und die Website zugleich betrifft. Es ist bewusst schlank: keine Abhängigkeitsgraphen, Sprints oder Zeiterfassung.
+
+- **Einordnung am TODO:** `goal_id` (höchstens ein Ziel), `goal_rank` (1 = zuerst, NULL = noch nicht eingeordnet), `complexity` (S/M/L/XL), `suggested_effort` (`low`…`xhigh`, dieselben Stufen wie `workflow.effort` und `claude --effort`), `rating_note`, `rated_by` (USER/AI), `rated_at` und `open_question`. Geschrieben über `PATCH /api/v1/todos/{id}/planning` (`TodoPlanningService`); `null` lässt ein Feld stehen, ein leerer Text leert es.
+- **Reihenfolge:** Rang, dann Priorität, dann Alter (`GoalService.WORK_ORDER`). `PUT /goals/{id}/order` setzt Rang 1..n für die genannten TODOs, alle übrigen verlieren den Rang. Zuordnen ist `POST /goals/{id}/todos` (neu Zugeordnete stehen ohne Rang hinten).
+- **Fortschritt:** ARCHIVED zählt nicht mit; offene Fragen zählen nur bei aktiven TODOs. Liste und Detail lesen schlanke Projektionen (`GoalStatusCounts`, `GoalTodoRow`) ohne Beschreibungen – pool-size=1-sicher.
+- **Wer einordnet:** Im Gespräch der Plugin-Skill `/mysuricates:plan-goal`, der das Repo sieht (TODO 9ed0687d); unbeaufsichtigt später ein Workflow (TODO 473f47e0). Ein Mensch überschreibt jede KI-Einschätzung im TODO-Dialog.
+- **UI:** Zielkarten im Cockpit (`components/goal/GoalsSection`), Zielansicht `/goals/:goalId` (Als Nächstes · Offene Fragen · Erledigt · je Projekt), Einordnung im Bearbeiten-Dialog eines TODOs (`TodoPlanningPanel`).
 
 ## Notification System (V40)
 
@@ -1181,7 +1191,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 84 Flyway-Migrationen (V1–V84)
+│           └── db/migration/          ← 85 Flyway-Migrationen (V1–V85)
 │
 └── ai-automation-frontend/
     ├── package.json

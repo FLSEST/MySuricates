@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.request.BulkUpdateTodoStatusRequest;
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.ExportTodoRequest;
+import com.automation.dto.request.UpdateTodoPlanningRequest;
 import com.automation.dto.request.UpdateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
@@ -14,6 +15,7 @@ import com.automation.mapper.TodoMapper;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
+import com.automation.service.goal.TodoPlanningService;
 import com.automation.service.todo.TodoHygieneService;
 import com.automation.service.todo.TodoOverviewService;
 import com.automation.service.todo.TodoResolutionService;
@@ -42,6 +44,7 @@ public class TodoController {
     private final TodoMapper todoMapper;
     private final WorkflowMapper workflowMapper;
     private final TodoSimilarityService similarityService;
+    private final TodoPlanningService planningService;
 
     @GetMapping
     public PageResponse<TodoResponse> listTodos(
@@ -52,8 +55,9 @@ public class TodoController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String tag,
-            @RequestParam(required = false) String q) {
-        return todoService.findAll(page, size, projectId, status, priority, source, tag, q);
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String goalId) {
+        return todoService.findAll(page, size, projectId, status, priority, source, tag, q, goalId);
     }
 
     @PostMapping
@@ -70,6 +74,12 @@ public class TodoController {
     @PutMapping("/{id}")
     public TodoResponse updateTodo(@PathVariable String id, @RequestBody UpdateTodoRequest request) {
         return todoService.updateAndReturn(id, request);
+    }
+
+    /** Ziel, Rang und Einschaetzung (Komplexitaet, Effort, Begruendung, offene Frage) – TODO dc0566f8. */
+    @PatchMapping("/{id}/planning")
+    public TodoResponse updateTodoPlanning(@PathVariable String id, @RequestBody UpdateTodoPlanningRequest request) {
+        return planningService.update(id, request);
     }
 
     @PatchMapping("/{id}/status")

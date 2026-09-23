@@ -22,6 +22,10 @@ public class Todo {
     public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     public enum Source { USER, AI, WORKFLOW }
     public enum ResolutionState { IDLE, RUNNING, FAILED, SUCCEEDED }
+    /** Umfang und Unsicherheit einer Aufgabe – grob, damit Mensch und KI dieselbe Skala nutzen. */
+    public enum Complexity { S, M, L, XL }
+    /** Wer die Einschaetzung zuletzt gesetzt hat; ein Mensch ueberschreibt die KI. */
+    public enum RatedBy { USER, AI }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -112,6 +116,43 @@ public class Todo {
     @Enumerated(EnumType.STRING)
     @Column(name = "resolution_state")
     private ResolutionState resolutionState;
+
+    // ── Einordnung in ein Ziel (TODO dc0566f8) ────────────────────────────────
+
+    /** Ziel, auf das dieses TODO einzahlt; hoechstens eins. */
+    @Column(name = "goal_id")
+    private String goalId;
+
+    /** Position im Ziel, 1 = zuerst; null = noch nicht eingeordnet (steht am Ende). */
+    @Column(name = "goal_rank")
+    private Integer goalRank;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "complexity")
+    private Complexity complexity;
+
+    /**
+     * Empfohlener Reasoning-Effort ({@code low|medium|high|xhigh}), als Text wie
+     * {@code Workflow.effort} – die Entity haengt nicht vom Service-Paket ab; geprueft wird
+     * gegen {@code ReasoningEffort} beim Schreiben.
+     */
+    @Column(name = "suggested_effort")
+    private String suggestedEffort;
+
+    /** Ein bis zwei Saetze, warum Komplexitaet und Effort so eingeschaetzt sind. */
+    @Column(name = "rating_note", columnDefinition = "text")
+    private String ratingNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rated_by")
+    private RatedBy ratedBy;
+
+    @Column(name = "rated_at")
+    private Instant ratedAt;
+
+    /** Frage, die vor der Arbeit geklaert sein muss; null = nichts offen. */
+    @Column(name = "open_question", columnDefinition = "text")
+    private String openQuestion;
 
     @CreatedDate
     @Column(updatable = false)

@@ -48,9 +48,17 @@ public class TodoService {
 
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority, String source, String tag, String q) {
+        return findAll(page, size, projectId, status, priority, source, tag, q, null);
+    }
+
+    /** Wie oben, zusaetzlich gefiltert auf ein Ziel (TODO dc0566f8). */
+    @Transactional(readOnly = true)
+    public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority,
+                                              String source, String tag, String q, String goalId) {
         // The order (priority rank, then newest) sits in the specification — an unsorted
         // PageRequest is required, a Sort would overwrite that order-by (aa434aee).
-        Specification<Todo> spec = TodoSpecifications.listSpec(projectId, status, priority, source, tag, q);
+        Specification<Todo> spec = TodoSpecifications.listSpec(projectId, status, priority, source, tag, q)
+                .and(TodoSpecifications.inGoal(goalId));
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<Todo> result = todoRepository.findAll(spec, pageRequest);
 

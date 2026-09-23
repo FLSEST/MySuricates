@@ -2709,8 +2709,9 @@ TODOs auflisten (paginiert, filterbar).
 | `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter nach Tag |
 | `q` | String | Volltextsuche |
+| `goalId` | String | Nur TODOs dieses Ziels (V85) |
 
-**Response:** `PageResponse<TodoResponse>`
+**Response:** `PageResponse<TodoResponse>` – mit `planning` (Ziel, Rang, Einschätzung), sobald davon etwas gesetzt ist
 
 ### `POST /api/v1/todos`
 
@@ -2856,6 +2857,68 @@ Veraltete TODOs archivieren.
 **Query-Parameter:** `projectId` (Pflicht), `title` (Pflicht)
 
 **Response:** `SimilarTodoResponse[]` mit `id`, `title`, `priority`, `score`, `similarity`
+
+### `PATCH /api/v1/todos/{id}/planning`
+
+Ziel, Rang und Einschätzung eines TODOs setzen (V85). `null` lässt ein Feld stehen, ein leerer Text leert es: `goalId: ""` löst das TODO vom Ziel, `openQuestion: ""` markiert die Frage als geklärt. `goalRank <= 0` nimmt den Rang zurück. Ohne `ratedBy` gilt die Einschätzung als menschlich (`USER`); `ratedAt` setzt der Server, sobald `complexity`, `suggestedEffort` oder `ratingNote` mitkommt.
+
+```json
+{
+  "goalId": "uuid",
+  "goalRank": 2,
+  "complexity": "M",
+  "suggestedEffort": "high",
+  "ratingNote": "Viele Dateien, aber klare Vorlage",
+  "openQuestion": "Welcher Video-Stil?",
+  "ratedBy": "AI"
+}
+```
+
+`complexity`: `S`, `M`, `L`, `XL` · `suggestedEffort`: `low`, `medium`, `high`, `xhigh` · andere Werte → 400.
+
+**Response:** `TodoResponse`
+
+---
+
+## Ziele
+
+Ein Ziel sammelt TODOs projektübergreifend und zeigt den Fortschritt (V85). Siehe [architektur.md](architektur.md#ziele--todos-projektübergreifend-einordnen-v85).
+
+### `GET /api/v1/goals`
+
+Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angabe `ACTIVE` und `DONE`, archivierte nur ausdrücklich).
+
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` ohne ARCHIVED).
+
+### `POST /api/v1/goals`
+
+```json
+{ "title": "Open-Source-Launch", "description": "Repo öffentlich, README mit Video", "targetDate": "2026-10-15" }
+```
+
+`targetDate` als Datum oder ISO-Zeitpunkt. **Response:** `201` + `GoalResponse`
+
+### `GET /api/v1/goals/{id}`
+
+Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Priorität, dann Alter) – ohne Beschreibungen – und Fortschritt je Projekt.
+
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`), `byProject[]` (`projectId`, `projectName`, `total`, `done`)
+
+### `PUT /api/v1/goals/{id}`
+
+Teiländerung: `title`, `description`, `status`, `targetDate` (`null` = unverändert, leer = leeren). **Response:** `GoalResponse`
+
+### `DELETE /api/v1/goals/{id}`
+
+Löscht das Ziel; seine TODOs bleiben und verlieren nur die Zuordnung. **Response:** `204`
+
+### `POST /api/v1/goals/{id}/todos`
+
+TODOs zuordnen: `{ "todoIds": ["…"] }`. Ein TODO aus einem anderen Ziel wechselt hierher; neu Zugeordnete bekommen keinen Rang. **Response:** `GoalDetailResponse`
+
+### `PUT /api/v1/goals/{id}/order`
+
+Reihenfolge setzen: `{ "todoIds": ["…"] }` → Rang 1..n in dieser Folge, alle übrigen TODOs des Ziels verlieren den Rang. Jede ID muss schon zum Ziel gehören, sonst 400. **Response:** `GoalDetailResponse`
 
 ---
 
