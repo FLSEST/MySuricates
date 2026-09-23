@@ -66,10 +66,15 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
      * ({@code @SQLRestriction("deleted_at IS NULL")}) werden bewusst ausgeschlossen.
      * Ein LEFT JOIN FETCH würde hier {@code FetchNotFoundException} werfen, weil der
      * nicht-nullable FK gesetzt ist, die Zeile aber durch die Restriction unsichtbar.
+     *
+     * <p>Der Container des Projekts kommt mit: {@code Project.container} ist eine nullable
+     * {@code @OneToOne(mappedBy)}, die Hibernate sonst je Ergebniszeile mit einem eigenen
+     * {@code select containers} auflöst — 60 bei 60 Runs (TODO 13d1e2a2).
      */
     @Query("SELECT wr FROM WorkflowRun wr "
          + "JOIN FETCH wr.workflow w "
-         + "LEFT JOIN FETCH w.project "
+         + "LEFT JOIN FETCH w.project p "
+         + "LEFT JOIN FETCH p.container "
          + "WHERE wr.startedAt > :since "
          + "ORDER BY wr.startedAt DESC")
     List<WorkflowRun> findDashboardWindow(@Param("since") Instant since);
@@ -87,11 +92,13 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     /**
      * Lädt vollständige Runs (inkl. steps + workflow + project) für die wenigen "recentRuns"
      * des Dashboards. Nur für ≤10 IDs gedacht — hier sind die großen TEXT-Spalten gewollt
-     * (das Frontend zeigt sie). Eager-Fetch, weil getDashboard ohne Transaktion läuft (OSIV aus).
+     * (das Frontend zeigt sie). Eager-Fetch, weil getDashboard ohne Transaktion läuft (OSIV aus);
+     * den Container des Projekts aus demselben Grund wie bei {@link #findDashboardWindow(Instant)}.
      */
     @Query("SELECT DISTINCT wr FROM WorkflowRun wr "
          + "JOIN FETCH wr.workflow w "
-         + "LEFT JOIN FETCH w.project "
+         + "LEFT JOIN FETCH w.project p "
+         + "LEFT JOIN FETCH p.container "
          + "LEFT JOIN FETCH wr.steps "
          + "WHERE wr.id IN :ids")
     List<WorkflowRun> findByIdInWithStepsAndWorkflow(@Param("ids") List<String> ids);

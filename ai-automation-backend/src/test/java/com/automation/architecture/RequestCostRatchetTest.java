@@ -137,9 +137,16 @@ class RequestCostRatchetTest {
      * {@code /executions} went from 29 statements to 5 when TODO 9db34f3b was fixed).
      *
      * <ul>
-     *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: one
-     *       {@code select containers} per workflow — the project's container association is
-     *       resolved row by row (TODO 13d1e2a2). Listed in {@link #KNOWN_GROWING}.</li>
+     *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: fixed, 32 → 2,
+     *       32 → 2 and 70 → 10 statements. Each paid one {@code select containers} per result row:
+     *       {@code Project.container} is a nullable {@code @OneToOne(mappedBy)}, and Hibernate
+     *       re-selects it for every row whose project has no container — a found container is
+     *       cached, "no container" is not. The queries behind the three routes now fetch the
+     *       container along ({@code WorkflowRepository.findAllWithActiveProject},
+     *       {@code WorkflowRunRepository.findDashboardWindow} and
+     *       {@code findByIdInWithStepsAndWorkflow}, TODO 13d1e2a2) — the same move as
+     *       {@code /projects} and {@code /schedules} below. What is left is the query itself plus
+     *       the bundled run counts; the dashboard adds its counters and aggregations.</li>
      *   <li>{@code /projects}: fixed, 4 → 1 statement. It was the same root cause as the three
      *       routes above — the nullable {@code @OneToOne(mappedBy)} {@code Project.container},
      *       resolved once per project. The list now runs through
@@ -161,9 +168,8 @@ class RequestCostRatchetTest {
      *       {@code /executions} instead of every run with every step. {@code {wf}} is the first
      *       seeded workflow.</li>
      *   <li>{@code /search}: the per-hit {@code select workflow_runs} is gone — search now uses the
-     *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). What is
-     *       left is the same {@code select containers} per workflow as {@code /workflows}, which is
-     *       the half of that ticket still open.</li>
+     *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). The
+     *       {@code select containers} per workflow went with the first bullet (32 → 2).</li>
      *   <li>{@code /schedules}: fixed, 91 → 33 → 3 statements. The last 30 were one
      *       {@code select workflows} per schedule, because the EAGER association
      *       {@code ScheduledWorkflow.workflow} is not fetched along by {@code findAll()}; the list
@@ -178,11 +184,11 @@ class RequestCostRatchetTest {
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
             "/api/v1/todos", new Cost(2, 32_000),
             "/api/v1/projects", new Cost(2, 1_200),
-            "/api/v1/workflows", new Cost(32, 26_000),
+            "/api/v1/workflows", new Cost(2, 26_000),
             "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/workflows/{wf}/runs", new Cost(4, 5_000),
-            "/api/v1/learning/dashboard", new Cost(70, 650_000),
-            "/api/v1/search?q=Workflow", new Cost(32, 18_000),
+            "/api/v1/learning/dashboard", new Cost(10, 650_000),
+            "/api/v1/search?q=Workflow", new Cost(2, 18_000),
             "/api/v1/schedules", new Cost(3, 20_000)));
 
     @Autowired private MockMvc mockMvc;
@@ -346,16 +352,12 @@ class RequestCostRatchetTest {
      * fuer diese Routen weiter, und {@link #knownGrowingRoutesStillGrow} meldet, sobald eine von
      * ihnen aufhoert zu wachsen — dann gehoert sie aus der Liste heraus, im selben Commit wie der
      * Fix.
+     *
+     * <p>Zurzeit leer: {@code /workflows}, {@code /search} und {@code /learning/dashboard} standen
+     * hier, bis ihr {@code select containers} je Zeile behoben war (TODO 13d1e2a2). Seitdem gilt
+     * das Wachstums-Kriterium fuer alle Routen.
      */
-    static final Map<String, String> KNOWN_GROWING = new TreeMap<>(Map.of(
-            "/api/v1/workflows",
-            "TODO 13d1e2a2 — ein select containers je Workflow (Project.container ist eine "
-                    + "nullable @OneToOne(mappedBy)). Ob Batch-Lookup oder schlanke Projektion, "
-                    + "entscheidet der Nutzer; bis dahin bleibt die Route hier.",
-            "/api/v1/search?q=Workflow",
-            "TODO 13d1e2a2 — derselbe Mapper-Pfad wie /workflows.",
-            "/api/v1/learning/dashboard",
-            "TODO 13d1e2a2 — derselbe Mapper-Pfad wie /workflows."));
+    static final Map<String, String> KNOWN_GROWING = new TreeMap<>();
 
     /**
      * Das eigentliche N+1-Kriterium: Dieselbe Route wird gegen zwei Saat-Groessen gemessen, und
