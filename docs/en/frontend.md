@@ -211,7 +211,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 |---|---|
 | `StatusBadge` | Maps status strings to badge variants |
 | `LogViewer` | Terminal-style log display: level colors, icons per live line kind, step badge, auto-scroll only while scrolled to the bottom (otherwise "Jump to latest") |
-| `MonacoEditor` | JSON editor (Monaco, dark theme) |
+| `MonacoEditor` | Editor for JSON and Markdown (Monaco, follows the theme). `value` may hand every keystroke back through state: echoes of its own `onChange` are not written into the model (`monacoValueSync.ts`), any other value replaces the content. `prose` for running text (wrapping, no word suggestions, which would make Enter accept a suggestion); `jsonSchema` and `placeholders` for block configs |
 | `ErrorState` | Error message with icon |
 | `EmptyState` | Empty state with description |
 | `Pagination` | Page navigation for paginated lists |

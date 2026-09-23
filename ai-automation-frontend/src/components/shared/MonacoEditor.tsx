@@ -1,13 +1,18 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { AlignLeft } from 'lucide-react';
 import { useThemeAppearance } from '../../stores/themeStore';
 import { useT } from '../../i18n';
 import { ensureLocalMonaco, registerJsonSchema } from './monacoSetup';
 import { attachPlaceholders } from './monacoPlaceholders';
+import { MonacoValueSync } from './monacoValueSync';
 import type { PlaceholderContext } from '../workflow/placeholderContext';
 
 interface MonacoEditorProps {
+  /**
+   * The text. Echoes of the editor's own `onChange` are not written back (they may be older than
+   * what was typed meanwhile); any other value replaces the content, e.g. after loading or a reset.
+   */
   value: string;
   onChange?: (value: string) => void;
   language?: string;
@@ -35,7 +40,12 @@ interface MonacoEditorProps {
 
 // Monaco-Editor-Instanz (locker typisiert, um keine monaco-Typen zu importieren)
 type MonacoEditorInstance = {
+  getValue: () => string;
+  setValue: (value: string) => void;
+  executeEdits: (source: string, edits: Array<{ range: unknown; text: string; forceMoveMarkers?: boolean }>) => boolean;
+  pushUndoStop: () => void;
   getModel: () => {
+    getFullModelRange: () => unknown;
     findMatches: (
       searchString: string,
       isRegex: boolean,
@@ -94,6 +104,11 @@ export function MonacoEditor({
   const placeholdersRef = useRef(placeholders);
   // Monaco comes from our bundle (no CDN, see monacoSetup) — mount the editor only once it is configured
   const [monacoReady, setMonacoReady] = useState(false);
+  // The editor itself is uncontrolled; `value` reaches the model only when it is no echo (monacoValueSync)
+  const [mounted, setMounted] = useState(false);
+  const valueSync = useRef(new MonacoValueSync());
+  const applyingValue = useRef(false);
+  const editorOptions = useMemo(() => (prose ? { readOnly, ...PROSE_OPTIONS } : { readOnly }), [prose, readOnly]);
 
   useEffect(() => {
     let active = true;
@@ -163,10 +178,37 @@ export function MonacoEditor({
       hover: { enabled: true, delay: 250 },
       formatOnPaste: !!jsonSchema,
       fixedOverflowWidgets: true,
+      // Prose keeps its switches: the suggestions above would bring back Enter accepting a word
+      ...(prose ? PROSE_OPTIONS : {}),
     });
     editorRef.current = editor as unknown as MonacoEditorInstance;
     doReveal();
+    setMounted(true);
   };
+
+  const handleChange = (text: string | undefined) => {
+    if (applyingValue.current) return; // our own write of an outside value, not an edit
+    const next = text ?? '';
+    valueSync.current.reportedChange(next);
+    onChange?.(next);
+  };
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!mounted || !editor || !valueSync.current.shouldApply(value, editor.getValue())) return;
+    applyingValue.current = true;
+    try {
+      if (readOnly) {
+        editor.setValue(value);
+      } else {
+        // One undoable edit, as @monaco-editor/react does it for a controlled value
+        editor.executeEdits('', [{ range: editor.getModel()!.getFullModelRange(), text: value, forceMoveMarkers: true }]);
+        editor.pushUndoStop();
+      }
+    } finally {
+      applyingValue.current = false;
+    }
+  }, [value, mounted, readOnly]);
 
   // Beim erneuten Anspringen (revealNonce) oder geändertem Ziel neu hervorheben
   useEffect(() => {
@@ -191,10 +233,10 @@ export function MonacoEditor({
               path={jsonSchema ? modelPath : undefined}
               language={language}
               theme={appearance === 'dark' ? 'vs-dark' : 'light'}
-              value={value}
-              onChange={(val) => onChange?.(val ?? '')}
+              defaultValue={value}
+              onChange={handleChange}
               onMount={handleMount}
-              options={prose ? { readOnly, ...PROSE_OPTIONS } : { readOnly }}
+              options={editorOptions}
             />
           ) : (
             <div style={{ height: editorHeight }} aria-busy="true" />

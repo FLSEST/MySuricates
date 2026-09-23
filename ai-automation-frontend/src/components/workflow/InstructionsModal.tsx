@@ -37,6 +37,7 @@ export function InstructionsModal({ open, onClose, instructions, setInstructions
           onChange={setInstructions}
           language="markdown"
           height="300px"
+          prose
         />
       </div>
     </Modal>
