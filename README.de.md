@@ -143,8 +143,12 @@ ein VPN davor, kein offener Port. Vollstaendig:
 
 Ausgefuehrt wird dort, wo die Instanz laeuft — im Container (empfohlen) oder direkt auf dem
 Rechner: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die installierte CLI (im
-Container samt Anmeldung vom Rechner eingebunden, ohne zweite Anmeldung). Einen eigenen Container je
+Container vom Rechner eingebunden). Einen eigenen Container je
 Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklich freigegeben ist.
+Was von den KI-Anbietern in den Container kommt, bestimmt ein Schalter: standardmaessig nur die
+Programme und je Anbieter die Anmeldung (fuer Claude einmal ein Token aus `claude setup-token`), nicht
+die Einstellungen, Plugins, Memory oder Verlaeufe des Rechners. Wer weniger oder alles teilen will,
+findet die Varianten unter [KI-Anbieter im Container](docs/deployment.md#ki-anbieter-im-container).
 
 ## Quickstart
 
