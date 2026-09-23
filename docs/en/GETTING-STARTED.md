@@ -64,7 +64,9 @@ without sudo when the package manager is too old).
 
 For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
 logged in to — via its login file or an environment variable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates starts without one; the installer shows which it finds,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). An instance in a container only sees login files, for Claude a
+token ([Deployment → AI providers in the container](deployment.md#ai-providers-in-the-container)).
+MySuricates starts without one; the installer shows which it finds,
 and so does the start page of the interface — with the command for whatever is missing.
 
 ---

@@ -75,6 +75,12 @@ lands neither in the image nor in the volume, but anyone with Docker access can 
 and no angle brackets. A placeholder such as `<token>` stays out; the starters, the installer and the
 settings report it as a missing login.
 
+**Login via environment variable.** On the machine a set variable such as `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` or `GEMINI_API_KEY` counts as a login. It does not reach the container: the switches
+mount login files, for Claude the token from `ai.env`. For a container instance the installer says so
+instead of leaving "logged in" standing, and names the command that creates the login file
+(`codex login`, `pi` → `/login`); at start `instance.sh` reports a missing file (90b4422c).
+
 **Project containers.** For a run the platform starts one container per project
 (`automation-<project-id>`, whenever Docker is reachable — on Stable and Test through the socket).
 Claude runs in it for commands during a run and in the terminal. It follows the same rule as its

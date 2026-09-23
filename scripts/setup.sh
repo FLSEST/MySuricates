@@ -408,7 +408,26 @@ ai_container() {
     if [ -n "$sel" ] && [ "$sel" != "$all_present" ]; then AI_PROVIDERS="$(printf '%s' "$sel" | tr ' ' ',')"; fi
   fi
   ai_claude_token
+  ai_env_only_hints
   tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}"
+  return 0
+}
+
+# Angemeldet nur per Umgebungsvariable (90b4422c): Schritt 5 zaehlt das als „angemeldet“, in den
+# Container kommt die Variable aber nicht — host-mounts.sh bindet Anmeldedateien ein, fuer Claude im
+# Modus login den Token aus ai.env (den ai_claude_token anbietet). Das sagen statt es stehen zu lassen.
+# Bei programs meldet sich jede Instanz ohnehin selbst an. Namen der Variablen, nie ihre Werte.
+ai_env_only_hints() {
+  local id vars
+  [ "$AI_FROM_HOST" = programs ] && return 0
+  for id in $(printf '%s' "${AI_PROVIDERS:-$(providers_ids | tr '\n' ',')}" | tr ',' ' '); do
+    { [ "$id" = claude ] && [ "$AI_FROM_HOST" = login ]; } && continue
+    provider_present "$id" || continue
+    provider_login_file "$id" && continue
+    vars="$(provider_login_env_names "$id")"
+    [ -n "$vars" ] || continue
+    printf '  %s\n' "$(msg ai_env_only "$id" "$(printf '%s' "$vars" | sed 's/ /, /g')" "$(provider_shell_cmd "$id" login)")"
+  done
   return 0
 }
 

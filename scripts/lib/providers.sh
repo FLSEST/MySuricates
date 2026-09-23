@@ -23,12 +23,20 @@ provider_get() {
 
 provider_present() { command -v "$(provider_get "${1:-}" cli)" >/dev/null 2>&1; }
 
-provider_logged_in() {
-  local entry file pattern var
+# Namen der gesetzten, nicht leeren Anmelde-Variablen, durch Leerzeichen getrennt — nie ihre Werte
+provider_login_env_names() {
+  local var out=""
   for var in $(provider_get "${1:-}" login_env); do
     case "$var" in ''|[!A-Z]*|*[!A-Z0-9_]*) continue ;; esac
-    [ -n "${!var-}" ] && return 0
+    [ -n "${!var-}" ] && out="${out:+$out }$var"
   done
+  printf '%s' "$out"
+}
+
+# Angemeldet per Datei unter $HOME — nur so kommt eine Anmeldung von Codex oder Pi in einen Container
+# (scripts/lib/host-mounts.sh bindet Dateien ein, keine Umgebungsvariablen; 90b4422c)
+provider_login_file() {
+  local entry file pattern
   for entry in $(provider_get "${1:-}" login_files); do
     file="${entry%%:*}"; pattern=""
     [ "$file" != "$entry" ] && pattern="${entry#*:}"
@@ -37,6 +45,8 @@ provider_logged_in() {
   done
   return 1
 }
+
+provider_logged_in() { [ -n "$(provider_login_env_names "${1:-}")" ] || provider_login_file "${1:-}"; }
 
 # Eine Zeile je Anbieter: "<id> present|missing logged-in|logged-out"
 providers_status() {

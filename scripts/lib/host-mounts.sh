@@ -192,7 +192,7 @@ host_mounts_missing_text() {
     case "$id:$what" in
       claude:token) echo "  $id: CLAUDE_CODE_OAUTH_TOKEN in ~/.config/mysuricates/ai.env sieht nicht wie ein Token aus (Platzhalter, Leerzeichen oder unter 40 Zeichen) — neu mit \`claude setup-token\`" ;;
       claude:login) echo "  $id: keine Anmeldung fuer Container — einmal \`claude setup-token\`, den Token als CLAUDE_CODE_OAUTH_TOKEN=... nach ~/.config/mysuricates/ai.env (chmod 600)" ;;
-      *:login)      echo "  $id: keine Anmeldung auf diesem Rechner gefunden" ;;
+      *:login)      echo "  $id: keine Anmeldedatei auf diesem Rechner gefunden (eine Anmeldung nur per Umgebungsvariable kommt nicht in den Container)" ;;
       *)            echo "  $id: Programm auf diesem Rechner nicht gefunden" ;;
     esac
   done

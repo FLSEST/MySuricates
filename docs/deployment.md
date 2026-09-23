@@ -75,6 +75,12 @@ Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, d
 mindestens 40 Zeichen, ohne Leerzeichen und ohne spitze Klammern. Ein Platzhalter wie `<token>` bleibt
 draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmeldung.
 
+**Anmeldung per Umgebungsvariable.** Auf dem Rechner zählt eine gesetzte Variable wie `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` oder `GEMINI_API_KEY` als Anmeldung. In den Container kommt sie nicht: Die Schalter
+binden Anmeldedateien ein, für Claude den Token aus `ai.env`. Der Installer sagt das bei einer
+Container-Instanz, statt „angemeldet“ stehen zu lassen, und nennt den Befehl, der die Anmeldedatei
+anlegt (`codex login`, `pi` → `/login`); beim Start meldet `instance.sh` eine fehlende Datei (90b4422c).
+
 **Projekt-Container.** Für einen Lauf startet die Plattform je Projekt einen Container
 (`automation-<projekt-id>`, sobald Docker erreichbar ist, bei Stable und Test über den Socket). Darin
 läuft Claude für Befehle mitten im Lauf und im Terminal. Er folgt derselben Regel wie seine Instanz:

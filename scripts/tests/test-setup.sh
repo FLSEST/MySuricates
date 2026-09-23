@@ -141,6 +141,23 @@ fi
 rm -rf "$DD" "$TMP/home/.profile" "$INST"
 if [ -n "$OLD_SHELL" ]; then export SHELL="$OLD_SHELL"; else unset SHELL; fi
 
+echo "4d) logged in only via a variable: the container does not get it (90b4422c)"
+LOGIN_VARS="CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_OAUTH_TOKEN OPENAI_API_KEY CODEX_API_KEY GEMINI_API_KEY OPENROUTER_API_KEY"
+runvars() {  # "VAR=WERT …" FLAGS… — nur diese Anmelde-Variablen, keine des Rechners
+  local kv="$1"; shift
+  ( for v in $LOGIN_VARS; do unset "$v"; done; for a in $kv; do export "$a"; done; run "$@" )
+}
+rm -rf "$INST"
+check "codex only via OPENAI_API_KEY: says it stays out" '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && out | grep -qF "codex is logged in here only via OPENAI_API_KEY — the variable does not reach the container. For the container, log in on this machine: codex login"'
+check "the value is never shown"                          '! out | grep -q "sk-test-geheim-42"'
+mkdir -p "$TMP/home/.codex"; echo '{"tokens":1}' > "$TMP/home/.codex/auth.json"; rm -rf "$INST"
+check "with ~/.codex/auth.json: no such hint"             '[ "$(runvars OPENAI_API_KEY=sk-test-geheim-42 --yes --dry-run)" = 0 ] && ! out | grep -q "only via"'
+rm -rf "$TMP/home/.codex" "$INST"
+check "programs: every instance logs in itself, no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --ai-from-host programs)" = 0 ] && ! out | grep -q "only via"'
+rm -rf "$INST"
+check "on this machine the variable just works: no hint"  '[ "$(runvars OPENAI_API_KEY=x --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "only via"'
+rm -rf "$INST"
+
 echo "5) staged — Dev · Test · Prod"
 rm -rf "$INST"
 check "--mode staged → exit 0"                          '[ "$(run --yes --dry-run --mode staged)" = 0 ]'
