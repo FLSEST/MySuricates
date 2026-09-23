@@ -24,6 +24,8 @@ interface MonacoEditorProps {
   jsonSchema?: object;
   /** Fill the parent's height instead of a fixed `height` (parent must give the editor a height). */
   fill?: boolean;
+  /** Wrap long lines at the editor width — for prose such as Markdown. */
+  wordWrap?: boolean;
   /** `{{ … }}` bound at this block: suggestions after `{{`, origin hint and hover, warnings. */
   placeholders?: PlaceholderContext;
 }
@@ -67,6 +69,7 @@ export function MonacoEditor({
   revealNonce = 0,
   jsonSchema,
   fill = false,
+  wordWrap = false,
   placeholders,
 }: MonacoEditorProps) {
   const t = useT();
@@ -181,7 +184,7 @@ export function MonacoEditor({
               value={value}
               onChange={(val) => onChange?.(val ?? '')}
               onMount={handleMount}
-              options={{ readOnly }}
+              options={{ readOnly, wordWrap: wordWrap ? 'on' : 'off' }}
             />
           ) : (
             <div style={{ height: editorHeight }} aria-busy="true" />

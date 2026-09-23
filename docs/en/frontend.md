@@ -103,8 +103,11 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Search filter + category filter
 - Grid layout with skill cards
-- Detail slide-over: capabilities, async badges, AI context preview
+- Detail slide-over: capabilities, async badges, AI context preview, collapsible history (`skill_versions`)
 - Category icons and colors
+- "New skill" and "Edit" open `SkillEditorModal` (name, icon, category, description, AI context in the Monaco Markdown editor); "Import" reads an export file, "Export" downloads it
+- Built-in skills are read-only and can be copied as a custom skill (without capabilities)
+- If a sealed workflow uses the skill, editing and deleting are locked — regardless of the `sealing` module; the hint names the way out (unseal, unsealing switched off, or `seal-immutable`)
 
 ### Schedules (`/schedules`)
 
@@ -399,6 +402,8 @@ All API data is managed via React Query:
 | `useSkillCapabilities(skillId)` | Query | Capabilities of a skill |
 | `useActivateSkills()` | Mutation | Activate skills for workflow |
 | `useDeactivateSkill()` | Mutation | Deactivate skill |
+| `useSkillVersions(skillId, enabled)` | Query | Change history of a skill |
+| `useCreateSkill()` / `useUpdateSkill()` / `useDeleteSkill()` / `useImportSkill()` | Mutation | Create, edit, delete, import custom skills; `isSkillPinnedBySealError` detects 409 `SKILL_PINNED_BY_SEAL` |
 
 ### `useSchedules.ts`
 

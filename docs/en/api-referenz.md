@@ -956,6 +956,18 @@ List capabilities of a skill.
 
 **Response:** `CapabilityResponse[]`
 
+### `GET /api/v1/skills/{id}/versions`
+
+Change history of a skill, newest first — also for deleted skills.
+
+**Response:** `SkillVersionResponse[]` with `id`, `skillId`, `versionNumber`, `operation` (`CREATE`/`UPDATE`/`DELETE`), `changeSource` (`user`/`import`/`builtin-seed`), `contentHash`, `createdAt`; the snapshot itself is not returned.
+
+### `GET /api/v1/skills/seal-pins`
+
+Maps each skill id to the names of the sealed workflows that use the skill. Such skills cannot be changed or deleted.
+
+**Response:** `{"<skillId>": ["workflow name", ...]}`
+
 ### `POST /api/v1/skills`
 
 Create a new skill.
@@ -984,11 +996,17 @@ Create a new skill.
 
 **Response:** `201` with `SkillResponse`
 
+### `PUT /api/v1/skills/{id}`
+
+Edit a custom skill. `name`, `description`, `icon`, `category` and `aiContext` can be changed (required fields as for creation); `configSchema`, capabilities and the version label stay as they are. Each change writes a row to `GET /api/v1/skills/{id}/versions` (source `user`).
+
+**Response:** `200` with `SkillResponse` · `409 STATE_CONFLICT` for a built-in skill (the next release update would overwrite the change) · `409 SKILL_PINNED_BY_SEAL` while a sealed workflow uses the skill
+
 ### `DELETE /api/v1/skills/{id}`
 
 Delete a skill.
 
-**Response:** `204 No Content`
+**Response:** `204 No Content` · `409 STATE_CONFLICT` for a built-in skill · `409 SKILL_PINNED_BY_SEAL` while a sealed workflow uses the skill
 
 ### `GET /api/v1/skills/export/{id}`
 
@@ -1000,7 +1018,7 @@ Export a skill as JSON (including capabilities).
 
 Import a skill from JSON.
 
-**Request:** `ImportSkillRequest` (exported format)
+**Request:** `ImportSkillRequest` (exported format); every capability needs a `name`, otherwise `400`
 
 **Response:** `201` with `SkillResponse`
 

@@ -961,6 +961,18 @@ Capabilities eines Skills auflisten.
 
 **Response:** `CapabilityResponse[]`
 
+### `GET /api/v1/skills/{id}/versions`
+
+Änderungsverlauf eines Skills, neueste zuerst — auch für gelöschte Skills.
+
+**Response:** `SkillVersionResponse[]` mit `id`, `skillId`, `versionNumber`, `operation` (`CREATE`/`UPDATE`/`DELETE`), `changeSource` (`user`/`import`/`builtin-seed`), `contentHash`, `createdAt`; der Snapshot selbst wird nicht ausgeliefert.
+
+### `GET /api/v1/skills/seal-pins`
+
+Ordnet jeder Skill-ID die Namen der versiegelten Workflows zu, die den Skill nutzen. Solche Skills lassen sich nicht ändern oder löschen.
+
+**Response:** `{"<skillId>": ["Workflow-Name", ...]}`
+
 ### `POST /api/v1/skills`
 
 Neuen Skill erstellen.
@@ -989,11 +1001,17 @@ Neuen Skill erstellen.
 
 **Response:** `201` mit `SkillResponse`
 
+### `PUT /api/v1/skills/{id}`
+
+Eigenen Skill bearbeiten. Änderbar sind `name`, `description`, `icon`, `category` und `aiContext` (Pflichtfelder wie beim Anlegen); `configSchema`, Capabilities und das Versions-Etikett bleiben unverändert. Jede Änderung schreibt eine Zeile in `GET /api/v1/skills/{id}/versions` (Herkunft `user`).
+
+**Response:** `200` mit `SkillResponse` · `409 STATE_CONFLICT` bei einem Built-in-Skill (das nächste Release-Update würde die Änderung überschreiben) · `409 SKILL_PINNED_BY_SEAL`, solange ein versiegelter Workflow den Skill nutzt
+
 ### `DELETE /api/v1/skills/{id}`
 
 Skill löschen.
 
-**Response:** `204 No Content`
+**Response:** `204 No Content` · `409 STATE_CONFLICT` bei einem Built-in-Skill · `409 SKILL_PINNED_BY_SEAL`, solange ein versiegelter Workflow den Skill nutzt
 
 ### `GET /api/v1/skills/export/{id}`
 
@@ -1005,7 +1023,7 @@ Skill als JSON exportieren (inkl. Capabilities).
 
 Skill aus JSON importieren.
 
-**Request:** `ImportSkillRequest` (exportiertes Format)
+**Request:** `ImportSkillRequest` (exportiertes Format); jede Capability braucht einen `name`, sonst `400`
 
 **Response:** `201` mit `SkillResponse`
 
