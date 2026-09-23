@@ -709,6 +709,13 @@ Geprüft wird:
    isolierten Run-Workspaces der Evidenz-Workflows. Gesucht wird wörtlich, ohne Groß-/Kleinschreibung;
    die Meldung nennt die Listenzeile, nicht den Begriff. Fehlt die Liste (CI, fremder Clone), wird
    der Check hörbar übersprungen.
+   Eine Zeile mit dem Präfix `low:` (`low: <Begriff>`) markiert einen **schwachen** Begriff: Er
+   bleibt auf der Liste, ein Treffer ist aber nur eine Warnung („privater Begriff, schwach (Zeile N
+   …)“) — kein Verstoss, kein Exit 1, weder im Bestand noch bei Commit oder Push; der
+   Evidenz-Workflow wertet ihn als LOW. Gedacht für Begriffe, die sichtbar bleiben, aber keinen
+   Release aufhalten sollen. Alle Leser der Liste (Bestand, hinzugefügte Zeilen, Commit-Nachrichten
+   im Pre-Push-Gate) parsen sie über denselben Helfer `hygiene_private_terms_load` in
+   `scripts/lib/hygiene-rules.sh`.
 
 Die Hooks (`pre-commit`, `commit-msg`, `pre-push`) installiert `scripts/install-hooks.sh` über
 `core.hooksPath` (läuft in `setup.sh` mit).
@@ -733,10 +740,11 @@ Remote-Ref kennt):
 
 1. **Commit-Metadaten.** Autor und Committer tragen die GitHub-noreply-Form
    (`<id>+<login>@users.noreply.github.com`, `HYGIENE_COMMIT_EMAIL_REGEX`); die Nachricht enthält
-   keine verbotenen Literale, keine privaten Begriffe und keine Mailadresse außerhalb eines
-   Trailers (`Co-Authored-By`, `Generated-By`, `Signed-off-by`, …). Die Adresse selbst steht
-   nirgends im Repository, nur ihre Form.
-2. **Hygiene-Gate auf den Bereich** (`public-hygiene.sh --range`): was neu dazukommt.
+   keine verbotenen Literale, keine privaten Begriffe (schwache, Präfix `low:`, nur als Warnung)
+   und keine Mailadresse außerhalb eines Trailers (`Co-Authored-By`, `Generated-By`,
+   `Signed-off-by`, …). Die Adresse selbst steht nirgends im Repository, nur ihre Form.
+2. **Hygiene-Gate auf den Bereich** (`public-hygiene.sh --range`): was neu dazukommt. Seine
+   Warnungen erscheinen auch dann, wenn der Bereich sauber ist.
 3. **Bestands-Gates der CI, die vom Code abhängen:** Doku-Zahlen, Doku-Verweise mit
    DE/EN-Gleichstand, Diagramm-Drift. Fehlt eines der Skripte, ist das ein harter Fehler.
 4. **gitleaks auf den Bereich** — nur wenn installiert, sonst hörbar übersprungen. Es wird nichts

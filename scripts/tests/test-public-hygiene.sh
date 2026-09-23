@@ -562,12 +562,56 @@ mkdir -p "$XDG_CONFIG_HOME/mysuricates"
 cp "$TMP/terms-liste.txt" "$XDG_CONFIG_HOME/mysuricates/hygiene-private-terms.txt"
 OUT=$(cd "$TMP/terms" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "XDG-Begriffsliste greift (exit 1)"                '[ "$RC" -eq 1 ]'
+# Seit dem Pre-Push-Gate (7030f362) prueft --staged die hinzugefuegten Zeilen
+# (check_private_terms_diff), den Bestand weiterhin nicht: notiz.md bleibt ungenannt.
 OUT=$(cd "$TMP/terms" && printf 'zebrafink\n' > neu.md && git add neu.md && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
-check "--staged prueft die Begriffe nicht"               '! grep -q "privater Begriff" <<<"$OUT"'
+check "--staged prueft den Bestand nicht"                '! grep -q "privater Begriff" <<<"$OUT" && ! grep -q "notiz.md" <<<"$OUT"'
+check "--staged prueft die neue Zeile (exit 1)"          '[ "$RC" -eq 1 ] && grep -q "neu.md:1 — neue Zeile enthaelt einen privaten Begriff (Zeile 3" <<<"$OUT"'
 rm -f "$XDG_CONFIG_HOME/mysuricates/hygiene-private-terms.txt"
 printf 'Schnecke\n' > "$TMP/terms-liste.txt"
 OUT=$(cd "$TMP/terms" && HYGIENE_PRIVATE_TERMS="$TMP/terms-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "Liste ohne Treffer: kein Begriffsbefund"          '! grep -q "privater Begriff" <<<"$OUT"'
+
+echo "36) Praefix low: — schwacher Begriff warnt nur, im Bestand und in neuen Zeilen (TODO 2542ef85)"
+make_repo "$TMP/weak"
+( cd "$TMP/weak" && printf 'Report vulnerabilities via Private vulnerability reporting on GitHub.\n' > SECURITY.md \
+    && printf 'Notiz: Entscheidung Zaunkoenig zum Moorhuhn-Projekt\n' > notiz.md \
+    && $GIT add SECURITY.md notiz.md && $GIT commit -q -m notiz )
+printf '# Kommentar\nlow: zaunkoenig\n' > "$TMP/weak-liste.txt"
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "nur schwacher Treffer: Gate bleibt gruen (exit 0)"  '[ "$RC" -eq 0 ]'
+check "Warnung nennt Datei, Zeile und Listenzeile" \
+  'grep -q "notiz.md:1 — privater Begriff, schwach (Zeile 2 der privaten Begriffsliste)" <<<"$OUT"'
+check "Warnung statt Verstoss"                             'grep -q "Public-Hygiene-Gate OK — 1 Warnung(en), kein Verstoss" <<<"$OUT"'
+check "Begriff steht nicht in der Ausgabe"                 '! grep -qi "zaunkoenig" <<<"$OUT"'
+check "Praefix wird nicht als Begriff gelesen"             '! grep -q "privater Begriff (Zeile" <<<"$OUT"'
+
+printf '   low:zaunkoenig   \n' > "$TMP/weak-liste.txt"
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "low: ohne Leerzeichen, eingerueckt: ebenso schwach" \
+  '[ "$RC" -eq 0 ] && grep -q "privater Begriff, schwach (Zeile 1" <<<"$OUT"'
+
+printf 'low: zaunkoenig\nmoorhuhn\n' > "$TMP/weak-liste.txt"
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "normaler Begriff daneben schlaegt das Gate (exit 1)" '[ "$RC" -eq 1 ]'
+check "normaler Treffer als Verstoss"                      'grep -q "notiz.md:1 — privater Begriff (Zeile 2" <<<"$OUT"'
+check "schwacher Treffer bleibt Warnung"                   'grep -q "notiz.md:1 — privater Begriff, schwach (Zeile 1" <<<"$OUT"'
+
+printf 'low: zaunkoenig\n' > "$TMP/weak-liste.txt"
+( cd "$TMP/weak" && printf 'Neu: Zaunkoenig war da\n' > neu.md && git add neu.md )
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged: schwacher Treffer blockiert nicht (exit 0)" '[ "$RC" -eq 0 ]'
+check "--staged: Warnung nennt Datei und Listenzeile" \
+  'grep -q "neu.md:1 — neue Zeile enthaelt einen privaten Begriff, schwach (Zeile 1" <<<"$OUT"'
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" $GIT commit -q -m neu 2>&1); RC=$?
+check "pre-commit-Hook laesst den Commit zu"               '[ "$RC" -eq 0 ]'
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --range HEAD~1..HEAD 2>&1); RC=$?
+check "--range: schwacher Treffer blockiert nicht (exit 0)"  '[ "$RC" -eq 0 ]'
+check "--range: Warnung nennt die Datei" \
+  'grep -q "neu.md:1 — neue Zeile enthaelt einen privaten Begriff, schwach" <<<"$OUT"'
+printf 'zaunkoenig\n' > "$TMP/weak-liste.txt"
+OUT=$(cd "$TMP/weak" && HYGIENE_PRIVATE_TERMS="$TMP/weak-liste.txt" bash scripts/ci/public-hygiene.sh --range HEAD~1..HEAD 2>&1); RC=$?
+check "--range: ohne low: weiterhin ein Verstoss (exit 1)" '[ "$RC" -eq 1 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

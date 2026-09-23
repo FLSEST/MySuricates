@@ -241,6 +241,12 @@ hygiene_private_list_path() {
 # Format: ein Begriff je Zeile, Kommentare mit #. Gesucht wird woertlich und ohne
 # Ruecksicht auf Gross-/Kleinschreibung. Meldungen nennen den Begriff nicht,
 # nur seine Zeilennummer in der Liste — die Ausgabe landet im Evidenz-Bericht.
+#
+# Praefix "low:" (TODO 2542ef85): "low: <begriff>" markiert einen schwachen
+# Begriff. Er bleibt auf der Liste, ein Treffer ist aber nur eine Warnung
+# ("privater Begriff, schwach") — kein Verstoss, kein Exit 1, weder im Bestand
+# noch beim Commit oder Push; der Evidenz-Workflow wertet ihn als LOW. Gedacht
+# fuer Begriffe, die sichtbar bleiben sollen, aber keinen Release aufhalten.
 # ---------------------------------------------------------------------------
 HYGIENE_PRIVATE_TERMS_FILE="scripts/ci/hygiene-private-terms.txt"
 
@@ -254,6 +260,42 @@ hygiene_private_terms_path() {
     [ -n "$c" ] && [ -f "$c" ] && { printf '%s\n' "$c"; return 0; }
   done
   return 1
+}
+
+# hygiene_private_terms_load <liste> — der einzige Parser der Begriffsliste. Fuellt
+# drei parallele Arrays:
+#   HYGIENE_TERMS       Begriff (getrimmt, ohne Kommentar und ohne Praefix)
+#   HYGIENE_TERM_LINES  Zeilennummer in der Liste — Meldungen nennen nur sie
+#   HYGIENE_TERM_WEAK   1 = schwach (Praefix low:), 0 = normal
+# public-hygiene.sh (Bestand und hinzugefuegte Zeilen) und pre-push-checks.sh
+# (Commit-Nachrichten) lesen die Liste nur hierueber. Vorher hatte jede Pruefung
+# ihre eigene Schleife — eine Formatregel an einer Stelle fehlte an der anderen,
+# und ein "low:"-Eintrag waere dort als woertlicher Begriff stumm ins Leere gelaufen.
+HYGIENE_TERMS=()
+HYGIENE_TERM_LINES=()
+HYGIENE_TERM_WEAK=()
+hygiene_private_terms_load() {
+  local list="$1" term lineno=0 weak
+  HYGIENE_TERMS=(); HYGIENE_TERM_LINES=(); HYGIENE_TERM_WEAK=()
+  # "|| [ -n "$term" ]" nimmt die letzte Zeile mit, wenn die Datei ohne Umbruch endet.
+  while IFS= read -r term || [ -n "$term" ]; do
+    lineno=$((lineno + 1))
+    term="${term%%#*}"
+    term="${term#"${term%%[![:space:]]*}"}"
+    term="${term%"${term##*[![:space:]]}"}"
+    weak=0
+    case "$term" in
+      low:*)
+        weak=1
+        term="${term#low:}"
+        term="${term#"${term%%[![:space:]]*}"}"
+        ;;
+    esac
+    [ -z "$term" ] && continue
+    HYGIENE_TERMS+=("$term")
+    HYGIENE_TERM_LINES+=("$lineno")
+    HYGIENE_TERM_WEAK+=("$weak")
+  done < "$list"
 }
 
 # Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).

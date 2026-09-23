@@ -186,6 +186,25 @@ check "ohne Modus: exit 2"                       '[ "$RC" -eq 2 ]'
 OUT=$(cd "$TMP/clean" && bash scripts/ci/pre-push-checks.sh --range kaputt 2>&1); RC=$?
 check "--range ohne ..: exit 2"                  '[ "$RC" -eq 2 ]'
 
+echo "18) Schwacher privater Begriff (Praefix low:) warnt nur — Nachricht und Push-Bereich (TODO 2542ef85)"
+printf '# Kommentar\nlow: Schnecke\n' > "$TMP/weak.txt"
+commit_file "$TMP/clean" n.txt "Die Schnecke kriecht" "docs: Notiz zur schnecke" $NOREPLY
+OUT=$(cd "$TMP/clean" && HYGIENE_PRIVATE_TERMS="$TMP/weak.txt" bash scripts/ci/pre-push-checks.sh --range HEAD~1..HEAD --skip-tree --skip-build 2>&1); RC=$?
+check "schwacher Treffer blockiert nicht (exit 0)" '[ "$RC" -eq 0 ]'
+check "Nachricht: Warnung nennt Listenzeile 2" \
+  'grep -q "Nachricht enthaelt einen privaten Begriff, schwach (Zeile 2 der privaten Begriffsliste)" <<<"$OUT"'
+check "Bereich: Warnung des Hygiene-Gates sichtbar" \
+  'grep -q "n.txt:1 — neue Zeile enthaelt einen privaten Begriff, schwach (Zeile 2" <<<"$OUT"'
+check "Hygiene-Gate im Bereich: OK mit Warnung"  'grep -q "Hygiene-Gate auf HEAD~1..HEAD: OK — 1 Warnung(en)" <<<"$OUT"'
+check "Gate meldet OK mit beiden Warnungen"      'grep -q "Pre-Push-Gate OK — 2 Warnung(en), kein Verstoss" <<<"$OUT"'
+check "Begriff steht nicht in der Ausgabe"       '! grep -qi "schnecke" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+OUT=$(cd "$TMP/clean" && printf 'w\n' > o.txt && $NOREPLY add o.txt && HYGIENE_PRIVATE_TERMS="$TMP/weak.txt" $NOREPLY commit -q -m "docs: schnecke" 2>&1); RC=$?
+check "commit-msg-Hook: Commit entsteht"         '[ "$RC" -eq 0 ]'
+check "commit-msg-Hook: Warnung sichtbar" \
+  'grep -q "dieser Commit: Nachricht enthaelt einen privaten Begriff, schwach (Zeile 2" <<<"$OUT"'
+( cd "$TMP/clean" && git reset -q --hard HEAD~1 )
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
