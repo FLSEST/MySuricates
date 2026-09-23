@@ -24,14 +24,28 @@ public record WorkflowTemplateResponse(
         Instant createdAt,
         Instant updatedAt,
         /** {@code TEMPLATE} or {@code BLUEPRINT} (TODO 268ae0db). */
-        TemplateKind kind
+        TemplateKind kind,
+        /**
+         * Keys of the optional modules its blocks need ({@code BlockTypeModules}); the picker hides
+         * the template while one of them is off (TODO 560d18dd).
+         */
+        List<String> requiredModules,
+        /** Whether running it can call an AI model ({@code ModelUse}). */
+        boolean needsAi
 ) {
     /** The same template with its blocks and instructions in another language (bilingual templates). */
     public WorkflowTemplateResponse withBlocksAndInstructions(List<BlockDefinition> localizedBlocks,
                                                               String localizedInstructions) {
         return new WorkflowTemplateResponse(id, name, description, icon, category, localizedBlocks,
                 localizedInstructions, model, builtIn, sortOrder, qualityStatus, verifications, version,
-                createdAt, updatedAt, kind);
+                createdAt, updatedAt, kind, requiredModules, needsAi);
+    }
+
+    /** The same template with the projects it was verified in. */
+    public WorkflowTemplateResponse withVerifications(List<TemplateVerificationInfo> verificationInfos) {
+        return new WorkflowTemplateResponse(id, name, description, icon, category, blocks, instructions, model,
+                builtIn, sortOrder, qualityStatus, verificationInfos, version, createdAt, updatedAt, kind,
+                requiredModules, needsAi);
     }
 
     public record TemplateVerificationInfo(

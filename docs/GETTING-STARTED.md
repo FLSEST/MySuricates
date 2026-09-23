@@ -160,7 +160,9 @@ Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
    Projekt existiert. Ein Klick, und die Beispiel-Workflows laufen ohne KI und ohne Einrichtung.
    Das Dashboard bekommt dazu eine eigene Ansicht, die nur dieses Projekt zeigt.
 2. **Eine Vorlage übernehmen** — unter *Templates* liegen 66 fertige Workflows. Eine auswählen,
-   ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert.
+   ins Projekt kopieren, starten. Der Lauf zeigt Schritt für Schritt, was passiert. Vorlagen, die
+   ein auf dieser Instanz ausgeschaltetes Modul brauchen, stehen hinter einem Zähler, und der Filter
+   „Läuft ohne KI“ zeigt nur, was kein Modell ruft.
 3. **Den Lauf ansehen** — die Detailansicht zeigt je Block Dauer, Status und ob er deterministisch
    war oder ein Modell gerufen hat.
 

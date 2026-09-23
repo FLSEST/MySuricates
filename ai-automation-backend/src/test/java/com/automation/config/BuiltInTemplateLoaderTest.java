@@ -5,6 +5,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.TemplateKind;
 import com.automation.entity.WorkflowTemplate;
+import com.automation.executor.ModelUse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,17 @@ class BuiltInTemplateLoaderTest {
         assertThat(german).extracting(BlockDefinition::getName).containsExactly("messen", "freigabe", "abschluss");
         assertThat(german.get(1).getConfig().get("question").toString()).contains("{{ block.messen.output }}");
         assertThat(german.get(1).getConfig().get("options")).isEqualTo(List.of("Ja", "Nein"));
+    }
+
+    /**
+     * The picker's AI badge and its "runs without AI" filter read {@link ModelUse} (TODO 560d18dd);
+     * it has to agree with {@code BlueprintGateTest}: only the AI group calls a model.
+     */
+    @Test
+    void blueprints_callAModelOnlyInTheAiGroup_asThePickerShowsIt() {
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT))
+                .allSatisfy(bp -> assertThat(ModelUse.needsAi(bp.getBlocks())).as(bp.getId())
+                        .isEqualTo("AI".equals(bp.getCategory())));
     }
 
     @Test

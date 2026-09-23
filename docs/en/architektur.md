@@ -113,6 +113,7 @@ matches the catalog — whoever adds a module finds out at the latest there.
 - Background paths ask `ModuleRegistry` directly: `integration`/`skill-capability` blocks fail with a clear message, `/ws/terminal` refuses the handshake (`ModuleHandshakeGuard`), auto-memory, audit ingestion, staging health checks and chain schedules do not run, auto-repair is bound via `@EventListener(condition = ModuleConditions.FACTORY)`.
 - Unknown module names, invalid values and unmet dependencies (`requires`) **fail the startup** — nothing enables itself.
 - `ControllerModuleGateTest` enforces that every controller belongs to a module or is consciously listed as core.
+- The block types of a module are kept in one list, `executor/BlockTypeModules` (`skill-capability` → `skills`, `integration` → `integrations`, `dashboard-report`). `/system/capabilities` offers such a type only while its module is on, and `GET /workflow-templates` names `requiredModules` per template. `BlockTypeModuleGateTest` keeps the list and the executor checks in step both ways: every entry needs an executor that refuses, and every executor that checks a module needs an entry.
 - `GET /api/v1/system/capabilities` returns `preset`, `modulesUiEditable` and `modules[]` (with `configured`/`overridden`); the frontend uses it to hide navigation, routes (a "module disabled" page with a snippet) and widgets. **Settings → Modules & hardening** shows everything with YAML/env snippets.
 
 **Switching in the UI (optional)** — With `automation.modules.ui-editable: true` (env `AUTOMATION_MODULES_UI_EDITABLE`) every feature module gets a switch in the settings:
@@ -658,6 +659,7 @@ Claude Code sessions can also serve as templates for workflows:
 - Users can create custom templates via API or by saving an existing workflow
 - `workflow.templateId` — optional back-reference to the source template
 - Frontend resolves localized template names via `resolveTemplateName()` in `utils/templateUtils.ts`
+- Every response carries `requiredModules` (the modules its blocks need, nested ones included; `BlockTypeModules.requiredBy`) and `needsAi` (whether a run can call a model; `executor/ModelUse`, the same rule as the AI badge in the frontend). The template picker hides templates and blueprints whose module is off and shows a counter instead ("N more need a module – show"). Once shown, the card names the module and how to switch it on. On top come the "Runs without AI" filter and translated categories
 - CRUD API at `/api/v1/workflow-templates`
 
 ## Built-in Skills

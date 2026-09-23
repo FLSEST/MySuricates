@@ -120,7 +120,7 @@ class TemplateVerificationServiceTest {
         var response = new WorkflowTemplateResponse(
                 "tpl-1", Map.of("de", "Test"), Map.of(), "icon", "cat",
                 List.of(), null, null, true, 0, "TESTED", List.of(), "1.0",
-                Instant.now(), Instant.now(), null);
+                Instant.now(), Instant.now(), null, List.of(), false);
 
         var enriched = service.enrichWithVerifications(response);
 
@@ -169,7 +169,7 @@ class TemplateVerificationServiceTest {
         var response = new WorkflowTemplateResponse(
                 "tpl-1", Map.of("de", "Test"), Map.of(), "icon", "cat",
                 List.of(), null, null, true, 0, "TESTED", List.of(), "1.0",
-                Instant.now(), Instant.now(), null);
+                Instant.now(), Instant.now(), null, List.of(), false);
 
         var enriched = service.enrichWithVerifications(response);
 
@@ -184,7 +184,7 @@ class TemplateVerificationServiceTest {
         var response = new WorkflowTemplateResponse(
                 "tpl-1", Map.of("de", "Test"), Map.of(), "icon", "cat",
                 List.of(), null, null, true, 0, "UNTESTED", List.of(), "1.0",
-                Instant.now(), Instant.now(), null);
+                Instant.now(), Instant.now(), null, List.of(), false);
 
         var enriched = service.enrichWithVerifications(response);
 
@@ -207,9 +207,9 @@ class TemplateVerificationServiceTest {
 
         Instant now = Instant.now();
         var resp1 = new WorkflowTemplateResponse("tpl-1", Map.of("de", "T1"), Map.of(), "i", "c",
-                List.of(), null, null, true, 0, "TESTED", List.of(), "1.0", now, now, null);
+                List.of(), null, null, true, 0, "TESTED", List.of(), "1.0", now, now, null, List.of(), false);
         var resp2 = new WorkflowTemplateResponse("tpl-2", Map.of("de", "T2"), Map.of(), "i", "c",
-                List.of(), null, null, true, 0, "TESTED", List.of(), "1.0", now, now, null);
+                List.of(), null, null, true, 0, "TESTED", List.of(), "1.0", now, now, null, List.of(), false);
 
         var enriched = service.enrichAllWithVerifications(List.of(resp1, resp2));
 

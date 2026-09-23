@@ -1523,6 +1523,8 @@ Invokes actions from connected external services (Google Calendar, Trello, etc.)
 
 **Prerequisite:** The provider must be connected on the integrations page (`/integrations`).
 
+**Module:** `integrations` (on only in the `full` preset). While it is off, the block is refused, the editor does not offer the type, and the template picker hides templates with this block.
+
 ### Config
 
 | Field | Required | Description |

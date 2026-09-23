@@ -207,6 +207,10 @@ export interface WorkflowTemplate {
   updatedAt: string;
   /** TEMPLATE = finished task; BLUEPRINT = empty scaffold showing how block types connect */
   kind?: 'TEMPLATE' | 'BLUEPRINT';
+  /** Optional modules its blocks need; the picker hides it while one is off. Absent on older backends. */
+  requiredModules?: ModuleName[];
+  /** Whether running it can call an AI model (server-side rule, see `getExecutionModes`). */
+  needsAi?: boolean;
 }
 
 export interface CreateWorkflowTemplateRequest {

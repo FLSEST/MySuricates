@@ -636,12 +636,17 @@ Alle Workflow-Templates auflisten, sortiert nach Art und `sortOrder`. Das Feld `
     "verifications": [],
     "version": "1.0.0",
     "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z"
+    "updatedAt": "2025-01-15T10:00:00Z",
+    "kind": "TEMPLATE",
+    "requiredModules": [],
+    "needsAi": true
   }
 ]
 ```
 
 `verifications` enthält pro Projekt, in dem das Template verifiziert wurde, ein Objekt mit `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
+
+`requiredModules` nennt die optionalen Module, die die Blöcke brauchen (etwa `skills` für `skill-capability`, `integrations` für `integration`; verschachtelte Blöcke eingeschlossen). Ist eines davon aus, verweigert der Lauf den Block, und die Vorlagen-Auswahl blendet das Template aus. `needsAi` sagt, ob ein Lauf ein KI-Modell rufen kann: Modell-Blöcke, `foreach`/`while`/`conditional`/`retry` ohne `execution_mode: shell`, ein `simple`-Block in einem `switch`-Zweig ohne Shell-Modus, und `sub-workflow`, weil der gestartete Workflow nicht Teil der Definition ist.
 
 ### `GET /api/v1/workflow-templates/{id}`
 

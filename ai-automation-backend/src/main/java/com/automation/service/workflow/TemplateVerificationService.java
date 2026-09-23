@@ -79,23 +79,7 @@ public class TemplateVerificationService {
                 ))
                 .toList();
 
-        return new WorkflowTemplateResponse(
-                response.id(),
-                response.name(),
-                response.description(),
-                response.icon(),
-                response.category(),
-                response.blocks(),
-                response.instructions(),
-                response.model(),
-                response.builtIn(),
-                response.sortOrder(),
-                response.qualityStatus(),
-                infos,
-                response.version(),
-                response.createdAt(),
-                response.updatedAt(),
-                response.kind());
+        return response.withVerifications(infos);
     }
 
     @Transactional(readOnly = true)
@@ -114,12 +98,7 @@ public class TemplateVerificationService {
                                     v.getVerifiedAt()
                             ))
                             .toList();
-                    return new WorkflowTemplateResponse(
-                            response.id(), response.name(), response.description(),
-                            response.icon(), response.category(), response.blocks(),
-                            response.instructions(), response.model(), response.builtIn(),
-                            response.sortOrder(), response.qualityStatus(), infos,
-                            response.version(), response.createdAt(), response.updatedAt(), response.kind());
+                    return response.withVerifications(infos);
                 })
                 .toList();
     }

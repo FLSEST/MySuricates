@@ -158,7 +158,9 @@ The application is running. A first way in, without building anything:
    One click, and its example workflows run without AI and without any setup. The dashboard gets
    a view of its own that shows only this project.
 2. **Take a template** — *Templates* holds 66 ready-made workflows. Pick one, copy it into the
-   project, run it. The run shows step by step what happens.
+   project, run it. The run shows step by step what happens. Templates that need a module switched
+   off on this instance wait behind a counter, and the "Runs without AI" filter shows only what calls
+   no model.
 3. **Look at the run** — the detail view shows per block its duration, its status and whether it was
    deterministic or called a model.
 

@@ -30,7 +30,7 @@ class WorkflowTemplateResponseTest {
                 "tpl-1", name, description, "rocket", "automation",
                 List.of(block), "Do this", "claude-sonnet-4-6",
                 true, 5, "VERIFIED",
-                List.of(verification), "1.0.0", NOW, LATER, null);
+                List.of(verification), "1.0.0", NOW, LATER, null, List.of(), false);
 
         assertThat(response.id()).isEqualTo("tpl-1");
         assertThat(response.name()).containsEntry("de", "Vorlage").containsEntry("en", "Template");
@@ -55,7 +55,7 @@ class WorkflowTemplateResponseTest {
         var response = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(response.builtIn()).isFalse();
     }
@@ -65,7 +65,7 @@ class WorkflowTemplateResponseTest {
         var response = new WorkflowTemplateResponse(
                 null, null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(response.id()).isNull();
         assertThat(response.name()).isNull();
@@ -90,7 +90,7 @@ class WorkflowTemplateResponseTest {
                 "tpl-1", Map.of(), Map.of(), "icon", "cat",
                 List.of(), "instr", "model",
                 true, 1, "OK",
-                List.of(), "1.0", NOW, LATER, null);
+                List.of(), "1.0", NOW, LATER, null, List.of(), false);
 
         assertThat(response.name()).isEmpty();
         assertThat(response.description()).isEmpty();
@@ -103,7 +103,7 @@ class WorkflowTemplateResponseTest {
         var response = new WorkflowTemplateResponse(
                 null, null, null, null, null,
                 null, null, null, false, 42, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(response.sortOrder()).isEqualTo(42);
     }
@@ -150,12 +150,12 @@ class WorkflowTemplateResponseTest {
                 "tpl-1", name, desc, "star", "ops",
                 List.of(block), "instr", "opus",
                 true, 3, "VERIFIED",
-                List.of(verif), "2.0", NOW, LATER, null);
+                List.of(verif), "2.0", NOW, LATER, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-1", name, desc, "star", "ops",
                 List.of(block), "instr", "opus",
                 true, 3, "VERIFIED",
-                List.of(verif), "2.0", NOW, LATER, null);
+                List.of(verif), "2.0", NOW, LATER, null, List.of(), false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -166,11 +166,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-2", null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -180,11 +180,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, true, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -194,11 +194,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 1, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 2, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -208,11 +208,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, "ops",
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, "dev",
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -222,11 +222,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, "opus", false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, "sonnet", false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -236,7 +236,7 @@ class WorkflowTemplateResponseTest {
         var response = new WorkflowTemplateResponse(
                 "tpl-1", null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(response).isNotEqualTo(null);
     }
@@ -246,11 +246,11 @@ class WorkflowTemplateResponseTest {
         var a = new WorkflowTemplateResponse(
                 null, null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var b = new WorkflowTemplateResponse(
                 null, null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -303,6 +303,30 @@ class WorkflowTemplateResponseTest {
     }
 
     // ============================================================
+    // Withers keep what the picker needs (TODO 560d18dd)
+    // ============================================================
+
+    @Test
+    void should_keepModulesAndAiFlag_when_localizedOrEnriched() {
+        var response = new WorkflowTemplateResponse(
+                "tpl-1", Map.of("en", "T"), Map.of(), "i", "CODE",
+                List.of(BlockDefinition.builder().type("skill-capability").build()), "en", null,
+                true, 0, null, null, "1.0.0", NOW, LATER, null, List.of("skills"), true);
+        var info = new WorkflowTemplateResponse.TemplateVerificationInfo("p-1", "P", "run-1", NOW);
+
+        var localized = response.withBlocksAndInstructions(List.of(), "de");
+        var enriched = response.withVerifications(List.of(info));
+
+        assertThat(localized.requiredModules()).containsExactly("skills");
+        assertThat(localized.needsAi()).isTrue();
+        assertThat(localized.instructions()).isEqualTo("de");
+        assertThat(enriched.requiredModules()).containsExactly("skills");
+        assertThat(enriched.needsAi()).isTrue();
+        assertThat(enriched.verifications()).containsExactly(info);
+        assertThat(enriched.blocks()).isEqualTo(response.blocks());
+    }
+
+    // ============================================================
     // toString
     // ============================================================
 
@@ -313,7 +337,7 @@ class WorkflowTemplateResponseTest {
                 "rocket", "automation",
                 List.of(), "instructions here", "claude-opus-4-6",
                 true, 10, "VERIFIED",
-                List.of(), "3.0.0", NOW, LATER, null);
+                List.of(), "3.0.0", NOW, LATER, null, List.of(), false);
         var str = response.toString();
 
         assertThat(str).contains("tpl-42");
@@ -330,7 +354,7 @@ class WorkflowTemplateResponseTest {
         var response = new WorkflowTemplateResponse(
                 null, null, null, null, null,
                 null, null, null, false, 0, null,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of(), false);
         var str = response.toString();
 
         assertThat(str).contains("null");

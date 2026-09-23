@@ -1543,6 +1543,8 @@ Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc
 
 **Voraussetzung:** Der Provider muss auf der Integrationen-Seite (`/integrations`) verbunden sein.
 
+**Modul:** `integrations` (nur im Preset `full` an). Ist es aus, verweigert der Block, der Editor bietet den Typ nicht an, und die Vorlagen-Auswahl blendet Vorlagen mit diesem Block aus.
+
 ### Config
 
 | Feld | Pflicht | Beschreibung |
