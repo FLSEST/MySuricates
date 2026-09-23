@@ -60,7 +60,7 @@ WORKDIR /app
 COPY target/ai-automation-backend-*.jar app.jar
 COPY docker/entrypoint.sh /app/entrypoint.sh
 
-RUN mkdir -p /app/data /app/data/logs /app/frontend && \
+RUN mkdir -p /app/data /app/data/logs /app/frontend /app/secrets && \
     chown -R ${HOST_USER}:${HOST_USER} /app && \
     chmod +x /app/entrypoint.sh
 

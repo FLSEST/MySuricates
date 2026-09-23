@@ -64,14 +64,15 @@ COPY deploy/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh && mkdir -p /app/data /app/secrets
 
 # Alles, was ueber einen Neuaufbau des Containers hinaus bleiben muss, liegt auf Volumes:
-# /app/data (DB, Logs, Backups, Workspaces, Reports) und /app/secrets (Integrations-Schluessel —
-# absichtlich getrennt von der DB, siehe IntegrationEncryptionService; 3fb2242c).
+# /app/data (DB, Logs, Backups, Workspaces, Reports) und /app/secrets (Integrations- und Siegel-Schluessel
+# — absichtlich getrennt von der DB, siehe IntegrationEncryptionService und WorkflowSealSigner; 3fb2242c).
 ENV AUTOMATION_DB_PATH=/app/data/automation.db \
     LOG_DIR=/app/data/logs \
     AUTOMATION_BACKUP_DIR=/app/data/backups \
     AUTOMATION_REPORTS_DIR=/app/data/reports \
     AUTOMATION_RUNWORKSPACE_ROOT=/app/data/workspaces \
     AUTOMATION_INTEGRATION_KEYFILE=/app/secrets/integration-encryption.key \
+    AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key \
     AUTOMATION_DOCS_DIR=/app/docs \
     AUTOMATION_POOL_DIR=/app/workflow-pool \
     AUTOMATION_SERVEFRONTEND=true \

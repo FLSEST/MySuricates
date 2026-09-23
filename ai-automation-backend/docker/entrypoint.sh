@@ -13,6 +13,12 @@ if [ -S /var/run/docker.sock ]; then
   usermod -aG "$GROUP_NAME" "$APP_USER" 2>/dev/null || true
 fi
 
+# Keys live on their own volume (3fb2242c): an empty named volume comes up owned by root.
+if [ -d /app/secrets ]; then
+  chown "${APP_USER}:${APP_USER}" /app/secrets
+  chmod 700 /app/secrets
+fi
+
 # Own provider directories on the data volume (scripts/lib/host-mounts.sh sets them for the modes
 # programs and login): the directories belong to the app user; login files of the host mounted into
 # them keep their owner (262948a4).

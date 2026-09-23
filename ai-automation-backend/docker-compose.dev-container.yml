@@ -28,6 +28,7 @@ services:
       - "${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}:9090"
     volumes:
       - dev-container-data:/app/data
+      - dev-container-secrets:/app/secrets
       # Docker-Socket und KI-Anbieter kommen aus der Override-Datei des Starters
       # (scripts/lib/host-mounts.sh): AUTOTRIGGER_DEV_DOCKER_SOCKET (Default 1),
       # AUTOTRIGGER_DEV_AI_FROM_HOST (Default login), AUTOTRIGGER_DEV_AI_PROVIDERS (262948a4).
@@ -42,6 +43,11 @@ services:
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AUTOMATION_SECURITY_ENABLED=true
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
+      # Schlüssel außerhalb der Container-Schicht (3fb2242c): Integrations- und Siegel-Schlüssel liegen
+      # auf einem eigenen Volume, getrennt von den Daten. In der Container-Schicht wären sie nach jedem
+      # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
+      - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
+      - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
       # Dev laeuft mit allen Modulen — wie die Host-Instanz (config/application.yml: preset full).
       - AUTOMATION_MODULES_PRESET=${AUTOTRIGGER_DEV_PRESET:-full}
       - HOME=${HOME}
@@ -55,3 +61,4 @@ services:
 
 volumes:
   dev-container-data:
+  dev-container-secrets:

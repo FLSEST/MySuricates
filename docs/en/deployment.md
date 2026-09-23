@@ -30,7 +30,7 @@ The instance uses the machine's AI CLIs, so nobody logs in twice. How much of th
 container is set by `MYSURICATES_AI_FROM_HOST` ([AI providers in the container](#ai-providers-in-the-container));
 on macOS only logins go in, no programs (a Mac binary does not start in a Linux container).
 The user ID comes from `id(1)` at start, so files in mounted folders belong to the right user. Data
-lives in the volume `mysuricates-<name>-data`, the integration key separately in
+lives in the volume `mysuricates-<name>-data`, the integration and seal keys separately in
 `mysuricates-<name>-secrets`. Without the Docker socket the instance reports Docker as "not set
 up" — that is not an error.
 
@@ -208,7 +208,7 @@ Backend + agent images (build-only). Network: `automation` (bridge).
 Stable environment on port 9091:
 - Container: `mysuricates-stable`
 - Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-frontend/` (read-only), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
+- Volumes: `stable-data` (persistent DB), `stable-secrets` (integration and seal keys, kept apart from the DB — 3fb2242c), `stable-frontend/` (read-only), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -217,7 +217,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
+- Volumes: `test-data` (persistent DB), `test-secrets` (keys as for Stable), `stable-frontend/` (read-only), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -684,6 +684,13 @@ The stable environment is a Docker container containing the backend + embedded R
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
 - `ai-automation-backend/docker-compose.stable.yml` — data, frontend, projects; AI providers and the socket via `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, auto-start disabled, frontend serving enabled
+
+**Keys:** the integration and seal keys live in the volume `stable-secrets`, apart from the database.
+Images from before 2026-09-23 still kept the integration key in the database; the first start with a newer
+image moves it onto the volume and deletes it from the database. Without the volume it would then sit in
+the container layer and be lost at the next `staging.sh stop` or `promote` — and with it every encrypted
+integration login (3fb2242c). Test does the same with `test-secrets`; `test-reset` deletes both volumes,
+which is intended there.
 
 ### Test Instance (Port 8090)
 

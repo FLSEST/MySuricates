@@ -30,8 +30,8 @@ Die Instanz nutzt die KI-CLIs des Rechners, man meldet sich nicht doppelt an. Wi
 Container kommt, bestimmt `MYSURICATES_AI_FROM_HOST` ([KI-Anbieter im Container](#ki-anbieter-im-container));
 unter macOS kommen nur Anmeldungen, keine Programme (eine Mac-Binary startet im Linux-Container nicht).
 Die Benutzer-ID kommt beim Start aus `id(1)`, Dateien in eingebundenen
-Ordnern gehören also dem richtigen Benutzer. Daten liegen im Volume `mysuricates-<name>-data`, der
-Integrations-Schlüssel getrennt davon in `mysuricates-<name>-secrets`. Ohne Docker-Socket meldet
+Ordnern gehören also dem richtigen Benutzer. Daten liegen im Volume `mysuricates-<name>-data`,
+Integrations- und Siegel-Schlüssel getrennt davon in `mysuricates-<name>-secrets`. Ohne Docker-Socket meldet
 die Instanz Docker als „nicht eingerichtet“ — das ist kein Fehler.
 
 Mehrere Instanzen — etwa Dev · Test · Prod — sind mehrere Env-Dateien mit eigenen Ports. Stable und
@@ -210,7 +210,7 @@ Backend + Agent-Images (build-only). Netzwerk: `automation` (Bridge).
 Stable-Umgebung auf Port 9091:
 - Container: `mysuricates-stable`
 - Profil: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`); KI-Anbieter und Docker-Socket kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
+- Volumes: `stable-data` (persistente DB), `stable-secrets` (Integrations- und Siegel-Schlüssel, getrennt von der DB — 3fb2242c), `stable-frontend/` (read-only), Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`); KI-Anbieter und Docker-Socket kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -219,7 +219,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profil: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Backup-Volume (`~/.autotrigger/backups/test`); KI-Anbieter und Docker-Socket wie bei Stable
+- Volumes: `test-data` (persistente DB), `test-secrets` (Schlüssel wie bei Stable), `stable-frontend/` (read-only), `application-test.yml` (read-only), Backup-Volume (`~/.autotrigger/backups/test`); KI-Anbieter und Docker-Socket wie bei Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -691,6 +691,13 @@ Die Stable-Umgebung ist ein Docker-Container, der Backend + eingebettetes React-
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-basiert (glibc für Claude CLI)
 - `ai-automation-backend/docker-compose.stable.yml` — Daten, Frontend, Projekte; KI-Anbieter und Socket über `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, Auto-Start deaktiviert, Frontend-Serving aktiviert
+
+**Schlüssel:** Integrations- und Siegel-Schlüssel liegen im Volume `stable-secrets`, getrennt von der
+Datenbank. Images vor dem 23.09.2026 hielten den Integrations-Schlüssel noch in der Datenbank; der erste
+Start mit einem neueren Image verschiebt ihn auf das Volume und löscht ihn in der Datenbank. Ohne das
+Volume läge er danach in der Container-Schicht und wäre beim nächsten `staging.sh stop` oder `promote`
+verloren — mit ihm alle verschlüsselten Integrations-Zugänge (3fb2242c). Test hält es mit `test-secrets`
+genauso; `test-reset` löscht beide Volumes, dort ist das gewollt.
 
 ### Test-Instanz (Port 8090)
 

@@ -45,4 +45,14 @@ check "entrypoint parses"                      'bash -n "$BEP"'
 check "own provider homes for the user"        'grep -q "CLAUDE_CONFIG_DIR" "$BEP" && grep -q "CODEX_HOME" "$BEP" && grep -q "PI_CODING_AGENT_DIR" "$BEP"'
 check "drops root before starting java"        'grep -q "^exec gosu" "$BEP"'
 
+echo "4) keys never in the container layer (3fb2242c)"
+check "deploy: seal key on the secrets volume" 'grep -q "AUTOMATION_SEAL_KEY_FILE=/app/secrets/" "$DF"'
+for f in docker-compose.stable.yml docker-compose.test.yml docker-compose.dev-container.yml; do
+  C="$R/ai-automation-backend/$f"
+  check "$f: both key files on /app/secrets" 'grep -q "AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/" "$C" && grep -q "AUTOMATION_SEAL_KEY_FILE=/app/secrets/" "$C"'
+  check "$f: own secrets volume, declared"   'grep -qE "^      - [a-z-]+-secrets:/app/secrets$" "$C" && grep -qE "^  [a-z-]+-secrets:$" "$C"'
+done
+check "Dockerfile.stable prepares /app/secrets"  'grep -q "/app/secrets" "$R/ai-automation-backend/docker/Dockerfile.stable"'
+check "backend entrypoint hands /app/secrets to the app user" 'grep -q "chown .*/app/secrets" "$BEP" && grep -q "chmod 700 /app/secrets" "$BEP"'
+
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

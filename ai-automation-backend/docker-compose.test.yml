@@ -20,8 +20,14 @@ services:
       - LOG_DIR=/app/data/logs
       - PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.local/bin
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
+      # Schlüssel außerhalb der Container-Schicht (3fb2242c): Integrations- und Siegel-Schlüssel liegen
+      # auf einem eigenen Volume, getrennt von den Daten. In der Container-Schicht wären sie nach jedem
+      # `compose down` weg — und mit ihnen die verschlüsselten Integrations-Zugänge und die Siegel.
+      - AUTOMATION_INTEGRATION_KEY_FILE=/app/secrets/integration-encryption.key
+      - AUTOMATION_SEAL_KEY_FILE=/app/secrets/seal-signing.key
     volumes:
       - test-data:/app/data
+      - test-secrets:/app/secrets
       - ./stable-frontend:/app/frontend:ro
       - ./src/main/resources/application-test.yml:/app/config/application-test.yml:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
@@ -43,3 +49,4 @@ services:
 
 volumes:
   test-data:
+  test-secrets:
