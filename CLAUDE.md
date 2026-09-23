@@ -107,6 +107,10 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      einzelne Klassenzeile oder ein abgeschnittener `tail`.
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
+   - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten,
+     Autor-Adresse (nur GitHub-noreply, nie eine private Adresse), Hygiene des Push-Bereichs, die
+     Doku-Gates und baut nach Scope; `commit-msg` prüft Nachricht und Adresse schon beim Commit.
+     Kein `--no-verify` per Reflex — Details: [docs/entwicklung.md](docs/entwicklung.md) → Pre-Push-Gate.
 3. **Wenn Tests brechen** — Sofort fixen. NICHT committen mit kaputten Tests. Ursache untersuchen, nicht einfach Tests anpassen oder löschen.
 4. **Neue Funktionalität** — Tests schreiben für neue/geänderte Logik
 

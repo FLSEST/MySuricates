@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Pre-Push-Gate — prueft die Commits, die gleich das Repository verlassen:
+# Autor-Adresse, Commit-Nachrichten, neu hinzugekommene Inhalte, Doku-Gates, Bauprüfung.
+# Die Refs kommen von git auf stdin und werden unveraendert weitergereicht.
+#
+# Regeln: scripts/lib/hygiene-rules.sh — Logik: scripts/ci/pre-push-checks.sh
+# Auslassen (wird gemeldet): MYSURICATES_PREPUSH_SKIP=tree,build git push
+# Bypass: git push --no-verify — kein Bypass per Reflex.
+#
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+GATE="$REPO_ROOT/scripts/ci/pre-push-checks.sh"
+
+if [ ! -f "$GATE" ]; then
+  echo "Hinweis: $GATE fehlt — Pre-Push-Gate uebersprungen." >&2
+  exit 0
+fi
+
+exec bash "$GATE" --hook

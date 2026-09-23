@@ -24,6 +24,22 @@ jobs:
         run: bash scripts/ci/public-hygiene.sh --tracked
       - name: Hygiene-Gate Selbsttest (Worktrees, fehlende Regeldatei)
         run: bash scripts/tests/test-public-hygiene.sh
+      # Dieselbe Pruefung wie der pre-push-Hook, hier auf die Commits dieses Push-Ereignisses:
+      # faengt, was an einem Klon ohne installierte Hooks vorbeikam (Autor-Adresse, Nachricht,
+      # neu hinzugekommene Inhalte). Beim ersten Push eines Branches ist `before` die Null-Referenz,
+      # nach einem Force-Push liegt er nicht im Checkout — beides wird hoerbar uebersprungen.
+      - name: Pre-Push-Gate auf die Commits dieses Pushes
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "Kein Bereich (neuer Branch oder Force-Push) — Commit-Pruefung uebersprungen"
+          else
+            bash scripts/ci/pre-push-checks.sh --range "${BEFORE}..${GITHUB_SHA}" --skip-tree --skip-build
+          fi
+      - name: Pre-Push-Gate Selbsttest (Hooks, Nachrichten, Autor-Adresse, Scope)
+        run: bash scripts/tests/test-pre-push-checks.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
       # Der Probelauf selbst braucht Docker und zehn Minuten — hier nur Aufruf, Vorab-Pruefungen
@@ -49,16 +65,16 @@ jobs:
           python3 scripts/tools/installer-art.py --check
       # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
       # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
-      - name: Doku-Zahlen gegen den Code pruefen
-        run: bash scripts/public-readiness/doc-facts-check.sh
+      # Doku-Zahlen, Doku-Verweise/DE-EN-Gleichstand und Diagramm-Drift laufen ueber dasselbe
+      # Skript wie der pre-push-Hook (--tree), damit Hook und CI nicht auseinanderlaufen.
+      - name: Bestands-Gates (Doku-Zahlen, Doku-Verweise, Diagramm-Seiten) — wie im pre-push-Hook
+        run: bash scripts/ci/pre-push-checks.sh --tree
       - name: Doku-Zahlen-Gate Selbsttest
         run: bash scripts/tests/test-doc-facts-check.sh
       - name: Doku-Readiness-Gate Selbsttest
         run: bash scripts/tests/test-docs-check.sh
       - name: Evidenz-Scans Selbsttest (Oberflaeche, Architektur, Inventar)
         run: bash scripts/tests/test-readiness-scans.sh
-      - name: Doku-Verweise und DE/EN-Gleichstand pruefen
-        run: python3 scripts/public-readiness/docs_parity_check.py
       - name: Doku-Verweis-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
       # Misst nur, meldet nicht: das Urteil ueber die Kandidaten faellt der Workflow
@@ -71,8 +87,6 @@ jobs:
       # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
       # Gate faellt eine von Hand geaenderte HTML-Datei erst auf, wenn jemand die
       # Markdown-Quelle anfasst und die Aenderung wieder ueberschreibt.
-      - name: Diagramm-Seiten gegen die Markdown-Quelle pruefen
-        run: python3 scripts/docs-diagrams.py --check
       - name: Diagramm-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
       - name: Audit-Fakten Selbsttest

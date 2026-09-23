@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#
+# Commit-Nachricht und Autor-Adresse pruefen, bevor der Commit entsteht — dieselben Regeln,
+# die das Pre-Push-Gate spaeter auf den ganzen Push-Bereich anwendet. Hier ist der Befund
+# billig (Nachricht aendern), beim Push nur noch per amend oder rebase zu heilen.
+#
+# Regeln: scripts/lib/hygiene-rules.sh — Logik: scripts/ci/pre-push-checks.sh
+# Bypass: git commit --no-verify — kein Bypass per Reflex.
+#
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+GATE="$REPO_ROOT/scripts/ci/pre-push-checks.sh"
+
+if [ ! -f "$GATE" ]; then
+  echo "Hinweis: $GATE fehlt — Nachrichten-Check uebersprungen." >&2
+  exit 0
+fi
+
+exec bash "$GATE" --message-file "$1"

@@ -665,6 +665,7 @@ forbidden literals, backup-file patterns, allowlist path, thresholds — live in
 | `--tracked` (default) | CI | tracked files | error |
 | `--worktree` | local | additionally files that are neither tracked nor ignored | warning |
 | `--staged` | pre-commit hook | staged changes only | error |
+| `--range A..B` | pre-push gate | only the changes of a commit range, same checks as `--staged` | error |
 
 What is checked:
 
@@ -689,7 +690,8 @@ What is checked:
    at the original checkout instead of its own tree in every clone, worktree and run snapshot.
    Example: `ai-automation-backend/workflow-pool` must point at `../workflow-pool`, because the
    backend runs with cwd `ai-automation-backend/` and resolves the pool relatively.
-8. **Private terms** (`--tracked`/`--worktree` only). Names of private projects, employers or people
+8. **Private terms** — in the tracked set for `--tracked`/`--worktree`, in added lines for
+   `--staged`/`--range`. Names of private projects, employers or people
    cannot go into check 2 without publishing them in the repository. They live in a list outside the
    tracked set instead: `scripts/ci/hygiene-private-terms.txt` (untracked, in `.git/info/exclude`),
    `$HYGIENE_PRIVATE_TERMS` or `~/.config/mysuricates/hygiene-private-terms.txt` — the last one is
@@ -697,13 +699,47 @@ What is checked:
    literal and case-insensitive; the message names the list line, not the term. Without a list (CI,
    someone else's clone) the check is skipped with a notice.
 
-`scripts/install-hooks.sh` installs the hook via `core.hooksPath` (and runs as part of `setup.sh`).
+`scripts/install-hooks.sh` installs the hooks (`pre-commit`, `commit-msg`, `pre-push`) via
+`core.hooksPath` (and runs as part of `setup.sh`).
 
 ### When the gate fires
 
 Do not reach for the bypass. `git commit --no-verify` exists, but a hit is almost always real: a
 blanket `git add` picked up something that does not belong in the repository. Look at what is
 staged first.
+
+## Pre-push gate
+
+`scripts/ci/pre-push-checks.sh` checks what is about to leave the repository — locally,
+deterministically, in seconds to a minute. Two hooks call it: `commit-msg` (message and author
+address only, while writing — a hit is cheap there) and `pre-push` (the whole push range, the last
+net: it also catches commits from worktrees without hooks, from run workspaces and with
+`--no-verify`). CI runs the same tree gates (`--tree`) and the same range check on the commits of
+every push event; the rules live in `scripts/lib/hygiene-rules.sh`.
+
+Checked per push range (remote state..local; for a new branch everything no remote ref knows yet):
+
+1. **Commit metadata.** Author and committer carry the GitHub noreply form
+   (`<id>+<login>@users.noreply.github.com`, `HYGIENE_COMMIT_EMAIL_REGEX`); the message contains no
+   forbidden literals, no private terms and no e-mail address outside a trailer (`Co-Authored-By`,
+   `Generated-By`, `Signed-off-by`, …). The address itself appears nowhere in the repository, only
+   its form.
+2. **Hygiene gate on the range** (`public-hygiene.sh --range`): what is newly added.
+3. **CI tree gates that depend on the code:** documentation numbers, documentation links with DE/EN
+   parity, diagram drift. A missing gate script is a hard error.
+4. **gitleaks on the range** — only if installed, otherwise skipped with a notice. Nothing is
+   installed on the fly; CI scans anyway.
+5. **Build check by scope.** Frontend touched → `tsc --noEmit` and `npm run lint` (about a minute);
+   backend touched → `mvn -q test-compile` (seconds). Docs-only pushes stay at seconds.
+
+Not here: the full test suite (CI and the commit rule in CLAUDE.md), the tracked set (`--tracked`
+in CI and in the "Public Readiness" chain) and anything that needs judgement.
+
+Skipping when it must be: `MYSURICATES_PREPUSH_SKIP=tree,build git push` — every omission is
+reported; a gate that does not measure is not green. `git push --no-verify` remains the bypass; do
+not reach for it by reflex. A hit on message or address is healed by `git commit --amend` (with
+`--reset-author` after `git config user.email …`), older commits by `git rebase -i`.
+Self-test: `bash scripts/tests/test-pre-push-checks.sh`.
 
 ## Dependency advisories (frontend)
 

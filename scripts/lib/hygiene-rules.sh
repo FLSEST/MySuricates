@@ -44,6 +44,15 @@ HYGIENE_SELF_EXCLUDE=(
 # wäre workflow-pool/job-shortlist-template.html.bak-<zeitstempel> beinahe in
 # einen Release-Commit geraten.
 # ---------------------------------------------------------------------------
+# Commit-Metadaten (Pre-Push-Gate, scripts/ci/pre-push-checks.sh; TODOs 7030f362, 5e0edb7c):
+# Autor und Committer tragen nur die GitHub-noreply-Form, nie eine private Adresse.
+# Die Adresse selbst steht nirgends im Repository — nur ihre Form.
+HYGIENE_COMMIT_EMAIL_REGEX='@users\.noreply\.github\.com$'
+# Trailer, deren Adressen in der Commit-Nachricht erlaubt sind (KI-Urheberschaft, Sign-off).
+# Alle anderen Zeilen einer Nachricht duerfen keine Mailadresse enthalten.
+HYGIENE_COMMIT_TRAILER_REGEX='^(Co-Authored-By|Co-authored-by|Generated-By|Signed-off-by|Reviewed-by): '
+HYGIENE_EMAIL_REGEX='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+
 HYGIENE_BACKUP_GLOBS=(
   '*.bak' '*.bak-*' '*.orig' '*.old' '*~' '*.save' '*.rej'
 )

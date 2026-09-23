@@ -673,6 +673,7 @@ verbotene Literale, Sicherungsdatei-Muster, Allowlist-Pfad, Schwellwerte — ste
 | `--tracked` (Default) | CI | getrackter Bestand | Fehler |
 | `--worktree` | lokal | zusätzlich Dateien, die weder getrackt noch ignoriert sind | Warnung |
 | `--staged` | pre-commit-Hook | nur gestagte Aenderungen | Fehler |
+| `--range A..B` | Pre-Push-Gate | nur die Aenderungen eines Commit-Bereichs, dieselben Checks wie `--staged` | Fehler |
 
 Geprüft wird:
 
@@ -699,7 +700,8 @@ Geprüft wird:
    Link in jedem Clone, Worktree und Run-Snapshot auf den Original-Checkout statt in den eigenen Baum.
    Beispiel: `ai-automation-backend/workflow-pool` muss auf `../workflow-pool` zeigen, weil das Backend
    mit cwd `ai-automation-backend/` läuft und den Pool relativ auflöst.
-8. **Private Begriffe** (nur `--tracked`/`--worktree`). Namen privater Projekte, Arbeitgeber oder
+8. **Private Begriffe** — im Bestand bei `--tracked`/`--worktree`, in hinzugefügten Zeilen bei
+   `--staged`/`--range`. Namen privater Projekte, Arbeitgeber oder
    Personen kann Check 2 nicht führen, ohne sie im Repository zu veröffentlichen. Sie stehen deshalb
    in einer Liste außerhalb des Bestands: `scripts/ci/hygiene-private-terms.txt` (untrackt, in
    `.git/info/exclude`), `$HYGIENE_PRIVATE_TERMS` oder
@@ -708,13 +710,49 @@ Geprüft wird:
    die Meldung nennt die Listenzeile, nicht den Begriff. Fehlt die Liste (CI, fremder Clone), wird
    der Check hörbar übersprungen.
 
-Den Hook installiert `scripts/install-hooks.sh` über `core.hooksPath` (läuft in `setup.sh` mit).
+Die Hooks (`pre-commit`, `commit-msg`, `pre-push`) installiert `scripts/install-hooks.sh` über
+`core.hooksPath` (läuft in `setup.sh` mit).
 
 ### Wenn das Gate anschlägt
 
 Kein Bypass per Reflex. `git commit --no-verify` existiert, aber ein Treffer ist fast immer echt:
 ein pauschales `git add` hat etwas mitgenommen, das nicht ins Repository gehört. Erst schauen,
 was gestaged ist.
+
+## Pre-Push-Gate
+
+`scripts/ci/pre-push-checks.sh` prüft, was gleich das Repository verlässt — lokal, deterministisch,
+in Sekunden bis zu einer Minute. Zwei Hooks rufen es auf: `commit-msg` (nur Nachricht und
+Autor-Adresse, beim Schreiben — dort ist der Befund billig) und `pre-push` (der ganze Push-Bereich,
+das letzte Netz: fängt auch Commits aus Worktrees ohne Hooks, aus Run-Workspaces und mit
+`--no-verify`). Die CI fährt dieselben Bestands-Gates (`--tree`) und dieselbe Bereichsprüfung auf
+die Commits jedes Push-Ereignisses; die Regeln stehen in `scripts/lib/hygiene-rules.sh`.
+
+Geprüft wird je Push-Bereich (Remote-Stand..lokal; bei einem neuen Branch alles, was noch kein
+Remote-Ref kennt):
+
+1. **Commit-Metadaten.** Autor und Committer tragen die GitHub-noreply-Form
+   (`<id>+<login>@users.noreply.github.com`, `HYGIENE_COMMIT_EMAIL_REGEX`); die Nachricht enthält
+   keine verbotenen Literale, keine privaten Begriffe und keine Mailadresse außerhalb eines
+   Trailers (`Co-Authored-By`, `Generated-By`, `Signed-off-by`, …). Die Adresse selbst steht
+   nirgends im Repository, nur ihre Form.
+2. **Hygiene-Gate auf den Bereich** (`public-hygiene.sh --range`): was neu dazukommt.
+3. **Bestands-Gates der CI, die vom Code abhängen:** Doku-Zahlen, Doku-Verweise mit
+   DE/EN-Gleichstand, Diagramm-Drift. Fehlt eines der Skripte, ist das ein harter Fehler.
+4. **gitleaks auf den Bereich** — nur wenn installiert, sonst hörbar übersprungen. Es wird nichts
+   nachinstalliert; die CI scannt ohnehin.
+5. **Bauprüfung nach Scope.** Frontend berührt → `tsc --noEmit` und `npm run lint` (etwa eine
+   Minute); Backend berührt → `mvn -q test-compile` (Sekunden). Reine Doku-Pushes bleiben bei
+   Sekunden.
+
+Nicht hier: die volle Testsuite (CI und die Commit-Regel in CLAUDE.md), der getrackte Bestand
+(`--tracked` in der CI und in der Kette „Public Readiness") und alles, was ein Urteil braucht.
+
+Auslassen, wenn es sein muss: `MYSURICATES_PREPUSH_SKIP=tree,build git push` — jede Auslassung
+wird gemeldet, ein Gate, das nicht misst, ist nicht grün. `git push --no-verify` bleibt der Bypass;
+kein Bypass per Reflex. Einen Befund an Nachricht oder Adresse heilt `git commit --amend`
+(nach `git config user.email …` mit `--reset-author`), ältere Commits `git rebase -i`.
+Selbsttest: `bash scripts/tests/test-pre-push-checks.sh`.
 
 ## Diagramm-Seiten
 

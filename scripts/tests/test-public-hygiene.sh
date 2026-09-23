@@ -18,7 +18,8 @@ check() {  # $1 = label, $2 = shell condition
 
 # Das verbotene Literal zur Laufzeit zusammensetzen, damit diese Datei selbst sauber bleibt.
 FORBIDDEN="$(printf '%s%s' '/home/' 'flo')"
-GIT="git -c user.name=t -c user.email=t@example.invalid"
+# noreply-Form, weil der commit-msg-Hook (Pre-Push-Gate) private Adressen ablehnt.
+GIT="git -c user.name=t -c user.email=1+t@users.noreply.github.com"
 
 # Frisches Repo mit den Gate-Dateien, Hook via core.hooksPath (wie scripts/install-hooks.sh).
 make_repo() {  # $1 = pfad

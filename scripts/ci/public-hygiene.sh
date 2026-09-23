@@ -11,9 +11,11 @@
 #   --worktree   zusätzlich der Arbeitsbaum: Dateien, die weder getrackt noch
 #                ignoriert sind. Warnung, kein Fehler — lokal will man das sehen,
 #                aber nicht blockiert werden.
-#   --staged     nur gestagte Änderungen. Für den Hook. Fehler.
+#   --staged     nur gestagte Änderungen. Für den pre-commit-Hook. Fehler.
+#   --range A..B nur die Änderungen eines Commit-Bereichs, dieselben Checks wie
+#                --staged. Für das Pre-Push-Gate (scripts/ci/pre-push-checks.sh). Fehler.
 #
-# Usage:  bash scripts/ci/public-hygiene.sh [--tracked|--worktree|--staged]
+# Usage:  bash scripts/ci/public-hygiene.sh [--tracked|--worktree|--staged|--range A..B]
 # Exit:   0 = sauber (bzw. nur Warnungen), 1 = Verstöße
 #
 set -uo pipefail
@@ -33,13 +35,25 @@ fi
 . "$RULES_FILE"
 
 MODE="tracked"
+RANGE=""
 case "${1:-}" in
   --tracked)  MODE="tracked" ;;
   --worktree) MODE="worktree" ;;
   --staged)   MODE="staged" ;;
+  --range)
+    MODE="range"; RANGE="${2:-}"
+    case "$RANGE" in
+      *..*) ;;
+      *) echo "--range erwartet einen Commit-Bereich A..B, bekommen: '${RANGE}'" >&2; exit 2 ;;
+    esac
+    ;;
   "")         ;;
   *) echo "Unbekannter Modus: $1" >&2; exit 2 ;;
 esac
+
+# Quelle der Aenderungs-Checks: der Index (pre-commit) oder ein Commit-Bereich (pre-push).
+# Beide Modi stellen dieselbe Frage — was kommt NEU dazu? — nur an einer anderen Stelle.
+if [ "$MODE" = "range" ]; then DIFF_SRC=("$RANGE"); else DIFF_SRC=(--cached); fi
 
 FAIL=0
 WARN=0
@@ -99,27 +113,60 @@ check_patterns_tracked() {
   done
 }
 
+# Hinzugefuegte Zeilen der Aenderungsquelle als "datei<TAB>inhalt", einmal je Lauf. Ein
+# Push-Bereich kann zehntausende Zeilen haben — eine Bash-Schleife je Zeile und Muster
+# brauchte dafuer Minuten, ein grep je Muster braucht Sekundenbruchteile.
+# Setzt ADDED_LINES_FILE — bewusst keine Kommandosubstitution: in deren Subshell
+# feuerte der EXIT-Trap und loeschte die Datei, bevor ein grep sie lesen konnte.
+ADDED_LINES_FILE=""
+ensure_added_lines_file() {
+  [ -n "$ADDED_LINES_FILE" ] && return 0
+  ADDED_LINES_FILE="$(mktemp)"
+  trap 'rm -f "$ADDED_LINES_FILE"' EXIT
+  git diff "${DIFF_SRC[@]}" --no-color -U0 --diff-filter=AM 2>/dev/null \
+    | awk 'index($0, "+++ b/") == 1 { f = substr($0, 7); next }
+           index($0, "+++") == 1 { next }
+           index($0, "+") == 1 { print f "\t" substr($0, 2) }' > "$ADDED_LINES_FILE"
+}
+
 check_patterns_staged() {
-  local current_file="" line content entry pat desc
-  while IFS= read -r line; do
-    case "$line" in
-      "+++ b/"*) current_file="${line#+++ b/}"; continue ;;
-      "+++"*)    continue ;;
-    esac
-    hygiene_is_self_excluded "$current_file" && continue
-    case "$line" in
-      +*)
-        content="${line:1}"
-        for entry in "${HYGIENE_PATTERNS[@]}"; do
-          pat="$(hygiene_pattern_of "$entry")"
-          desc="$(hygiene_desc_of "$entry")"
-          case "$content" in
-            *"$pat"*) annotate "$current_file" 1 "neue Zeile enthaelt '${pat}' (${desc})" ;;
-          esac
-        done
-        ;;
-    esac
-  done < <(git diff --cached --no-color -U0 --diff-filter=AM 2>/dev/null || true)
+  local entry pat desc file
+  ensure_added_lines_file
+  for entry in "${HYGIENE_PATTERNS[@]}"; do
+    pat="$(hygiene_pattern_of "$entry")"
+    desc="$(hygiene_desc_of "$entry")"
+    while IFS=$'\t' read -r file _; do
+      [ -z "$file" ] && continue
+      hygiene_is_self_excluded "$file" && continue
+      annotate "$file" 1 "neue Zeile enthaelt '${pat}' (${desc})"
+    done < <(grep -F -- "$pat" "$ADDED_LINES_FILE" 2>/dev/null || true)
+  done
+}
+
+# Private Begriffe in hinzugefuegten Zeilen (--staged/--range). Der Bestandslauf
+# (check_private_terms) beantwortet die Release-Frage; hier geht es darum, dass kein
+# neuer Treffer dazukommt — beim Commit und noch einmal vor dem Push.
+check_private_terms_diff() {
+  local list term lineno=0 file
+  if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
+    echo "  – ${HYGIENE_PRIVATE_TERMS_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_TERMS und keine" \
+         "~/.config/mysuricates/hygiene-private-terms.txt) — private Begriffe werden nicht geprueft" \
+         "(uebersprungen)"
+    return 0
+  fi
+  ensure_added_lines_file
+  while IFS= read -r term || [ -n "$term" ]; do
+    lineno=$((lineno + 1))
+    term="${term%%#*}"
+    term="${term#"${term%%[![:space:]]*}"}"
+    term="${term%"${term##*[![:space:]]}"}"
+    [ -z "$term" ] && continue
+    while IFS=$'\t' read -r file _; do
+      [ -z "$file" ] && continue
+      hygiene_is_allowlisted "$file" && continue
+      annotate "$file" 1 "neue Zeile enthaelt einen privaten Begriff (Zeile ${lineno} der privaten Begriffsliste)"
+    done < <(grep -iF -- "$term" "$ADDED_LINES_FILE" 2>/dev/null || true)
+  done < "$list"
 }
 
 # Gestagte Dateien, die unter eine Ignore-Regel fallen oder wie eine Sicherung aussehen.
@@ -136,7 +183,7 @@ check_staged_files() {
         $g) annotate "$f" 1 "Sicherungsdatei wird gestaged — gehoert nicht ins Repository" ;;
       esac
     done
-  done < <(git diff --cached --name-only --diff-filter=A 2>/dev/null || true)
+  done < <(git diff "${DIFF_SRC[@]}" --name-only --diff-filter=A 2>/dev/null || true)
 }
 
 # ---------------------------------------------------------------------------
@@ -300,12 +347,13 @@ check_security_md() {
 # Ausgabe: LINK<TAB>pfad<TAB>ziel — je Verstoss eine Zeile.
 # ---------------------------------------------------------------------------
 check_symlinks() {
-  python3 - "$MODE" <<'PY'
+  python3 - "$MODE" "$RANGE" <<'PY'
 import subprocess, sys, posixpath
-mode = sys.argv[1]
+mode, rng = sys.argv[1], sys.argv[2]
 links = []  # (pfad, blob-referenz)
-if mode == "staged":
-    raw = subprocess.run(['git', 'diff', '--cached', '--raw', '--diff-filter=AM', '-z'],
+if mode in ("staged", "range"):
+    src = [rng] if mode == "range" else ['--cached']
+    raw = subprocess.run(['git', 'diff', *src, '--raw', '--diff-filter=AM', '-z'],
                          capture_output=True, text=True).stdout
     fields = raw.split('\0')
     i = 0
@@ -314,7 +362,7 @@ if mode == "staged":
         i += 2
         parts = meta.lstrip(':').split()
         if len(parts) >= 2 and parts[1] == '120000':
-            links.append((path, ':' + path))
+            links.append((path, (rng.split('..', 1)[1] + ':' + path) if mode == "range" else ':' + path))
 else:
     ls = subprocess.run(['git', 'ls-files', '-s', '-z'], capture_output=True, text=True).stdout
     for entry in ls.split('\0'):
@@ -434,9 +482,10 @@ report_symlinks() {
 # ---------------------------------------------------------------------------
 echo "Public-Hygiene-Gate (${MODE})"
 
-if [ "$MODE" = "staged" ]; then
+if [ "$MODE" = "staged" ] || [ "$MODE" = "range" ]; then
   check_staged_files
   check_patterns_staged
+  check_private_terms_diff
   # Der Pre-Commit-Moment ist genau das Szenario: ein pauschales "git add -A" hat
   # die privaten Definitionen gerade in den Index geholt. git ls-files liest den
   # Index, die Pruefung sieht sie also schon vor dem Commit.
