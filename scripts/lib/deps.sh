@@ -226,3 +226,73 @@ deps_write_env() {
     if [ -n "$home" ]; then echo "export JAVA_HOME=\"$home\""; echo "export PATH=\"$home/bin:\$PATH\""; fi
   } > "$out"
 }
+
+# --- Shell des Nutzers (2605ed1f) -------------------------------------------------------------------
+# setup.sh und instance.sh laden env.sh selbst, die Shell des Nutzers nicht: ohne Eintrag im Profil
+# fehlen dort das heruntergeladene node/npm und alles, was npm -g dorthin legt (codex, pi). Eingetragen
+# wird in das Profil, das eine Login-Shell wirklich liest — bash nimmt ~/.bash_profile, wenn es die
+# gibt (Rocky, Fedora), und ignoriert dann ~/.profile; zsh (macOS) liest ~/.zprofile.
+
+deps_tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+
+# Hat der Download etwas auf den PATH gelegt? (env.sh ohne export-Zeile bringt nichts)
+deps_env_active() { grep -q '^export PATH=' "$DEPS_DATA/env.sh" 2>/dev/null; }
+
+deps_login_shell() {
+  local sh="${SHELL:-}"
+  [ -n "$sh" ] || sh="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7)"
+  [ -n "$sh" ] || { if [ "$(deps_os)" = darwin ]; then sh=zsh; else sh=bash; fi; }
+  printf '%s' "${sh##*/}"
+}
+
+deps_profile_file() {
+  case "$(deps_login_shell)" in
+    zsh)  printf '%s' "${ZDOTDIR:-$HOME}/.zprofile" ;;
+    bash) if [ -f "$HOME/.bash_profile" ]; then printf '%s' "$HOME/.bash_profile"
+          elif [ -f "$HOME/.bash_login" ]; then printf '%s' "$HOME/.bash_login"
+          else printf '%s' "$HOME/.profile"; fi ;;
+    *)    printf '%s' "$HOME/.profile" ;;
+  esac
+}
+
+# Laedt das Profil env.sh schon — in welcher Form auch immer?
+deps_profile_has_env() { grep -qF "mysuricates/env.sh" "${1:-$(deps_profile_file)}" 2>/dev/null; }
+
+# Die Zeile zum Abschreiben, und die, die der Installer eintraegt: sie bricht die Anmeldung nicht, wenn
+# ~/.local/share/mysuricates spaeter geloescht wird.
+deps_profile_hint() { printf '. %s' "$(deps_tilde "$DEPS_DATA/env.sh")"; }
+deps_profile_line() {
+  local f="$DEPS_DATA/env.sh"
+  case "$f" in "$HOME"/*) f="\$HOME${f#"$HOME"}" ;; esac
+  printf '[ -r "%s" ] && . "%s"' "$f" "$f"
+}
+
+# deps_profile_add [PROFIL] — traegt die Zeile ein, wenn das Profil env.sh noch nicht laedt (idempotent)
+deps_profile_add() {
+  local p="${1:-$(deps_profile_file)}"
+  deps_profile_has_env "$p" && return 0
+  {
+    if [ -s "$p" ] && [ -n "$(tail -c 1 "$p")" ]; then echo; fi   # letzte Zeile ohne Zeilenende
+    echo
+    echo "# MySuricates: vom Installer heruntergeladene Werkzeuge (Node, npm, Java) und npm-Programme wie pi"
+    deps_profile_line; echo
+  } >> "$p"
+}
+
+# --- npm -g -----------------------------------------------------------------------------------------
+
+_deps_can_write() {  # VERZEICHNIS — schreibbar, oder im naechsten vorhandenen Elternordner anlegbar
+  local d="$1"
+  while [ -n "$d" ] && [ "$d" != / ] && [ ! -e "$d" ]; do d="$(dirname "$d")"; done
+  [ -d "$d" ] && [ -w "$d" ]
+}
+
+# Braucht `npm install -g` sudo? Nein beim heruntergeladenen Node ($DEPS_DATA/node) und bei Homebrew,
+# ja beim Node aus apt/dnf — dessen globales Verzeichnis gehoert root (0a078449).
+deps_npm_needs_sudo() {
+  local prefix
+  prefix="$(npm prefix -g 2>/dev/null)"
+  [ -n "$prefix" ] || return 1
+  if _deps_can_write "$prefix/lib/node_modules" && _deps_can_write "$prefix/bin"; then return 1; fi
+  return 0
+}

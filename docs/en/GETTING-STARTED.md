@@ -64,7 +64,9 @@ without sudo when the package manager is too old).
 
 For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
 logged in to — via its login file or an environment variable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates starts without one; the installer shows which it finds,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). An instance in a container only sees login files, for Claude a
+token ([Deployment → AI providers in the container](deployment.md#ai-providers-in-the-container)).
+MySuricates starts without one; the installer shows which it finds,
 and so does the start page of the interface — with the command for whatever is missing.
 
 ---
@@ -90,6 +92,8 @@ Done. `b` goes one step back, `q` quits.
   [deployment.md](deployment.md).
   Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
+  If pi is missing, the installer offers to install it via npm (default no, without a terminal
+  `--with-pi`); for claude and codex it names the command. Logging in is up to you.
   In the container the instance uses the CLI **and** your login from the machine — no second login
   (on macOS only the login; the program lives in the image).
 - **Ports:** default 9090, busy ports are skipped. For the container also the projects folder the
@@ -107,6 +111,16 @@ hardening, ui-editable and other settings go into the instance file (section 4).
 ```
 
 Without a terminal (pipe, CI) and without `--yes` the installer only checks.
+
+If Java or Node from the package manager are too old, the installer downloads them to
+`~/.local/share/mysuricates`. The instance finds them there on its own, your shell only with a line in
+your profile — otherwise `node`, `npm` and whatever `npm install -g` puts there (codex, pi) are missing:
+
+```bash
+. ~/.local/share/mysuricates/env.sh      # in ~/.profile (bash with ~/.bash_profile: there; macOS: ~/.zprofile)
+```
+
+In the guided run the installer offers to add the line; with `--yes` it only shows it.
 
 ---
 
@@ -128,6 +142,10 @@ Start, stop and inspect — the same command for every way:
 scripts/instance.sh up|down|status|logs|key --name main
 scripts/instance.sh list                         # all instances with their port
 ```
+
+**After a reboot of the machine:** an instance in a container starts again by itself once the Docker
+service runs. An instance on this machine (`--runtime host`) does **not** start by itself — then run
+`scripts/instance.sh up --name main`. The installer does not set up an autostart for it.
 
 ### What now?
 
@@ -154,7 +172,8 @@ Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to yo
 ## 4. Change settings later
 
 Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). Or edit
-`deploy/instances/main.env` and run `scripts/instance.sh up --name main`:
+`deploy/instances/main.env` and restart the instance (`scripts/instance.sh down --name main`, then
+`up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
@@ -164,6 +183,22 @@ Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provid
 
 **Settings → Modules & hardening** lists the modules with maturity and risk. Details on instances:
 [deployment.md](deployment.md#one-instance-in-a-container-deploy).
+
+### Update
+
+After `git pull`, stop the instance once and start it again — `up` then builds from the new state:
+
+```bash
+git pull
+scripts/instance.sh down --name main
+scripts/instance.sh up --name main
+```
+
+In a container, `up` builds the image anew every time (unchanged layers come from the cache). On the
+machine, `instance.sh` notes the commit when it builds and builds anew as soon as the clone is on
+another one; `up` does not rebuild a running instance but reports that it still shows the old state.
+`scripts/instance.sh built --name main` shows which commit the build comes from. Your data stays in
+both cases. Running `./scripts/setup.sh` again also brings the instance to the new state.
 
 ---
 
@@ -223,7 +258,9 @@ in the repo — SSL off with the default password remains allowed.
 | Docker installed but not running | Linux: `sudo systemctl start docker`, macOS: open Docker Desktop |
 | Port in use | the installer takes the next free one; change it in `deploy/instances/main.env` |
 | AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login`; the start page and the settings show per provider whether program and login are found |
+| `npm`, `node` or `pi` not found after the installer | Node came as a download: `. ~/.local/share/mysuricates/env.sh`, permanently as a line in your profile (section 2) |
 | Instance does not start | `scripts/instance.sh logs --name main`; setup logs in `~/.local/state/mysuricates/setup-logs/` |
+| Not reachable after a reboot of the machine | instance on the machine: `scripts/instance.sh up --name main` (no autostart); in a container: starts with the Docker service |
 | Settings show "Docker not set up" | not an error — only shell blocks with `container_image` need Docker |
 
 ---

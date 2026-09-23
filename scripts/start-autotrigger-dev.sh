@@ -5,7 +5,10 @@
 #   scripts/start-autotrigger-dev.sh stop                                # nur Backend
 #   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
 #   scripts/start-autotrigger-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
-#   scripts/start-autotrigger-dev.sh [start|stop|restart] --container     # Backend im Docker-Container
+#   scripts/start-autotrigger-dev.sh [start|stop|restart|build] --container  # Backend im Docker-Container
+#
+# --container: Dockerfile.stable kompiliert nichts, es kopiert das JAR aus target/. restart baut es
+# deshalb vorher immer (mvn clean package), start nur mit --rebuild oder wenn keins liegt, build nur das.
 #
 # Das Backend laeuft NICHT aus target/classes (mvn spring-boot:run), sondern aus einer JAR-Kopie unter
 # ${STATE_DIR}/runtime/current.jar. Grund: Eine JVM mit -cp target/classes liest Klassen lebenslang lazy
@@ -36,7 +39,7 @@ for arg in "$@"; do
     --rebuild) REBUILD=1 ;;     # start: JAR neu bauen, auch wenn schon eins liegt
     --container) RUNTIME_MODE=container ;;  # Backend im Container statt als java -jar (TODO a1236a64)
     --host) RUNTIME_MODE=host ;;
-    -h|--help) sed -n '2,15p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # andere Argumente ignorieren
   esac
 done
@@ -69,6 +72,9 @@ BACKEND_PROCESS_PATTERN='(mvn|maven|spring-boot|java)'
 FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
 
 BACKEND_PORT=9090
+# Im Container antwortet das Backend auf dem Port, den Compose veroeffentlicht: laeuft-schon-Pruefung,
+# Bereitschaft und Run-Check vor restart folgen ihm — eine Probe neben dem Host-Backend (3bfa4e10).
+if [[ "${RUNTIME_MODE}" == "container" ]]; then BACKEND_PORT="${AUTOTRIGGER_DEV_CONTAINER_PORT:-9090}"; fi
 API_BASE="${MYSURICATES_API_BASE:-http://localhost:${BACKEND_PORT}/api/v1}"
 BACKEND_READY_URL="${API_BASE}/system/info"
 # Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
@@ -291,14 +297,23 @@ install_runtime_jar() {
   echo "${target}"
 }
 
+# Fat-JAR in target/ — leer, wenn keins liegt.
+target_jar() {
+  find "${BACKEND_DIR}/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original' 2>/dev/null | head -1 || true
+}
+
 # Fat-JAR im Backend-Verzeichnis bauen (clean: heilt auch ein von IDE-Builds korrumpiertes target/).
-build_backend_jar() {
-  local jar
+# Setzt BUILT_JAR. Der Host-Weg kopiert es danach nach runtime/, der Container-Weg ins Image.
+compile_backend_jar() {
   echo "Baue Backend-JAR (mvn clean package -DskipTests) ..."
-  (cd "${BACKEND_DIR}" && "${MVN_CMD}" -q clean package -DskipTests)
-  jar="$(find "${BACKEND_DIR}/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original' | head -1)"
-  [[ -n "${jar}" ]] || { echo "Kein Fat-JAR unter ${BACKEND_DIR}/target gefunden." >&2; return 1; }
-  echo "Runtime-JAR: $(install_runtime_jar "${jar}")"
+  (cd "${BACKEND_DIR}" && "${MVN_CMD}" -q clean package -DskipTests) || return 1
+  BUILT_JAR="$(target_jar)"
+  [[ -n "${BUILT_JAR}" ]] || { echo "Kein Fat-JAR unter ${BACKEND_DIR}/target gefunden." >&2; return 1; }
+}
+
+build_backend_jar() {
+  compile_backend_jar || return 1
+  echo "Runtime-JAR: $(install_runtime_jar "${BUILT_JAR}")"
 }
 
 # ---------------------------------------------------------------------------
@@ -342,12 +357,29 @@ write_compose_override() {
   fi
 }
 
-start_backend_container() {
+# Das JAR, das Dockerfile.stable ins Image kopiert (COPY target/…jar). Ohne diesen Schritt lief nach
+# einer Code-Aenderung still das zuletzt auf dem Host gebaute JAR, ohne JAR scheiterte der Build (3bfa4e10).
+#   $1 = always (restart, build) | missing (start: nur mit --rebuild oder ohne JAR) | built (eben gebaut)
+ensure_container_jar() {
+  local jar
+  [[ "${1:-missing}" == "built" ]] && return 0
+  jar="$(target_jar)"
+  if [[ "${1:-missing}" == "always" || "${REBUILD}" -eq 1 || -z "${jar}" ]]; then
+    if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+    compile_backend_jar || return 1
+    echo "JAR fuer das Image: ${BUILT_JAR}"
+  else
+    echo "Verwende vorhandenes JAR fuer das Image: ${jar} (neu bauen: restart oder --rebuild)"
+  fi
+}
+
+start_backend_container() {  # $1 = always|missing|built, siehe ensure_container_jar
   require_command docker
   if endpoint_is_ready "${BACKEND_READY_URL}"; then
     echo "Auf :${BACKEND_PORT} antwortet bereits ein Backend — erst stoppen." >&2
     return 1
   fi
+  ensure_container_jar "${1:-missing}" || return 1
   write_compose_override
   echo "Starte Backend im Container (docker compose up -d) ..."
   compose_cmd up -d --build
@@ -520,12 +552,13 @@ main() {
     build)
       # Baut das JAR, das ein spaeteres `start` ohne weiteren Build verwendet — so kompiliert
       # scripts/setup.sh das Backend nur einmal statt test-compile + clean package (0ab376d3).
+      # Im Container-Betrieb dasselbe JAR in target/, aus dem start/restart das Image bauen (3bfa4e10).
       if [[ "${RUNTIME_MODE}" == "container" ]]; then
-        echo "build gilt nur fuer die Betriebsart host (Container bauen ihr Image selbst)." >&2
-        exit 2
+        ensure_container_jar always || exit 1
+      else
+        if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
+        build_backend_jar
       fi
-      if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
-      build_backend_jar
       ;;
     stop)
       if [[ "${RUNTIME_MODE}" == "container" ]]; then stop_backend_container; else stop_backend; fi
@@ -533,8 +566,10 @@ main() {
     restart)
       refuse_restart_if_runs_active
       if [[ "${RUNTIME_MODE}" == "container" ]]; then
+        # Erst bauen, dann anhalten: scheitert Maven, laeuft der alte Container weiter
+        ensure_container_jar always || exit 1
         stop_backend_container
-        start_backend_container
+        start_backend_container built || exit 1
       else
         if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
         stop_backend
@@ -554,7 +589,7 @@ main() {
     start)
       require_command npm
       if [[ "${RUNTIME_MODE}" == "container" ]]; then
-        start_backend_container
+        start_backend_container missing || exit 1
       else
         if [[ "${MVN_CMD}" == "mvn" ]]; then require_command mvn; fi
         start_backend

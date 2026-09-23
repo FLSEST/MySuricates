@@ -73,6 +73,43 @@ else
 fi
 check "pinned checksums are 64 hex chars"    '[ "$(grep -cE "^DEPS_(NODE|JDK)_SHA256_[a-z0-9_]+=\"[0-9a-f]{64}\"" "$LIB/deps.sh")" -eq 8 ]'
 
+echo "5b) the downloaded tools in the user's own shell (2605ed1f)"
+H="$TMP/home"; D="$TMP/data/mysuricates"; rm -rf "$D"; mkdir -p "$D/node/bin"
+check "zsh (macOS) → ~/.zprofile"                  '[ "$(SHELL=/bin/zsh run deps_profile_file)" = "$H/.zprofile" ]'
+check "bash without ~/.bash_profile → ~/.profile"  '[ "$(SHELL=/bin/bash run deps_profile_file)" = "$H/.profile" ]'
+touch "$H/.bash_profile"
+check "bash with ~/.bash_profile → that one (it hides ~/.profile)" '[ "$(SHELL=/bin/bash run deps_profile_file)" = "$H/.bash_profile" ]'
+rm -f "$H/.bash_profile"
+check "other shells → ~/.profile"                  '[ "$(SHELL=/bin/sh run deps_profile_file)" = "$H/.profile" ]'
+printf '# nur ein Kommentar\n' > "$D/env.sh"
+check "env.sh without PATH export is not active"   '! run deps_env_active'
+printf 'export PATH="%s/node/bin:$PATH"\n' "$D" > "$D/env.sh"
+check "env.sh with PATH export is active"          'run deps_env_active'
+check "hint: the line to copy"                     '[ "$(run deps_profile_hint)" = ". $D/env.sh" ]'
+EXP_LINE='[ -r "$HOME/.local/share/mysuricates/env.sh" ] && . "$HOME/.local/share/mysuricates/env.sh"'
+check "line: \$HOME kept for the usual place"      '[ "$(run "DEPS_DATA=\$HOME/.local/share/mysuricates; deps_profile_line")" = "$EXP_LINE" ]'
+printf 'export FOO=1' > "$H/.profile"                       # letzte Zeile ohne Zeilenende
+run 'deps_profile_add "$HOME/.profile"'; run 'deps_profile_add "$HOME/.profile"'
+check "added once, even when called twice"         '[ "$(grep -c "mysuricates/env.sh" "$H/.profile")" = 1 ]'
+check "existing content stays on its own line"     '[ "$(head -n 1 "$H/.profile")" = "export FOO=1" ]'
+printf '#!/bin/sh\necho v24\n' > "$D/node/bin/node"; chmod +x "$D/node/bin/node"
+check "a login shell then finds the downloaded node" '[ "$(env -i HOME="$H" PATH=/usr/bin:/bin sh -c ". \"$H/.profile\"; command -v node")" = "$D/node/bin/node" ]'
+check "a hand-written line counts as present"      'printf ". ~/.local/share/mysuricates/env.sh\n" > "$H/p2"; run "deps_profile_has_env \"$H/p2\""'
+rm -rf "$D"
+check "a deleted download does not break the login" '[ -z "$(env -i HOME="$H" PATH=/usr/bin:/bin sh -c ". \"$H/.profile\"" 2>&1)" ]'
+rm -f "$H/.profile" "$H/p2"
+
+echo "5c) npm -g: sudo only where npm may not write (0a078449)"
+mkdir -p "$TMP/npmp"
+stub npm 'case "$1" in prefix) echo "$NPM_PREFIX" ;; esac'
+check "downloaded Node / Homebrew: no sudo"         '! NPM_PREFIX="$TMP/npmp" run deps_npm_needs_sudo'
+if [ "$(id -u)" != 0 ]; then
+  check "apt/dnf Node (root owns the prefix): sudo" 'NPM_PREFIX=/usr run deps_npm_needs_sudo'
+else
+  echo "  skip (root may write everywhere)"
+fi
+unstub npm
+
 echo "6) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"         '! grep -v "^[[:space:]]*#" "$LIB/deps.sh" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
 

@@ -65,7 +65,9 @@ geprüfter Download ohne sudo).
 
 Für KI-Workflows brauchst du **eine KI-CLI deiner Wahl** — `claude`, `codex` oder `pi` —, bei der
 du angemeldet bist — per Anmeldedatei oder per Umgebungsvariable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates startet auch ohne; der Installer zeigt, welche er findet,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). Eine Instanz im Container sieht nur Anmeldedateien, für Claude
+einen Token ([Deployment → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container)).
+MySuricates startet auch ohne; der Installer zeigt, welche er findet,
 und die Startseite der Oberfläche sagt es ebenso — samt Befehl für das, was fehlt.
 
 ---
@@ -92,6 +94,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
+  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren (Vorgabe nein, ohne Terminal
+  `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
   (unter macOS nur die Anmeldung, das Programm liegt im Image).
 - **Ports:** Default 9090, belegte Ports werden übersprungen. Beim Container zusätzlich der
@@ -109,6 +113,16 @@ sie); Härtung, ui-editable und weitere Einstellungen stehen in der Instanz-Date
 ```
 
 Ohne Terminal (Pipe, CI) und ohne `--yes` prüft der Installer nur.
+
+Sind Java oder Node des Paketmanagers zu alt, lädt der Installer sie nach `~/.local/share/mysuricates`.
+Die Instanz findet sie dort selbst, deine Shell erst mit einer Zeile im Profil — sonst fehlen dort
+`node`, `npm` und was `npm install -g` dorthin legt (codex, pi):
+
+```bash
+. ~/.local/share/mysuricates/env.sh      # in ~/.profile (bash mit ~/.bash_profile: dort; macOS: ~/.zprofile)
+```
+
+Im geführten Ablauf bietet der Installer an, die Zeile einzutragen; mit `--yes` zeigt er sie nur an.
 
 ---
 
@@ -130,6 +144,10 @@ Starten, stoppen und ansehen — für jeden Weg derselbe Befehl:
 scripts/instance.sh up|down|status|logs|key --name main
 scripts/instance.sh list                         # alle Instanzen mit Port
 ```
+
+**Nach einem Neustart des Rechners:** Eine Instanz im Container startet von selbst wieder, sobald der
+Docker-Dienst läuft. Eine Instanz auf diesem Rechner (`--runtime host`) startet **nicht** von selbst —
+dann `scripts/instance.sh up --name main`. Einen Autostart dafür richtet der Installer nicht ein.
 
 ### Und jetzt?
 
@@ -157,8 +175,8 @@ Eigene Workflows baut man danach am besten mit dem
 ## 4. Einstellungen später ändern
 
 `./scripts/setup.sh` erneut starten → **Einstellungen ändern** (Port, Module, KI-Anbieter).
-Oder direkt die Datei `deploy/instances/main.env` bearbeiten und `scripts/instance.sh up --name main`
-ausführen:
+Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu starten
+(`scripts/instance.sh down --name main`, dann `up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (oder `setup.sh --docker-socket`) — erlaubt Shell-Blöcke mit
@@ -168,6 +186,23 @@ ausführen:
 
 Welche Module es gibt, mit Reifegrad und Risiko, zeigt **Settings → Module & Härtung**. Details zu
 den Instanzen: [deployment.md](deployment.md#eine-instanz-im-container-deploy).
+
+### Aktualisieren
+
+Nach `git pull` die Instanz einmal stoppen und wieder starten — `up` baut dann aus dem neuen Stand:
+
+```bash
+git pull
+scripts/instance.sh down --name main
+scripts/instance.sh up --name main
+```
+
+Im Container baut `up` das Image jedes Mal neu (unveränderte Schichten kommen aus dem Cache). Auf dem
+Rechner merkt sich `instance.sh` beim Bauen den Commit und baut neu, sobald der Klon auf einem anderen
+steht; eine laufende Instanz baut `up` nicht um, sondern meldet, dass sie noch den alten Stand zeigt.
+Aus welchem Commit der Build stammt, zeigt `scripts/instance.sh built --name main`. Die Daten bleiben
+in beiden Fällen erhalten. Ein erneuter Lauf von `./scripts/setup.sh` bringt die Instanz ebenfalls auf
+den neuen Stand.
 
 ---
 
@@ -225,7 +260,9 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | Docker installiert, läuft aber nicht | Linux: `sudo systemctl start docker`, macOS: Docker Desktop öffnen |
 | Port belegt | der Installer nimmt den nächsten freien; ändern in `deploy/instances/main.env` |
 | KI-Block schlägt fehl, „nicht angemeldet“ | bei der CLI anmelden: `claude auth login`, `codex login` oder `pi` → `/login`; ob Programm und Anmeldung gefunden werden, zeigen Startseite und Einstellungen je Anbieter |
+| `npm`, `node` oder `pi` nach dem Installer nicht gefunden | Node kam als Download: `. ~/.local/share/mysuricates/env.sh`, dauerhaft als Zeile im Profil (Abschnitt 2) |
 | Instanz startet nicht | `scripts/instance.sh logs --name main`; Setup-Protokolle unter `~/.local/state/mysuricates/setup-logs/` |
+| Nach einem Neustart des Rechners nicht erreichbar | Instanz auf dem Rechner: `scripts/instance.sh up --name main` (kein Autostart); im Container: startet mit dem Docker-Dienst |
 | Settings zeigen „Docker nicht eingerichtet“ | kein Fehler — nur Shell-Blöcke mit `container_image` brauchen Docker |
 
 ---

@@ -47,8 +47,14 @@ zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen
 Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,
 `AUTOTRIGGER_DEV_COMPOSE_PROJECT`, `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` —
-damit eine Probeinstanz neben der echten laufen kann. Eine Probe auf anderem Port braucht zusätzlich
-`MYSURICATES_API_BASE=http://localhost:<port>/api/v1`, sonst prüft der Starter Port 9090.
+damit eine Probeinstanz neben der echten laufen kann. Die Prüfungen des Starters (läuft schon ein
+Backend?, Bereitschaft, Run-Check vor `restart`) folgen im Container-Betrieb dem Port aus
+`AUTOTRIGGER_DEV_CONTAINER_PORT`; `MYSURICATES_API_BASE` überschreibt ihn weiterhin.
+
+Das Image (`Dockerfile.stable`) kompiliert nichts, es kopiert das JAR aus
+`ai-automation-backend/target/`. Deshalb baut `restart --container` das JAR vorher
+(`mvn clean package -DskipTests`, erst danach wird der Container angehalten), `start --container`
+nur mit `--rebuild` oder wenn noch keins liegt, und `build --container` baut nur das JAR (3bfa4e10).
 
 Was von den KI-Anbietern des Rechners in den Container kommt, entscheidet
 `AUTOTRIGGER_DEV_AI_FROM_HOST` (`login` = Programme und je Anbieter nur die Anmeldung, der Standard;
@@ -137,8 +143,8 @@ cd ai-automation-backend
 mvn clean package -DskipTests
 docker compose build backend
 
-# Alle Agent-Images
-docker compose --profile build-only build
+# Alle Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo frisch, 97e1529d)
+AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
 ## Builds neben dem laufenden Dev-Backend

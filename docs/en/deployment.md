@@ -26,6 +26,11 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 
+The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
+tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
+via `.git/info/exclude` — does not. Your own pool file therefore shows up in the container only once
+it is committed or at least added with `git add`.
+
 The instance uses the machine's AI CLIs, so nobody logs in twice. How much of them goes into the
 container is set by `MYSURICATES_AI_FROM_HOST` ([AI providers in the container](#ai-providers-in-the-container));
 on macOS only logins go in, no programs (a Mac binary does not start in a Linux container).
@@ -69,6 +74,12 @@ lands neither in the image nor in the volume, but anyone with Docker access can 
 `docker inspect`. Only a value that can be a token counts as a login: at least 40 characters, no spaces
 and no angle brackets. A placeholder such as `<token>` stays out; the starters, the installer and the
 settings report it as a missing login.
+
+**Login via environment variable.** On the machine a set variable such as `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` or `GEMINI_API_KEY` counts as a login. It does not reach the container: the switches
+mount login files, for Claude the token from `ai.env`. For a container instance the installer says so
+instead of leaving "logged in" standing, and names the command that creates the login file
+(`codex login`, `pi` → `/login`); at start `instance.sh` reports a missing file (90b4422c).
 
 **Project containers.** For a run the platform starts one container per project
 (`automation-<project-id>`, whenever Docker is reachable — on Stable and Test through the socket).
@@ -138,8 +149,8 @@ mvn clean package -DskipTests
 # 2. Start backend
 docker compose up --build -d
 
-# 3. Build agent images (one-time)
-docker compose --profile build-only build
+# 3. Build agent images — the month in the value refreshes the third-party repos of agent-devops
+AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
 The backend is then accessible at `http://localhost:9090`.
@@ -187,6 +198,10 @@ The agent images are only built (`profiles: build-only`), not started directly v
 - **GitHub CLI:** `gh` from the official APT repository
 - **Security Tools:** gitleaks, trivy (binaries with SHA256 verification, multi-arch)
 - **Docker:** Docker CE CLI (client only, no daemon)
+- **Freshness:** the layers with third-party repos (gh, Docker) come last, behind `ARG APT_REFRESH`. A
+  new value (Compose: `AGENT_APT_REFRESH`, e.g. the month) rebuilds them instead of taking keys and
+  package lists from an old layer cache — a build once failed on `NO_PUBKEY` that way although the
+  current keyring was fine (97e1529d). gitleaks and trivy are pinned.
 - **User:** `agent` (UID 1000)
 - **CMD:** `tail -f /dev/null`
 

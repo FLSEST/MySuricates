@@ -26,6 +26,11 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
 
+Das Image entsteht aus den getrackten Dateien des Klons (`git ls-files`), wie sie im Arbeitsbaum
+liegen: Geänderte getrackte Dateien kommen mit, was nur lokal liegt — etwa per `.git/info/exclude`
+ausgeschlossene Pool-Definitionen —, nicht. Eine eigene Pool-Datei erscheint im Container also erst,
+wenn sie committet oder zumindest mit `git add` aufgenommen ist.
+
 Die Instanz nutzt die KI-CLIs des Rechners, man meldet sich nicht doppelt an. Wie viel davon in den
 Container kommt, bestimmt `MYSURICATES_AI_FROM_HOST` ([KI-Anbieter im Container](#ki-anbieter-im-container));
 unter macOS kommen nur Anmeldungen, keine Programme (eine Mac-Binary startet im Linux-Container nicht).
@@ -69,6 +74,12 @@ Datei beim Start als Umgebung durch. Sie landet weder im Image noch im Volume, i
 Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, der ein Token sein kann:
 mindestens 40 Zeichen, ohne Leerzeichen und ohne spitze Klammern. Ein Platzhalter wie `<token>` bleibt
 draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmeldung.
+
+**Anmeldung per Umgebungsvariable.** Auf dem Rechner zählt eine gesetzte Variable wie `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY` oder `GEMINI_API_KEY` als Anmeldung. In den Container kommt sie nicht: Die Schalter
+binden Anmeldedateien ein, für Claude den Token aus `ai.env`. Der Installer sagt das bei einer
+Container-Instanz, statt „angemeldet“ stehen zu lassen, und nennt den Befehl, der die Anmeldedatei
+anlegt (`codex login`, `pi` → `/login`); beim Start meldet `instance.sh` eine fehlende Datei (90b4422c).
 
 **Projekt-Container.** Für einen Lauf startet die Plattform je Projekt einen Container
 (`automation-<projekt-id>`, sobald Docker erreichbar ist, bei Stable und Test über den Socket). Darin
@@ -140,8 +151,8 @@ mvn clean package -DskipTests
 # 2. Backend starten
 docker compose up --build -d
 
-# 3. Agent-Images bauen (einmalig)
-docker compose --profile build-only build
+# 3. Agent-Images bauen — der Monat im Wert frischt die Fremd-Repos von agent-devops auf
+AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
 Das Backend ist dann unter `http://localhost:9090` erreichbar.
@@ -189,6 +200,10 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 - **GitHub CLI:** `gh` aus dem offiziellen APT-Repository
 - **Security-Tools:** gitleaks, trivy (Binaries mit SHA256-Verifizierung, multi-arch)
 - **Docker:** Docker CE CLI (nur Client, kein Daemon)
+- **Frische:** Die Layer mit Fremd-Repos (gh, Docker) stehen zuletzt, hinter `ARG APT_REFRESH`. Ein
+  neuer Wert (Compose: `AGENT_APT_REFRESH`, etwa der Monat) baut sie neu, statt Schlüssel und
+  Paketlisten aus einem alten Layer-Cache zu übernehmen — daran scheiterte ein Build mit `NO_PUBKEY`,
+  obwohl der aktuelle Schlüsselbund stimmte (97e1529d). gitleaks und trivy sind fest gepinnt.
 - **User:** `agent` (UID 1000)
 - **CMD:** `tail -f /dev/null`
 

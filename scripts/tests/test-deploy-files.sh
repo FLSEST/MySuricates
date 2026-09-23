@@ -55,4 +55,13 @@ done
 check "Dockerfile.stable prepares /app/secrets"  'grep -q "/app/secrets" "$R/ai-automation-backend/docker/Dockerfile.stable"'
 check "backend entrypoint hands /app/secrets to the app user" 'grep -q "chown .*/app/secrets" "$BEP" && grep -q "chmod 700 /app/secrets" "$BEP"'
 
+echo "5) agent-devops: third-party APT repos never frozen in an old layer cache (97e1529d)"
+ADF="$R/ai-automation-backend/docker/Dockerfile.agent-devops"; DC="$R/ai-automation-backend/docker-compose.yml"
+line_of() { grep -n "$1" "$ADF" | head -n 1 | cut -d: -f1; }
+check "APT_REFRESH comes before the gh and the Docker repo" '[ "$(line_of "^ARG APT_REFRESH")" -lt "$(line_of "cli.github.com/packages/githubcli")" ] && [ "$(line_of "^ARG APT_REFRESH")" -lt "$(line_of "download.docker.com")" ]'
+check "pinned binaries stay before it (cached)"   '[ "$(line_of "^ARG GITLEAKS_VERSION")" -lt "$(line_of "^ARG APT_REFRESH")" ] && [ "$(line_of "^ARG TRIVY_VERSION")" -lt "$(line_of "^ARG APT_REFRESH")" ]'
+check "the gh layer uses APT_REFRESH itself"      'grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$ADF"'
+check "compose passes AGENT_APT_REFRESH"          'grep -q "APT_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
+check "pinned checksums are 64 hex chars"         '[ "$(grep -cE "^ARG (GITLEAKS|TRIVY)_LINUX_(X64|ARM64)_SHA256=[0-9a-f]{64}$" "$ADF")" -eq 4 ]'
+
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

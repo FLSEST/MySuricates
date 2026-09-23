@@ -58,6 +58,14 @@ check "OPENAI_API_KEY logs codex in"            'run "export OPENAI_API_KEY=x; p
 check "an empty variable is not a login"        'run "export CLAUDE_CODE_OAUTH_TOKEN=; providers_status" | grep -x "claude present logged-out" >/dev/null'
 check "the value is never printed"              '! run "export CLAUDE_CODE_OAUTH_TOKEN=sk-secret-123; providers_status; provider_logged_in claude" 2>&1 | grep -q sk-secret'
 
+echo "4b) file login vs. variable login — only files reach a container (90b4422c)"
+check "names of the set variables, not values"  '[ "$(run "export ANTHROPIC_API_KEY=sk-secret-1 GEMINI_API_KEY=g-secret-2; provider_login_env_names pi")" = "ANTHROPIC_API_KEY GEMINI_API_KEY" ]'
+check "no variable set: no names"               '[ -z "$(run "provider_login_env_names codex")" ]'
+check "a variable is no file login"             '! run "export OPENAI_API_KEY=x; provider_login_file codex"'
+echo '{"tokens":1}' > "$TMP/home/.codex/auth.json"
+check "auth.json is a file login"               'run "provider_login_file codex"'
+rm -f "$TMP/home/.codex/auth.json"
+
 echo "5) bash 3.2 hygiene"
 check "no bash-4-only syntax"                   '! grep -nE "declare -g?A|mapfile|readarray" "$HERE/../lib/providers.sh" "$HERE/../lib/provider-catalog.generated.sh"'
 

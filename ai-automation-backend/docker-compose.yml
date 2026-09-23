@@ -32,7 +32,8 @@ services:
 
   # Agent images - build only, not run via compose.
   # The backend creates/manages agent containers via Docker API.
-  # Build all: docker compose --profile build-only build
+  # Build all: AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
+  # (a new value rebuilds the third-party APT layers of agent-devops instead of reusing old keyrings)
   agent-node:
     build:
       context: .
@@ -53,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.agent-devops
+      args:
+        APT_REFRESH: ${AGENT_APT_REFRESH:-}
     image: automation-agent-devops:latest
     profiles:
       - build-only
