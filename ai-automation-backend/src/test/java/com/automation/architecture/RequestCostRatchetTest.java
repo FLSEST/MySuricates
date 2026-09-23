@@ -1,6 +1,7 @@
 package com.automation.architecture;
 
 import com.automation.dto.response.WorkflowRunListItemResponse;
+import com.automation.entity.Goal;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -12,6 +13,7 @@ import com.automation.entity.Todo;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
+import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
@@ -112,7 +114,7 @@ class RequestCostRatchetTest {
      * {@link #nothingButTheSeedIsMeasured()}.
      */
     private static final List<String> SEEDED_TABLES = List.of(
-            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos");
+            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos", "goals");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -189,6 +191,15 @@ class RequestCostRatchetTest {
      *       null target instead of throwing — see
      *       {@code ScheduleSoftDeletedWorkflowIntegrationTest}. What is left is the query itself
      *       plus the two bundled run-status queries.</li>
+     *   <li>{@code /todos}: 2 → 3 statements and 32 → 42 kB on purpose (TODO dc0566f8). The seed puts
+     *       every todo into a goal, and each list row carries its {@code planning} (goal title, rank,
+     *       rating, open question). The goal titles come from ONE batched {@code findAllById} per
+     *       page in {@code TodoResponseAssembler} — a constant statement, which
+     *       {@link #statementCountMustNotGrowWithTheNumberOfRows} keeps constant.</li>
+     *   <li>{@code /goals} and {@code /goals/{goal}}: added with TODO dc0566f8. Both read lean
+     *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
+     *       reaches the goal view. The detail is the goal plus one row query (the project names
+     *       are only looked up when a todo has a project; the seeded ones have none).</li>
      *   <li>{@code /schedules/{sched}/runs} and the calendar week: added with TODO 168e3d7f, both
      *       answered with every step of every run — 122 651 bytes for the two runs of one schedule,
      *       3 697 137 bytes for the week with 60 runs. They now send the same list rows as
@@ -201,17 +212,19 @@ class RequestCostRatchetTest {
      *       {@code {sched}} is the schedule of the first seeded workflow.</li>
      * </ul>
      */
-    static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
-            "/api/v1/todos", new Cost(2, 32_000),
-            "/api/v1/projects", new Cost(2, 1_200),
-            "/api/v1/workflows", new Cost(2, 26_000),
-            "/api/v1/executions", new Cost(5, 60_000),
-            "/api/v1/workflows/{wf}/runs", new Cost(4, 5_000),
-            "/api/v1/learning/dashboard", new Cost(10, 650_000),
-            "/api/v1/search?q=Workflow", new Cost(2, 18_000),
-            "/api/v1/schedules", new Cost(3, 20_000),
-            "/api/v1/schedules/{sched}/runs", new Cost(5, 5_000),
-            CALENDAR, new Cost(7, 95_000)));
+    static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("/api/v1/todos", new Cost(3, 42_000)),
+            Map.entry("/api/v1/projects", new Cost(2, 1_200)),
+            Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
+            Map.entry("/api/v1/executions", new Cost(5, 60_000)),
+            Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
+            Map.entry("/api/v1/learning/dashboard", new Cost(10, 650_000)),
+            Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
+            Map.entry("/api/v1/schedules", new Cost(3, 20_000)),
+            Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
+            Map.entry("/api/v1/goals", new Cost(2, 2_000)),
+            Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
+            Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -220,6 +233,7 @@ class RequestCostRatchetTest {
     @Autowired private StepResultRepository stepResultRepository;
     @Autowired private TodoRepository todoRepository;
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
+    @Autowired private GoalRepository goalRepository;
     @PersistenceContext private EntityManager entityManager;
 
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
@@ -227,6 +241,8 @@ class RequestCostRatchetTest {
 
     /** Target of {@code {sched}} in a route: that workflow's schedule. */
     private String firstScheduleId;
+    /** Das Ziel der ersten Charge; jede Charge ordnet ihm ihre Todos zu (TODO dc0566f8). */
+    private String firstGoalId;
 
     @BeforeEach
     void seed() {
@@ -335,8 +351,18 @@ class RequestCostRatchetTest {
             }
         }
 
+        // Ziele (TODO dc0566f8): jede Charge legt ein Ziel an und ordnet ihre Todos dem ERSTEN zu –
+        // so waechst die Zielansicht mit der zweiten Charge, und /goals zaehlt zwei Ziele. Beide
+        // Routen lesen schlanke Projektionen (GoalStatusCounts, GoalTodoRow); faellt eine davon auf
+        // Entities zurueck, zeigt es sich hier als Vielfaches.
+        String goalId = goalRepository.save(Goal.builder().title("Cost Goal " + batch).build()).getId();
+        if (firstGoalId == null) {
+            firstGoalId = goalId;
+        }
         for (int t = 0; t < TODOS; t++) {
             todoRepository.save(Todo.builder()
+                    .goalId(firstGoalId)
+                    .goalRank(t % 2 == 0 ? t + 1 : null)
                     .title("Cost Todo " + batch + t)
                     .description("Seeded for the request cost ratchet")
                     .status(Todo.Status.OPEN)
@@ -528,7 +554,8 @@ class RequestCostRatchetTest {
     }
 
     private String resolve(String route) {
-        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId);
+        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId)
+                .replace("{goal}", firstGoalId);
     }
 
     private Cost measure(String route) throws Exception {
@@ -546,7 +573,8 @@ class RequestCostRatchetTest {
         }
 
         assertThat(result.getResponse().getStatus())
-                .as("%s must answer 200 for the measurement to mean anything", route)
+                .as("%s must answer 200 for the measurement to mean anything (answer: %s)", route,
+                        result.getResponse().getContentAsString())
                 .isEqualTo(200);
 
         // A ceiling only guards while something is actually being counted. Zero statements on a

@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -163,10 +164,14 @@ public class GoalService {
                 .toList();
     }
 
+    /** Projekt-ID → Name; eine HashMap, weil TODOs ohne Projekt mit {@code null} nachschlagen. */
     private Map<String, String> projectNames(List<GoalTodoRow> rows) {
         Set<String> ids = rows.stream().map(GoalTodoRow::projectId).filter(Objects::nonNull).collect(Collectors.toSet());
-        return ids.isEmpty() ? Map.of()
-                : projectRepository.findAllById(ids).stream().collect(Collectors.toMap(Project::getId, Project::getName));
+        Map<String, String> names = new HashMap<>();
+        if (!ids.isEmpty()) {
+            projectRepository.findAllById(ids).forEach(project -> names.put(project.getId(), project.getName()));
+        }
+        return names;
     }
 
     private static GoalTodoItem toItem(GoalTodoRow row, String projectName) {
