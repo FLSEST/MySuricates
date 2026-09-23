@@ -48,6 +48,9 @@ DASH = r"[-‐-―]"
 # ---------------------------------------------------------------------------
 PATTERNS = {
     # Blocktypen: Quelle ist die Registry BlockTypesIndexSection.BLOCK_TYPES.
+    # Bewusst NICHT erfasst: "(N Typen)" hinter einem Block-Wort. docs/assistant-system.md
+    # nannte dort die Zahl der Block-Spezifikationen des Assistenten — eine Teilmenge der
+    # Blocktypen, die gegen die Gesamtzahl gemessen einen Fehlalarm ergaebe (TODO e36ca773).
     "block-types": [
         r"\b(\d+)\s+[Bb]lock-?[Tt]ypen\b",
         r"\b(\d+)\s+block[- ]types?\b",
@@ -59,13 +62,19 @@ PATTERNS = {
     ],
     # Hoechste Migrationsnummer: nur die Spanne ab V1 ist eine Standangabe.
     # Tabellenzeilen sind ausgenommen, dort stehen echte Teilspannen (| V1-V9 |).
+    # "hoechste (vorhandene) Migration: V73" und "V73 als hoechste Migration" nennen den
+    # Stand ebenso — so stand er undatiert in docs/onboarding/FAQ.md (TODO e36ca773).
     "migration-max": [
         r"\bV1\s*" + DASH + r"\s*V(\d+)\b",
+        r"\b(?:h(?:ö|oe)chste|highest|latest)\s+(?:vorhandene\s+|existing\s+)?[Mm]igration"
+        r"(?:snummer)?\s*:?\s*`?V(\d+)\b",
+        r"\bV(\d+)`?\s+(?:als|as the)\s+(?:h(?:ö|oe)chste|highest)\s+[Mm]igration",
     ],
-    # Anzahl der Migrationsdateien.
+    # Anzahl der Migrationsdateien, auch als "(N)" hinter dem Quellpfad.
     "migrations": [
         r"\b(\d+)\s+(?:Flyway-)?Migrationen\b",
         r"\b(\d+)\s+(?:Flyway )?migrations\b",
+        r"db/migration/?(?:\*\.sql|V\*\.sql)?`?\s*\((\d+)\)",
     ],
     # Built-in-Templates.
     "templates": [
@@ -73,6 +82,12 @@ PATTERNS = {
         r"(?:Workflow-)?(?:Templates?|Vorlagen)\b",
         r"\b(\d+)\s+(?:built-?in|workflow|pre-?built|pre-?defined)[- ]"
         r"(?:workflow )?templates?\b",
+        # "unter *Templates* liegen 67 fertige Workflows" (docs/GETTING-STARTED.md): die Zahl
+        # gehoert zu den Templates, weil der Satz sie unmittelbar davor nennt. Ohne diesen
+        # Bezug waeren "N fertige Workflows" auch Pool-Eintraege — die zaehlt keine Quelle hier.
+        r"\bTemplates\b\*?[^.\n]{0,40}?\b(\d+)\s+(?:fertige|ready-?made)\s+[Ww]orkflows\b",
+        # "(N)" hinter dem Quellpfad, z. B. in docs/workflow-pool-kuratierung.md.
+        r"templates/builtin/?(?:\*\.json)?`?\s*\((\d+)\)",
     ],
     # Built-in-Skills. Der optionale "+ <Wort>"-Einschub fängt die Glossar-Formel
     # „19 Built-in + benutzerdefinierte Skills" / „19 built-in + user-defined skills":
@@ -80,6 +95,7 @@ PATTERNS = {
     "skills": [
         r"\b(\d+)\s+(?:Built-?in|eingebaute|vordefinierte)(?:\s*\+\s*\S+)?[- ][Ss]kills?\b",
         r"\b(\d+)\s+(?:built-?in|predefined|pre-?defined)(?:\s*\+\s*\S+)?[- ]skills?\b",
+        r"skills/builtin/?(?:\*\.json)?`?\s*\((\d+)\)",
     ],
     # Integrations-Provider. "KI-Provider" (Claude/Codex/Pi) ist etwas anderes
     # und faellt heraus, weil nur "Integrations-" als Beiwort erlaubt ist.
@@ -409,6 +425,39 @@ def check_definition_count(rel, no, lines, findings):
                     f" TemplateHygieneGateTest) | {line.strip()[:120]}")
 
 
+# ---------------------------------------------------------------------------
+# Aufzaehlung der Blocktypen: "type": "simple | shell | ... | integration"
+#
+# docs/datenmodell.md zeigte die BlockDefinition mit 14 Typen, als es 20 gab
+# (TODO e36ca773). Keine Zahl, die ein Muster fassen koennte — die Luecke steckt in
+# der Liste selbst. Als Aufzaehlung der Blocktypen gilt eine "type"-Liste erst, wenn sie
+# mehr als die Haelfte aller Blocktypen nennt — dann behauptet sie, die Liste zu sein.
+# Andere Typ-Felder ("type": "stop | continue") und kurze Beispiele bleiben aussen vor.
+# ---------------------------------------------------------------------------
+TYPE_ENUM = re.compile(r'"type"\s*:\s*"([a-z][a-z-]*(?:\s*\|\s*[a-z][a-z-]*)+)"')
+
+
+def check_block_type_enum(rel, no, line, names, findings):
+    if not names:
+        return
+    for match in TYPE_ENUM.finditer(line):
+        items = [item.strip() for item in match.group(1).split("|")]
+        known = [item for item in items if item in names]
+        if len(known) * 2 <= len(names):
+            continue
+        missing = [name for name in names if name not in items]
+        unknown = [item for item in items if item not in names]
+        if not missing and not unknown:
+            continue
+        detail = []
+        if missing:
+            detail.append("es fehlen " + ", ".join(missing))
+        if unknown:
+            detail.append("unbekannt " + ", ".join(unknown))
+        findings.append(f"DRIFT {rel}:{no} block-type-enum nennt {len(known)} von {len(names)}"
+                        f" Blocktypen ({'; '.join(detail)}) | {line.strip()[:120]}")
+
+
 def check_absent_files(rel, no, line, absent, findings):
     for name in absent or ():
         if name in line:
@@ -505,6 +554,7 @@ def scan(root, rel, facts, findings):
         check_forbidden_patterns(rel, no, line, findings)
         check_definition_count(rel, no, lines, findings)
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
+        check_block_type_enum(rel, no, line, facts.get("block-type-names"), findings)
         check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
                               findings)
     check_migration_table(rel, lines, facts.get("migration-max"),

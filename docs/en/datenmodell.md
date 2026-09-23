@@ -1131,7 +1131,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 
 ```json
 {
-  "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | document | integration",
+  "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | integration | document | todo-create | todo-update | todo-close | compress | compress-ai | dashboard-report",
   "name": "Optional display name",
   "config": {
     "prompt": "Instruction or command",
