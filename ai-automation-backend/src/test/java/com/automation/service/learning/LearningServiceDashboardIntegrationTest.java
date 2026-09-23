@@ -16,6 +16,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
@@ -31,7 +32,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>This deliberately does <b>not</b> use {@code @Transactional}: a transactional test
  * keeps its own Hibernate session open, which would mask the {@code LazyInitializationException}
- * this test exists to catch. Runs created here are removed in {@link #cleanUp()}.
+ * this test exists to catch. Everything created here — runs, workflows, projects — is removed in
+ * {@link #cleanUp()}: the integration tests of one JVM share one database, and the projects and
+ * workflows this test used to leave behind pushed {@code RequestCostRatchetTest} over its ceilings
+ * whenever it ran first (TODO 5695d482).
  *
  * <p>Regression coverage for the two bugs introduced by commit 8a93e06e:
  * <ul>
@@ -55,7 +59,12 @@ class LearningServiceDashboardIntegrationTest {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private final List<String> createdRunIds = new ArrayList<>();
+    private final List<String> createdWorkflowIds = new ArrayList<>();
+    private final List<String> createdProjectIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
@@ -68,6 +77,11 @@ class LearningServiceDashboardIntegrationTest {
             }
         });
         createdRunIds.clear();
+        // Plain SQL: the soft-deleted workflow is hidden from the repository by @SQLRestriction.
+        createdWorkflowIds.forEach(id -> jdbc.update("DELETE FROM workflows WHERE id = ?", id));
+        createdWorkflowIds.clear();
+        createdProjectIds.forEach(id -> jdbc.update("DELETE FROM projects WHERE id = ?", id));
+        createdProjectIds.clear();
     }
 
     @Test
@@ -80,6 +94,7 @@ class LearningServiceDashboardIntegrationTest {
                 .path("/tmp/dash-it-" + nano)
                 .status(ProjectStatus.STOPPED)
                 .build());
+        createdProjectIds.add(project.getId());
 
         Workflow liveWorkflow = workflowRepository.save(Workflow.builder()
                 .name("live-wf-" + nano)
@@ -91,6 +106,8 @@ class LearningServiceDashboardIntegrationTest {
                 .description("Soon-deleted workflow")
                 .project(project)
                 .build());
+        createdWorkflowIds.add(liveWorkflow.getId());
+        createdWorkflowIds.add(deletedWorkflow.getId());
 
         Instant now = Instant.now();
         WorkflowRun liveRun = WorkflowRun.builder()
@@ -156,11 +173,13 @@ class LearningServiceDashboardIntegrationTest {
                 .path("/tmp/dash-cost-" + nano)
                 .status(ProjectStatus.STOPPED)
                 .build());
+        createdProjectIds.add(project.getId());
         Workflow workflow = workflowRepository.save(Workflow.builder()
                 .name("cost-wf-" + nano)
                 .description("Cost workflow")
                 .project(project)
                 .build());
+        createdWorkflowIds.add(workflow.getId());
 
         Instant now = Instant.now();
         WorkflowRun run = WorkflowRun.builder()

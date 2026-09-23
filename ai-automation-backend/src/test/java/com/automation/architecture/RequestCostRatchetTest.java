@@ -24,14 +24,19 @@ import org.hibernate.Session;
 import org.hibernate.engine.spi.EntityKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,12 +79,40 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * persistence context is cleared before every measurement, so the request re-reads what it needs
  * instead of finding the seeded entities in the first-level cache — otherwise a lazy-loading N+1
  * would stay invisible here.
+ *
+ * <p><b>Its own database.</b> The ceilings describe <em>this seed</em>, so nothing else may be in
+ * the tables when it is measured. The integration tests of one JVM share one SQLite file, and a
+ * test without rollback leaves its rows behind: two projects and three workflows from
+ * {@code LearningServiceDashboardIntegrationTest} were enough to push {@code /projects} over its
+ * byte ceiling and {@code /workflows} over its statement ceiling — in a {@code -Dtest} selection
+ * that ran that test first, while the class alone and the full suite stayed green (TODO 5695d482).
+ * A ceiling that depends on the test order is luck. This class therefore points
+ * {@code integration.db.path} at a file of its own, migrated fresh for this context and closed
+ * with it ({@link DirtiesContext}), and {@link #nothingButTheSeedIsMeasured()} checks before every
+ * seed that the seeded tables are empty.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("integration")
 @Transactional
+@DirtiesContext
 class RequestCostRatchetTest {
+
+    /** Directory of the class's own database file, see the class comment. */
+    @TempDir
+    static Path ownDatabase;
+
+    @DynamicPropertySource
+    static void useOwnDatabase(DynamicPropertyRegistry registry) {
+        registry.add("integration.db.path", () -> ownDatabase.resolve("request-cost.db").toString());
+    }
+
+    /**
+     * The tables {@link #seedBatch} writes to — empty before the first batch, see
+     * {@link #nothingButTheSeedIsMeasured()}.
+     */
+    private static final List<String> SEEDED_TABLES = List.of(
+            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -90,6 +123,16 @@ class RequestCostRatchetTest {
 
     /** A step output big enough that fetching it by accident is visible in the response size. */
     private static final String FAT_STEP_OUTPUT = "x".repeat(20_000);
+
+    /** Start of every seeded run — a Tuesday. */
+    private static final Instant RUN_STARTED = Instant.parse("2026-09-01T10:00:00Z");
+
+    /** Next occurrence of the seeded schedules ({@code 0 0 6 * * MON}): the following Monday. */
+    private static final Instant NEXT_SCHEDULED = Instant.parse("2026-09-07T06:00:00Z");
+
+    /** The calendar week holding both: every seeded run and every seeded schedule's next date. */
+    private static final String CALENDAR =
+            "/api/v1/schedules/calendar?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z";
 
     record Cost(int statements, int responseBytes) {}
 
@@ -104,9 +147,16 @@ class RequestCostRatchetTest {
      * {@code /executions} went from 29 statements to 5 when TODO 9db34f3b was fixed).
      *
      * <ul>
-     *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: one
-     *       {@code select containers} per workflow — the project's container association is
-     *       resolved row by row (TODO 13d1e2a2). Listed in {@link #KNOWN_GROWING}.</li>
+     *   <li>{@code /workflows}, {@code /search}, {@code /learning/dashboard}: fixed, 32 → 2,
+     *       32 → 2 and 70 → 10 statements. Each paid one {@code select containers} per result row:
+     *       {@code Project.container} is a nullable {@code @OneToOne(mappedBy)}, and Hibernate
+     *       re-selects it for every row whose project has no container — a found container is
+     *       cached, "no container" is not. The queries behind the three routes now fetch the
+     *       container along ({@code WorkflowRepository.findAllWithActiveProject},
+     *       {@code WorkflowRunRepository.findDashboardWindow} and
+     *       {@code findByIdInWithStepsAndWorkflow}, TODO 13d1e2a2) — the same move as
+     *       {@code /projects} and {@code /schedules} below. What is left is the query itself plus
+     *       the bundled run counts; the dashboard adds its counters and aggregations.</li>
      *   <li>{@code /projects}: fixed, 4 → 1 statement. It was the same root cause as the three
      *       routes above — the nullable {@code @OneToOne(mappedBy)} {@code Project.container},
      *       resolved once per project. The list now runs through
@@ -128,9 +178,8 @@ class RequestCostRatchetTest {
      *       {@code /executions} instead of every run with every step. {@code {wf}} is the first
      *       seeded workflow.</li>
      *   <li>{@code /search}: the per-hit {@code select workflow_runs} is gone — search now uses the
-     *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). What is
-     *       left is the same {@code select containers} per workflow as {@code /workflows}, which is
-     *       the half of that ticket still open.</li>
+     *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). The
+     *       {@code select containers} per workflow went with the first bullet (32 → 2).</li>
      *   <li>{@code /schedules}: fixed, 91 → 33 → 3 statements. The last 30 were one
      *       {@code select workflows} per schedule, because the EAGER association
      *       {@code ScheduledWorkflow.workflow} is not fetched along by {@code findAll()}; the list
@@ -140,17 +189,29 @@ class RequestCostRatchetTest {
      *       null target instead of throwing — see
      *       {@code ScheduleSoftDeletedWorkflowIntegrationTest}. What is left is the query itself
      *       plus the two bundled run-status queries.</li>
+     *   <li>{@code /schedules/{sched}/runs} and the calendar week: added with TODO 168e3d7f, both
+     *       answered with every step of every run — 122 651 bytes for the two runs of one schedule,
+     *       3 697 137 bytes for the week with 60 runs. They now send the same list rows as
+     *       {@code /executions}. The runs route went 4 → 5 statements on purpose: counting the steps
+     *       and cutting the last output takes two queries per list, where loading the step rows
+     *       took one. The calendar went 37 → 7: its upcoming dates came from
+     *       {@code findSchedulesInRange}, which resolved {@code ScheduledWorkflow.workflow} row by
+     *       row until it got the same LEFT JOIN FETCH as {@code findAllWithTargets()}. That only
+     *       showed once the seeded schedules carried a {@code nextRunAt} like real ones.
+     *       {@code {sched}} is the schedule of the first seeded workflow.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
             "/api/v1/todos", new Cost(2, 32_000),
             "/api/v1/projects", new Cost(2, 1_200),
-            "/api/v1/workflows", new Cost(32, 26_000),
+            "/api/v1/workflows", new Cost(2, 26_000),
             "/api/v1/executions", new Cost(5, 60_000),
             "/api/v1/workflows/{wf}/runs", new Cost(4, 5_000),
-            "/api/v1/learning/dashboard", new Cost(70, 650_000),
-            "/api/v1/search?q=Workflow", new Cost(32, 18_000),
-            "/api/v1/schedules", new Cost(3, 20_000)));
+            "/api/v1/learning/dashboard", new Cost(10, 650_000),
+            "/api/v1/search?q=Workflow", new Cost(2, 18_000),
+            "/api/v1/schedules", new Cost(3, 20_000),
+            "/api/v1/schedules/{sched}/runs", new Cost(5, 5_000),
+            CALENDAR, new Cost(7, 95_000)));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -164,9 +225,35 @@ class RequestCostRatchetTest {
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
     private String firstWorkflowId;
 
+    /** Target of {@code {sched}} in a route: that workflow's schedule. */
+    private String firstScheduleId;
+
     @BeforeEach
     void seed() {
+        nothingButTheSeedIsMeasured();
         seedBatch("a");
+    }
+
+    /**
+     * Stellt den Bestand vor der Saat fest: In den Tabellen, die die Saat beschreibt, darf nichts
+     * stehen. Gezaehlt wird per SQL, damit auch weich geloeschte Workflows auffallen, die
+     * {@code @SQLRestriction} vor dem Repository verbirgt. Schlaegt das fehl, misst die Klasse nicht
+     * mehr gegen ihre eigene Datenbank — oder ein Start-Seeder legt neuerdings Zeilen an; beides
+     * verschiebt jede Obergrenze in {@link #BASELINE}, ohne dass sich eine Route geaendert haette.
+     */
+    private void nothingButTheSeedIsMeasured() {
+        Map<String, Long> foreignRows = new TreeMap<>();
+        for (String table : SEEDED_TABLES) {
+            long rows = ((Number) entityManager.createNativeQuery("SELECT COUNT(*) FROM " + table)
+                    .getSingleResult()).longValue();
+            if (rows > 0) {
+                foreignRows.put(table, rows);
+            }
+        }
+        assertThat(foreignRows)
+                .as("Rows the seed did not write sit in the measured tables — the ceilings would "
+                        + "measure them too. Is the class still on its own database?")
+                .isEmpty();
     }
 
     /**
@@ -199,13 +286,35 @@ class RequestCostRatchetTest {
         if (firstWorkflowId == null) {
             firstWorkflowId = workflows.get(0).getId();
         }
+        // Ein Zeitplan je Workflow, wie im Betrieb mit naechstem Termin, und die Runs des Workflows
+        // tragen seine Id: So misst /schedules/{sched}/runs echte Zeitplan-Runs, und der Kalender
+        // findet in seiner Woche beides, die Termine und die vergangenen Runs (TODO 168e3d7f).
+        // Die Route /schedules laedt ueber ScheduledWorkflow.workflow (EAGER) und Workflow.project
+        // (EAGER). Faellt der JOIN FETCH aus findAllWithTargets() weg, loest Hibernate die
+        // Assoziationen wieder Zeile fuer Zeile auf und die Zahl der Statements springt sichtbar
+        // auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
         for (Workflow workflow : workflows) {
+            ScheduledWorkflow schedule = scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
+                    .workflow(workflow)
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
+                    .cronExpression("0 0 6 * * MON")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
+                    .enabled(true)
+                    .nextRunAt(NEXT_SCHEDULED)
+                    .description("Seeded for the request cost ratchet")
+                    .inputContext(Map.of())
+                    .build());
+            if (firstScheduleId == null) {
+                firstScheduleId = schedule.getId();
+            }
+
             for (int r = 0; r < RUNS_PER_WORKFLOW; r++) {
                 WorkflowRun run = runRepository.save(WorkflowRun.builder()
                         .workflow(workflow)
+                        .triggeredByScheduleId(schedule.getId())
                         .status(RunStatus.COMPLETED)
-                        .startedAt(Instant.parse("2026-09-01T10:00:00Z"))
-                        .completedAt(Instant.parse("2026-09-01T10:00:05Z"))
+                        .startedAt(RUN_STARTED)
+                        .completedAt(RUN_STARTED.plusSeconds(5))
                         .durationMs(5_000L)
                         .inputContext(Map.of())
                         .metadata(Map.of())
@@ -218,28 +327,12 @@ class RequestCostRatchetTest {
                             .status(StepStatus.COMPLETED)
                             .input("seeded input")
                             .output(FAT_STEP_OUTPUT)
-                            .startedAt(Instant.parse("2026-09-01T10:00:00Z"))
-                            .completedAt(Instant.parse("2026-09-01T10:00:01Z"))
+                            .startedAt(RUN_STARTED)
+                            .completedAt(RUN_STARTED.plusSeconds(1))
                             .durationMs(1_000L)
                             .build());
                 }
             }
-        }
-
-        // Ein Zeitplan je Workflow: Die Route /schedules laedt ueber ScheduledWorkflow.workflow
-        // (EAGER) und Workflow.project (EAGER). Faellt der JOIN FETCH aus findAllWithTargets()
-        // weg, loest Hibernate die Assoziationen wieder Zeile fuer Zeile auf und die Zahl der
-        // Statements springt sichtbar auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
-        for (Workflow workflow : workflows) {
-            scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
-                    .workflow(workflow)
-                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
-                    .cronExpression("0 0 6 * * MON")
-                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
-                    .enabled(true)
-                    .description("Seeded for the request cost ratchet")
-                    .inputContext(Map.of())
-                    .build());
         }
 
         for (int t = 0; t < TODOS; t++) {
@@ -290,16 +383,12 @@ class RequestCostRatchetTest {
      * fuer diese Routen weiter, und {@link #knownGrowingRoutesStillGrow} meldet, sobald eine von
      * ihnen aufhoert zu wachsen — dann gehoert sie aus der Liste heraus, im selben Commit wie der
      * Fix.
+     *
+     * <p>Zurzeit leer: {@code /workflows}, {@code /search} und {@code /learning/dashboard} standen
+     * hier, bis ihr {@code select containers} je Zeile behoben war (TODO 13d1e2a2). Seitdem gilt
+     * das Wachstums-Kriterium fuer alle Routen.
      */
-    static final Map<String, String> KNOWN_GROWING = new TreeMap<>(Map.of(
-            "/api/v1/workflows",
-            "TODO 13d1e2a2 — ein select containers je Workflow (Project.container ist eine "
-                    + "nullable @OneToOne(mappedBy)). Ob Batch-Lookup oder schlanke Projektion, "
-                    + "entscheidet der Nutzer; bis dahin bleibt die Route hier.",
-            "/api/v1/search?q=Workflow",
-            "TODO 13d1e2a2 — derselbe Mapper-Pfad wie /workflows.",
-            "/api/v1/learning/dashboard",
-            "TODO 13d1e2a2 — derselbe Mapper-Pfad wie /workflows."));
+    static final Map<String, String> KNOWN_GROWING = new TreeMap<>();
 
     /**
      * Das eigentliche N+1-Kriterium: Dieselbe Route wird gegen zwei Saat-Groessen gemessen, und
@@ -407,7 +496,8 @@ class RequestCostRatchetTest {
      */
     @Test
     void runListsLoadNoStepRows() throws Exception {
-        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs")) {
+        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs",
+                "/api/v1/schedules/{sched}/runs", CALENDAR)) {
             Cost before = measure(route);
             assertThat(stepRowsInPersistenceContext())
                     .as("%s loaded step rows — the list must count and preview them in the database", route)
@@ -438,7 +528,7 @@ class RequestCostRatchetTest {
     }
 
     private String resolve(String route) {
-        return route.replace("{wf}", firstWorkflowId);
+        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId);
     }
 
     private Cost measure(String route) throws Exception {

@@ -4,7 +4,10 @@ import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
+import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
+import com.automation.entity.StepStatus;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
@@ -287,16 +290,31 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.schedules").isArray());
     }
 
+    /** Listenzeile eines Runs, wie {@code WorkflowMapper.toRunListItemsWithOwners} sie liefert. */
+    private static WorkflowRunListItemResponse listItem(String id) {
+        return new WorkflowRunListItemResponse(
+                id, "wf-1", "Nightly", "Project", "/tmp/project", RunStatus.COMPLETED,
+                Instant.parse("2026-09-01T10:00:00Z"), null, 5_000L, null, null, Map.of(), Map.of(),
+                "sched-1", null, null, null, 3, StepStatus.COMPLETED, "last output");
+    }
+
+    /**
+     * Workflow-Runs eines Zeitplans kommen als Listenzeilen: Anzahl und Vorschau des letzten
+     * Schritts, keine Schritte (TODO 168e3d7f).
+     */
     @Test
     void getScheduleRuns_returnsBothWorkflowAndChainRuns() throws Exception {
         when(schedulerService.findWorkflowRunsByScheduleId("sched-1")).thenReturn(List.of());
         when(schedulerService.findChainRunsByScheduleId("sched-1")).thenReturn(List.of());
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
         when(chainMapper.toRunResponseList(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/schedules/sched-1/runs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.workflowRuns").isArray())
+                .andExpect(jsonPath("$.workflowRuns[0].id").value("run-1"))
+                .andExpect(jsonPath("$.workflowRuns[0].stepCount").value(3))
+                .andExpect(jsonPath("$.workflowRuns[0].lastStepPreview").value("last output"))
+                .andExpect(jsonPath("$.workflowRuns[0].steps").doesNotExist())
                 .andExpect(jsonPath("$.chainRuns").isArray());
     }
 
@@ -367,19 +385,22 @@ class ScheduleControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** Die vergangenen Runs des Kalenders sind Listenzeilen ohne Schritte (TODO 168e3d7f). */
     @Test
     void getCalendarData_returnsUpcomingAndPastRuns() throws Exception {
         when(schedulerService.findSchedulesInRange(any(), any())).thenReturn(List.of(testScheduled));
         when(schedulerService.findWorkflowRunsBetween(any(), any())).thenReturn(List.of());
         when(scheduleMapper.toResponseList(any())).thenReturn(List.of(testResponse));
-        when(workflowMapper.toRunResponseList(any())).thenReturn(List.of());
+        when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
 
         mockMvc.perform(get("/api/v1/schedules/calendar")
                         .param("from", "2026-02-16T00:00:00Z")
                         .param("to", "2026-02-23T00:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.upcoming").isArray())
-                .andExpect(jsonPath("$.pastRuns").isArray());
+                .andExpect(jsonPath("$.pastRuns[0].id").value("run-1"))
+                .andExpect(jsonPath("$.pastRuns[0].stepCount").value(3))
+                .andExpect(jsonPath("$.pastRuns[0].steps").doesNotExist());
     }
 
     @Test

@@ -59,6 +59,22 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
 
     List<ScheduledWorkflow> findByChainId(String chainId);
 
-    @Query("SELECT s FROM ScheduledWorkflow s WHERE s.enabled = true AND s.nextRunAt BETWEEN :from AND :to")
+    /**
+     * Aktive Zeitplaene, deren naechster Termin im Zeitraum liegt, samt ihren Zielen — die Termine
+     * des Kalenders ({@code GET /api/v1/schedules/calendar}) und der Assistent-Abschnitt fuer die
+     * naechsten 24 Stunden.
+     *
+     * <p>Holt Workflow, Projekt, Container und Kette mit wie {@link #findAllWithTargets()}: Ohne
+     * den Join loest Hibernate die {@code EAGER}-Assoziationen Zeile fuer Zeile auf, 30 Abfragen
+     * fuer 30 Termine im RequestCostRatchetTest (TODO 168e3d7f). Ein Zeitplan auf einen
+     * soft-geloeschten Workflow erscheint weiterhin mit leerem Ziel — siehe
+     * {@code ScheduleSoftDeletedWorkflowIntegrationTest}.
+     */
+    @Query("SELECT s FROM ScheduledWorkflow s " +
+           "LEFT JOIN FETCH s.workflow w " +
+           "LEFT JOIN FETCH w.project p " +
+           "LEFT JOIN FETCH p.container " +
+           "LEFT JOIN FETCH s.chain " +
+           "WHERE s.enabled = true AND s.nextRunAt BETWEEN :from AND :to")
     List<ScheduledWorkflow> findSchedulesInRange(@Param("from") Instant from, @Param("to") Instant to);
 }

@@ -368,7 +368,8 @@ export interface WorkflowSealStatus {
 }
 
 /**
- * Eine Run-Zeile aus einer Listen-Route (`/executions`, `/workflows/{id}/runs`) — ohne die Schritte.
+ * Eine Run-Zeile aus einer Listen-Route (`/executions`, `/workflows/{id}/runs`, `/schedules/{id}/runs`,
+ * `/schedules/calendar`) — ohne die Schritte.
  *
  * Die Liste trug vorher jeden Step-Output mit: 3 MB Antwort bei 60 Runs, gemessen vom
  * RequestCostRatchetTest (MySuricates-TODO a05c9504). Statt der Schritte kommen jetzt ihre Anzahl
@@ -552,7 +553,8 @@ export interface CalendarEvent {
 
 export interface CalendarDataResponse {
   upcoming: ScheduledWorkflow[];
-  pastRuns: WorkflowRun[];
+  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  pastRuns: WorkflowRunListItem[];
 }
 
 // ── Upcoming Schedule ────────────────────────────────────
@@ -1384,7 +1386,8 @@ export interface ChainRun {
 }
 
 export interface ScheduleRunsResponse {
-  workflowRuns: WorkflowRun[];
+  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  workflowRuns: WorkflowRunListItem[];
   chainRuns: ChainRun[];
 }
 

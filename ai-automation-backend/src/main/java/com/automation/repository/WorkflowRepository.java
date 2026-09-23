@@ -45,10 +45,13 @@ public interface WorkflowRepository extends JpaRepository<Workflow, String> {
     long countByProjectId(String projectId);
 
     /**
-     * Finds all workflows whose project is not archived.
-     * Eagerly fetches activatedSkills to avoid LazyInitializationException (OSIV disabled).
+     * Finds all workflows whose project is not archived — the list behind {@code /workflows} and
+     * {@code /search}. Eagerly fetches activatedSkills to avoid LazyInitializationException (OSIV
+     * disabled), and the project's container along with the project: {@code Project.container} is a
+     * nullable {@code @OneToOne(mappedBy)} that Hibernate otherwise resolves with one
+     * {@code select containers} per result row, 30 for 30 workflows (TODO 13d1e2a2).
      */
-    @EntityGraph(attributePaths = {"activatedSkills", "project"})
+    @EntityGraph(attributePaths = {"activatedSkills", "project", "project.container"})
     @Query("SELECT w FROM Workflow w WHERE w.project.archivedAt IS NULL")
     List<Workflow> findAllWithActiveProject();
 

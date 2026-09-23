@@ -60,6 +60,11 @@ public class Project {
     // Project referencing a detached Container can be merged without TransientObjectException;
     // REMOVE stays so that deleting a Project in the same persistence context as its (already
     // removed) Container flushes cleanly — the schema cascades the delete anyway (V2).
+    //
+    // A query that lists projects — or workflows/runs with their project — must fetch this along
+    // (LEFT JOIN FETCH, or "project.container" in an entity graph): a nullable mappedBy one-to-one
+    // cannot be proxied, and Hibernate re-selects it for every result row whose project has no
+    // container (TODO 13d1e2a2; RequestCostRatchetTest catches it on the measured routes).
     @OneToOne(mappedBy = "project", cascade = {CascadeType.MERGE, CascadeType.REMOVE})
     private Container container;
 

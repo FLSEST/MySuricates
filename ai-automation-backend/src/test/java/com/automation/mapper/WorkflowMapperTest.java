@@ -27,8 +27,6 @@ class WorkflowMapperTest extends WorkflowMapper {
     @Override public StepResultResponse toStepResponse(StepResult step) { return null; }
     @Override public WorkflowResponse toResponse(Workflow workflow, Map<String, Long> runCounts) { return null; }
     @Override public List<WorkflowResponse> toResponseList(List<Workflow> workflows, Map<String, Long> runCounts) { return null; }
-    @Override public WorkflowRunResponse toRunResponse(WorkflowRun run, Map<String, RunOwner> owners) { return null; }
-    @Override public List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs, Map<String, RunOwner> owners) { return null; }
 
     @Nested
     class SafeWorkflowId {

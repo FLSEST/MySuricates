@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +47,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @ActiveProfiles("integration")
 @Transactional
 class ScheduleSoftDeletedWorkflowIntegrationTest {
+
+    /** Naechster Termin der gesaeten Zeitplaene — ein aktiver Zeitplan hat im Betrieb immer einen. */
+    private static final Instant NEXT_RUN = Instant.parse("2026-09-07T06:00:00Z");
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -74,6 +78,7 @@ class ScheduleSoftDeletedWorkflowIntegrationTest {
                 .cronExpression("0 0 6 * * MON")
                 .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
                 .enabled(true)
+                .nextRunAt(NEXT_RUN)
                 .description("Schedule " + suffix)
                 .inputContext(Map.of())
                 .build());
@@ -129,6 +134,55 @@ class ScheduleSoftDeletedWorkflowIntegrationTest {
                 .isEqualTo("Orphan Schedule Workflow alive");
         assertThat(intact.get("projectName").asText())
                 .isEqualTo("Orphan Schedule Project alive");
+    }
+
+    /**
+     * Der Kalender liest seine Termine ueber {@code findSchedulesInRange} — dieselbe Frage wie bei
+     * der Liste. Seit TODO 168e3d7f holt die Abfrage die Ziele per {@code LEFT JOIN FETCH} mit wie
+     * {@code findAllWithTargets()}, statt sie Zeile fuer Zeile nachzuladen. Das Verhalten fuer den
+     * verwaisten Zeitplan bleibt dabei dasselbe wie vorher (geprueft gegen die alte Abfrage): Der
+     * Termin erscheint ohne Ziel, und der Kalender antwortet.
+     */
+    @Test
+    void calendarSurvivesAScheduleWhoseWorkflowWasSoftDeleted() throws Exception {
+        Workflow doomed = seedWorkflowWithSchedule("calendar-doomed");
+        seedWorkflowWithSchedule("calendar-alive");
+
+        mockMvc.perform(delete("/api/v1/workflows/" + doomed.getId())).andReturn();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        MvcResult result;
+        try {
+            result = mockMvc.perform(get("/api/v1/schedules/calendar")
+                    .param("from", "2026-09-07T00:00:00Z")
+                    .param("to", "2026-09-08T00:00:00Z")).andReturn();
+        } catch (Exception e) {
+            throw new AssertionError(
+                    "GET /api/v1/schedules/calendar brach ab, weil ein Zeitplan auf einen "
+                            + "soft-geloeschten Workflow zeigt: " + rootCause(e), e);
+        }
+
+        assertThat(result.getResponse().getStatus())
+                .as("Ein verwaister Zeitplan darf den Kalender nicht unbrauchbar machen")
+                .isEqualTo(200);
+
+        JsonNode upcoming = objectMapper.readTree(result.getResponse().getContentAsString()).get("upcoming");
+
+        JsonNode orphan = scheduleWithDescription(upcoming, "Schedule calendar-doomed");
+        assertThat(orphan)
+                .as("Ist-Verhalten wie in der Liste: Der Termin bleibt, ohne Ziel")
+                .isNotNull();
+        assertThat(orphan.get("workflowId").isNull()).isTrue();
+
+        JsonNode intact = scheduleWithDescription(upcoming, "Schedule calendar-alive");
+        assertThat(intact).isNotNull();
+        assertThat(intact.get("workflowName").asText())
+                .as("Der Nachbar-Termin bleibt vollstaendig")
+                .isEqualTo("Orphan Schedule Workflow calendar-alive");
+        assertThat(intact.get("projectName").asText())
+                .isEqualTo("Orphan Schedule Project calendar-alive");
     }
 
     private static JsonNode scheduleWithDescription(JsonNode all, String description) {

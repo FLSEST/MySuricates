@@ -1,11 +1,16 @@
 package com.automation.repository;
 
+import com.automation.entity.Container;
+import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
 import com.automation.entity.RunStatus;
+import com.automation.entity.StepResult;
+import com.automation.entity.StepStatus;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.metrics.SqlStatementCounter;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,9 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +44,9 @@ class WorkflowRunRepositoryTest {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private ContainerRepository containerRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -414,6 +424,112 @@ class WorkflowRunRepositoryTest {
         assertThat(window).isNotEmpty();
         assertThat(window).allSatisfy(r ->
                 assertThat(r.getWorkflow().getId()).isEqualTo(workflowA.getId()));
+    }
+
+    // --- Dashboard: der Container des Projekts kommt mit (TODO 13d1e2a2) ---
+
+    /**
+     * Das Dashboard-Fenster holt den Container des Projekts in derselben Abfrage.
+     * {@code Project.container} ist eine nullable {@code @OneToOne(mappedBy)}: Ohne den Join loest
+     * Hibernate ihn je Ergebniszeile mit einem eigenen {@code select containers} auf — 60 bei
+     * 60 Runs im RequestCostRatchetTest.
+     */
+    @Test
+    void should_fetch_the_project_container_along_with_the_dashboard_window() {
+        List<String> seeded = runsWithAndWithoutContainer();
+
+        Counted<List<WorkflowRun>> window = counted(
+                () -> runRepository.findDashboardWindow(Instant.now().minus(1, ChronoUnit.DAYS)));
+
+        assertThat(window.statements())
+                .as("one query for the window, not one select containers per run")
+                .isEqualTo(1);
+        assertContainersResolved(window.result(), seeded);
+    }
+
+    /**
+     * Die zehn letzten Runs des Dashboards ebenso — und hier zaehlt es doppelt: Mit den Schritten
+     * im Join ist jede Schritt-Zeile eine Ergebniszeile, und {@code getDashboard} laeuft ohne
+     * Transaktion, also mit leerem Persistenzkontext. Im RequestCostRatchetTest sieht man das nicht,
+     * weil der Request dort den Persistenzkontext der Testtransaktion mitbenutzt; ohne Transaktion
+     * kostete das Dashboard mit 12 Runs zu je 3 Schritten 52 statt 10 Statements.
+     */
+    @Test
+    void should_fetch_the_project_container_along_with_the_recent_dashboard_runs() {
+        List<String> seeded = runsWithAndWithoutContainer();
+
+        Counted<List<WorkflowRun>> recent = counted(() -> runRepository.findByIdInWithStepsAndWorkflow(seeded));
+
+        assertThat(recent.statements())
+                .as("one query for the recent runs, not one select containers per step row")
+                .isEqualTo(1);
+        assertThat(recent.result()).hasSize(seeded.size())
+                .allSatisfy(r -> assertThat(r.getSteps()).hasSize(2));
+        assertContainersResolved(recent.result(), seeded);
+    }
+
+    /**
+     * Je zwei Runs mit zwei Schritten fuer workflowA (Projekt mit Container) und workflowB (Projekt
+     * ohne). Leert danach den Persistenzkontext, sonst faende die Abfrage die verwalteten Instanzen
+     * vor und muesste nichts nachladen.
+     */
+    private List<String> runsWithAndWithoutContainer() {
+        containerRepository.save(Container.builder()
+                .project(project)
+                .dockerContainerId("docker-run-list")
+                .imageName("automation/test:latest")
+                .status(ContainerStatus.RUNNING)
+                .build());
+        List<String> ids = new ArrayList<>();
+        Instant now = Instant.now();
+        for (Workflow workflow : List.of(workflowA, workflowB)) {
+            for (int r = 0; r < 2; r++) {
+                WorkflowRun run = WorkflowRun.builder()
+                        .workflow(workflow)
+                        .workflowName(workflow.getName())
+                        .status(RunStatus.COMPLETED)
+                        .startedAt(now.minusSeconds(60 + r))
+                        .build();
+                for (int s = 0; s < 2; s++) {
+                    run.addStep(StepResult.builder()
+                            .stepIndex(s)
+                            .status(StepStatus.COMPLETED)
+                            .startedAt(now)
+                            .durationMs(5L)
+                            .build());
+                }
+                ids.add(runRepository.save(run).getId());
+            }
+        }
+        entityManager.flush();
+        entityManager.clear();
+        return ids;
+    }
+
+    /** Runs von workflowA tragen den Container ihres Projekts, Runs von workflowB keinen. */
+    private void assertContainersResolved(List<WorkflowRun> runs, List<String> seeded) {
+        List<WorkflowRun> ours = runs.stream().filter(r -> seeded.contains(r.getId())).toList();
+        assertThat(ours).hasSize(seeded.size());
+        assertThat(ours).filteredOn(r -> r.getWorkflow().getId().equals(workflowA.getId()))
+                .hasSize(2)
+                .allSatisfy(r -> assertThat(r.getWorkflow().getProject().getContainer().getDockerContainerId())
+                        .isEqualTo("docker-run-list"));
+        assertThat(ours).filteredOn(r -> r.getWorkflow().getId().equals(workflowB.getId()))
+                .hasSize(2)
+                .allSatisfy(r -> assertThat(r.getWorkflow().getProject().getContainer()).isNull());
+    }
+
+    private record Counted<T>(T result, int statements) {}
+
+    /** Fuehrt die Abfrage aus und zaehlt die SQL-Statements, die sie absetzt. */
+    private static <T> Counted<T> counted(Supplier<T> query) {
+        SqlStatementCounter.start();
+        try {
+            T result = query.get();
+            return new Counted<>(result, SqlStatementCounter.count());
+        } finally {
+            SqlStatementCounter.stop();
+        }
     }
 
     @Test

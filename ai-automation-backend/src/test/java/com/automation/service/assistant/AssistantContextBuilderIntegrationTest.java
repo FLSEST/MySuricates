@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Instant;
@@ -40,6 +41,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Regression coverage: {@code appendRunSummary} used to navigate the detached
  * {@code run.workflow} proxy; the resulting exception was swallowed and the
  * Status / Run error / Steps lines silently vanished from the diagnosis prompt.
+ *
+ * <p>Without a rollback, {@link #cleanUp()} removes everything the test created — the run, the
+ * workflow and the project. The integration tests of one JVM share one database; the project this
+ * test used to leave behind turned {@code ProjectRepositoryTest} red whenever it ran later (TODO
+ * 5695d482).
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -60,7 +66,12 @@ class AssistantContextBuilderIntegrationTest {
     @Autowired
     private com.automation.executor.BlockTypeRegistry blockTypeRegistry;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     private final List<String> createdRunIds = new ArrayList<>();
+    private final List<String> createdWorkflowIds = new ArrayList<>();
+    private final List<String> createdProjectIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
@@ -72,6 +83,10 @@ class AssistantContextBuilderIntegrationTest {
             }
         });
         createdRunIds.clear();
+        createdWorkflowIds.forEach(id -> jdbc.update("DELETE FROM workflows WHERE id = ?", id));
+        createdWorkflowIds.clear();
+        createdProjectIds.forEach(id -> jdbc.update("DELETE FROM projects WHERE id = ?", id));
+        createdProjectIds.clear();
     }
 
     /**
@@ -97,6 +112,7 @@ class AssistantContextBuilderIntegrationTest {
                 .path("/tmp/diag-it-" + nano)
                 .status(ProjectStatus.STOPPED)
                 .build());
+        createdProjectIds.add(project.getId());
         Workflow workflow = workflowRepository.save(Workflow.builder()
                 .name("diag-wf-" + nano)
                 .description("Failing workflow")
@@ -106,6 +122,7 @@ class AssistantContextBuilderIntegrationTest {
                                 .config(new HashMap<>(Map.of("command", "curl -f https://example.org/health")))
                                 .build())))
                 .build());
+        createdWorkflowIds.add(workflow.getId());
 
         Instant now = Instant.now();
         String output = "x".repeat(6000) + "curl: (22) The requested URL returned error: 502 Bad Gateway";

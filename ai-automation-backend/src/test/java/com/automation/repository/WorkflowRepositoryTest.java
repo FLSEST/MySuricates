@@ -1,10 +1,13 @@
 package com.automation.repository;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.Container;
+import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
 import com.automation.entity.Workflow;
+import com.automation.metrics.SqlStatementCounter;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,6 +33,9 @@ class WorkflowRepositoryTest {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private ContainerRepository containerRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -134,6 +141,62 @@ class WorkflowRepositoryTest {
 
         assertThat(result).extracting(Workflow::getId).contains(active.getId()).doesNotContain(archived.getId());
         assertThat(result).allMatch(w -> w.getProject().getArchivedAt() == null);
+    }
+
+    /**
+     * Die Liste hinter {@code /workflows} und {@code /search} holt den Container des Projekts in
+     * derselben Abfrage: {@code Project.container} ist eine nullable {@code @OneToOne(mappedBy)},
+     * die Hibernate sonst je Ergebniszeile mit einem eigenen {@code select containers} aufloest —
+     * auch fuer dasselbe Projekt, auch wenn es gar keinen Container hat (TODO 13d1e2a2). Geprueft
+     * mit und ohne Container, denn nur der vorhandene zeigt, dass der Join auch etwas liefert.
+     */
+    @Test
+    void should_fetch_the_project_container_along_with_the_workflow_list() {
+        containerRepository.save(Container.builder()
+                .project(activeProject)
+                .dockerContainerId("docker-wf-list")
+                .imageName("automation/test:latest")
+                .status(ContainerStatus.RUNNING)
+                .build());
+        Project bare = projectRepository.save(Project.builder()
+                .name("Bare-WF-Repo-Test-" + System.nanoTime())
+                .type(ProjectType.CODE)
+                .path("/tmp/bare-" + System.nanoTime())
+                .status(ProjectStatus.STOPPED)
+                .build());
+        for (int i = 0; i < 3; i++) {
+            saveWorkflow("WithContainer-" + i + "-" + System.nanoTime(), activeProject);
+            saveWorkflow("Bare-" + i + "-" + System.nanoTime(), bare);
+        }
+        // Sonst faende die Abfrage die verwalteten Instanzen vor, und nichts wuerde nachgeladen.
+        entityManager.flush();
+        entityManager.clear();
+
+        Counted<List<Workflow>> listed = counted(workflowRepository::findAllWithActiveProject);
+
+        assertThat(listed.statements())
+                .as("one query for the whole list, not one select containers per workflow")
+                .isEqualTo(1);
+        assertThat(listed.result()).filteredOn(w -> w.getProject().getId().equals(activeProject.getId()))
+                .hasSize(3)
+                .allSatisfy(w -> assertThat(w.getProject().getContainer().getDockerContainerId())
+                        .isEqualTo("docker-wf-list"));
+        assertThat(listed.result()).filteredOn(w -> w.getProject().getId().equals(bare.getId()))
+                .hasSize(3)
+                .allSatisfy(w -> assertThat(w.getProject().getContainer()).isNull());
+    }
+
+    private record Counted<T>(T result, int statements) {}
+
+    /** Fuehrt die Abfrage aus und zaehlt die SQL-Statements, die sie absetzt. */
+    private static <T> Counted<T> counted(Supplier<T> query) {
+        SqlStatementCounter.start();
+        try {
+            T result = query.get();
+            return new Counted<>(result, SqlStatementCounter.count());
+        } finally {
+            SqlStatementCounter.stop();
+        }
     }
 
     @Test
