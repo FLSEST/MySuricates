@@ -9,8 +9,11 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 # Die Ausweichorte der Privatliste (hygiene_private_list_path) liegen ausserhalb
 # des Repos. Ohne diese Isolation faende das Gate die echte Liste des Rechners.
+# GITHUB_ACTIONS gehoert mit dazu: annotate() schreibt dort '::error file=x,line=1::'
+# statt 'x:1 — ', und Zusicherungen auf 'Datei:Zeile' fallen dann nur in der CI
+# (Lauf 35910938266). Wie in test-pre-push-checks.sh.
 export XDG_CONFIG_HOME="$TMP/xdg"
-unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS
+unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS GITHUB_ACTIONS
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
