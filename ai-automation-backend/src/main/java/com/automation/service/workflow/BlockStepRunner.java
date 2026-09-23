@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Runs a single block of a workflow: the RUNNING placeholder the UI shows immediately, the actual
@@ -57,17 +58,33 @@ public class BlockStepRunner {
         step.setStartedAt(Instant.now());
         step.setStatus(StepStatus.RUNNING);
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("blockType", block.getType());
+        labelBlock(metadata, block);
         metadata.put("blockIndex", blockPosition);
-        if (block.getName() != null && !block.getName().isBlank()) {
-            metadata.put("blockName", block.getName());
-        }
         step.setMetadata(metadata);
         step.setWorkflowRun(run);
         run.getSteps().add(step);
         stepResultRepository.save(step);
         broadcaster.broadcastStepResult(run.getId(), step);
         return step;
+    }
+
+    /** Block types whose {@code config.description} is content (the TODO text), not a note on the step. */
+    private static final Set<String> DESCRIPTION_IS_CONTENT = Set.of("todo-create", "todo-update");
+
+    /**
+     * What the run view shows about the step's block: type, name and the step note
+     * {@code config.description} as {@code blockDescription} (TODO 31b7aca8 — blueprints explain
+     * each step there). Written at start and again after the run, which replaces the metadata.
+     */
+    static void labelBlock(Map<String, Object> metadata, BlockDefinition block) {
+        metadata.put("blockType", block.getType());
+        if (block.getName() != null && !block.getName().isBlank()) {
+            metadata.put("blockName", block.getName());
+        }
+        Object note = block.getConfig() != null ? block.getConfig().get("description") : null;
+        if (note instanceof String text && !text.isBlank() && !DESCRIPTION_IS_CONTENT.contains(block.getType())) {
+            metadata.put("blockDescription", text);
+        }
     }
 
     /** Executes the block (with validation + retry) and copies the result into {@code step} and the context. */
@@ -95,10 +112,7 @@ public class BlockStepRunner {
         Map<String, Object> stepMetadata = result.getMetadata() != null
                 ? new HashMap<>(result.getMetadata())
                 : new HashMap<>();
-        stepMetadata.put("blockType", block.getType());
-        if (block.getName() != null && !block.getName().isBlank()) {
-            stepMetadata.put("blockName", block.getName());
-        }
+        labelBlock(stepMetadata, block);
         if (blockIndex != null) {
             stepMetadata.put("blockIndex", blockIndex);
         }

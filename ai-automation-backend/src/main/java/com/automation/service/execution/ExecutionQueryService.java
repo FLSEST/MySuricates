@@ -66,12 +66,21 @@ public class ExecutionQueryService {
         return workflowMapper.toRunResponse(findById(id));
     }
 
-    /** Runs eines Workflows, absteigend nach Startzeit — Mapping innerhalb der Transaktion. */
+    /**
+     * Runs eines Workflows, absteigend nach Startzeit — Listenzeilen ohne Schritte wie bei
+     * {@code /executions} (TODO 7fd9f654). Wer die Schritte eines Runs zeigt, laedt ihn ueber
+     * {@link #getRunForWorkflow}.
+     */
     @Transactional(readOnly = true)
-    public PageResponse<WorkflowRunResponse> listRunsForWorkflow(String workflowId, int page, int size) {
+    public PageResponse<WorkflowRunListItemResponse> listRunsForWorkflow(String workflowId, int page, int size) {
         Page<WorkflowRun> result = runRepository.findByWorkflowIdOrderByStartedAtDesc(
                 workflowId, PageRequest.of(page, size));
-        return toPageResponse(result);
+        return new PageResponse<>(
+                workflowMapper.toRunListItemsWithOwners(result.getContent()),
+                result.getNumber(),
+                result.getSize(),
+                result.getTotalElements(),
+                result.getTotalPages());
     }
 
     /** Einzelner Run für die Workflow-Detailansicht ({@code 404} mit "WorkflowRun"-Wortlaut). */
@@ -84,23 +93,5 @@ public class ExecutionQueryService {
 
     public boolean hasFailedRuns(String workflowId) {
         return runRepository.existsByWorkflowIdAndStatus(workflowId, RunStatus.FAILED);
-    }
-
-    /**
-     * Antwort MIT Schritten — fuer {@code /workflows/{id}/runs}.
-     *
-     * <p>Diese Route behaelt die Schritte bewusst: {@code WishDetail.tsx} rendert daraus die
-     * vollstaendigen Schritt-Karten des aktuellen Runs. Ihr Wachstumsproblem bleibt damit bestehen
-     * und ist als eigenes Ticket erfasst (TODO 7fd9f654) — die gemessene und behobene Route ist
-     * {@code /executions} (TODO a05c9504).
-     */
-    private PageResponse<WorkflowRunResponse> toPageResponse(Page<WorkflowRun> result) {
-        return new PageResponse<>(
-                workflowMapper.toRunResponseListWithOwners(result.getContent()),
-                result.getNumber(),
-                result.getSize(),
-                result.getTotalElements(),
-                result.getTotalPages()
-        );
     }
 }

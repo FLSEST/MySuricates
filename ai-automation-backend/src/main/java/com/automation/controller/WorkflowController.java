@@ -105,7 +105,7 @@ public class WorkflowController {
     }
 
     @GetMapping("/{id}/runs")
-    public PageResponse<WorkflowRunResponse> getWorkflowRuns(
+    public PageResponse<WorkflowRunListItemResponse> getWorkflowRuns(
             @PathVariable String id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {

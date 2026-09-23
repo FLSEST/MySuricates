@@ -93,6 +93,8 @@ public record DashboardResponse(
             long scheduled,
             long webhook,
             long completionTrigger,
-            long todoTrigger
+            long todoTrigger,
+            /** Chain, sub-workflow, wish and auto-repair runs — automatic, but none of the above. */
+            long otherAutomatic
     ) {}
 }

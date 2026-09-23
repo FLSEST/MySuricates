@@ -15,7 +15,7 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 15,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -33,7 +33,11 @@
           "report-c.txt"
         ],
         "shell_escape_variables": true,
-        "command": "# placeholder - how a candidate is described\nprintf -- '- %s\\n' {{ item }}"
+        "command": "# placeholder - how a candidate is described\nprintf -- '- %s\\n' {{ item }}",
+        "description": {
+          "de": "Beschreibt jeden Kandidaten der Liste. Ersetze die Liste (items) und wie ein Kandidat beschrieben wird.",
+          "en": "Describes every candidate of the list. Replace the list (items) and how a candidate is described."
+        }
       }
     },
     {
@@ -58,7 +62,11 @@
           }
         ],
         "on_no": "fail",
-        "timeout_minutes": 60
+        "timeout_minutes": 60,
+        "description": {
+          "de": "Eine Freigabe für die ganze Liste statt einer pro Element. Passe die Frage an.",
+          "en": "One approval for the whole list instead of one per item. Adjust the question."
+        }
       }
     },
     {
@@ -75,7 +83,11 @@
           "report-c.txt"
         ],
         "shell_escape_variables": true,
-        "command": "# placeholder - what happens per item after approval\nprintf 'processed: %s\\n' {{ item }}"
+        "command": "# placeholder - what happens per item after approval\nprintf 'processed: %s\\n' {{ item }}",
+        "description": {
+          "de": "Arbeitet die Liste erst nach dem Ja ab. Ersetze den Befehl pro Element — die Liste muss zu „sammeln“ passen.",
+          "en": "Works through the list only after the yes. Replace the per-item command — the list must match the collecting step."
+        }
       }
     }
   ]

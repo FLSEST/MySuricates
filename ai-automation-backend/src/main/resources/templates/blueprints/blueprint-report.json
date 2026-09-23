@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 12,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\n# placeholder - replace with your own measurement\nprintf '%s' \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\""
+        "command": "set -eu\n# placeholder - replace with your own measurement\nprintf '%s' \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\"",
+        "description": {
+          "de": "Misst, was gemeldet wird. Ersetze den Befehl durch deine eigene Messung.",
+          "en": "Measures what gets reported. Replace the command with your own measurement."
+        }
       },
       "name": {
         "de": "messen",
@@ -62,7 +66,11 @@
             "de": "Ersetze Messung und Kennzahlen durch deine eigenen.",
             "en": "Replace the measurement and key figures with your own."
           }
-        ]
+        ],
+        "description": {
+          "de": "Meldet Ampel, Kennzahlen und Punkte ans Dashboard, ohne KI. Passe Titel, Kennzahlen und Punkte an.",
+          "en": "Reports traffic light, KPIs and items to the dashboard, without AI. Adjust title, KPIs and items."
+        }
       }
     }
   ]

@@ -35,6 +35,9 @@ public abstract class WorkflowMapper {
     @Autowired
     protected WorkflowRepository workflowRepository;
 
+    @Autowired
+    protected RunStepSummaries runStepSummaries;
+
     // Optional: controller slices that import the mapper without the module system still work
     @Autowired(required = false)
     protected WorkflowDefinitionHasher definitionHasher;
@@ -145,21 +148,27 @@ public abstract class WorkflowMapper {
     // --- Lean list variant: no steps in the response (TODO a05c9504) ---
 
     /**
-     * Run-Liste fuer Listen-Routen: wie {@link #toRunResponseListWithOwners}, aber ohne die
-     * Schritte.
+     * Run-Liste fuer Listen-Routen ({@code /executions}, {@code /workflows/{id}/runs}): wie
+     * {@link #toRunResponseListWithOwners}, aber ohne die Schritte.
      *
      * <p>Die Listen-Route trug jeden {@code step_results.output} (TEXT) in die Antwort — gemessen
-     * 3 061 816 Bytes bei 60 Runs. Statt der Schritte liefert sie jetzt deren Anzahl und die
-     * gekuerzte Ausgabe des letzten; den Volltext hat die Detail-Route.
+     * 3 061 816 Bytes bei 60 Runs (TODO a05c9504). Statt der Schritte liefert sie deren Anzahl und
+     * die gekuerzte Ausgabe des letzten; den Volltext hat die Detail-Route. Seit TODO 7fd9f654
+     * werden die Schritte dafuer auch nicht mehr geladen: zwei Abfragen fuer die ganze Seite
+     * zaehlen sie und schneiden die letzte Ausgabe in der Datenbank ab.
      */
     public List<WorkflowRunListItemResponse> toRunListItemsWithOwners(List<WorkflowRun> runs) {
-        Map<String, RunOwner> owners = ownersFor(runs);
-        return runs.stream().map(run -> toRunListItem(run, owners)).toList();
+        return toRunListItems(runs, ownersFor(runs), runStepSummaries.of(runs));
     }
 
-    private WorkflowRunListItemResponse toRunListItem(WorkflowRun run, Map<String, RunOwner> owners) {
-        List<StepResult> steps = run.getSteps() == null ? List.of() : run.getSteps();
-        StepResult last = steps.isEmpty() ? null : steps.get(steps.size() - 1);
+    protected List<WorkflowRunListItemResponse> toRunListItems(List<WorkflowRun> runs, Map<String, RunOwner> owners,
+                                                               Map<String, RunStepSummary> steps) {
+        return runs.stream()
+                .map(run -> toRunListItem(run, owners, steps.getOrDefault(run.getId(), RunStepSummary.NONE)))
+                .toList();
+    }
+
+    private WorkflowRunListItemResponse toRunListItem(WorkflowRun run, Map<String, RunOwner> owners, RunStepSummary steps) {
         return new WorkflowRunListItemResponse(
                 run.getId(),
                 safeWorkflowId(run),
@@ -178,9 +187,9 @@ public abstract class WorkflowMapper {
                 run.getDefinitionHash(),
                 run.getDefinitionVersionId(),
                 run.getTriggerSource(),
-                steps.size(),
-                last == null ? null : last.getStatus(),
-                preview(last == null ? null : last.getOutput()),
+                steps.count(),
+                steps.lastStatus(),
+                steps.preview(),
                 run.getSealed());
     }
 
@@ -194,16 +203,6 @@ public abstract class WorkflowMapper {
         } catch (RuntimeException e) {
             return null;
         }
-    }
-
-    /** Gekuerzte Vorschau; {@code null} bleibt {@code null}, damit "kein Wert" nicht wie "leer" aussieht. */
-    private static String preview(String output) {
-        if (output == null) {
-            return null;
-        }
-        return output.length() <= WorkflowRunListItemResponse.PREVIEW_LENGTH
-                ? output
-                : output.substring(0, WorkflowRunListItemResponse.PREVIEW_LENGTH) + " […]";
     }
 
     protected RunOwner ownerOf(WorkflowRun run, Map<String, RunOwner> owners) {

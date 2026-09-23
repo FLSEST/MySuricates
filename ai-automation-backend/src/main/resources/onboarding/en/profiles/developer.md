@@ -23,6 +23,15 @@ Building blocks for code projects, no fixed order:
 - Schedule: `POST $MS/schedules` with `{"workflowId": "<id>", "cronExpression": "0 0 8 * * MON-FRI", "description": "Weekdays at 8"}`.
   More fields: `maxRuns`, `endDate`, `conflictBehavior` (`SKIP` by default, or `OVERLAP`), `inputContext`.
   Switch on/off: `POST $MS/schedules/<id>/enable` or `/disable`.
+
+### After another workflow finishes
+
+- Create: `POST $MS/completion-triggers` with `{"sourceWorkflowId": "<a>", "targetWorkflowId": "<b>", "triggerOnSuccess": true}` (also `triggerOnFailure`, `triggerAlways`, `contextVariables`).
+- What A triggers: `GET $MS/completion-triggers/workflow/<id>/as-source`; what triggers B: `…/as-target`.
+
+### What starts workflow X?
+
+The card "Gets triggered by" on the workflow page collects all of it. Via the API: `GET $MS/schedules/workflow/<id>`, `GET $MS/todo-triggers/workflow/<id>`, `GET $MS/completion-triggers/workflow/<id>/as-target` and, if the module is on, `GET $MS/webhooks/workflow/<id>`. Chains and `sub-workflow` blocks that call it appear in none of these lists.
 <!-- module: webhooks -->
 
 ### Webhooks

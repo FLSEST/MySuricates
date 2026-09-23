@@ -1,0 +1,36 @@
+{
+  "id": "gate-ordered-but-missing",
+  "title": "Bestelltes, aber ausgebliebenes Gate-Urteil wird sichtbar",
+  "derivedFrom": {
+    "spec": "GateExpectation / RunCompletionHandler: bestelltes Urteil ohne Marker ist kein Erfolg",
+    "incidents": [
+      "63ecc124 (Ausbleibendes Gate-Urteil nicht als GREEN werten)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe den Stand. Schreibe am Ende genau eine Zeile gate_status: GREEN|YELLOW|RED."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "Alles geprüft, keine Auffälligkeiten."
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": {
+      "status": "YELLOW",
+      "category": "gate-missing"
+    }
+  }
+}

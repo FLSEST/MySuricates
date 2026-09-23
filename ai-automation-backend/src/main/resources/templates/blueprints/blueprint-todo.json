@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 9,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -59,7 +59,11 @@
         "en": "close"
       },
       "config": {
-        "id": "{{ todo_id }}"
+        "id": "{{ todo_id }}",
+        "description": {
+          "de": "Schließt das TODO wieder; {{ todo_id }} verbindet die drei Schritte. Streiche den Schritt, wenn das TODO offen bleiben soll.",
+          "en": "Closes the TODO again; {{ todo_id }} links the three steps. Drop this step if the TODO should stay open."
+        }
       }
     }
   ]

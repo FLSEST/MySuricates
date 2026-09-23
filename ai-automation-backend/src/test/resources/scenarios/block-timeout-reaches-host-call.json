@@ -1,0 +1,48 @@
+{
+  "id": "block-timeout-reaches-host-call",
+  "title": "timeout_seconds, Modell und Effort des Blocks kommen am Host-Aufruf an",
+  "derivedFrom": {
+    "spec": "CLAUDE.md Execution Config: Per-Block Timeout, Model Selection, Reasoning Effort",
+    "incidents": [
+      "fdf79a86: Timeout-Weitergabe bisher nur durch Codelektüre belegt (HostClaudeService)",
+      "FAILED-Läufe 2026-09: Host Claude action timed out after N seconds"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "model": "sonnet",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "kurz",
+        "config": {
+          "command": "Antworte kurz.",
+          "timeout_seconds": 42,
+          "effort": "low"
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "ok"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCalls": {
+      "SCRIPTED": [
+        {
+          "model": "sonnet",
+          "timeoutSeconds": 42,
+          "effort": "low",
+          "promptContains": [
+            "Antworte kurz."
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -65,6 +65,12 @@ fact_block_types() {
   [ -f "$REGISTRY" ] || { MISSING+=("block-types: $REGISTRY fehlt"); echo 0; return; }
   grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sort -u | wc -l | tr -d ' '
 }
+# Die Namen selbst, fuer die Pruefung von "type"-Aufzaehlungen (TODO e36ca773).
+fact_block_type_names() {
+  [ -f "$REGISTRY" ] || { echo "[]"; return; }
+  grep -oE 'new BlockTypeEntry\("[a-z-]+"' "$REGISTRY" | sed 's/.*("\([a-z-]*\)"/"\1"/' \
+    | awk '!seen[$0]++' | paste -sd',' - | sed 's/^/[/; s/$/]/'
+}
 fact_controllers() {
   [ -d "$JAVA_SRC" ] || { MISSING+=("controllers: $JAVA_SRC fehlt"); echo 0; return; }
   find "$JAVA_SRC" -name '*Controller.java' | wc -l | tr -d ' '
@@ -119,6 +125,7 @@ fact_commits() {
 }
 
 BLOCK_TYPES="$(fact_block_types)"
+BLOCK_TYPE_NAMES="$(fact_block_type_names)"
 CONTROLLERS="$(fact_controllers)"
 MIGRATION_MAX="$(fact_migration_max)"
 MIGRATION_COUNT="$(fact_migrations)"
@@ -244,13 +251,13 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
-  "$BLOCK_TYPES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
+DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
+  "$BLOCK_TYPES" "$BLOCK_TYPE_NAMES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
   "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?
 
 if [ "$RC" -eq 0 ]; then
-  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Testzahl-Datierung und Zahlen ueber die ausgelieferten Definitionen."
+  echo "Doku-Zahlen OK — ${#FILES[@]} Dateien, 7 Groessen (Blocktypen $BLOCK_TYPES, Controller $CONTROLLERS, Migrationen $MIGRATION_COUNT/V$MIGRATION_MAX, Templates $TEMPLATES, Skills $SKILLS, Provider $PROVIDERS)${COMMITS_NOTE}, Migrationstabellen, Blocktyp-Aufzaehlungen, Testzahl-Datierung und Zahlen ueber die ausgelieferten Definitionen."
 fi
 exit "$RC"

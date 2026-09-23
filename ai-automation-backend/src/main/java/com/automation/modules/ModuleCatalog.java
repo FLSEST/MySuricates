@@ -67,7 +67,7 @@ public enum ModuleCatalog {
     SKILLS("skills", ADVANCED, LEGACY, false, Set.of(HOST_ACCESS), List.of(),
             "Skill packages and the skill-capability block."),
     DEBUG("debug", ADVANCED, LEGACY, false, Set.of(), List.of(),
-            "Step-by-step workflow debugger."),
+            "Lists workflows whose last run failed, with diagnosis and restart."),
     FACTORY("factory", ADVANCED, EXPERIMENTAL, false, Set.of(), List.of(),
             "Generate workflows from a description and auto-fix failing ones."),
     WISHES("wishes", ADVANCED, EXPERIMENTAL, false, Set.of(), List.of("chains"),

@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 13,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -24,7 +24,11 @@
       "config": {
         "command": "# placeholder - replace with your own check; exit 0 = GREEN\ntest -d .",
         "checked_command": true,
-        "check_category": "blueprint-check"
+        "check_category": "blueprint-check",
+        "description": {
+          "de": "Ampel aus dem Exit-Code: 0 = GREEN, sonst RED (checked_command). Ersetze den Befehl durch deine Prüfung.",
+          "en": "Traffic light from the exit code: 0 = GREEN, otherwise RED (checked_command). Replace the command with your check."
+        }
       },
       "name": {
         "de": "pruefung_ok",
@@ -34,7 +38,11 @@
     {
       "type": "shell",
       "config": {
-        "command": "# placeholder - a script can report its own traffic light\nprintf 'gate_status: YELLOW\\ngate_category: blueprint-warning\\ngate_description: example warning from a blueprint\\n'"
+        "command": "# placeholder - a script can report its own traffic light\nprintf 'gate_status: YELLOW\\ngate_category: blueprint-warning\\ngate_description: example warning from a blueprint\\n'",
+        "description": {
+          "de": "Meldet die Ampel selbst per gate_status. Ersetze das Skript durch deine Prüfung mit eigener Einstufung.",
+          "en": "Reports its own traffic light via gate_status. Replace the script with your check and its own rating."
+        }
       },
       "name": {
         "de": "pruefung_warnung",

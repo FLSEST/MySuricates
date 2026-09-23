@@ -15,14 +15,18 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 17,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared",
+        "description": {
+          "de": "Legt ein Arbeitsverzeichnis für diesen Lauf an. Meist unverändert übernehmen.",
+          "en": "Creates a working directory for this run. Usually keep as is."
+        }
       },
       "name": {
         "de": "vorbereiten",
@@ -39,7 +43,11 @@
         "execution_mode": "shell",
         "max_iterations": 10,
         "condition_command": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt 3 ]",
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - preparation per round\nprintf 'prepared part %s\\n' \"$N\""
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - preparation per round\nprintf 'prepared part %s\\n' \"$N\"",
+        "description": {
+          "de": "Der unbeaufsichtigte Teil: bereitet in Runden vor. Ersetze Bedingung und Arbeit pro Runde.",
+          "en": "The unattended part: prepares in rounds. Replace the condition and the work per round."
+        }
       }
     },
     {
@@ -64,13 +72,21 @@
           }
         ],
         "on_no": "fail",
-        "timeout_minutes": 60
+        "timeout_minutes": 60,
+        "description": {
+          "de": "Ein Mensch entscheidet, ob der riskante Schritt folgt. Passe die Frage an.",
+          "en": "A person decides whether the risky step follows. Adjust the question."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\n# placeholder - the approved step\necho finished"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\n# placeholder - the approved step\necho finished",
+        "description": {
+          "de": "Der freigegebene, riskante Schritt. Ersetze den Befehl.",
+          "en": "The approved, risky step. Replace the command."
+        }
       },
       "name": {
         "de": "abschliessen",

@@ -3,7 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
 import { server } from '../../test/server';
-import { useWorkflows } from '../useWorkflows';
+import { http, HttpResponse } from 'msw';
+import { useWorkflows, useWorkflowRun } from '../useWorkflows';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -48,5 +49,32 @@ describe('useWorkflows', () => {
   it('returns loading state initially', () => {
     const { result } = renderHook(() => useWorkflows(), { wrapper: createWrapper() });
     expect(result.current.isLoading).toBe(true);
+  });
+});
+
+// TODO 7fd9f654: the run lists carry no steps any more — a view with steps loads its one run
+describe('useWorkflowRun', () => {
+  it('loads the run with its steps from the detail route, not from the list', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get('/api/v1/workflows/:id/runs/:runId', ({ params, request }) => {
+        seen.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          id: params.runId, workflowId: params.id, status: 'COMPLETED',
+          steps: [{ id: 's-1', stepIndex: 0, status: 'COMPLETED', output: 'done' }],
+        });
+      }),
+    );
+
+    const { result } = renderHook(() => useWorkflowRun('wf-1', 'run-old'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(seen).toEqual(['/api/v1/workflows/wf-1/runs/run-old']);
+    expect(result.current.data!.steps).toHaveLength(1);
+  });
+
+  it('waits for a run id instead of asking for "undefined"', () => {
+    const { result } = renderHook(() => useWorkflowRun('wf-1', undefined), { wrapper: createWrapper() });
+    expect(result.current.fetchStatus).toBe('idle');
   });
 });

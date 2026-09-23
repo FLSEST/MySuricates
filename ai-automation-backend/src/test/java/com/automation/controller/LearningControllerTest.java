@@ -51,7 +51,7 @@ class LearningControllerTest {
                 3000L, 2000L,
                 List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
-                new DashboardResponse.TriggerDistribution(15, 3, 0, 0, 2)
+                new DashboardResponse.TriggerDistribution(15, 3, 0, 0, 2, 0)
         );
         when(learningService.getDashboard(30, null)).thenReturn(dashboard);
 
@@ -70,7 +70,7 @@ class LearningControllerTest {
                 500L, 500L,
                 List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
-                new DashboardResponse.TriggerDistribution(10, 0, 0, 0, 0)
+                new DashboardResponse.TriggerDistribution(10, 0, 0, 0, 0, 0)
         );
         when(learningService.getDashboard(7, "proj-1")).thenReturn(dashboard);
 

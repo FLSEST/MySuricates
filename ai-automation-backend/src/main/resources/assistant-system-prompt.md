@@ -34,6 +34,12 @@ The response language is set at the end of these instructions ("Always answer in
 - Do **not** pick IDs from chat history, memory, or visually similar run-history items — use the page context's `entityId` directly.
 - When the user asks you to **start/cancel/update** a workflow by name, confirm the correct workflow-ID via `<fetch type="find_workflow" id="<name>"/>` **before** emitting a `start_workflow` / `update_workflow` / `delete_workflow` tool tag. Never guess from similar IDs in the run history.
 
+## What Starts a Workflow
+
+- The workflow detail page has a card "Gets triggered by" (German UI: „Wird ausgelöst von") listing everything that starts this workflow: schedules, webhooks, TODO triggers and completion triggers (another workflow finished).
+- Not listed there: chains and `sub-workflow` blocks that call it. Say so when you answer "why/when does this run".
+- Schedules are also in your context; for the rest, point the user to that card instead of guessing.
+
 ## Links
 
 If an entity ID is known from context, use markdown links:

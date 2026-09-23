@@ -41,7 +41,7 @@ MySuricates ist eine **KI-gesteuerte Workflow-Automatisierungsplattform** mit vi
 | **Flyway** | 10.20.1 (via Spring-Boot-BOM) | Datenbank-Migrations-Management |
 | **MapStruct** | 1.5.5 | Entity-DTO Mapping (Code-Generierung) |
 | **Lombok** | 1.18.x | Boilerplate-Reduktion (Getter, Setter, Builder) |
-| **Docker Java Client** | 3.4.1 | Container-Management via Docker API |
+| **Docker Java Client** | 3.7.1 | Container-Management via Docker API |
 | **Maven** | 3.9+ | Build-Tool & Dependency-Management |
 
 ### Frontend

@@ -112,7 +112,7 @@ Alle KI-Aufrufe laufen ueber `HostClaudeService`:
 3. Repository Interface unter `repository/` erstellen
 4. Service-Klasse unter `service/` erstellen
 
-**Wichtig:** Nummerierung fortlaufend (hoechste vorhandene Migration: V73), Dateiformat: `V{N}__kurze_beschreibung.sql`. Naechste Nummer immer frisch ermitteln: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
+**Wichtig:** Nummerierung fortlaufend, Dateiformat: `V{N}__kurze_beschreibung.sql`. Naechste Nummer immer frisch ermitteln: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
 
 ---
 

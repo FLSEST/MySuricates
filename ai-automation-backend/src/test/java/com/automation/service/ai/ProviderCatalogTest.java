@@ -3,7 +3,9 @@ package com.automation.service.ai;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.AssignableTypeFilter;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -68,10 +70,17 @@ class ProviderCatalogTest {
 
     // ── Anbieter finden, ohne Spring-Kontext ─────────────────────────────────
 
-    /** Alle AiProvider-Klassen unter com.automation, jede mit Mocks fuer ihre Konstruktor-Parameter. */
+    /**
+     * Alle ausgelieferten AiProvider unter com.automation, jede mit Mocks fuer ihre Konstruktor-Parameter.
+     * Ausgeliefert heisst: eine Spring-Komponente. Der Test-Provider der Szenario-Tests
+     * ({@code ScriptedAiProvider}, TODO fdf79a86) liegt im selben Paketbaum, gehoert aber nicht in
+     * den Katalog des Installers.
+     */
     private static List<AiProvider> providers() throws Exception {
         ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
-        scanner.addIncludeFilter(new AssignableTypeFilter(AiProvider.class));
+        scanner.addIncludeFilter((reader, factory) ->
+                new AssignableTypeFilter(AiProvider.class).match(reader, factory)
+                        && new AnnotationTypeFilter(Component.class).match(reader, factory));
         List<AiProvider> result = new ArrayList<>();
         for (BeanDefinition candidate : scanner.findCandidateComponents("com.automation")) {
             Class<?> type = Class.forName(candidate.getBeanClassName());

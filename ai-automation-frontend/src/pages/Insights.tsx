@@ -85,8 +85,9 @@ export function Insights() {
 
   // Automation degree
   const trig = stats?.triggerDistribution;
-  const totalTriggers = trig ? trig.manual + trig.scheduled + trig.webhook + trig.completionTrigger + trig.todoTrigger : 0;
-  const automatedCount = trig ? trig.scheduled + trig.webhook + trig.completionTrigger + trig.todoTrigger : 0;
+  const automatedCount = trig
+    ? trig.scheduled + trig.webhook + trig.completionTrigger + trig.todoTrigger + (trig.otherAutomatic ?? 0) : 0;
+  const totalTriggers = trig ? trig.manual + automatedCount : 0;
   const automationPct = totalTriggers > 0 ? Math.round((automatedCount / totalTriggers) * 100) : 0;
 
   return (

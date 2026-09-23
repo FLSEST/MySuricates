@@ -72,16 +72,37 @@ export function useWorkflow(id: string) {
   });
 }
 
+/**
+ * One page of a workflow's runs — list rows without steps (`WorkflowRunListItem`, TODO 7fd9f654).
+ * A view that shows steps loads its run through {@link useWorkflowRun}.
+ */
 export function useWorkflowRuns(workflowId: string, page = 0, size = 50) {
   return useQuery({
     queryKey: ['workflows', workflowId, 'runs', page, size],
-    queryFn: () => api.get<PageResponse<WorkflowRun>>(`/workflows/${workflowId}/runs?page=${page}&size=${size}`),
+    queryFn: () => api.get<PageResponse<WorkflowRunListItem>>(`/workflows/${workflowId}/runs?page=${page}&size=${size}`),
     enabled: !!workflowId,
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data?.content?.length) return false;
       const hasActiveRuns = data.content.some((run) => !TERMINAL_RUN_STATUSES.has(run.status));
       return hasActiveRuns ? 5_000 : false;
+    },
+  });
+}
+
+/**
+ * One run with all its steps (`/workflows/{id}/runs/{runId}`). Under the list's query key, so every
+ * invalidation of `['workflows', id, 'runs']` refreshes it too; polls while the run is active.
+ * Unlike picking the run out of the list, it also finds a run older than the list's first page.
+ */
+export function useWorkflowRun(workflowId: string, runId: string | undefined) {
+  return useQuery({
+    queryKey: ['workflows', workflowId, 'runs', 'detail', runId],
+    queryFn: () => api.get<WorkflowRun>(`/workflows/${workflowId}/runs/${runId}`),
+    enabled: !!workflowId && !!runId,
+    refetchInterval: (query) => {
+      const run = query.state.data;
+      return run && !TERMINAL_RUN_STATUSES.has(run.status) ? 5_000 : false;
     },
   });
 }

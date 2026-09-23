@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
  * configuration and there is no REST or settings path to flip it. An instance that keeps its run
  * history as evidence must not have it turned back on by whoever holds a leaked API key.
  *
- * <p>Does not cover the operational jobs in {@link RunCleanupService} (interrupted-run sweep and
- * the configurable retention) — they are the operator's own housekeeping; disable retention via
- * {@code run-retention-days = 0} if nothing may ever disappear.
+ * <p>The operational jobs in {@link RunCleanupService} (interrupted-run sweep and the configurable
+ * retention) stay the operator's own housekeeping; disable retention via
+ * {@code run-retention-days = 0} if nothing may ever disappear. What a leaked key must not do is
+ * reach the same deletion by the back door: with deletion switched off, the retention can only be
+ * made longer at runtime, never shorter ({@link #requireRetentionChangeAllowed}, TODO 8dbd7e10).
  */
 @Component
 public class RunDeletionPolicy {
@@ -27,6 +29,26 @@ public class RunDeletionPolicy {
 
     public boolean isAllowed() {
         return allowDelete;
+    }
+
+    /**
+     * A runtime change of {@code run-retention-days} from {@code currentDays} to {@code requestedDays}.
+     * Free while deletion is allowed; otherwise only a longer retention passes — {@code 0} (off)
+     * counts as the longest, so from 0 nothing but 0 is accepted.
+     *
+     * @throws HardeningException (403 RUN_DELETION_DISABLED) for a shorter retention while deletion is off
+     */
+    public void requireRetentionChangeAllowed(int currentDays, int requestedDays) {
+        if (allowDelete || keptDays(requestedDays) >= keptDays(currentDays)) {
+            return;
+        }
+        throw new HardeningException(ErrorCode.RUN_DELETION_DISABLED,
+                "Run retention can only be extended while deleting runs is disabled "
+                        + "(automation.executions.allow-delete=false): " + currentDays + " -> " + requestedDays + " days");
+    }
+
+    private static long keptDays(int retentionDays) {
+        return retentionDays <= 0 ? Long.MAX_VALUE : retentionDays;
     }
 
     /** @throws HardeningException (403 RUN_DELETION_DISABLED) when deletion is switched off */

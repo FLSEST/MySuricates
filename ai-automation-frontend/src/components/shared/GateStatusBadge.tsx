@@ -1,7 +1,8 @@
 import type { WorkflowRun } from '../../types';
 
 interface GateStatusBadgeProps {
-  run: WorkflowRun;
+  /** Only `metadata.gate_status` is read — a list row without steps is enough. */
+  run: Pick<WorkflowRun, 'metadata'>;
   className?: string;
   compact?: boolean;
 }

@@ -128,7 +128,7 @@ trusted person — for remote access, put a VPN in front of it, not an open port
 | Backend | Spring Boot 3.5, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Database | SQLite (WAL mode) + Flyway |
-| Container | Docker (Java Docker Client 3.4.1) — optional, only for shell blocks with `container_image` |
+| Container | Docker (Java Docker Client 3.7.1) — optional, only for shell blocks with `container_image` |
 | Styling | Tailwind CSS 4, CSS variables |
 | State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP over SockJS |

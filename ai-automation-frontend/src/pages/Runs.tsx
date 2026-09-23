@@ -110,6 +110,8 @@ export function Runs() {
     { value: 'CANCELLED', label: 'Cancelled' },
     { value: 'PAUSED', label: 'Paused' },
     { value: 'PENDING', label: 'Pending' },
+    // After a restart of the instance — resumable from the run page
+    { value: 'INTERRUPTED', label: 'Interrupted' },
   ];
 
   const workflowColumns = [
@@ -233,7 +235,7 @@ export function Runs() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-text">{t.runs.title}</h1>
-        <p className="text-sm text-text-secondary mt-1">{t.runs.subtitle}</p>
+        <p className="text-sm text-text-secondary mt-1">{chainsModule ? t.runs.subtitle : t.runs.subtitleWorkflowsOnly}</p>
       </div>
 
       <Hint id="runs-list" />

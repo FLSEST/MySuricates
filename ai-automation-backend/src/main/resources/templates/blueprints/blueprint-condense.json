@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 11,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\n# placeholder - replace with a command that prints a lot\ni=1\nwhile [ \"$i\" -le 200 ]; do printf 'line %s: status ok\\n' \"$i\"; i=$((i+1)); done\nprintf 'line 201: WARNING disk almost full\\n'"
+        "command": "set -eu\n# placeholder - replace with a command that prints a lot\ni=1\nwhile [ \"$i\" -le 200 ]; do printf 'line %s: status ok\\n' \"$i\"; i=$((i+1)); done\nprintf 'line 201: WARNING disk almost full\\n'",
+        "description": {
+          "de": "Erzeugt eine lange Ausgabe. Ersetze den Befehl durch deinen eigenen (Build-Log, Testlauf …).",
+          "en": "Produces a long output. Replace the command with your own (build log, test run …)."
+        }
       },
       "name": "long_output"
     },
@@ -52,14 +56,22 @@
             "keep": "head_tail"
           }
         ],
-        "max_chars": 4000
+        "max_chars": 4000,
+        "description": {
+          "de": "Verdichtet die Ausgabe regelbasiert, ohne KI: normalisieren, filtern, kürzen. Passe die Stufen an deine Ausgabe an.",
+          "en": "Condenses the output by rules, without AI: normalize, filter, truncate. Adapt the stages to your output."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ previous_output }}\nprintf 'condensed_chars=%s\\n' \"$(printf '%s' \"$1\" | wc -c | tr -d ' ')\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Arbeitet mit der verdichteten Fassung weiter; das Original bleibt unter block.long_output erhalten.",
+          "en": "Carries on with the condensed version; the original stays available as block.long_output."
+        }
       },
       "name": {
         "de": "weiter",

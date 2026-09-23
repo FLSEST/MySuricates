@@ -46,7 +46,7 @@ class DashboardResponseTest {
     }
 
     private static DashboardResponse.TriggerDistribution sampleTriggerDistribution() {
-        return new DashboardResponse.TriggerDistribution(10L, 20L, 5L, 3L, 2L);
+        return new DashboardResponse.TriggerDistribution(10L, 20L, 5L, 3L, 2L, 4L);
     }
 
     private static DashboardResponse sample() {
@@ -334,7 +334,7 @@ class DashboardResponseTest {
 
         @Test
         void should_allow_zero_values() {
-            DashboardResponse.TriggerDistribution dist = new DashboardResponse.TriggerDistribution(0L, 0L, 0L, 0L, 0L);
+            DashboardResponse.TriggerDistribution dist = new DashboardResponse.TriggerDistribution(0L, 0L, 0L, 0L, 0L, 0L);
 
             assertThat(dist.manual()).isZero();
             assertThat(dist.scheduled()).isZero();

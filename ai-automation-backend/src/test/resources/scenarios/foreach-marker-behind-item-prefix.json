@@ -1,0 +1,49 @@
+{
+  "id": "foreach-marker-behind-item-prefix",
+  "title": "Gate-Marker einer foreach-Iteration geht hinter dem [item]-Präfix nicht verloren",
+  "derivedFrom": {
+    "spec": "GateStatusOutputParser: FOREACH_PREFIX",
+    "incidents": [
+      "8671d03b (ForEach-Präfix verschluckt todo_item- und gate_status-Marker)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "foreach",
+        "name": "je_modul",
+        "config": {
+          "items": [
+            "core"
+          ],
+          "variable_name": "modul",
+          "command": "Prüfe {{ modul }} und schreibe gate_status: GREEN|YELLOW|RED."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Prüfe core",
+        "respond": "gate_status: RED\ngate_category: build"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": {
+      "status": "RED",
+      "category": "build"
+    },
+    "steps": [
+      {
+        "index": 0,
+        "outputContains": [
+          "[core]: gate_status: RED"
+        ]
+      }
+    ]
+  }
+}

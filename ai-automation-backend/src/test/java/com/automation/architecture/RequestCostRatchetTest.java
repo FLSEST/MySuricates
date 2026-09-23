@@ -1,5 +1,6 @@
 package com.automation.architecture;
 
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -19,6 +20,8 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import org.hibernate.Session;
+import org.hibernate.engine.spi.EntityKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -118,9 +121,12 @@ class RequestCostRatchetTest {
      *       when the route stopped serialising every step (TODO a05c9504) — it now answers with
      *       {@code WorkflowRunListItemResponse}, which carries the step count and the last step's
      *       truncated output instead of the steps themselves. What is left is run metadata and
-     *       input context; the size no longer grows with step output. The read side still fetches
-     *       the step rows (the count and the last output come from them) — a projection would
-     *       avoid that too, see TODO 7fd9f654.</li>
+     *       input context; the size no longer grows with step output. Since TODO 7fd9f654 the read
+     *       side does not load the step rows either: two queries per page count them and cut the
+     *       last output in the database ({@link #runListsLoadNoStepRows}).</li>
+     *   <li>{@code /workflows/{wf}/runs}: added with TODO 7fd9f654 — the same list rows as
+     *       {@code /executions} instead of every run with every step. {@code {wf}} is the first
+     *       seeded workflow.</li>
      *   <li>{@code /search}: the per-hit {@code select workflow_runs} is gone — search now uses the
      *       same batched mapper as {@code /workflows} (51 → 32 statements, TODO 13d1e2a2). What is
      *       left is the same {@code select containers} per workflow as {@code /workflows}, which is
@@ -141,6 +147,7 @@ class RequestCostRatchetTest {
             "/api/v1/projects", new Cost(2, 1_200),
             "/api/v1/workflows", new Cost(32, 26_000),
             "/api/v1/executions", new Cost(5, 60_000),
+            "/api/v1/workflows/{wf}/runs", new Cost(4, 5_000),
             "/api/v1/learning/dashboard", new Cost(70, 650_000),
             "/api/v1/search?q=Workflow", new Cost(32, 18_000),
             "/api/v1/schedules", new Cost(3, 20_000)));
@@ -153,6 +160,9 @@ class RequestCostRatchetTest {
     @Autowired private TodoRepository todoRepository;
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @PersistenceContext private EntityManager entityManager;
+
+    /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
+    private String firstWorkflowId;
 
     @BeforeEach
     void seed() {
@@ -186,6 +196,9 @@ class RequestCostRatchetTest {
             }
         }
 
+        if (firstWorkflowId == null) {
+            firstWorkflowId = workflows.get(0).getId();
+        }
         for (Workflow workflow : workflows) {
             for (int r = 0; r < RUNS_PER_WORKFLOW; r++) {
                 WorkflowRun run = runRepository.save(WorkflowRun.builder()
@@ -386,6 +399,48 @@ class RequestCostRatchetTest {
         }
     }
 
+    /**
+     * The run lists show a step count and a preview of the last output — and must get both without
+     * loading a step row (TODO 7fd9f654). Two checks: after the request no {@link StepResult} sits in
+     * the persistence context (the service joins this test's transaction, so whatever it loaded is
+     * still there), and the response does not grow when every step output grows tenfold.
+     */
+    @Test
+    void runListsLoadNoStepRows() throws Exception {
+        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs")) {
+            Cost before = measure(route);
+            assertThat(stepRowsInPersistenceContext())
+                    .as("%s loaded step rows — the list must count and preview them in the database", route)
+                    .isZero();
+
+            MvcResult result = mockMvc.perform(get(resolve(route))).andReturn();
+            String body = result.getResponse().getContentAsString();
+            assertThat(body).contains("\"stepCount\":" + STEPS_PER_RUN)
+                    .contains("\"lastStepStatus\":\"COMPLETED\"")
+                    .contains("\"lastStepPreview\":\"" + "x".repeat(WorkflowRunListItemResponse.PREVIEW_LENGTH) + " […]\"");
+
+            entityManager.createQuery("UPDATE StepResult s SET s.output = :output")
+                    .setParameter("output", FAT_STEP_OUTPUT.repeat(10))
+                    .executeUpdate();
+            Cost after = measure(route);
+            assertThat(after.responseBytes())
+                    .as("%s grew with the step output — something serialises or reads the full output", route)
+                    .isEqualTo(before.responseBytes());
+            assertThat(after.statements()).isEqualTo(before.statements());
+        }
+    }
+
+    private long stepRowsInPersistenceContext() {
+        return entityManager.unwrap(Session.class).getStatistics().getEntityKeys().stream()
+                .map(EntityKey.class::cast)
+                .filter(key -> StepResult.class.getName().equals(key.getEntityName()))
+                .count();
+    }
+
+    private String resolve(String route) {
+        return route.replace("{wf}", firstWorkflowId);
+    }
+
     private Cost measure(String route) throws Exception {
         entityManager.flush();
         entityManager.clear();
@@ -394,7 +449,7 @@ class RequestCostRatchetTest {
         MvcResult result;
         int statements;
         try {
-            result = mockMvc.perform(get(route)).andReturn();
+            result = mockMvc.perform(get(resolve(route))).andReturn();
             statements = SqlStatementCounter.count();
         } finally {
             SqlStatementCounter.stop();

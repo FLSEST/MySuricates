@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 1,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -euo pipefail\n# placeholder - replace with your own measurement\nprintf -- '- %s\\n- %s\\n- %s\\n' \"$(date '+%H:%M:%S')\" \"$(uname -n)\" \"$(df -h . | awk 'NR==2 {print $4}')\""
+        "command": "set -euo pipefail\n# placeholder - replace with your own measurement\nprintf -- '- %s\\n- %s\\n- %s\\n' \"$(date '+%H:%M:%S')\" \"$(uname -n)\" \"$(df -h . | awk 'NR==2 {print $4}')\"",
+        "description": {
+          "de": "Misst, was du vor der Entscheidung sehen willst. Ersetze den Befehl durch deine eigene Prüfung.",
+          "en": "Measures what you want to see before deciding. Replace the command with your own check."
+        }
       },
       "name": {
         "de": "messen",
@@ -51,13 +55,21 @@
           }
         ],
         "on_no": "fail",
-        "timeout_minutes": 60
+        "timeout_minutes": 60,
+        "description": {
+          "de": "Zeigt das Ergebnis und fragt Ja/Nein; bei Nein scheitert der Lauf (on_no). Passe die Frage an.",
+          "en": "Shows the result and asks yes/no; on no the run fails (on_no). Adjust the question."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "# placeholder - replace with what should happen after approval\necho OK"
+        "command": "# placeholder - replace with what should happen after approval\necho OK",
+        "description": {
+          "de": "Läuft nur nach einem Ja. Ersetze den Befehl durch das, was nach der Freigabe passieren soll.",
+          "en": "Only runs after a yes. Replace the command with what should happen after the approval."
+        }
       },
       "name": {
         "de": "abschluss",

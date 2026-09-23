@@ -65,7 +65,7 @@
   },
   "debug": {
     "name": "Workflow-Debugger",
-    "description": "Führt einen Workflow Schritt für Schritt aus, zum Nachvollziehen."
+    "description": "Listet Workflows, deren letzter Lauf gescheitert ist – mit Diagnose und Neustart."
   },
   "factory": {
     "name": "Workflow-Factory",

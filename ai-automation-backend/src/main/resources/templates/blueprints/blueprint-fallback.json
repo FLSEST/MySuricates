@@ -15,14 +15,18 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 16,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n\necho prepared"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n\necho prepared",
+        "description": {
+          "de": "Legt ein Arbeitsverzeichnis für diesen Lauf an. Meist unverändert übernehmen.",
+          "en": "Creates a working directory for this run. Usually keep as is."
+        }
       },
       "name": {
         "de": "vorbereiten",
@@ -40,7 +44,11 @@
         "max_retries": 2,
         "delay": 1,
         "on_failure": "continue",
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n# placeholder - route A; on success it would run: touch \"$D/route_a_ok\"\necho 'route A unavailable' >&2\nexit 1"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n# placeholder - route A; on success it would run: touch \"$D/route_a_ok\"\necho 'route A unavailable' >&2\nexit 1",
+        "description": {
+          "de": "Weg A, mehrmals versucht; scheitert er, geht es dank on_failure weiter. Ersetze ihn durch deinen bevorzugten Weg.",
+          "en": "Route A, tried several times; if it fails, on_failure lets the run carry on. Replace it with your preferred route."
+        }
       }
     },
     {
@@ -53,13 +61,21 @@
         "execution_mode": "shell",
         "condition": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\ntest -f \"$D/route_a_ok\"",
         "then_command": "printf 'route A worked\\n'",
-        "else_command": "# placeholder - route B\nprintf 'route B done\\n'"
+        "else_command": "# placeholder - route B\nprintf 'route B done\\n'",
+        "description": {
+          "de": "Prüft, ob Weg A geklappt hat, und schaltet sonst auf Weg B. Ersetze Prüfung und Weg B.",
+          "en": "Checks whether route A worked and otherwise switches to route B. Replace the check and route B."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned",
+        "description": {
+          "de": "Räumt das Arbeitsverzeichnis wieder weg. Meist unverändert übernehmen.",
+          "en": "Removes the working directory again. Usually keep as is."
+        }
       },
       "name": {
         "de": "aufraeumen",

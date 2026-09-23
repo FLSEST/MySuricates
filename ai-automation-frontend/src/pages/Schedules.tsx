@@ -60,7 +60,7 @@ export function Schedules() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text">{t.schedules.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">{t.schedules.subtitle}</p>
+          <p className="text-sm text-text-secondary mt-1">{chainsModule ? t.schedules.subtitle : t.schedules.subtitleWorkflowsOnly}</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Maintenance mode toggle */}

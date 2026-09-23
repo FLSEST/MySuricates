@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -29,4 +30,22 @@ public interface StepResultRepository extends JpaRepository<StepResult, String> 
     @Query("SELECT s.output FROM StepResult s WHERE s.workflowRun.id = :runId AND s.output IS NOT NULL "
          + "ORDER BY s.stepIndex DESC")
     List<String> findOutputsByRunIdNewestFirst(@Param("runId") String runId, Pageable pageable);
+
+    /**
+     * Rows {@code [runId, stepCount]} for the run lists — counted, not loaded (TODO 7fd9f654).
+     * Runs without steps have no row.
+     */
+    @Query("SELECT s.workflowRun.id, COUNT(s) FROM StepResult s WHERE s.workflowRun.id IN :runIds "
+         + "GROUP BY s.workflowRun.id")
+    List<Object[]> countStepsByRunIds(@Param("runIds") Collection<String> runIds);
+
+    /**
+     * Rows {@code [runId, status, head]} with the last step of every run: its status and the
+     * first {@code chars} characters of its output. The output is cut in the database, so a list
+     * of runs never carries a whole step blob across the single SQLite connection (TODO 7fd9f654).
+     */
+    @Query("SELECT s.workflowRun.id, s.status, SUBSTRING(s.output, 1, :chars) FROM StepResult s "
+         + "WHERE s.workflowRun.id IN :runIds AND s.stepIndex = "
+         + "(SELECT MAX(last.stepIndex) FROM StepResult last WHERE last.workflowRun = s.workflowRun)")
+    List<Object[]> findLastStepHeadsByRunIds(@Param("runIds") Collection<String> runIds, @Param("chars") int chars);
 }

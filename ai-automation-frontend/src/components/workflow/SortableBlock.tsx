@@ -5,6 +5,7 @@ import { Badge } from '../ui';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
 import { compressedSourcesUsed, compressionSummary, isCompressionBlock } from './compression';
+import { blockNote } from './blockEdit';
 import type { BlockDefinition, BlockType } from '../../types';
 import type { BadgeVariant } from '../ui/Badge';
 
@@ -46,6 +47,7 @@ interface SortableBlockProps {
 export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = [], flashNonce, onHover }: SortableBlockProps) {
   const t = useT();
   const advancedMode = useSettingsStore((s) => s.advancedMode);
+  const note = blockNote(block);
   const {
     attributes,
     listeners,
@@ -98,6 +100,9 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
           <Badge variant={blockTypeVariant[block.type] || 'accent'}>
             {t.workflows.blockTypes[block.type] ?? block.type}
           </Badge>
+          {block.name && (
+            <span className="text-sm font-medium text-text truncate" data-testid="block-name">{block.name}</span>
+          )}
           {block.skillIds && block.skillIds.length > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] text-accent">
               <Zap className="w-3 h-3" />
@@ -145,6 +150,7 @@ export function SortableBlock({ id, index, block, onEdit, onRemove, allBlocks = 
                       : JSON.stringify(block.config)}
           </p>
         )}
+        {note && <p className="text-xs text-text-tertiary mt-1 line-clamp-2" data-testid="block-note">{note}</p>}
       </div>
       <button
         onClick={(e) => { e.stopPropagation(); onEdit(index); }}

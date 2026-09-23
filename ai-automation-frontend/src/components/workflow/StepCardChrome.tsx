@@ -8,7 +8,7 @@ import { Badge } from '../ui';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import { BLOCK_TYPES, type BlockType, type StepResult } from '../../types';
-import { stepBlockName, stepBlockType, stepKind, type StepKind } from './stepMetadata';
+import { stepBlockName, stepBlockNote, stepBlockType, stepKind, type StepKind } from './stepMetadata';
 import { useStepAnchor } from './stepAnchors';
 
 const ICON = 'w-3 h-3';
@@ -113,6 +113,7 @@ export function StepBlockTypeBadge({ step }: { step: StepResult }) {
 export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: StepResult; badge?: ReactNode; className?: string }) {
   const t = useT();
   const blockName = stepBlockName(step);
+  const note = stepBlockNote(step);
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <span className="text-xs font-mono text-text-tertiary">
@@ -127,6 +128,7 @@ export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: Step
           {formatDuration(step.durationMs)}
         </span>
       )}
+      {note && <p className="basis-full text-xs text-text-tertiary" data-testid="step-note">{note}</p>}
     </div>
   );
 }

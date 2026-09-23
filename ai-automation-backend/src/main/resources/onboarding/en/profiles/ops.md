@@ -13,6 +13,7 @@
 - List: `GET $MS/schedules`; what still runs today: `GET $MS/schedules/remaining-today`.
 - Cron has six fields: `0 */15 * * * *` means every 15 minutes.
 - Times that fall into standby or a restart are caught up once or skipped, depending on the setting.
+- What else starts a workflow (webhooks, TODO triggers, another workflow finishing) is shown in the card "Gets triggered by" on its page.
 
 ### Finding errors
 

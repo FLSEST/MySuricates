@@ -21,13 +21,17 @@ import com.automation.config.WishConfig;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
+import com.automation.exception.HardeningException;
+import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -91,7 +95,8 @@ class ExecutionSettingsServiceTest {
                 rateLimitConfig, executionRegistry, containerShellService,
                 schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
                 summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig
+                compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig,
+                new RunDeletionPolicy(true)
         );
     }
 
@@ -667,5 +672,80 @@ class ExecutionSettingsServiceTest {
                 .allSatisfy(key -> assertThat(service.applierKeys())
                         .as("Grenzwert '%s' ohne Applier — der Wert wird gespeichert, wirkt aber nicht", key)
                         .contains(key));
+    }
+
+    /** 8dbd7e10: a leaked key must not delete runs through a shortened retention. */
+    @Nested
+    class RetentionWhileDeletionIsDisabled {
+
+        private ExecutionSettingsService locked;
+
+        @BeforeEach
+        void lock() {
+            runRetentionConfig.setRetentionDays(90);
+            locked = new ExecutionSettingsService(
+                    appSettingsRepository, executionSemaphore,
+                    hostClaudeService, hostClaudeConfig, chainConfig,
+                    rateLimitConfig, executionRegistry, containerShellService,
+                    schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
+                    summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
+                    compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig,
+                    new RunDeletionPolicy(false));
+        }
+
+        @Test
+        void shorterRetention_isRefusedAndNothingIsStored() {
+            assertThatThrownBy(() -> locked.validateAndApply("run-retention-days", "7"))
+                    .isInstanceOf(HardeningException.class);
+
+            assertThat(runRetentionConfig.getRetentionDays()).isEqualTo(90);
+            verify(appSettingsRepository, never()).set(eq("run-retention-days"), anyString());
+        }
+
+        @Test
+        void camelCaseAlias_isGuardedToo() {
+            assertThatThrownBy(() -> locked.updateAll(Map.of("runRetentionDays", "30")))
+                    .isInstanceOf(HardeningException.class);
+            assertThat(runRetentionConfig.getRetentionDays()).isEqualTo(90);
+        }
+
+        @Test
+        void refusedBatch_appliesNoOtherKeyEither() {
+            LinkedHashMap<String, String> batch = new LinkedHashMap<>();
+            batch.put("execution-max-concurrent", "3");
+            batch.put("run-retention-days", "1");
+
+            assertThatThrownBy(() -> locked.updateAll(batch)).isInstanceOf(HardeningException.class);
+
+            assertThat(executionSemaphore.getMaxPermits()).isEqualTo(10);
+            verify(appSettingsRepository, never()).set(anyString(), anyString());
+        }
+
+        @Test
+        void longerRetentionOrOff_isAccepted() {
+            locked.validateAndApply("run-retention-days", "120");
+            assertThat(runRetentionConfig.getRetentionDays()).isEqualTo(120);
+
+            locked.validateAndApply("run-retention-days", "0");
+            assertThat(runRetentionConfig.getRetentionDays()).isZero();
+        }
+
+        @Test
+        void fromOff_everyPositiveValueIsAShortening() {
+            runRetentionConfig.setRetentionDays(0);
+
+            assertThatThrownBy(() -> locked.validateAndApply("run-retention-days", "730"))
+                    .isInstanceOf(HardeningException.class);
+            assertThat(runRetentionConfig.getRetentionDays()).isZero();
+        }
+    }
+
+    @Test
+    void shorterRetention_isFreeWhileDeletionIsAllowed() {
+        runRetentionConfig.setRetentionDays(90);
+
+        service.validateAndApply("run-retention-days", "7");
+
+        assertThat(runRetentionConfig.getRetentionDays()).isEqualTo(7);
     }
 }

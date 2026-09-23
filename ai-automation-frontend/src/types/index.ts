@@ -933,7 +933,11 @@ export interface GateStatusEntry { status: string; count: number; }
 export interface FailureReasonEntry { reason: string; count: number; }
 export interface CostByWorkflowEntry { workflowId: string; workflowName: string; totalCostUsd: number; runCount: number; }
 export interface BlockTypeUsageEntry { blockType: string; stepCount: number; failedCount: number; failureRate: number; }
-export interface TriggerDistribution { manual: number; scheduled: number; webhook: number; completionTrigger: number; todoTrigger: number; }
+export interface TriggerDistribution {
+  manual: number; scheduled: number; webhook: number; completionTrigger: number; todoTrigger: number;
+  /** Chain, sub-workflow, wish, auto-repair — optional because older backends do not send it */
+  otherAutomatic?: number;
+}
 
 export interface DashboardData {
   totalWorkflows: number;
@@ -1080,7 +1084,7 @@ export interface PageResponse<T> {
 // ── Activity Log ─────────────────────────────────────────
 
 export type ActivityLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-export type ActivityLogCategory = 'SYSTEM' | 'EXECUTION' | 'SCHEDULE' | 'WEBHOOK' | 'SECURITY' | 'CONTAINER';
+export type ActivityLogCategory = 'SYSTEM' | 'EXECUTION' | 'SCHEDULE' | 'WEBHOOK' | 'SECURITY' | 'CONTAINER' | 'PLUGIN';
 
 export interface ActivityLogEntry {
   id: string;

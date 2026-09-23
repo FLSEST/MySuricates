@@ -11,7 +11,7 @@
   },
   "category" : "CODE",
   "sortOrder" : 56,
-  "version" : "1.0.0",
+  "version" : "1.0.1",
   "model" : "sonnet",
   "instructions" : "Implementiert genau EIN Feature im Ziel-Projekt. Hard rule: claim NIE Erfolg ohne grünen factory test. Tests fixen statt verstecken. Niemals Bibliotheken erfinden — wenn etwas fehlt, package.json erweitern.",
   "blocks" : [ {
@@ -32,8 +32,7 @@
       "max_repeated_actions" : 3,
       "require_approval" : false,
       "success_criteria" : "factory test im Projekt-Verzeichnis gibt JSON mit ok=true zurück (lint/typecheck/unit alle passed).",
-      "goal" : "Implementiere das Feature {{ feature_id }} im Projekt {{ slug }}.\n\nKONTEXT:\n- Projekt-Pfad: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n- Feature-Beschreibung: {{ feature_desc }}\n- Stack: {{ stack }}\n- Snippet-Resultat (Block 1 oben): {{ previous_output }}\n\nAUFGABE:\n1. Wenn das Snippet bereits Files kopiert hat, fülle Lücken (TODO-Marker, fehlende Imports, business logic).\n2. Sonst: Generiere alle Files für das Feature von Grund auf, im Stack-spezifischen Idiom (Next.js App-Router → src/app/, server actions in src/lib/, Prisma-Schema-Erweiterungen in prisma/schema.prisma).\n3. Schreibe mindestens einen Unit-Test (Vitest/Jest/pytest je nach Stack).\n4. Wenn Prisma-Schema geändert wird: NUR Schema-Datei anpassen — Migration läuft danach via `factory migrate`.\n5. README.md kurz aktualisieren (1-2 Sätze für das neue Feature).\n6. Iteriere via factory test (im Projekt-Verzeichnis ausführen) bis ok=true.\n\nABSOLUTE PFADE verwenden — jede ACTION ist ein eigener Agent ohne Kontext der vorherigen.\nKeine inkrementellen Refactors außerhalb des Features.\nKeine Secrets hartcoden — .env.example pflegen.",
-      "instructions_addendum" : "Wenn factory test fehlschlägt: lies log_tail im JSON-Report, fixe gezielt, re-run. Nie Tests deaktivieren oder skippen."
+      "goal" : "Implementiere das Feature {{ feature_id }} im Projekt {{ slug }}.\n\nKONTEXT:\n- Projekt-Pfad: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n- Feature-Beschreibung: {{ feature_desc }}\n- Stack: {{ stack }}\n- Snippet-Resultat (Block 1 oben): {{ previous_output }}\n\nAUFGABE:\n1. Wenn das Snippet bereits Files kopiert hat, fülle Lücken (TODO-Marker, fehlende Imports, business logic).\n2. Sonst: Generiere alle Files für das Feature von Grund auf, im Stack-spezifischen Idiom (Next.js App-Router → src/app/, server actions in src/lib/, Prisma-Schema-Erweiterungen in prisma/schema.prisma).\n3. Schreibe mindestens einen Unit-Test (Vitest/Jest/pytest je nach Stack).\n4. Wenn Prisma-Schema geändert wird: NUR Schema-Datei anpassen — Migration läuft danach via `factory migrate`.\n5. README.md kurz aktualisieren (1-2 Sätze für das neue Feature).\n6. Iteriere via factory test (im Projekt-Verzeichnis ausführen) bis ok=true.\n\nABSOLUTE PFADE verwenden — jede ACTION ist ein eigener Agent ohne Kontext der vorherigen.\nKeine inkrementellen Refactors außerhalb des Features.\nKeine Secrets hartcoden — .env.example pflegen.\n\nWenn factory test fehlschlägt: lies log_tail im JSON-Report, fixe gezielt, re-run. Nie Tests deaktivieren oder skippen."
     },
     "requiredCapabilities" : [ ],
     "skillIds" : [ "builtin-feature-implementer" ]

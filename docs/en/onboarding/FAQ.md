@@ -114,7 +114,7 @@ All AI calls go through `HostClaudeService`:
 3. Create a repository interface under `repository/`
 4. Create a service class under `service/`
 
-**Important:** Keep numbering sequential (highest existing migration: V73), file format: `V{N}__short_description.sql`. Always determine the next number freshly: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
+**Important:** Keep numbering sequential, file format: `V{N}__short_description.sql`. Always determine the next number freshly: `ls ai-automation-backend/src/main/resources/db/migration | sort -V | tail -1`
 
 ---
 

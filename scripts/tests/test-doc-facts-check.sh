@@ -571,6 +571,56 @@ OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "IGNORE_MARKER nimmt die Zeile aus" '! grep -q "zahlen.md" <<<"$OUT"'
 rm "$FAKE/docs/zahlen.md"
 
+echo "N) Zahlen im Fliesstext, die frueher durchs Muster fielen (TODO e36ca773)"
+# Die sechs Stellen der Doku-Durchsicht 2026-09-22: je Formulierung ein Fall, dazu die
+# bewusst ausgenommenen. Das Mini-Repo hat 4 Blocktypen (simple, shell, retry,
+# todo-create), 6 Templates, 3 Skills, Migrationen V1/V2/V5.
+cat > "$FAKE/docs/fliesstext.md" <<'MD_EOF'
+# Fliesstext
+2. **Eine Vorlage uebernehmen** — unter *Templates* liegen 67 fertige Workflows. Eine waehlen.
+2. **Take a template** — *Templates* holds 67 ready-made workflows. Pick one.
+| Ablage | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (67) | `workflow-pool/*.json` |
+| Skills | `src/main/resources/skills/builtin/*.json` (9) | — |
+**Wichtig:** Nummerierung fortlaufend (hoechste vorhandene Migration: V73), Dateiformat `V{N}__x.sql`.
+**Important:** Keep numbering sequential (highest existing migration: V73), file format `V{N}__x.sql`.
+  "type": "simple | shell | retry | conditional",
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "'unter *Templates* liegen N fertige Workflows' erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:2 templates sagt 67, Code 6" <<<"$OUT"'
+check "'*Templates* holds N ready-made workflows' erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:3 templates sagt 67, Code 6" <<<"$OUT"'
+check "'(N)' hinter templates/builtin/*.json erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:4 templates sagt 67, Code 6" <<<"$OUT"'
+check "'(N)' hinter skills/builtin/*.json erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:5 skills sagt 9, Code 3" <<<"$OUT"'
+check "'hoechste vorhandene Migration: VN' erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:6 migration-max sagt 73, Code 5" <<<"$OUT"'
+check "'highest existing migration: VN' erkannt" \
+  'grep -qE "^DRIFT docs/fliesstext.md:7 migration-max sagt 73, Code 5" <<<"$OUT"'
+check "unvollstaendige type-Aufzaehlung erkannt (fehlt todo-create, unbekannt conditional)" \
+  'grep -qE "^DRIFT docs/fliesstext.md:8 block-type-enum nennt 3 von 4 .*es fehlen todo-create; unbekannt conditional" <<<"$OUT"'
+
+# Nicht gemeint: eine type-Liste eines anderen Feldes, ein Beispiel mit der Haelfte der
+# Blocktypen, eine vollstaendige Aufzaehlung,
+# "N fertige Workflows" ohne Templates-Bezug (Pool), die datierte Klassenzahl des
+# Onboardings und die Zahl der Block-Spezifikationen des Assistenten (eine Teilmenge).
+cat > "$FAKE/docs/fliesstext.md" <<'MD_EOF'
+# Fliesstext ohne Befund
+  "type": "stop | continue",
+  "type": "simple | shell",
+  "type": "simple | shell | retry | todo-create",
+Im Pool liegen 12 fertige Workflows zum Installieren.
+Die REST-Controller liegen unter `controller/` (Stand 2026-09-18: 43 Klassen mit `@RestController`).
+| `block-spec` | Block-Typ-Spezifikation (14 Typen) | — |
+| `block-spec` | Block type specification (14 types) | — |
+Unter *Templates* liegen 6 fertige Workflows; `templates/builtin/*.json` (6), hoechste Migration: V5.
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Abgrenzungen und richtige Zahlen: kein Befund" '! grep -q "docs/fliesstext.md" <<<"$OUT"'
+check "Abgrenzungen und richtige Zahlen: exit 0"       '[ "$RC" -eq 0 ]'
+rm "$FAKE/docs/fliesstext.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -1,0 +1,36 @@
+{
+  "id": "workflow-provider-reaches-every-block",
+  "title": "Der Workflow-Provider gilt für jeden KI-Block",
+  "derivedFrom": {
+    "spec": "CLAUDE.md: Provider routing — provider im Workflow gilt für jeden Nicht-Shell-Block",
+    "incidents": [
+      "24680e80 (Simple-Block ignoriert Workflow-Provider — CODEX wird nicht genutzt)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED_B",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "eins",
+        "config": {
+          "command": "Sag eins."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED_B": [
+      {
+        "respond": "eins"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 0,
+      "SCRIPTED_B": 1
+    }
+  }
+}

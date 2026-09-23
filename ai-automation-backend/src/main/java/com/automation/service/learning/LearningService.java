@@ -214,8 +214,7 @@ public class LearningService {
         Map<String, long[]> blockTypeStepCount = new LinkedHashMap<>();
         Map<String, long[]> blockTypeFailedCount = new LinkedHashMap<>();
 
-        // Trigger distribution
-        long trigScheduled = 0, trigTodoTrigger = 0, trigManual = 0;
+        Map<TriggerCategory, long[]> triggerCounts = new EnumMap<>(TriggerCategory.class);
 
         for (WorkflowRun run : recentWindow) {
             String runProvider = null;
@@ -223,14 +222,7 @@ public class LearningService {
             double runCost = 0.0;
             long runTokens = 0;
 
-            // Trigger classification
-            if (run.getTriggeredByScheduleId() != null) {
-                trigScheduled++;
-            } else if (run.getMetadata() != null && Boolean.TRUE.equals(run.getMetadata().get("todoTriggerRun"))) {
-                trigTodoTrigger++;
-            } else {
-                trigManual++;
-            }
+            triggerCounts.computeIfAbsent(TriggerCategory.of(run), k -> new long[1])[0]++;
 
             // Gate status from run metadata
             if (run.getMetadata() != null) {
@@ -421,8 +413,7 @@ public class LearningService {
                 .sorted(Comparator.comparingLong(DashboardResponse.BlockTypeUsageEntry::stepCount).reversed())
                 .toList();
 
-        var triggerDistribution = new DashboardResponse.TriggerDistribution(
-                trigManual, trigScheduled, 0, 0, trigTodoTrigger);
+        var triggerDistribution = TriggerCategory.distribution(triggerCounts);
 
         return new DashboardResponse(
                 totalWorkflows,

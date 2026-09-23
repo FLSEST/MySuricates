@@ -25,11 +25,12 @@ function ProviderIcon({ icon }: { icon: string }) {
 }
 
 function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }) {
+  const t = useT();
   if (provider.status === 'CONNECTED') {
     return (
       <Badge variant="success">
         <CheckCircle2 className="w-3 h-3 mr-1" />
-        Verbunden
+        {t.integrations.statusConnected}
       </Badge>
     );
   }
@@ -37,7 +38,7 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
     return (
       <Badge variant="warning">
         <AlertTriangle className="w-3 h-3 mr-1" />
-        Abgelaufen
+        {t.integrations.statusExpired}
       </Badge>
     );
   }
@@ -45,14 +46,14 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
     return (
       <Badge variant="warning">
         <Settings2 className="w-3 h-3 mr-1" />
-        Einrichtung erforderlich
+        {t.integrations.setupRequired}
       </Badge>
     );
   }
   return (
     <Badge variant="default">
       <XCircle className="w-3 h-3 mr-1" />
-      Nicht verbunden
+      {t.integrations.statusNotConnected}
     </Badge>
   );
 }
@@ -356,6 +357,7 @@ export function Integrations() {
                       variant="ghost"
                       onClick={() => handleTestAction(selected.providerId, action)}
                       loading={testingAction === action.name}
+                      title={t.integrations.testHint}
                     >
                       <Play className="w-3 h-3 mr-1" />
                       {t.integrations.test}
