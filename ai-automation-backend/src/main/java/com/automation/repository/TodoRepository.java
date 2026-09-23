@@ -1,5 +1,7 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.GoalStatusCounts;
+import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.projection.NeedsYouRow;
 import com.automation.dto.projection.ProjectCount;
 import com.automation.dto.projection.ProjectStatusCounts;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -175,6 +178,34 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + "ORDER BY CASE t.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, "
          + "CASE WHEN t.dueDate IS NULL THEN 1 ELSE 0 END, t.dueDate ASC, t.createdAt DESC")
     List<NeedsYouRow> findNeedsYou(@Param("now") Instant now, Pageable pageable);
+
+    // ── Ziele (TODO dc0566f8): schlanke Projektionen, keine Beschreibungen ─────────
+
+    /** Status-Zaehler je Ziel in einem GROUP BY; Ziele ohne TODOs fehlen in der Liste. */
+    @Query("SELECT new com.automation.dto.projection.GoalStatusCounts("
+         + "t.goalId, "
+         + "SUM(CASE WHEN t.status = 'OPEN' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'BACKLOG' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.status = 'ARCHIVED' THEN 1 ELSE 0 END), "
+         + "SUM(CASE WHEN t.openQuestion IS NOT NULL AND t.status IN ('OPEN','IN_PROGRESS','BACKLOG') THEN 1 ELSE 0 END)"
+         + ") FROM Todo t WHERE t.goalId IN :goalIds GROUP BY t.goalId")
+    List<GoalStatusCounts> countByGoal(@Param("goalIds") Collection<String> goalIds);
+
+    @Query("SELECT new com.automation.dto.projection.GoalTodoRow("
+         + "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.complexity, "
+         + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt"
+         + ") FROM Todo t WHERE t.goalId = :goalId")
+    List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
+
+    @Query("SELECT MAX(t.goalRank) FROM Todo t WHERE t.goalId = :goalId")
+    Integer maxGoalRank(@Param("goalId") String goalId);
+
+    /** Loest alle TODOs vom Ziel; die TODOs selbst bleiben. Aufrufer muss @Transactional sein. */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.updatedAt = :now WHERE t.goalId = :goalId")
+    int detachFromGoal(@Param("goalId") String goalId, @Param("now") Instant now);
 
     // ── Hygiene ────────────────────────────────────────────────────────────────
 

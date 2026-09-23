@@ -58,7 +58,7 @@ Runtime context passed through all block executors of a workflow execution. Cont
 ## F
 
 **Flyway**
-Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 84 migrations (V1-V84).
+Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 85 migrations (V1-V85).
 
 ## G
 

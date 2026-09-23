@@ -105,6 +105,11 @@ public final class TodoSpecifications {
         };
     }
 
+    /** Nur TODOs dieses Ziels (TODO dc0566f8); ohne ID keine Einschraenkung. */
+    public static Specification<Todo> inGoal(String goalId) {
+        return (root, query, cb) -> goalId == null || goalId.isBlank() ? null : cb.equal(root.get("goalId"), goalId);
+    }
+
     static String escapeLikePattern(String input) {
         return input.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }

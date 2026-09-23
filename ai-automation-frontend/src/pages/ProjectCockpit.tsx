@@ -6,6 +6,7 @@ import { Card, Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
+import { GoalsSection } from '../components/goal/GoalsSection';
 import { priorityColor, sourceIcon, formatRelative } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
 import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
@@ -79,6 +80,8 @@ export function ProjectCockpit() {
       </section>
 
       {/* Per-project rollup cards */}
+      <GoalsSection />
+
       <section>
         <div className="flex items-center gap-2 mb-3">
           <FolderKanban className="w-4 h-4 text-text-secondary" />

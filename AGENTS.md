@@ -42,6 +42,25 @@ curl -s -X POST http://localhost:9090/api/v1/todos \
   }'
 ```
 
+### TODO in ein Ziel einordnen und einschaetzen
+
+Ziele buendeln TODOs projektuebergreifend (`/api/v1/goals`). Wer ein TODO einschaetzt, schreibt das
+ueber einen eigenen Endpunkt – `ratedBy: "AI"` markiert die Einschaetzung als maschinell, ein Mensch
+kann sie spaeter ueberschreiben:
+
+```bash
+curl -s -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" \
+  -d '{"goalId": "<goal-id>", "complexity": "M", "suggestedEffort": "high",
+       "ratingNote": "Viele Dateien, klare Vorlage", "openQuestion": "Welcher Stil?", "ratedBy": "AI"}'
+
+# Reihenfolge im Ziel setzen (Rang 1..n)
+curl -s -X PUT http://localhost:9090/api/v1/goals/<goal-id>/order \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"todoIds": ["<id-1>", "<id-2>"]}'
+```
+
+Referenz: [docs/api-referenz.md](docs/api-referenz.md) → „Ziele“.
+
 ## Cypress E2E gegen Dev oder Test
 
 Die Cypress-Tests koennen jetzt gegen **Dev** (`9090`) oder **Test** (`8090`) laufen. Wichtig ist, dass **Frontend-Proxy und Cypress immer dasselbe Ziel verwenden**.

@@ -698,12 +698,36 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `exported_provider` | TEXT | | Provider-Kennung des externen Systems (z.B. `jira`, `github`), entkoppelt von `reference_type` (V66) |
 | `exported_ref` | TEXT | | Externe Referenz-ID (z.B. Issue-Key) (V66) |
 | `exported_url` | TEXT | | URL zum externen Objekt (V66) |
+| `goal_id` | TEXT | FK → goals, ON DELETE SET NULL | Ziel, auf das das TODO einzahlt – höchstens eins (V85) |
+| `goal_rank` | INTEGER | | Position im Ziel, 1 = zuerst; NULL = noch nicht eingeordnet (V85) |
+| `complexity` | TEXT | | `S`, `M`, `L`, `XL` (V85) |
+| `suggested_effort` | TEXT | | Empfohlener Reasoning-Effort `low`/`medium`/`high`/`xhigh` (V85) |
+| `rating_note` | TEXT | | Begründung der Einschätzung (V85) |
+| `rated_by` | TEXT | | `USER` oder `AI` – wer zuletzt eingeschätzt hat (V85) |
+| `rated_at` | TEXT | | Zeitpunkt der Einschätzung (V85) |
+| `open_question` | TEXT | | Frage, die vor der Arbeit geklärt sein muss (V85) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59)
+**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_goal` (V85)
 
 TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM). Bei konfiguriertem `TodoTrigger` werden Fix-Workflows automatisch gestartet (Self-Improvement-Loop).
+
+### `goals`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `title` | TEXT | NOT NULL | Name des Ziels, z. B. „Open-Source-Launch“ |
+| `description` | TEXT | | Markdown: was „fertig“ heißt |
+| `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
+| `target_date` | TEXT | | Zieldatum |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indizes:** `idx_goals_status`
+
+Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang und die Einschätzung stehen am TODO (`todos.goal_id` …), nicht am Ziel; Fortschritt und Reihenfolge rechnet `GoalService` aus schlanken Projektionen zusammen. Beim Löschen eines Ziels bleiben die TODOs erhalten.
 
 ### `activity_log`
 
@@ -1058,6 +1082,14 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `USER` | Manuell erstellt |
 | `AI` | Von AI-Agent erstellt (z.B. Claude Code) |
 | `WORKFLOW` | Automatisch durch Workflow erstellt (z.B. AutoTodoService) |
+
+### Todo.Complexity / Todo.RatedBy / Goal.Status (V85)
+
+| Enum | Werte | Bedeutung |
+|---|---|---|
+| `Todo.Complexity` | `S`, `M`, `L`, `XL` | Umfang und Unsicherheit, grob – dieselbe Skala für Mensch und KI |
+| `Todo.RatedBy` | `USER`, `AI` | Wer die Einschätzung zuletzt gesetzt hat; ein Mensch überschreibt die KI |
+| `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archivierte Ziele erscheinen nur mit ausdrücklichem Filter |
 
 ### LogLevel (ActivityLog)
 

@@ -31,8 +31,27 @@ public record TodoResponse(
         Todo.ResolutionState resolutionState,
         Instant dueDate,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        /** Ziel und Einschaetzung (TODO dc0566f8); null, solange nichts davon gesetzt ist. */
+        TodoPlanningResponse planning
 ) {
+    /** Form ohne {@code planning} (TODO dc0566f8) — fuer Aufrufer und Test-Fixturen von vorher. */
+    public TodoResponse(String id, String title, String description, Todo.Status status,
+                        Todo.Priority priority, List<String> tags, String projectId,
+                        String projectName, String linkedWorkflowId, String linkedWorkflowName,
+                        Todo.Source source, String sourceAgent, String sessionId,
+                        String agentSessionRef, String workflowRunId, String referenceType,
+                        String referenceId, String exportedProvider, String exportedRef,
+                        String exportedUrl, int fixAttempts, String lastFixRunId,
+                        Todo.ResolutionState resolutionState, Instant dueDate, Instant createdAt,
+                        Instant updatedAt) {
+        this(id, title, description, status, priority, tags, projectId, projectName,
+                linkedWorkflowId, linkedWorkflowName, source, sourceAgent, sessionId,
+                agentSessionRef, workflowRunId, referenceType, referenceId, exportedProvider,
+                exportedRef, exportedUrl, fixAttempts, lastFixRunId, resolutionState, dueDate,
+                createdAt, updatedAt, null);
+    }
+
     /** Kurzform ohne {@code agentSessionRef} (TODO 3497533c) — fuer Test-Fixturen. */
     public TodoResponse(String id, String title, String description, Todo.Status status,
                         Todo.Priority priority, List<String> tags, String projectId,
@@ -46,6 +65,6 @@ public record TodoResponse(
                 linkedWorkflowId, linkedWorkflowName, source, sourceAgent, sessionId, null,
                 workflowRunId, referenceType, referenceId, exportedProvider, exportedRef,
                 exportedUrl, fixAttempts, lastFixRunId, resolutionState, dueDate, createdAt,
-                updatedAt);
+                updatedAt, null);
     }
 }

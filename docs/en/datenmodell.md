@@ -698,10 +698,18 @@ A chain does not belong to any project and can reference workflows from differen
 | `exported_provider` | TEXT | | Provider identifier of the external system (e.g. `jira`, `github`), decoupled from `reference_type` (V66) |
 | `exported_ref` | TEXT | | External reference ID (e.g. issue key) (V66) |
 | `exported_url` | TEXT | | URL to the external object (V66) |
+| `goal_id` | TEXT | FK → goals, ON DELETE SET NULL | Goal this TODO contributes to – at most one (V85) |
+| `goal_rank` | INTEGER | | Position within the goal, 1 = first; NULL = not ordered yet (V85) |
+| `complexity` | TEXT | | `S`, `M`, `L`, `XL` (V85) |
+| `suggested_effort` | TEXT | | Suggested reasoning effort `low`/`medium`/`high`/`xhigh` (V85) |
+| `rating_note` | TEXT | | Reasoning behind the assessment (V85) |
+| `rated_by` | TEXT | | `USER` or `AI` – who assessed last (V85) |
+| `rated_at` | TEXT | | Time of the assessment (V85) |
+| `open_question` | TEXT | | Question that has to be settled before work starts (V85) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59)
+**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_goal` (V85)
 
 TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
@@ -1058,6 +1066,28 @@ The only persistent system configuration outside of `application.yml`.
 | `USER` | Manually created |
 | `AI` | Created by AI agent (e.g. Claude Code) |
 | `WORKFLOW` | Automatically created by workflow (e.g. AutoTodoService) |
+
+### Todo.Complexity / Todo.RatedBy / Goal.Status (V85)
+
+| Enum | Values | Meaning |
+|---|---|---|
+| `Todo.Complexity` | `S`, `M`, `L`, `XL` | Size and uncertainty, coarse – the same scale for people and AI |
+| `Todo.RatedBy` | `USER`, `AI` | Who set the assessment last; a person overrides the AI |
+| `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archived goals only show up with an explicit filter |
+
+### `goals` (V85)
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `title` | TEXT | NOT NULL | Name of the goal, e.g. "Open-source launch" |
+| `description` | TEXT | | Markdown: what "done" means |
+| `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
+| `target_date` | TEXT | | Target date |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+A goal groups TODOs across projects. Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs.
 
 ### LogLevel (ActivityLog)
 
