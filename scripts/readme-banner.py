@@ -26,7 +26,7 @@ AMBER = "#e8a54c"
 AI = "#b58ee8"  # --color-ai aus dem dunklen Standard-Theme
 HUMAN = "#56c2b0"  # --color-human
 
-# Wortlaut von Flo (2026-09-23); Titelzeile erklaert das Bild, die vier Zeilen sind seine Saetze.
+# Wortlaut des Autors (2026-09-23); Titelzeile erklaert das Bild, die vier Zeilen sind seine Saetze.
 TEXT = {
     "de": {
         "tagline": ["Baue deine eigenen Workflows mit deinen Erdmännchen",
