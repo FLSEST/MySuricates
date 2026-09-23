@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -57,6 +58,16 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
+    void publicEndpoint_jvmMemory_accessibleWithoutAuth() throws Exception {
+        // c2cda5ed: die drei Heap-Zahlen fuer den Performance-Audit — ohne Key, aber nur sie
+        mockMvc.perform(get("/api/v1/system/jvm-memory"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jvm_memory_used_bytes").isNumber())
+                .andExpect(jsonPath("$.jvm_memory_max_bytes").isNumber())
+                .andExpect(jsonPath("$.jvm_heap_used_percent").isNumber());
+    }
+
+    @Test
     void publicEndpoint_webhookTrigger_accessibleWithoutAuth() throws Exception {
         mockMvc.perform(post("/api/v1/webhook/trigger/test-token")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -91,6 +102,23 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
+    void protectedEndpoint_actuatorMetricsWithoutAuth_returns403() throws Exception {
+        // Die Metrik-Oberflaeche verraet Routen, Lastprofil und Speicherlage — sie bleibt
+        // hinter dem Key; frei ist nur /api/v1/system/jvm-memory (c2cda5ed).
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/metrics/jvm.memory.used"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void protectedEndpoint_requestMetricsWithoutAuth_returns403() throws Exception {
+        // Die Ausnahme gilt dem einen Pfad, nicht seinen Nachbarn unter /system.
+        mockMvc.perform(get("/api/v1/system/request-metrics"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void protectedEndpoint_withInvalidApiKey_returns403() throws Exception {
         mockMvc.perform(get("/api/v1/projects")
                         .header(API_KEY_HEADER, "wrong-key"))
@@ -108,6 +136,14 @@ class SecurityConfigIntegrationTest {
     @Test
     void protectedEndpoint_apiWithValidKey_succeeds() throws Exception {
         mockMvc.perform(get("/api/v1/projects")
+                        .header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void protectedEndpoint_actuatorMetricsWithValidKey_succeeds() throws Exception {
+        // Mit Key bleibt die Metrik-Oberflaeche erreichbar — gesperrt ist nur der Weg ohne Key.
+        mockMvc.perform(get("/actuator/metrics/jvm.memory.used")
                         .header(API_KEY_HEADER, VALID_API_KEY))
                 .andExpect(status().isOk());
     }

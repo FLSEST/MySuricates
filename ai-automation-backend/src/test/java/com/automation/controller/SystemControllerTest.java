@@ -7,6 +7,7 @@ import com.automation.service.system.ApiKeyService;
 import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,9 +18,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import javax.sql.DataSource;
+import java.lang.management.MemoryUsage;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -31,6 +36,9 @@ class SystemControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockitoBean
     private DataSource dataSource;
@@ -169,6 +177,47 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.rateLimit.enabled").value(false))
                 .andExpect(jsonPath("$.rateLimit.globalBackoffSeconds").value(2))
                 .andExpect(jsonPath("$.rateLimit.defaultRetryAfterSeconds").value(10));
+    }
+
+    // --- jvm-memory: drei Zahlen ohne Key statt der Metrik-Oberflaeche (c2cda5ed) ---
+
+    @Test
+    void jvmMemory_returnsExactlyTheThreeHeapNumbers() throws Exception {
+        String body = mockMvc.perform(get("/api/v1/system/jvm-memory"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jvm_memory_used_bytes").isNumber())
+                .andExpect(jsonPath("$.jvm_memory_max_bytes").isNumber())
+                .andExpect(jsonPath("$.jvm_heap_used_percent").isNumber())
+                .andReturn().getResponse().getContentAsString();
+
+        // Genau diese drei Schluessel, sonst nichts aus der Metrik-Oberflaeche.
+        assertThat(objectMapper.readValue(body, Map.class).keySet()).containsExactly(
+                "jvm_memory_used_bytes", "jvm_memory_max_bytes", "jvm_heap_used_percent");
+    }
+
+    @Test
+    void jvmMemory_percentIsUsedOverMax_roundedToOneDecimal() {
+        Map<String, Object> numbers = SystemController.jvmMemory(
+                new MemoryUsage(0, 268_435_456L, 300_000_000L, 1_073_741_824L));
+
+        assertThat(numbers).containsExactly(
+                entry("jvm_memory_used_bytes", 268_435_456L),
+                entry("jvm_memory_max_bytes", 1_073_741_824L),
+                entry("jvm_heap_used_percent", 25.0));
+        assertThat(SystemController.jvmMemory(new MemoryUsage(0, 1L, 3L, 3L)))
+                .containsEntry("jvm_heap_used_percent", 33.3);
+    }
+
+    @Test
+    void jvmMemory_undefinedMax_leavesMaxAndPercentEmpty() {
+        // MemoryUsage.getMax() ist -1, wenn die JVM kein Maximum kennt: dann gibt es keinen
+        // Anteil, und -1 als "Maximum" darf nicht als Zahl durchgereicht werden.
+        Map<String, Object> numbers = SystemController.jvmMemory(new MemoryUsage(0, 1_000L, 2_000L, -1L));
+
+        assertThat(numbers).containsExactly(
+                entry("jvm_memory_used_bytes", 1_000L),
+                entry("jvm_memory_max_bytes", null),
+                entry("jvm_heap_used_percent", null));
     }
 
     @Test

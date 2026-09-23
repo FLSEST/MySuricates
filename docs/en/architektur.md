@@ -294,7 +294,7 @@ com.automation
 | `WishController` | `/api/v1/wishes` | CRUD, cancel, respond, crystallize |
 | `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
 | `TestingController` | `/api/v1/testing` | Status, start, stop, reset, sync-preview, sync-definitions, report-result, pull-changes |
-| `SystemController` | `/api/v1/system` | Health, auth-status, info, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
+| `SystemController` | `/api/v1/system` | Health, auth-status, info, jvm-memory, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
 | `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list, task export targets |
 | `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding profiles CRUD, reset, history |
 | `ReportsController` | `/api/v1/reports` | Report generation and retrieval |
@@ -916,6 +916,7 @@ Response (DTO) → React Query Cache → UI Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
+- `GET /api/v1/system/jvm-memory` (only the three heap numbers; `/actuator/metrics` requires the key)
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)

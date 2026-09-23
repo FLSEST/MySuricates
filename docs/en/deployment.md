@@ -580,10 +580,15 @@ Authentication uses the `X-API-Key` header and covers `/api/**` and `/actuator/*
 | Path | Purpose |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Status checks before login |
+| `/api/v1/system/jvm-memory` | Heap usage as exactly three numbers (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`, `jvm_heap_used_percent`) for the performance audit |
 | `/actuator/health` | Docker healthcheck |
 | `/ws/**` | WebSocket handshake (the key is checked there as a query parameter) |
 | `/api/v1/webhook/trigger/**` | Public webhook entry point |
 | `/api/v1/integrations/*/callback` | OAuth callbacks |
+
+The rest of the actuator surface (`/actuator/metrics`, `/actuator/info`) requires the key: metrics
+reveal route names, load profile and memory situation to anyone who can reach the port. Measuring
+memory without a key therefore gets you only the three numbers from `/api/v1/system/jvm-memory`.
 
 Everything outside `/api/**` and `/actuator/**` is open as well (`anyRequest().permitAll()`) — that
 covers the bundled frontend and any unmapped path.

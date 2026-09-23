@@ -298,6 +298,20 @@ write_pool api-health-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "curl -s -o /dev/null -w '%{time_total}' http://localhost:9090/api/v1/system/health"}}]}
 JSON
 
+# Erlaubt: die drei Heap-Zahlen ohne Key (c2cda5ed) — der Performance-Audit liest sie dort.
+write_pool api-jvm-memory-ok <<'JSON'
+{"name": {"de": "Heap", "en": "Heap"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s -m 5 http://localhost:9090/api/v1/system/jvm-memory"}}]}
+JSON
+
+# Nicht erlaubt: der Nachbar unter /system verlangt den Key — die Ausnahme gilt nur dem Heap-Pfad.
+write_pool self-api-request-metrics <<'JSON'
+{"name": {"de": "Kosten", "en": "Costs"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "curl -s http://localhost:9090/api/v1/system/request-metrics"}}]}
+JSON
+
 # Erlaubt: das Praefix als Suchmuster in einer Liste, ohne Aufruf (mocking-gap-audit).
 write_pool api-prefix-as-marker-ok <<'JSON'
 {"name": {"de": "Marker", "en": "Marker"},
@@ -334,6 +348,8 @@ check "app_settings erkannt"                   'grep -q "app-settings-key.*CREDE
 check "sqlite3 auf die DB erkannt"             'grep -q "db-sqlite.*DB-DIRECT" <<<"$OUT"'
 check "Dateigroesse der DB bleibt erlaubt"     '! grep -q "db-filesize-ok" <<<"$OUT"'
 check "auth-freie Health-Sonde bleibt erlaubt" '! grep -q "api-health-ok" <<<"$OUT"'
+check "Heap-Zahlen ohne Key bleiben erlaubt"   '! grep -q "api-jvm-memory-ok" <<<"$OUT"'
+check "Request-Kosten mit Key erkannt"         'grep -q "self-api-request-metrics.*SELF-API" <<<"$OUT"'
 check "API-Praefix als Suchmuster erlaubt"     '! grep -q "api-prefix-as-marker-ok" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"

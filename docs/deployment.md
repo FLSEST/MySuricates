@@ -586,10 +586,15 @@ Ausgenommen sind:
 | Pfad | Zweck |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
+| `/api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`, `jvm_heap_used_percent`) für den Performance-Audit |
 | `/actuator/health` | Healthcheck für Docker |
 | `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprüft) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
 | `/api/v1/integrations/*/callback` | OAuth-Rückleitungen |
+
+Die übrige Actuator-Oberfläche (`/actuator/metrics`, `/actuator/info`) verlangt den Key: Metriken
+verraten Routennamen, Lastprofil und Speicherlage an jeden, der den Port erreicht. Wer ohne Key den
+Speicher messen will, bekommt deshalb nur die drei Zahlen von `/api/v1/system/jvm-memory`.
 
 Alles ausserhalb von `/api/**` und `/actuator/**` ist ebenfalls offen (`anyRequest().permitAll()`) —
 das betrifft das ausgelieferte Frontend und jeden nicht gemappten Pfad.

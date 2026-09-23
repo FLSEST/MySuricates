@@ -264,7 +264,7 @@ Which tool when:
 | A single slow query | `hibernate.log_slow_query` (>200 ms) in the backend log |
 | Everything slow, CPU high | JFR `jdk.ExecutionSample` |
 | Everything slow, CPU low | JFR `jdk.ThreadPark` |
-| Suspected leak or GC | JFR `jdk.GCPhasePause`, plus `/actuator/metrics/jvm.memory.used` |
+| Suspected leak or GC | JFR `jdk.GCPhasePause`, plus `/actuator/metrics/jvm.memory.used` (with the API key) or, without a key, the heap numbers from `/api/v1/system/jvm-memory` |
 
 **No scheduling under the integration test profile:** `@EnableScheduling` lives in `config/SchedulingConfig` with `@Profile("!integration")`. Every `@SpringBootTest` class runs with `@ActiveProfiles("integration")` and therefore without background jobs. Reason: those jobs otherwise write into the same SQLite file while tests run — `HealthAutoTodoService`, for example, creates a TODO as soon as the stable or test instance is unreachable. Such rows survive the `@Transactional` rollback (separate thread, separate transaction) and make globally counting assertions depend on whether a container happens to be running. Scheduled methods are invoked directly in tests, so their logic stays covered. When adding a new `@Scheduled` job, test it by calling the method directly — do not wait for a tick.
 

@@ -152,7 +152,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, Zeilen, Churn) | `scripts/tests/test-arch-metrics.sh` |
 | Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
-| Performance-Audit | Block `facts` (Actuator, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
+| Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`, Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
 | Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py` |
 
