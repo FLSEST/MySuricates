@@ -256,7 +256,7 @@ The assistant can load additional data via `<fetch type="..." id="..."/>` tags. 
 | `skill` | Skill detail | Desc: 200, AI context: 400, Capability desc: 100 |
 | `integration` | Integration detail | Desc: 200, Account: 80, Action desc: 100 |
 | `chain` | Chain detail | Desc: 200 |
-| `block-spec` | Block type specification per type (`DocsFetchHandler.BLOCK_SPECS`; not yet for `todo-create`/`-update`/`-close` and `dashboard-report`) | — |
+| `block-spec` | Block type specification per type (`BlockSpecs`, one for every type of the registry; `BlockTypeListsGuardTest` keeps it complete) | — |
 
 Doc files: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 

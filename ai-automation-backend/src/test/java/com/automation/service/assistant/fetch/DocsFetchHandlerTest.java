@@ -98,6 +98,16 @@ class DocsFetchHandlerTest {
                 .contains("shell").contains("compress-ai").contains("human-input");
     }
 
+    /** The four types that answered "Unknown block type" (TODO 321b414e) name their required config. */
+    @Test
+    void formatBlockSpec_todoAndDashboardBlocks_nameTheirRequiredConfig() {
+        assertThat(handler.formatBlockSpec("todo-create"))
+                .contains("Required config: title").contains("variable_name (default \"todo_id\")");
+        assertThat(handler.formatBlockSpec("todo-update")).contains("Required config: id");
+        assertThat(handler.formatBlockSpec("todo-close")).contains("Required config: id").contains("{{ todo_id }}");
+        assertThat(handler.formatBlockSpec("dashboard-report")).contains("Required config: status (GREEN/YELLOW/RED");
+    }
+
     @Test
     void formatBlockSpec_approval_documentsAnswerField() {
         assertThat(handler.formatBlockSpec("approval"))

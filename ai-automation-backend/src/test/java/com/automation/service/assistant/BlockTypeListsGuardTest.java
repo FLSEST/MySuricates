@@ -3,6 +3,8 @@ package com.automation.service.assistant;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.BlockTypeRegistry;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
+import com.automation.service.assistant.fetch.BlockSpecs;
+import com.automation.service.assistant.fetch.DocsFetchHandler;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -32,7 +34,8 @@ import static org.mockito.Mockito.withSettings;
  * <p>Fails when an executor is added without maintaining
  * {@link BlockTypesIndexSection#BLOCK_TYPES} (assistant context + {@code GET /system/capabilities})
  * or {@link AssistantToolValidator#KNOWN_BLOCK_TYPES}, and when either list drifts from
- * {@link BlockTypeRegistry} — the set the save-time block-type check uses.
+ * {@link BlockTypeRegistry} — the set the save-time block-type check uses. The assistant's block
+ * specifications ({@link BlockSpecs}, {@code fetch block-spec}) must cover the same types.
  */
 class BlockTypeListsGuardTest {
 
@@ -68,6 +71,23 @@ class BlockTypeListsGuardTest {
         assertThat(new TreeSet<>(AssistantToolValidator.KNOWN_BLOCK_TYPES))
                 .as("validator list vs. index-section list")
                 .containsExactlyElementsOf(indexSectionTypes());
+    }
+
+    /**
+     * {@code <fetch type="block-spec" id="…"/>} knows every listed type (TODO 321b414e): four types
+     * had no specification, and the assistant got "Unknown block type" for them.
+     */
+    @Test
+    void everyListedTypeHasABlockSpec() {
+        assertThat(new TreeSet<>(BlockSpecs.types()))
+                .as("BlockSpecs vs. BlockTypesIndexSection.BLOCK_TYPES")
+                .containsExactlyElementsOf(indexSectionTypes());
+        DocsFetchHandler docs = new DocsFetchHandler();
+        for (String type : indexSectionTypes()) {
+            assertThat(docs.formatBlockSpec(type)).as("block-spec of %s", type)
+                    .startsWith("**Block type: " + type + "**")
+                    .contains("Required config:");
+        }
     }
 
     @Test
