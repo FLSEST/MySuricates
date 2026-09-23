@@ -15,7 +15,7 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 14,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -56,7 +56,11 @@
             "required": true
           }
         ],
-        "timeout_minutes": 30
+        "timeout_minutes": 30,
+        "description": {
+          "de": "Nimmt die Meldung auf: Titel, Dringlichkeit, Details. Passe die Felder an.",
+          "en": "Takes in the report: title, urgency, details. Adjust the fields."
+        }
       }
     },
     {
@@ -98,7 +102,11 @@
               "command": "printf MEDIUM"
             }
           }
-        ]
+        ],
+        "description": {
+          "de": "Übersetzt die Dringlichkeit in eine Priorität. Passe die Fälle an deine Stufen an.",
+          "en": "Translates the urgency into a priority. Adapt the cases to your levels."
+        }
       }
     },
     {

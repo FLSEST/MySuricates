@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 10,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n# placeholder - stands in for your document\nprintf 'MySuricates blueprint\\n\\nThis sample file stands in for your document.\\n' > \"$D/sample.txt\"\necho \"$D/sample.txt\""
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\n# placeholder - stands in for your document\nprintf 'MySuricates blueprint\\n\\nThis sample file stands in for your document.\\n' > \"$D/sample.txt\"\necho \"$D/sample.txt\"",
+        "description": {
+          "de": "Legt nur eine Beispieldatei an. Streiche den Schritt, wenn dein Dokument schon existiert.",
+          "en": "Only creates a sample file. Drop this step once your document exists."
+        }
       },
       "name": {
         "de": "datei_anlegen",
@@ -39,14 +43,22 @@
         "file_path": "/tmp/mysuricates-blueprints/{{ workflow_run_id }}/sample.txt",
         "variable_name": "document_text",
         "min_characters": 10,
-        "fail_on_empty": true
+        "fail_on_empty": true,
+        "description": {
+          "de": "Liest den Text des Dokuments in {{ document_text }}. Setze file_path auf dein Dokument (PDF, DOCX, TXT …).",
+          "en": "Reads the document's text into {{ document_text }}. Point file_path at your document (PDF, DOCX, TXT …)."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ document_text }}\nW=$(printf '%s' \"$1\" | wc -w | tr -d ' ')\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\nprintf 'words=%s\\n' \"$W\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Verarbeitet den eingelesenen Text. Ersetze den Befehl durch deine Auswertung.",
+          "en": "Processes the text read in. Replace the command with your evaluation."
+        }
       },
       "name": {
         "de": "auswerten",

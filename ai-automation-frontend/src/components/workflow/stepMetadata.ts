@@ -8,6 +8,16 @@ export function stepBlockType(step: StepResult): string {
   return typeof fromMetadata === 'string' ? fromMetadata : '';
 }
 
+/**
+ * The block's step note (`config.description`), written by the backend as `metadata.blockDescription`
+ * (TODO 31b7aca8); null when the block has none. todo-create/-update never carry it — there the
+ * description is the TODO text.
+ */
+export function stepBlockNote(step: StepResult): string | null {
+  const note = step.metadata?.blockDescription;
+  return typeof note === 'string' && note.trim() ? note : null;
+}
+
 /** Block name of a step: top-level field, else `metadata.blockName`; null for unnamed blocks. */
 export function stepBlockName(step: StepResult): string | null {
   if (step.blockName) return step.blockName;

@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 8,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -23,7 +23,11 @@
       "type": "shell",
       "config": {
         "command": "# placeholder - this step fails on purpose\necho 'something went wrong' >&2\nexit 3",
-        "on_failure": "continue"
+        "on_failure": "continue",
+        "description": {
+          "de": "Scheitert absichtlich; on_failure: continue lässt den Lauf weiterlaufen. Ersetze ihn durch einen Schritt, dessen Fehler nur gemeldet werden soll.",
+          "en": "Fails on purpose; on_failure: continue keeps the run going. Replace it with a step whose failure should only be reported."
+        }
       },
       "name": {
         "de": "scheitert",
@@ -33,7 +37,11 @@
     {
       "type": "shell",
       "config": {
-        "command": "printf 'still running after the failed step\\n'"
+        "command": "printf 'still running after the failed step\\n'",
+        "description": {
+          "de": "Läuft trotz des Fehlers davor. Ersetze den Befehl durch deinen nächsten Schritt.",
+          "en": "Runs despite the failure before it. Replace the command with your next step."
+        }
       },
       "name": {
         "de": "weiter",

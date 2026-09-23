@@ -44,6 +44,19 @@ describe('ExecutionStepCard', () => {
     expect(screen.getByText('Human')).toBeInTheDocument();
   });
 
+  // 31b7aca8: the step note (config.description) reaches the run view via metadata
+  it('shows the step note under the header', () => {
+    render(<ExecutionStepCard step={step({ metadata: { blockType: 'shell', blockName: 'pruefen', blockDescription: 'Ersetze die Pruefung.' } })} />);
+
+    expect(screen.getByTestId('step-note')).toHaveTextContent('Ersetze die Pruefung.');
+  });
+
+  it('shows no note line for a step without one', () => {
+    render(<ExecutionStepCard step={step({ metadata: { blockType: 'shell' } })} />);
+
+    expect(screen.queryByTestId('step-note')).toBeNull();
+  });
+
   it('shows an unknown block type verbatim', () => {
     render(<ExecutionStepCard step={step({ blockType: 'future-block' })} />);
     expect(screen.getByText('future-block')).toBeInTheDocument();

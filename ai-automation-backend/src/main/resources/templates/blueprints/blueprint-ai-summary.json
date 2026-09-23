@@ -15,14 +15,18 @@
   },
   "category": "AI",
   "sortOrder": 19,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\n# placeholder - replace with the facts you want summarized\nprintf 'host=%s\\nos=%s\\ntime=%s\\nfree_mb=%s\\n' \"$(uname -n)\" \"$(uname -s)\" \"$(date '+%H:%M')\" \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\""
+        "command": "set -eu\n# placeholder - replace with the facts you want summarized\nprintf 'host=%s\\nos=%s\\ntime=%s\\nfree_mb=%s\\n' \"$(uname -n)\" \"$(uname -s)\" \"$(date '+%H:%M')\" \"$(df -Pk . | awk 'NR==2 {printf \"%d\", $4/1024}')\"",
+        "description": {
+          "de": "Sammelt die Fakten, die die KI bekommt. Ersetze den Befehl durch deine eigene Messung oder Abfrage.",
+          "en": "Collects the facts the AI gets. Replace the command with your own measurement or query."
+        }
       },
       "name": {
         "de": "sammeln",
@@ -40,6 +44,10 @@
         "command": {
           "de": "Fasse diese Messwerte in höchstens zwei Sätzen auf Deutsch zusammen. Schreibe keine Dateien und führe keine Befehle aus.\n\n{{ block.sammeln.output }}",
           "en": "Summarize these readings in at most two sentences in English. Do not write any files and do not run any commands.\n\n{{ block.collect.output }}"
+        },
+        "description": {
+          "de": "Der einzige KI-Aufruf: fasst die gesammelten Fakten zusammen. Passe den Auftrag an — Ziel, Länge, Sprache.",
+          "en": "The only AI call: summarizes the collected facts. Adjust the instruction — goal, length, language."
         }
       }
     }

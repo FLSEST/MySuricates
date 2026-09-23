@@ -195,6 +195,41 @@ class BlockStepRunnerTest {
         assertThat(context.getVariable("step_0_output")).isEqualTo("");
     }
 
+    /** 31b7aca8: the step note reaches the run view, before and after the block ran. */
+    @Test
+    void stepNote_isCarriedAsBlockDescription_atStartAndAfterTheRun() {
+        BlockDefinition block = block("pruefen", null);
+        block.getConfig().put("description", "Ersetze diese Pruefung durch deine eigene.");
+        when(blockExecutor.execute(eq(block), any())).thenReturn(result(StepStatus.COMPLETED, "ok"));
+
+        StepResult step = runner.startStep(run, 0, block, 0);
+        assertThat(step.getMetadata()).containsEntry("blockDescription", "Ersetze diese Pruefung durch deine eigene.");
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+        assertThat(step.getMetadata()).containsEntry("blockDescription", "Ersetze diese Pruefung durch deine eigene.");
+    }
+
+    @Test
+    void stepNote_isNotTakenFromTodoBlocks_whereDescriptionIsTheTodoText() {
+        for (String type : List.of("todo-create", "todo-update")) {
+            Map<String, Object> config = new HashMap<>(Map.of("description", "Text des TODOs"));
+            BlockDefinition block = BlockDefinition.builder().type(type).name("todo").config(config).build();
+
+            StepResult step = runner.startStep(run, 0, block, 0);
+
+            assertThat(step.getMetadata()).as(type).doesNotContainKey("blockDescription");
+        }
+    }
+
+    @Test
+    void stepNote_blankOrMissing_writesNothing() {
+        BlockDefinition blank = block("a", null);
+        blank.getConfig().put("description", "  ");
+
+        assertThat(runner.startStep(run, 0, blank, 0).getMetadata()).doesNotContainKey("blockDescription");
+        assertThat(runner.startStep(run, 1, block("b", null), 1).getMetadata()).doesNotContainKey("blockDescription");
+    }
+
     @Test
     void runStep_completedStep_setsContextDelta() {
         BlockDefinition block = block("b", null);

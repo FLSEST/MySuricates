@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 4,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -40,7 +40,11 @@
         ],
         "default_value": "low",
         "variable_name": "level",
-        "timeout_minutes": 30
+        "timeout_minutes": 30,
+        "description": {
+          "de": "Die Auswahl, die den Fall bestimmt. Passe die Optionen an deine Fälle an.",
+          "en": "The choice that picks the case. Adapt the options to your cases."
+        }
       }
     },
     {
@@ -93,7 +97,11 @@
               "command": "# placeholder - no case matched\nprintf 'case: default\\n'"
             }
           }
-        ]
+        ],
+        "description": {
+          "de": "Führt den passenden Fall aus; default fängt den Rest. Ersetze die Befehle in den Fällen.",
+          "en": "Runs the matching case; default catches the rest. Replace the commands in the cases."
+        }
       }
     }
   ]

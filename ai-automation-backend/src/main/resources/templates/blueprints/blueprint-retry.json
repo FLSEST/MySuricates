@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 7,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/attempts\"\necho prepared"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/attempts\"\necho prepared",
+        "description": {
+          "de": "Legt ein Arbeitsverzeichnis für diesen Lauf an. Meist unverändert übernehmen.",
+          "en": "Creates a working directory for this run. Usually keep as is."
+        }
       },
       "name": {
         "de": "vorbereiten",
@@ -40,13 +44,21 @@
         "max_retries": 3,
         "delay": 1,
         "exponential_backoff": true,
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/attempts\") + 1 ))\necho \"$N\" > \"$D/attempts\"\n# placeholder - fails twice on purpose, then succeeds\nif [ \"$N\" -lt 3 ]; then echo \"attempt $N failed\" >&2; exit 1; fi\nprintf 'attempt %s succeeded\\n' \"$N\""
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/attempts\") + 1 ))\necho \"$N\" > \"$D/attempts\"\n# placeholder - fails twice on purpose, then succeeds\nif [ \"$N\" -lt 3 ]; then echo \"attempt $N failed\" >&2; exit 1; fi\nprintf 'attempt %s succeeded\\n' \"$N\"",
+        "description": {
+          "de": "Versucht den Befehl erneut, bis er klappt; delay und exponential_backoff steuern die Pausen. Ersetze ihn durch deinen unzuverlässigen Befehl.",
+          "en": "Retries the command until it works; delay and exponential_backoff control the pauses. Replace it with your unreliable command."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned",
+        "description": {
+          "de": "Räumt das Arbeitsverzeichnis wieder weg. Meist unverändert übernehmen.",
+          "en": "Removes the working directory again. Usually keep as is."
+        }
       },
       "name": {
         "de": "aufraeumen",

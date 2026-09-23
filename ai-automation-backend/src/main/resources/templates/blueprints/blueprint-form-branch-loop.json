@@ -15,7 +15,7 @@
   },
   "category": "COMBINATIONS",
   "sortOrder": 18,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -57,7 +57,11 @@
             "required": true
           }
         ],
-        "timeout_minutes": 30
+        "timeout_minutes": 30,
+        "description": {
+          "de": "Fragt Modus und Rundenzahl ab; beide Werte steuern die folgenden Schritte. Passe die Felder an.",
+          "en": "Asks for mode and number of rounds; both values drive the following steps. Adjust the fields."
+        }
       }
     },
     {
@@ -88,13 +92,21 @@
               "command": "# placeholder - quiet setup\nprintf 'mode: quiet\\n'"
             }
           }
-        ]
+        ],
+        "description": {
+          "de": "Verzweigt nach {{ mode }}. Ersetze die Befehle der Fälle, behalte die Verknüpfung zum Formular.",
+          "en": "Branches on {{ mode }}. Replace the commands of the cases, keep the link to the form."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared",
+        "description": {
+          "de": "Legt ein Arbeitsverzeichnis für diesen Lauf an. Meist unverändert übernehmen.",
+          "en": "Creates a working directory for this run. Usually keep as is."
+        }
       },
       "name": {
         "de": "vorbereiten",
@@ -112,13 +124,21 @@
         "max_iterations": 5,
         "shell_escape_variables": true,
         "condition_command": "set -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt {{ rounds }} ]",
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - work per round\nprintf 'round %s\\n' \"$N\""
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\n# placeholder - work per round\nprintf 'round %s\\n' \"$N\"",
+        "description": {
+          "de": "Läuft {{ rounds }} Runden, max_iterations sichert ab. Ersetze die Arbeit pro Runde.",
+          "en": "Runs {{ rounds }} rounds, max_iterations is the safeguard. Replace the work per round."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned",
+        "description": {
+          "de": "Räumt das Arbeitsverzeichnis wieder weg. Meist unverändert übernehmen.",
+          "en": "Removes the working directory again. Usually keep as is."
+        }
       },
       "name": {
         "de": "aufraeumen",

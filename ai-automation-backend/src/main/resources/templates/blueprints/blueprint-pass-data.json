@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 0,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "# placeholder - replace with a command that produces data\nprintf '%s\\n' alpha beta gamma"
+        "command": "# placeholder - replace with a command that produces data\nprintf '%s\\n' alpha beta gamma",
+        "description": {
+          "de": "Liefert die Daten, die weitergereicht werden. Ersetze den Befehl durch deinen eigenen.",
+          "en": "Produces the data that is passed on. Replace the command with your own."
+        }
       },
       "name": "data"
     },
@@ -30,7 +34,11 @@
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ block.data.output }}\nprintf 'lines=%s\\n' \"$(printf '%s\\n' \"$1\" | grep -c .)\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest die Daten über den Blocknamen ({{ block.data.output }}). Ersetze die Verarbeitung.",
+          "en": "Reads the data by block name ({{ block.data.output }}). Replace the processing."
+        }
       },
       "name": {
         "de": "zaehlen",
@@ -41,7 +49,11 @@
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ previous_output }}\nprintf 'previous step said: %s\\n' \"$1\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Liest die Ausgabe des Schritts davor über {{ previous_output }}. Ersetze die Verarbeitung.",
+          "en": "Reads the previous step's output via {{ previous_output }}. Replace the processing."
+        }
       },
       "name": {
         "de": "ergebnis",

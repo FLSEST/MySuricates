@@ -15,14 +15,18 @@
   },
   "category": "BASICS",
   "sortOrder": 6,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nmkdir -p \"$D\"\necho 0 > \"$D/counter\"\necho prepared",
+        "description": {
+          "de": "Legt ein Arbeitsverzeichnis und den Zähler an. Meist unverändert übernehmen.",
+          "en": "Creates a working directory and the counter. Usually keep as is."
+        }
       },
       "name": {
         "de": "vorbereiten",
@@ -39,13 +43,21 @@
         "execution_mode": "shell",
         "max_iterations": 10,
         "condition_command": "# placeholder - loop while this exits 0\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\n[ \"$(cat \"$D/counter\")\" -lt 3 ]",
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\nprintf 'round %s\\n' \"$N\""
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nN=$(( $(cat \"$D/counter\") + 1 ))\necho \"$N\" > \"$D/counter\"\nprintf 'round %s\\n' \"$N\"",
+        "description": {
+          "de": "Wiederholt, solange die Bedingung Exit 0 liefert; max_iterations sichert ab. Ersetze Bedingung und Schleifenbefehl.",
+          "en": "Repeats while the condition exits 0; max_iterations is the safeguard. Replace the condition and the loop command."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
-        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned"
+        "command": "set -eu\nset -- {{ workflow_run_id }}\nD=/tmp/mysuricates-blueprints/$1\nrm -rf \"$D\"\necho cleaned",
+        "description": {
+          "de": "Räumt das Arbeitsverzeichnis wieder weg. Meist unverändert übernehmen.",
+          "en": "Removes the working directory again. Usually keep as is."
+        }
       },
       "name": {
         "de": "aufraeumen",

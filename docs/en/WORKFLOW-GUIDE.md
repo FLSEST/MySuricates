@@ -1711,6 +1711,7 @@ Besides **templates** (finished tasks) and the **pool** there are **blueprints**
 - **Always bilingual** (`"i18n": ["de","en"]`), `id` prefixed `blueprint-`, category `BASICS`, `COMBINATIONS` or `AI`.
 - **Placeholders:** shell steps do something harmless and carry a comment `# placeholder - …`. Scratch files live in `/tmp/mysuricates-blueprints/<run id>`, the last step removes them.
 - **0 tokens outside `AI`:** no AI block types; `foreach`, `while`, `conditional` and `retry` need `"execution_mode": "shell"`, otherwise they ask the AI. `BlueprintGateTest` checks this.
+- **Explanation per step:** `config.description` (bilingual) says what the step does in the pattern and what to replace. The editor shows it under the block, the run view under the step header (`metadata.blockDescription`). This works in every workflow, since `description` is a common key with no effect on execution. The exceptions are `todo-create` and `todo-update`, where `description` is the TODO's text.
 
 ---
 

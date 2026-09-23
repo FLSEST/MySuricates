@@ -1734,6 +1734,7 @@ Neben **Vorlagen** (fertige Aufgaben) und dem **Pool** gibt es **Blaupausen**: l
 - **Immer zweisprachig** (`"i18n": ["de","en"]`), `id` mit Präfix `blueprint-`, Kategorie `BASICS`, `COMBINATIONS` oder `AI`.
 - **Platzhalter:** Shell-Schritte tun etwas Harmloses und tragen einen Kommentar `# placeholder - …`. Arbeitsdateien liegen in `/tmp/mysuricates-blueprints/<Run-ID>`, der letzte Schritt räumt sie weg.
 - **0 Tokens außerhalb von `AI`:** keine KI-Block-Typen; `foreach`, `while`, `conditional` und `retry` brauchen `"execution_mode": "shell"`, sonst fragen sie die KI. Das prüft `BlueprintGateTest`.
+- **Erklärtext je Schritt:** `config.description` (zweisprachig) sagt, was der Schritt im Muster tut und was man ersetzt. Der Editor zeigt ihn unter dem Block, die Run-Ansicht unter dem Step-Kopf (`metadata.blockDescription`). Das gilt für jeden Workflow, denn `description` ist ein gemeinsamer Schlüssel ohne Wirkung auf die Ausführung. Ausgenommen sind `todo-create` und `todo-update`, dort ist `description` der Text des TODOs.
 
 ---
 

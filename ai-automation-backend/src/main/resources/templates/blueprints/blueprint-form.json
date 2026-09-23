@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 2,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -81,14 +81,22 @@
             "required": false
           }
         ],
-        "timeout_minutes": 30
+        "timeout_minutes": 30,
+        "description": {
+          "de": "Das Formular: jedes Feld wird eine Variable des Laufs. Passe Felder, Typen und Vorgaben an.",
+          "en": "The form: every field becomes a variable of the run. Adjust fields, types and defaults."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ environment }} {{ reason }} {{ count }} {{ dry_run }}\nprintf 'environment=%s\\nreason=%s\\ncount=%s\\ndry_run=%s\\n' \"$1\" \"$2\" \"$3\" \"$4\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Zeigt, wie die Formularwerte ankommen. Ersetze den Befehl durch deinen Schritt, der sie nutzt.",
+          "en": "Shows how the form values arrive. Replace the command with your step that uses them."
+        }
       },
       "name": {
         "de": "verwenden",

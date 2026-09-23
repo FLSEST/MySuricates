@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 3,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -29,14 +29,22 @@
         "execution_mode": "shell",
         "condition": "# placeholder - replace with your own test (exit 0 = then, otherwise else)\n[ \"$(df -Pk . | awk 'NR==2 {print $4}')\" -gt 1048576 ]",
         "then_command": "printf 'enough space\\n'",
-        "else_command": "printf 'low on space\\n'"
+        "else_command": "printf 'low on space\\n'",
+        "description": {
+          "de": "Die Bedingung entscheidet: Exit 0 führt zu then, alles andere zu else. Ersetze Bedingung und beide Befehle.",
+          "en": "The condition decides: exit 0 leads to then, anything else to else. Replace the condition and both commands."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ previous_output }}\nprintf 'decision: %s\\n' \"$1\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Läuft nach beiden Wegen. Ersetze den Befehl durch deinen Abschluss.",
+          "en": "Runs after either route. Replace the command with your final step."
+        }
       },
       "name": {
         "de": "abschluss",

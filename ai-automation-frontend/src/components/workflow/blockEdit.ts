@@ -62,3 +62,16 @@ export function blockUsesSkills(type: string, config: Record<string, unknown> | 
   const mode = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).execution_mode : undefined;
   return mode !== 'shell';
 }
+
+/** Block types whose `config.description` is content (the TODO text), not a note on the step. */
+const DESCRIPTION_IS_CONTENT = new Set(['todo-create', 'todo-update']);
+
+/**
+ * The note on a step (`config.description`, a common key without effect on execution) — what the
+ * editor shows under the block, e.g. the "replace this with …" hints of the blueprints (TODO 31b7aca8).
+ */
+export function blockNote(block: { type: string; config?: Record<string, unknown> }): string | null {
+  if (DESCRIPTION_IS_CONTENT.has(block.type)) return null;
+  const note = block.config?.description;
+  return typeof note === 'string' && note.trim() ? note : null;
+}

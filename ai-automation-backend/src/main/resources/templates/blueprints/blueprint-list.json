@@ -15,7 +15,7 @@
   },
   "category": "BASICS",
   "sortOrder": 5,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -35,14 +35,22 @@
         "variable_name": "item",
         "continue_on_error": true,
         "shell_escape_variables": true,
-        "command": "set -eu\n# placeholder - replace with what should happen per item\nif [ {{ item }} = beta ]; then echo 'fails on purpose: beta' >&2; exit 1; fi\nprintf 'done: %s\\n' {{ item }}"
+        "command": "set -eu\n# placeholder - replace with what should happen per item\nif [ {{ item }} = beta ]; then echo 'fails on purpose: beta' >&2; exit 1; fi\nprintf 'done: %s\\n' {{ item }}",
+        "description": {
+          "de": "Ein Befehl pro Element; continue_on_error lässt die übrigen weiterlaufen. Ersetze die Liste (oder nimm items_command) und den Befehl.",
+          "en": "One command per item; continue_on_error keeps the others going. Replace the list (or use items_command) and the command."
+        }
       }
     },
     {
       "type": "shell",
       "config": {
         "command": "set -eu\nset -- {{ previous_output }}\n# foreach prefixes every line with [item]:\nprintf 'items done: %s\\n' \"$(printf '%s\\n' \"$1\" | grep -c ': done: ' || true)\"",
-        "shell_escape_variables": true
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Fasst die Ergebnisse der Liste zusammen. Ersetze den Befehl durch deine Auswertung.",
+          "en": "Sums up the results of the list. Replace the command with your evaluation."
+        }
       },
       "name": {
         "de": "zusammenfassen",

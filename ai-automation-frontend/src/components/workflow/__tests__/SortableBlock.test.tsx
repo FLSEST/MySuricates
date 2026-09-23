@@ -27,4 +27,18 @@ describe('SortableBlock', () => {
 
     expect(screen.getByText('quantum-block')).toBeInTheDocument();
   });
+
+  // 31b7aca8: the editor shows the step name and, for blueprints, what belongs into the step
+  it('shows the step name and the step note', () => {
+    renderBlock({ type: 'shell', name: 'pruefen', config: { command: 'test -f x', description: 'Ersetze die Pruefung.' } });
+
+    expect(screen.getByTestId('block-name')).toHaveTextContent('pruefen');
+    expect(screen.getByTestId('block-note')).toHaveTextContent('Ersetze die Pruefung.');
+  });
+
+  it('shows no note for a TODO block, whose description is the TODO text', () => {
+    renderBlock({ type: 'todo-create', name: 'melden', config: { title: 'Befund', description: 'Text des TODOs' } });
+
+    expect(screen.queryByTestId('block-note')).toBeNull();
+  });
 });
