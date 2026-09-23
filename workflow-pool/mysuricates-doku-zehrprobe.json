@@ -1,0 +1,68 @@
+{
+  "name": {
+    "de": "MySuricates Doku-Zehrprobe",
+    "en": "MySuricates Documentation Weight Check"
+  },
+  "description": {
+    "de": "Prueft wiederholbar, ob jedes Dokument noch sein Gewicht traegt: ein Shell-Block misst Erreichbarkeit, Verweise, Pflegestand und Themen-Ueberlappung, die KI urteilt je auffaelligem Dokument, ob es so ins Repository gehoert. Befunde landen im Audit Center.",
+    "en": "Repeatable check whether every document still carries its weight: a shell block measures reachability, references, maintenance and topic overlap; the AI judges per flagged document whether it belongs in the repository as it is. Findings go to the Audit Center."
+  },
+  "category": "CUSTOM",
+  "icon": "📚",
+  "tags": [
+    "documentation",
+    "mysuricates",
+    "audit",
+    "quality",
+    "continuous-improvement"
+  ],
+  "author": "MySuricates",
+  "version": "1.0.0",
+  "scope": "repo",
+  "model": "opus",
+  "metadata": {
+    "audit": {
+      "enabled": true,
+      "key": "mysuricates.docs",
+      "category": "documentation",
+      "reportBlock": "report",
+      "schemaVersion": 1
+    },
+    "workspace": {
+      "mode": "isolated",
+      "source": "commit"
+    }
+  },
+  "blocks": [
+    {
+      "name": "dossier",
+      "type": "shell",
+      "config": {
+        "label": "Doku vermessen",
+        "timeout_seconds": 300,
+        "on_failure": "continue",
+        "shell_escape_variables": true,
+        "command": "set -uo pipefail\nexport LC_ALL=C\nBASE={{ execution_path }}\ncd \"$BASE\" || { echo 'NICHT GEMESSEN: docs_dossier (Arbeitsverzeichnis nicht erreichbar)'; exit 0; }\nif [ ! -f scripts/public-readiness/docs_orphan_scan.py ]; then\n  echo 'NICHT GEMESSEN: docs_dossier (scripts/public-readiness/docs_orphan_scan.py fehlt)'\n  exit 0\nfi\npython3 scripts/public-readiness/docs_orphan_scan.py --root \"$BASE\"\nrc=$?\nif [ \"$rc\" = \"2\" ]; then\n  echo 'NICHT GEMESSEN: docs_dossier (Skript meldet: gar nichts gemessen)'\nelif [ \"$rc\" != \"0\" ]; then\n  echo \"NICHT GEMESSEN: docs_dossier (Skript-Exitcode $rc)\"\nfi\nexit 0\n"
+      }
+    },
+    {
+      "name": "report",
+      "type": "simple",
+      "config": {
+        "label": "Urteilen und Befunde ausgeben",
+        "timeout_seconds": 600,
+        "command": "WICHTIG: Gib den GESAMTEN Report als direkte Text-Antwort aus. Schreibe KEINE Dateien (keine .md, keine .txt, nichts). Alles — inklusive Audit-Envelope — muss in deiner Antwort stehen.\n\nDu beurteilst die Dokumentation von MySuricates. Die Frage ist nicht, ob ein Dokument stimmt (das prueft doc-facts-check.sh) und nicht, ob es verstaendlich ist (das prueft die Doku-Durchsicht), sondern: **traegt es noch sein Gewicht, oder zehrt es?**\n\n## FAKTENBLATT (deine einzige Zahlenquelle)\n{{ previous_output }}\n\n## LETZTER REPORT\n{{ previous_report }}\n\n## OFFENE TODOS\n{{ open_todos }}\n\n---\n\n## MESSREGEL (verbindlich)\n\nBewerte ausschliesslich das Faktenblatt. **Miss und zaehle nichts selbst** — du siehst das Repository nicht, du siehst diese Messung. Jede Zahl in deinem Report nennt die FAKT-Zeile, aus der sie stammt. Eine `NICHT GEMESSEN:`-Zeile ist eine verbindliche Auskunft ueber eine Luecke, kein Freibrief zum Schaetzen.\n\nJede `TREFFER docs_candidate:`-Zeile traegt alle Achsen eines Dokuments nebeneinander:\n`lines` Umfang · `share` Anteil am Korpus · `inbound_links` echte Markdown-Links darauf ·\n`mentions` Pfadnennungen im Quelltext · `container` ein Konsument, der das Verzeichnis ausliefert ·\n`reachable` vom README-Index aus erreichbar · `last_content` letzte **inhaltliche** Aenderung ·\n`content_edits` / `wave_edits` inhaltliche Pflege gegenueber blossen Sync-Wellen.\n\n`wave_edits=15 content_edits=1` heisst: fuenfzehnmal angefasst, einmal gepflegt. Das ist ein Dokument, das mitgeschleift wird — nicht eines, das gepflegt wird.\n\n## DEIN URTEIL\n\nJe Kandidat genau eine Empfehlung:\n\n- **bleibt** — das Dokument traegt. Kein Finding.\n- **zusammenlegen** — sein Inhalt gehoert in ein anderes Dokument.\n- **erzeugen statt pflegen** — eine handgefuehrte Aufzaehlung, die zwangslaeufig altert; es gibt eine Quelle, aus der sie erzeugt werden koennte.\n- **verlinken** — das Dokument traegt, aber niemand findet es.\n- **streichen** — niemand braucht es mehr.\n\nEin `container=`-Eintrag bedeutet: Die Anwendung liefert dieses Dokument aus, auch wenn kein Text darauf verlinkt. Das ist echte Erreichbarkeit fuer Nutzer der App, aber keine fuer Leser des Repositorys — entscheide, welche hier zaehlt, und sag warum.\n\n## REPORT-FORMAT\n\n### Doku-Zehrprobe — {{ started_at }}\n\n**Korpus**: <docs_scope_files> Dokumente, <docs_scope_lines> Zeilen (FAKT docs_scope_files, docs_scope_lines)\n**Nicht vom Index erreichbar**: <docs_unreachable_from_roots> (<docs_unreachable_line_share_pct> % des Korpus)\n**Ohne inhaltliche Pflege**: <docs_no_content_edit_180d> im Fenster von <stale_window_days> Tagen\n\n### Urteile\n\n| Dokument | Zeilen | Befund | Empfehlung | Begruendung |\n|---|---:|---|---|---|\n\nDann je empfohlener Aenderung ein Absatz: was konkret zu tun ist und was verloren geht, wenn man es tut.\n\nGib **KEINEN** `gate_status` aus. Das Gate-Urteil faellt der nachgelagerte Shell-Block.\n\n## STRUKTURIERTES AUDIT-ERGEBNIS (VERBINDLICH)\n\nSchliesse mit genau einem HTML-Kommentar. Kein Delta — immer der komplette Schnappschuss.\n\nErlaubte ruleKey-Werte, woertlich und unveraendert:\n\n- ruleKey \"docs.orphan\" — weder vom Index erreichbar noch ueber `container` oder `mentions`; niemand kommt dort an\n- ruleKey \"docs.unlinked-from-index\" — nur ueber `container` oder `mentions` erreichbar, nicht ueber den Doku-Index\n- ruleKey \"docs.unmaintained\" — seit dem Pflegefenster keine inhaltliche Aenderung, und der Inhalt beschreibt etwas, das sich seither geaendert hat\n- ruleKey \"docs.superseded-by\" — ein anderes Dokument traegt dasselbe Thema (aus `TREFFER docs_overlap_pair`)\n\n`subject` ist die Identitaet des Befunds ueber Laeufe hinweg und muss zeichengleich bleiben:\nder **deutsche** Pfad aus dem Feld `de_path` der Trefferzeile (nie `docs/en/...`, sonst wandert\ndie Identitaet, sobald eine Uebersetzung entsteht oder verschwindet). Bei `docs.superseded-by`\nist es das Paar `pfad-a::pfad-b`, beide Pfade lexikografisch sortiert.\n\n`severity` nach Gewicht: `share >= 3 %` → HIGH, `share >= 0.5 %` → MEDIUM, sonst LOW. Umfang allein ist nie ein Befund — er gewichtet nur einen.\n\n`evidence` MUSS eine FAKT- oder TREFFER-Zeile dieses Laufs woertlich nennen (z. B. `docs_candidate: docs/onboarding/GLOSSARY.md`). Ein Beleg, der nicht aus dem Faktenblatt stammt, wird als unbelegt markiert und erzeugt kein TODO.\n\n`tags`: `[\"documentation\"]`.\n\n**Stabilitaet ueber Laeufe:** Ein Dokument, das du im LETZTEN REPORT gemeldet hast und dessen Trefferzeile unveraendert ist, meldest du wieder. Das Audit Center wertet deinen Envelope als vollstaendigen Schnappschuss und setzt jeden fehlenden Befund auf RESOLVED — ein blosser Sinneswandel wuerde also „behoben\" melden, ohne dass sich etwas geaendert hat. Aendere dein Urteil nur, wenn die Messung es hergibt, und begruende es dann im Report.\n\nGib keine todo-item-Zeilen aus; TODOs werden aus den strukturierten Findings verwaltet.\n\nFormat (findings darf leer sein, wenn jedes Dokument traegt):\n\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stabile-regel-id\",\"subject\":\"pfad/zur/datei\",\"severity\":\"MEDIUM\",\"title\":\"Kurzfassung\",\"description\":\"Empfehlung und was verloren geht\",\"evidence\":\"docs_candidate: pfad/zur/datei\",\"tags\":[\"documentation\"]}]}\n-->\n\nSetze `\"snapshotComplete\": false`, wenn das Faktenblatt fehlt oder eine `NICHT GEMESSEN: docs_dossier`-Zeile traegt: dann wird der Run als INVALID historisiert und veraendert keine Befunde — besser als ein Schnappschuss, der auf einer ausgefallenen Messung beruht.\n"
+      }
+    },
+    {
+      "name": "gate",
+      "type": "shell",
+      "config": {
+        "label": "Vollstaendigkeit pruefen",
+        "timeout_seconds": 120,
+        "shell_escape_variables": true,
+        "command": "set -uo pipefail\nset -- {{ block.dossier.output }}\nDOSSIER=${1:-}\nset -- {{ block.report.output }}\nREPORT=${1:-}\n# Unaufgeloeste Platzhalter (Block gar nicht gelaufen) zaehlen als 'nichts geliefert'.\nPH='{'\"{\"\ncase \"$DOSSIER\" in \"$PH\"*) DOSSIER='' ;; esac\ncase \"$REPORT\" in \"$PH\"*) REPORT='' ;; esac\n\n# Der Envelope ist ein Vollschnappschuss: fehlt er oder ist er unvollstaendig, setzt das\n# Audit Center jeden nicht gelieferten Befund auf RESOLVED. Anders als bei der\n# Test-Abdeckung gibt es hier bewusst keine Soll-Zahl — welche Kandidaten ein Befund\n# sind, ist das Urteil des Reports, keine Messung. Geprueft wird deshalb, ob die\n# Messung ueberhaupt getragen hat.\nENVELOPE=$(printf '%s\\n' \"$REPORT\" | sed -n '/mysuricates:audit-result:v1/,/-->/p')\nPFLICHT=$(printf '%s\\n' \"$DOSSIER\" | sed -n 's/^PFLICHT-FAKTEN: *//p' | tail -1)\nFEHLEND=''\nfor name in $PFLICHT; do\n  printf '%s\\n' \"$DOSSIER\" | grep -q \"^FAKT ${name}:\" || FEHLEND=\"$FEHLEND $name\"\ndone\n\nif [ -z \"$DOSSIER\" ]; then\n  echo 'Doku-Zehrprobe: Faktenblatt fehlt'\n  echo 'gate_status: RED'\n  echo 'gate_category: audit-invalid'\n  echo 'gate_description: Der Messblock hat nichts geliefert — das Urteil des Reports haette keine Grundlage'\nelif [ -z \"$PFLICHT\" ]; then\n  echo 'Doku-Zehrprobe: Pflichtfelder nicht deklariert'\n  echo 'gate_status: RED'\n  echo 'gate_category: audit-invalid'\n  echo 'gate_description: Das Faktenblatt nennt keine PFLICHT-FAKTEN — Vollstaendigkeit nicht pruefbar'\nelif [ -n \"$FEHLEND\" ]; then\n  echo \"Doku-Zehrprobe: Pflichtfelder fehlen:$FEHLEND\"\n  echo 'gate_status: RED'\n  echo 'gate_category: audit-invalid'\n  echo \"gate_description: Diese Pflicht-FAKT-Zeilen fehlen im Faktenblatt:$FEHLEND\"\nelif [ -z \"$ENVELOPE\" ]; then\n  echo 'Doku-Zehrprobe: Envelope fehlt'\n  echo 'gate_status: RED'\n  echo 'gate_category: audit-invalid'\n  echo 'gate_description: Der Report hat keinen mysuricates:audit-result:v1-Envelope geliefert — es wurden keine Befunde uebernommen'\nelif printf '%s' \"$ENVELOPE\" | tr -d ' ' | grep -q '\"snapshotComplete\":false'; then\n  echo 'Doku-Zehrprobe: Schnappschuss als unvollstaendig gemeldet'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: audit-invalid'\n  echo 'gate_description: Der Report meldet snapshotComplete=false — der Run wird als INVALID historisiert, die Befunde bleiben auf dem alten Stand'\nelse\n  KANDIDATEN=$(printf '%s\\n' \"$DOSSIER\" | sed -n 's/^FAKT docs_candidates: *//p' | tail -1)\n  BEFUNDE=$(printf '%s\\n' \"$ENVELOPE\" | grep -o '\"ruleKey\"' | wc -l | tr -d ' ')\n  echo \"Doku-Zehrprobe: ${KANDIDATEN:-0} Kandidaten gemessen, $BEFUNDE als Befund beurteilt\"\n  if [ \"$BEFUNDE\" -gt 0 ]; then\n    echo 'gate_status: YELLOW'\n  else\n    echo 'gate_status: GREEN'\n  fi\n  echo 'gate_category: documentation-weight'\n  echo \"gate_description: ${KANDIDATEN:-0} auffaellige Dokumente gemessen, $BEFUNDE davon als Befund beurteilt\"\nfi\n"
+      }
+    }
+  ]
+}

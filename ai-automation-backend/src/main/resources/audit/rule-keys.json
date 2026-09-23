@@ -85,5 +85,11 @@
     "public.evidence.claude-dir-tracking",
     "public.evidence.git-status-empty",
     "public.evidence.script-inconsistency"
+  ],
+  "mysuricates.docs": [
+    "docs.orphan",
+    "docs.unlinked-from-index",
+    "docs.unmaintained",
+    "docs.superseded-by"
   ]
 }

@@ -26,13 +26,15 @@ from __future__ import annotations
 
 import argparse
 import difflib
-import re
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
-FENCE = re.compile(r"^\s*(?:```|~~~)")
+# Das eigene Verzeichnis muss auf den Pfad: Tests laden dieses Skript ueber
+# spec_from_file_location, und dabei liegt sein Verzeichnis nicht auf sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from md_common import headings, iter_links, slug, tracked_markdown  # noqa: E402
 
 # Bekannte, ticketierte Luecken. Format: Pfad -> Begruendung mit TODO-Kennung.
 KNOWN_GAPS: dict[str, str] = {
@@ -59,46 +61,6 @@ KNOWN_SECTION_GAPS: dict[str, str] = {
 }
 
 
-def slug(heading: str) -> str:
-    """Anker-Slug nach GitHubs Regeln.
-
-    Kleinschreibung, alles ausser Buchstaben/Ziffern/Unterstrich/Bindestrich/Leerzeichen
-    faellt weg, dann wird **jedes einzelne** Leerzeichen zu einem Bindestrich. Das letzte
-    Detail ist der Fallstrick: Wer Leerzeichenfolgen zu einem Bindestrich zusammenzieht,
-    haelt korrekte Anker faelschlich fuer tot (passiert bei der Erstfassung dieses Skripts).
-    """
-    text = heading.lstrip("#").strip().lower()
-    text = re.sub(r"[^\w\- ]", "", text, flags=re.UNICODE)
-    return text.replace(" ", "-")
-
-
-def headings(path: Path) -> list[str]:
-    """Ueberschriften einer Datei, ohne die in Code-Bloecken.
-
-    Ein `# Kommentar` in einem Shell-Beispiel ist keine Ueberschrift — ohne die
-    Fence-Erkennung zaehlt er mit und erzeugt einen Phantom-Unterschied.
-    """
-    out: list[str] = []
-    fence = False
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        stripped = line.lstrip()
-        if FENCE.match(line):
-            fence = not fence
-            continue
-        if not fence and stripped.startswith("#") and not stripped.startswith("#!"):
-            out.append(stripped)
-    return out
-
-
-def tracked_markdown(root: Path) -> list[str]:
-    result = subprocess.run(
-        ["git", "ls-files", "*.md"], cwd=root, capture_output=True, text=True, check=False
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        return sorted(result.stdout.split())
-    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*.md"))
-
-
 def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
     findings: list[str] = []
     checked = 0
@@ -106,32 +68,18 @@ def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
         path = root / rel
         if not path.exists():
             continue
-        fence = False
-        for no, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
-            if FENCE.match(line):
-                fence = not fence
+        # Welche Links aktiv und relativ sind, entscheidet md_common.iter_links —
+        # dieselbe Regel, die der Linkgraph in docs_orphan_scan.py benutzt.
+        for no, href in iter_links(path):
+            checked += 1
+            path_part, _, frag = href.partition("#")
+            target = (path.parent / path_part).resolve() if path_part else path.resolve()
+            if not target.exists():
+                findings.append(f"totes-ziel {rel}:{no} -> {href}")
                 continue
-            if fence:
-                continue
-            # Auskommentierte Zeilen sind nicht aktiv — die Screenshot-Platzhalter in
-            # beiden READMEs stehen genau so da und sind kein toter Link.
-            if "<!--" in line and "-->" in line:
-                continue
-            for href in LINK.findall(line):
-                if href.startswith(("http://", "https://", "mailto:", "#")):
-                    continue
-                # Routen-Vorlagen wie /workflows/<id> sind Platzhalter, keine Dateiverweise.
-                if "<" in href or ">" in href:
-                    continue
-                checked += 1
-                path_part, _, frag = href.partition("#")
-                target = (path.parent / path_part).resolve() if path_part else path.resolve()
-                if not target.exists():
-                    findings.append(f"totes-ziel {rel}:{no} -> {href}")
-                    continue
-                if frag and target.suffix == ".md":
-                    if frag.lower() not in {slug(h) for h in headings(target)}:
-                        findings.append(f"toter-anker {rel}:{no} -> {href}")
+            if frag and target.suffix == ".md":
+                if frag.lower() not in {slug(h) for h in headings(target)}:
+                    findings.append(f"toter-anker {rel}:{no} -> {href}")
     return findings, checked
 
 

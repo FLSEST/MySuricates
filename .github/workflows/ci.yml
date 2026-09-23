@@ -58,6 +58,11 @@ jobs:
         run: python3 scripts/public-readiness/docs_parity_check.py
       - name: Doku-Verweis-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
+      # Misst nur, meldet nicht: das Urteil ueber die Kandidaten faellt der Workflow
+      # "Doku-Zehrprobe". Hier laeuft allein der Selbsttest, damit die Heuristik nicht
+      # unbemerkt driftet — ein Gate waere es nicht, weil "verwaist" ein Urteil ist.
+      - name: Doku-Zehrprobe Selbsttest
+        run: python3 -m unittest discover -s scripts/tests -p 'test_docs_orphan_scan.py'
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
       # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
