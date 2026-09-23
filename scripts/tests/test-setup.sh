@@ -71,12 +71,14 @@ check "instance file for host"                          '[ "$(val main MYSURICAT
 check "default provider is the one installed (codex)"   '[ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
 check "dry run names the start command"                 'out | grep "instance.sh up --name main" >/dev/null'
 check "host: no container switches for the AI"          '[ -z "$(val main MYSURICATES_AI_FROM_HOST)" ]'
+check "host: says it does not start after a reboot"     'out | grep -qF "After a reboot of this machine main does not start by itself — then: scripts/instance.sh up --name main"'
 
 echo "4) one instance in a container (default)"
 rm -rf "$INST"
 check "--yes --dry-run → container"                     '[ "$(run --yes --dry-run)" = 0 ] && [ "$(val main MYSURICATES_RUNTIME)" = container ]'
 check "projects: folder above the clone"                '[ "$(val main MYSURICATES_PROJECTS)" = "$(cd "$HERE/../../.." && pwd)" ]'
 check "docker socket off by default"                    '[ "$(val main MYSURICATES_DOCKER_SOCKET)" = 0 ]'
+check "container: no reboot warning (restarts with Docker)" '! out | grep -q "does not start by itself"'
 rm -rf "$INST"
 check "--docker-socket mounts it on request"            '[ "$(run --yes --dry-run --docker-socket)" = 0 ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ]'
 

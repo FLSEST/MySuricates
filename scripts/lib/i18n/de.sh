@@ -143,6 +143,7 @@ M_done_change="Ändern:"
 M_done_update="Aktualisieren:"
 M_done_not_started="eingerichtet, noch nicht gestartet"
 M_done_key_cmd="API-Key ganz:"
+M_done_no_autostart="Nach einem Neustart des Rechners startet %s nicht von selbst — dann: %s"
 
 # Hilfe (--help) und Fehler in den Argumenten
 M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in einem Durchgang.

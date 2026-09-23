@@ -143,6 +143,10 @@ scripts/instance.sh up|down|status|logs|key --name main
 scripts/instance.sh list                         # alle Instanzen mit Port
 ```
 
+**Nach einem Neustart des Rechners:** Eine Instanz im Container startet von selbst wieder, sobald der
+Docker-Dienst läuft. Eine Instanz auf diesem Rechner (`--runtime host`) startet **nicht** von selbst —
+dann `scripts/instance.sh up --name main`. Einen Autostart dafür richtet der Installer nicht ein.
+
 ### Und jetzt?
 
 Damit läuft die Anwendung. Ein erster Weg hinein, ohne etwas zu bauen:
@@ -256,6 +260,7 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | KI-Block schlägt fehl, „nicht angemeldet“ | bei der CLI anmelden: `claude auth login`, `codex login` oder `pi` → `/login`; ob Programm und Anmeldung gefunden werden, zeigen Startseite und Einstellungen je Anbieter |
 | `npm`, `node` oder `pi` nach dem Installer nicht gefunden | Node kam als Download: `. ~/.local/share/mysuricates/env.sh`, dauerhaft als Zeile im Profil (Abschnitt 2) |
 | Instanz startet nicht | `scripts/instance.sh logs --name main`; Setup-Protokolle unter `~/.local/state/mysuricates/setup-logs/` |
+| Nach einem Neustart des Rechners nicht erreichbar | Instanz auf dem Rechner: `scripts/instance.sh up --name main` (kein Autostart); im Container: startet mit dem Docker-Dienst |
 | Settings zeigen „Docker nicht eingerichtet“ | kein Fehler — nur Shell-Blöcke mit `container_image` brauchen Docker |
 
 ---

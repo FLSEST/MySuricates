@@ -141,6 +141,10 @@ scripts/instance.sh up|down|status|logs|key --name main
 scripts/instance.sh list                         # all instances with their port
 ```
 
+**After a reboot of the machine:** an instance in a container starts again by itself once the Docker
+service runs. An instance on this machine (`--runtime host`) does **not** start by itself — then run
+`scripts/instance.sh up --name main`. The installer does not set up an autostart for it.
+
 ### What now?
 
 The application is running. A first way in, without building anything:
@@ -254,6 +258,7 @@ in the repo — SSL off with the default password remains allowed.
 | AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login`; the start page and the settings show per provider whether program and login are found |
 | `npm`, `node` or `pi` not found after the installer | Node came as a download: `. ~/.local/share/mysuricates/env.sh`, permanently as a line in your profile (section 2) |
 | Instance does not start | `scripts/instance.sh logs --name main`; setup logs in `~/.local/state/mysuricates/setup-logs/` |
+| Not reachable after a reboot of the machine | instance on the machine: `scripts/instance.sh up --name main` (no autostart); in a container: starts with the Docker service |
 | Settings show "Docker not set up" | not an error — only shell blocks with `container_image` need Docker |
 
 ---

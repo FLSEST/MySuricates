@@ -144,6 +144,7 @@ M_done_change="Change:"
 M_done_update="Update:"
 M_done_not_started="configured, not started yet"
 M_done_key_cmd="Full API key:"
+M_done_no_autostart="After a reboot of this machine %s does not start by itself — then: %s"
 
 # Help (--help) and argument errors
 M_help="MySuricates setup — from a bare machine to the login in one pass.

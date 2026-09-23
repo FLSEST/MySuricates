@@ -640,6 +640,10 @@ ADDR
   lines[${#lines[@]}]="${l_update}$(_tui_repeat ' ' $((w - ${#l_update} + 2)))${C_BOLD}git pull && scripts/instance.sh down --name $n${C_RESET}"
   lines[${#lines[@]}]="$(_tui_repeat ' ' $((w + 2)))${C_BOLD}scripts/instance.sh up --name $n${C_RESET}"
   tui_box "$(msg step_of 8 ${#STEPS[@]}) · $(msg step_done)" "${lines[@]}"
+  # Ehrlich sagen, was nach einem Neustart des Rechners passiert (f9e2a033): ein Container kommt mit
+  # dem Docker-Dienst zurueck (restart: unless-stopped), eine Instanz auf dem Rechner nicht — ein
+  # Autostart dafuer ist ein eigener Schritt (f52c1fff).
+  [ "$RUNTIME" = host ] && printf '  %s\n' "$(msg done_no_autostart "$n" "scripts/instance.sh up --name $n")"
   # Unter dem Kasten: der kuerzte den Befehl, und mit env.sh davor wird er lang (2605ed1f)
   logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
   [ "$logged" = logged-in ] || printf '  %s%s%s\n' "$C_AMBER" "$(msg ai_login_hint "$PROVIDER" "$(provider_shell_cmd "$PROVIDER" login)")" "$C_RESET"
