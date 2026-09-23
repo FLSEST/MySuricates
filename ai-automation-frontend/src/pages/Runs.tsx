@@ -128,7 +128,7 @@ export function Runs() {
         <div className="min-w-0">
           <span className="font-medium text-text flex items-center gap-1.5 min-w-0">
             <span className="truncate">{r.workflowName}</span>
-            {r.sealed != null && <SealStateIcon sealed={r.sealed} />}
+            <SealStateIcon sealed={r.sealed} unrecorded={r.sealed == null} />
           </span>
           {r.projectName && (
             <span className="text-xs text-accent/70 block truncate">{r.projectName}</span>

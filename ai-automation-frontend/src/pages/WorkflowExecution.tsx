@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, Clock, Send, TerminalSquare,
-  FolderOpen, ListTodo, Save, Trash2, Lock, LockOpen,
+  FolderOpen, ListTodo, Save, Trash2, Lock, LockOpen, Minus,
 } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner, Input } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -326,42 +326,48 @@ export function WorkflowExecution() {
         )}
       </div>
 
-      {/* Provenance: what started the run and which definition it executed */}
-      {(run.triggerSource || run.definitionHash || run.sealed != null) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-provenance">
-          {run.sealed === true && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent font-medium"
-                  data-testid="run-sealed"
-                  title={Object.keys(run.sealedSkillPins ?? {}).length > 0
-                    ? t.workflows.sealView.runSealedSkills.replace('{count}', String(Object.keys(run.sealedSkillPins ?? {}).length))
-                    : t.workflows.sealView.runSealedNoSkills}>
-              <Lock className="w-3 h-3" />
-              {t.workflows.sealView.runSealed}
-            </span>
-          )}
-          {run.sealed === false && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-text-secondary"
-                  data-testid="run-not-sealed">
-              <LockOpen className="w-3 h-3" />
-              {t.workflows.sealView.runNotSealed}
-            </span>
-          )}
-          {run.triggerSource && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised">
-              <span className="text-text-secondary">{t.workflows.triggeredBy}</span>
-              <span className="text-text font-medium">{t.workflows.triggerSources[run.triggerSource]}</span>
-            </span>
-          )}
-          {run.definitionHash && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
-                  title={t.workflows.definitionHashHint}>
-              <span className="text-text-secondary">{t.workflows.definitionHash}</span>
-              <span className="text-text">{run.definitionHash.slice(0, 12)}</span>
-              <CopyButton text={run.definitionHash} />
-            </span>
-          )}
-        </div>
-      )}
+      {/* Provenance: seal state, what started the run and which definition it executed. Always shown —
+          the seal chip covers every state, including runs that predate the record. */}
+      <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-provenance">
+        {run.sealed === true && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-text-inverse font-medium"
+                data-testid="run-sealed"
+                title={Object.keys(run.sealedSkillPins ?? {}).length > 0
+                  ? t.workflows.sealView.runSealedSkills.replace('{count}', String(Object.keys(run.sealedSkillPins ?? {}).length))
+                  : t.workflows.sealView.runSealedNoSkills}>
+            <Lock className="w-3 h-3" />
+            {t.workflows.sealView.runSealed}
+          </span>
+        )}
+        {run.sealed === false && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border-strong text-text-secondary"
+                data-testid="run-not-sealed">
+            <LockOpen className="w-3 h-3" />
+            {t.workflows.sealView.runNotSealed}
+          </span>
+        )}
+        {run.sealed == null && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-text-tertiary"
+                title={t.workflows.sealView.unrecordedHint} data-testid="run-seal-unrecorded">
+            <Minus className="w-3 h-3" />
+            {t.workflows.sealView.unrecorded}
+          </span>
+        )}
+        {run.triggerSource && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised">
+            <span className="text-text-secondary">{t.workflows.triggeredBy}</span>
+            <span className="text-text font-medium">{t.workflows.triggerSources[run.triggerSource]}</span>
+          </span>
+        )}
+        {run.definitionHash && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
+                title={t.workflows.definitionHashHint}>
+            <span className="text-text-secondary">{t.workflows.definitionHash}</span>
+            <span className="text-text">{run.definitionHash.slice(0, 12)}</span>
+            <CopyButton text={run.definitionHash} />
+          </span>
+        )}
+      </div>
 
       {/* Input Variables */}
       {run.inputContext && Object.keys(run.inputContext).length > 0 && (

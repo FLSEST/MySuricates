@@ -178,7 +178,7 @@ interface CategoryChipProps {
 
 function DiscoverySealIcon({ workflow }: { workflow: Workflow }) {
   const status = useSealStatus(workflow.id);
-  return <SealStateIcon sealed={workflow.sealed} status={status} className="w-3.5 h-3.5" />;
+  return <SealStateIcon sealed={workflow.sealed} status={status} />;
 }
 
 function CategoryChip({ label, active, onClick, count }: CategoryChipProps) {

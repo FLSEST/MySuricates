@@ -29,3 +29,10 @@ describe('SealStateIcon', () => {
     expect(screen.getByTestId('seal-intact')).toBeInTheDocument();
   });
 });
+
+describe('SealStateIcon for runs', () => {
+  it('marks a run without recorded seal state instead of hiding it', () => {
+    render(<SealStateIcon sealed={null} unrecorded />);
+    expect(screen.getByTestId('seal-unrecorded')).toHaveAttribute('title', en.workflows.sealView.unrecordedHint);
+  });
+});

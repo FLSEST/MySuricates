@@ -782,6 +782,8 @@ export const de: TranslationKeys = {
       violatedHint: 'Siegel verletzt — Starts werden abgelehnt',
       notSealed: 'Nicht versiegelt',
       notSealedHint: 'Nicht versiegelt: Die Definition ist frei bearbeitbar, und Starts werden nicht gegen ein Siegel geprüft.',
+      unrecorded: 'Siegelstand nicht erfasst',
+      unrecordedHint: 'Siegelstand nicht erfasst: Dieser Run wurde gestartet, bevor Runs ihren Siegelstand festhielten.',
       filterAll: 'Alle',
       filterLabel: 'Nach Siegel filtern',
       intactTitle: 'Versiegelt seit {date}',

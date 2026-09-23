@@ -780,6 +780,8 @@ export const en = {
       violatedHint: 'Seal broken — starts are refused',
       notSealed: 'Not sealed',
       notSealedHint: 'Not sealed: the definition can be edited freely, and starts are not checked against a seal.',
+      unrecorded: 'Seal state not recorded',
+      unrecordedHint: 'Seal state not recorded: this run started before runs recorded their seal state.',
       filterAll: 'All',
       filterLabel: 'Filter by seal',
       intactTitle: 'Sealed since {date}',
