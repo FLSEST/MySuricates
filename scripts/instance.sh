@@ -162,10 +162,20 @@ PID_FILE="$STATE/instance.pid"
 host_running() { [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; }
 
 host_build() {
-  local jar
+  local jar count
   echo "Baue Backend (Maven) ..."
-  (cd "$REPO_ROOT/ai-automation-backend" && ./mvnw -q -B -DskipTests package) || return 1
-  jar="$(find "$REPO_ROOT/ai-automation-backend/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original' | head -n 1)"
+  # clean: sonst bleibt das JAR der vorigen Version im target/ liegen und der find unten nimmt
+  # irgendeines davon. Beim Sprung der Demo-VM von 0.7.6 auf 0.7.7 (2026-09-23) kopierte er so
+  # das alte JAR zurueck — die Instanz lief nach dem „Upgrade" unbemerkt weiter auf 0.7.6.
+  (cd "$REPO_ROOT/ai-automation-backend" && ./mvnw -q -B -DskipTests clean package) || return 1
+  jar="$(find "$REPO_ROOT/ai-automation-backend/target" -maxdepth 1 -name 'ai-automation-backend-*.jar' ! -name '*.original')"
+  count="$(printf '%s' "$jar" | grep -c .)"
+  if [ "$count" -gt 1 ]; then
+    echo "Mehrere JARs unter ai-automation-backend/target — welches gemeint ist, ist nicht entscheidbar:" >&2
+    printf '%s\n' "$jar" | sed 's/^/  /' >&2
+    echo "  target/ leeren (mvnw clean) und neu bauen." >&2
+    return 1
+  fi
   [ -n "$jar" ] || { echo "Kein JAR unter ai-automation-backend/target" >&2; return 1; }
   echo "Baue Frontend (npm ci, vite build) ..."
   (cd "$REPO_ROOT/ai-automation-frontend" && npm ci --no-audit --no-fund && npm run build) || return 1

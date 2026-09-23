@@ -108,5 +108,49 @@ PATH="$TMP/hostbin:$PATH" bash "$SCRIPT" down --name hostdemo >/dev/null 2>&1
 check "down stops the process"                '! kill -0 "$PID" 2>/dev/null'
 check "list shows the runtime"                'bash "$SCRIPT" list | grep "hostdemo.*19401.*host" >/dev/null'
 
+echo "4) host build takes the JAR it just built, not one left over from an older version"
+# Eigenes Wegwerf-Repo: instance.sh leitet REPO_ROOT aus seinem eigenen Ort ab, und gebaut wird
+# mit Stubs (kein Maven, kein npm). Der Fall stammt aus der Demo-VM: nach dem Sprung auf 0.7.7 lag
+# das 0.7.6-JAR noch im target/, und kopiert wurde das alte (2026-09-23).
+REPO="$TMP/repo"
+mkdir -p "$REPO/scripts" "$REPO/ai-automation-backend/target" "$REPO/ai-automation-frontend"
+cp "$SCRIPT" "$REPO/scripts/instance.sh"
+ln -s "$HERE/../lib" "$REPO/scripts/lib"
+cat > "$REPO/ai-automation-backend/mvnw" <<'STUB'
+#!/bin/sh
+for a in "$@"; do [ "$a" = clean ] && rm -f target/*.jar; done
+mkdir -p target && echo neu > target/ai-automation-backend-9.9.9.jar
+STUB
+cat > "$TMP/hostbin/npm" <<'STUB'
+#!/bin/sh
+case "$*" in *"run build"*) mkdir -p dist && echo html > dist/index.html ;; esac
+exit 0
+STUB
+chmod +x "$REPO/ai-automation-backend/mvnw" "$TMP/hostbin/npm"
+cat > "$TMP/inst/buildtest.env" <<'ENV'
+MYSURICATES_RUNTIME=host
+MYSURICATES_PORT=19403
+ENV
+STATE2="$TMP/state/mysuricates/buildtest"
+echo alt > "$REPO/ai-automation-backend/target/ai-automation-backend-0.0.1-SNAPSHOT.jar"
+PATH="$TMP/hostbin:$PATH" INSTANCE_HEALTH_TIMEOUT=10 bash "$REPO/scripts/instance.sh" up --name buildtest --rebuild >"$TMP/build.out" 2>&1
+check "clean raeumt das alte JAR weg"         '[ ! -e "$REPO/ai-automation-backend/target/ai-automation-backend-0.0.1-SNAPSHOT.jar" ]'
+check "app.jar is the fresh build"            '[ "$(cat "$STATE2/app.jar" 2>/dev/null)" = neu ]'
+check "built frontend copied"                 '[ -s "$STATE2/frontend/index.html" ]'
+PATH="$TMP/hostbin:$PATH" bash "$REPO/scripts/instance.sh" down --name buildtest >/dev/null 2>&1
+
+# Zweiter Fall: ein Bau, der das target/ nicht raeumt, hinterlaesst zwei JARs — dann darf das
+# Skript nicht raten, sondern muss abbrechen.
+cat > "$REPO/ai-automation-backend/mvnw" <<'STUB'
+#!/bin/sh
+mkdir -p target && echo neu > target/ai-automation-backend-9.9.9.jar
+STUB
+chmod +x "$REPO/ai-automation-backend/mvnw"
+echo alt > "$REPO/ai-automation-backend/target/ai-automation-backend-0.0.1-SNAPSHOT.jar"
+PATH="$TMP/hostbin:$PATH" bash "$REPO/scripts/instance.sh" up --name buildtest --rebuild >"$TMP/build2.out" 2>&1
+RC_BUILD=$?
+check "two JARs: stops instead of guessing"   '[ "$RC_BUILD" -ne 0 ] && grep -q "Mehrere JARs" "$TMP/build2.out"'
+check "names both files in the message"       'grep -q "0.0.1-SNAPSHOT.jar" "$TMP/build2.out" && grep -q "9.9.9.jar" "$TMP/build2.out"'
+
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]
