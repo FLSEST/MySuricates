@@ -1,6 +1,6 @@
 **Deutsch** | [English](README.md)
 
-<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Nicht jedes Problem braucht einen Hammer. Stecke Workflows aus festen Schritten, KI und deinen Entscheidungen zusammen, so wie deine Aufgabe es braucht. Deterministisch, wo es geht. KI, wo sie hilft. Anbieter austauschbar. Im Bild ein Erdmännchen, um das Bausteine kreisen: Zeitplan, KI-Agent, Freigabe, Schleife, Bericht, Shell."></p>
+<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Deine Erdmännchen bauen Workflows mit dir und halten Wache über jeden Schritt. Deterministisch, wo es geht. Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf. Behalte im Blick, was du getan hast und was du tust. Setze deine Erdmännchen ein, so wie du sie brauchst. Workflows, Ketten, Skills, BPMN, Zeitpläne, TODOs, Integrationen, Human-in-the-Loop, Assistent."></p>
 
 # MySuricates
 

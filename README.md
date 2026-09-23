@@ -1,6 +1,6 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Not every problem needs a hammer. Build workflows from fixed steps, AI and your own decisions, put together the way your task needs them. Deterministic where possible. AI where it helps. Any provider. The picture shows a meerkat circled by building blocks: schedule, AI agent, approval, loop, report, shell."></p>
+<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Your suricates build workflows with you and keep watch over every step. Deterministic if possible. Any provider: change it and keep your flow. Keep track of what you did and what you do. Put your suricates to work the way you need them. Workflows, chains, skills, BPMN, schedules, TODOs, integrations, human-in-the-loop, assistant."></p>
 
 # MySuricates
 

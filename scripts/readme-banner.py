@@ -16,7 +16,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-W, H = 1280, 420
+W, H = 1280, 480
 
 SAND = "#d4a060"
 FAWN = "#a87840"
@@ -26,28 +26,57 @@ AMBER = "#e8a54c"
 AI = "#b58ee8"  # --color-ai aus dem dunklen Standard-Theme
 HUMAN = "#56c2b0"  # --color-human
 
+# Wortlaut von Flo (2026-09-23); Titelzeile erklaert das Bild, die vier Zeilen sind seine Saetze.
 TEXT = {
     "de": {
-        "tagline": "Nicht jedes Problem braucht einen Hammer.",
+        "tagline": ["Deine Erdmännchen bauen Workflows mit dir", "und halten Wache über jeden Schritt."],
         "body": [
-            "Stecke Workflows aus festen Schritten, KI und deinen",
-            "Entscheidungen zusammen – so, wie deine Aufgabe es braucht.",
-            "Deterministisch, wo es geht. KI, wo sie hilft. Anbieter austauschbar.",
+            "Deterministisch, wo es geht.",
+            "Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf.",
+            "Behalte im Blick, was du getan hast und was du tust.",
+            "Setze deine Erdmännchen ein, so wie du sie brauchst.",
         ],
-        "legend": ["fester Schritt", "KI-Schritt", "du entscheidest"],
-        "nodes": ["Zeitplan", "KI-Agent", "Freigabe", "Schleife", "Bericht", "Shell"],
+        "things": [["Workflows", "Ketten", "Skills", "BPMN", "Zeitpläne"],
+                   ["TODOs", "Integrationen", "Human-in-the-Loop", "Assistent"]],
     },
     "en": {
-        "tagline": "Not every problem needs a hammer.",
+        "tagline": ["Your suricates build workflows with you", "and keep watch over every step."],
         "body": [
-            "Build workflows from fixed steps, AI and your own",
-            "decisions – put together the way your task needs them.",
-            "Deterministic where possible. AI where it helps. Any provider.",
+            "Deterministic if possible.",
+            "Any provider: change it and keep your flow.",
+            "Keep track of what you did and what you do.",
+            "Put your suricates to work the way you need them.",
         ],
-        "legend": ["fixed step", "AI step", "you decide"],
-        "nodes": ["Schedule", "AI agent", "Approval", "Loop", "Report", "Shell"],
+        "things": [["Workflows", "Chains", "Skills", "BPMN", "Schedules"],
+                   ["TODOs", "Integrations", "Human-in-the-loop", "Assistant"]],
     },
 }
+
+# Linien-Icons (16x16, Ursprung Mitte) fuer die Reihe unten, gleiche Reihenfolge wie "things".
+ICONS = [[
+    # Workflows: drei Schritte in Reihe
+    '<rect x="-8" y="-3" width="5" height="6" rx="1"/><rect x="-2.5" y="-3" width="5" height="6" rx="1"/>'
+    '<rect x="3" y="-3" width="5" height="6" rx="1"/>',
+    # Ketten: zwei Glieder
+    '<rect x="-9" y="-4" width="10" height="8" rx="4"/><rect x="-1" y="-4" width="10" height="8" rx="4"/>',
+    # Skills: Stern
+    '<path d="M0-8 2.3-2.6 8-2.2 3.6 1.6 5 7.4 0 4.4-5 7.4-3.6 1.6-8-2.2-2.3-2.6Z"/>',
+    # BPMN: Startereignis, Aufgabe, Gateway
+    '<circle cx="-8" cy="0" r="2.5"/><path d="M-5.5 0H-3.5"/><rect x="-3.5" y="-3" width="6" height="6" rx="1"/>'
+    '<path d="M2.5 0H4.5"/><path d="M7.5-3 10.5 0 7.5 3 4.5 0Z"/>',
+    # Zeitplaene: Uhr
+    '<circle r="7.5"/><path d="M0-4V0.5L3 2.5"/>',
+], [
+    # TODOs: Kasten mit Haken
+    '<rect x="-7" y="-7" width="14" height="14" rx="2"/><path d="M-3.5 0.5-1 3 4-3"/>',
+    # Integrationen: Stecker
+    '<path d="M-3-8V-4M3-8V-4"/><rect x="-6" y="-4" width="12" height="7" rx="2"/><path d="M0 3V8"/>',
+    # Human-in-the-Loop: Person im Kreispfeil
+    '<circle cy="-2" r="2.6"/><path d="M-4.5 5c0-3 2-4.5 4.5-4.5S4.5 2 4.5 5"/>'
+    '<path d="M6.5-5.5A8.5 8.5 0 1 0 8.5 1"/><path d="M8-8.5V-5H4.5"/>',
+    # Assistent: Sprechblase
+    '<path d="M-7-6h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H-2l-4 3.5V4h-1a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"/>',
+]]
 
 
 class Face:
@@ -119,6 +148,51 @@ def marker(kind, x, y, small=False):
             f'fill="#241910" stroke="{CREAM}" stroke-width="2.5"/>')
 
 
+def ghost(kind, x, y):
+    """Blasser Schritt fuer die Hintergrund-Workflows (nur Umrisse)."""
+    if kind == "ai":
+        return f'<circle cx="{x}" cy="{y}" r="5" stroke="{AI}"/>'
+    if kind == "human":
+        return f'<path d="M{x} {y - 6}L{x + 6} {y}L{x} {y + 6}L{x - 6} {y}Z" stroke="{HUMAN}"/>'
+    return f'<rect x="{x - 5}" y="{y - 5}" width="10" height="10" rx="1.5"/>'
+
+
+def background_flows():
+    """Vier verschieden geformte Workflows, blass im Himmel: es gibt viele Wege."""
+    g = []
+    # 1) Gerade Kette
+    x, y = 590, 66
+    for i, k in enumerate(("fixed", "ai", "fixed", "human", "fixed")):
+        g.append(ghost(k, x + i * 34, y))
+    g.append(f'<path d="M{x + 6} {y}H{x + 4 * 34 - 6}"/>')
+    # 2) Auffaechern (foreach) und wieder zusammenfuehren
+    x, y = 1120, 58
+    g.append(ghost("fixed", x, y))
+    for dy in (-26, 0, 26):
+        g.append(ghost("ai", x + 44, y + dy))
+        g.append(f'<path d="M{x + 6} {y}C{x + 22} {y} {x + 22} {y + dy} {x + 38} {y + dy}"/>')
+        g.append(f'<path d="M{x + 50} {y + dy}C{x + 66} {y + dy} {x + 66} {y} {x + 82} {y}"/>')
+    g.append(ghost("fixed", x + 88, y))
+    # 3) Verzweigung mit Freigabe
+    x, y = 640, 150
+    g.append(ghost("ai", x, y))
+    g.append(ghost("human", x + 40, y))
+    g.append(f'<path d="M{x + 6} {y}H{x + 33}"/>')
+    g.append(f'<path d="M{x + 47} {y}C{x + 60} {y} {x + 60} {y - 22} {x + 74} {y - 22}"/>')
+    g.append(f'<path d="M{x + 47} {y}C{x + 60} {y} {x + 60} {y + 22} {x + 74} {y + 22}"/>')
+    g.append(ghost("fixed", x + 80, y - 22))
+    g.append(ghost("fixed", x + 80, y + 22))
+    # 4) Schleife mit Rueckpfeil
+    x, y = 1150, 150
+    for i, k in enumerate(("fixed", "ai", "fixed")):
+        g.append(ghost(k, x + i * 36, y))
+    g.append(f'<path d="M{x + 6} {y}H{x + 66}"/>')
+    g.append(f'<path d="M{x + 72} {y + 6}C{x + 72} {y + 26} {x} {y + 26} {x} {y + 6}"/>')
+    g.append(f'<path d="M{x - 4} {y + 12}L{x} {y + 6}L{x + 4} {y + 12}"/>')
+    return (f'<g fill="none" stroke="{CREAM}" stroke-width="1.6" stroke-opacity=".22" '
+            f'stroke-linecap="round" stroke-linejoin="round">{"".join(g)}</g>')
+
+
 MEERKAT = """
     <ellipse cx="63" cy="62" rx="24" ry="32" fill="#a87840"/>
     <ellipse cx="193" cy="62" rx="24" ry="32" fill="#a87840"/>
@@ -140,10 +214,10 @@ def build(lang, book, demi):
     out = []
     add = out.append
 
-    # Szene rechts: Waechter-Erdmaennchen, umkreist vom Regelkreis
+    # Szene rechts: Waechter-Erdmaennchen, umkreist von Bausteinen
     mx, scale = 1010, 1.12
-    tx, ty = mx - 128 * scale, 84 - 30 * scale
-    ocx, ocy, orx, ory = mx, 230, 214, 56
+    tx, ty = mx - 128 * scale, 118 - 30 * scale
+    ocx, ocy, orx, ory = mx, 264, 214, 56
     loop_d = (f"M{ocx - orx} {ocy}"
               f"A{orx} {ory} 0 1 1 {ocx + orx} {ocy}"
               f"A{orx} {ory} 0 1 1 {ocx - orx} {ocy}Z")
@@ -177,12 +251,13 @@ def build(lang, book, demi):
     rnd = random.Random(7)
     stars = []
     for _ in range(46):
-        x, y = rnd.uniform(700, 1265), rnd.uniform(14, 190)
+        x, y = rnd.uniform(700, 1265), rnd.uniform(14, 200)
         stars.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{rnd.uniform(.6, 1.5):.1f}" '
                      f'opacity="{rnd.uniform(.25, .75):.2f}"/>')
     add(f'<g fill="{CREAM}">{"".join(stars)}</g>')
+    add(background_flows())
 
-    # Hintere Haelfte des Regelkreises (hinter dem Erdmaennchen)
+    # Hintere Haelfte des Rings (hinter dem Erdmaennchen)
     add(f'<use href="#loop" fill="none" stroke="{AMBER}" stroke-opacity=".32" stroke-width="2" '
         'stroke-dasharray="2 7" stroke-linecap="round"/>')
 
@@ -194,17 +269,13 @@ def build(lang, book, demi):
 
     add(runner())
 
-    # Bausteine auf dem Ring: dieselben drei Arten wie in der Legende
+    # Bausteine auf dem Ring, ohne Beschriftung: die Formen stehen fuer fest / KI / Mensch
     kinds = ["fixed", "ai", "human", "fixed", "ai", "fixed"]
     angles = [210, 330, 10, 60, 120, 170]  # hinten links, hinten rechts, rechts, vorn rechts, vorn links, links
 
     def node(i):
         x, y = on_orbit(angles[i])
-        parts = [marker(kinds[i], x, y)]
-        ly = y - 20 if y < ocy - 5 else y + 34
-        label, _ = text(book, t["nodes"][i], 18, x, ly, CREAM, anchor="middle", tracking=.3)
-        parts.append(label)
-        return "".join(parts)
+        return marker(kinds[i], x, y)
 
     add(node(0))
     add(node(1))
@@ -214,15 +285,15 @@ def build(lang, book, demi):
         f'stroke-linecap="round" stroke-linejoin="round">{MEERKAT}</g>')
 
     # Huegel, verdeckt den Rumpf; dahinter eine flache Duene fuer Tiefe
-    add(f'<path d="M520 {H}C640 368 760 352 900 350C1040 348 1160 336 {W} 318V{H}Z" fill="#2a1a0f" opacity=".8"/>')
-    add(f'<path d="M700 {H}C790 356 880 300 1010 296C1130 292 1200 330 {W} 356V{H}Z" fill="url(#mound)"/>')
+    add(f'<path d="M520 {H}C640 402 760 386 900 384C1040 382 1160 370 {W} 352V{H}Z" fill="#2a1a0f" opacity=".8"/>')
+    add(f'<path d="M700 {H}C790 390 880 334 1010 330C1130 326 1200 364 {W} 390V{H}Z" fill="url(#mound)"/>')
 
-    # Vordere Haelfte des Regelkreises (vor dem Erdmaennchen)
+    # Vordere Haelfte des Rings (vor dem Erdmaennchen)
     add(f'<g clip-path="url(#front)"><use href="#loop" fill="none" stroke="{AMBER}" stroke-opacity=".75" '
         f'stroke-width="2.5"/>{runner()}</g>')
     for i in (2, 3, 4):
         add(node(i))
-    # Pfeilspitzen zeigen die Laufrichtung (im Uhrzeigersinn)
+    # Pfeilspitze zeigt die Laufrichtung (im Uhrzeigersinn)
     for deg in (90,):
         x, y = on_orbit(deg)
         a = math.radians(deg)
@@ -232,26 +303,35 @@ def build(lang, book, demi):
 
     # Text links
     x0 = 72
-    title, _ = text(demi, "MySuricates", 78, x0, 146, CREAM, tracking=-1.0)
+    widths = []
+    title, _ = text(demi, "MySuricates", 72, x0, 112, CREAM, tracking=-1.0)
     add(title)
-    add(f'<rect x="{x0 + 2}" y="170" width="64" height="5" rx="2.5" fill="{AMBER}"/>')
-    tag, w = text(demi, t["tagline"], 29, x0, 224, "#f0c890", tracking=-.2)
-    add(tag)
-    widths = [w]
-    for i, line in enumerate(t["body"]):
-        p, w = text(book, line, 20, x0, 266 + i * 30, MUTED, tracking=.1)
+    add(f'<rect x="{x0 + 2}" y="134" width="64" height="5" rx="2.5" fill="{AMBER}"/>')
+    for i, line in enumerate(t["tagline"]):
+        p, w = text(demi, line, 27, x0, 186 + i * 33, "#f0c890", tracking=-.2)
         add(p)
         widths.append(w)
-    if x0 + max(widths) > 740:  # dahinter beginnen Ring und Beschriftung
+    for i, line in enumerate(t["body"]):
+        y = 262 + i * 29
+        add(f'<rect x="{x0}" y="{y - 15}" width="3" height="18" rx="1.5" fill="{AMBER}" opacity=".8"/>')
+        p, w = text(book, line, 19.5, x0 + 16, y, MUTED, tracking=.1)
+        add(p)
+        widths.append(w + 16)
+    if x0 + max(widths) > 740:  # dahinter beginnen Ring und Szene
         raise SystemExit(f"{lang}: Textzeile zu breit ({max(widths):.0f} px)")
 
-    ly = 384
-    lx = x0 + 7
-    for kind, label in zip(("fixed", "ai", "human"), t["legend"]):
-        add(marker(kind, lx, ly - 6, small=True))
-        p, w = text(book, label, 18, lx + 18, ly, CREAM, tracking=.3)
-        add(p)
-        lx += 18 + w + 42
+    # Zwei Reihen unten: was es alles gibt, je mit Symbol
+    for row, (icons, labels) in enumerate(zip(ICONS, t["things"])):
+        ly = 404 + row * 31
+        lx = x0
+        for icon, label in zip(icons, labels):
+            add(f'<g transform="translate({lx + 8:.1f} {ly - 6:.1f})" fill="none" stroke="{AMBER}" '
+                f'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{icon}</g>')
+            p, w = text(book, label, 16, lx + 24, ly, CREAM, tracking=.3)
+            add(p)
+            lx += 24 + w + 30
+        if lx > 740:
+            raise SystemExit(f"{lang}: Reihe {row + 1} unten zu breit ({lx:.0f} px)")
 
     add("</g>")
     add(f'<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="27.5" fill="none" '
