@@ -771,4 +771,4 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 ### Frontend
 
 - Kein Offline-Modus (PWA-Shell wird gecacht, aber API-Daten nicht).
-- Monaco Editor lädt externe Bundles (erfordert Internetverbindung beim ersten Laden).
+- Monaco Editor kommt aus dem eigenen Bundle (kein CDN, die CSP erlaubt nur `'self'`), wird aber nicht von der PWA vorab gecacht — offline öffnet er sich nur, wenn der Browser den `monaco`-Chunk schon zwischengespeichert hat.

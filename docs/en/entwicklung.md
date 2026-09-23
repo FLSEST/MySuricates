@@ -725,4 +725,4 @@ see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-si
 ### Frontend
 
 - No offline mode (PWA shell is cached, but API data is not).
-- Monaco Editor loads external bundles (requires internet connection on first load).
+- Monaco Editor is served from the app's own bundle (no CDN, the CSP allows `'self'` only), but the PWA does not precache it — offline, it only opens if the browser has already cached the `monaco` chunk.
