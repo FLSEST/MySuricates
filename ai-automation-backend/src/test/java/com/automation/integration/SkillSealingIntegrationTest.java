@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -150,6 +151,36 @@ class SkillSealingIntegrationTest {
                 .andExpect(jsonPath("$[0].changeSource").value("user"))
                 .andExpect(jsonPath("$[1].operation").value("CREATE"))
                 .andExpect(jsonPath("$[1].contentHash").isString());
+    }
+
+    @Test
+    void sealRefusesEditingTheSkillUntilUnsealed() throws Exception {
+        String workflowId = workflowActivating();
+        mockMvc.perform(post("/api/v1/workflows/{id}/seal", workflowId)).andExpect(status().isOk());
+        String edit = objectMapper.writeValueAsString(Map.of("name", "Reviewer edited",
+                "category", "RESEARCH", "aiContext", "Review only the tests."));
+
+        String storedName = skillRepository.findById(skillId).orElseThrow().getName();
+        mockMvc.perform(put("/api/v1/skills/{id}", skillId).contentType(MediaType.APPLICATION_JSON).content(edit))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SKILL_PINNED_BY_SEAL"))
+                // The refusal names the skill as stored, not the requested new name
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("'" + storedName + "'")));
+        assertThat(skillRepository.findById(skillId).orElseThrow().getAiContext()).isEqualTo("Review the diff carefully.");
+
+        mockMvc.perform(post("/api/v1/workflows/{id}/unseal", workflowId)).andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/skills/{id}", skillId).contentType(MediaType.APPLICATION_JSON).content(edit))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Reviewer edited"))
+                .andExpect(jsonPath("$.category").value("RESEARCH"))
+                .andExpect(jsonPath("$.aiContext").value("Review only the tests."));
+
+        mockMvc.perform(get("/api/v1/skills/{id}/versions", skillId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].operation").value("UPDATE"))
+                .andExpect(jsonPath("$[0].changeSource").value("user"))
+                .andExpect(jsonPath("$[1].operation").value("CREATE"));
     }
 
     @Test

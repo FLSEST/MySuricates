@@ -77,7 +77,8 @@ public class SkillMutationGateway {
         logChange(skill, version, source, false);
     }
 
-    private void requireNotPinned(Skill skill, String operation) {
+    /** Also called before an edit touches the entity, so a refusal names the skill as it is stored. */
+    void requireNotPinned(Skill skill, String operation) {
         List<String> sealed = workflowRepository.findSealedWorkflowNamesUsingSkill(skill.getId());
         if (!sealed.isEmpty()) {
             throw new HardeningException(ErrorCode.SKILL_PINNED_BY_SEAL, "Skill '" + skill.getName()

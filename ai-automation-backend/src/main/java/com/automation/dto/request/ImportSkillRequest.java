@@ -1,6 +1,7 @@
 package com.automation.dto.request;
 
 import com.automation.entity.SkillCategory;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -15,7 +16,7 @@ public record ImportSkillRequest(
         String aiContext,
         Map<String, Object> configSchema,
         String version,
-        List<ImportCapabilityRequest> capabilities
+        List<@Valid ImportCapabilityRequest> capabilities
 ) {
     public record ImportCapabilityRequest(
             @NotBlank String name,

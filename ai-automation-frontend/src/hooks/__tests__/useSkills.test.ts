@@ -34,7 +34,7 @@ describe('useSkills', () => {
     const skill = result.current.data![0];
     expect(skill.id).toBe('s1');
     expect(skill.builtin).toBe(true);
-    expect(skill.capabilityCount).toBe(2);
+    expect(skill.capabilities).toHaveLength(2);
   });
 
   it('returns loading state initially', () => {

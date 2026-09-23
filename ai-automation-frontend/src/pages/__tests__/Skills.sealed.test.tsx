@@ -16,9 +16,9 @@ describe('Skills page seal pins', () => {
     server.use(
       http.get('/api/v1/skills', () => HttpResponse.json([
         { id: 's1', name: 'Reviewer', description: 'Reviews', icon: null, category: 'CODE', aiContext: null,
-          builtin: false, version: '1.0.0', capabilityCount: 1 },
+          builtin: false, version: '1.0.0', capabilities: [] },
         { id: 's2', name: 'Writer', description: 'Writes', icon: null, category: 'CODE', aiContext: null,
-          builtin: false, version: '1.0.0', capabilityCount: 0 },
+          builtin: false, version: '1.0.0', capabilities: [] },
       ])),
       http.get('/api/v1/skills/seal-pins', () => HttpResponse.json({ s1: ['Deploy'] })),
     );

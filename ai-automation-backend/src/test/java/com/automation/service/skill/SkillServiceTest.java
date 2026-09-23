@@ -1,10 +1,13 @@
 package com.automation.service.skill;
 
 import com.automation.dto.request.CreateSkillRequest;
+import com.automation.dto.request.UpdateSkillRequest;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillChangeSource;
 import com.automation.entity.SkillCategory;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.CapabilityRepository;
 import com.automation.repository.SkillRepository;
@@ -135,6 +138,80 @@ class SkillServiceTest {
         assertThat(result.getName()).isEqualTo("Custom Skill");
         assertThat(result.isBuiltin()).isFalse();
         verify(skillRegistry).register(result);
+    }
+
+    @Test
+    void update_customSkill_appliesFieldsSavesAsUserAndReRegisters() {
+        Skill customSkill = Skill.builder()
+                .id("skill-custom")
+                .name("Old")
+                .description("old description")
+                .icon("x")
+                .category(SkillCategory.CODE)
+                .aiContext("old context")
+                .configSchema(Map.of("keep", "me"))
+                .version("2.1.0")
+                .builtin(false)
+                .build();
+        when(skillRepository.findById("skill-custom")).thenReturn(Optional.of(customSkill));
+        when(mutationGateway.save(any(Skill.class), eq(SkillChangeSource.USER))).thenAnswer(inv -> inv.getArgument(0));
+
+        Skill result = skillService.update("skill-custom", new UpdateSkillRequest(
+                "New", "new description", "🧪", SkillCategory.RESEARCH, "new context"));
+
+        assertThat(result.getName()).isEqualTo("New");
+        assertThat(result.getDescription()).isEqualTo("new description");
+        assertThat(result.getIcon()).isEqualTo("🧪");
+        assertThat(result.getCategory()).isEqualTo(SkillCategory.RESEARCH);
+        assertThat(result.getAiContext()).isEqualTo("new context");
+        // Not editable through the dialog: stays as it was
+        assertThat(result.getConfigSchema()).containsEntry("keep", "me");
+        assertThat(result.getVersion()).isEqualTo("2.1.0");
+        var order = inOrder(mutationGateway, skillRegistry);
+        order.verify(mutationGateway).save(customSkill, SkillChangeSource.USER);
+        order.verify(skillRegistry).unregister("skill-custom");
+        order.verify(skillRegistry).register(result);
+    }
+
+    @Test
+    void update_builtinSkill_isRefused() {
+        when(skillRepository.findById("skill-1")).thenReturn(Optional.of(testSkill));
+
+        assertThatThrownBy(() -> skillService.update("skill-1", new UpdateSkillRequest(
+                "X", null, null, SkillCategory.CODE, "ctx")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("built-in");
+
+        assertThat(testSkill.getName()).isEqualTo("Document Analyzer");
+        verify(mutationGateway, never()).save(any(), any());
+        verifyNoInteractions(skillRegistry);
+    }
+
+    @Test
+    void update_skillPinnedBySeal_isRefusedBeforeTheEntityChanges() {
+        Skill customSkill = Skill.builder().id("skill-custom").name("Reviewer")
+                .category(SkillCategory.CODE).aiContext("ctx").builtin(false).build();
+        when(skillRepository.findById("skill-custom")).thenReturn(Optional.of(customSkill));
+        doThrow(new HardeningException(ErrorCode.SKILL_PINNED_BY_SEAL, "pinned"))
+                .when(mutationGateway).requireNotPinned(customSkill, "changing it");
+
+        assertThatThrownBy(() -> skillService.update("skill-custom", new UpdateSkillRequest(
+                "Renamed", null, null, SkillCategory.DATA, "other")))
+                .isInstanceOf(HardeningException.class);
+
+        assertThat(customSkill.getName()).isEqualTo("Reviewer");
+        assertThat(customSkill.getAiContext()).isEqualTo("ctx");
+        verify(mutationGateway, never()).save(any(), any());
+        verifyNoInteractions(skillRegistry);
+    }
+
+    @Test
+    void update_unknownSkill_throwsNotFound() {
+        when(skillRepository.findById("unknown")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> skillService.update("unknown", new UpdateSkillRequest(
+                "X", null, null, SkillCategory.CODE, null)))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

@@ -422,21 +422,52 @@ export interface BrokenWorkflow {
 
 // ── Skill ────────────────────────────────────────────────
 
-export type SkillCategory = 'DOCUMENT' | 'CODE' | 'DATA' | 'CONTENT' | 'RESEARCH' | 'BUSINESS';
+export type SkillCategory = 'DOCUMENT' | 'CODE' | 'DATA' | 'CONTENT' | 'RESEARCH' | 'BUSINESS' | 'PRODUCTIVITY';
 
 export interface Skill {
   id: string;
   name: string;
-  description: string;
-  icon: string;
+  description: string | null;
+  icon: string | null;
   category: SkillCategory;
-  aiContext: string;
-  configSchema: Record<string, unknown>;
+  aiContext: string | null;
+  configSchema: Record<string, unknown> | null;
   builtin: boolean;
   version: string;
-  capabilityCount: number;
+  capabilities?: Capability[];
   createdAt: string;
-  updatedAt: string;
+}
+
+/** The editable fields of a custom skill (`POST /skills`, `PUT /skills/{id}`). */
+export interface SkillInput {
+  name: string;
+  description: string | null;
+  icon: string | null;
+  category: SkillCategory;
+  aiContext: string | null;
+}
+
+/** One row of `GET /skills/{id}/versions`, newest first; the snapshot itself is not exposed. */
+export interface SkillVersion {
+  id: string;
+  skillId: string;
+  versionNumber: number;
+  operation: 'CREATE' | 'UPDATE' | 'DELETE';
+  changeSource: 'user' | 'import' | 'builtin-seed' | string;
+  contentHash: string;
+  createdAt: string;
+}
+
+/** A skill export file (`GET /skills/export/{id}`) — also the body of `POST /skills/import`. */
+export interface SkillExportData {
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  category: SkillCategory;
+  aiContext?: string | null;
+  configSchema?: Record<string, unknown> | null;
+  version?: string | null;
+  capabilities?: Array<Record<string, unknown>>;
 }
 
 export interface Capability {

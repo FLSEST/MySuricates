@@ -32,7 +32,10 @@ export const handlers = [
   // Skills
   http.get(`${BASE}/skills`, () =>
     HttpResponse.json([
-      { id: 's1', name: 'Code Review', description: 'Review code', icon: '🔍', category: 'CODE', aiContext: '', configSchema: {}, builtin: true, version: '1', capabilityCount: 2, createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' },
+      { id: 's1', name: 'Code Review', description: 'Review code', icon: '🔍', category: 'CODE', aiContext: '', configSchema: {}, builtin: true, version: '1', capabilities: [
+        { id: 'c1', name: 'lint', description: 'Lint code', inputSchema: {}, outputSchema: {}, async: false, writes: false },
+        { id: 'c2', name: 'review', description: 'Review a diff', inputSchema: {}, outputSchema: {}, async: false, writes: false },
+      ], createdAt: '2025-01-01T00:00:00Z' },
     ]),
   ),
 
