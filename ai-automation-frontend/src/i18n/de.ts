@@ -2491,7 +2491,8 @@ export const de: TranslationKeys = {
       socketRisk: 'Workflows dieser Instanz erreichen über Docker den ganzen Rechner. Die Grenze oben schützt dann nur vor Versehen.',
       allRisk: 'Einstellungen, Hooks, Plugins, Memory und Verläufe des Rechners sind im Container sichtbar und änderbar. Was dort geändert wird, wirkt später auf dem Rechner.',
       hostNote: 'Diese Instanz läuft direkt auf dem Rechner: Die KI-Programme sehen das ganze Home-Verzeichnis mit allen Anmeldungen. Eine Grenze gibt es nur im Container-Betrieb.',
-      changeIn: 'Ändern in {source}, danach neu starten',
+      changeIn: 'Ändern in {source}, danach neu starten:',
+      linesLabel: 'Zeilen',
     },
   },
   commandPalette: {

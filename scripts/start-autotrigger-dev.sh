@@ -333,7 +333,7 @@ write_compose_override() {
   local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-}"   # leer: npm root -g
   local missing
   host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-1}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
-    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "Umgebung von scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ \
+    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ \
     > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige AUTOTRIGGER_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
   echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
   missing="$(host_mounts_missing_text)"

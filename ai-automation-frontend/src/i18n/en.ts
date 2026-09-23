@@ -2494,7 +2494,8 @@ export const en = {
       socketRisk: 'Workflows of this instance reach the whole machine through Docker. The boundary above then only guards against mistakes.',
       allRisk: 'Settings, hooks, plugins, memory and transcripts of the machine are visible and writable in the container. Changes made there take effect on the machine later.',
       hostNote: 'This instance runs directly on the machine: the AI programs see the whole home directory with every login. A boundary exists only when running in a container.',
-      changeIn: 'Change in {source}, then restart',
+      changeIn: 'Change in {source}, then restart:',
+      linesLabel: 'Lines',
     },
   },
   commandPalette: {

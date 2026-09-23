@@ -55,7 +55,10 @@ describe('ContainerAccessSection', () => {
     expect(within(section).queryByTestId('container-access-all-risk')).not.toBeInTheDocument();
 
     // Where to change it, with the names of that path and the values this instance runs with
-    expect(within(section).getByText('Change in /home/u/.config/mysuricates/staging.env, then restart')).toBeInTheDocument();
+    // The place stays in its own line, in its real case — the snippet label is set in capitals
+    expect(within(section).getByTestId('container-access-change-in'))
+      .toHaveTextContent('Change in /home/u/.config/mysuricates/staging.env, then restart:');
+    expect(within(section).getByText('/home/u/.config/mysuricates/staging.env').tagName).toBe('CODE');
     const snippet = within(section).getByText(/STABLE_AI_FROM_HOST=login/);
     expect(snippet).toHaveTextContent('STABLE_AI_PROVIDERS=claude,codex');
     expect(snippet).toHaveTextContent('STABLE_DOCKER_SOCKET=1');

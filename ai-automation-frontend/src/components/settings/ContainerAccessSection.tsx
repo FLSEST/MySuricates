@@ -23,6 +23,7 @@ export function ContainerAccessSection() {
   if (!access) return null;
   const c = t.startupConfig.containerAccess;
   const container = access.runtime === 'container';
+  const [changeInBefore, changeInAfter = ''] = c.changeIn.split('{source}');
 
   return (
     <div data-testid="container-access">
@@ -55,11 +56,15 @@ export function ContainerAccessSection() {
         )}
         {!container && <Note testId="container-access-host-note">{c.hostNote}</Note>}
         {container && access.switchPrefix && (
-          <div className="max-w-md">
-            <ConfigSnippet
-              label={c.changeIn.replace('{source}', access.switchSource ?? '')}
-              text={switchLines(access)}
-            />
+          <div className="max-w-md space-y-1.5">
+            {/* Der Ort steht als eigene Zeile: das Label des Snippets ist in Versalien gesetzt, und ein
+                Pfad in Versalien waere ein anderer Pfad */}
+            <p className="text-xs text-text-secondary" data-testid="container-access-change-in">
+              {changeInBefore}
+              <code className="font-mono text-text break-words">{access.switchSource}</code>
+              {changeInAfter}
+            </p>
+            <ConfigSnippet label={c.linesLabel} text={switchLines(access)} />
           </div>
         )}
       </div>
