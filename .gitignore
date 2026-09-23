@@ -123,3 +123,6 @@ __pycache__/
 # Container-Instanzen (scripts/instance.sh): Konfiguration und erzeugte Mounts je Rechner
 deploy/instances/*
 !deploy/instances/.gitkeep
+
+# Lokales Werkzeug fuer den README-Banner (erzeugt docs/assets/readme-banner-*.svg), gehoert nicht ins Repo
+scripts/readme-banner.py
