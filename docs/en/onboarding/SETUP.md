@@ -163,7 +163,8 @@ docker compose --profile build-only build
 # Individual images
 docker build -f docker/Dockerfile.agent-python -t automation-agent-python:latest .
 docker build -f docker/Dockerfile.agent-node -t automation-agent-node:latest .
-docker build -f docker/Dockerfile.agent-go -t automation-agent-go:latest .
+docker build -f docker/Dockerfile.agent-devops -t automation-agent-devops:latest .
+docker build -f docker/Dockerfile.agent-java -t automation-agent-java:latest .
 ```
 
 ### Docker-based Start (alternative)

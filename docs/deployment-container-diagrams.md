@@ -12,7 +12,8 @@ flowchart LR
         BE["backend (:9090)"]
         N["agent-node (Node 22)"]
         PY["agent-python (Python 3.12)"]
-        GO["agent-go (Go 1.24)"]
+        DO["agent-devops (Ubuntu 24.04)"]
+        JV["agent-java (Temurin 21)"]
     end
     BE -->|"docker.sock"| Engine["Docker Engine"]
     style Compose fill:#1a1f2e,stroke:#30363d,color:#e6edf3
@@ -37,7 +38,8 @@ Backend Port: 9090
 | backend | OpenJDK 21 + Spring Boot Jar | `docker/Dockerfile.backend` |
 | agent-node | Node 22 | `docker/Dockerfile.agent-node` |
 | agent-python | Python 3.12 | `docker/Dockerfile.agent-python` |
-| agent-go | Go 1.24 | `docker/Dockerfile.agent-go` |
+| agent-devops | Ubuntu 24.04 | `docker/Dockerfile.agent-devops` |
+| agent-java | Temurin 21 | `docker/Dockerfile.agent-java` |
 
 ## Container Lifecycle — *ContainerService*
 

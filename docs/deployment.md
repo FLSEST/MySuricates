@@ -94,7 +94,8 @@ Das Backend ist dann unter `http://localhost:9090` erreichbar.
 | `backend` | `Dockerfile.backend` | 9090 | Spring Boot Backend |
 | `agent-node` | `Dockerfile.agent-node` | - | Node.js 22 Agent-Container |
 | `agent-python` | `Dockerfile.agent-python` | - | Python 3.12 Agent-Container |
-| `agent-go` | `Dockerfile.agent-go` | - | Go 1.24 Agent-Container |
+| `agent-devops` | `Dockerfile.agent-devops` | - | Ubuntu 24.04 Agent-Container (gh, trivy, gitleaks, docker-cli) |
+| `agent-java` | `Dockerfile.agent-java` | - | Temurin 21 Agent-Container (maven, LibreOffice) |
 
 Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über Compose gestartet. Das Backend erstellt und verwaltet Agent-Container dynamisch über die Docker API.
 
@@ -121,12 +122,6 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 - **Base:** `python:3.12-slim`
 - **Tools:** git, curl, jq
 - **Pakete:** anthropic, pandas, numpy, requests, beautifulsoup4
-
-### Agent Go (`docker/Dockerfile.agent-go`)
-
-- **Base:** `golang:1.24-alpine`
-- **Tools:** git, curl, bash, jq
-- **User:** `aiuser` (UID 1000)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 

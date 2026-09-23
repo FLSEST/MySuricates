@@ -370,7 +370,8 @@ CREATED → RUNNING → STOPPED
 |---|---|---|
 | `Dockerfile.agent-python` | `automation-agent-python:latest` | Python-based skills |
 | `Dockerfile.agent-node` | `automation-agent-node:latest` | Node.js-based skills |
-| `Dockerfile.agent-go` | `automation-agent-go:latest` | Go-based skills |
+| `Dockerfile.agent-devops` | `automation-agent-devops:latest` | gh, trivy, gitleaks, docker-cli |
+| `Dockerfile.agent-java` | `automation-agent-java:latest` | maven, LibreOffice (DOCX->PDF) |
 | `Dockerfile.backend` | Backend image | For Docker-based deployment |
 
 Agent containers are NOT started via Docker Compose — they are managed dynamically by the backend via the Docker API.

@@ -1292,7 +1292,7 @@ Für Shell-Blöcke die mehr Tools benötigen, `container_image` setzen:
 | `automation-agent-python:latest` | Python 3.12 | pandas, numpy, requests, beautifulsoup4, pip, git, curl, jq |
 | `automation-agent-devops:latest` | Ubuntu 24.04 | git, curl, jq, python3, docker-cli, gh (GitHub CLI), trivy, gitleaks |
 | `automation-agent-node:latest` | Node.js 22 | npm (volles Oekosystem), git, curl, jq |
-| `automation-agent-go:latest` | Go 1.24 | git, curl, bash, jq |
+| `automation-agent-java:latest` | Temurin 21 | maven, git, curl, jq, python3, LibreOffice (DOCX→PDF) |
 
 ### Regeln
 

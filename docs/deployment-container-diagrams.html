@@ -168,7 +168,8 @@ flowchart LR
         BE["backend (:9090)"]
         N["agent-node (Node 22)"]
         PY["agent-python (Python 3.12)"]
-        GO["agent-go (Go 1.24)"]
+        DO["agent-devops (Ubuntu 24.04)"]
+        JV["agent-java (Temurin 21)"]
     end
     BE --&gt;|"docker.sock"| Engine["Docker Engine"]
     style Compose fill:#1a1f2e,stroke:#30363d,color:#e6edf3
@@ -195,7 +196,8 @@ flowchart LR
       <tr><td>backend</td><td>OpenJDK 21 + Spring Boot Jar</td><td><code>docker/Dockerfile.backend</code></td></tr>
       <tr><td>agent-node</td><td>Node 22</td><td><code>docker/Dockerfile.agent-node</code></td></tr>
       <tr><td>agent-python</td><td>Python 3.12</td><td><code>docker/Dockerfile.agent-python</code></td></tr>
-      <tr><td>agent-go</td><td>Go 1.24</td><td><code>docker/Dockerfile.agent-go</code></td></tr>
+      <tr><td>agent-devops</td><td>Ubuntu 24.04</td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
+      <tr><td>agent-java</td><td>Temurin 21</td><td><code>docker/Dockerfile.agent-java</code></td></tr>
     </tbody>
   </table>
 </section>

@@ -49,11 +49,19 @@ services:
     profiles:
       - build-only
 
-  agent-go:
+  agent-devops:
     build:
       context: .
-      dockerfile: docker/Dockerfile.agent-go
-    image: automation-agent-go:latest
+      dockerfile: docker/Dockerfile.agent-devops
+    image: automation-agent-devops:latest
+    profiles:
+      - build-only
+
+  agent-java:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-java
+    image: automation-agent-java:latest
     profiles:
       - build-only
 

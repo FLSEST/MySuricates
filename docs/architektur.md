@@ -44,11 +44,14 @@ Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
                   ▼
 ┌─────────────────────────────────────────────────────────┐
 │                  Docker Engine                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │agent-node│  │agent-py  │  │agent-go  │              │
-│  │(Node 22) │  │(Python   │  │(Go 1.24) │              │
-│  │          │  │ 3.12)    │  │          │              │
-│  └──────────┘  └──────────┘  └──────────┘              │
+│  ┌──────────────┐  ┌──────────────┐                     │
+│  │agent-node    │  │agent-python  │                     │
+│  │(Node 22)     │  │(Python 3.12) │                     │
+│  └──────────────┘  └──────────────┘                     │
+│  ┌──────────────┐  ┌──────────────┐                     │
+│  │agent-devops  │  │agent-java    │                     │
+│  │(Ubuntu 24.04)│  │(Temurin 21)  │                     │
+│  └──────────────┘  └──────────────┘                     │
 └─────────────────────────────────────────────────────────┘
 
 Stable (:9091) und Test (:8090) laufen als separate Docker-Container.
@@ -1165,7 +1168,6 @@ autotrigger/
 │   │   ├── Dockerfile.stable          ← Ubuntu-basiert (glibc für Claude CLI)
 │   │   ├── Dockerfile.agent-node
 │   │   ├── Dockerfile.agent-python
-│   │   ├── Dockerfile.agent-go
 │   │   ├── Dockerfile.agent-devops
 │   │   └── Dockerfile.agent-java
 │   ├── data/                          ← SQLite-DB (gitignored)
