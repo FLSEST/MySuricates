@@ -157,8 +157,8 @@ Eigene Workflows baut man danach am besten mit dem
 ## 4. Einstellungen später ändern
 
 `./scripts/setup.sh` erneut starten → **Einstellungen ändern** (Port, Module, KI-Anbieter).
-Oder direkt die Datei `deploy/instances/main.env` bearbeiten und `scripts/instance.sh up --name main`
-ausführen:
+Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu starten
+(`scripts/instance.sh down --name main`, dann `up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (oder `setup.sh --docker-socket`) — erlaubt Shell-Blöcke mit
@@ -168,6 +168,23 @@ ausführen:
 
 Welche Module es gibt, mit Reifegrad und Risiko, zeigt **Settings → Module & Härtung**. Details zu
 den Instanzen: [deployment.md](deployment.md#eine-instanz-im-container-deploy).
+
+### Aktualisieren
+
+Nach `git pull` die Instanz einmal stoppen und wieder starten — `up` baut dann aus dem neuen Stand:
+
+```bash
+git pull
+scripts/instance.sh down --name main
+scripts/instance.sh up --name main
+```
+
+Im Container baut `up` das Image jedes Mal neu (unveränderte Schichten kommen aus dem Cache). Auf dem
+Rechner merkt sich `instance.sh` beim Bauen den Commit und baut neu, sobald der Klon auf einem anderen
+steht; eine laufende Instanz baut `up` nicht um, sondern meldet, dass sie noch den alten Stand zeigt.
+Aus welchem Commit der Build stammt, zeigt `scripts/instance.sh built --name main`. Die Daten bleiben
+in beiden Fällen erhalten. Ein erneuter Lauf von `./scripts/setup.sh` bringt die Instanz ebenfalls auf
+den neuen Stand.
 
 ---
 

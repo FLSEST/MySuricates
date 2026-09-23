@@ -7,11 +7,12 @@
 #   scripts/instance.sh status --name NAME
 #   scripts/instance.sh logs   --name NAME
 #   scripts/instance.sh key    --name NAME                           # API-Key fuer den Login
+#   scripts/instance.sh built  --name NAME                           # Host: Stand des Builds gegen den Klon
 #   scripts/instance.sh list                                          # alle Instanzen mit Port
 #   scripts/instance.sh login  --name NAME [claude|codex|pi]         # eigene Anmeldung (nur AI_FROM_HOST=programs)
 #
 # Jede Instanz ist eine Datei deploy/instances/NAME.env (git-ignoriert; der Installer schreibt sie).
-# Commands: up|down|status|logs|key|list|login
+# Commands: up|down|status|logs|key|list|login|built
 #
 # Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
 # (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
@@ -22,8 +23,12 @@
 # unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
 #
 # Host: gebaut wird in eine Kopie unter ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
-# Frontend), das Backend liefert das Frontend selbst aus — ein Prozess, ein Port. Neu gebaut wird mit
-# --rebuild (oder wenn noch kein JAR liegt). bash-3.2-tauglich (macOS).
+# Frontend), das Backend liefert das Frontend selbst aus — ein Prozess, ein Port. `up` baut neu, wenn
+# der Klon auf einem anderen Commit steht als beim letzten Bau (built-from daneben), mit --rebuild oder
+# wenn noch kein JAR liegt. Eine laufende Instanz baut `up` nicht um: es sagt, dass sie einen alten
+# Stand zeigt — uebernommen wird er mit down und up (1c016162). Container: `up` baut das Image jedes
+# Mal (docker compose --build, unveraenderte Schichten aus dem Cache) und ersetzt einen laufenden
+# Container, wenn sich das Image geaendert hat. bash-3.2-tauglich (macOS).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -54,7 +59,7 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-case "$CMD" in -h|--help|"") sed -n '3,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+case "$CMD" in -h|--help|"") sed -n '3,15p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
 
 env_value() { grep "^$2=" "$1" 2>/dev/null | tail -n 1 | cut -d= -f2-; }
 
@@ -148,7 +153,8 @@ container_cmd() {
         || die "mysuricates-$NAME nutzt die Anmeldung dieses Rechners (MYSURICATES_AI_FROM_HOST=${MYSURICATES_AI_FROM_HOST:-login}). Eigene Anmeldung nur mit MYSURICATES_AI_FROM_HOST=programs in $ENV_FILE"
       provider_login_argv "${TOOL:-claude}" || die "login kennt claude, codex, pi"
       docker exec -it -u "$HOST_UID" "mysuricates-$NAME" "${PROVIDER_LOGIN_ARGV[@]}" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login)" ;;
+    built)  die "built gibt es nur für Host-Instanzen — im Container baut docker compose das Image bei jedem up" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;
   esac
 }
 container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null)" = healthy ]; }
@@ -158,11 +164,32 @@ container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "mysuric
 # ---------------------------------------------------------------------------------------------------
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/$NAME"
 PID_FILE="$STATE/instance.pid"
+BUILT_FROM="$STATE/built-from"   # Commit des Klons beim letzten Bau (1c016162)
 
 host_running() { [ -s "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; }
 
+# Commit, auf dem der Klon steht — leer ohne git (dann bleibt es beim vorhandenen Build)
+repo_head() { git -C "$REPO_ROOT" rev-parse --verify -q HEAD 2>/dev/null; }
+short_sha() { if [ "${1:--}" = - ]; then printf 'unbekannt'; else printf '%s' "${1:0:8}"; fi; }
+
+# Stand des Host-Builds gegen den Klon, eine Zeile (auch fuer scripts/setup.sh):
+#   none                 noch kein Build
+#   current SHA          gebaut aus dem Commit, auf dem der Klon steht
+#   outdated BUILT HEAD  aus einem anderen Commit gebaut; BUILT ist "-", wenn nicht vermerkt ist, woraus
+#                        (Bau vor dieser Buchfuehrung oder abgebrochen) — dann lieber einmal zu oft bauen
+#   unknown BUILT        Commit des Klons nicht ermittelbar (kein git) — kein Vergleich, kein Neubau
+host_build_state() {
+  local built head
+  [ -s "$STATE/app.jar" ] || { echo none; return 0; }
+  built="$(cat "$BUILT_FROM" 2>/dev/null)"; head="$(repo_head)"
+  if [ -z "$head" ]; then echo "unknown ${built:--}"
+  elif [ "$built" = "$head" ]; then echo "current $head"
+  else echo "outdated ${built:--} $head"; fi
+}
+
 host_build() {
-  local jar count
+  local jar count head
+  head="$(repo_head)"   # vor dem Bau: ein git pull waehrend der Minuten danach zaehlt nicht mit
   echo "Baue Backend (Maven) ..."
   # clean: sonst bleibt das JAR der vorigen Version im target/ liegen und der find unten nimmt
   # irgendeines davon. Beim Sprung der Demo-VM von 0.7.6 auf 0.7.7 (2026-09-23) kopierte er so
@@ -180,17 +207,43 @@ host_build() {
   echo "Baue Frontend (npm ci, vite build) ..."
   (cd "$REPO_ROOT/ai-automation-frontend" && npm ci --no-audit --no-fund && npm run build) || return 1
   mkdir -p "$STATE"
-  cp -f "$jar" "$STATE/app.jar"
-  rm -rf "$STATE/frontend" && cp -R "$REPO_ROOT/ai-automation-frontend/dist" "$STATE/frontend"
+  # Erst den Vermerk loeschen: bricht das Kopieren ab, baut das naechste up neu, statt dem halben
+  # Stand den alten Commit zuzuschreiben.
+  rm -f "$BUILT_FROM"
+  cp -f "$jar" "$STATE/app.jar" || return 1
+  rm -rf "$STATE/frontend" && cp -R "$REPO_ROOT/ai-automation-frontend/dist" "$STATE/frontend" || return 1
+  [ -z "$head" ] || printf '%s\n' "$head" > "$BUILT_FROM"
 }
 
 host_cmd() {
-  local pid
+  local pid st built head
   case "$CMD" in
     up)
-      if host_running; then say_running "läuft bereits"; exit 0; fi
-      if [ "$REBUILD" = 1 ] || [ ! -s "$STATE/app.jar" ]; then host_build || exit 1; fi
+      read -r st built head <<EOF
+$(host_build_state)
+EOF
+      if host_running; then
+        say_running "läuft bereits"
+        # Nie still auf dem alten Stand weiterlaufen (1c016162) — aber auch nicht ungefragt anhalten:
+        # das beendete laufende Workflow-Runs. Uebernommen wird der neue Stand mit down und up.
+        if [ "$st" = outdated ]; then
+          echo "mysuricates-$NAME läuft mit Stand $(short_sha "$built"), der Klon steht auf $(short_sha "$head") — nicht übernommen." >&2
+          echo "  Übernehmen (baut neu): scripts/instance.sh down --name $NAME && scripts/instance.sh up --name $NAME" >&2
+        elif [ "$REBUILD" = 1 ]; then
+          echo "--rebuild wirkt erst auf eine gestoppte Instanz: scripts/instance.sh down --name $NAME, dann up --rebuild" >&2
+        fi
+        exit 0
+      fi
       if port_busy; then die "Port $PORT ist schon belegt — anderen Port in $ENV_FILE eintragen"; fi
+      case "$st" in
+        none) host_build || exit 1 ;;
+        outdated)
+          echo "Der Klon steht auf $(short_sha "$head"), gebaut ist Stand $(short_sha "$built") — baue neu"
+          host_build || exit 1 ;;
+        *)
+          if [ "$REBUILD" = 1 ]; then host_build || exit 1
+          else echo "Build vorhanden, nicht neu gebaut (Stand $(short_sha "$built"))"; fi ;;
+      esac
       mkdir -p "$STATE/data/logs" "$STATE/home"
       # Reihenfolge: erst die Werte aus MYSURICATES_*, dann die AUTOMATION_*-Zeilen der Datei —
       # was dort steht, gewinnt.
@@ -234,8 +287,9 @@ host_cmd() {
       else echo "nicht gestartet"; fi ;;
     logs)   tail -n 200 "$STATE/data/logs/mysuricates.log" 2>/dev/null || tail -n 200 "$STATE/data/logs/stdout.log" ;;
     key)    cat "$STATE/home/.autotrigger/api-key" ;;
+    built)  host_build_state ;;
     login)  die "login gibt es nur fuer Container-Instanzen — im Host-Betrieb nutzen die Programme die Anmeldungen dieses Rechners direkt" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login)" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login|built)" ;;
   esac
 }
 

@@ -478,13 +478,35 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
   } > "$f"
 }
 
+# Auf dem Rechner baut `instance.sh up` nur, wenn der Build nicht zum Klon passt (instance.sh built,
+# 1c016162). Der Schritt sagt deshalb vorher, ob gebaut wird — statt „✓ bauen 0:00“ nach einem
+# git pull. Eine laufende Instanz haelt `up` nie selbst an; mit altem Stand oder neuen Einstellungen
+# startet sie der Installer neu, denn dazu wurde er aufgerufen. Im Container baut docker compose.
 start_instance() {  # NAME
-  local cmd="bash '$SCRIPT_DIR/instance.sh' up --name $1"
-  [ "$RECONF" = 1 ] && [ "$RUNTIME" = host ] && cmd="bash '$SCRIPT_DIR/instance.sh' down --name $1 >/dev/null 2>&1; $cmd --rebuild"
+  local inst="bash '$SCRIPT_DIR/instance.sh'" cmd title st="" built="" head="" running=0
+  cmd="$inst up --name $1"; title="$(msg build_run "$1")"
   if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "scripts/instance.sh up --name $1")"; return 0; fi
+  if [ "$RUNTIME" = host ]; then
+    read -r st built head <<EOF
+$(bash "$SCRIPT_DIR/instance.sh" built --name "$1" 2>/dev/null)
+EOF
+    case "$(bash "$SCRIPT_DIR/instance.sh" status --name "$1" 2>/dev/null)" in running*) running=1 ;; esac
+    if [ "$st" = outdated ]; then
+      if [ "$running" = 1 ]; then printf '  %s\n' "$(msg build_outdated_running "$1" "$(short_sha "$built")" "$(short_sha "$head")")"
+      else printf '  %s\n' "$(msg build_outdated "$1" "$(short_sha "$built")" "$(short_sha "$head")")"; fi
+    fi
+    if [ "$running" = 1 ]; then
+      if [ "$st" != outdated ] && [ "$RECONF" = 0 ]; then
+        tui_done "$(msg step_build)" "$(msg build_running_kept "$1" "$(short_sha "$built")")"; return 0
+      fi
+      cmd="$inst down --name $1 >/dev/null 2>&1; $cmd"
+    fi
+    case "$st" in current|unknown) title="$(msg build_start "$1") — $(msg build_kept "$(short_sha "$built")")" ;; esac
+  fi
   [ "$DOCKER_SG" = 1 ] && cmd="sg docker -c \"$cmd\""
-  tui_run "$(msg build_run "$1")" "$LOG_DIR/start-$1.log" bash -c "$cmd" || { printf '  %s\n' "$(msg build_failed "$1" "$LOG_DIR/start-$1.log")"; return 1; }
+  tui_run "$title" "$LOG_DIR/start-$1.log" bash -c "$cmd" || { printf '  %s\n' "$(msg build_failed "$1" "$LOG_DIR/start-$1.log")"; return 1; }
 }
+short_sha() { if [ "${1:--}" = - ]; then msg build_state_unknown; else printf '%s' "${1:0:8}"; fi; }
 
 step_build() {
   section 6
@@ -508,7 +530,7 @@ step_build() {
 
 # --- Schritt 8: Fertig ------------------------------------------------------------------------------
 step_done() {
-  local n port bind key lines l_key l_manage l_change w l first addr
+  local n port bind key lines l_key l_manage l_change l_update w l first addr
   section 7
   lines=()
   for n in $INSTANCES; do
@@ -538,11 +560,14 @@ ADDR
   n="$(printf '%s' "$INSTANCES" | cut -d' ' -f1)"
   lines[${#lines[@]}]=""
   # Beschriftungen auf gleiche Breite — die Laenge haengt von der Sprache ab, nie in der Uebersetzung auffuellen
-  l_key="$(msg done_key_cmd)"; l_manage="$(msg done_manage)"; l_change="$(msg done_change)"; w=0
-  for l in "$l_key" "$l_manage" "$l_change"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
+  l_key="$(msg done_key_cmd)"; l_manage="$(msg done_manage)"; l_change="$(msg done_change)"; l_update="$(msg done_update)"; w=0
+  for l in "$l_key" "$l_manage" "$l_change" "$l_update"; do [ "${#l}" -gt "$w" ] && w=${#l}; done
   lines[${#lines[@]}]="${l_key}$(_tui_repeat ' ' $((w - ${#l_key} + 2)))${C_BOLD}scripts/instance.sh key --name $n${C_RESET}"
   lines[${#lines[@]}]="${l_manage}$(_tui_repeat ' ' $((w - ${#l_manage} + 2)))${C_BOLD}scripts/instance.sh up|down|status --name $n${C_RESET}"
   lines[${#lines[@]}]="${l_change}$(_tui_repeat ' ' $((w - ${#l_change} + 2)))${C_BOLD}scripts/setup.sh${C_RESET} · deploy/instances/$n.env"
+  # Nach git pull: down und up — up baut neu, wenn sich der Stand geaendert hat (1c016162)
+  lines[${#lines[@]}]="${l_update}$(_tui_repeat ' ' $((w - ${#l_update} + 2)))${C_BOLD}git pull && scripts/instance.sh down --name $n${C_RESET}"
+  lines[${#lines[@]}]="$(_tui_repeat ' ' $((w + 2)))${C_BOLD}scripts/instance.sh up --name $n${C_RESET}"
   logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
   [ "$logged" = logged-in ] || lines[${#lines[@]}]="${C_AMBER}$(msg ai_login_hint "$PROVIDER" "$(provider_get "$PROVIDER" login)")${C_RESET}"
   tui_box "$(msg step_of 8 ${#STEPS[@]}) · $(msg step_done)" "${lines[@]}"

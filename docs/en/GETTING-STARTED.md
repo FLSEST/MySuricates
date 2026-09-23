@@ -154,7 +154,8 @@ Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to yo
 ## 4. Change settings later
 
 Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). Or edit
-`deploy/instances/main.env` and run `scripts/instance.sh up --name main`:
+`deploy/instances/main.env` and restart the instance (`scripts/instance.sh down --name main`, then
+`up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
@@ -164,6 +165,22 @@ Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provid
 
 **Settings → Modules & hardening** lists the modules with maturity and risk. Details on instances:
 [deployment.md](deployment.md#one-instance-in-a-container-deploy).
+
+### Update
+
+After `git pull`, stop the instance once and start it again — `up` then builds from the new state:
+
+```bash
+git pull
+scripts/instance.sh down --name main
+scripts/instance.sh up --name main
+```
+
+In a container, `up` builds the image anew every time (unchanged layers come from the cache). On the
+machine, `instance.sh` notes the commit when it builds and builds anew as soon as the clone is on
+another one; `up` does not rebuild a running instance but reports that it still shows the old state.
+`scripts/instance.sh built --name main` shows which commit the build comes from. Your data stays in
+both cases. Running `./scripts/setup.sh` again also brings the instance to the new state.
 
 ---
 

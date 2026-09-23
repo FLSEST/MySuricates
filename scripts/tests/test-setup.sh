@@ -172,6 +172,45 @@ FE="$HERE/../../ai-automation-frontend/src/i18n"
 check "login dialog does not send users to the log"     '! grep -hE "^ *authHint:" "$FE/de.ts" "$FE/en.ts" | grep -iE "log|AUTO-GENERATED" >/dev/null'
 check "dev starter does not send users to the log"      '! grep -n "siehe Backend-Log" "$HERE/../start-autotrigger-dev.sh" >/dev/null'
 
+echo "9b) the build step says whether it built — also after git pull (1c016162)"
+# Ohne --dry-run, aber in einem Wegwerf-Repo mit Stubs: kein Maven, kein npm, java schlaeft nur.
+# Frueher meldete der Schritt nach git pull „✓ bauen 0:00“, und die Instanz lief mit dem alten Build.
+SREPO="$TMP/srepo"; SINST="$TMP/sinst"; SSTATE="$TMP/state2"; B2="$TMP/bin2"
+mkdir -p "$SREPO/scripts" "$SREPO/ai-automation-backend" "$SREPO/ai-automation-frontend" "$B2"
+cp "$SETUP" "$HERE/../instance.sh" "$SREPO/scripts/"; ln -s "$HERE/../lib" "$SREPO/scripts/lib"
+cp "$HERE/../../ai-automation-backend/pom.xml" "$SREPO/ai-automation-backend/"
+printf '#!/bin/sh\necho build >> "$MVN_LOG"\nrm -rf target && mkdir -p target && git rev-parse --short HEAD > target/ai-automation-backend-9.9.9.jar\n' > "$SREPO/ai-automation-backend/mvnw"
+chmod +x "$SREPO/ai-automation-backend/mvnw"
+printf 'target/\ndist/\n' > "$SREPO/.gitignore"
+for t in git nohup; do ln -sf "$(command -v "$t")" "$B2/$t"; done
+printf '#!/bin/sh\ncase "$1" in -version|--version) echo "openjdk version \\"21.0.8\\" 2025-07-15" >&2 ;; *) exec sleep 300 ;; esac\n' > "$B2/java"
+printf '#!/bin/sh\ncase "$*" in --version*) echo "curl 8.5.0 (x86_64)" ;; *system/health*) echo "{\\"status\\":\\"UP\\"}" ;; *) exit 7 ;; esac\n' > "$B2/curl"
+printf '#!/bin/sh\necho v24.21.0\n' > "$B2/node"
+printf '#!/bin/sh\ncase "$1" in -v|--version) echo 11.19.0 ;; run) mkdir -p dist && echo html > dist/index.html ;; esac\nexit 0\n' > "$B2/npm"
+chmod +x "$B2/java" "$B2/curl" "$B2/node" "$B2/npm"
+scommit() { git -C "$SREPO" add -A && git -C "$SREPO" -c user.name=t -c user.email=t@t commit -qm "$1"; }
+git -C "$SREPO" init -q && scommit eins
+SPORT="$(firstfree 19480)"
+export MVN_LOG="$TMP/mvn.log"; : > "$MVN_LOG"
+senv() { env HOME="$TMP/home" PATH="$B2:$TMP/tools" XDG_DATA_HOME="$TMP/data" XDG_STATE_HOME="$SSTATE" \
+  XDG_CONFIG_HOME="$TMP/home/.config" MYSURICATES_INSTANCES_DIR="$SINST" TERM=dumb INSTANCE_HEALTH_TIMEOUT=10 "$@"; }
+srun() { senv bash "$SREPO/scripts/setup.sh" --yes --runtime host --port "$SPORT" "$@" < /dev/null > "$TMP/out" 2>&1; echo $?; }
+sinst() { senv bash "$SREPO/scripts/instance.sh" "$@" --name main; }
+builds() { grep -c build "$MVN_LOG"; }
+spid() { cat "$SSTATE/mysuricates/main/instance.pid" 2>/dev/null; }
+check "fresh: exit 0, built once, says build"           '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep -q "Build and start main"'
+check "done box: how to update after git pull"          'out | grep -q "git pull && scripts/instance.sh down --name main" && out | grep -qE "^[│|] +scripts/instance.sh up --name main"'
+H1="$(git -C "$SREPO" rev-parse HEAD)"; P1="$(spid)"
+check "running, same state: not rebuilt, says so"       '[ "$(srun)" = 0 ] && [ "$(builds)" = 1 ] && out | grep -q "main is already running — existing build, not rebuilt (state ${H1:0:8})" && ! out | grep -q "Build and start" && [ "$(spid)" = "$P1" ]'
+echo neu > "$SREPO/neu.txt"; scommit zwei; H2="$(git -C "$SREPO" rev-parse HEAD)"
+check "git pull while running: rebuilt and restarted"   '[ "$(srun)" = 0 ] && [ "$(builds)" = 2 ] && out | grep -q "main runs state ${H1:0:8}, the clone is at ${H2:0:8}" && [ "$(spid)" != "$P1" ]'
+check "the instance now runs the new build"             '[ "$(cat "$SSTATE/mysuricates/main/app.jar")" = "$(git -C "$SREPO" rev-parse --short HEAD)" ] && [ "$(sinst built)" = "current $H2" ]'
+sinst down >/dev/null 2>&1
+check "stopped, same state: started without a build"    '[ "$(srun --lang de)" = 0 ] && [ "$(builds)" = 2 ] && out | grep -q "main starten — vorhanden, nicht neu gebaut (Stand ${H2:0:8})"'
+P2="$(spid)"
+check "--reconfigure: restarted, not rebuilt"          '[ "$(srun --reconfigure)" = 0 ] && [ "$(builds)" = 2 ] && [ "$(spid)" != "$P2" ] && out | grep -q "Start main — existing build, not rebuilt"'
+sinst down >/dev/null 2>&1
+
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
 
