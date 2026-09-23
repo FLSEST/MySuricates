@@ -1009,9 +1009,12 @@ Neither SockJS nor a raw browser WebSocket can send its own headers during the h
 
 ### CORS
 
-- Origin patterns configurable via `automation.cors.allowed-origins` (default: localhost:3000/5173 + Tailscale patterns)
+- One answer for the CORS filter, WebSocket handshakes and OAuth popup: `security/AllowedOrigins`
+- Configured list `automation.cors.allowed-origins` (default: `http(s)://localhost:3000` and `:5173`)
+- With the module `remote-access`, additionally the instance's own Tailscale IPv4 and MagicDNS name, any port (`service/system/OwnTailnetAddresses`: `tailscale ip -4` / `tailscale status --json`, kept for 60 s)
+- WebSocket: `AllowedOriginHandshakeInterceptor` checks before the ticket; Spring's own check gets `*` because it only knows a fixed startup list
 - All HTTP methods (GET, POST, PUT, PATCH, DELETE, OPTIONS)
-- Credentials allowed
+- No credentials (auth via `X-API-Key`, no cookies)
 
 ## Database Migrations (Flyway)
 

@@ -1,30 +1,27 @@
 package com.automation.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.automation.security.AllowedOrigins;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-import java.util.List;
-
+/**
+ * One CORS rule set for every path. Which origins pass is decided by {@link AllowedOrigins}: the
+ * configured list plus, with remote-access on, this instance's own Tailscale addresses. No
+ * credentials (a8056256).
+ */
 @Configuration
+@RequiredArgsConstructor
 public class CorsConfig {
 
-    @Value("${automation.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
-    private String allowedOrigins;
+    private final AllowedOrigins allowedOrigins;
 
     @Bean
     public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(allowedOrigins.split(",")));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
+        source.registerCorsConfiguration("/**", allowedOrigins.corsConfiguration());
         return new CorsFilter(source);
     }
 }

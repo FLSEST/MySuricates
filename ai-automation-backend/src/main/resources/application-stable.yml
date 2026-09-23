@@ -9,7 +9,9 @@ automation:
   modules:
     preset: ${AUTOMATION_MODULES_PRESET:full}   # Stable spiegelt die volle Dev-Nutzung; öffentlicher Default ist core
   cors:
-    allowed-origins: http://localhost:9091,https://localhost:9091,http://100.*:9091,https://100.*:9091,https://*.tail*.ts.net:*
+    # Stable liefert die Oberfläche selbst aus (Same-Origin, CORS greift nicht). Die eigene Tailscale-
+    # Adresse kommt mit remote-access automatisch dazu, sofern `tailscale` im Container antwortet (a8056256).
+    allowed-origins: http://localhost:9091,https://localhost:9091
   staging:
     auto-start: false
   tray:

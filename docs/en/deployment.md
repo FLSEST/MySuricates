@@ -568,7 +568,26 @@ listens on all interfaces; Vite runs with `host: true`. The compose service publ
 without a host-IP prefix, i.e. on every address — and Docker's port publishing bypasses most host
 firewall rules while doing so.
 
-By default CORS allows Tailscale patterns (`100.*` and `*.tail*.ts.net`) next to `localhost`.
+**CORS** does not affect an installed instance: the backend serves the UI itself, so page and API
+share one origin. The list only matters where the two have different origins — with the Vite dev
+server (its proxy rewrites the host, not the `Origin`) and behind a reverse proxy that rewrites the
+host. Then these are admitted:
+
+- by default only the dev servers on this machine: `localhost:3000` and `localhost:5173`, each over
+  http and https;
+- with the module `remote-access`, additionally the instance's **own** Tailscale address — the IPv4
+  from `tailscale ip -4` and the MagicDNS name from `tailscale status --json`, on any port, over http
+  and https. The instance asks Tailscale at runtime and keeps the answer for a minute; without a
+  running Tailscale nothing is added. Foreign tailnets and other `100.*` hosts stay out;
+- whatever `AUTOMATION_CORS_ORIGINS` (`automation.cors.allowed-origins`) lists. The variable replaces
+  the default list — if you open the dev server via its LAN IP, say, list that address together
+  with the localhost entries. Patterns with `*` are possible, but `*` also covers dots:
+  `http://100.*:3000` matches `http://100.evil.example:3000`. Exact origins are the safe choice.
+
+The same rule applies to the WebSocket handshakes (`/ws`, `/ws/terminal/**`) and to the target of
+the OAuth popup. CORS grants no credentials: authentication uses the `X-API-Key` header, there are
+no cookies.
+
 **CORS is not access control** — it only governs which origin a browser accepts and stops nobody
 from calling the API directly. Having Tailscale in front does not make the application a secured
 system.

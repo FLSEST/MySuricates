@@ -1067,9 +1067,12 @@ Weder SockJS noch ein rohes Browser-WebSocket kann beim Handshake eigene Header 
 
 ### CORS
 
-- Origin-Patterns konfigurierbar via `automation.cors.allowed-origins` (Default: localhost:3000/5173 + Tailscale-Patterns)
+- Eine Antwort für CORS-Filter, WebSocket-Handshakes und OAuth-Popup: `security/AllowedOrigins`
+- Konfigurierte Liste `automation.cors.allowed-origins` (Default: `http(s)://localhost:3000` und `:5173`)
+- Mit dem Modul `remote-access` zusätzlich die eigene Tailscale-IPv4 und der eigene MagicDNS-Name, jeder Port (`service/system/OwnTailnetAddresses`: `tailscale ip -4` / `tailscale status --json`, 60 s gemerkt)
+- WebSocket: `AllowedOriginHandshakeInterceptor` prüft vor dem Ticket; Springs eigene Prüfung bekommt `*`, weil sie nur eine feste Startliste kennt
 - Alle HTTP-Methoden (GET, POST, PUT, PATCH, DELETE, OPTIONS)
-- Credentials erlaubt
+- Keine Credentials (Auth über `X-API-Key`, keine Cookies)
 
 ## Datenbankmigrationen (Flyway)
 

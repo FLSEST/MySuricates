@@ -1,18 +1,21 @@
 package com.automation.controller;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.util.HtmlUtils;
 
 import java.net.URI;
-import java.util.Arrays;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /** OAuth popup response: untrusted strings are data attributes, never JavaScript source. */
 final class OAuthCallbackPage {
     private OAuthCallbackPage() {}
 
-    static String validateOrigin(String origin, String redirectUri, String allowedOrigins) {
+    /**
+     * @param isAllowedOrigin the origin check CORS uses as well ({@code AllowedOrigins::isAllowed}),
+     *                        so the popup never posts to an origin the API would turn away
+     */
+    static String validateOrigin(String origin, String redirectUri, Predicate<String> isAllowedOrigin) {
         URI callback = URI.create(redirectUri);
         String sameOrigin = callback.getScheme() + "://" + callback.getRawAuthority();
         if (origin == null) return sameOrigin;
@@ -24,9 +27,7 @@ final class OAuthCallbackPage {
             throw new IllegalArgumentException("Invalid frontend origin");
         }
         if (sameOrigin.equals(origin)) return origin;
-        CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOriginPatterns(Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList());
-        if (cors.checkOrigin(origin) == null) throw new IllegalArgumentException("Frontend origin is not allowed");
+        if (!isAllowedOrigin.test(origin)) throw new IllegalArgumentException("Frontend origin is not allowed");
         return origin;
     }
 

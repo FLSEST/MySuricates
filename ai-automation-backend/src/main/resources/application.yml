@@ -114,7 +114,9 @@ automation:
     skip-permissions: ${AUTOMATION_CLI_SKIP_PERMISSIONS:true}
     allowed-tools: ${AUTOMATION_CLI_ALLOWED_TOOLS:}
   cors:
-    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,https://localhost:3000,https://localhost:5173,http://100.*:3000,https://100.*:3000,https://*.tail*.ts.net:*}
+    # Nur die Dev-Server auf diesem Rechner. Mit dem Modul remote-access kommen die eigene
+    # Tailscale-IP und der eigene MagicDNS-Name automatisch dazu (a8056256) — fremde Tailnets nicht.
+    allowed-origins: ${AUTOMATION_CORS_ORIGINS:http://localhost:3000,http://localhost:5173,https://localhost:3000,https://localhost:5173}
   workspace:
     root: ${AUTOMATION_WORKSPACE_ROOT:}
   security:

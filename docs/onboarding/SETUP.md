@@ -58,7 +58,7 @@ Die Standardkonfiguration in `src/main/resources/application.yml` funktioniert o
 | `AUTOMATION_DB_PATH` | `./data/automation.db` | SQLite-Datenbankpfad |
 | `AUTOMATION_SECURITY_ENABLED` | `true` | API-Key-Authentifizierung |
 | `AUTOMATION_API_KEY` | (leer) | API-Key (wird beim ersten Start generiert) |
-| `AUTOMATION_CORS_ORIGINS` | `localhost:3000,localhost:5173` | Erlaubte CORS-Origins |
+| `AUTOMATION_CORS_ORIGINS` | `http(s)://localhost:3000` und `:5173` | Erlaubte CORS-Origins (ersetzt die Liste); die eigene Tailscale-Adresse kommt mit `remote-access` automatisch dazu |
 | `AUTOMATION_MAX_CONCURRENT_RUNS` | `10` | Maximale parallele Workflow-Ausfuehrungen |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Timeout fuer Claude CLI (Sekunden) |
 
@@ -244,5 +244,5 @@ Wenn `AUTOMATION_SECURITY_ENABLED=true`:
 | `SQLite BUSY` | Nur eine Backend-Instanz gleichzeitig starten |
 | `Claude CLI not found` | Sicherstellen dass `claude` im PATH ist |
 | `Docker socket permission denied` | Benutzer zur `docker`-Gruppe hinzufuegen: `sudo usermod -aG docker $USER` |
-| `CORS-Fehler im Browser` | `AUTOMATION_CORS_ORIGINS` pruefen oder Security deaktivieren |
+| `CORS-Fehler im Browser` (403 `Invalid CORS request`) | Die Adresse, unter der die Oberflaeche aufgerufen wird, samt der localhost-Eintraege in `AUTOMATION_CORS_ORIGINS` aufnehmen — Security abzuschalten aendert an CORS nichts |
 | `mvn: command not found` | Maven installieren oder Maven Wrapper nutzen: `./mvnw` |

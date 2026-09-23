@@ -828,7 +828,7 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 ### Sicherheit
 
 - Der Docker-Socket-Mount gibt dem Backend Host-Level Docker-Zugriff. In Produktionsumgebungen sollte mindestens API-Key-Auth aktiviert sein.
-- CORS ist standardmäßig offen (`*`). Für Produktion sollten spezifische Origins konfiguriert werden.
+- CORS lässt per Default nur die Dev-Server auf `localhost` (3000/5173) zu, mit `remote-access` zusätzlich die eigene Tailscale-Adresse; weitere Ursprünge über `AUTOMATION_CORS_ORIGINS` ([Wo gelauscht wird](deployment.md#wo-gelauscht-wird)).
 - Rate Limiting ist standardmäßig aktiv (120 req/min). Konfigurierbar zur Laufzeit in Settings → Execution.
 
 ### Frontend
