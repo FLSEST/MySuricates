@@ -103,34 +103,13 @@ public abstract class WorkflowMapper {
     @IterableMapping(qualifiedByName = "runSingle")
     public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs);
 
-    // --- Batch variant: workflow/project labels injected via @Context (avoids the per-run
-    // lazy-load of WorkflowRun.workflow, TODO 9db34f3b) ---
+    // --- Run lists: workflow/project labels from ONE query (avoids the per-run lazy-load of
+    // WorkflowRun.workflow, TODO 9db34f3b) ---
 
     /** Die Bezeichner, die eine Run-Zeile vom zugehörigen Workflow braucht. */
     public record RunOwner(String workflowName, String projectName, String projectPath) {}
 
     private static final RunOwner UNKNOWN_OWNER = new RunOwner(null, null, null);
-
-    @Mapping(target = "workflowId", expression = "java(safeWorkflowId(run))")
-    @Mapping(target = "workflowName", expression = "java(batchedWorkflowName(run, owners))")
-    @Mapping(target = "projectName", expression = "java(ownerOf(run, owners).projectName())")
-    @Mapping(target = "projectPath", expression = "java(ownerOf(run, owners).projectPath())")
-    @Mapping(target = "sealedSkillPins", expression = "java(sealedSkillPinsOf(run))")
-    @Named("runWithOwners")
-    public abstract WorkflowRunResponse toRunResponse(WorkflowRun run, @Context Map<String, RunOwner> owners);
-
-    @IterableMapping(qualifiedByName = "runWithOwners")
-    public abstract List<WorkflowRunResponse> toRunResponseList(List<WorkflowRun> runs,
-                                                                @Context Map<String, RunOwner> owners);
-
-    /**
-     * Run-Liste, deren Workflow- und Projektnamen aus EINER Query stammen (statt je Run die
-     * Lazy-Assoziation aufzulösen). Werte identisch zum Einzelpfad: Vorrang hat der Namens-
-     * Schnappschuss des Runs, dann der Workflow, sonst "(deleted)".
-     */
-    public List<WorkflowRunResponse> toRunResponseListWithOwners(List<WorkflowRun> runs) {
-        return toRunResponseList(runs, ownersFor(runs));
-    }
 
     /** Workflow- und Projektnamen aller Runs aus EINER Query (TODO 9db34f3b). */
     private Map<String, RunOwner> ownersFor(List<WorkflowRun> runs) {
@@ -148,8 +127,11 @@ public abstract class WorkflowMapper {
     // --- Lean list variant: no steps in the response (TODO a05c9504) ---
 
     /**
-     * Run-Liste fuer Listen-Routen ({@code /executions}, {@code /workflows/{id}/runs}): wie
-     * {@link #toRunResponseListWithOwners}, aber ohne die Schritte.
+     * Run-Liste fuer Listen-Routen ({@code /executions}, {@code /workflows/{id}/runs},
+     * {@code /schedules/{id}/runs}, {@code /schedules/calendar}): Workflow- und Projektnamen aus
+     * EINER Query, statt der Schritte ihre Anzahl und die gekuerzte Ausgabe des letzten. Namen wie
+     * im Einzelpfad: Vorrang hat der Namens-Schnappschuss des Runs, dann der Workflow, sonst
+     * "(deleted)".
      *
      * <p>Die Listen-Route trug jeden {@code step_results.output} (TEXT) in die Antwort — gemessen
      * 3 061 816 Bytes bei 60 Runs (TODO a05c9504). Statt der Schritte liefert sie deren Anzahl und

@@ -124,6 +124,16 @@ class RequestCostRatchetTest {
     /** A step output big enough that fetching it by accident is visible in the response size. */
     private static final String FAT_STEP_OUTPUT = "x".repeat(20_000);
 
+    /** Start of every seeded run — a Tuesday. */
+    private static final Instant RUN_STARTED = Instant.parse("2026-09-01T10:00:00Z");
+
+    /** Next occurrence of the seeded schedules ({@code 0 0 6 * * MON}): the following Monday. */
+    private static final Instant NEXT_SCHEDULED = Instant.parse("2026-09-07T06:00:00Z");
+
+    /** The calendar week holding both: every seeded run and every seeded schedule's next date. */
+    private static final String CALENDAR =
+            "/api/v1/schedules/calendar?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z";
+
     record Cost(int statements, int responseBytes) {}
 
     /**
@@ -179,6 +189,16 @@ class RequestCostRatchetTest {
      *       null target instead of throwing — see
      *       {@code ScheduleSoftDeletedWorkflowIntegrationTest}. What is left is the query itself
      *       plus the two bundled run-status queries.</li>
+     *   <li>{@code /schedules/{sched}/runs} and the calendar week: added with TODO 168e3d7f, both
+     *       answered with every step of every run — 122 651 bytes for the two runs of one schedule,
+     *       3 697 137 bytes for the week with 60 runs. They now send the same list rows as
+     *       {@code /executions}. The runs route went 4 → 5 statements on purpose: counting the steps
+     *       and cutting the last output takes two queries per list, where loading the step rows
+     *       took one. The calendar went 37 → 7: its upcoming dates came from
+     *       {@code findSchedulesInRange}, which resolved {@code ScheduledWorkflow.workflow} row by
+     *       row until it got the same LEFT JOIN FETCH as {@code findAllWithTargets()}. That only
+     *       showed once the seeded schedules carried a {@code nextRunAt} like real ones.
+     *       {@code {sched}} is the schedule of the first seeded workflow.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.of(
@@ -189,7 +209,9 @@ class RequestCostRatchetTest {
             "/api/v1/workflows/{wf}/runs", new Cost(4, 5_000),
             "/api/v1/learning/dashboard", new Cost(10, 650_000),
             "/api/v1/search?q=Workflow", new Cost(2, 18_000),
-            "/api/v1/schedules", new Cost(3, 20_000)));
+            "/api/v1/schedules", new Cost(3, 20_000),
+            "/api/v1/schedules/{sched}/runs", new Cost(5, 5_000),
+            CALENDAR, new Cost(7, 95_000)));
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ProjectRepository projectRepository;
@@ -202,6 +224,9 @@ class RequestCostRatchetTest {
 
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
     private String firstWorkflowId;
+
+    /** Target of {@code {sched}} in a route: that workflow's schedule. */
+    private String firstScheduleId;
 
     @BeforeEach
     void seed() {
@@ -261,13 +286,35 @@ class RequestCostRatchetTest {
         if (firstWorkflowId == null) {
             firstWorkflowId = workflows.get(0).getId();
         }
+        // Ein Zeitplan je Workflow, wie im Betrieb mit naechstem Termin, und die Runs des Workflows
+        // tragen seine Id: So misst /schedules/{sched}/runs echte Zeitplan-Runs, und der Kalender
+        // findet in seiner Woche beides, die Termine und die vergangenen Runs (TODO 168e3d7f).
+        // Die Route /schedules laedt ueber ScheduledWorkflow.workflow (EAGER) und Workflow.project
+        // (EAGER). Faellt der JOIN FETCH aus findAllWithTargets() weg, loest Hibernate die
+        // Assoziationen wieder Zeile fuer Zeile auf und die Zahl der Statements springt sichtbar
+        // auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
         for (Workflow workflow : workflows) {
+            ScheduledWorkflow schedule = scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
+                    .workflow(workflow)
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
+                    .cronExpression("0 0 6 * * MON")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
+                    .enabled(true)
+                    .nextRunAt(NEXT_SCHEDULED)
+                    .description("Seeded for the request cost ratchet")
+                    .inputContext(Map.of())
+                    .build());
+            if (firstScheduleId == null) {
+                firstScheduleId = schedule.getId();
+            }
+
             for (int r = 0; r < RUNS_PER_WORKFLOW; r++) {
                 WorkflowRun run = runRepository.save(WorkflowRun.builder()
                         .workflow(workflow)
+                        .triggeredByScheduleId(schedule.getId())
                         .status(RunStatus.COMPLETED)
-                        .startedAt(Instant.parse("2026-09-01T10:00:00Z"))
-                        .completedAt(Instant.parse("2026-09-01T10:00:05Z"))
+                        .startedAt(RUN_STARTED)
+                        .completedAt(RUN_STARTED.plusSeconds(5))
                         .durationMs(5_000L)
                         .inputContext(Map.of())
                         .metadata(Map.of())
@@ -280,28 +327,12 @@ class RequestCostRatchetTest {
                             .status(StepStatus.COMPLETED)
                             .input("seeded input")
                             .output(FAT_STEP_OUTPUT)
-                            .startedAt(Instant.parse("2026-09-01T10:00:00Z"))
-                            .completedAt(Instant.parse("2026-09-01T10:00:01Z"))
+                            .startedAt(RUN_STARTED)
+                            .completedAt(RUN_STARTED.plusSeconds(1))
                             .durationMs(1_000L)
                             .build());
                 }
             }
-        }
-
-        // Ein Zeitplan je Workflow: Die Route /schedules laedt ueber ScheduledWorkflow.workflow
-        // (EAGER) und Workflow.project (EAGER). Faellt der JOIN FETCH aus findAllWithTargets()
-        // weg, loest Hibernate die Assoziationen wieder Zeile fuer Zeile auf und die Zahl der
-        // Statements springt sichtbar auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
-        for (Workflow workflow : workflows) {
-            scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
-                    .workflow(workflow)
-                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW)
-                    .cronExpression("0 0 6 * * MON")
-                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON)
-                    .enabled(true)
-                    .description("Seeded for the request cost ratchet")
-                    .inputContext(Map.of())
-                    .build());
         }
 
         for (int t = 0; t < TODOS; t++) {
@@ -465,7 +496,8 @@ class RequestCostRatchetTest {
      */
     @Test
     void runListsLoadNoStepRows() throws Exception {
-        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs")) {
+        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs",
+                "/api/v1/schedules/{sched}/runs", CALENDAR)) {
             Cost before = measure(route);
             assertThat(stepRowsInPersistenceContext())
                     .as("%s loaded step rows — the list must count and preview them in the database", route)
@@ -496,7 +528,7 @@ class RequestCostRatchetTest {
     }
 
     private String resolve(String route) {
-        return route.replace("{wf}", firstWorkflowId);
+        return route.replace("{wf}", firstWorkflowId).replace("{sched}", firstScheduleId);
     }
 
     private Cost measure(String route) throws Exception {

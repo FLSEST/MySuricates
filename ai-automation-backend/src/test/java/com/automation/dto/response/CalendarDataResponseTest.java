@@ -30,7 +30,7 @@ class CalendarDataResponseTest {
 
     @Test
     void should_returnPastRunsList_when_constructedWithPastRuns() {
-        var run = mock(WorkflowRunResponse.class);
+        var run = mock(WorkflowRunListItemResponse.class);
         var response = new CalendarDataResponse(List.of(), List.of(run));
 
         assertThat(response.upcoming()).isEmpty();
@@ -41,9 +41,9 @@ class CalendarDataResponseTest {
     void should_returnBothLists_when_constructedWithBothPopulated() {
         var scheduled1 = mock(ScheduledWorkflowResponse.class);
         var scheduled2 = mock(ScheduledWorkflowResponse.class);
-        var run1 = mock(WorkflowRunResponse.class);
-        var run2 = mock(WorkflowRunResponse.class);
-        var run3 = mock(WorkflowRunResponse.class);
+        var run1 = mock(WorkflowRunListItemResponse.class);
+        var run2 = mock(WorkflowRunListItemResponse.class);
+        var run3 = mock(WorkflowRunListItemResponse.class);
 
         var response = new CalendarDataResponse(
                 List.of(scheduled1, scheduled2),
@@ -56,7 +56,7 @@ class CalendarDataResponseTest {
 
     @Test
     void should_acceptNullUpcoming_when_constructed() {
-        var run = mock(WorkflowRunResponse.class);
+        var run = mock(WorkflowRunListItemResponse.class);
         var response = new CalendarDataResponse(null, List.of(run));
 
         assertThat(response.upcoming()).isNull();
@@ -94,7 +94,7 @@ class CalendarDataResponseTest {
     @Test
     void should_beEqual_when_bothHaveSameContent() {
         var scheduled = mock(ScheduledWorkflowResponse.class);
-        var run = mock(WorkflowRunResponse.class);
+        var run = mock(WorkflowRunListItemResponse.class);
 
         var a = new CalendarDataResponse(List.of(scheduled), List.of(run));
         var b = new CalendarDataResponse(List.of(scheduled), List.of(run));
@@ -125,8 +125,8 @@ class CalendarDataResponseTest {
 
     @Test
     void should_notBeEqual_when_differentPastRuns() {
-        var run1 = mock(WorkflowRunResponse.class);
-        var run2 = mock(WorkflowRunResponse.class);
+        var run1 = mock(WorkflowRunListItemResponse.class);
+        var run2 = mock(WorkflowRunListItemResponse.class);
 
         var a = new CalendarDataResponse(List.of(), List.of(run1));
         var b = new CalendarDataResponse(List.of(), List.of(run2));
@@ -163,7 +163,7 @@ class CalendarDataResponseTest {
     @Test
     void should_containListContents_when_toStringCalledWithPopulatedLists() {
         var scheduled = mock(ScheduledWorkflowResponse.class);
-        var run = mock(WorkflowRunResponse.class);
+        var run = mock(WorkflowRunListItemResponse.class);
 
         var response = new CalendarDataResponse(List.of(scheduled), List.of(run));
         var str = response.toString();

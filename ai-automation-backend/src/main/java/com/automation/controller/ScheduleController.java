@@ -6,7 +6,7 @@ import com.automation.dto.response.CalendarDataResponse;
 import com.automation.dto.response.ChainRunResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
-import com.automation.dto.response.WorkflowRunResponse;
+import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
@@ -58,10 +58,14 @@ public class ScheduleController {
         return scheduleMapper.toResponse(schedulerService.findById(id));
     }
 
+    /**
+     * Die Runs eines Zeitplans als Listenzeilen: Anzahl und Vorschau des letzten Schritts statt
+     * aller Schritte (TODO 168e3d7f) — die Detail-Route eines Runs liefert den Volltext.
+     */
     @GetMapping("/{id}/runs")
     @Transactional(readOnly = true)
     public Map<String, Object> getScheduleRuns(@PathVariable String id) {
-        List<WorkflowRunResponse> workflowRuns = workflowMapper.toRunResponseListWithOwners(
+        List<WorkflowRunListItemResponse> workflowRuns = workflowMapper.toRunListItemsWithOwners(
                 schedulerService.findWorkflowRunsByScheduleId(id));
         List<ChainRunResponse> chainRuns = chainMapper.toRunResponseList(
                 schedulerService.findChainRunsByScheduleId(id));
@@ -84,7 +88,7 @@ public class ScheduleController {
             @RequestParam Instant from,
             @RequestParam Instant to) {
         var upcoming = scheduleMapper.toResponseList(schedulerService.findSchedulesInRange(from, to));
-        var pastRuns = workflowMapper.toRunResponseListWithOwners(schedulerService.findWorkflowRunsBetween(from, to));
+        var pastRuns = workflowMapper.toRunListItemsWithOwners(schedulerService.findWorkflowRunsBetween(from, to));
         return new CalendarDataResponse(upcoming, pastRuns);
     }
 

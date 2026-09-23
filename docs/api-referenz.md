@@ -1100,6 +1100,10 @@ Runs die durch diesen Schedule ausgelöst wurden.
 }
 ```
 
+`workflowRuns` sind `WorkflowRunListItemResponse` — **ohne Steps**, dieselben Listenzeilen wie
+`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
+Route jeden Run mit allen Schritten. Die Schritte eines Runs liefert `GET /api/v1/executions/{id}`.
+
 ### `GET /api/v1/schedules/workflow/{workflowId}`
 
 Schedules eines bestimmten Workflows.
@@ -1123,7 +1127,9 @@ Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
 | `from` | Instant | Ja |
 | `to` | Instant | Ja |
 
-**Response:** `CalendarDataResponse` mit `upcoming` und `pastRuns`
+**Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne mit
+nächstem Termin im Zeitraum) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
+Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum)
 
 ### `POST /api/v1/schedules/preview`
 
