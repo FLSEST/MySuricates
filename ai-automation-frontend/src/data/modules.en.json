@@ -65,7 +65,7 @@
   },
   "debug": {
     "name": "Workflow debugger",
-    "description": "Runs a workflow step by step so you can follow what happens."
+    "description": "Lists workflows whose last run failed – with diagnosis and restart."
   },
   "factory": {
     "name": "Workflow factory",

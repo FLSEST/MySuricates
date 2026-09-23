@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -92,5 +92,51 @@ describe('AuditCenter accepted findings', () => {
     expect(disposition).toHaveTextContent('Big.java: 320 LOC');
     // 2026-08-15 + 180 days = 2027-02-11
     expect(disposition).toHaveTextContent(/2027/);
+  });
+});
+
+// d75fbfef: dispositionNote existed only in the API — the page accepted without a reason
+describe('AuditCenter disposition reason', () => {
+  const open: AuditFinding = { ...accepted, id: 'f-open', status: 'OPEN', dispositionNote: null, dispositionAt: null, dispositionEvidence: null };
+
+  function useOpenFindingEndpoints(patches: unknown[]) {
+    useAuditEndpoints();
+    server.use(
+      http.get(`${BASE}/audit-findings/:id`, () => HttpResponse.json(open)),
+      http.get(`${BASE}/audit-findings`, () =>
+        HttpResponse.json({ content: [open], page: 0, size: 200, totalElements: 1, totalPages: 1 })),
+      http.patch(`${BASE}/audit-findings/:id`, async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ ...open, status: 'ACCEPTED_RISK' });
+      }),
+    );
+  }
+
+  it('asks for the reason before accepting a risk and sends it along', async () => {
+    const patches: unknown[] = [];
+    useOpenFindingEndpoints(patches);
+    renderWithProviders(<AuditCenter />, { route: '/?finding=f-open' });
+
+    fireEvent.change(await screen.findByTestId('finding-status'), { target: { value: 'ACCEPTED_RISK' } });
+    expect(patches).toEqual([]); // nothing saved yet — the reason comes first
+
+    const form = await screen.findByTestId('disposition-form');
+    fireEvent.change(form.querySelector('textarea')!, { target: { value: 'Tragbar bis zum Split' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(patches).toEqual([
+      { status: 'ACCEPTED_RISK', dispositionNote: 'Tragbar bis zum Split' },
+    ]));
+  });
+
+  it('saves other statuses right away, without asking', async () => {
+    const patches: unknown[] = [];
+    useOpenFindingEndpoints(patches);
+    renderWithProviders(<AuditCenter />, { route: '/?finding=f-open' });
+
+    fireEvent.change(await screen.findByTestId('finding-status'), { target: { value: 'AWAITING_VERIFICATION' } });
+
+    await waitFor(() => expect(patches).toEqual([{ status: 'AWAITING_VERIFICATION' }]));
+    expect(screen.queryByTestId('disposition-form')).toBeNull();
   });
 });

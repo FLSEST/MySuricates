@@ -3,7 +3,7 @@ import { ChartCard } from '../dashboard/ChartCard';
 import { useT } from '../../i18n';
 import type { TriggerDistribution } from '../../types';
 
-const COLORS = ['var(--color-text-secondary)', 'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)'];
+const COLORS = ['var(--color-text-secondary)', 'var(--color-chart-1)', 'var(--color-chart-2)', 'var(--color-chart-3)', 'var(--color-chart-4)', 'var(--color-chart-5)'];
 
 export function TriggerDistributionChart({ data }: { data?: TriggerDistribution }) {
   const t = useT();
@@ -15,6 +15,7 @@ export function TriggerDistributionChart({ data }: { data?: TriggerDistribution 
     { name: t.insights.triggerWebhook, value: data.webhook },
     { name: t.insights.triggerCompletion, value: data.completionTrigger },
     { name: t.insights.triggerTodo, value: data.todoTrigger },
+    { name: t.insights.triggerOther, value: data.otherAutomatic ?? 0 },
   ].filter((e) => e.value > 0);
   const total = entries.reduce((s, e) => s + e.value, 0);
 

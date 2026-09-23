@@ -2,7 +2,7 @@ import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Archive, ArchiveRestore, ArrowLeft, Play, Square, Pencil, GitBranch, Container as ContainerIcon,
+  Archive, ArrowLeft, Play, Square, Pencil, GitBranch, Container as ContainerIcon,
   Brain, Sparkles,
 } from 'lucide-react';
 import { ModalFooter } from '../components/ui';
@@ -11,7 +11,7 @@ import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import {
-  useProject, useUpdateProject, useArchiveProject, useRestoreProject,
+  useProject, useUpdateProject, useArchiveProject,
   useStartContainer, useStopContainer, useGenerateProjectContext,
 } from '../hooks/useProjects';
 import { OnboardingCard } from '../components/project/OnboardingCard';
@@ -32,7 +32,6 @@ export function ProjectDetail() {
   const onboardingModule = useModuleEnabled('onboarding-profiles');
   const updateProject = useUpdateProject();
   const archiveProject = useArchiveProject();
-  const restoreProject = useRestoreProject();
   const startContainer = useStartContainer();
   const stopContainer = useStopContainer();
   const generateContext = useGenerateProjectContext();
@@ -95,10 +94,6 @@ export function ProjectDetail() {
     });
   };
 
-  const handleRestore = () => {
-    restoreProject.mutate(project.id);
-  };
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Back + Title */}
@@ -118,26 +113,14 @@ export function ProjectDetail() {
           <p className="text-sm text-text-tertiary font-mono mt-0.5">{project.path}</p>
         </div>
         <div className="flex items-center gap-2">
-          {project.archivedAt ? (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<ArchiveRestore className="w-4 h-4" />}
-              onClick={handleRestore}
-              loading={restoreProject.isPending}
-            >
-              {t.projects.restore}
-            </Button>
-          ) : (
-            <>
-              <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
-                {t.common.edit}
-              </Button>
-              <Button variant="danger" size="sm" icon={<Archive className="w-4 h-4" />} onClick={() => setShowArchive(true)}>
-                {t.projects.archive}
-              </Button>
-            </>
-          )}
+          {/* No restore here: GET /projects/{id} answers 404 for archived projects, so this page
+              never shows one — they are restored from the archive filter of the project list. */}
+          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={openEdit}>
+            {t.common.edit}
+          </Button>
+          <Button variant="danger" size="sm" icon={<Archive className="w-4 h-4" />} onClick={() => setShowArchive(true)}>
+            {t.projects.archive}
+          </Button>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import { useT } from '../i18n';
 import type { ActivityLogLevel, ActivityLogCategory } from '../types';
 
 const LEVELS: ActivityLogLevel[] = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
-const CATEGORIES: ActivityLogCategory[] = ['SYSTEM', 'EXECUTION', 'SCHEDULE', 'WEBHOOK', 'SECURITY', 'CONTAINER'];
+const CATEGORIES: ActivityLogCategory[] = ['SYSTEM', 'EXECUTION', 'SCHEDULE', 'WEBHOOK', 'SECURITY', 'CONTAINER', 'PLUGIN'];
 
 const levelColors: Record<ActivityLogLevel, string> = {
   DEBUG: 'bg-surface-hover text-text-secondary',
@@ -75,9 +75,11 @@ export function ActivityLog() {
           value={level}
           onChange={e => { setLevel(e.target.value); setPage(0); }}
           className="px-3 py-2 rounded-lg border border-border bg-surface-raised text-sm"
+          title={t.activityLog.levelExactHint}
         >
           <option value="">{t.activityLog.allLevels}</option>
-          {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+          {/* The API filters for exactly this level, not "this level and above" */}
+          {LEVELS.map(l => <option key={l} value={l}>{t.activityLog.levelOnly.replace('{level}', l)}</option>)}
         </select>
         <select
           value={category}

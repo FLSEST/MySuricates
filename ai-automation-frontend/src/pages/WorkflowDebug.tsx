@@ -7,8 +7,10 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useBrokenWorkflows } from '../hooks/useWorkflowDebug';
+import { useDeadLetters } from '../hooks/useDeadLetters';
 import { useRetryExecution } from '../hooks/useWorkflows';
 import { useAssistantStore } from '../stores/assistantStore';
+import { useModuleEnabled } from '../hooks/useModules';
 import { useT, useI18nStore } from '../i18n';
 import { formatRelativeTime, formatDuration } from '../utils/formatTime';
 import type { BrokenWorkflow } from '../types';
@@ -16,6 +18,8 @@ import type { BrokenWorkflow } from '../types';
 export function WorkflowDebug() {
   const t = useT();
   const { data, isLoading, error, refetch } = useBrokenWorkflows();
+  // The DLQ page has no nav entry; this page is where failed runs are looked at (d75fbfef)
+  const { data: openDeadLetters } = useDeadLetters('OPEN', 0, 1);
   const [restartTarget, setRestartTarget] = useState<BrokenWorkflow | null>(null);
   const retry = useRetryExecution();
 
@@ -34,6 +38,15 @@ export function WorkflowDebug() {
           {t.workflowDebug.title}
         </h1>
         <p className="text-sm text-text-secondary mt-1">{t.workflowDebug.subtitle}</p>
+        <Link to="/dlq" className="mt-2 inline-flex items-center gap-1 text-sm text-accent hover:underline" data-testid="dlq-link">
+          {t.workflowDebug.dlqLink}
+          {!!openDeadLetters?.totalElements && (
+            <span className="text-text-secondary">
+              ({t.workflowDebug.dlqOpen.replace('{count}', String(openDeadLetters.totalElements))})
+            </span>
+          )}
+          <ArrowRight className="w-3 h-3" />
+        </Link>
       </header>
 
       <Hint id="debug-failing" />
@@ -78,6 +91,8 @@ export function WorkflowDebug() {
 function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => void }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
+  // The diagnosis opens the assistant panel, which only exists with the assistant module
+  const assistantModule = useModuleEnabled('assistant');
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
   const startNewSession = useAssistantStore((s) => s.startNewSession);
@@ -168,15 +183,17 @@ function BrokenRow({ wf, onRestart }: { wf: BrokenWorkflow; onRestart: () => voi
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Stethoscope className="w-4 h-4" />}
-            onClick={handleDiagnose}
-            title={t.workflowDebug.diagnoseTitle}
-          >
-            {t.workflowDebug.diagnose}
-          </Button>
+          {assistantModule && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Stethoscope className="w-4 h-4" />}
+              onClick={handleDiagnose}
+              title={t.workflowDebug.diagnoseTitle}
+            >
+              {t.workflowDebug.diagnose}
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
