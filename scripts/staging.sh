@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
+# staging.sh — Stable (:9091) und Test (:8090) als Docker-Container. Befehle: siehe usage unten.
+#
+# Was vom Rechner in die Container kommt, entscheidet scripts/lib/host-mounts.sh — dieselbe Stelle wie
+# fuer instance.sh und den Dev-Container (262948a4). Die Schalter stehen in
+# ~/.config/mysuricates/staging.env (zeilenweise KEY=VALUE, wird nie ausgefuehrt); eine gleichnamige
+# Umgebungsvariable gewinnt:
+#   STABLE_AI_FROM_HOST / TEST_AI_FROM_HOST    programs | login (Default) | all
+#   STABLE_AI_PROVIDERS / TEST_AI_PROVIDERS    Auswahl aus claude,codex,pi (Default: alle)
+#   STABLE_DOCKER_SOCKET / TEST_DOCKER_SOCKET  1 (Default, wie bisher) | 0
+# Jeder Compose-Aufruf nimmt die daraus erzeugte Override-Datei mit — auch die aus dem Backend
+# (StagingService/TestingService holen sie ueber `staging.sh write-override`).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/host-mounts.sh
+. "$SCRIPT_DIR/lib/host-mounts.sh"
+# shellcheck source=lib/provider-login.sh
+. "$SCRIPT_DIR/lib/provider-login.sh"
 BACKEND_DIR="$PROJECT_ROOT/ai-automation-backend"
 FRONTEND_DIR="$PROJECT_ROOT/ai-automation-frontend"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.stable.yml"
@@ -19,6 +34,48 @@ NC='\033[0m'
 log()  { echo -e "${GREEN}[staging]${NC} $*"; }
 warn() { echo -e "${YELLOW}[staging]${NC} $*"; }
 err()  { echo -e "${RED}[staging]${NC} $*" >&2; }
+
+STAGING_ENV="${MYSURICATES_STAGING_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/staging.env}"
+OVERRIDE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mysuricates/staging"
+
+# staging_setting stable|test KEY DEFAULT — STABLE_KEY / TEST_KEY aus der Umgebung, sonst aus
+# staging.env, sonst DEFAULT.
+staging_setting() {
+    local prefix v
+    case "$1" in stable) prefix=STABLE_ ;; *) prefix=TEST_ ;; esac
+    v="$(printenv "$prefix$2" 2>/dev/null || true)"
+    if [ -z "$v" ] && [ -f "$STAGING_ENV" ]; then
+        v="$( { grep -E "^$prefix$2=" "$STAGING_ENV" || true; } | tail -n 1 | cut -d= -f2-)"
+    fi
+    printf '%s' "${v:-$3}"
+}
+
+# write_override stable|test — schreibt die Override-Datei und gibt ihren Pfad aus (nur den: das
+# Backend liest ihn). Hinweise zu fehlenden Anbietern gehen nach stderr.
+write_override() {
+    local env="$1" service prefix file missing
+    case "$env" in
+        stable) service=stable; prefix=STABLE_ ;;
+        test)   service=test; prefix=TEST_ ;;
+        *) err "write-override: stable|test"; return 2 ;;
+    esac
+    mkdir -p "$OVERRIDE_DIR"
+    file="$OVERRIDE_DIR/$env.override.yml"
+    if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 1)" \
+            "$(staging_setting "$env" AI_FROM_HOST login)" "$(staging_setting "$env" AI_PROVIDERS "")" \
+            "$STAGING_ENV" "$prefix" > "$file.tmp"; then
+        rm -f "$file.tmp"
+        err "Ungueltige ${prefix}AI_*-Werte (programs|login|all, claude,codex,pi) — $STAGING_ENV"
+        return 2
+    fi
+    mv "$file.tmp" "$file"
+    missing="$(host_mounts_missing_text)"
+    [ -z "$missing" ] || printf 'KI-Anbieter, die %s nicht nutzen kann:\n%s\n' "$env" "$missing" >&2
+    printf '%s\n' "$file"
+}
+
+stable_compose() { local ovr; ovr="$(write_override stable)" || exit 2; docker compose -f "$COMPOSE_FILE" -f "$ovr" "$@"; }
+test_compose()   { local ovr; ovr="$(write_override test)" || exit 2; docker compose -f "$TEST_COMPOSE_FILE" -f "$ovr" "$@"; }
 
 wait_healthy() {
     local max_wait=60
@@ -71,7 +128,7 @@ cmd_snapshot() {
     # Build Docker image
     log "Building Docker image..."
     cd "$BACKEND_DIR"
-    docker compose -f "$COMPOSE_FILE" build
+    stable_compose build
     log "Docker image built."
 
     log "Snapshot complete: $tag"
@@ -85,7 +142,7 @@ cmd_start() {
 
     log "Starting stable environment..."
     cd "$BACKEND_DIR"
-    docker compose -f "$COMPOSE_FILE" up -d
+    stable_compose up -d
 
     wait_healthy
     log "Stable environment running at http://localhost:9091"
@@ -94,7 +151,7 @@ cmd_start() {
 cmd_stop() {
     log "Stopping stable environment..."
     cd "$BACKEND_DIR"
-    docker compose -f "$COMPOSE_FILE" down
+    stable_compose down
     log "Stable environment stopped."
 }
 
@@ -140,7 +197,7 @@ cmd_status() {
 
 cmd_log() {
     cd "$BACKEND_DIR"
-    docker compose -f "$COMPOSE_FILE" logs -f
+    stable_compose logs -f
 }
 
 cmd_db_seed() {
@@ -194,7 +251,7 @@ cmd_db_seed() {
 cmd_clean() {
     log "Cleaning up stable environment completely..."
     cd "$BACKEND_DIR"
-    docker compose -f "$COMPOSE_FILE" down -v --rmi local 2>/dev/null || true
+    stable_compose down -v --rmi local 2>/dev/null || true
     rm -rf "$STABLE_FRONTEND_DIR"
     log "Cleaned: container, volume, image, and stable-frontend removed."
 }
@@ -237,7 +294,7 @@ cmd_test_start() {
 
     log "Starting test environment..."
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" up -d
+    test_compose up -d
 
     test_wait_healthy
     log "Test environment running at http://localhost:8090"
@@ -246,7 +303,7 @@ cmd_test_start() {
 cmd_test_stop() {
     log "Stopping test environment..."
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" down
+    test_compose down
     log "Test environment stopped."
 }
 
@@ -282,7 +339,7 @@ cmd_test_reset() {
 
     log "Resetting test database..."
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" down -v 2>/dev/null || true
+    test_compose down -v 2>/dev/null || true
     log "Volume removed. Starting fresh..."
     cmd_test_start
     log "Test database reset complete."
@@ -290,7 +347,7 @@ cmd_test_reset() {
 
 cmd_test_log() {
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" logs -f
+    test_compose logs -f
 }
 
 cmd_test_clean() {
@@ -303,7 +360,7 @@ cmd_test_clean() {
 
     log "Cleaning up test environment completely..."
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" down -v --rmi local 2>/dev/null || true
+    test_compose down -v --rmi local 2>/dev/null || true
     log "Cleaned: test container, volume, and image removed."
 }
 
@@ -318,7 +375,7 @@ cmd_test_snapshot() {
     # hangs on "loading".
     log "Building test Docker image..."
     cd "$BACKEND_DIR"
-    docker compose -f "$TEST_COMPOSE_FILE" build
+    test_compose build
     log "Test Docker image built."
 
     log "Test snapshot complete."
@@ -330,6 +387,31 @@ cmd_test_promote() {
     cmd_test_snapshot
     cmd_test_start
     log "Test promotion complete!"
+}
+
+# login stable|test [claude|codex|pi] — eigene Anmeldung im Container. Nur mit AI_FROM_HOST=programs:
+# im Modus login kommt die Anmeldung vom Rechner, eine zweite im Container ueberschriebe dort die
+# eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
+cmd_login() {
+    local env="${1:-}" tool="${2:-claude}" container prefix mode user
+    case "$env" in
+        stable) container="$CONTAINER_NAME"; prefix=STABLE_ ;;
+        test)   container="$TEST_CONTAINER_NAME"; prefix=TEST_ ;;
+        *) err "login: stable|test [claude|codex|pi]"; exit 2 ;;
+    esac
+    case "$tool" in claude|codex|pi) ;; *) err "login kennt claude, codex, pi"; exit 2 ;; esac
+    if ! docker ps --filter "name=^${container}\$" --format '{{.ID}}' | grep -q .; then
+        err "$container laeuft nicht."; exit 2
+    fi
+    mode="$(docker exec "$container" printenv MYSURICATES_AI_FROM_HOST 2>/dev/null || true)"
+    if [ "$mode" != programs ]; then
+        err "$container nutzt die Anmeldung dieses Rechners (${prefix}AI_FROM_HOST=${mode:-login})."
+        err "Eigene Anmeldung nur mit ${prefix}AI_FROM_HOST=programs in $STAGING_ENV und Neustart."
+        exit 2
+    fi
+    user="$(docker exec "$container" printenv APP_USER)"
+    provider_login_argv "$tool"
+    docker exec -it -u "$user" "$container" "${PROVIDER_LOGIN_ARGV[@]}"
 }
 
 usage() {
@@ -354,6 +436,12 @@ usage() {
     echo "  test-reset     Reset test DB (delete volume + restart)"
     echo "  test-log       Tail test container logs"
     echo "  test-clean     Remove test container, volume, and image"
+    echo ""
+    echo "Both:"
+    echo "  write-override stable|test    Write the compose override (what comes from the host), print its path"
+    echo "  login stable|test [provider]  Own login inside the container (only with *_AI_FROM_HOST=programs)"
+    echo ""
+    echo "Switches: $STAGING_ENV (STABLE_/TEST_ + AI_FROM_HOST, AI_PROVIDERS, DOCKER_SOCKET)"
 }
 
 case "${1:-}" in
@@ -373,5 +461,7 @@ case "${1:-}" in
     test-reset)   cmd_test_reset ;;
     test-log)     cmd_test_log ;;
     test-clean)   cmd_test_clean ;;
+    write-override) write_override "${2:-}" ;;
+    login)        cmd_login "${2:-}" "${3:-}" ;;
     *)            usage; exit 1 ;;
 esac

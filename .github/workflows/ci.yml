@@ -37,6 +37,7 @@ jobs:
           bash scripts/tests/test-host-mounts.sh
           bash scripts/tests/test-instance.sh
           bash scripts/tests/test-deploy-files.sh
+          bash scripts/tests/test-staging-override.sh
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
         run: |
           bash scripts/tests/test-providers.sh

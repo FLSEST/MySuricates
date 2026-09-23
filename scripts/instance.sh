@@ -8,9 +8,10 @@
 #   scripts/instance.sh logs   --name NAME
 #   scripts/instance.sh key    --name NAME                           # API-Key fuer den Login
 #   scripts/instance.sh list                                          # alle Instanzen mit Port
+#   scripts/instance.sh login  --name NAME [claude|codex|pi]         # eigene Anmeldung (nur AI_FROM_HOST=programs)
 #
 # Jede Instanz ist eine Datei deploy/instances/NAME.env (git-ignoriert; der Installer schreibt sie).
-# Commands: up|down|status|logs|key|list
+# Commands: up|down|status|logs|key|list|login
 #
 # Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
 # (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
@@ -28,6 +29,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=lib/host-mounts.sh
 . "${SCRIPT_DIR}/lib/host-mounts.sh"
+# shellcheck source=lib/provider-login.sh
+. "${SCRIPT_DIR}/lib/provider-login.sh"
 # shellcheck source=lib/i18n.sh
 . "${SCRIPT_DIR}/lib/i18n.sh"
 # shellcheck source=lib/netaddr.sh
@@ -39,18 +42,19 @@ COMPOSE_FILE="${REPO_ROOT}/deploy/compose.yml"
 
 die() { echo "instance.sh: $*" >&2; exit 2; }
 CMD="${1:-}"; [ "$#" -gt 0 ] && shift
-NAME=""; WAIT=1; REBUILD=0
+NAME=""; WAIT=1; REBUILD=0; TOOL=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --name) NAME="${2:-}"; shift ;;
     --name=*) NAME="${1#--name=}" ;;
     --no-wait) WAIT=0 ;;
     --rebuild) REBUILD=1 ;;
+    claude|codex|pi) TOOL="$1" ;;
     *) die "Unbekannte Option: $1" ;;
   esac
   shift
 done
-case "$CMD" in -h|--help|"") sed -n '3,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
+case "$CMD" in -h|--help|"") sed -n '3,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
 
 env_value() { grep "^$2=" "$1" 2>/dev/null | tail -n 1 | cut -d= -f2-; }
 
@@ -137,7 +141,14 @@ container_cmd() {
     status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null || echo "nicht gestartet" ;;
     logs)   compose logs --tail 200 ;;
     key)    docker exec -u "$HOST_UID" "mysuricates-$NAME" cat "$HOST_HOME/.autotrigger/api-key" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list)" ;;
+    login)
+      # Im Modus login kommt die Anmeldung vom Rechner; eine zweite im Container ueberschriebe dort die
+      # eingebundene auth.json (Codex, Pi) oder liefe am Token vorbei (Claude).
+      [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] \
+        || die "mysuricates-$NAME nutzt die Anmeldung dieses Rechners (MYSURICATES_AI_FROM_HOST=${MYSURICATES_AI_FROM_HOST:-login}). Eigene Anmeldung nur mit MYSURICATES_AI_FROM_HOST=programs in $ENV_FILE"
+      provider_login_argv "${TOOL:-claude}" || die "login kennt claude, codex, pi"
+      docker exec -it -u "$HOST_UID" "mysuricates-$NAME" "${PROVIDER_LOGIN_ARGV[@]}" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login)" ;;
   esac
 }
 container_healthy() { [ "$(docker inspect -f '{{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null)" = healthy ]; }
@@ -213,7 +224,8 @@ host_cmd() {
       else echo "nicht gestartet"; fi ;;
     logs)   tail -n 200 "$STATE/data/logs/mysuricates.log" 2>/dev/null || tail -n 200 "$STATE/data/logs/stdout.log" ;;
     key)    cat "$STATE/home/.autotrigger/api-key" ;;
-    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list)" ;;
+    login)  die "login gibt es nur fuer Container-Instanzen — im Host-Betrieb nutzen die Programme die Anmeldungen dieses Rechners direkt" ;;
+    *)      die "Unbekannter Befehl: $CMD (up|down|status|logs|key|list|login)" ;;
   esac
 }
 

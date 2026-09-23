@@ -19,7 +19,6 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.Comparator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -34,6 +33,7 @@ public class StagingService {
     private final SyncPreviewService previewService;
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
+    private final StagingComposeCommand compose;
 
     public enum PromotePhase {
         IDLE, STOPPING, BUILDING_BACKEND, BUILDING_FRONTEND, BUILDING_IMAGE, STARTING, ERROR
@@ -116,7 +116,7 @@ public class StagingService {
             throw new IllegalStateException("No stable-frontend/ found. Run promote first.");
         }
         log.info("Starting stable environment...");
-        runCommand(composeFile.getParent(), apiKeyEnv(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+        runCommand(composeFile.getParent(), apiKeyEnv(), compose.command(resolveBackendDir(), composeFile, "stable", "up", "-d"));
         waitForHealth(60);
         log.info("Stable environment started.");
     }
@@ -124,7 +124,7 @@ public class StagingService {
     public void stop() {
         Path composeFile = resolveComposeFile();
         log.info("Stopping stable environment...");
-        runCommand(composeFile.getParent(), "docker", "compose", "-f", composeFile.toString(), "down");
+        runCommand(composeFile.getParent(), compose.command(resolveBackendDir(), composeFile, "stable", "down"));
         log.info("Stable environment stopped.");
     }
 
@@ -150,7 +150,7 @@ public class StagingService {
                 checkCancelled();
                 promoteState.set(PromoteState.of(PromotePhase.STOPPING, 1));
                 try {
-                    runCommand(backendDir, "docker", "compose", "-f", composeFile.toString(), "down");
+                    runCommand(backendDir, compose.command(backendDir, composeFile, "stable", "down"));
                 } catch (Exception e) {
                     log.debug("Stop failed (container may not be running): {}", e.getMessage());
                 }
@@ -174,12 +174,12 @@ public class StagingService {
                 // Step 4: Build Docker image
                 checkCancelled();
                 promoteState.set(PromoteState.of(PromotePhase.BUILDING_IMAGE, 4));
-                runCommand(backendDir, "docker", "compose", "-f", composeFile.toString(), "build");
+                runCommand(backendDir, compose.command(backendDir, composeFile, "stable", "build"));
 
                 // Step 5: Start
                 checkCancelled();
                 promoteState.set(PromoteState.of(PromotePhase.STARTING, 5));
-                runCommand(backendDir, apiKeyEnv(), "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+                runCommand(backendDir, apiKeyEnv(), compose.command(backendDir, composeFile, "stable", "up", "-d"));
                 waitForHealth(60);
 
                 // Tag the commit

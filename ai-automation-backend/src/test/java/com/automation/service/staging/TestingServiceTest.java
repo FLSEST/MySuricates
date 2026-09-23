@@ -52,6 +52,9 @@ class TestingServiceTest {
     @Mock
     private DockerContainerManager dockerContainerManager;
 
+    @Mock
+    private StagingComposeCommand stagingComposeCommand;
+
     @InjectMocks
     private TestingService testingService;
 

@@ -8,8 +8,9 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi; }
 
 # Throwaway repo: scripts/tryout.sh + a Dockerfile; v0.1.0 without the tryout stage, v0.2.0 and v0.10.0 with it
-REPO="$TMP/repo"; mkdir -p "$REPO/scripts" "$REPO/deploy"
+REPO="$TMP/repo"; mkdir -p "$REPO/scripts/lib" "$REPO/deploy"
 cp "$R/scripts/tryout.sh" "$REPO/scripts/"
+cp "$R/scripts/lib/provider-login.sh" "$REPO/scripts/lib/"   # login commands shared with instance.sh/staging.sh
 git -C "$REPO" init -q && git -C "$REPO" config user.email t@t && git -C "$REPO" config user.name t
 printf 'FROM x AS runtime\n' > "$REPO/deploy/Dockerfile"
 git -C "$REPO" add -A && git -C "$REPO" commit -qm one && git -C "$REPO" tag v0.1.0

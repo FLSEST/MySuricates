@@ -19,6 +19,8 @@
 # mysuricates-tryout-data/-secrets. Einrichten fuer die echte Arbeit: scripts/setup.sh.
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/provider-login.sh
+. "${SCRIPT_DIR}/lib/provider-login.sh"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 CONTAINER="mysuricates-tryout"
 DATA_VOLUME="mysuricates-tryout-data"
@@ -111,14 +113,8 @@ cmd_start() {
 
 cmd_login() {
   need_running
-  local tool="${ARGS[0]:-claude}" cmd
-  case "$tool" in
-    claude) cmd=(claude) ; echo "Claude startet — beim ersten Start fuehrt es durch den Login (sonst /login)." ;;
-    codex)  cmd=(codex login --device-auth) ;;
-    pi)     cmd=(pi) ; echo "pi startet — dort /login." ;;
-    *) die "login kennt claude, codex, pi" ;;
-  esac
-  as_user -it -u "$TRYOUT_UID" -e "HOME=$TRYOUT_HOME" -w "$TRYOUT_HOME" "$CONTAINER" "${cmd[@]}"
+  provider_login_argv "${ARGS[0]:-claude}" || die "login kennt claude, codex, pi"
+  as_user -it -u "$TRYOUT_UID" -e "HOME=$TRYOUT_HOME" -w "$TRYOUT_HOME" "$CONTAINER" "${PROVIDER_LOGIN_ARGV[@]}"
 }
 
 cmd_export() {

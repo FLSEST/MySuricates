@@ -40,6 +40,7 @@ public class TestingService {
     private final WorkflowRepository workflowRepository;
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
+    private final StagingComposeCommand compose;
 
     @EventListener(ApplicationReadyEvent.class)
     void autoStartTest() {
@@ -100,7 +101,7 @@ public class TestingService {
         }
         log.info("Starting test environment...");
         Map<String, String> env = Map.of("AUTOMATION_API_KEY", apiKeyService.getEffectiveApiKey());
-        runCommand(composeFile.getParent(), env, "docker", "compose", "-f", composeFile.toString(), "up", "-d");
+        runCommand(composeFile.getParent(), env, compose.command(resolveBackendDir(), composeFile, "test", "up", "-d"));
         waitForHealth(60);
         log.info("Test environment started.");
     }
@@ -108,7 +109,7 @@ public class TestingService {
     public void stop() {
         Path composeFile = resolveTestComposeFile();
         log.info("Stopping test environment...");
-        runCommand(composeFile.getParent(), "docker", "compose", "-f", composeFile.toString(), "down");
+        runCommand(composeFile.getParent(), compose.command(resolveBackendDir(), composeFile, "test", "down"));
         log.info("Test environment stopped.");
     }
 
@@ -118,7 +119,7 @@ public class TestingService {
 
         // Stop container
         try {
-            runCommand(composeFile.getParent(), "docker", "compose", "-f", composeFile.toString(), "down", "-v");
+            runCommand(composeFile.getParent(), compose.command(resolveBackendDir(), composeFile, "test", "down", "-v"));
         } catch (Exception e) {
             log.debug("Stop/remove volume failed (may not exist): {}", e.getMessage());
         }
@@ -404,8 +405,7 @@ public class TestingService {
     }
 
     private Path resolveTestComposeFile() {
-        Path backendDir = resolveBackendDir();
-        return backendDir.resolve(config.getTestComposeFile());
+        return resolveBackendDir().resolve(config.getTestComposeFile());
     }
 
     private Path resolveBackendDir() {

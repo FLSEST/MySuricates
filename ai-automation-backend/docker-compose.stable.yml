@@ -23,11 +23,11 @@ services:
       - stable-data:/app/data
       - ./stable-frontend:/app/frontend:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/.claude.json:/seed/.claude.json:ro
-      - ${HOME}/.local/share/claude:${HOME}/.local/share/claude:ro
-      - ${HOME}/.local/bin:${HOME}/.local/bin:ro
-      - ${HOME}/.claude:${HOME}/.claude
+      # KI-Anbieter und Docker-Socket kommen aus der Override-Datei, die scripts/staging.sh (und das
+      # Backend beim Start aus der Oberflaeche) ueber scripts/lib/host-mounts.sh schreibt. Schalter:
+      # STABLE_AI_FROM_HOST, STABLE_AI_PROVIDERS, STABLE_DOCKER_SOCKET in
+      # ~/.config/mysuricates/staging.env (262948a4). Ohne die Override-Datei startet der Container
+      # ohne KI-Anbieter und ohne Socket.
       - ${HOME}/Entwicklung:${HOME}/Entwicklung
       - ${HOME}/dokumente:${HOME}/dokumente
       - ${HOME}/.autotrigger/backups/stable:/host-backups/stable
