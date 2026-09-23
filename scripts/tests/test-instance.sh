@@ -9,6 +9,8 @@ mkdir -p "$TMP/bin" "$TMP/inst" "$TMP/home"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >> "$DOCKER_LOG"
+# docker build … - : der Build-Kontext kommt als tar ueber stdin — aufheben, damit der Test ihn prueft
+[ "$1" = build ] && { cat > "${DOCKER_CTX:-/dev/null}"; exit 0; }
 case "$*" in
   *"compose"*"config"*) exit 0 ;;
   *"com.docker.compose.project"*) [ -n "${OWNER+x}" ] || exit 1; echo "$OWNER"; exit 0 ;;  # Container da? wem gehoert er?
@@ -220,7 +222,37 @@ check "no git: starts the build it has"        '[ "$(builds)" = 0 ] && [ -s "$ST
 GIT_CEILING_DIRECTORIES="$TMP" inst down >/dev/null 2>&1
 mv "$REPO2/.git-weg" "$REPO2/.git"
 check "built is host-only (container: exit 2)" 'bash "$SCRIPT" built --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
-check "container up always builds the image"   'grep -q "up -d --build" "$DOCKER_LOG"'
+check "container up always builds the image"   'grep -q "^build -f deploy/Dockerfile --target runtime -t mysuricates:local -$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
+
+echo "6) the image gets only tracked files — nothing kept out by .git/info/exclude (890e8e9c)"
+# Auf dem Rechner des Autors lagen private Pool-Definitionen, nur per .git/info/exclude
+# ausgeschlossen; der Build aus dem Arbeitsbaum nahm sie mit ins Image und in den Pool-Browser.
+CREPO="$TMP/crepo"
+mkdir -p "$CREPO/scripts" "$CREPO/deploy" "$CREPO/workflow-pool" "$CREPO/docs"
+cp "$SCRIPT" "$CREPO/scripts/instance.sh"; ln -s "$HERE/../lib" "$CREPO/scripts/lib"
+cp "$HERE/../../deploy/compose.yml" "$CREPO/deploy/"; echo "FROM scratch" > "$CREPO/deploy/Dockerfile"
+echo '{"id":"shared"}' > "$CREPO/workflow-pool/shared.json"; echo '{"id":"gone"}' > "$CREPO/workflow-pool/gone.json"
+echo alt > "$CREPO/docs/page.md"
+git -C "$CREPO" init -q && git -C "$CREPO" add -A && git -C "$CREPO" -c user.name=t -c user.email=t@t commit -qm eins
+echo '{"id":"private"}' > "$CREPO/workflow-pool/private.json"; echo "/workflow-pool/private.json" >> "$CREPO/.git/info/exclude"
+echo '{"id":"loose"}' > "$CREPO/workflow-pool/loose.json"   # neu, nie hinzugefuegt
+echo neu > "$CREPO/docs/page.md"                             # geaendert, nicht committet
+rm "$CREPO/workflow-pool/gone.json"                           # geloescht, nicht committet
+printf 'MYSURICATES_PORT=19406\n' > "$TMP/inst/ctx.env"
+export DOCKER_CTX="$TMP/ctx.tar"; : > "$DOCKER_LOG"
+INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait > "$TMP/ctx.out" 2>&1; RC=$?
+LIST="$(tar -tf "$DOCKER_CTX" 2>/dev/null)"
+check "up builds and starts (exit 0)"          '[ "$RC" = 0 ]'
+check "context: tracked pool file + Dockerfile" 'grep -qx "workflow-pool/shared.json" <<<"$LIST" && grep -qx "deploy/Dockerfile" <<<"$LIST"'
+check "context: excluded private file stays out" '! grep -q "private.json" <<<"$LIST"'
+check "context: untracked file stays out"       '! grep -q "loose.json" <<<"$LIST"'
+check "context: a changed tracked file as it is" '[ "$(tar -xOf "$DOCKER_CTX" docs/page.md 2>/dev/null)" = neu ]'
+check "context: a deleted tracked file is left out" '! grep -q "gone.json" <<<"$LIST"'
+check "image first, then up without compose build" '[ "$(grep -n "^build " "$DOCKER_LOG" | cut -d: -f1)" -lt "$(grep -n "up -d --no-build" "$DOCKER_LOG" | cut -d: -f1)" ] && ! grep -q -e "--build$" -e "compose.* build$" "$DOCKER_LOG"'
+mv "$CREPO/.git" "$CREPO/.git-weg"; : > "$DOCKER_LOG"
+GIT_CEILING_DIRECTORIES="$TMP" INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
+check "without git: compose builds from the folder" 'grep -q "compose .* build$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
+mv "$CREPO/.git-weg" "$CREPO/.git"
 
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

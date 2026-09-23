@@ -4,7 +4,9 @@
 # auf dem Host gebautes JAR). Die Benutzer-ID kommt erst beim Start (deploy/entrypoint.sh), damit
 # ein Image fuer alle taugt (TODO fc9de67b, spaeter Registry-Image 4c992a25).
 #
-#   docker build -f deploy/Dockerfile --target runtime -t mysuricates:local .   (Kontext = Repo-Wurzel)
+#   git ls-files -z | tar --null -T - -cf - | docker build -f deploy/Dockerfile --target runtime -t mysuricates:local -
+#   (Kontext = die getrackten Dateien des Klons, so baut scripts/instance.sh; der Ordner selbst als
+#   Kontext naehme auch Ungetracktes mit, etwa per .git/info/exclude ausgeschlossene Pool-Dateien, 890e8e9c)
 #
 # Zwei Ziele: `runtime` ist das Image fuer eine eingerichtete Instanz (Werkzeuge und KI-Logins kommen
 # vom Rechner), `tryout` baut darauf auf und bringt alles selbst mit — zum Ausprobieren ohne

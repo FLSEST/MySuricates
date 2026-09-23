@@ -26,6 +26,11 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
 
+Das Image entsteht aus den getrackten Dateien des Klons (`git ls-files`), wie sie im Arbeitsbaum
+liegen: Geänderte getrackte Dateien kommen mit, was nur lokal liegt — etwa per `.git/info/exclude`
+ausgeschlossene Pool-Definitionen —, nicht. Eine eigene Pool-Datei erscheint im Container also erst,
+wenn sie committet oder zumindest mit `git add` aufgenommen ist.
+
 Die Instanz nutzt die KI-CLIs des Rechners, man meldet sich nicht doppelt an. Wie viel davon in den
 Container kommt, bestimmt `MYSURICATES_AI_FROM_HOST` ([KI-Anbieter im Container](#ki-anbieter-im-container));
 unter macOS kommen nur Anmeldungen, keine Programme (eine Mac-Binary startet im Linux-Container nicht).

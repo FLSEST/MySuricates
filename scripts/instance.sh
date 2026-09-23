@@ -27,8 +27,9 @@
 # der Klon auf einem anderen Commit steht als beim letzten Bau (built-from daneben), mit --rebuild oder
 # wenn noch kein JAR liegt. Eine laufende Instanz baut `up` nicht um: es sagt, dass sie einen alten
 # Stand zeigt — uebernommen wird er mit down und up (1c016162). Container: `up` baut das Image jedes
-# Mal (docker compose --build, unveraenderte Schichten aus dem Cache) und ersetzt einen laufenden
-# Container, wenn sich das Image geaendert hat. bash-3.2-tauglich (macOS).
+# Mal (unveraenderte Schichten aus dem Cache), und zwar nur aus den getrackten Dateien des Klons
+# (890e8e9c), und ersetzt einen laufenden Container, wenn sich das Image geaendert hat.
+# bash-3.2-tauglich (macOS).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -119,9 +120,31 @@ wait_health() {
 # ---------------------------------------------------------------------------------------------------
 # Container
 # ---------------------------------------------------------------------------------------------------
+# Build-Kontext des Images: die getrackten Dateien des Klons, wie sie im Arbeitsbaum liegen (git
+# ls-files), nie der ganze Ordner. Nur per .git/info/exclude ausgeschlossene Pool-Definitionen oder
+# andere private Dateien kaemen sonst ins Image und in den Pool-Browser (890e8e9c); die Positivliste
+# in .dockerignore greift danach zusaetzlich. Geaenderte getrackte Dateien zaehlen mit, wie beim
+# Host-Build; geloeschte fehlen einfach. scripts/tryout.sh baut ebenso nur Getracktes (git archive).
+tracked_files_tar() {
+  ( cd "$REPO_ROOT" || exit 1
+    git ls-files -z | while IFS= read -r -d '' f; do
+      if [ -e "$f" ] || [ -L "$f" ]; then printf '%s\0' "$f"; fi
+    done | tar --null -T - -cf - )
+}
+is_git_clone() { [ "$(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$REPO_ROOT" && pwd -P)" ]; }
+
 container_cmd() {
   local override="$INSTANCES_DIR/$NAME.override.yml" owner missing
   compose() { docker compose -p "mysuricates-$NAME" -f "$COMPOSE_FILE" -f "$override" "$@"; }
+  build_image() {
+    if is_git_clone; then
+      echo "Baue Image mysuricates:local aus den getrackten Dateien des Klons ..."
+      tracked_files_tar | docker build -f deploy/Dockerfile --target runtime -t mysuricates:local -
+    else
+      # Ohne git (etwa ein entpacktes Release-Archiv, das ohnehin nur Getracktes enthaelt): der Ordner
+      compose build
+    fi
+  }
   # Ein gleichnamiger Container aus einer anderen Einrichtung (z. B. docker-compose.test.yml →
   # mysuricates-test) wird nie angefasst; down/logs bleiben ohnehin im eigenen Compose-Projekt.
   case "$CMD" in down|logs) ;; *)
@@ -138,7 +161,8 @@ container_cmd() {
         || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
       missing="$(host_mounts_missing_text)"
       [ -z "$missing" ] || printf 'KI-Anbieter, die dieser Container nicht nutzen kann:\n%s\n' "$missing" >&2
-      compose up -d --build || exit 1
+      build_image || exit 1
+      compose up -d --no-build || exit 1
       [ "$WAIT" = 1 ] || exit 0
       if wait_health container_healthy; then say_running läuft; exit 0; fi
       echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;

@@ -26,6 +26,11 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 
+The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
+tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
+via `.git/info/exclude` — does not. Your own pool file therefore shows up in the container only once
+it is committed or at least added with `git add`.
+
 The instance uses the machine's AI CLIs, so nobody logs in twice. How much of them goes into the
 container is set by `MYSURICATES_AI_FROM_HOST` ([AI providers in the container](#ai-providers-in-the-container));
 on macOS only logins go in, no programs (a Mac binary does not start in a Linux container).
