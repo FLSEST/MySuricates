@@ -8,7 +8,6 @@ import {
   BellOff,
   AlignLeft,
   AlignJustify,
-  Lock,
 } from 'lucide-react';
 import { Button, Input } from '../ui';
 import type { Workflow } from '../../types';
@@ -28,10 +27,6 @@ interface WorkflowListToolbarProps {
   onBulkToggleAutoTodo: (enable: boolean) => void;
   showDetails: boolean;
   onToggleShowDetails: () => void;
-  /** Offered only when at least one workflow is sealed */
-  hasSealed?: boolean;
-  sealedOnly?: boolean;
-  onToggleSealedOnly?: () => void;
 }
 
 export function WorkflowListToolbar({
@@ -48,9 +43,6 @@ export function WorkflowListToolbar({
   onBulkToggleAutoTodo,
   showDetails,
   onToggleShowDetails,
-  hasSealed = false,
-  sealedOnly = false,
-  onToggleSealedOnly,
 }: WorkflowListToolbarProps) {
   return (
     <>
@@ -63,22 +55,6 @@ export function WorkflowListToolbar({
             icon={<Search className="w-4 h-4 text-text-tertiary" />}
           />
         </div>
-        {hasSealed && onToggleSealedOnly && (
-          <button
-            onClick={onToggleSealedOnly}
-            aria-pressed={sealedOnly}
-            className={`p-2 rounded-lg transition-colors shrink-0 ${
-              sealedOnly
-                ? 'bg-accent/10 text-accent'
-                : 'hover:bg-surface-raised text-text-tertiary hover:text-text'
-            }`}
-            title={t.workflows.sealView.filterSealedHint}
-            aria-label={t.workflows.sealView.filterSealed}
-            data-testid="filter-sealed"
-          >
-            <Lock className="w-4 h-4" />
-          </button>
-        )}
         <button
           onClick={onToggleSelectMode}
           className={`p-2 rounded-lg transition-colors shrink-0 ${

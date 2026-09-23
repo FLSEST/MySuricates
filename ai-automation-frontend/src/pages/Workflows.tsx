@@ -7,6 +7,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { WorkflowListHeader } from '../components/workflow/WorkflowListHeader';
 import { WorkflowListToolbar } from '../components/workflow/WorkflowListToolbar';
+import { SealFilterTabs, type SealFilter } from '../components/workflow/SealFilterTabs';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import { WorkflowImportModal } from '../components/workflow/WorkflowImportModal';
 import { ProjectGroup } from '../components/workflow/ProjectGroup';
@@ -133,11 +134,12 @@ export function Workflows() {
     try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* ignore */ }
   }, [viewMode]);
 
-  const [sealedOnly, setSealedOnly] = useState(false);
-  const hasSealed = useMemo(() => (workflows ?? []).some((w) => w.sealed), [workflows]);
+  const [sealFilter, setSealFilter] = useState<SealFilter>('all');
+  const sealedCount = useMemo(() => (workflows ?? []).filter((w) => w.sealed).length, [workflows]);
   const filtered = useMemo(
     () => {
-      const base = sealedOnly && hasSealed ? (workflows ?? []).filter((w) => w.sealed) : (workflows ?? []);
+      const all = workflows ?? [];
+      const base = sealFilter === 'all' ? all : all.filter((w) => !!w.sealed === (sealFilter === 'sealed'));
       if (!search) return base;
       const q = search.toLowerCase();
       return (
@@ -149,7 +151,7 @@ export function Workflows() {
         )
       );
     },
-    [workflows, search, sealedOnly, hasSealed],
+    [workflows, search, sealFilter],
   );
 
   const groupedByProject = useMemo(() => {
@@ -448,9 +450,6 @@ export function Workflows() {
               onBulkToggleAutoTodo={handleBulkToggleAutoTodo}
               showDetails={showDetails}
               onToggleShowDetails={() => setShowDetails((v) => !v)}
-              hasSealed={hasSealed}
-              sealedOnly={sealedOnly}
-              onToggleSealedOnly={() => setSealedOnly((v) => !v)}
             />
 
             <div className="flex items-center gap-1 mb-2 text-xs" role="tablist">
@@ -478,6 +477,10 @@ export function Workflows() {
               >
                 {t.workflows.viewModeDiscovery}
               </button>
+            </div>
+            <div className="mb-2 text-xs">
+              <SealFilterTabs t={t} value={sealFilter} onChange={setSealFilter}
+                sealedCount={sealedCount} unsealedCount={(workflows?.length ?? 0) - sealedCount} />
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-1 pr-1">

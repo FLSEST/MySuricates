@@ -86,7 +86,7 @@ export function WorkflowRow({
       ) : (
         <span className="text-sm truncate flex-1">{workflow.name}</span>
       )}
-      {!selectMode && (workflow.sealed || sealStatus?.state === 'VIOLATED') && (
+      {!selectMode && (
         <span className="shrink-0 inline-flex" data-testid="row-sealed">
           <SealStateIcon sealed={workflow.sealed} status={sealStatus} />
         </span>

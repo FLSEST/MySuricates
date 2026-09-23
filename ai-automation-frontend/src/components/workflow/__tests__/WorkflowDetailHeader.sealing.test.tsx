@@ -78,4 +78,13 @@ describe('WorkflowDetailHeader sealing', () => {
     await waitFor(() => expect(screen.getByTestId('sealed-badge')).toHaveAttribute('data-state', 'violated'));
     expect(screen.getByTestId('sealed-badge')).toHaveTextContent(en.workflows.sealView.violated);
   });
+
+  it('shows "not sealed" and a labelled seal button for an unsealed workflow', () => {
+    renderHeader(workflow());
+
+    const badge = screen.getByTestId('sealed-badge');
+    expect(badge).toHaveAttribute('data-state', 'unsealed');
+    expect(badge).toHaveTextContent(en.workflows.sealView.notSealed);
+    expect(screen.getByRole('button', { name: en.workflows.seal })).toHaveTextContent(en.workflows.seal);
+  });
 });

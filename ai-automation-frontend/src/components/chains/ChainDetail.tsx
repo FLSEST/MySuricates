@@ -73,11 +73,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-text-primary flex items-center gap-1.5 min-w-0">
                           <span className="truncate">{entry.label || entry.workflowName || entry.workflowId}</span>
-                          {sealStatuses.get(entry.workflowId) && (
-                            <span title={t.workflows.sealView.chainEntrySealed} className="inline-flex">
-                              <SealStateIcon sealed status={sealStatuses.get(entry.workflowId)} />
-                            </span>
-                          )}
+                          <SealStateIcon sealed={sealStatuses.has(entry.workflowId)} status={sealStatuses.get(entry.workflowId)} />
                         </p>
                         {entry.projectName && (
                           <p className="text-xs text-text-tertiary">{entry.projectName}</p>

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Play } from 'lucide-react';
 import { WorkflowIcon } from '../../utils/workflowIcon';
+import { SealStateIcon } from './SealStateIcon';
+import { useSealStatus } from '../../hooks/useSealStatus';
 import type { Workflow } from '../../types';
 import type { TranslationKeys } from '../../i18n';
 import type { useNavigate } from 'react-router-dom';
@@ -138,6 +140,7 @@ export function DiscoveryView({ t, workflows, search, onExecute, navigate }: Dis
                 <div className="text-xs text-text-tertiary truncate">{w.description}</div>
               )}
             </div>
+            <DiscoverySealIcon workflow={w} />
             {(w.tags ?? []).slice(0, 3).map((tag) => (
               <span
                 key={tag}
@@ -171,6 +174,11 @@ interface CategoryChipProps {
   active: boolean;
   onClick: () => void;
   count: number;
+}
+
+function DiscoverySealIcon({ workflow }: { workflow: Workflow }) {
+  const status = useSealStatus(workflow.id);
+  return <SealStateIcon sealed={workflow.sealed} status={status} className="w-3.5 h-3.5" />;
 }
 
 function CategoryChip({ label, active, onClick, count }: CategoryChipProps) {

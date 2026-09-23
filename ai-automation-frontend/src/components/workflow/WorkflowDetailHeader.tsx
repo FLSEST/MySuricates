@@ -1,10 +1,11 @@
 import {
-  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen, ShieldAlert,
+  ArrowLeft, Play, Pencil, Wand2, Wrench, Copy, Download, FileCode2, Trash2, Lock, LockOpen,
 } from 'lucide-react';
 import { Button } from '../ui';
 import type { Workflow } from '../../types';
 import { exportWorkflow, useSealWorkflow } from '../../hooks/useWorkflows';
 import { useSealStatus } from '../../hooks/useSealStatus';
+import { SealBadge } from './SealStateIcon';
 import { apiErrorMessage, fetchWorkflowBpmn } from '../../api/client';
 import { downloadBlob } from '../../utils/downloadFile';
 import { useToast } from '../../hooks/useToast';
@@ -77,26 +78,7 @@ export function WorkflowDetailHeader({
         <div className="flex items-center gap-3">
           <span className="text-2xl">{workflow.icon || '📋'}</span>
           <h1 className="text-2xl font-bold text-text truncate">{workflow.name}</h1>
-          {sealStatus?.state === 'VIOLATED' ? (
-            <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-danger-subtle text-danger text-xs font-medium shrink-0"
-              title={t.workflows.sealView.violatedHint}
-              data-testid="sealed-badge"
-              data-state="violated"
-            >
-              <ShieldAlert className="w-3 h-3" />
-              {t.workflows.sealView.violated}
-            </span>
-          ) : sealed && (
-            <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium shrink-0"
-              title={t.workflows.sealedHint}
-              data-testid="sealed-badge"
-            >
-              <Lock className="w-3 h-3" />
-              {t.workflows.sealed}
-            </span>
-          )}
+          <SealBadge sealed={sealed} status={sealStatus} />
         </div>
         {workflow.description && (
           <p className="text-sm text-text-secondary mt-0.5">{workflow.description}</p>
@@ -138,14 +120,16 @@ export function WorkflowDetailHeader({
           title={sealed ? t.workflows.sealedLocked : t.common.edit} aria-label={t.common.edit} />
         {sealingModule && (
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             icon={sealed ? <LockOpen className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
             onClick={toggleSeal}
             loading={sealWorkflow.isPending}
             title={sealed ? t.workflows.unseal : t.workflows.seal}
             aria-label={sealed ? t.workflows.unseal : t.workflows.seal}
-          />
+          >
+            {sealed ? t.workflows.unseal : t.workflows.seal}
+          </Button>
         )}
         <Button
           variant="ghost"
