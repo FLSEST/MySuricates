@@ -105,6 +105,14 @@ M_ai_token_saved="Token gespeichert in %s (nur für dich lesbar)"
 M_ai_token_hint="Claude im Container: einmal claude setup-token ausführen, dann CLAUDE_CODE_OAUTH_TOKEN=… nach %s (chmod 600)"
 M_ai_token_implausible="In %s steht bei CLAUDE_CODE_OAUTH_TOKEN kein Token (Platzhalter, Leerzeichen oder unter 40 Zeichen) — das zählt nicht als Anmeldung."
 M_ai_token_rejected="Das sieht nicht wie ein Token aus (Platzhalter, Leerzeichen oder unter 40 Zeichen) — nicht gespeichert."
+M_ai_pi_q="pi mitinstallieren? (%s)"
+M_ai_pi_run="pi installieren (npm)"
+M_ai_pi_failed="pi ließ sich nicht installieren — von Hand: %s"
+M_ai_pi_no_npm="--with-pi braucht npm (Node) auf diesem Rechner — pi wurde nicht installiert."
+M_ai_pi_not_found="pi ist installiert, aber nicht auf dem PATH — es liegt in %s"
+M_profile_q="Eine Zeile in %s eintragen, damit node, npm und npm-Programme wie pi auch in deiner Shell gehen?"
+M_profile_added="%s lädt jetzt die heruntergeladenen Werkzeuge — ab der nächsten Anmeldung; sofort: %s"
+M_profile_hint="node, npm und npm-Programme (codex, pi) aus dem Download gehen in deiner Shell erst mit dieser Zeile in %s: %s"
 
 # Ports und Ordner
 M_ports_title="Ports und Ordner"
@@ -151,6 +159,7 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = aus dem Netz, VPN davor)
   --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
   --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)
+  --with-pi                    die KI-CLI pi per npm mitinstallieren (Default: nein, auch mit --yes)
   --ai-from-host MODUS         Container: was von den KI-Anbietern hineinkommt — login (Default), programs, all
   --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)

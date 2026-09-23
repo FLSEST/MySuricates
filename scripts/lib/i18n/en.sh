@@ -106,6 +106,14 @@ M_ai_token_saved="Token saved in %s (readable only by you)"
 M_ai_token_hint="Claude in a container: run claude setup-token once, then put CLAUDE_CODE_OAUTH_TOKEN=… into %s (chmod 600)"
 M_ai_token_implausible="CLAUDE_CODE_OAUTH_TOKEN in %s is not a token (placeholder, spaces or under 40 characters) — it does not count as a login."
 M_ai_token_rejected="That does not look like a token (placeholder, spaces or under 40 characters) — not saved."
+M_ai_pi_q="Also install pi? (%s)"
+M_ai_pi_run="Install pi (npm)"
+M_ai_pi_failed="pi could not be installed — by hand: %s"
+M_ai_pi_no_npm="--with-pi needs npm (Node) on this machine — pi was not installed."
+M_ai_pi_not_found="pi is installed, but not on the PATH — it lives in %s"
+M_profile_q="Add one line to %s so that node, npm and npm programs such as pi also work in your shell?"
+M_profile_added="%s now loads the downloaded tools — from the next login on; right away: %s"
+M_profile_hint="node, npm and npm programs (codex, pi) from the download work in your shell only with this line in %s: %s"
 
 # Ports and folders
 M_ports_title="Ports and folders"
@@ -152,6 +160,7 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --bind ADDR                  address (default 127.0.0.1; 0.0.0.0 = from the network, VPN in front)
   --projects DIR               projects folder for the container (default: the folder above the clone)
   --docker-socket              container: allow shell blocks with container_image (full Docker control)
+  --with-pi                    also install the AI CLI pi via npm (default: no, also with --yes)
   --ai-from-host MODE          container: what of the AI providers goes in — login (default), programs, all
   --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)

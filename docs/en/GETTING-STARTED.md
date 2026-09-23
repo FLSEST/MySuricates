@@ -90,6 +90,8 @@ Done. `b` goes one step back, `q` quits.
   [deployment.md](deployment.md).
   Staged: Dev gets all modules, Test and Prod get Standard with seals ("unattended runs only sealed").
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
+  If pi is missing, the installer offers to install it via npm (default no, without a terminal
+  `--with-pi`); for claude and codex it names the command. Logging in is up to you.
   In the container the instance uses the CLI **and** your login from the machine — no second login
   (on macOS only the login; the program lives in the image).
 - **Ports:** default 9090, busy ports are skipped. For the container also the projects folder the
@@ -107,6 +109,16 @@ hardening, ui-editable and other settings go into the instance file (section 4).
 ```
 
 Without a terminal (pipe, CI) and without `--yes` the installer only checks.
+
+If Java or Node from the package manager are too old, the installer downloads them to
+`~/.local/share/mysuricates`. The instance finds them there on its own, your shell only with a line in
+your profile — otherwise `node`, `npm` and whatever `npm install -g` puts there (codex, pi) are missing:
+
+```bash
+. ~/.local/share/mysuricates/env.sh      # in ~/.profile (bash with ~/.bash_profile: there; macOS: ~/.zprofile)
+```
+
+In the guided run the installer offers to add the line; with `--yes` it only shows it.
 
 ---
 
@@ -240,6 +252,7 @@ in the repo — SSL off with the default password remains allowed.
 | Docker installed but not running | Linux: `sudo systemctl start docker`, macOS: open Docker Desktop |
 | Port in use | the installer takes the next free one; change it in `deploy/instances/main.env` |
 | AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login`; the start page and the settings show per provider whether program and login are found |
+| `npm`, `node` or `pi` not found after the installer | Node came as a download: `. ~/.local/share/mysuricates/env.sh`, permanently as a line in your profile (section 2) |
 | Instance does not start | `scripts/instance.sh logs --name main`; setup logs in `~/.local/state/mysuricates/setup-logs/` |
 | Settings show "Docker not set up" | not an error — only shell blocks with `container_image` need Docker |
 

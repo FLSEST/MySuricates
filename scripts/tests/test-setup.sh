@@ -21,7 +21,9 @@ stub git 'echo "git version 2.43.0"'
 stub curl 'case "$1" in --version) echo "curl 8.5.0 (x86_64)";; *) exit 7;; esac'
 stub java 'echo "openjdk version \"21.0.8\" 2025-07-15" >&2'
 stub node 'echo v24.21.0'
-stub npm 'echo 11.19.0'
+# npm: Version, globales Verzeichnis (NPM_PREFIX) und `install` (NPM_LOG; legt NPM_CREATES als Programm an)
+NPM_STUB='case "$1" in prefix) echo "${NPM_PREFIX:-/nonexistent-npm-prefix}" ;; install) echo "$*" >> "${NPM_LOG:-/dev/null}"; [ -z "${NPM_CREATES:-}" ] || { printf "#!/bin/sh\nexit 0\n" > "$NPM_CREATES"; chmod +x "$NPM_CREATES"; } ;; *) echo 11.19.0 ;; esac'
+stub npm "$NPM_STUB"
 stub docker 'case "$1" in --version) echo "Docker version 29.1.3, build x";; info) exit 0;; esac'
 stub apt-get 'exit 0'
 stub codex 'exit 0'
@@ -99,6 +101,44 @@ check "placeholder token: named, hint, file kept"       '[ "$(run --yes --dry-ru
 check "a pasted token is checked before it is saved"    'grep -F "claude_token_plausible \"\$token\"" "$SETUP" >/dev/null'
 rm -rf "$TMP/home/.config"; unstub claude
 
+echo "4c) pi only on request; the downloaded Node in the user's shell (0a078449, 2605ed1f)"
+export NPM_LOG="$TMP/npm.log"; : > "$NPM_LOG"
+OLD_SHELL="${SHELL:-}"; export SHELL=/bin/bash   # Profil: ~/.profile (ohne ~/.bash_profile)
+rm -rf "$INST"
+check "default: no pi, also with --yes"                 '[ "$(run --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "pi-coding-agent" && [ ! -s "$NPM_LOG" ]'
+rm -rf "$INST"
+check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm install -g @earendil-works/pi-coding-agent"'
+mkdir -p "$TMP/npmprefix"; rm -rf "$INST"
+check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm install -g @earendil-works/pi-coding-agent" && ! out | grep -qF "sudo npm"'
+rm -rf "$INST"
+check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qx "install -g @earendil-works/pi-coding-agent" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
+unstub pi; unstub npm; rm -rf "$INST"
+check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -q -- "--with-pi needs npm"'
+stub npm "$NPM_STUB"
+check "--help names --with-pi"                          'bash "$SETUP" --help | grep -q -- "--with-pi" && bash "$SETUP" --help --lang de | grep -q -- "--with-pi"'
+# Heruntergeladenes Node: env.sh bringt es auf den PATH, die Shell des Nutzers kennt es nicht
+DD="$TMP/data/mysuricates"; mkdir -p "$DD/node/bin"
+printf 'export PATH="%s/node/bin:$PATH"\n' "$DD" > "$DD/env.sh"
+rm -rf "$INST"
+check "--yes: profile untouched, the line is shown"    '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -qF "only with this line in ~/.profile: . $DD/env.sh" && [ ! -e "$TMP/home/.profile" ]'
+printf '#!/bin/sh\n%s\n' "$NPM_STUB" > "$DD/node/bin/npm"; chmod +x "$DD/node/bin/npm"; unstub codex; rm -rf "$INST"
+check "no CLI yet: full npm commands with env.sh first" '[ "$(run --yes --dry-run --runtime host)" = 0 ] && out | grep -qF "install: . $DD/env.sh && npm install -g @openai/codex   log in: . $DD/env.sh && codex login"'
+check "the commands are not cut off by the box"         '! out | grep -E "install: .*…" >/dev/null'
+stub codex 'exit 0'
+pty_profile() {  # TASTEN → Mitschnitt in $TMP/menu; ohne --dry-run, gebaut wird nicht (n)
+  printf "$1" | script -qec "stty cols 120 rows 50; env HOME='$TMP/home' SHELL=/bin/bash PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --lang en --runtime host --preset core --provider codex --port 19490" /dev/null > "$TMP/menu" 2>&1
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
+  rm -rf "$INST"; pty_profile 'n\ny\nn\n'   # pi: nein · Profil: ja · bauen: nein
+  check "guided: the line goes into ~/.profile once"   '[ "$(grep -c "mysuricates/env.sh" "$TMP/home/.profile" 2>/dev/null)" = 1 ] && grep -qxF "[ -r \"$DD/env.sh\" ] && . \"$DD/env.sh\"" "$TMP/home/.profile"'
+  pty_profile 'n\nn\n'
+  check "guided again: not asked, not added twice"     '[ "$(grep -c "mysuricates/env.sh" "$TMP/home/.profile")" = 1 ] && ! grep -q "Add one line" "$TMP/menu"'
+else
+  echo "  skip (no usable script command)"
+fi
+rm -rf "$DD" "$TMP/home/.profile" "$INST"
+if [ -n "$OLD_SHELL" ]; then export SHELL="$OLD_SHELL"; else unset SHELL; fi
+
 echo "5) staged — Dev · Test · Prod"
 rm -rf "$INST"
 check "--mode staged → exit 0"                          '[ "$(run --yes --dry-run --mode staged)" = 0 ]'
@@ -158,7 +198,7 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
     check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
     pty_setup "$l" q --runtime host
     check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
-    pty_setup "$l" q --runtime container --preset core --provider codex
+    pty_setup "$l" 'n\nq' --runtime container --preset core --provider codex   # n: pi nicht mitinstallieren
     sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" | grep -A4 -E "(in den Container|into the container)\?" > "$TMP/ai-menu"
     check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut "$TMP/ai-menu"'
   done

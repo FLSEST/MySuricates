@@ -92,6 +92,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
+  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren (Vorgabe nein, ohne Terminal
+  `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
   (unter macOS nur die Anmeldung, das Programm liegt im Image).
 - **Ports:** Default 9090, belegte Ports werden übersprungen. Beim Container zusätzlich der
@@ -109,6 +111,16 @@ sie); Härtung, ui-editable und weitere Einstellungen stehen in der Instanz-Date
 ```
 
 Ohne Terminal (Pipe, CI) und ohne `--yes` prüft der Installer nur.
+
+Sind Java oder Node des Paketmanagers zu alt, lädt der Installer sie nach `~/.local/share/mysuricates`.
+Die Instanz findet sie dort selbst, deine Shell erst mit einer Zeile im Profil — sonst fehlen dort
+`node`, `npm` und was `npm install -g` dorthin legt (codex, pi):
+
+```bash
+. ~/.local/share/mysuricates/env.sh      # in ~/.profile (bash mit ~/.bash_profile: dort; macOS: ~/.zprofile)
+```
+
+Im geführten Ablauf bietet der Installer an, die Zeile einzutragen; mit `--yes` zeigt er sie nur an.
 
 ---
 
@@ -242,6 +254,7 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | Docker installiert, läuft aber nicht | Linux: `sudo systemctl start docker`, macOS: Docker Desktop öffnen |
 | Port belegt | der Installer nimmt den nächsten freien; ändern in `deploy/instances/main.env` |
 | KI-Block schlägt fehl, „nicht angemeldet“ | bei der CLI anmelden: `claude auth login`, `codex login` oder `pi` → `/login`; ob Programm und Anmeldung gefunden werden, zeigen Startseite und Einstellungen je Anbieter |
+| `npm`, `node` oder `pi` nach dem Installer nicht gefunden | Node kam als Download: `. ~/.local/share/mysuricates/env.sh`, dauerhaft als Zeile im Profil (Abschnitt 2) |
 | Instanz startet nicht | `scripts/instance.sh logs --name main`; Setup-Protokolle unter `~/.local/state/mysuricates/setup-logs/` |
 | Settings zeigen „Docker nicht eingerichtet“ | kein Fehler — nur Shell-Blöcke mit `container_image` brauchen Docker |
 

@@ -31,7 +31,7 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # --- Flags ------------------------------------------------------------------------------------------
 MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
-HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""
+HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0
 AI_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env"
 die() { echo "setup.sh: $*" >&2; exit 2; }
 _prev=""
@@ -65,6 +65,7 @@ while [ "$#" -gt 0 ]; do
     --force) FORCE=1 ;;
     --reconfigure) RECONF=1 ;;
     --docker-socket) SOCKET_FLAG=1 ;;
+    --with-pi) WITH_PI=1 ;;
     -h|--help) HELP=1 ;;
     *) die "$(msg err_option "$1")" ;;
   esac
@@ -338,23 +339,32 @@ step_modules() {
 
 # --- Schritt 5: KI-Anbieter -------------------------------------------------------------------------
 step_ai() {
-  local id p l lines choice rc opts default=0 i=0 present=""
+  local id p l lines choice rc opts default=0 i=0 present="" hints=""
   section 4
   lines=()
   while read -r id p l; do
     case "$p:$l" in
       present:logged-in) lines[${#lines[@]}]="  ${C_GREEN}$T_OK${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_logged_in)${C_RESET}"; present="$present $id" ;;
-      present:*) lines[${#lines[@]}]="  ${C_AMBER}$T_WARN${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_logged_out) — $(provider_get "$id" login)${C_RESET}"; present="$present $id" ;;
+      present:*) lines[${#lines[@]}]="  ${C_AMBER}$T_WARN${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_logged_out)${C_RESET}"; present="$present $id"
+        hints="$hints  $(msg ai_login_hint "$id" "$(provider_shell_cmd "$id" login)")
+" ;;
       *) lines[${#lines[@]}]="  ${C_GREY}–${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_missing)${C_RESET}" ;;
     esac
   done <<EOF
 $(providers_status)
 EOF
   if [ -z "$present" ]; then
-    lines[${#lines[@]}]=""; lines[${#lines[@]}]="$(msg ai_none)"
-    for id in $(providers_ids); do lines[${#lines[@]}]="  $(msg ai_install "$id" "$(provider_get "$id" install)" "$(provider_get "$id" login)")"; done
+    hints="  $(msg ai_none)
+"
+    for id in $(providers_ids); do hints="$hints    $(msg ai_install "$id" "$(provider_shell_cmd "$id" install)" "$(provider_shell_cmd "$id" login)")
+"; done
   fi
   tui_box "$(msg step_of 5 ${#STEPS[@]}) · $(msg ai_title)" "${lines[@]}"
+  # Die Befehle unter dem Kasten, nicht darin: der kuerzt lange Zeilen, und ein halber Befehl hilft nicht
+  printf '%s' "$hints"
+  offer_pi
+  offer_profile
+  present="$(providers_status | awk '$2=="present"{print $1}' | tr '\n' ' ')"   # pi kann dazugekommen sein
   if [ -z "$PROVIDER" ]; then
     # Default: der erste angemeldete, sonst der erste vorhandene, sonst der erste bekannte
     PROVIDER="$(providers_status | awk '$2=="present" && $3=="logged-in"{print $1; exit}')"
@@ -425,6 +435,67 @@ ai_claude_token() {
     { grep -v '^CLAUDE_CODE_OAUTH_TOKEN=' "$AI_ENV" 2>/dev/null; printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token"; } > "$AI_ENV.tmp" ) \
     && mv "$AI_ENV.tmp" "$AI_ENV" && chmod 600 "$AI_ENV"
   printf '  %s\n' "$(msg ai_token_saved "$AI_ENV")"
+}
+
+# pi mitinstallieren (0a078449): nur auf Wunsch — im Terminal gefragt, sonst mit --with-pi; Default
+# nein, auch mit --yes: kein ungefragtes globales npm-Paket. Der Befehl kommt aus dem Anbieter-Katalog,
+# mit sudo nur, wo npm -g nicht selbst schreiben darf (Node aus apt/dnf). Beim heruntergeladenen Node
+# landet pi unter ~/.local/share/mysuricates/node/bin — instance.sh findet es ueber env.sh.
+pi_install_cmd() {
+  local cmd
+  cmd="$(provider_get pi install)"
+  case "$cmd" in "npm install -g "*) ;; *) return 1 ;; esac
+  command -v npm >/dev/null 2>&1 || return 1
+  if deps_npm_needs_sudo; then printf 'sudo %s' "$cmd"; else printf '%s' "$cmd"; fi
+}
+
+offer_pi() {
+  local cmd
+  provider_present pi && return 0
+  if ! cmd="$(pi_install_cmd)"; then
+    [ "$WITH_PI" = 0 ] || printf '  %s\n' "$(msg ai_pi_no_npm)"
+    return 0
+  fi
+  if [ "$WITH_PI" = 0 ]; then
+    [ "$INTERACTIVE" = 1 ] || return 0
+    tui_confirm "$(msg ai_pi_q "$cmd")" n || return 0
+  fi
+  if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "$cmd")"; return 0; fi
+  if ! tui_run "$(msg ai_pi_run)" "$LOG_DIR/install-pi.log" bash -c "$cmd"; then
+    printf '  %s\n' "$(msg ai_pi_failed "$cmd")"; return 0   # ohne pi geht es weiter
+  fi
+  provider_present pi || printf '  %s\n' "$(msg ai_pi_not_found "$(npm prefix -g 2>/dev/null)/bin")"
+  return 0
+}
+
+# Heruntergeladenes Node — und damit npm, codex, pi — gibt es in der Shell des Nutzers erst mit env.sh
+# im Profil (2605ed1f). Im gefuehrten Ablauf auf Nachfrage eintragen (Default nein), mit --yes oder im
+# Probelauf nur die Zeile zeigen.
+offer_profile() {
+  local profile
+  deps_env_active || return 0
+  profile="$(deps_profile_file)"
+  deps_profile_has_env "$profile" && return 0
+  if [ "$INTERACTIVE" = 1 ] && [ "$DRY" = 0 ] && tui_confirm "$(msg profile_q "$(deps_tilde "$profile")")" n; then
+    if deps_profile_add "$profile"; then
+      printf '  %s\n' "$(msg profile_added "$(deps_tilde "$profile")" "$(deps_profile_hint)")"; return 0
+    fi
+  fi
+  printf '  %s\n' "$(msg profile_hint "$(deps_tilde "$profile")" "$(deps_profile_hint)")"
+}
+
+# Ein Befehl eines Anbieters so, wie er in der Shell des Nutzers laeuft (2605ed1f): Kommt das Programm —
+# oder npm, mit dem es erst kommt — aus dem Download und laedt das Profil env.sh nicht, steht env.sh davor.
+provider_shell_cmd() {  # ID install|login
+  local cmd prog where
+  cmd="$(provider_get "$1" "$2")"
+  { deps_env_active && ! deps_profile_has_env; } || { printf '%s' "$cmd"; return 0; }
+  prog="$(provider_get "$1" cli)"
+  if [ "$2" = install ] || ! command -v "$prog" >/dev/null 2>&1; then
+    case "$(provider_get "$1" install)" in "npm "*) prog=npm ;; *) printf '%s' "$cmd"; return 0 ;; esac
+  fi
+  where="$(command -v "$prog" 2>/dev/null)"
+  case "$where" in "$DEPS_DATA"/*) printf '%s && %s' "$(deps_profile_hint)" "$cmd" ;; *) printf '%s' "$cmd" ;; esac
 }
 
 # --- Schritt 6: Ports und Ordner --------------------------------------------------------------------
@@ -568,9 +639,10 @@ ADDR
   # Nach git pull: down und up — up baut neu, wenn sich der Stand geaendert hat (1c016162)
   lines[${#lines[@]}]="${l_update}$(_tui_repeat ' ' $((w - ${#l_update} + 2)))${C_BOLD}git pull && scripts/instance.sh down --name $n${C_RESET}"
   lines[${#lines[@]}]="$(_tui_repeat ' ' $((w + 2)))${C_BOLD}scripts/instance.sh up --name $n${C_RESET}"
-  logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
-  [ "$logged" = logged-in ] || lines[${#lines[@]}]="${C_AMBER}$(msg ai_login_hint "$PROVIDER" "$(provider_get "$PROVIDER" login)")${C_RESET}"
   tui_box "$(msg step_of 8 ${#STEPS[@]}) · $(msg step_done)" "${lines[@]}"
+  # Unter dem Kasten: der kuerzte den Befehl, und mit env.sh davor wird er lang (2605ed1f)
+  logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
+  [ "$logged" = logged-in ] || printf '  %s%s%s\n' "$C_AMBER" "$(msg ai_login_hint "$PROVIDER" "$(provider_shell_cmd "$PROVIDER" login)")" "$C_RESET"
   return 0
 }
 
@@ -594,6 +666,7 @@ from_source() {
   else
     module_preset_write "$cfg" "${PRESET:-core}" "$I18N_LANG"
   fi
+  offer_profile   # sonst findet ein spaeterer Aufruf aus der eigenen Shell das heruntergeladene npm nicht
   [ "$DO_START" = 1 ] || { printf '  ./scripts/start-autotrigger-dev.sh\n'; exit 0; }
   exec bash "$SCRIPT_DIR/start-autotrigger-dev.sh" $([ "$SHOW_KEY" = 1 ] && echo --show-key)
 }
