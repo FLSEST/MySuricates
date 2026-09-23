@@ -19,7 +19,7 @@ import { CopyButton } from '../components/shared/CopyButton';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
-  useWorkflow, useWorkflowRuns, useWorkflowBpmn,
+  useWorkflow, useWorkflowRun, useWorkflowBpmn,
   usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
   useApproveTodos, useResumeFromStep, useUpdateRunNotes, useDeleteRun,
 } from '../hooks/useWorkflows';
@@ -37,7 +37,7 @@ import { useToast } from '../hooks/useToast';
 import { useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import { api, openPath } from '../api/client';
-import type { WorkflowRun, PendingHumanInput, PendingTodoItem } from '../types';
+import type { PendingHumanInput, PendingTodoItem } from '../types';
 
 const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
 
@@ -47,7 +47,7 @@ export function WorkflowExecution() {
   const t = useT();
 
   const { data: workflow } = useWorkflow(id!);
-  const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
+  const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
   const { logs, connected, pendingApproval, pendingHumanInput, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
   const toast = useToast();
   const learningModule = useModuleEnabled('learning');
@@ -108,7 +108,6 @@ export function WorkflowExecution() {
     }).catch(() => { /* ignore */ });
   }, [runId]);
 
-  const run: WorkflowRun | undefined = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
   // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
@@ -167,8 +166,8 @@ export function WorkflowExecution() {
     });
   };
 
-  if (runsError) {
-    return <ErrorState message={runsError.message} onRetry={() => refetchRuns()} />;
+  if (runError) {
+    return <ErrorState message={runError.message} onRetry={() => refetchRun()} />;
   }
 
   if (!run) {

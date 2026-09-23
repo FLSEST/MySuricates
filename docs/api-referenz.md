@@ -496,11 +496,13 @@ Alle Runs eines Workflows (absteigend nach Startzeit, paginiert).
 
 **Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50)
 
-**Response:** `PageResponse<WorkflowRunResponse>`
+**Response:** `PageResponse<WorkflowRunListItemResponse>` — **ohne Steps**, dieselben Listenzeilen wie
+`GET /api/v1/executions` (`stepCount`, `lastStepStatus`, `lastStepPreview`). Bis 2026-09-23 trug diese
+Route jeden Run mit allen Schritten. Die Schritte eines Runs liefert `GET /api/v1/workflows/{id}/runs/{runId}`.
 
 ### `GET /api/v1/workflows/{id}/runs/{runId}`
 
-Einzelnen Run abrufen.
+Einzelnen Run abrufen, mit allen Schritten.
 
 **Response:** `WorkflowRunResponse`
 
@@ -727,7 +729,7 @@ Alle Ausführungen auflisten (paginiert, filterbar).
 
 **Response:** `PageResponse<WorkflowRunListItemResponse>` — **ohne Steps.** Statt der Schritte
 trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Ausgabe des letzten
-Schritts, auf 500 Zeichen gekürzt). Grund: Die Liste trug vorher jeden `step_results.output`
+Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
 (TEXT) mit — gemessen 3 061 816 Bytes bei 60 Runs, danach 51 716. Wer die Schritte braucht, holt
 den Run einzeln über `GET /api/v1/executions/{id}`; die Detail-Route liefert unverändert alles.
 

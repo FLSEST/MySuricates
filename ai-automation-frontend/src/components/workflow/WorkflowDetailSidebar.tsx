@@ -11,7 +11,7 @@ import { useAiProviders } from '../../hooks/useSystem';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
-import type { Workflow, WorkflowRun } from '../../types';
+import type { Workflow } from '../../types';
 
 interface WorkflowDetailSidebarProps {
   workflow: Workflow;
@@ -305,7 +305,7 @@ export function WorkflowDetailSidebar({
         ) : (
           <>
             <div className="divide-y divide-border">
-              {runs.content.map((run: WorkflowRun) => (
+              {runs.content.map((run) => (
                 <div
                   key={run.id}
                   className="px-5 py-3 hover:bg-surface transition-colors cursor-pointer"

@@ -11,7 +11,7 @@ import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
 import {
-  useWorkflow, useWorkflowRuns,
+  useWorkflow, useWorkflowRun,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
@@ -78,7 +78,7 @@ export function SimpleWorkflowExecution() {
   const t = useT();
 
   const { data: workflow } = useWorkflow(id!);
-  const { data: runs, error: runsError, refetch: refetchRuns } = useWorkflowRuns(id!);
+  const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
   const { connected, pendingApproval, pendingHumanInput } = useExecutionWebSocket(runId!, id, { liveOutput: false });
   const pauseExecution = usePauseExecution();
   const resumeExecution = useResumeExecution();
@@ -121,7 +121,6 @@ export function SimpleWorkflowExecution() {
     }).catch(() => { /* ignore */ });
   }, [runId]);
 
-  const run = runs?.content?.find((r) => r.id === runId);
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
   // Recovered dialogs only apply while the run is still active
@@ -129,8 +128,8 @@ export function SimpleWorkflowExecution() {
   const activeApproval = pendingApproval ?? (runFinished ? null : recoveredApproval);
   const activeHumanInput = pendingHumanInput ?? (runFinished ? null : recoveredHumanInput);
 
-  if (runsError) {
-    return <ErrorState message={runsError.message} onRetry={() => refetchRuns()} />;
+  if (runError) {
+    return <ErrorState message={runError.message} onRetry={() => refetchRun()} />;
   }
 
   if (!run) {

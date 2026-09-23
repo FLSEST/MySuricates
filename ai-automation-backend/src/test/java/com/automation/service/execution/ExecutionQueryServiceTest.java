@@ -281,11 +281,10 @@ class ExecutionQueryServiceTest {
         WorkflowRun run = new WorkflowRun();
         Page<WorkflowRun> page = new PageImpl<>(List.of(run), PageRequest.of(1, 20), 21);
         when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1", PageRequest.of(1, 20))).thenReturn(page);
-        // /workflows/{id}/runs behaelt die Schritte (WishDetail.tsx rendert sie) — schlank ist nur
-        // /executions, die gemessene Route (TODO a05c9504).
-        when(workflowMapper.toRunResponseListWithOwners(List.of(run))).thenReturn(List.of(sampleResponse("run-1")));
+        // /workflows/{id}/runs antwortet wie /executions ohne Schritte (TODO 7fd9f654)
+        when(workflowMapper.toRunListItemsWithOwners(List.of(run))).thenReturn(List.of(sampleListItem("run-1")));
 
-        PageResponse<WorkflowRunResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);
+        PageResponse<WorkflowRunListItemResponse> result = service.listRunsForWorkflow("wf-1", 1, 20);
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.page()).isEqualTo(1);

@@ -210,61 +210,67 @@ class WorkflowMapperTest extends WorkflowMapper {
     }
 
     /**
-     * Die schlanke Listen-Antwort (TODO a05c9504).
+     * Die schlanke Listen-Antwort (TODO a05c9504, 7fd9f654).
      *
      * <p>Die Listen-Route trug jeden Step-Output mit: 3 061 816 Bytes bei 60 Runs, nach der
      * Umstellung 51 716. Statt der Schritte kommen ihre Anzahl und die gekuerzte Ausgabe des
-     * letzten. Die Runs hier haben bewusst keinen Workflow — dann braucht {@code ownersFor} keine
-     * Repository-Abfrage, und dieser Test bleibt ein Unit-Test.
+     * letzten — seit 7fd9f654 aus einer Zusammenfassung, die die Datenbank liefert, ohne dass eine
+     * Step-Zeile geladen wird. {@link #summaryOf} baut sie hier so, wie die beiden Abfragen sie
+     * liefern: Anzahl, Status des letzten Schritts und dessen Ausgabe auf Vorschau + 1 Zeichen
+     * gekuerzt. Die Abfragen selbst prueft {@code RequestCostRatchetTest} gegen die echte Datenbank.
      */
     @Nested
     class SchlankeListenAntwort {
 
-        private WorkflowRun runWithSteps(String... outputs) {
-            WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
-            for (int i = 0; i < outputs.length; i++) {
-                run.getSteps().add(StepResult.builder()
-                        .stepIndex(i)
-                        .status(i == outputs.length - 1 ? StepStatus.FAILED : StepStatus.COMPLETED)
-                        .output(outputs[i])
-                        .build());
-            }
-            return run;
+        private static final WorkflowRun RUN = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED).build();
+
+        private RunStepSummary summaryOf(String... outputs) {
+            String last = outputs[outputs.length - 1];
+            String head = last == null ? null
+                    : last.substring(0, Math.min(last.length(), WorkflowRunListItemResponse.PREVIEW_LENGTH + 1));
+            return new RunStepSummary(outputs.length, StepStatus.FAILED, head);
+        }
+
+        private WorkflowRunListItemResponse itemFor(RunStepSummary steps) {
+            return toRunListItems(List.of(RUN), Map.of(), Map.of("run-1", steps)).get(0);
         }
 
         @Test
         void traegtAnzahlUndDenLetztenSchritt_nichtDieSchritteSelbst() {
-            var items = toRunListItemsWithOwners(List.of(runWithSteps("erster", "zweiter", "dritter")));
+            var item = itemFor(summaryOf("erster", "zweiter", "dritter"));
 
-            assertThat(items).singleElement().satisfies(item -> {
-                assertThat(item.stepCount()).isEqualTo(3);
-                assertThat(item.lastStepStatus()).isEqualTo(StepStatus.FAILED);
-                assertThat(item.lastStepPreview()).isEqualTo("dritter");
-            });
+            assertThat(item.stepCount()).isEqualTo(3);
+            assertThat(item.lastStepStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(item.lastStepPreview()).isEqualTo("dritter");
         }
 
         @Test
         void langeAusgabeWirdGekuerzt_damitDieListeNichtWiederWaechst() {
-            String huge = "x".repeat(20_000);
-
-            var item = toRunListItemsWithOwners(List.of(runWithSteps(huge))).get(0);
+            var item = itemFor(summaryOf("x".repeat(20_000)));
 
             assertThat(item.lastStepPreview())
                     .hasSize(WorkflowRunListItemResponse.PREVIEW_LENGTH + " […]".length())
                     .endsWith(" […]");
         }
 
+        /** Genau Vorschau-Laenge ist nicht gekuerzt — das eine Zeichen mehr aus der Abfrage entscheidet. */
+        @Test
+        void ausgabeGenauInVorschauLaenge_bleibtOhneKuerzungsmarke() {
+            String exact = "y".repeat(WorkflowRunListItemResponse.PREVIEW_LENGTH);
+
+            assertThat(itemFor(summaryOf(exact)).lastStepPreview()).isEqualTo(exact);
+            assertThat(itemFor(summaryOf(exact + "z")).lastStepPreview()).endsWith(" […]");
+        }
+
         @Test
         void kurzeAusgabeBleibtVollstaendig_ohneKuerzungsmarke() {
-            var item = toRunListItemsWithOwners(List.of(runWithSteps("kurz"))).get(0);
-
-            assertThat(item.lastStepPreview()).isEqualTo("kurz");
+            assertThat(itemFor(summaryOf("kurz")).lastStepPreview()).isEqualTo("kurz");
         }
 
         /** Kein Wert bleibt null — sonst sieht "nichts ausgegeben" wie "leer ausgegeben" aus. */
         @Test
         void ausgabeNull_bleibtNull() {
-            var item = toRunListItemsWithOwners(List.of(runWithSteps((String) null))).get(0);
+            var item = itemFor(summaryOf((String) null));
 
             assertThat(item.lastStepPreview()).isNull();
             assertThat(item.stepCount()).isEqualTo(1);
@@ -272,8 +278,7 @@ class WorkflowMapperTest extends WorkflowMapper {
 
         @Test
         void runOhneSchritte_zaehltNullUndLaesstDenLetztenLeer() {
-            var item = toRunListItemsWithOwners(List.of(
-                    WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build())).get(0);
+            var item = toRunListItems(List.of(RUN), Map.of(), Map.of()).get(0);
 
             assertThat(item.stepCount()).isZero();
             assertThat(item.lastStepStatus()).isNull();

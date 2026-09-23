@@ -16,7 +16,7 @@ import { CrystallizeButton } from './CrystallizeButton';
 import { ExecutionStepCard } from '../workflow/ExecutionStepCard';
 import { StepAnchorScope } from '../workflow/stepAnchors';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
-import { useWorkflowRuns } from '../../hooks/useWorkflows';
+import { useWorkflowRun } from '../../hooks/useWorkflows';
 
 export function WishDetail({ wishId, onCancel, onDelete }: {
   wishId: string;
@@ -26,7 +26,8 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
   const t = useT();
   const navigate = useNavigate();
   const { data: wish } = useWish(wishId);
-  const { data: generatedRuns } = useWorkflowRuns(wish?.generatedWorkflowIds?.[0] ?? '');
+  // Only the current run's steps are shown — loaded on their own, the run list carries none
+  const { data: currentRun } = useWorkflowRun(wish?.generatedWorkflowIds?.[0] ?? '', wish?.currentRunId ?? undefined);
   const respond = useRespondToWish();
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -337,7 +338,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
       )}
 
       {/* Result */}
-      {generatedRuns?.content?.find(run => run.id === wish.currentRunId)?.steps?.length ? (
+      {currentRun?.id === wish.currentRunId && currentRun?.steps?.length ? (
         <Card>
           <div className="p-4 space-y-2">
             <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide mb-3">
@@ -345,7 +346,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
             </h3>
             {/* Run-scoped anchors: the page may show the steps of more than one run, `step-N` alone would collide. */}
             <StepAnchorScope value={wish.currentRunId ?? ''}>
-              {generatedRuns.content.find(run => run.id === wish.currentRunId)?.steps.map(step => (
+              {currentRun.steps.map(step => (
                 <ExecutionStepCard key={step.id} step={step} />
               ))}
             </StepAnchorScope>

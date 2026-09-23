@@ -11,7 +11,8 @@ import type { WorkflowRun, WorkflowMemory } from '../../types';
 
 interface Props {
   workflowId: string;
-  runs?: WorkflowRun[];
+  /** List rows are enough — the panel reads no steps. */
+  runs?: Omit<WorkflowRun, 'steps'>[];
 }
 
 export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
