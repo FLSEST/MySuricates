@@ -1,6 +1,7 @@
 package com.automation.service.skill;
 
 import com.automation.dto.request.CreateSkillRequest;
+import com.automation.dto.request.UpdateSkillRequest;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
@@ -70,6 +71,29 @@ public class SkillService {
         Skill saved = mutationGateway.save(skill, SkillChangeSource.USER);
         skillRegistry.register(saved);
         log.info("Created custom skill: {} ({})", saved.getName(), saved.getId());
+        return saved;
+    }
+
+    /**
+     * Edits a custom skill. Built-ins stay read-only: the next bundled version would silently
+     * overwrite the edit. A skill used by a sealed workflow is refused by the gateway.
+     */
+    @Transactional
+    public Skill update(String id, UpdateSkillRequest request) {
+        Skill skill = findById(id);
+        if (skill.isBuiltin()) {
+            throw new IllegalStateException("Cannot edit built-in skill: " + skill.getName());
+        }
+        skill.setName(request.name());
+        skill.setDescription(request.description());
+        skill.setIcon(request.icon());
+        skill.setCategory(request.category());
+        skill.setAiContext(request.aiContext());
+
+        Skill saved = mutationGateway.save(skill, SkillChangeSource.USER);
+        skillRegistry.unregister(id);
+        skillRegistry.register(saved);
+        log.info("Updated custom skill: {} ({})", saved.getName(), saved.getId());
         return saved;
     }
 

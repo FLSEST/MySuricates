@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.request.CreateSkillRequest;
 import com.automation.dto.request.ImportSkillRequest;
+import com.automation.dto.request.UpdateSkillRequest;
 import com.automation.dto.response.CapabilityResponse;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.dto.response.SkillResponse;
@@ -62,6 +63,12 @@ public class SkillController {
     public ResponseEntity<SkillResponse> createSkill(@Valid @RequestBody CreateSkillRequest request) {
         var skill = skillService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(skillMapper.toResponse(skill));
+    }
+
+    /** Custom skills only (built-in → 409); a skill used by a sealed workflow → 409 SKILL_PINNED_BY_SEAL. */
+    @PutMapping("/{id}")
+    public SkillResponse updateSkill(@PathVariable String id, @Valid @RequestBody UpdateSkillRequest request) {
+        return skillMapper.toResponse(skillService.update(id, request));
     }
 
     @DeleteMapping("/{id}")

@@ -7,7 +7,9 @@ import com.automation.dto.response.SkillResponse;
 import com.automation.entity.Capability;
 import com.automation.entity.Skill;
 import com.automation.entity.SkillCategory;
+import com.automation.exception.ErrorCode;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.SkillMapper;
 import com.automation.service.skill.SkillImportExportService;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -181,6 +184,64 @@ class SkillControllerTest {
     }
 
     @Test
+    void updateSkill_validRequest_returns200() throws Exception {
+        when(skillService.update(eq("skill-1"), any())).thenReturn(testSkill);
+        when(skillMapper.toResponse(testSkill)).thenReturn(testResponse);
+
+        mockMvc.perform(put("/api/v1/skills/skill-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Renamed", "category": "RESEARCH", "aiContext": "ctx"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("skill-1"));
+
+        verify(skillService).update(eq("skill-1"), argThat(r -> r.name().equals("Renamed")
+                && r.category() == SkillCategory.RESEARCH && r.aiContext().equals("ctx")));
+    }
+
+    @Test
+    void updateSkill_blankName_returns400() throws Exception {
+        mockMvc.perform(put("/api/v1/skills/skill-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": " ", "category": "CODE"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(skillService);
+    }
+
+    @Test
+    void updateSkill_pinnedBySeal_returns409WithCode() throws Exception {
+        when(skillService.update(eq("skill-1"), any())).thenThrow(new HardeningException(
+                ErrorCode.SKILL_PINNED_BY_SEAL, "Skill 'X' is used by sealed workflow(s) Deploy"));
+
+        mockMvc.perform(put("/api/v1/skills/skill-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "X", "category": "CODE"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SKILL_PINNED_BY_SEAL"))
+                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("Deploy")));
+    }
+
+    @Test
+    void updateSkill_builtinSkill_returns409() throws Exception {
+        when(skillService.update(eq("skill-1"), any()))
+                .thenThrow(new IllegalStateException("Cannot edit built-in skill: Document Analyzer"));
+
+        mockMvc.perform(put("/api/v1/skills/skill-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "X", "category": "CODE"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
+    }
+
+    @Test
     void deleteSkill_existingId_returns204() throws Exception {
         doNothing().when(skillService).delete("skill-1");
 
@@ -237,6 +298,24 @@ class SkillControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void importSkill_capabilityWithoutName_returns400() throws Exception {
+        String body = """
+                {
+                    "name": "Imported Skill",
+                    "category": "DOCUMENT",
+                    "capabilities": [ { "description": "no name" } ]
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/skills/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(importExportService);
     }
 
     @Test
