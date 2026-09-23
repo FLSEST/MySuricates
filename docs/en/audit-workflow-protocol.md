@@ -145,6 +145,22 @@ Converted audits in `workflow-pool/`:
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (actuator, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
+| Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py` |
+
+### When `expectedFindings` does **not** fit
+
+The documentation weight check deliberately omits it, and the reason applies to any audit whose
+findings are a judgement rather than a measurement. For test coverage the target number *is* a
+measurement — every untested class must be reported, leaving one out is an error. The weight check
+only measures *candidates*; which of them is a finding is decided by the report. If the gate counted
+the candidates against the envelope, the AI would have to report every one and could never say "this
+document belongs in the repository as it is" — the division of roles would be gone.
+
+Instead the gate there checks that the **mandatory FAKT lines are present** (`PFLICHT-FAKTEN:` in the
+fact sheet). That catches what `expectedFindings` protects against — a snapshot built on a failed
+measurement — without forcing the judgement. The report prompt additionally carries the rule to
+report an unchanged finding from the previous run again: otherwise a mere change of mind would close
+it as RESOLVED.
 
 ## Lifecycle
 

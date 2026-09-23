@@ -145,6 +145,22 @@ Umgestellte Audits im `workflow-pool/`:
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Actuator, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`, Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
+| Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py` |
+
+### Wann `expectedFindings` **nicht** passt
+
+Die Doku-Zehrprobe verzichtet bewusst darauf, und der Grund gilt für jedes Audit, dessen
+Findings ein Urteil sind statt einer Messung: Bei der Test-Abdeckung *ist* die Sollzahl eine
+Messung — jede ungetestete Klasse muss gemeldet werden, Weglassen wäre ein Fehler. Bei der
+Zehrprobe misst die Shell nur *Kandidaten*; welcher davon ein Befund ist, entscheidet der
+Report. Zählte das Gate die Kandidaten gegen den Envelope, müsste die KI jeden melden und
+dürfte nie sagen „dieses Dokument gehört so ins Repository" — die Rollenteilung wäre dahin.
+
+Statt der Zahl prüft das Gate dort die **Anwesenheit der Pflicht-FAKT-Zeilen**
+(`PFLICHT-FAKTEN:` im Faktenblatt). Das fängt den Fall ab, gegen den `expectedFindings`
+schützt — einen Schnappschuss auf ausgefallener Messung —, ohne das Urteil zu erzwingen.
+Der Report-Prompt trägt zusätzlich die Regel, einen unverändert gebliebenen Befund des
+Vorlaufs erneut zu melden: sonst schlösse ein bloßer Sinneswandel ihn als RESOLVED.
 
 ## Lebenszyklus
 
