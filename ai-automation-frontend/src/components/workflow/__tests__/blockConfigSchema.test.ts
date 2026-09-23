@@ -19,14 +19,14 @@ const DEFINITION_DIRS = [
 ];
 
 /**
- * Keys in shipped built-in templates that no executor reads (saas-feature-implement, github-project-bootstrap,
- * saas-spec-to-buildplan) — the editor rightly warns about them there.
- * Listed so this guard stays strict for everything else; fixing the definition removes the entry
- * (TODO „Built-in-Templates: wirkungslose Block-Config-Schlüssel bereinigen").
+ * Keys in shipped definitions that no executor reads — the editor rightly warns about them there.
+ * Listed so this guard stays strict for everything else; fixing the definition removes the entry.
+ * github-project-bootstrap, saas-feature-implement and saas-spec-to-buildplan are fixed (TODO
+ * 955f765a). Left: saas-feature-loop nests a sub-workflow in a foreach, which no block type can
+ * express yet — TODO 46b9b229 (Built-in-Template saas-feature-loop läuft nicht).
  */
 const KNOWN_INEFFECTIVE = new Set([
-  'foreach.items_inline', 'foreach.blocks', 'foreach.items_source = inline', 'foreach lacks command',
-  'document.max_chars', 'agentic.instructions_addendum',
+  'foreach.blocks', 'foreach lacks command',
 ]);
 
 type Block = { type: string; config?: Record<string, unknown> };
