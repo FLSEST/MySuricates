@@ -415,6 +415,44 @@ check "Meldung nennt die Abhilfe"      'grep -q "fetch-depth: 0" <<<"$OUT"'
 check "keine erfundene Commit-Drift"   '! grep -q "commits sagt" <<<"$OUT"'
 rm -rf "$SHALLOW"
 
+# Eine datierte Zahl ist am Stichtag wahr, nicht an HEAD (TODO 65c6dedc): Die Kopftabelle sagt
+# "Stand … (Commit `<sha>`)" – nach 1 000 weiteren Commits war das Gate trotzdem rot.
+echo "11c) Stichtag-Commit: datierte Commit-Zahl wird am Stichtag gemessen"
+DATED="$TMP/dated"
+mkdir -p "$DATED"
+# Dieselben Faktenquellen wie im Fake-Repo, aber eine eigene Historie mit 30 Commits
+( cd "$FAKE" && tar --exclude=.git -cf - . ) | ( cd "$DATED" && tar -xf - )
+rm -f "$DATED/README.de.md"
+( cd "$DATED" && git init -q . && $GIT add -A && $GIT commit -q -m c1 \
+    && for i in $(seq 2 30); do $GIT commit -q --allow-empty -m "c$i"; done )
+TENTH="$(git -C "$DATED" rev-list --reverse HEAD | sed -n 10p | cut -c1-8)"
+cat > "$DATED/README.de.md" <<MD_EOF
+# MySuricates
+
+Der Code: 10 Commits tragen einen Trailer,
+alle von Hand (Stand Commit \`$TENTH\`).
+
+## Was da steht
+
+Stand 2026-09-22 (Commit \`$TENTH\`), Zeilen aus dem Arbeitsbaum:
+
+| | |
+|---|---|
+| Entstanden seit | 2026-02-15, rund 10 Commits, ein Autor |
+| Tests | Backend 8 767, Frontend 1 013 — Lauf vom 2026-09-18 |
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
+check "datierte Zahl am Stichtag: exit 0"             '[ "$RC" -eq 0 ]'
+check "keine Drift gegen HEAD (30)"                   '! grep -q "commits sagt" <<<"$OUT"'
+sed -i "s/Commit \`$TENTH\`/Commit \`deadbeef\`/g" "$DATED/README.de.md"
+OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
+check "unbekannter Stichtag-Commit ist ein Befund"   'grep -q "stichtag-commit deadbeef unbekannt" <<<"$OUT"'
+check "unbekannter Stichtag: exit 1"                  '[ "$RC" -eq 1 ]'
+sed -i "s/ (Commit \`deadbeef\`)//; s/ (Stand Commit \`deadbeef\`)//" "$DATED/README.de.md"
+OUT=$(bash "$SCRIPT" --root "$DATED" 2>&1); RC=$?
+check "ohne Stichtag gilt HEAD: Drift gemeldet"      'grep -qE "commits sagt 10, Code 30" <<<"$OUT"'
+rm -rf "$DATED"
+
 echo "12) Onboarding-Fakten: Versionen, verbotene Muster, nicht existierende Dateien"
 mkdir -p "$FAKE/docs/onboarding"
 cat > "$FAKE/docs/onboarding/README.md" <<'MD_EOF'
