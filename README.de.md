@@ -67,7 +67,7 @@ abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus R
 Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
 die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
 Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
-steht in [docs/architektur.md](docs/architektur.md#module-system-startkonfiguration).
+steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 ## Was da steht
 
@@ -148,7 +148,7 @@ Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklic
 
 ## Quickstart
 
-> Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+> Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[Getting Started](docs/GETTING-STARTED.md)**
 > fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
 
 **Voraussetzung fuer KI-Bloecke:** Mindestens eine der unterstuetzten Kommandozeilen muss auf dem
@@ -186,7 +186,7 @@ das Runtime-JAR und startet damit gleich `./scripts/start-autotrigger-dev.sh` �
 und Vite mit Hot Reload auf :3000, in einer Instanz. Ohne `--start` endet der Installer mit
 demselben Befehl als Hinweis; von da an ist er der Weg, die Dev-Instanz zu starten, zu stoppen
 (`stop`) und nach einer Aenderung neu zu bauen (`restart`). Er ist idempotent und startet keine
-zweite Instanz. Siehe [docs/entwicklung.md](docs/entwicklung.md).
+zweite Instanz. Siehe [Entwicklung](docs/entwicklung.md).
 
 <!-- Screenshot-Platzhalter -->
 <!-- ![Dashboard](docs/screenshots/dashboard.png) -->
