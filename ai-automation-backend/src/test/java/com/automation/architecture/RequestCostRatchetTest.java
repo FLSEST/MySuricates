@@ -24,14 +24,19 @@ import org.hibernate.Session;
 import org.hibernate.engine.spi.EntityKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,12 +79,40 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * persistence context is cleared before every measurement, so the request re-reads what it needs
  * instead of finding the seeded entities in the first-level cache — otherwise a lazy-loading N+1
  * would stay invisible here.
+ *
+ * <p><b>Its own database.</b> The ceilings describe <em>this seed</em>, so nothing else may be in
+ * the tables when it is measured. The integration tests of one JVM share one SQLite file, and a
+ * test without rollback leaves its rows behind: two projects and three workflows from
+ * {@code LearningServiceDashboardIntegrationTest} were enough to push {@code /projects} over its
+ * byte ceiling and {@code /workflows} over its statement ceiling — in a {@code -Dtest} selection
+ * that ran that test first, while the class alone and the full suite stayed green (TODO 5695d482).
+ * A ceiling that depends on the test order is luck. This class therefore points
+ * {@code integration.db.path} at a file of its own, migrated fresh for this context and closed
+ * with it ({@link DirtiesContext}), and {@link #nothingButTheSeedIsMeasured()} checks before every
+ * seed that the seeded tables are empty.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("integration")
 @Transactional
+@DirtiesContext
 class RequestCostRatchetTest {
+
+    /** Directory of the class's own database file, see the class comment. */
+    @TempDir
+    static Path ownDatabase;
+
+    @DynamicPropertySource
+    static void useOwnDatabase(DynamicPropertyRegistry registry) {
+        registry.add("integration.db.path", () -> ownDatabase.resolve("request-cost.db").toString());
+    }
+
+    /**
+     * The tables {@link #seedBatch} writes to — empty before the first batch, see
+     * {@link #nothingButTheSeedIsMeasured()}.
+     */
+    private static final List<String> SEEDED_TABLES = List.of(
+            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -166,7 +199,30 @@ class RequestCostRatchetTest {
 
     @BeforeEach
     void seed() {
+        nothingButTheSeedIsMeasured();
         seedBatch("a");
+    }
+
+    /**
+     * Stellt den Bestand vor der Saat fest: In den Tabellen, die die Saat beschreibt, darf nichts
+     * stehen. Gezaehlt wird per SQL, damit auch weich geloeschte Workflows auffallen, die
+     * {@code @SQLRestriction} vor dem Repository verbirgt. Schlaegt das fehl, misst die Klasse nicht
+     * mehr gegen ihre eigene Datenbank — oder ein Start-Seeder legt neuerdings Zeilen an; beides
+     * verschiebt jede Obergrenze in {@link #BASELINE}, ohne dass sich eine Route geaendert haette.
+     */
+    private void nothingButTheSeedIsMeasured() {
+        Map<String, Long> foreignRows = new TreeMap<>();
+        for (String table : SEEDED_TABLES) {
+            long rows = ((Number) entityManager.createNativeQuery("SELECT COUNT(*) FROM " + table)
+                    .getSingleResult()).longValue();
+            if (rows > 0) {
+                foreignRows.put(table, rows);
+            }
+        }
+        assertThat(foreignRows)
+                .as("Rows the seed did not write sit in the measured tables — the ceilings would "
+                        + "measure them too. Is the class still on its own database?")
+                .isEmpty();
     }
 
     /**
