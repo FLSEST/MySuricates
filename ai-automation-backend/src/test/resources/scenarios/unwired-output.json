@@ -1,0 +1,36 @@
+{
+  "id": "unwired-output",
+  "title": "Blockausgabe ohne Leser wird beim Bauen gemeldet",
+  "derivedFrom": {
+    "spec": "WiringRules: unwired-output (Analyzer-Regel R1)",
+    "incidents": [
+      "2026-09-16: alle 48 Blöcke von neun PRD-Workflows unverdrahtet",
+      "182bd224 (Workflow-Analyzer)"
+    ]
+  },
+  "execute": false,
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "sammeln",
+        "config": {
+          "command": "Sammle die offenen Punkte."
+        }
+      },
+      {
+        "type": "simple",
+        "name": "bewerten",
+        "config": {
+          "command": "Bewerte die Lage."
+        }
+      }
+    ]
+  },
+  "expect": {
+    "analyzerRules": [
+      "unwired-output"
+    ]
+  }
+}

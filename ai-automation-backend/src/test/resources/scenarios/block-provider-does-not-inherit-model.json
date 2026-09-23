@@ -1,0 +1,66 @@
+{
+  "id": "block-provider-does-not-inherit-model",
+  "title": "Block mit anderem Provider erbt das Workflow-Modell nicht",
+  "derivedFrom": {
+    "spec": "CLAUDE.md: Per-block override — ein abweichender Block-provider erbt das Workflow-Modell nicht",
+    "incidents": [
+      "24680e80 (Simple-Block ignoriert Workflow-Provider)",
+      "fdf79a86 Startmenge Fall 10"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "model": "sonnet",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "erster",
+        "config": {
+          "command": "Erster Schritt."
+        }
+      },
+      {
+        "type": "simple",
+        "name": "zweiter",
+        "config": {
+          "command": "Zweiter Schritt: {{ block.erster.output }}",
+          "provider": "SCRIPTED_B"
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "eins"
+      }
+    ],
+    "SCRIPTED_B": [
+      {
+        "respond": "zwei"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 1,
+      "SCRIPTED_B": 1
+    },
+    "aiCalls": {
+      "SCRIPTED": [
+        {
+          "model": "sonnet"
+        }
+      ],
+      "SCRIPTED_B": [
+        {
+          "model": null,
+          "promptContains": [
+            "Zweiter Schritt: eins"
+          ]
+        }
+      ]
+    }
+  }
+}

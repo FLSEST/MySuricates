@@ -1,0 +1,29 @@
+{
+  "id": "chain-only-placeholder-in-single-run",
+  "title": "Ketten-Platzhalter in einem einzeln laufenden Workflow wird beim Bauen gemeldet",
+  "derivedFrom": {
+    "spec": "TemplateResolver: unbekannte Platzhalter bleiben stehen; WiringRules: chain-only-placeholder",
+    "incidents": [
+      "2026-09-16: {{ previous_chain_output }} blieb im Einzellauf als Literal im Prompt",
+      "182bd224 (Workflow-Analyzer)"
+    ]
+  },
+  "execute": false,
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "weiter",
+        "config": {
+          "command": "Arbeite mit {{ previous_chain_output }} weiter."
+        }
+      }
+    ]
+  },
+  "expect": {
+    "analyzerRules": [
+      "chain-only-placeholder"
+    ]
+  }
+}

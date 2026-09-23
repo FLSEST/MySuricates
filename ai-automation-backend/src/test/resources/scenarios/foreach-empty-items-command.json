@@ -1,0 +1,40 @@
+{
+  "id": "foreach-empty-items-command",
+  "title": "Leere items_command-Ausgabe ergibt null Durchläufe, nicht einen leeren",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md — foreach items_command: eine Zeile je Eintrag",
+    "incidents": [
+      "838cad00 (foreach: leere items_command-Ausgabe erzeugt ein leeres Item statt null Items)"
+    ]
+  },
+  "workflow": {
+    "blocks": [
+      {
+        "type": "foreach",
+        "name": "je_datei",
+        "config": {
+          "items_source": "command",
+          "items_command": "true",
+          "execution_mode": "shell",
+          "variable_name": "datei",
+          "command": "echo \"datei=[{{ datei }}]\""
+        }
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 0,
+      "SCRIPTED_B": 0
+    },
+    "steps": [
+      {
+        "index": 0,
+        "outputNotContains": [
+          "datei=["
+        ]
+      }
+    ]
+  }
+}

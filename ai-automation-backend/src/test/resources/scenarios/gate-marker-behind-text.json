@@ -1,0 +1,41 @@
+{
+  "id": "gate-marker-behind-text",
+  "title": "Gate-Marker mit Text davor wird nicht still GREEN",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md — Gates: gate_status am Zeilenanfang",
+    "incidents": [
+      "63ecc124 (Ausbleibendes Gate-Urteil nicht als GREEN werten)",
+      "2026-09-16: Gate-Marker ging verloren, Parser-Regex zeilenverankert"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "model": "sonnet",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe den Stand. Schreibe am Ende genau eine Zeile gate_status: GREEN|YELLOW|RED."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "## Verdict: gate_status: YELLOW\nZwei Befunde."
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": {
+      "status": "YELLOW",
+      "category": "gate-missing"
+    },
+    "aiCallCount": {
+      "SCRIPTED": 1
+    }
+  }
+}

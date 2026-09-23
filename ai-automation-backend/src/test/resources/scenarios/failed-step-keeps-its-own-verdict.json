@@ -1,0 +1,35 @@
+{
+  "id": "failed-step-keeps-its-own-verdict",
+  "title": "Gescheiterter KI-Schritt: Lauf FAILED, kein erfundenes Gate",
+  "derivedFrom": {
+    "spec": "RunCompletionHandler: gate-missing nur bei erfolgreichem Lauf",
+    "incidents": [
+      "63ecc124 (Ausbleibendes Gate-Urteil nicht als GREEN werten)",
+      "FAILED-Läufe 2026-09: simple failed: Prompt is too long / Host Claude action timed out"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe den Stand. Schreibe am Ende genau eine Zeile gate_status: GREEN|YELLOW|RED."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "Prompt is too long",
+        "exitCode": 1
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "FAILED",
+    "gate": "none"
+  }
+}

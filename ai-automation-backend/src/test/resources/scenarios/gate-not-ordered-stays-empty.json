@@ -1,0 +1,39 @@
+{
+  "id": "gate-not-ordered-stays-empty",
+  "title": "Workflow ohne bestelltes Gate bekommt keins",
+  "derivedFrom": {
+    "spec": "GateExpectation: Gates bleiben freiwillig",
+    "incidents": [
+      "63ecc124 (Ausbleibendes Gate-Urteil nicht als GREEN werten) — Gegenprobe"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "metadata": {
+      "autoTodo": {
+        "enabled": false
+      }
+    },
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "schreiben",
+        "config": {
+          "command": "Fasse den Stand in einem Satz zusammen."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "Der Stand ist gut."
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": "none",
+    "noTodos": true
+  }
+}
