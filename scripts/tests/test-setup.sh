@@ -27,9 +27,14 @@ stub apt-get 'exit 0'
 stub codex 'exit 0'
 
 INST="$TMP/inst"
+# XDG_CONFIG_HOME gehoert mitgesetzt: setup.sh:35 loest AI_ENV ueber
+# ${XDG_CONFIG_HOME:-$HOME/.config} auf. Erbt der Lauf die Variable, schreiben die Tests
+# nach $TMP/home/.config und setup.sh liest woanders — der Token wird nie gefunden. Auf
+# dem CI-Runner ist sie gesetzt, lokal meist nicht (Lauf 35912021976: genau diese 2 rot).
 run() {  # setup.sh without a terminal; stdin closed
   ( HOME="$TMP/home" PATH="$TMP/bin:$TMP/tools" XDG_DATA_HOME="$TMP/data" XDG_STATE_HOME="$TMP/state" \
-    MYSURICATES_INSTANCES_DIR="$INST" TERM=dumb; export HOME PATH XDG_DATA_HOME XDG_STATE_HOME MYSURICATES_INSTANCES_DIR TERM
+    XDG_CONFIG_HOME="$TMP/home/.config" \
+    MYSURICATES_INSTANCES_DIR="$INST" TERM=dumb; export HOME PATH XDG_DATA_HOME XDG_STATE_HOME XDG_CONFIG_HOME MYSURICATES_INSTANCES_DIR TERM
     bash "$SETUP" "$@" < /dev/null ) > "$TMP/out" 2>&1
   echo $?
 }
@@ -145,7 +150,7 @@ cut() { sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$1" | tr -d "\r" | grep -
 pty_setup() {  # SPRACHE TASTEN FLAGS… → Mitschnitt in $TMP/menu
   local l="$1" keys="$2"; shift 2
   rm -rf "$INST"
-  printf "$keys" | script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --dry-run --lang $l $*" /dev/null > "$TMP/menu" 2>&1
+  printf "$keys" | script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$TMP/bin:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$TMP/state' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$INST' TERM=xterm-256color bash '$SETUP' --dry-run --lang $l $*" /dev/null > "$TMP/menu" 2>&1
 }
 if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
   for l in en de; do
