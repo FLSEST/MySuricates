@@ -197,6 +197,20 @@ else
        "die Commit-Zahl der README-Kopftabelle wird nicht geprueft." >&2
 fi
 
+# Stichtag-Commits der README-Kopftabelle ("Stand … Commit `d23a09ed`"): Dort gilt die Zahl des
+# Stichtags, nicht die von HEAD (TODO 65c6dedc). Ein Commit, den git nicht kennt (etwa nach einem
+# History-Rewrite), geht als null mit – der Checker meldet ihn, statt still an HEAD zu messen.
+COMMITS_AT_JSON=""
+if [ -n "$COMMITS_JSON" ] && [ -f "$ROOT/README.de.md" ]; then
+  pairs=""
+  while IFS= read -r sha; do
+    [ -z "$sha" ] && continue
+    count="$(git -C "$ROOT" rev-list --count "$sha" 2>/dev/null | tr -d ' ')"
+    pairs="${pairs}${pairs:+,}\"$sha\":${count:-null}"
+  done < <(grep -oE 'Commit `[0-9a-f]{7,40}`' "$ROOT/README.de.md" | grep -oE '[0-9a-f]{7,40}' | sort -u)
+  [ -n "$pairs" ] && COMMITS_AT_JSON=",\"commits-at\":{$pairs}"
+fi
+
 # MISSING wird in Subshells nicht gefuellt (Kommandosubstitution) — deshalb hier
 # zusaetzlich gegen 0 pruefen. Das ist die eigentliche Absicherung.
 for pair in "block-types:$BLOCK_TYPES" "controllers:$CONTROLLERS" \
@@ -251,9 +265,9 @@ if [ ${#FILES[@]} -eq 0 ]; then
 fi
 
 DOC_FACTS_ROOT="$ROOT" \
-DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s,"versions":{%s},"absent-files":[%s]}' \
+DOC_FACTS="$(printf '{"block-types":%s,"block-type-names":%s,"controllers":%s,"migration-max":%s,"migrations":%s,"migration-numbers":%s,"templates":%s,"skills":%s,"integration-providers":%s%s%s,"versions":{%s},"absent-files":[%s]}' \
   "$BLOCK_TYPES" "$BLOCK_TYPE_NAMES" "$CONTROLLERS" "$MIGRATION_MAX" "$MIGRATION_COUNT" "$MIGRATION_NUMBERS" \
-  "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
+  "$TEMPLATES" "$SKILLS" "$PROVIDERS" "$COMMITS_JSON" "$COMMITS_AT_JSON" "$VERSIONS_JSON" "$ABSENT_JSON")" \
   python3 "$PY" "${FILES[@]}"
 RC=$?
 

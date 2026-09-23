@@ -188,6 +188,13 @@ TABLE_MIGRATION_ROW = re.compile(rf"^\|\s*`?V(\d+)`?(?:\s*{DASH}\s*`?V(\d+)`?)?\
 COMMITS_CLAIM = re.compile(r"\b([0-9][0-9.   ' ]*)\s*Commits\b")
 COMMITS_TOLERANCE = 0.05
 
+# Stichtag eines Abschnitts: "Stand 2026-09-22 (Commit `d23a09ed`, …)". Eine datierte Zahl ist
+# am Stichtag wahr, nicht an HEAD – sonst wird das Gate mit jedem Commit roter, obwohl der Text
+# stimmt (TODO 65c6dedc). Gilt fuer den ganzen Abschnitt (Ueberschrift bis Ueberschrift), weil
+# die Angabe mal vor der Tabelle und mal hinter dem Satz steht.
+STICHTAG = re.compile(r"\bStand\b[^\n`]*?Commit\s+`([0-9a-f]{7,40})`")
+HEADING = re.compile(r"^#{1,6}\s")
+
 # Testzahlen altern schneller als alles andere. Sie duerfen stehen bleiben, solange
 # sie datiert sind ("Stand 2026-09-18: 715 Testklassen") — eine undatierte Testzahl
 # behauptet Aktualitaet, die niemand geprueft hat.
@@ -355,14 +362,40 @@ def check_migration_table_complete(rel, seen, best, best_no, numbers, findings):
                     f" fehlen zwischen V{min(seen)} und V{best} ({shown})")
 
 
-def check_readme_head(rel, no, line, facts, findings):
-    """Kopftabelle von README.de.md: Commit-Zahl und Datierung der Testzahlen."""
-    expected = facts.get("commits")
+def section_stichtage(lines):
+    """Je Zeile der Stichtag-Commit ihres Abschnitts (oder None); Codebloecke trennen nicht."""
+    result, start, fenced = [None] * len(lines), 0, False
+
+    def assign(first, end):
+        sha = next((m.group(1) for m in map(STICHTAG.search, lines[first:end]) if m), None)
+        for i in range(first, end):
+            result[i] = sha
+
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        elif not fenced and HEADING.match(line) and i > start:
+            assign(start, i)
+            start = i
+    assign(start, len(lines))
+    return result
+
+
+def check_readme_head(rel, no, line, facts, findings, stichtag=None):
+    """Kopftabelle von README.de.md: Commit-Zahl (am Stichtag des Abschnitts, sonst an HEAD)."""
+    expected, basis = facts.get("commits"), "Code"
+    if stichtag is not None and COMMITS_CLAIM.search(line):
+        known = facts.get("commits-at", {})
+        if known.get(stichtag) is None:
+            findings.append(f"DRIFT {rel}:{no} stichtag-commit {stichtag} unbekannt – die"
+                            f" Commit-Zahl ist nicht pruefbar | {line.strip()[:120]}")
+            return
+        expected, basis = known[stichtag], f"Stand {stichtag}"
     if expected is not None:
         for match in COMMITS_CLAIM.finditer(line):
             said = digits(match.group(1))
             if abs(said - expected) > max(1, round(expected * COMMITS_TOLERANCE)):
-                findings.append(f"DRIFT {rel}:{no} commits sagt {said}, Code {expected}"
+                findings.append(f"DRIFT {rel}:{no} commits sagt {said}, {basis} {expected}"
                                 f" | {line.strip()[:120]}")
 
 
@@ -533,6 +566,7 @@ def scan(root, rel, facts, findings):
             lines = fh.readlines()
     except OSError:
         return
+    stichtage = section_stichtage(lines) if rel == README_SOURCE else None
     for no, line in enumerate(lines, 1):
         # Codebloecke werden bewusst MIT geprueft: die Verzeichnisbaeume in
         # docs/architektur.md ("├── controller/   43 REST-Controller") stehen in
@@ -550,7 +584,7 @@ def scan(root, rel, facts, findings):
                         findings)
         check_version_row(rel, no, line, facts.get("versions"), findings)
         if rel == README_SOURCE:
-            check_readme_head(rel, no, line, facts, findings)
+            check_readme_head(rel, no, line, facts, findings, stichtage[no - 1])
         check_forbidden_patterns(rel, no, line, findings)
         check_definition_count(rel, no, lines, findings)
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
