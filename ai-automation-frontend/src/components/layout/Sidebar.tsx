@@ -382,7 +382,7 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Menü bearbeiten */}
+      {/* Edit menu */}
       {showLabels && (
         <div className="flex items-center gap-1 px-2 py-1">
           <button
@@ -392,17 +392,17 @@ export function Sidebar() {
                 ? 'text-accent bg-accent/10'
                 : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
             }`}
-            aria-label={editMode ? 'Bearbeitung beenden' : 'Menü bearbeiten'}
+            aria-label={editMode ? t.nav.finishEditing : t.nav.editMenu}
           >
             {editMode ? (
               <>
                 <Check className="w-[16px] h-[16px] shrink-0" />
-                <span>Fertig</span>
+                <span>{t.nav.editDone}</span>
               </>
             ) : (
               <>
                 <Pencil className="w-[16px] h-[16px] shrink-0" />
-                <span>Menü bearbeiten</span>
+                <span>{t.nav.editMenu}</span>
               </>
             )}
           </button>
@@ -410,8 +410,8 @@ export function Sidebar() {
             <button
               onClick={handleReset}
               className="rounded-lg p-2 text-[var(--color-sidebar-text-muted)] transition-colors hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]"
-              aria-label="Zurücksetzen"
-              title="Reihenfolge zurücksetzen"
+              aria-label={t.nav.resetMenu}
+              title={t.nav.resetMenuHint}
             >
               <RotateCcw className="w-[14px] h-[14px]" />
             </button>

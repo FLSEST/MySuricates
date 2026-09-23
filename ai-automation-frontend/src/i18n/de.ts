@@ -83,6 +83,13 @@ export const de: TranslationKeys = {
     dividerNamePlaceholder: 'Name (optional)',
     moveDivider: 'Unterteiler verschieben',
     removeDivider: 'Unterteiler entfernen',
+    editMenu: 'Menü bearbeiten',
+    finishEditing: 'Bearbeitung beenden',
+    editDone: 'Fertig',
+    resetMenu: 'Menü zurücksetzen',
+    resetMenuHint: 'Standard-Reihenfolge, ausgeblendete Seiten und Unterteiler wiederherstellen',
+    movePage: '{name} verschieben',
+    hidePage: '{name} ausblenden',
   },
   simple: {
     home: {
