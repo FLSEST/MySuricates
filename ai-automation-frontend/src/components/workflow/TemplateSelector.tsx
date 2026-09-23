@@ -4,13 +4,13 @@ import { Card, Input, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
 import { useTemplates, exportTemplate } from '../../hooks/useTemplates';
-import { useSystemModules } from '../../hooks/useModules';
+import { useModuleEnabled, useSystemModules } from '../../hooks/useModules';
 import { resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
+import { Hint } from '../hints/Hint';
 import { PoolBrowser } from './PoolBrowser';
 import { BlueprintBrowser } from './BlueprintBrowser';
 import { ProHandoff } from '../simple/ProHandoff';
-import { Hint } from '../hints/Hint';
 import { NeedsModuleToggle, TemplateModuleNote } from './TemplateAvailability';
 import { missingModules, splitByAvailability, templateNeedsAi } from './templateAvailability';
 import type { WorkflowTemplate, PoolWorkflowEntry } from '../../types';
@@ -42,6 +42,11 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
   const [withoutAi, setWithoutAi] = useState(false);
   // Templates whose module is off stay hidden until asked for (TODO 560d18dd)
   const [showNeedsModule, setShowNeedsModule] = useState(false);
+  // No way to build from a description here (preset core): say that they exist (TODO 3f96f7a0)
+  const assistantOn = useModuleEnabled('assistant');
+  const factoryOn = useModuleEnabled('factory');
+  const wishesOn = useModuleEnabled('wishes');
+  const describingIsOff = !assistantOn && !factoryOn && !wishesOn;
 
   // Blueprints share the endpoint but have their own tab
   const taskTemplates = (templates ?? []).filter((tmpl) => tmpl.kind !== 'BLUEPRINT');
@@ -105,6 +110,8 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
           {t.pool.tab}
         </button>
       </div>
+
+      {!simple && describingIsOff && <Hint id="build-from-description" />}
 
       {activeTab === 'pool' ? (
         <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} variant={variant} />

@@ -171,7 +171,9 @@ eine wartende Freigabe oder einen fehlgeschlagenen Lauf. Jeder lässt sich wegkl
 Stelle zurückholen; unter *Einstellungen → Allgemein* lassen sich alle abschalten.
 
 Eigene Workflows baut man danach am besten mit dem
-[Workflow-Leitfaden](WORKFLOW-GUIDE.md) daneben.
+[Workflow-Leitfaden](WORKFLOW-GUIDE.md) daneben. Workflows aus einer Beschreibung in Worten bauen
+Assistent und Workflow-Factory; im Preset `core` sind sie aus, die Vorlagen-Auswahl sagt dann, wie
+man sie zuschaltet.
 
 ---
 

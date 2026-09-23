@@ -627,7 +627,7 @@ Details on the three trust classes and taint propagation:
 | **Types** | Centrally defined in `src/types/index.ts` |
 | **i18n** | Type-safe translation objects (no runtime key lookup) |
 | **Icons** | Lucide React (consistent icon set) |
-| **Hints in place** | `<Hint id="…">` sits in the component it explains, never in a central list — a page that is missing (preset, Simple Mode, module off) takes its hint with it. Registry with version in `src/data/hints.ts` (raise the version only for a change in substance; the hint then shows again), copy in `src/data/hints.<lang>.json`: what and why, never where to click. `i18n/__tests__/hints.test.ts` keeps registry, copy and usage in step |
+| **Hints in place** | `<Hint id="…">` sits in the component it explains, never in a central list — a page that is missing (preset, Simple Mode, module off) takes its hint with it. Registry with version in `src/data/hints.ts` (raise the version only for a change in substance; the hint then shows again), copy in `src/data/hints.<lang>.json`: what and why, never where to click. `i18n/__tests__/hints.test.ts` keeps registry, copy and usage in step. Conversely, a hint may appear precisely because a module is missing: `build-from-description` in the template picker names the assistant, the factory and wishes on core, and how to switch them on |
 | **Forms** | Controlled components with React state |
 
 ### Annotation Processors

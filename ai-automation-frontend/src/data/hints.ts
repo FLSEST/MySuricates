@@ -46,6 +46,8 @@ export const HINTS = {
   'simple-home': { version: 1 },
   'simple-result': { version: 1 },
   'simple-create': { version: 1 },
+  // Only while assistant, factory and wishes are all off (preset core): the ways to build from a description.
+  'build-from-description': { version: 1 },
 } as const satisfies Record<string, { version: number }>;
 
 export type HintId = keyof typeof HINTS;

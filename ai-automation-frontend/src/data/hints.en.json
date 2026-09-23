@@ -226,5 +226,13 @@
       "A template already brings all its steps: create it, give it a project and start it, without building anything",
       "The pool holds more finished workflows; some of them only fit one particular project"
     ]
+  },
+  "build-from-description": {
+    "title": "Building from a description is off here",
+    "points": [
+      "The assistant and the workflow factory build a workflow from a description in words; wishes break a goal down into several workflows",
+      "All three are optional, still experimental modules and not part of the default preset core, which is why this instance has none of them",
+      "To switch them on at startup: ./scripts/setup.sh --preset research --force brings the assistant, --preset full also the factory and wishes; one at a time with automation.modules.assistant: true (likewise factory, wishes). Where the instance allows it, also in the settings"
+    ]
   }
 }

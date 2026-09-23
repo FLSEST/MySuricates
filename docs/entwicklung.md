@@ -637,7 +637,7 @@ Details zu den drei Vertrauensklassen und zur Taint-Propagation:
 | **Typen** | Zentral in `src/types/index.ts` definiert |
 | **i18n** | Typsichere Übersetzungsobjekte (kein Runtime-Key-Lookup) |
 | **Icons** | Lucide React (konsistentes Icon-Set) |
-| **Hinweise am Ort** | `<Hint id="…">` steht in der Komponente, die er erklärt, nie in einer zentralen Liste — fehlt die Seite (Preset, Simple Mode, Modul aus), fehlt auch der Hinweis. Registry mit Version in `src/data/hints.ts` (Version nur bei wesentlicher Inhaltsänderung erhöhen, dann erscheint er wieder), Texte in `src/data/hints.<lang>.json`: was und warum, nie wo man klickt. `i18n/__tests__/hints.test.ts` hält Registry, Texte und Verwendung gleich |
+| **Hinweise am Ort** | `<Hint id="…">` steht in der Komponente, die er erklärt, nie in einer zentralen Liste — fehlt die Seite (Preset, Simple Mode, Modul aus), fehlt auch der Hinweis. Registry mit Version in `src/data/hints.ts` (Version nur bei wesentlicher Inhaltsänderung erhöhen, dann erscheint er wieder), Texte in `src/data/hints.<lang>.json`: was und warum, nie wo man klickt. `i18n/__tests__/hints.test.ts` hält Registry, Texte und Verwendung gleich. Umgekehrt kann ein Hinweis gerade dann erscheinen, wenn ein Modul fehlt: `build-from-description` in der Vorlagen-Auswahl nennt auf core Assistent, Factory und Wünsche und wie man sie zuschaltet |
 | **Forms** | Kontrollierte Komponenten mit React State |
 
 ### Annotation-Prozessoren

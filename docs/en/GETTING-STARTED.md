@@ -168,7 +168,9 @@ Along the way, short **hints** explain the pages and states you meet for the fir
 waiting approval or a failed run. Each can be dismissed and brought back in its place; *Settings →
 General* switches them all off.
 
-Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to you.
+Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to you. The assistant
+and the workflow factory build workflows from a description in words; in the `core` preset they are
+off, and the template picker then says how to switch them on.
 
 ---
 
