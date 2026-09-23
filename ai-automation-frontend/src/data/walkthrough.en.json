@@ -100,7 +100,8 @@
     "title": "This tour was built by the thing it's showing you.",
     "points": [
       "The texts, the images and this sequence come from workflows in the pool",
-      "Install one of them, run it, and read the log"
+      "Start a blueprint and read its log — blueprints run in any project, most of them without a model",
+      "Pool entries marked portable run in any project too"
     ]
   }
 }

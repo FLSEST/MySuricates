@@ -100,7 +100,8 @@
     "title": "Dieser Rundgang wurde von dem gebaut, was er zeigt.",
     "points": [
       "Texte, Bilder und diese Abfolge stammen aus Workflows im Pool",
-      "Einen davon installieren, starten und das Protokoll lesen"
+      "Eine Blaupause starten und ihr Protokoll lesen — Blaupausen laufen in jedem Projekt, die meisten ohne Modell",
+      "Auch Pool-Einträge mit dem Vermerk „portable“ laufen in jedem Projekt"
     ]
   }
 }

@@ -32,6 +32,14 @@ function serve(disabled: ModuleName[] = []) {
 }
 
 const title = (id: string) => walkthroughText(id, 'en').title;
+const point = (id: string, index: number) => walkthroughText(id, 'en').points[index] ?? '';
+
+/** Everything the public `core` preset leaves off: all research and advanced modules. */
+const CORE_OFF: ModuleName[] = [
+  'chains', 'assistant', 'learning', 'memory', 'audit', 'bpmn', 'integrations', 'webhooks',
+  'remote-access', 'terminal', 'staging', 'conversion', 'dialog-import', 'onboarding-profiles',
+  'skills', 'debug', 'factory', 'wishes',
+];
 
 /** Click "next" until the tour ends, collecting the headline of every panel on the way. */
 async function walk(): Promise<string[]> {
@@ -69,6 +77,46 @@ describe('Walkthrough', () => {
     expect(seen).not.toContain(title(panel));
     expect(seen).toContain(title('intro'));
     expect(seen).toContain(title('closing'));
+  });
+
+  // f2a233eb: a fresh installation runs `core` — the tour must not promise chains, a process
+  // diagram, an audit center, repairs or integrations there, neither as a panel nor as a sentence.
+  it('mentions nothing on core that core does not have', async () => {
+    serve(CORE_OFF);
+    renderWithProviders(<Walkthrough onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText(title('verdict'))).not.toBeInTheDocument());
+
+    const said: string[] = [];
+    for (;;) {
+      said.push(screen.getByRole('heading', { level: 2 }).textContent ?? '');
+      said.push(...screen.getAllByRole('listitem').map((li) => li.textContent ?? ''));
+      const button = screen.getByRole('button', { name: /next|done/i });
+      if (/done/i.test(button.textContent ?? '')) break;
+      fireEvent.click(button);
+      await screen.findByRole('heading', { level: 2 });
+    }
+    const text = said.join('\n');
+
+    for (const panel of ['repair', 'verdict', 'connect']) expect(text).not.toContain(title(panel));
+    expect(text).not.toContain(point('blocks', 1));
+    expect(text).not.toContain(point('trace', 2));
+    expect(text).not.toMatch(/chain|process diagram|audit|integration/i);
+    // The panels themselves stay — only the sentence that needs the module goes
+    expect(text).toContain(title('blocks'));
+    expect(text).toContain(point('blocks', 0));
+    expect(text).toContain(title('trace'));
+    expect(text).toContain(title('closing'));
+  });
+
+  it('keeps a gated sentence while its module is on', async () => {
+    serve(['bpmn']);
+    renderWithProviders(<Walkthrough onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getAllByRole('button').length).toBeGreaterThan(0));
+
+    await walk();
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(await screen.findByRole('heading', { level: 2 })).toHaveTextContent(title('blocks'));
+    expect(screen.getByText(point('blocks', 1))).toBeInTheDocument();
   });
 
   it('still ends on the closing panel when several modules are off', async () => {

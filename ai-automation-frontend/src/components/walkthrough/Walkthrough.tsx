@@ -13,8 +13,9 @@ import { PanelDiagram } from './PanelDiagram';
  * The welcome tour shown once after the first start. Skippable, re-openable from the settings.
  *
  * It shows concepts, not places: no route is linked and no state is probed, so no module preset,
- * Simple Mode or per-module switch can break it. Only a panel that would otherwise claim something
- * untrue on this instance is hidden (see `module` in `walkthroughPanels.ts`).
+ * Simple Mode or per-module switch can break it. Only what would otherwise claim something untrue
+ * on this instance is hidden — a whole panel or a single point (`module` and `pointModules` in
+ * `walkthroughPanels.ts`).
  */
 export function Walkthrough({ onClose }: { onClose: () => void }) {
   const t = useT();
@@ -22,16 +23,19 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
   const locale = useI18nStore((s) => s.locale);
   const setLocale = useI18nStore((s) => s.setLocale);
   // One call per value of `PanelModule` — the record below is total over that union, so a new
-  // gated panel does not compile until its module is looked up here.
+  // gated panel or point does not compile until its module is looked up here.
   const audit = useModuleEnabled('audit');
+  const bpmn = useModuleEnabled('bpmn');
+  const chains = useModuleEnabled('chains');
   const factory = useModuleEnabled('factory');
   const integrations = useModuleEnabled('integrations');
   const [index, setIndex] = useState(0);
 
-  const panels = useMemo(() => {
-    const on: Record<PanelModule, boolean> = { audit, factory, integrations };
-    return WALKTHROUGH_PANELS.filter((p) => !p.module || on[p.module]);
-  }, [audit, factory, integrations]);
+  const on = useMemo<Record<PanelModule, boolean>>(
+    () => ({ audit, bpmn, chains, factory, integrations }),
+    [audit, bpmn, chains, factory, integrations],
+  );
+  const panels = useMemo(() => WALKTHROUGH_PANELS.filter((p) => !p.module || on[p.module]), [on]);
 
   // Module state is optimistic until the backend answers, so the list can shrink under a reader
   // who is already past its new end. Clamped on read rather than corrected in an effect: the
@@ -62,6 +66,10 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
 
   if (!panel) return null;
   const copy = text(panel.id);
+  const points = copy.points.filter((_, i) => {
+    const gate = panel.pointModules?.[i];
+    return !gate || on[gate];
+  });
   // Written by the image workflow after the set has been approved — until then the stage
   // shows the diagram alone and panels without one have no stage at all.
   const image = (walkthroughImages as Record<string, string>)[panel.id];
@@ -127,7 +135,7 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
         <div className="overflow-y-auto px-6 sm:px-9 py-7">
           <h2 className="text-xl sm:text-2xl font-semibold text-text leading-snug pr-8">{copy.title}</h2>
           <ul className="mt-5 space-y-3">
-            {copy.points.map((point) => (
+            {points.map((point) => (
               <li key={point} className="flex gap-3 text-sm sm:text-[0.95rem] text-text-secondary leading-relaxed">
                 <span className="mt-2 w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                 <span>{point}</span>

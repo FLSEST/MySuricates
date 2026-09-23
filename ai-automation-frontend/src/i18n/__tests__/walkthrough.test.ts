@@ -49,6 +49,51 @@ describe('walkthrough copy', () => {
     expect(prompts.stil).toBeTruthy();
   });
 
+  // Point gates (`pointModules`) address a point by its index, so every language needs the same
+  // points in the same order — a translation that merges two points would move a gate.
+  it('keeps the same number of points per panel in every language', () => {
+    for (const panel of WALKTHROUGH_PANELS) {
+      const counts = WALKTHROUGH_LANGUAGES.map((lang) => catalogs[lang]?.[panel.id]?.points.length);
+      expect(new Set(counts).size, panel.id).toBe(1);
+    }
+  });
+
+  it('gates only points that exist, and leaves every panel two points with its gates closed', () => {
+    for (const panel of WALKTHROUGH_PANELS) {
+      const gated = Object.keys(panel.pointModules ?? {}).map(Number);
+      for (const lang of WALKTHROUGH_LANGUAGES) {
+        const points = catalogs[lang]?.[panel.id]?.points ?? [];
+        for (const index of gated) {
+          expect(Number.isInteger(index) && index >= 0 && index < points.length, `${lang}/${panel.id}[${index}]`).toBe(true);
+        }
+        expect(points.length - gated.length, `${lang}/${panel.id}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  // f2a233eb: on the public `core` preset the tour must not mention what is missing there. Every
+  // panel or point that needs a module is listed here — a new claim about a module-bound feature
+  // has to be bound on purpose, and removing a gate shows up as a failing line, not as a silent
+  // promise on a fresh installation. `refill` stays ungated: a pattern of core parts (a schedule,
+  // previous_report, shell steps), not the memory module.
+  it('binds exactly these panels and points to a module', () => {
+    const tags: Record<string, string> = {};
+    for (const panel of WALKTHROUGH_PANELS) {
+      if (panel.module) tags[panel.id] = panel.module;
+      for (const [index, module] of Object.entries(panel.pointModules ?? {})) {
+        if (module) tags[`${panel.id}[${index}]`] = module;
+      }
+    }
+    expect(tags).toEqual({
+      'trace[2]': 'bpmn', // "Export the whole thing as a process diagram"
+      repair: 'factory',
+      verdict: 'audit',
+      connect: 'integrations',
+      'connect[1]': 'bpmn', // "A flow leaves as a process diagram and comes back as one"
+      'blocks[1]': 'chains', // "Chains line up finished flows end to end"
+    });
+  });
+
   it('has no duplicate panel ids', () => {
     const ids = WALKTHROUGH_PANELS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
