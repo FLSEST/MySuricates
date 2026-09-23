@@ -1,6 +1,6 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates: fixed steps and AI in one flow. A local control loop finds issues, files TODOs, triggers fixes and checks again – with Claude, Codex or Pi. The picture shows a meerkat circled by the loop Finding, TODO, Fix, Check."></p>
+<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Not every problem needs a hammer. Build workflows from fixed steps, AI and your own decisions, put together the way your task needs them. Deterministic where possible. AI where it helps. Any provider. The picture shows a meerkat circled by building blocks: schedule, AI agent, approval, loop, report, shell."></p>
 
 # MySuricates
 

@@ -1,6 +1,6 @@
 **Deutsch** | [English](README.md)
 
-<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates: feste Schritte und KI in einem Ablauf. Ein lokaler Regelkreis findet Befunde, legt TODOs an, stößt Fixes an und prüft nach – mit Claude, Codex oder Pi. Im Bild ein Erdmännchen, um das der Regelkreis Befund, TODO, Fix, Prüfung läuft."></p>
+<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Nicht jedes Problem braucht einen Hammer. Stecke Workflows aus festen Schritten, KI und deinen Entscheidungen zusammen, so wie deine Aufgabe es braucht. Deterministisch, wo es geht. KI, wo sie hilft. Anbieter austauschbar. Im Bild ein Erdmännchen, um das Bausteine kreisen: Zeitplan, KI-Agent, Freigabe, Schleife, Bericht, Shell."></p>
 
 # MySuricates
 

@@ -24,27 +24,28 @@ CREAM = "#f3e6d0"
 MUTED = "#c9ab84"
 AMBER = "#e8a54c"
 AI = "#b58ee8"  # --color-ai aus dem dunklen Standard-Theme
+HUMAN = "#56c2b0"  # --color-human
 
 TEXT = {
     "de": {
-        "tagline": "Feste Schritte und KI in einem Ablauf.",
+        "tagline": "Nicht jedes Problem braucht einen Hammer.",
         "body": [
-            "Ein lokaler Regelkreis findet Befunde, legt TODOs an,",
-            "stößt Fixes an und prüft nach – mit Claude, Codex oder Pi.",
+            "Stecke Workflows aus festen Schritten, KI und deinen",
+            "Entscheidungen zusammen – so, wie deine Aufgabe es braucht.",
+            "Deterministisch, wo es geht. KI, wo sie hilft. Anbieter austauschbar.",
         ],
-        "legend_fixed": "fester Schritt",
-        "legend_ai": "KI-Schritt",
-        "nodes": ["Befund", "TODO", "Fix", "Prüfung"],
+        "legend": ["fester Schritt", "KI-Schritt", "du entscheidest"],
+        "nodes": ["Zeitplan", "KI-Agent", "Freigabe", "Schleife", "Bericht", "Shell"],
     },
     "en": {
-        "tagline": "Fixed steps and AI in one flow.",
+        "tagline": "Not every problem needs a hammer.",
         "body": [
-            "A local control loop finds issues, files TODOs,",
-            "triggers fixes and checks again – with Claude, Codex or Pi.",
+            "Build workflows from fixed steps, AI and your own",
+            "decisions – put together the way your task needs them.",
+            "Deterministic where possible. AI where it helps. Any provider.",
         ],
-        "legend_fixed": "fixed step",
-        "legend_ai": "AI step",
-        "nodes": ["Finding", "TODO", "Fix", "Check"],
+        "legend": ["fixed step", "AI step", "you decide"],
+        "nodes": ["Schedule", "AI agent", "Approval", "Loop", "Report", "Shell"],
     },
 }
 
@@ -100,6 +101,22 @@ def text(face, s, size, x, y, fill, anchor="start", tracking=0.0, extra=""):
     elif anchor == "end":
         x -= width
     return f'<path transform="translate({x:.1f} {y:.1f})" fill="{fill}"{extra} d="{d}"/>', width
+
+
+def marker(kind, x, y, small=False):
+    """Zeichen je Schrittart: Quadrat = fest, Kreis = KI, Raute = Mensch."""
+    k = .85 if small else 1.0
+    if kind == "ai":
+        glow = "" if small else (f'<circle cx="{x:.1f}" cy="{y:.1f}" r="15" fill="{AI}" opacity=".35" '
+                                 f'filter="url(#glow)"/>')
+        return glow + f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{9 * k:.1f}" fill="{AI}"/>'
+    if kind == "human":
+        r = 10.5 * k
+        return (f'<path d="M{x:.1f} {y - r:.1f}L{x + r:.1f} {y:.1f}L{x:.1f} {y + r:.1f}L{x - r:.1f} {y:.1f}Z" '
+                f'fill="{HUMAN}"/>')
+    h = 8 * k
+    return (f'<rect x="{x - h:.1f}" y="{y - h:.1f}" width="{2 * h:.1f}" height="{2 * h:.1f}" rx="2.5" '
+            f'fill="#241910" stroke="{CREAM}" stroke-width="2.5"/>')
 
 
 MEERKAT = """
@@ -177,26 +194,21 @@ def build(lang, book, demi):
 
     add(runner())
 
-    kinds = ["ai", "fixed", "ai", "fixed"]  # Befund, TODO, Fix, Pruefung
-    angles = [205, 335, 25, 155]  # im Uhrzeigersinn: hinten links, hinten rechts, vorn rechts, vorn links
+    # Bausteine auf dem Ring: dieselben drei Arten wie in der Legende
+    kinds = ["fixed", "ai", "human", "fixed", "ai", "fixed"]
+    angles = [210, 330, 10, 60, 120, 170]  # hinten links, hinten rechts, rechts, vorn rechts, vorn links, links
 
     def node(i):
         x, y = on_orbit(angles[i])
-        parts = []
-        if kinds[i] == "ai":
-            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="15" fill="{AI}" opacity=".35" filter="url(#glow)"/>')
-            parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="9" fill="{AI}"/>')
-        else:
-            parts.append(f'<rect x="{x - 8:.1f}" y="{y - 8:.1f}" width="16" height="16" rx="2.5" '
-                         f'fill="#241910" stroke="{CREAM}" stroke-width="2.5"/>')
-        back = y < ocy
-        ly = y - 20 if back else y + 34
+        parts = [marker(kinds[i], x, y)]
+        ly = y - 20 if y < ocy - 5 else y + 34
         label, _ = text(book, t["nodes"][i], 18, x, ly, CREAM, anchor="middle", tracking=.3)
         parts.append(label)
         return "".join(parts)
 
     add(node(0))
     add(node(1))
+    add(node(5))
 
     add(f'<g transform="translate({tx:.1f} {ty:.1f}) scale({scale})" '
         f'stroke-linecap="round" stroke-linejoin="round">{MEERKAT}</g>')
@@ -208,10 +220,10 @@ def build(lang, book, demi):
     # Vordere Haelfte des Regelkreises (vor dem Erdmaennchen)
     add(f'<g clip-path="url(#front)"><use href="#loop" fill="none" stroke="{AMBER}" stroke-opacity=".75" '
         f'stroke-width="2.5"/>{runner()}</g>')
-    add(node(2))
-    add(node(3))
+    for i in (2, 3, 4):
+        add(node(i))
     # Pfeilspitzen zeigen die Laufrichtung (im Uhrzeigersinn)
-    for deg in (0, 90, 180):
+    for deg in (90,):
         x, y = on_orbit(deg)
         a = math.radians(deg)
         rot = math.degrees(math.atan2(ory * math.cos(a), -orx * math.sin(a)))
@@ -223,21 +235,23 @@ def build(lang, book, demi):
     title, _ = text(demi, "MySuricates", 78, x0, 146, CREAM, tracking=-1.0)
     add(title)
     add(f'<rect x="{x0 + 2}" y="170" width="64" height="5" rx="2.5" fill="{AMBER}"/>')
-    tag, _ = text(demi, t["tagline"], 31, x0, 226, "#f0c890", tracking=-.2)
+    tag, w = text(demi, t["tagline"], 29, x0, 224, "#f0c890", tracking=-.2)
     add(tag)
+    widths = [w]
     for i, line in enumerate(t["body"]):
-        p, _ = text(book, line, 21, x0, 270 + i * 31, MUTED, tracking=.1)
+        p, w = text(book, line, 20, x0, 266 + i * 30, MUTED, tracking=.1)
         add(p)
+        widths.append(w)
+    if x0 + max(widths) > 740:  # dahinter beginnen Ring und Beschriftung
+        raise SystemExit(f"{lang}: Textzeile zu breit ({max(widths):.0f} px)")
 
-    ly = 364
-    add(f'<rect x="{x0}" y="{ly - 13}" width="14" height="14" rx="2.5" fill="#241910" '
-        f'stroke="{CREAM}" stroke-width="2.2"/>')
-    lf, wf = text(book, t["legend_fixed"], 18, x0 + 26, ly, CREAM, tracking=.3)
-    add(lf)
-    cx = x0 + 26 + wf + 40
-    add(f'<circle cx="{cx + 7}" cy="{ly - 6}" r="7.5" fill="{AI}"/>')
-    la, _ = text(book, t["legend_ai"], 18, cx + 26, ly, CREAM, tracking=.3)
-    add(la)
+    ly = 384
+    lx = x0 + 7
+    for kind, label in zip(("fixed", "ai", "human"), t["legend"]):
+        add(marker(kind, lx, ly - 6, small=True))
+        p, w = text(book, label, 18, lx + 18, ly, CREAM, tracking=.3)
+        add(p)
+        lx += 18 + w + 42
 
     add("</g>")
     add(f'<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="27.5" fill="none" '
