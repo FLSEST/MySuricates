@@ -70,6 +70,15 @@ Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, d
 mindestens 40 Zeichen, ohne Leerzeichen und ohne spitze Klammern. Ein Platzhalter wie `<token>` bleibt
 draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmeldung.
 
+**Projekt-Container.** Für einen Lauf startet die Plattform je Projekt einen Container
+(`automation-<projekt-id>`, sobald Docker erreichbar ist, bei Stable und Test über den Socket). Darin
+läuft Claude für Befehle mitten im Lauf und im Terminal. Er folgt derselben Regel wie seine Instanz:
+Bei `login` bekommt er das Claude-Programm als einzelne Datei und den Token (aus der Umgebung der
+Instanz oder aus `~/.config/mysuricates/ai.env`), dazu ein eigenes Konfigurationsverzeichnis auf seinem
+`/tmp`, das mit dem Container verschwindet. Bei `programs` bekommt er keinen Token. Nur bei `all`
+bekommt er wie früher `~/.claude` und `~/.claude.json` mit Schreibrecht. Ohne `claude` in `…AI_PROVIDERS`
+bekommt er nichts von Claude.
+
 | Weg | Schalter | Docker-Socket ohne Schalter |
 |---|---|---|
 | `scripts/instance.sh`, auch der Installer-Modus „Dev · Test · Prod“ | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | aus |

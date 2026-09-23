@@ -70,6 +70,15 @@ lands neither in the image nor in the volume, but anyone with Docker access can 
 and no angle brackets. A placeholder such as `<token>` stays out; the starters, the installer and the
 settings report it as a missing login.
 
+**Project containers.** For a run the platform starts one container per project
+(`automation-<project-id>`, whenever Docker is reachable — on Stable and Test through the socket).
+Claude runs in it for commands during a run and in the terminal. It follows the same rule as its
+instance: with `login` it gets the Claude program as a single file and the token (from the instance's
+environment or from `~/.config/mysuricates/ai.env`), plus its own config directory on its `/tmp`, which
+disappears with the container. With `programs` it gets no token. Only with `all` does it get
+`~/.claude` and `~/.claude.json` read-write, as before. Without `claude` in `…AI_PROVIDERS` it gets
+nothing of Claude.
+
 | Way | Switches | Docker socket without a switch |
 |---|---|---|
 | `scripts/instance.sh`, including the installer mode "Dev · Test · Prod" | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | off |

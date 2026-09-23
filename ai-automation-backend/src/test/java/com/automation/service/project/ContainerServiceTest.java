@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -77,6 +78,7 @@ class ContainerServiceTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
         DockerContainerGateway docker = new DockerContainerGateway(
                 dockerClient, hostProcessUtils,
+                new ProjectContainerClaudeAccess(hostProcessUtils, name -> null, java.nio.file.Path.of("/nonexistent-home")),
                 100_000L,           // cpuQuota
                 4_294_967_296L,     // memoryLimit (4GB)
                 100L                // pidsLimit
@@ -137,6 +139,7 @@ class ContainerServiceTest {
         when(createCmd.withName(anyString())).thenReturn(createCmd);
         when(createCmd.withHostConfig(any())).thenReturn(createCmd);
         when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withEnv(anyList())).thenReturn(createCmd);
         when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
         when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
         when(createCmd.exec()).thenReturn(createResponse);
@@ -335,6 +338,7 @@ class ContainerServiceTest {
         when(createCmd.withName(anyString())).thenReturn(createCmd);
         when(createCmd.withHostConfig(any())).thenReturn(createCmd);
         when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withEnv(anyList())).thenReturn(createCmd);
         when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
         when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
         when(createCmd.exec()).thenAnswer(inv -> {

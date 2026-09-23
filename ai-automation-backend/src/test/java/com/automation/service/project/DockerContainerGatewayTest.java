@@ -12,9 +12,12 @@ import com.github.dockerjava.api.command.ListContainersCmd;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.HostConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -36,12 +40,13 @@ class DockerContainerGatewayTest {
 
     @Mock private DockerClient dockerClient;
     @Mock private HostProcessUtils hostProcessUtils;
+    @Mock private ProjectContainerClaudeAccess claudeAccess;
 
     private DockerContainerGateway gateway;
 
     @BeforeEach
     void setUp() {
-        gateway = new DockerContainerGateway(dockerClient, hostProcessUtils, 100_000L, 4_294_967_296L, 100L);
+        gateway = new DockerContainerGateway(dockerClient, hostProcessUtils, claudeAccess, 100_000L, 4_294_967_296L, 100L);
     }
 
     @Test
@@ -96,6 +101,10 @@ class DockerContainerGatewayTest {
         when(createCmd.withName(anyString())).thenReturn(createCmd);
         when(createCmd.withHostConfig(any())).thenReturn(createCmd);
         when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withEnv(anyList())).thenReturn(createCmd);
+        when(claudeAccess.forContainer("/home/test")).thenReturn(new ProjectContainerClaudeAccess.Access(
+                List.of(Bind.parse("/home/test/.local/bin/claude:/home/agent/.local/bin/claude:ro")),
+                List.of("CLAUDE_CONFIG_DIR=/tmp/claude-config")));
         when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
         when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
         when(createCmd.exec()).thenReturn(created);
@@ -112,6 +121,36 @@ class DockerContainerGatewayTest {
         verify(createCmd).withWorkingDir("/workspace");
         verify(createCmd).withCmd("tail", "-f", "/dev/null");
         verify(start).exec();
+    }
+
+    /** Workspace plus exactly what the Claude rule hands over — never ~/.claude of the host (f1b6d06b). */
+    @Test
+    void createAndStart_mountsTheWorkspaceAndOnlyWhatTheClaudeRuleGives() {
+        when(hostProcessUtils.getHostUid()).thenReturn("1000");
+        CreateContainerResponse created = mock(CreateContainerResponse.class);
+        when(created.getId()).thenReturn("docker-9");
+        CreateContainerCmd createCmd = mock(CreateContainerCmd.class, RETURNS_DEEP_STUBS);
+        when(createCmd.withName(anyString())).thenReturn(createCmd);
+        when(createCmd.withHostConfig(any())).thenReturn(createCmd);
+        when(createCmd.withEnv(anyList())).thenReturn(createCmd);
+        when(createCmd.withUser(anyString())).thenReturn(createCmd);
+        when(createCmd.withWorkingDir(anyString())).thenReturn(createCmd);
+        when(createCmd.withCmd(any(String[].class))).thenReturn(createCmd);
+        when(createCmd.exec()).thenReturn(created);
+        when(dockerClient.createContainerCmd(anyString())).thenReturn(createCmd);
+        when(dockerClient.startContainerCmd("docker-9")).thenReturn(mock(StartContainerCmd.class));
+        when(claudeAccess.forContainer("/home/test")).thenReturn(new ProjectContainerClaudeAccess.Access(
+                List.of(Bind.parse("/home/test/.local/bin/claude:/home/agent/.local/bin/claude:ro")),
+                List.of("CLAUDE_CONFIG_DIR=/tmp/claude-config", "DISABLE_AUTOUPDATER=1")));
+        Project project = Project.builder().id("p9").path("/work/p9").type(ProjectType.CODE).build();
+
+        gateway.createAndStart(project, "automation-agent-node:latest", "automation-p9", "/home/test");
+
+        ArgumentCaptor<HostConfig> hostConfig = ArgumentCaptor.forClass(HostConfig.class);
+        verify(createCmd).withHostConfig(hostConfig.capture());
+        assertThat(hostConfig.getValue().getBinds()).extracting(Bind::toString).containsExactly(
+                "/work/p9:/workspace:rw", "/home/test/.local/bin/claude:/home/agent/.local/bin/claude:ro");
+        verify(createCmd).withEnv(List.of("CLAUDE_CONFIG_DIR=/tmp/claude-config", "DISABLE_AUTOUPDATER=1"));
     }
 
     @Test

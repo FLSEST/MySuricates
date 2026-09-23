@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -26,10 +27,9 @@ import java.util.Map;
 @Slf4j
 public class DockerContainerGateway {
 
-    private static final String CONTAINER_HOME = "/home/agent";
-
     private final DockerClient dockerClient;
     private final HostProcessUtils hostProcessUtils;
+    private final ProjectContainerClaudeAccess claudeAccess;
     private final long cpuQuota;
     private final long memoryLimit;
     private final long pidsLimit;
@@ -37,11 +37,13 @@ public class DockerContainerGateway {
     public DockerContainerGateway(
             DockerClient dockerClient,
             HostProcessUtils hostProcessUtils,
+            ProjectContainerClaudeAccess claudeAccess,
             @Value("${docker.container.cpu-quota}") long cpuQuota,
             @Value("${docker.container.memory-limit}") long memoryLimit,
             @Value("${docker.container.pids-limit}") long pidsLimit) {
         this.dockerClient = dockerClient;
         this.hostProcessUtils = hostProcessUtils;
+        this.claudeAccess = claudeAccess;
         this.cpuQuota = cpuQuota;
         this.memoryLimit = memoryLimit;
         this.pidsLimit = pidsLimit;
@@ -49,6 +51,10 @@ public class DockerContainerGateway {
 
     /** Creates and starts the project container; returns the Docker container id. */
     public String createAndStart(Project project, String imageName, String containerName, String hostHome) {
+        ProjectContainerClaudeAccess.Access claude = claudeAccess.forContainer(hostHome);
+        List<Bind> binds = new ArrayList<>();
+        binds.add(Bind.parse(project.getPath() + ":/workspace:rw"));
+        binds.addAll(claude.binds());
         CreateContainerResponse response = dockerClient.createContainerCmd(imageName)
                 .withName(containerName)
                 .withHostConfig(
@@ -59,19 +65,10 @@ public class DockerContainerGateway {
                                 .withCpuQuota(cpuQuota)
                                 .withMemory(memoryLimit)
                                 .withPidsLimit(pidsLimit)
-                                .withBinds(
-                                        // Project workspace
-                                        Bind.parse(project.getPath() + ":/workspace:rw"),
-                                        // Claude binary (read-only, from host)
-                                        Bind.parse(hostHome + "/.local/bin/claude:" + CONTAINER_HOME + "/.local/bin/claude:ro"),
-                                        Bind.parse(hostHome + "/.local/share/claude:" + CONTAINER_HOME + "/.local/share/claude:ro"),
-                                        // Claude config (read-write, CLI needs to write session state/todos)
-                                        // TODO b983520f (KI-Ausführung im Container kapseln): only copy the auth credentials read-only
-                                        // and let the CLI manage its own state
-                                        Bind.parse(hostHome + "/.claude:" + CONTAINER_HOME + "/.claude"),
-                                        Bind.parse(hostHome + "/.claude.json:" + CONTAINER_HOME + "/.claude.json")
-                                )
+                                // Project workspace plus what of Claude comes from the host (f1b6d06b)
+                                .withBinds(binds)
                 )
+                .withEnv(claude.env())
                 .withUser(hostProcessUtils.getHostUid())
                 .withWorkingDir("/workspace")
                 .withCmd("tail", "-f", "/dev/null")

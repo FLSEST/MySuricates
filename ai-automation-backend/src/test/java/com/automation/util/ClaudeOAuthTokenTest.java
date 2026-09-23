@@ -1,8 +1,12 @@
 package com.automation.util;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,5 +39,21 @@ class ClaudeOAuthTokenTest {
         String token = "sk-ant-oat01-" + "a".repeat(80);
         assertThat(ClaudeOAuthToken.isPlausible(token + "\r")).isFalse();
         assertThat(ClaudeOAuthToken.isPlausible(token + "\n")).isFalse();
+    }
+
+    /** Read like compose: last line wins, one pair of quotes comes off, a missing file is no value. */
+    @Test
+    void fromEnvFileReadsTheLastLineWithoutQuotes(@TempDir Path tmp) throws Exception {
+        Path file = tmp.resolve("ai.env");
+        assertThat(ClaudeOAuthToken.fromEnvFile(file)).isEmpty();
+
+        Files.writeString(file, "CLAUDE_CODE_OAUTH_TOKEN=first\nOTHER=x\nCLAUDE_CODE_OAUTH_TOKEN='second'\n");
+        assertThat(ClaudeOAuthToken.fromEnvFile(file)).contains("second");
+
+        Files.writeString(file, "CLAUDE_CODE_OAUTH_TOKEN=\"quoted\"\n");
+        assertThat(ClaudeOAuthToken.fromEnvFile(file)).contains("quoted");
+
+        Files.writeString(file, "# CLAUDE_CODE_OAUTH_TOKEN=commented\n");
+        assertThat(ClaudeOAuthToken.fromEnvFile(file)).isEmpty();
     }
 }
