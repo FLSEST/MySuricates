@@ -60,6 +60,7 @@ The switching is handled by route wrapper components (e.g. `DashboardRoute`, `Wo
 The page renders the widgets from the registry `components/dashboard/widgetRegistry.ts`: stats, charts, todos, recent runs and quick actions.
 
 - **Widget = registry entry** `{ id, label, description, category, size, module?, multiple?, catalogOnly?, configForm?, component }` (type in `widgetDefinition.ts`). The component loads its own data via query hooks and receives `{ instanceId, config }` as props. Prop-based cards that Insights uses with its own time range get a wrapper (`DashboardDataWidgets.tsx`, `InsightsWidgets.tsx`). The Insights widgets (quality gates, failure analysis, cost by workflow, block types, trigger distribution, cost and duration over time, tokens) are `React.lazy` entries (`insightsWidgetDefs.ts`, one shared chunk). A widget that renders nothing drops out of the grid (`empty:hidden`).
+- **AI providers:** above the widgets, `AiProviderStartCard` (also on the Simple home page) shows whether the AI CLIs are ready — while there is no project or the default provider is not ready, with the command for whatever is missing. In a container the card names no commands but the start path. "Hide" applies to exactly the status shown (`aiStatusDismissed` in the settings store); when it changes, the card comes back.
 - **Robust:** every widget sits in an error boundary (`WidgetFrame`) with `Suspense` inside: lazy widgets show a skeleton until their code has loaded, a failed chunk shows the error card. The stat widgets, the widgets built on `/learning/dashboard`, "Recent Runs", todos, the todo chart and "Upcoming" show a `WidgetSkeleton` while loading. If `/learning/dashboard` fails, a banner with retry appears; the other widgets stay usable.
 - **Widget kinds:** a layout stores `WidgetInstance { instanceId, type, hidden?, size?, config? }`. *Standard singletons* (default, `instanceId = type`) are in every view automatically and can only be hidden; their set is pinned in `widgetRegistry.test.ts` (`DEFAULT_WIDGET_IDS`). *Catalog singletons* (`catalogOnly`, e.g. all Insights widgets) only get into a view through the catalog. *Multi widgets* (`multiple`) are added with their own config. Catalog and multi widgets can be removed, not only hidden. `config` holds primitive values only; keys are sorted like in the backend.
 - **Size classes** `stat | chart | third | twoThirds | full` set the flex basis per breakpoint (`WIDGET_SIZE_CLASSES`). Rows with fewer widgets widen them instead of leaving gaps. In edit mode the size menu on a widget sets `instance.size`; choosing the registry size ("default") removes the field again.
@@ -177,6 +178,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 ### Settings (`/settings`)
 
 - General: Language (EN/DE), Advanced Mode
+- AI providers (`AiProviderStatusCard`, in Simple Mode too): per provider program and login found, or the command for it, "Check again" (`POST /system/ai-providers/status/refresh`)
 - Appearance (own collapsible section): theme picker (18 themes based on well-known palettes, grouped dark/light), custom colors per theme
 - Security: API key input (masked)
 - Remote access: Tailscale status + enable/disable
@@ -443,6 +445,8 @@ All API data is managed via React Query:
 | `useBackupList()` | Query | Database backups |
 | `useAiProviders()` | Query | AI providers and default |
 | `usePiCatalog()` | Query | Pi provider catalog |
+| `useAiProviderStatus()` | Query (60 s stale) | Readiness of the AI CLIs per provider |
+| `useRefreshAiProviderStatus()` | Mutation | Check readiness again at once |
 | `useUpdateSystemSetting()` | Mutation | Change system setting |
 | `useAssistantModelSetting()` | Query | Assistant model setting |
 | `useAutoRepairModeSetting()` | Query | Auto-repair mode setting |

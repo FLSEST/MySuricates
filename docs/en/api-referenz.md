@@ -2035,6 +2035,40 @@ Bypass the cache and probe the host now.
 
 **Response:** `ModelCatalog`
 
+### `GET /api/v1/system/ai-providers/status`
+
+Whether the AI CLIs on the backend's machine are ready: per provider the program on the `PATH`, a login (login file or environment variable — the same rule as the installer, from `AiProvider#setup()`) and the commands to install and log in. Starts no CLI; the answer is cached (`automation.ai-provider-status.ttl-seconds`, default 60). It holds only names and commands, never a token or file content. "Ready" means program and login were found — not that the login is still valid.
+
+**Response:**
+
+```json
+{
+  "container": false,
+  "checkedAt": "2026-09-24T10:00:00Z",
+  "providers": [
+    {
+      "id": "CLAUDE", "cli": "claude", "state": "READY",
+      "installed": true, "loggedIn": true, "loginVia": "ENVIRONMENT", "loginSource": "CLAUDE_CODE_OAUTH_TOKEN",
+      "install": "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
+      "login": "claude auth login", "defaultProvider": true
+    },
+    {
+      "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    }
+  ]
+}
+```
+
+`state`: `READY` (program and login found), `LOGIN_MISSING` (program found, no login), `NOT_INSTALLED` (program missing). `loginSource`: the variable name or the login file as `~/…` — or as `$VARIABLE/…` when a container instance moves the directory (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` means the backend runs in a container: the programs and logins inside it are what counts.
+
+### `POST /api/v1/system/ai-providers/status/refresh`
+
+Bypass the cache and check now, e.g. right after logging in.
+
+**Response:** as `GET /api/v1/system/ai-providers/status`
+
 ### `POST /api/v1/system/client-errors`
 
 Report frontend errors (for logging).

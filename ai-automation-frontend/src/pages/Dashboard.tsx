@@ -7,6 +7,7 @@ import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
 import { FirstStepsCard } from '../components/dashboard/FirstStepsCard';
+import { AiProviderStartCard } from '../components/dashboard/AiProviderStartCard';
 import { Hint } from '../components/hints/Hint';
 import { WorkflowWidgetProvider } from '../components/dashboard/WorkflowWidgetProvider';
 import { useDashboardData } from '../components/dashboard/dashboardDataContext';
@@ -148,6 +149,8 @@ function DashboardPage() {
       <DashboardDataErrorBanner />
 
       <FirstStepsCard />
+
+      <AiProviderStartCard />
 
       <Hint id="dashboard-views" />
 

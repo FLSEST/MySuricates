@@ -14,6 +14,7 @@ import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
+import { AiProviderStartCard } from '../components/dashboard/AiProviderStartCard';
 import { SimpleOverview } from '../components/simple/SimpleOverview';
 import { FeatureTile } from '../components/simple/FeatureTile';
 import { StatusDot } from '../components/simple/kit';
@@ -82,6 +83,8 @@ export function SimpleHome() {
   return (
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <SimpleOnboarding />
+
+      <AiProviderStartCard />
 
       {/* Greeting */}
       <div>

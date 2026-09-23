@@ -10,6 +10,8 @@ import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
 import com.automation.service.ai.catalog.ModelCatalog;
 import com.automation.service.ai.catalog.ModelCatalogService;
+import com.automation.service.ai.status.AiProviderStatusReport;
+import com.automation.service.ai.status.AiProviderStatusService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.ContainerAccessReport;
 import com.automation.service.system.SystemIdentityService;
@@ -69,6 +71,9 @@ class SystemAiProviderControllerTest {
 
     @MockitoBean
     private ContainerAccessReport containerAccessReport;
+
+    @MockitoBean
+    private AiProviderStatusService aiProviderStatusService;
 
     /**
      * Real registry, not a mock: preset research with webhooks switched on by override, and
@@ -232,5 +237,42 @@ class SystemAiProviderControllerTest {
         when(runDeletionPolicy.isAllowed()).thenReturn(true);
         mockMvc.perform(get("/api/v1/system/capabilities"))
                 .andExpect(jsonPath("$.runDeletionAllowed").value(true));
+    }
+
+    /** f5a273ae: the start page asks whether the AI CLIs are ready — names and commands, never a value. */
+    @Test
+    void aiProviderStatus_reportsStateAndCommandsPerProvider() throws Exception {
+        when(aiProviderStatusService.report(false)).thenReturn(new AiProviderStatusReport(false,
+                Instant.parse("2026-09-24T10:00:00Z"), List.of(
+                        new AiProviderStatusReport.ProviderStatus("CLAUDE", "claude",
+                                AiProviderStatusReport.State.READY, true, true,
+                                AiProviderStatusReport.LoginVia.ENVIRONMENT, "CLAUDE_CODE_OAUTH_TOKEN",
+                                "curl -fsSL https://claude.ai/install.sh | bash", "claude auth login", true),
+                        new AiProviderStatusReport.ProviderStatus("CODEX", "codex",
+                                AiProviderStatusReport.State.LOGIN_MISSING, true, false, null, null,
+                                "npm install -g @openai/codex", "codex login", false))));
+
+        mockMvc.perform(get("/api/v1/system/ai-providers/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.container").value(false))
+                .andExpect(jsonPath("$.checkedAt").exists())
+                .andExpect(jsonPath("$.providers[0].id").value("CLAUDE"))
+                .andExpect(jsonPath("$.providers[0].state").value("READY"))
+                .andExpect(jsonPath("$.providers[0].loginVia").value("ENVIRONMENT"))
+                .andExpect(jsonPath("$.providers[0].loginSource").value("CLAUDE_CODE_OAUTH_TOKEN"))
+                .andExpect(jsonPath("$.providers[0].defaultProvider").value(true))
+                .andExpect(jsonPath("$.providers[1].state").value("LOGIN_MISSING"))
+                .andExpect(jsonPath("$.providers[1].login").value("codex login"))
+                .andExpect(jsonPath("$.providers[1].loginVia").doesNotExist());
+    }
+
+    @Test
+    void aiProviderStatus_refreshLooksAgain() throws Exception {
+        when(aiProviderStatusService.report(true)).thenReturn(new AiProviderStatusReport(true,
+                Instant.parse("2026-09-24T10:01:00Z"), List.of()));
+
+        mockMvc.perform(post("/api/v1/system/ai-providers/status/refresh"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.container").value(true));
     }
 }

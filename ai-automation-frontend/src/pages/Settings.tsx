@@ -5,6 +5,7 @@ import { useSystemInfo, useRepairAllFailed } from '../hooks/useSystem';
 import { useStagingStatus, useStagingStart, useStagingStop, useStagingPromote, useStagingCancel, useStagingSync } from '../hooks/useStaging';
 import { useTestingStatus, useTestingStart, useTestingStop, useTestingReset, useTestingSync, useTestingPullChanges } from '../hooks/useTesting';
 import { GeneralSettingsCard } from '../components/settings/GeneralSettingsCard';
+import { AiProviderStatusCard } from '../components/settings/AiProviderStatusCard';
 import { AppearanceCard } from '../components/settings/AppearanceCard';
 import { TraySettingsCard } from '../components/settings/TraySettingsCard';
 import { SecurityCard } from '../components/settings/SecurityCard';
@@ -94,6 +95,7 @@ export function Settings() {
         <div className="flex-1 min-w-0 space-y-10">
           <SettingsSection id="general" title={t.settings.settingsNavGeneral}>
             <GeneralSettingsCard />
+            <AiProviderStatusCard />
             <TodoSettingsCard />
             <SecurityCard />
           </SettingsSection>

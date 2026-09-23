@@ -7,6 +7,8 @@ import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
 import com.automation.service.ai.catalog.ModelCatalog;
 import com.automation.service.ai.catalog.ModelCatalogService;
+import com.automation.service.ai.status.AiProviderStatusReport;
+import com.automation.service.ai.status.AiProviderStatusService;
 import com.automation.service.assistant.context.BlockTypesIndexSection;
 import com.automation.service.system.ContainerAccessReport;
 import com.automation.service.system.SystemIdentityService;
@@ -41,6 +43,7 @@ public class SystemAiProviderController {
     private final ModuleRegistry moduleRegistry;
     private final RunDeletionPolicy runDeletionPolicy;
     private final ContainerAccessReport containerAccessReport;
+    private final AiProviderStatusService aiProviderStatusService;
 
     @Value("${automation.environment:Dev}")
     private String environment;
@@ -149,5 +152,21 @@ public class SystemAiProviderController {
     @PostMapping("/ai-providers/{id}/models/refresh")
     public ModelCatalog refreshModels(@PathVariable String id) {
         return modelCatalogService.getCatalog(id, true);
+    }
+
+    /**
+     * Per provider: program on the PATH, login found (file or environment variable), and the commands
+     * for what is missing — for the start page and the settings (f5a273ae). Cached, see
+     * {@link AiProviderStatusService}; never a token or file content.
+     */
+    @GetMapping("/ai-providers/status")
+    public AiProviderStatusReport aiProviderStatus() {
+        return aiProviderStatusService.report(false);
+    }
+
+    /** Looks at the machine again now, e.g. right after logging in. */
+    @PostMapping("/ai-providers/status/refresh")
+    public AiProviderStatusReport refreshAiProviderStatus() {
+        return aiProviderStatusService.report(true);
     }
 }

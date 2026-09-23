@@ -44,6 +44,7 @@ docker exec -it -u 1000 mysuricates-tryout claude                               
 ```
 
 Statt der Anmeldung geht auch ein Schlüssel per Umgebungsvariable (`-e ANTHROPIC_API_KEY=…`).
+Ob eine Anmeldung angekommen ist, zeigt die Startseite.
 Ohne Anmeldung laufen nur Shell- und deterministische Blöcke — die Blaupausen außerhalb der
 Kategorie `AI` kommen damit aus. Für die Arbeit an eigenen Projekten auf dem Rechner ist der
 Installer (Abschnitt 2) der richtige Weg. Details: [Deployment → Tryout-Image](deployment.md#tryout-image).
@@ -64,7 +65,8 @@ geprüfter Download ohne sudo).
 
 Für KI-Workflows brauchst du **eine KI-CLI deiner Wahl** — `claude`, `codex` oder `pi` —, bei der
 du angemeldet bist — per Anmeldedatei oder per Umgebungsvariable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates startet auch ohne; der Installer zeigt, welche er findet.
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates startet auch ohne; der Installer zeigt, welche er findet,
+und die Startseite der Oberfläche sagt es ebenso — samt Befehl für das, was fehlt.
 
 ---
 
@@ -222,7 +224,7 @@ Passwort — SSL aus mit dem Default bleibt weiterhin erlaubt.
 | `permission denied` auf den Docker-Socket | der Installer hat dich in die Gruppe `docker` aufgenommen — einmal ab- und anmelden |
 | Docker installiert, läuft aber nicht | Linux: `sudo systemctl start docker`, macOS: Docker Desktop öffnen |
 | Port belegt | der Installer nimmt den nächsten freien; ändern in `deploy/instances/main.env` |
-| KI-Block schlägt fehl, „nicht angemeldet“ | bei der CLI anmelden: `claude auth login`, `codex login` oder `pi` → `/login` |
+| KI-Block schlägt fehl, „nicht angemeldet“ | bei der CLI anmelden: `claude auth login`, `codex login` oder `pi` → `/login`; ob Programm und Anmeldung gefunden werden, zeigen Startseite und Einstellungen je Anbieter |
 | Instanz startet nicht | `scripts/instance.sh logs --name main`; Setup-Protokolle unter `~/.local/state/mysuricates/setup-logs/` |
 | Settings zeigen „Docker nicht eingerichtet“ | kein Fehler — nur Shell-Blöcke mit `container_image` brauchen Docker |
 

@@ -2040,6 +2040,40 @@ Cache umgehen und den Host jetzt neu abfragen.
 
 **Response:** `ModelCatalog`
 
+### `GET /api/v1/system/ai-providers/status`
+
+Ob die KI-CLIs auf dem Rechner des Backends bereit sind: je Anbieter das Programm auf dem `PATH`, eine Anmeldung (Anmeldedatei oder Umgebungsvariable — dieselbe Regel wie der Installer, aus `AiProvider#setup()`) und die Befehle zum Installieren und Anmelden. Ruft keine CLI auf; die Antwort ist gecacht (`automation.ai-provider-status.ttl-seconds`, Standard 60). Sie nennt nur Namen und Befehle, nie einen Token oder Dateiinhalt. „Bereit“ heißt: Programm und Anmeldung gefunden — nicht, dass die Anmeldung noch gilt.
+
+**Response:**
+
+```json
+{
+  "container": false,
+  "checkedAt": "2026-09-24T10:00:00Z",
+  "providers": [
+    {
+      "id": "CLAUDE", "cli": "claude", "state": "READY",
+      "installed": true, "loggedIn": true, "loginVia": "ENVIRONMENT", "loginSource": "CLAUDE_CODE_OAUTH_TOKEN",
+      "install": "curl -fsSL https://claude.ai/install.sh | bash   (or: npm install -g @anthropic-ai/claude-code)",
+      "login": "claude auth login", "defaultProvider": true
+    },
+    {
+      "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    }
+  ]
+}
+```
+
+`state`: `READY` (Programm und Anmeldung gefunden), `LOGIN_MISSING` (Programm gefunden, keine Anmeldung), `NOT_INSTALLED` (Programm fehlt). `loginSource`: der Variablenname oder die Anmeldedatei als `~/…` — bzw. als `$VARIABLE/…`, wenn eine Container-Instanz das Verzeichnis umlenkt (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` heißt, das Backend läuft in einem Container: Es zählen Programme und Anmeldungen darin.
+
+### `POST /api/v1/system/ai-providers/status/refresh`
+
+Cache umgehen und jetzt neu prüfen, etwa direkt nach einer Anmeldung.
+
+**Response:** wie `GET /api/v1/system/ai-providers/status`
+
 ### `POST /api/v1/system/client-errors`
 
 Frontend-Fehler melden (für Logging).

@@ -35,6 +35,11 @@ interface SettingsState {
   hintsEnabled: boolean;
   /** Dismissed hints: id → the hint version that was dismissed (a raised version shows it again). */
   dismissedHints: Record<string, number>;
+  /**
+   * AI provider card on the start page hidden for exactly this status (`aiStatusFingerprint`); a changed
+   * status shows it again. Empty = not hidden.
+   */
+  aiStatusDismissed: string;
   /** Todos list view: rows per page. */
   listPageSize: number;
   /** Todos board view: cards loaded per kanban column (one query per column). */
@@ -61,6 +66,7 @@ interface SettingsState {
   restoreHint: (id: string) => void;
   /** Shows every hint again and switches hints on. */
   resetHints: () => void;
+  setAiStatusDismissed: (fingerprint: string) => void;
   setListPageSize: (size: number) => void;
   setKanbanColumnSize: (size: number) => void;
 }
@@ -86,6 +92,7 @@ export const useSettingsStore = create<SettingsState>()(
       walkthroughSeen: false,
       hintsEnabled: true,
       dismissedHints: {},
+      aiStatusDismissed: '',
       listPageSize: 30,
       kanbanColumnSize: 50,
       setApiKey: (apiKey) => set({ apiKey }),
@@ -123,6 +130,7 @@ export const useSettingsStore = create<SettingsState>()(
           return { dismissedHints: rest };
         }),
       resetHints: () => set({ hintsEnabled: true, dismissedHints: {} }),
+      setAiStatusDismissed: (aiStatusDismissed) => set({ aiStatusDismissed }),
       setListPageSize: (size) => set({ listPageSize: clampPageSize(size) }),
       setKanbanColumnSize: (size) => set({ kanbanColumnSize: clampPageSize(size) }),
     }),

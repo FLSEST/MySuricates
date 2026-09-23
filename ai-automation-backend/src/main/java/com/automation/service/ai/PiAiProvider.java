@@ -39,7 +39,8 @@ public class PiAiProvider implements AiProvider {
                 // die gaengigen Backends aus "pi --help" (Environment Variables); jeder Schluessel
                 // reicht, weil pi das Backend je Modell waehlt (<backend>/<model>)
                 java.util.List.of("ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN", "OPENAI_API_KEY",
-                        "GEMINI_API_KEY", "OPENROUTER_API_KEY"));
+                        "GEMINI_API_KEY", "OPENROUTER_API_KEY"),
+                ".pi/agent", "PI_CODING_AGENT_DIR");
     }
 
     @Override
