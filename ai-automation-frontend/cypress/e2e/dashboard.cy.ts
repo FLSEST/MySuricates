@@ -47,6 +47,40 @@ describe('Dashboard', () => {
     });
   });
 
+  describe('Stat tiles', () => {
+    // Regression 606ec937: eight tiles per row next to the expanded sidebar were ~130 px wide at
+    // 1440 px and cut their titles to „Active P…", „Planne…" (twice, today and week).
+    it('show their full titles, stay inside their tile and come at most four per row at 1440px', () => {
+      cy.viewport(1440, 900);
+      cy.visit('/');
+      // Checks the tiles the instance shows (a customized dashboard may hide some), once loaded.
+      cy.get('[data-widget-type^="stat-"]').should('have.length.at.least', 1);
+      cy.get('[data-widget-type^="stat-"] [data-testid="widget-skeleton"]').should('not.exist');
+
+      cy.get('[data-widget-type^="stat-"]').each(($slot) => {
+        const tile = $slot[0].getBoundingClientRect();
+        const type = $slot.attr('data-widget-type');
+        $slot.find('*').each((_, el) => {
+          const box = el.getBoundingClientRect();
+          if (box.width === 0) return;
+          expect(box.left, `${el.tagName} in ${type} starts inside the tile`).to.be.at.least(tile.left - 0.5);
+          expect(box.right, `${el.tagName} in ${type} ends inside the tile`).to.be.at.most(tile.right + 0.5);
+          const text = el.children.length === 0 ? el.textContent?.trim() : '';
+          if (text) expect(el.scrollWidth, `"${text}" in ${type} is not cut off`).to.be.at.most(el.clientWidth + 1);
+        });
+      });
+
+      cy.get('[data-widget-type^="stat-"]').then(($slots) => {
+        const perRow = new Map<number, number>();
+        $slots.each((_, el) => {
+          const top = Math.round(el.getBoundingClientRect().top);
+          perRow.set(top, (perRow.get(top) ?? 0) + 1);
+        });
+        for (const count of perRow.values()) expect(count).to.be.at.most(4);
+      });
+    });
+  });
+
   it('shows recent runs section', () => {
     cy.contains('Recent Runs').should('be.visible');
   });

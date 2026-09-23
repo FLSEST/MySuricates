@@ -112,12 +112,14 @@ export const DASHBOARD_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.map((w)
 export const DEFAULT_WIDGET_IDS: readonly string[] = DASHBOARD_WIDGETS.filter((w) => !w.multiple && !w.catalogOnly).map((w) => w.id);
 
 /**
- * Flex-basis per size (minus the 1rem gap, flex-grow fills the rest). Mirrors the former
- * fixed rows: 8 stats / 5 charts / 3 thirds per row on xl. Rows with fewer widgets widen them
- * instead of leaving holes.
+ * Flex-basis per size (minus the 1rem gap, flex-grow fills the rest): 4 stats / 5 charts /
+ * 3 thirds per row on xl. Rows with fewer widgets widen them instead of leaving holes.
+ * Stats: never more than four per row, and four only from md on. At eight per row a tile
+ * next to the expanded sidebar was ~130 px wide at 1440 px and cut its title to „Active P…";
+ * below md, four tiles leave the title too little room for a word like „Ausführungen“.
  */
 export const WIDGET_SIZE_CLASSES: Record<WidgetSize, string> = {
-  stat: 'basis-[calc(50%_-_1rem)] sm:basis-[calc(25%_-_1rem)] xl:basis-[calc(12.5%_-_1rem)]',
+  stat: 'basis-[calc(50%_-_1rem)] md:basis-[calc(25%_-_1rem)]',
   chart: 'basis-full md:basis-[calc(50%_-_1rem)] xl:basis-[calc(20%_-_1rem)]',
   third: 'basis-full md:basis-[calc(50%_-_1rem)] lg:basis-[calc(33.333%_-_1rem)]',
   twoThirds: 'basis-full lg:basis-[calc(66.667%_-_1rem)]',
