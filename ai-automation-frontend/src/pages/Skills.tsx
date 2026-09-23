@@ -16,6 +16,7 @@ import { apiErrorMessage } from '../api/client';
 import { useT, useI18nStore } from '../i18n';
 import { formatRelativeTime } from '../utils/formatTime';
 import { CATEGORY_ICONS, CATEGORY_COLORS, SKILL_CATEGORIES } from '../data/skillConstants';
+import { WorkflowIcon } from '../utils/workflowIcon';
 import type { Skill, SkillCategory, SkillInput } from '../types';
 
 /** Who wrote a version row — a person, an import (a SECURITY event) or the bundled release. */
@@ -27,6 +28,13 @@ const SOURCE_STYLES: Record<string, string> = {
 
 type EditorState = { skill?: Skill; initial?: SkillInput; copied?: boolean };
 
+/** The skill's own icon (emoji or Lucide name) if it has one, otherwise its category icon. */
+function SkillIcon({ skill }: { skill: Skill }) {
+  return skill.icon
+    ? <span className="text-xl leading-none" data-testid="skill-icon"><WorkflowIcon icon={skill.icon} /></span>
+    : <>{CATEGORY_ICONS[skill.category]}</>;
+}
+
 function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => void }) {
   const t = useT();
   const { data: sealPins } = useSkillSealPins();
@@ -37,8 +45,8 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
       onClick={() => onSelect(skill)}
     >
       <div className="flex items-start gap-3 mb-3">
-        <div className={`p-2.5 rounded-xl bg-surface ${CATEGORY_COLORS[skill.category]}`}>
-          {CATEGORY_ICONS[skill.category]}
+        <div className={`p-2.5 rounded-xl bg-surface flex items-center justify-center w-10 h-10 ${CATEGORY_COLORS[skill.category]}`}>
+          <SkillIcon skill={skill} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -60,7 +68,7 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
       </div>
       <p className="text-sm text-text-secondary line-clamp-2 mb-3">{skill.description}</p>
       <div className="flex items-center justify-between text-xs text-text-tertiary">
-        <span>{skill.capabilities?.length ?? 0} {t.skills.capabilities.toLowerCase()}</span>
+        <span>{t.skills.capabilityCount.replace('{count}', String(skill.capabilities?.length ?? 0))}</span>
         <span className="font-mono">v{skill.version}</span>
       </div>
     </Card>
@@ -154,8 +162,8 @@ function SkillDetail({ skill, onClose, onEdit, onCopy }: {
         <div className="p-6 space-y-6">
           {/* Header */}
           <div className="flex items-start gap-3">
-            <div className={`p-3 rounded-xl bg-surface ${CATEGORY_COLORS[skill.category]}`}>
-              {CATEGORY_ICONS[skill.category]}
+            <div className={`p-3 rounded-xl bg-surface flex items-center justify-center w-11 h-11 ${CATEGORY_COLORS[skill.category]}`}>
+              <SkillIcon skill={skill} />
             </div>
             <div>
               <h2 className="text-xl font-bold text-text">{skill.name}</h2>

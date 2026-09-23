@@ -37,7 +37,7 @@ function skill(overrides: Partial<Skill>): Skill {
   };
 }
 
-const builtin = skill({ id: 'b1', name: 'Code Review', description: 'Reviews code', builtin: true, aiContext: 'Review carefully.' });
+const builtin = skill({ id: 'b1', name: 'Code Review', description: 'Reviews code', icon: '🔍', builtin: true, aiContext: 'Review carefully.' });
 const custom = skill({ id: 'c1', name: 'Reviewer', description: 'Mine', aiContext: 'Be brief.' });
 
 function serveSkills(list: Skill[], pins: Record<string, string[]> = {}) {
@@ -76,10 +76,11 @@ describe('Skills page — creating and editing', () => {
 
     fireEvent.change(within(editor).getByLabelText('Name'), { target: { value: '  Summarizer ' } });
     fireEvent.change(within(editor).getByTestId('mock-monaco'), { target: { value: '# Summarize\nShort.' } });
+    fireEvent.click(within(editor).getByRole('button', { name: '🚀' }));
     fireEvent.click(create);
 
     await waitFor(() => expect(screen.queryByTestId('skill-editor')).not.toBeInTheDocument());
-    expect(posted).toEqual({ name: 'Summarizer', description: null, icon: null, category: 'PRODUCTIVITY', aiContext: '# Summarize\nShort.' });
+    expect(posted).toEqual({ name: 'Summarizer', description: null, icon: '🚀', category: 'PRODUCTIVITY', aiContext: '# Summarize\nShort.' });
     expect(await screen.findByRole('heading', { level: 2, name: 'Summarizer' })).toBeInTheDocument();
   });
 
@@ -97,6 +98,7 @@ describe('Skills page — creating and editing', () => {
     const editor = await screen.findByTestId('skill-editor');
     expect(within(editor).getByLabelText('Name')).toHaveValue('Code Review (copy)');
     expect(within(editor).getByTestId('mock-monaco')).toHaveValue('Review carefully.');
+    expect(within(editor).getByRole('button', { name: '🔍' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(editor).getByText(/Capabilities are not/)).toBeInTheDocument();
   });
 
@@ -140,6 +142,19 @@ describe('Skills page — creating and editing', () => {
 
     await waitFor(() => expect(useToastStore.getState().toasts.at(-1)?.message).toContain('A sealed workflow uses this skill'));
     expect(screen.getByTestId('skill-editor')).toBeInTheDocument();
+  });
+});
+
+describe('Skills page — icons', () => {
+  it("shows a skill's own icon and falls back to the category icon", async () => {
+    serveSkills([builtin, custom]);
+    renderWithProviders(<Skills />);
+
+    const builtinCard = (await screen.findByText('Code Review')).closest('.cursor-pointer') as HTMLElement;
+    const customCard = screen.getByText('Reviewer').closest('.cursor-pointer') as HTMLElement;
+    expect(within(builtinCard).getByTestId('skill-icon')).toHaveTextContent('🔍');
+    expect(within(builtinCard).getByText('0 capabilities')).toBeInTheDocument();
+    expect(within(customCard).queryByTestId('skill-icon')).not.toBeInTheDocument();
   });
 });
 

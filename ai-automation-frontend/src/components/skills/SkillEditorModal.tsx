@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Input, Modal, ModalFooter, Select } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
+import { EmojiPicker } from '../shared/EmojiPicker';
 import { useCreateSkill, useUpdateSkill } from '../../hooks/useSkills';
 import { SKILL_CATEGORIES } from '../../data/skillConstants';
 import { useT } from '../../i18n';
@@ -87,18 +88,12 @@ export function SkillEditorModal({
     >
       <div className="flex flex-col flex-1 gap-4" data-testid="skill-editor">
         {copied && <p className="text-sm text-text-secondary">{t.skills.copyHint}</p>}
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_8rem_12rem] gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_12rem] gap-3">
           <Input
             label={t.common.name}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             autoFocus
-          />
-          <Input
-            label={t.skills.iconLabel}
-            value={form.icon ?? ''}
-            placeholder="🧩"
-            onChange={(e) => setForm({ ...form, icon: e.target.value })}
           />
           <Select
             label={t.skills.categoryLabel}
@@ -107,6 +102,7 @@ export function SkillEditorModal({
             onChange={(e) => setForm({ ...form, category: e.target.value as SkillInput['category'] })}
           />
         </div>
+        <EmojiPicker label={t.skills.iconLabel} value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
         <div className="space-y-1.5">
           <label htmlFor="skill-description" className="block text-sm font-medium text-text-secondary">
             {t.common.description}
