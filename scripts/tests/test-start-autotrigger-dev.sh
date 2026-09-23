@@ -143,11 +143,20 @@ else
   echo "  skip (node or script missing)"
 fi
 
-echo "8) dev container override comes from scripts/lib/host-mounts.sh"
+echo "8) dev container override comes from scripts/lib/host-mounts.sh (262948a4)"
 check "starter sources the mount library"   'grep -q "lib/host-mounts.sh" "$SCRIPT"'
-OUT="$(run_in_script 'mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"; write_compose_override >/dev/null; cat "$COMPOSE_OVERRIDE"')"
+mkdir -p "$TMP/nm"
+OVR='export HOST_MOUNTS_ASSUME_SOCKET=1 AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/nm"; mkdir -p "$HOME/.claude"; COMPOSE_OVERRIDE="'"$TMP"'/ov.yml"'
+OUT="$(run_in_script "$OVR"'; write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
-check "login dir is mounted"                'grep -q "/.claude:" <<<"$OUT"'
+check "default login: no login directory"   '! grep -q "/.claude:" <<<"$OUT" && grep -q "MYSURICATES_AI_FROM_HOST=login" <<<"$OUT"'
+check "socket on by default, as before"     'grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
+check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=AUTOTRIGGER_DEV_" <<<"$OUT"'
+OUT="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_DOCKER_SOCKET=0 AUTOTRIGGER_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "all + socket off are honored"        'grep -q "/.claude:" <<<"$OUT" && ! grep -q "docker.sock" <<<"$OUT"'
+RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_FROM_HOST=everything write_compose_override >/dev/null 2>&1; echo $?')"
+check "invalid mode refuses the start"      '[ "$RC" = 2 ]'
+check "compose file no longer hard-wires the socket" '! grep -q "docker.sock:/var/run/docker.sock" "$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

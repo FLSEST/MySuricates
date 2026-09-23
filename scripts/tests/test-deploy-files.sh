@@ -36,5 +36,13 @@ echo "3) entrypoint"
 check "entrypoint parses"                      'bash -n "$EP"'
 check "drops root before starting java"        'grep -q "^exec gosu" "$EP"'
 check "claude.json seeded writable"            'grep -q "/seed/.claude.json" "$EP"'
+check "own provider homes for the user"        'grep -q "CLAUDE_CONFIG_DIR" "$EP" && grep -q "CODEX_HOME" "$EP" && grep -q "PI_CODING_AGENT_DIR" "$EP"'
+check "host login files are never chowned"     'grep -q -- "-path /app/data/providers -prune" "$EP" && ! grep -qE "chown -R .*/app/data" "$EP"'
+
+echo "3b) Stable/Test entrypoint (ai-automation-backend/docker/entrypoint.sh)"
+BEP="$R/ai-automation-backend/docker/entrypoint.sh"
+check "entrypoint parses"                      'bash -n "$BEP"'
+check "own provider homes for the user"        'grep -q "CLAUDE_CONFIG_DIR" "$BEP" && grep -q "CODEX_HOME" "$BEP" && grep -q "PI_CODING_AGENT_DIR" "$BEP"'
+check "drops root before starting java"        'grep -q "^exec gosu" "$BEP"'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

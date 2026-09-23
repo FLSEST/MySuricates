@@ -23,7 +23,24 @@ else
 fi
 mkdir -p "$home/.local/bin"
 chown "$uid:$gid" "$home" "$home/.local" "$home/.local/bin" 2>/dev/null || true
-chown -R "$uid:$gid" /app/data /app/secrets
+chown -R "$uid:$gid" /app/secrets
+# Unter /app/data/providers koennen Dateien des Hosts eingebunden sein (Modus login: die auth.json
+# von Codex und Pi). Die bleiben unangetastet — sonst schriebe ein Start mit falscher UID (etwa per
+# sudo) den Besitzer der Anmeldung auf dem Host um (262948a4).
+find /app/data -path /app/data/providers -prune -o -exec chown "$uid:$gid" {} +
+
+# Eigene Provider-Verzeichnisse (scripts/lib/host-mounts.sh setzt sie fuer programs und login): die
+# Verzeichnisse gehoeren dem Benutzer, eingebundene Anmeldedateien darin bleiben, wie sie sind.
+for d in "${CLAUDE_CONFIG_DIR:-}" "${CODEX_HOME:-}" "${PI_CODING_AGENT_DIR:-}"; do
+  [ -n "$d" ] || continue
+  mkdir -p "$d"
+  chown "$uid:$gid" "$(dirname "$d")" "$d"
+done
+# Claude startet ohne Rueckfragen, wenn seine Zustandsdatei da ist; den Rest schreibt es selbst.
+if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ ! -e "$CLAUDE_CONFIG_DIR/.claude.json" ]; then
+  printf '{"hasCompletedOnboarding":true}\n' > "$CLAUDE_CONFIG_DIR/.claude.json"
+  chown "$uid:$gid" "$CLAUDE_CONFIG_DIR/.claude.json"
+fi
 
 # Docker-Socket nur, wenn eingebunden: dessen Gruppe dem Benutzer geben
 if [ -S /var/run/docker.sock ]; then
@@ -32,7 +49,8 @@ if [ -S /var/run/docker.sock ]; then
   usermod -aG "$(getent group "$sock_gid" | cut -d: -f1)" "$user" >/dev/null 2>&1 || true
 fi
 
-# Claude braucht eine BESCHREIBBARE ~/.claude.json; die des Hosts kommt read-only nach /seed
+# Nur im Modus all: Claude braucht eine BESCHREIBBARE ~/.claude.json, die des Hosts kommt read-only
+# nach /seed
 if [ -f /seed/.claude.json ]; then
   cp /seed/.claude.json "$home/.claude.json"
   chown "$uid:$gid" "$home/.claude.json"

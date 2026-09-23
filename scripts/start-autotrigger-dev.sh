@@ -324,14 +324,21 @@ compose_cmd() {
   docker compose -p "${COMPOSE_PROJECT}" -f "${COMPOSE_FILE}" -f "${COMPOSE_OVERRIDE}" "$@"
 }
 
-# Override mit genau den KI-Zugaengen, die es auf DIESEM Rechner gibt (scripts/lib/host-mounts.sh).
-# Projektwurzel und Docker-Socket bindet docker-compose.dev-container.yml selbst ein.
+# Override mit dem, was vom Host in den Container kommt (scripts/lib/host-mounts.sh, 262948a4):
+#   AUTOTRIGGER_DEV_AI_FROM_HOST  programs | login (Default) | all
+#   AUTOTRIGGER_DEV_AI_PROVIDERS  Auswahl aus claude,codex,pi (Default: alle)
+#   AUTOTRIGGER_DEV_DOCKER_SOCKET 1 (Default, wie bisher) | 0
+# Die Projektwurzel bindet docker-compose.dev-container.yml selbst ein.
 write_compose_override() {
-  local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-/usr/lib/node_modules}"
-  host_mounts_yaml backend "" 0 > "${COMPOSE_OVERRIDE}"
-  echo "Provider-Mounts: ${HOST_MOUNTS_PROVIDER_COUNT} (${COMPOSE_OVERRIDE})"
-  if [[ "${HOST_MOUNTS_PROVIDER_COUNT}" -eq 0 ]]; then
-    echo "  Kein Provider-Zugang gefunden — KI-Bloecke werden im Container scheitern." >&2
+  local HOST_MOUNTS_NODE_MODULES="${AUTOTRIGGER_DEV_NODE_MODULES:-}"   # leer: npm root -g
+  local missing
+  host_mounts_yaml backend "" "${AUTOTRIGGER_DEV_DOCKER_SOCKET:-1}" "${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}" \
+    "${AUTOTRIGGER_DEV_AI_PROVIDERS:-}" "Umgebung von scripts/start-autotrigger-dev.sh --container" AUTOTRIGGER_DEV_ \
+    > "${COMPOSE_OVERRIDE}" || { echo "Ungueltige AUTOTRIGGER_DEV_AI_*-Werte (siehe oben)." >&2; return 2; }
+  echo "KI-Anbieter im Container: ${HOST_MOUNTS_READY:-keiner} (${AUTOTRIGGER_DEV_AI_FROM_HOST:-login}, ${COMPOSE_OVERRIDE})"
+  missing="$(host_mounts_missing_text)"
+  if [[ -n "${missing}" ]]; then
+    printf 'Nicht nutzbar im Container:\n%s\n' "${missing}" >&2
   fi
 }
 

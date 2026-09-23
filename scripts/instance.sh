@@ -14,7 +14,9 @@
 #
 # Steuerung (MYSURICATES_*): RUNTIME container|host, PORT (Pflicht), BIND (127.0.0.1), PRESET
 # (core|research|full), LANG (de|en, Sprache der Adresszeilen; Default de), PROJECTS (Container: Ordner, der eingebunden wird; Default Ordner ueber dem
-# Klon, nie ganz $HOME), DOCKER_SOCKET 0|1 (volle Kontrolle ueber Docker!), HARDENING_SEALING,
+# Klon, nie ganz $HOME), DOCKER_SOCKET 0|1 (volle Kontrolle ueber Docker!), AI_FROM_HOST
+# programs|login|all (was von den KI-Anbietern des Rechners in den Container kommt; Default login =
+# Programme + je Anbieter nur die Anmeldung), AI_PROVIDERS (Auswahl aus claude,codex,pi), HARDENING_SEALING,
 # HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename). Jede AUTOMATION_*-Zeile geht
 # unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
 #
@@ -109,7 +111,7 @@ wait_health() {
 # Container
 # ---------------------------------------------------------------------------------------------------
 container_cmd() {
-  local override="$INSTANCES_DIR/$NAME.override.yml" owner
+  local override="$INSTANCES_DIR/$NAME.override.yml" owner missing
   compose() { docker compose -p "mysuricates-$NAME" -f "$COMPOSE_FILE" -f "$override" "$@"; }
   # Ein gleichnamiger Container aus einer anderen Einrichtung (z. B. docker-compose.test.yml →
   # mysuricates-test) wird nie angefasst; down/logs bleiben ohnehin im eigenen Compose-Projekt.
@@ -121,7 +123,12 @@ container_cmd() {
   esac
   case "$CMD" in
     up)
-      host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" > "$override"
+      # Was vom Host in den Container kommt, entscheiden die Schalter der Instanzdatei (262948a4)
+      host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" \
+        "${MYSURICATES_AI_FROM_HOST:-login}" "${MYSURICATES_AI_PROVIDERS:-}" "$ENV_FILE" MYSURICATES_ > "$override" \
+        || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
+      missing="$(host_mounts_missing_text)"
+      [ -z "$missing" ] || printf 'KI-Anbieter, die dieser Container nicht nutzen kann:\n%s\n' "$missing" >&2
       compose up -d --build || exit 1
       [ "$WAIT" = 1 ] || exit 0
       if wait_health container_healthy; then say_running läuft; exit 0; fi
