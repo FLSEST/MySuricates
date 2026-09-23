@@ -145,8 +145,8 @@ mvn clean package -DskipTests
 # 2. Backend starten
 docker compose up --build -d
 
-# 3. Agent-Images bauen (einmalig)
-docker compose --profile build-only build
+# 3. Agent-Images bauen — der Monat im Wert frischt die Fremd-Repos von agent-devops auf
+AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
 Das Backend ist dann unter `http://localhost:9090` erreichbar.
@@ -194,6 +194,10 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 - **GitHub CLI:** `gh` aus dem offiziellen APT-Repository
 - **Security-Tools:** gitleaks, trivy (Binaries mit SHA256-Verifizierung, multi-arch)
 - **Docker:** Docker CE CLI (nur Client, kein Daemon)
+- **Frische:** Die Layer mit Fremd-Repos (gh, Docker) stehen zuletzt, hinter `ARG APT_REFRESH`. Ein
+  neuer Wert (Compose: `AGENT_APT_REFRESH`, etwa der Monat) baut sie neu, statt Schlüssel und
+  Paketlisten aus einem alten Layer-Cache zu übernehmen — daran scheiterte ein Build mit `NO_PUBKEY`,
+  obwohl der aktuelle Schlüsselbund stimmte (97e1529d). gitleaks und trivy sind fest gepinnt.
 - **User:** `agent` (UID 1000)
 - **CMD:** `tail -f /dev/null`
 

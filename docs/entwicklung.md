@@ -143,8 +143,8 @@ cd ai-automation-backend
 mvn clean package -DskipTests
 docker compose build backend
 
-# Alle Agent-Images
-docker compose --profile build-only build
+# Alle Agent-Images (ein neuer AGENT_APT_REFRESH holt gh- und Docker-Repo frisch, 97e1529d)
+AGENT_APT_REFRESH=$(date +%Y-%m) docker compose --profile build-only build
 ```
 
 ## Builds neben dem laufenden Dev-Backend

@@ -9,16 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl jq bash python3 ca-certificates gnupg && \
     rm -rf /var/lib/apt/lists/*
 
-# GitHub CLI (gh) — official APT repo
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-      -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list && \
-    apt-get update && apt-get install -y gh && \
-    rm -rf /var/lib/apt/lists/*
-
 # gitleaks — pinned version + SHA256 verification (release artefact)
 ARG GITLEAKS_VERSION=8.30.1
 ARG GITLEAKS_LINUX_X64_SHA256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
@@ -37,10 +27,12 @@ RUN set -eu; \
     chmod +x /usr/local/bin/gitleaks; \
     rm /tmp/gitleaks.tar.gz
 
-# trivy — pinned binary release (replaces curl|sh from main branch)
-ARG TRIVY_VERSION=0.70.0
-ARG TRIVY_LINUX_X64_SHA256=8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
-ARG TRIVY_LINUX_ARM64_SHA256=2f6bb988b553a1bbac6bdd1ce890f5e412439564e17522b88a4541b4f364fc8d
+# trivy — pinned binary release (replaces curl|sh from main branch); checksums from the release's
+# trivy_<version>_checksums.txt. Checked on 2026-09-24: gitleaks 8.30.1 is the latest release, trivy
+# went from 0.70.0 to 0.74.0 (97e1529d).
+ARG TRIVY_VERSION=0.74.0
+ARG TRIVY_LINUX_X64_SHA256=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+ARG TRIVY_LINUX_ARM64_SHA256=b94ce1976bbf3c15b514b605ee88be7c6d94a29be2302847ff01cb794d47aad5
 RUN set -eu; \
     ARCH=$(dpkg --print-architecture); \
     case "$ARCH" in \
@@ -54,6 +46,23 @@ RUN set -eu; \
     tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy; \
     chmod +x /usr/local/bin/trivy; \
     rm /tmp/trivy.tar.gz
+
+# Third-party APT repos (GitHub CLI, Docker) come last and never solely from an old layer cache: a
+# build once took the gh layer with its months-old keyring from the cache, and only the next layer's
+# `apt-get update` failed on NO_PUBKEY although the current keyring was fine (97e1529d). A new
+# APT_REFRESH value (docker-compose.yml: AGENT_APT_REFRESH, e.g. the month) rebuilds from here on.
+ARG APT_REFRESH=
+
+# GitHub CLI (gh) — official APT repo
+RUN echo "APT_REFRESH=${APT_REFRESH:-unset}" && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
 
 # Docker CE CLI only (no daemon)
 RUN install -m 0755 -d /etc/apt/keyrings && \
