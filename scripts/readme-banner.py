@@ -16,7 +16,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-W, H = 1280, 480
+W, H = 1280, 500
 
 SAND = "#d4a060"
 FAWN = "#a87840"
@@ -29,26 +29,30 @@ HUMAN = "#56c2b0"  # --color-human
 # Wortlaut von Flo (2026-09-23); Titelzeile erklaert das Bild, die vier Zeilen sind seine Saetze.
 TEXT = {
     "de": {
-        "tagline": ["Deine Erdmännchen bauen Workflows mit dir", "und halten Wache über jeden Schritt."],
+        "tagline": ["Baue deine eigenen Workflows mit deinen Erdmännchen",
+                    "und lass sie dir helfen, jeden Schritt im Blick zu behalten."],
         "body": [
             "Deterministisch, wo es geht.",
             "Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf.",
             "Behalte im Blick, was du getan hast und was du tust.",
             "Setze deine Erdmännchen ein, so wie du sie brauchst.",
         ],
-        "things": [["Workflows", "Ketten", "Skills", "BPMN", "Zeitpläne"],
-                   ["TODOs", "Integrationen", "Human-in-the-Loop", "Assistent"]],
+        "things": [["Workflows", "Ketten", "Skills", "Vorlagen", "Zeitpläne"],
+                   ["TODOs", "Integrationen", "Webhooks", "Human-in-the-Loop", "Assistent"],
+                   ["BPMN", "Versionen", "Gates", "Memory", "Dashboard", "Audit", "…"]],
     },
     "en": {
-        "tagline": ["Your suricates build workflows with you", "and keep watch over every step."],
+        "tagline": ["Build your own workflows with your suricates",
+                    "and let them help you watch every step."],
         "body": [
             "Deterministic if possible.",
             "Any provider: change it and keep your flow.",
             "Keep track of what you did and what you do.",
             "Put your suricates to work the way you need them.",
         ],
-        "things": [["Workflows", "Chains", "Skills", "BPMN", "Schedules"],
-                   ["TODOs", "Integrations", "Human-in-the-loop", "Assistant"]],
+        "things": [["Workflows", "Chains", "Skills", "Templates", "Schedules"],
+                   ["TODOs", "Integrations", "Webhooks", "Human-in-the-loop", "Assistant"],
+                   ["BPMN", "Versions", "Gates", "Memory", "Dashboard", "Audit", "…"]],
     },
 }
 
@@ -61,9 +65,8 @@ ICONS = [[
     '<rect x="-9" y="-4" width="10" height="8" rx="4"/><rect x="-1" y="-4" width="10" height="8" rx="4"/>',
     # Skills: Stern
     '<path d="M0-8 2.3-2.6 8-2.2 3.6 1.6 5 7.4 0 4.4-5 7.4-3.6 1.6-8-2.2-2.3-2.6Z"/>',
-    # BPMN: Startereignis, Aufgabe, Gateway
-    '<circle cx="-8" cy="0" r="2.5"/><path d="M-5.5 0H-3.5"/><rect x="-3.5" y="-3" width="6" height="6" rx="1"/>'
-    '<path d="M2.5 0H4.5"/><path d="M7.5-3 10.5 0 7.5 3 4.5 0Z"/>',
+    # Vorlagen: gestapelte Blaetter
+    '<rect x="-7" y="-4" width="12" height="11" rx="1.5"/><path d="M-4-7h12v11"/>',
     # Zeitplaene: Uhr
     '<circle r="7.5"/><path d="M0-4V0.5L3 2.5"/>',
 ], [
@@ -71,11 +74,31 @@ ICONS = [[
     '<rect x="-7" y="-7" width="14" height="14" rx="2"/><path d="M-3.5 0.5-1 3 4-3"/>',
     # Integrationen: Stecker
     '<path d="M-3-8V-4M3-8V-4"/><rect x="-6" y="-4" width="12" height="7" rx="2"/><path d="M0 3V8"/>',
+    # Webhooks: Blitz
+    '<path d="M1.5-8-6 1.5h5L-1.5 8 6-1.5H1Z"/>',
     # Human-in-the-Loop: Person im Kreispfeil
     '<circle cy="-2" r="2.6"/><path d="M-4.5 5c0-3 2-4.5 4.5-4.5S4.5 2 4.5 5"/>'
     '<path d="M6.5-5.5A8.5 8.5 0 1 0 8.5 1"/><path d="M8-8.5V-5H4.5"/>',
     # Assistent: Sprechblase
     '<path d="M-7-6h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H-2l-4 3.5V4h-1a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z"/>',
+], [
+    # BPMN: Startereignis, Aufgabe, Gateway
+    '<circle cx="-8" cy="0" r="2.5"/><path d="M-5.5 0H-3.5"/><rect x="-3.5" y="-3" width="6" height="6" rx="1"/>'
+    '<path d="M2.5 0H4.5"/><path d="M7.5-3 10.5 0 7.5 3 4.5 0Z"/>',
+    # Versionen: Verzweigung mit drei Staenden
+    '<circle cx="-5" cy="-5" r="2.4"/><circle cx="-5" cy="5" r="2.4"/><circle cx="5" cy="-1" r="2.4"/>'
+    '<path d="M-5-2.6v5.2M-2.6-5C2-5 5-4.5 5-3.4"/>',
+    # Gates: Ampel
+    '<rect x="-4" y="-8" width="8" height="16" rx="2.5"/><circle cy="-4.5" r="1.4"/><circle r="1.4"/><circle cy="4.5" r="1.4"/>',
+    # Memory: Speicherzylinder
+    '<ellipse cy="-5" rx="6" ry="2.5"/><path d="M-6-5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-10"/>'
+    '<path d="M-6 0c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5"/>',
+    # Dashboard: Balken
+    '<path d="M-7 7V1M-2.3 7V-5M2.3 7V-1M7 7V-7"/>',
+    # Audit: Lupe
+    '<circle cx="-2" cy="-2" r="5.5"/><path d="M2 2l5 5"/>',
+    # "...": kein Symbol, das Wort steht fuer sich
+    '',
 ]]
 
 
@@ -308,7 +331,7 @@ def build(lang, book, demi):
     add(title)
     add(f'<rect x="{x0 + 2}" y="134" width="64" height="5" rx="2.5" fill="{AMBER}"/>')
     for i, line in enumerate(t["tagline"]):
-        p, w = text(demi, line, 27, x0, 186 + i * 33, "#f0c890", tracking=-.2)
+        p, w = text(demi, line, 24, x0, 184 + i * 30, "#f0c890", tracking=-.2)
         add(p)
         widths.append(w)
     for i, line in enumerate(t["body"]):
@@ -320,18 +343,25 @@ def build(lang, book, demi):
     if x0 + max(widths) > 740:  # dahinter beginnen Ring und Szene
         raise SystemExit(f"{lang}: Textzeile zu breit ({max(widths):.0f} px)")
 
-    # Zwei Reihen unten: was es alles gibt, je mit Symbol
-    for row, (icons, labels) in enumerate(zip(ICONS, t["things"])):
-        ly = 404 + row * 31
-        lx = x0
-        for icon, label in zip(icons, labels):
-            add(f'<g transform="translate({lx + 8:.1f} {ly - 6:.1f})" fill="none" stroke="{AMBER}" '
-                f'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{icon}</g>')
-            p, w = text(book, label, 16, lx + 24, ly, CREAM, tracking=.3)
+    # Reihen unten: was es alles gibt, je mit Symbol; Umbruch nach Breite, "…" steht am Ende
+    items = [(icon, label) for icons, labels in zip(ICONS, t["things"]) for icon, label in zip(icons, labels)]
+    row, lx = 0, x0
+    for icon, label in items:
+        if not icon:  # "…" steht ohne Symbol fuer alles Weitere
+            p, w = text(demi, label, 22, lx, 398 + row * 30, AMBER)
             add(p)
-            lx += 24 + w + 30
-        if lx > 740:
-            raise SystemExit(f"{lang}: Reihe {row + 1} unten zu breit ({lx:.0f} px)")
+            continue
+        p, w = text(book, label, 16, lx + 24, 0, CREAM, tracking=.3)
+        if lx + 24 + w > 740 and lx > x0:  # dahinter beginnt die Szene
+            row, lx = row + 1, x0
+        ly = 398 + row * 30
+        add(f'<g transform="translate({lx + 8:.1f} {ly - 6:.1f})" fill="none" stroke="{AMBER}" '
+            f'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{icon}</g>')
+        p, _ = text(book, label, 16, lx + 24, ly, CREAM, tracking=.3)
+        add(p)
+        lx += 24 + w + 26
+    if row > 2:
+        raise SystemExit(f"{lang}: mehr als drei Reihen unten")
 
     add("</g>")
     add(f'<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="27.5" fill="none" '

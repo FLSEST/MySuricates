@@ -1,6 +1,6 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Your suricates build workflows with you and keep watch over every step. Deterministic if possible. Any provider: change it and keep your flow. Keep track of what you did and what you do. Put your suricates to work the way you need them. Workflows, chains, skills, BPMN, schedules, TODOs, integrations, human-in-the-loop, assistant."></p>
+<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Build your own workflows with your suricates and let them help you watch every step. Deterministic if possible. Any provider: change it and keep your flow. Keep track of what you did and what you do. Put your suricates to work the way you need them. Workflows, chains, skills, templates, schedules, TODOs, integrations, webhooks, human-in-the-loop, assistant, BPMN, versions, gates, memory, dashboard, audit and more."></p>
 
 # MySuricates
 
