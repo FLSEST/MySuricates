@@ -21,20 +21,68 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_PRESET` | `core` (Default), `research`, `full` |
 | `MYSURICATES_PROJECTS` | Projektordner, Default: Ordner über dem Klon, nie ganz `$HOME` |
 | `MYSURICATES_DOCKER_SOCKET` | `1` bindet den Docker-Socket ein (für Shell-Blöcke mit `container_image`) — gibt der Instanz volle Kontrolle über Docker auf dem Rechner |
+| `MYSURICATES_AI_FROM_HOST` | was von den KI-Anbietern des Rechners in den Container kommt: `login` (Default), `programs`, `all` — siehe [KI-Anbieter im Container](#ki-anbieter-im-container) |
+| `MYSURICATES_AI_PROVIDERS` | Auswahl aus `claude,codex,pi`, Default: alle vorhandenen |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
 
-Die Instanz nutzt die KI-CLIs samt Anmeldung vom Host, man meldet sich nicht doppelt an:
-unter Linux Programm und Anmeldung, unter macOS nur die Anmeldung (eine Mac-Binary startet im
-Linux-Container nicht). Die Benutzer-ID kommt beim Start aus `id(1)`, Dateien in eingebundenen
+Die Instanz nutzt die KI-CLIs des Rechners, man meldet sich nicht doppelt an. Wie viel davon in den
+Container kommt, bestimmt `MYSURICATES_AI_FROM_HOST` ([KI-Anbieter im Container](#ki-anbieter-im-container));
+unter macOS kommen nur Anmeldungen, keine Programme (eine Mac-Binary startet im Linux-Container nicht).
+Die Benutzer-ID kommt beim Start aus `id(1)`, Dateien in eingebundenen
 Ordnern gehören also dem richtigen Benutzer. Daten liegen im Volume `mysuricates-<name>-data`, der
 Integrations-Schlüssel getrennt davon in `mysuricates-<name>-secrets`. Ohne Docker-Socket meldet
 die Instanz Docker als „nicht eingerichtet“ — das ist kein Fehler.
 
-Mehrere Instanzen — etwa Dev · Test · Prod — sind mehrere Env-Dateien mit eigenen Ports. Die
-bestehenden Dateien `docker-compose.stable.yml` und `docker-compose.test.yml` sind davon
-unberührt. Skript-Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
-`bash scripts/tests/test-instance.sh`, `bash scripts/tests/test-deploy-files.sh`.
+Mehrere Instanzen — etwa Dev · Test · Prod — sind mehrere Env-Dateien mit eigenen Ports. Stable und
+Test (`docker-compose.stable.yml`, `docker-compose.test.yml`) bleiben eigene Dateien, holen KI-Anbieter
+und Docker-Socket aber aus derselben Stelle. Skript-Tests ohne Docker:
+`bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-instance.sh`,
+`bash scripts/tests/test-deploy-files.sh`, `bash scripts/tests/test-staging-override.sh`.
+
+## KI-Anbieter im Container
+
+Was ein Container vom Rechner bekommt, entscheidet eine Stelle: `scripts/lib/host-mounts.sh` (262948a4).
+Sie gilt für Instanzen über `instance.sh`, für Stable und Test über `staging.sh` — auch wenn sie aus
+der Oberfläche gestartet werden — und für den Dev-Container. Die Schalter stehen außerhalb der App und
+wirken erst beim nächsten Start: Weder ein Workflow noch jemand mit dem API-Key kann sie ändern. Die
+Karte „Startkonfiguration“ in den Einstellungen zeigt sie an, nur lesend.
+
+| `…AI_FROM_HOST` | Vom Rechner im Container | Einrichtung | Was eine KI im Container damit kann |
+|---|---|---|---|
+| `login` (Standard) | die Programme, nur lesend; je Anbieter genau die Anmeldung: Codex `~/.codex/auth.json`, Pi `~/.pi/agent/auth.json`, Claude ein Token (unten) | für Claude einmal `claude setup-token` | die Anmeldung nutzen und auslesen. Einstellungen, Hooks, Plugins, Memory und Verläufe des Rechners bleiben draußen. |
+| `programs` | nur die Programme | je Instanz einmal anmelden: `scripts/instance.sh login --name X claude` bzw. `scripts/staging.sh login stable claude` | am wenigsten. Jede Anmeldung liegt im Volume der Instanz und lässt sich einzeln widerrufen. |
+| `all` | ganz `~/.claude`, `~/.codex`, `~/.pi` mit Schreibrecht, dazu `~/.local/bin` — so war es bisher | keine | Einstellungen, Hooks, Plugins, Memory und Verläufe aller Projekte sehen und ändern; was dort geändert wird, läuft später auf dem Rechner. Sinnvoll, wenn Workflows die eigenen Claude-Plugins oder MCP-Server brauchen. |
+
+`…AI_PROVIDERS` wählt die Anbieter aus `claude,codex,pi` (Standard: alle); die übrigen bekommen weder
+Programm noch Anmeldung. Mit `login` und `programs` hat jeder Anbieter ein eigenes Verzeichnis im
+Daten-Volume (`/app/data/providers/<anbieter>`, über `CLAUDE_CONFIG_DIR`, `CODEX_HOME` und
+`PI_CODING_AGENT_DIR`): Was die Programme dort schreiben — Sitzungen, Caches —, erreicht den Rechner nicht.
+
+**Warum Claude einen Token braucht.** Claude ersetzt `~/.claude/.credentials.json` bei jedem Erneuern der
+Anmeldung (neue Datei, dann Umbenennen). Eine einzeln eingebundene Datei zeigte im Container danach
+weiter auf die alte, und nach der nächsten Erneuerung auf dem Rechner wäre der Container abgemeldet.
+Codex und Pi schreiben ihre `auth.json` an Ort und Stelle, dort genügt die Datei. Den Token erzeugt
+`claude setup-token` einmal (er gilt ein Jahr); er gehört als `CLAUDE_CODE_OAUTH_TOKEN=…` nach
+`~/.config/mysuricates/ai.env` mit den Rechten 600, der Installer bietet das an. Compose reicht die
+Datei beim Start als Umgebung durch. Sie landet weder im Image noch im Volume, ist aber für jeden mit
+Docker-Zugriff per `docker inspect` lesbar.
+
+| Weg | Schalter | Docker-Socket ohne Schalter |
+|---|---|---|
+| `scripts/instance.sh`, auch der Installer-Modus „Dev · Test · Prod“ | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | aus |
+| Stable und Test (`scripts/staging.sh`, Start aus der Oberfläche) | `STABLE_…` bzw. `TEST_…` mit `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET` in `~/.config/mysuricates/staging.env` — zeilenweise gelesen, nie ausgeführt; eine gleichnamige Umgebungsvariable gewinnt | an |
+| Dev-Container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET` | an |
+
+Mit dem Socket kann ein Workflow per `docker run -v /:/host …` den ganzen Rechner erreichen; die Grenze
+oben schützt dann nur vor Versehen. Stable, Test und der Dev-Container behalten ihn, damit
+Container-Blöcke dort weiterlaufen — wer die Grenze ernst nimmt, schaltet ihn dort aus.
+
+Grenzen: Ein per npm installiertes Claude (statt des nativen Installers) wird mit `login` und `programs`
+nicht eingebunden. Unter macOS kommen keine Programme (3dd32594). Codex' eigene Sandbox
+(`--sandbox read-only`) startet weder auf dem Rechner noch im Container (`bwrap`), unabhängig von diesen
+Schaltern. Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
+`bash scripts/tests/test-staging-override.sh`.
 
 ## Tryout-Image
 
@@ -162,7 +210,7 @@ Backend + Agent-Images (build-only). Netzwerk: `automation` (Bridge).
 Stable-Umgebung auf Port 9091:
 - Container: `mysuricates-stable`
 - Profil: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Docker Socket, Claude CLI Directories vom Host, Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`)
+- Volumes: `stable-data` (persistente DB), `stable-frontend/` (read-only), Host-Projektverzeichnisse, Backup-Volume (`~/.autotrigger/backups/stable`); KI-Anbieter und Docker-Socket kommen aus der Override-Datei von `scripts/staging.sh` ([KI-Anbieter im Container](#ki-anbieter-im-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -171,7 +219,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profil: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker Socket, Claude CLI Directories vom Host, Backup-Volume (`~/.autotrigger/backups/test`)
+- Volumes: `test-data` (persistente DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Backup-Volume (`~/.autotrigger/backups/test`); KI-Anbieter und Docker-Socket wie bei Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -572,9 +620,10 @@ Die beiden werden leicht verwechselt:
 1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (Default `false`) ist ein serverseitiger Schalter dafür,
    ob ein Shell-Block mit `mount_docker_socket: true` den Socket in einen **erzeugten Agent-Container**
    bekommt. Wird es verweigert, landet ein SECURITY-Eintrag im Activity-Log.
-2. **Die ausgelieferte `docker-compose.yml`** mountet den Host-Docker-Socket dagegen direkt in den
-   **Backend-Container** (`/var/run/docker.sock`). Das ist unabhängig von Punkt 1 und gibt der
-   Anwendung volle Kontrolle über Docker auf dem Host.
+2. **Der Socket im Backend-Container** (`/var/run/docker.sock`) ist unabhängig von Punkt 1 und gibt der
+   Anwendung volle Kontrolle über Docker auf dem Host. Bei `instance.sh`, Stable, Test und dem
+   Dev-Container entscheidet das ein Schalter ([KI-Anbieter im Container](#ki-anbieter-im-container)); die
+   schlanke `docker-compose.yml` mountet ihn weiterhin fest.
 
 ### Container-Image-Allowlist
 
@@ -592,7 +641,7 @@ Allowlist) — `docker run` würde es sonst als Flag lesen. Analoges Muster zu
 
 - Nur in einem Netz betreiben, dem du vertraust; für Fernzugriff ein VPN davorsetzen statt den Port zu öffnen.
 - Einen eigenen API-Key setzen und prüfen, dass er nicht leer ist.
-- Den Docker-Socket-Mount aus der Compose-Datei nehmen, wenn keine Container-Blöcke gebraucht werden.
+- Den Docker-Socket ausschalten (`…DOCKER_SOCKET=0`), wenn keine Container-Blöcke gebraucht werden.
 - In Produktivumgebungen `AUTOMATION_ALLOWED_CONTAINER_IMAGES` auf die tatsächlich benötigten
   Images setzen, statt auf dem leeren Default (= alle Images erlaubt) zu bleiben.
 - Keine Workflows aus fremder Quelle ungelesen ausführen — sie laufen mit deinen Rechten.
@@ -640,7 +689,7 @@ Die Stable-Umgebung ist ein Docker-Container, der Backend + eingebettetes React-
 
 **Key-Dateien:**
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-basiert (glibc für Claude CLI)
-- `ai-automation-backend/docker-compose.stable.yml` — Volume-Mounts für Claude CLI + Projekte
+- `ai-automation-backend/docker-compose.stable.yml` — Daten, Frontend, Projekte; KI-Anbieter und Socket über `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, Auto-Start deaktiviert, Frontend-Serving aktiviert
 
 ### Test-Instanz (Port 8090)
@@ -666,6 +715,8 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 ./scripts/staging.sh db-seed     # Rohe DB-Kopie (nur Notfall, überschreibt alles)
 ./scripts/staging.sh clean       # Container + Volume + Image entfernen
 ./scripts/staging.sh promote     # stop → snapshot → start (Einzeiler)
+./scripts/staging.sh write-override stable|test   # Override-Datei (was vom Rechner kommt) schreiben, Pfad ausgeben
+./scripts/staging.sh login stable|test claude     # eigene Anmeldung im Container (nur *_AI_FROM_HOST=programs)
 ```
 
 ### Definition-Sync (Dev → Stable / Dev → Test)

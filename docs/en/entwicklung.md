@@ -30,7 +30,28 @@ Docker is only needed for container-execution workflow blocks — the backend bo
 scripts/start-autotrigger-dev.sh            # start
 scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build JAR → start
 scripts/start-autotrigger-dev.sh stop
+
+# Runtime: host (default) or container — the same commands (TODO a1236a64)
+scripts/start-autotrigger-dev.sh start --container
+AUTOTRIGGER_DEV_RUNTIME=container scripts/start-autotrigger-dev.sh   # permanently
 ```
+
+**Host or container?** The host way is the default and unchanged. `--container` starts the backend
+through `docker compose` from `ai-automation-backend/docker-compose.dev-container.yml` instead (image
+`Dockerfile.stable`, so with Node — the dev `docker-compose.yml` builds from a JRE Alpine image
+**without** Node, where no AI CLI runs). The Vite dev server stays on the host either way. Tunable via
+`AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`, `AUTOTRIGGER_DEV_COMPOSE_PROJECT`,
+`AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` — so a probe instance can run next to the real
+one. A probe on another port also needs `MYSURICATES_API_BASE=http://localhost:<port>/api/v1`,
+otherwise the starter checks port 9090.
+
+What of the machine's AI providers goes into the container is set by `AUTOTRIGGER_DEV_AI_FROM_HOST`
+(`login` = the programs and just the login of each provider, the default; `programs`; `all` = whole
+provider directories as before), plus `AUTOTRIGGER_DEV_AI_PROVIDERS` (selection from
+`claude,codex,pi`) and `AUTOTRIGGER_DEV_DOCKER_SOCKET` (default `1`). Claude needs a one-time
+`claude setup-token` for it — background in
+[deployment.md → AI providers in the container](deployment.md#ai-providers-in-the-container). The
+"Startup configuration" card in the settings shows what the container runs with.
 
 > Do **not** use `mvn spring-boot:run` — the command is **deliberately blocked**: the backend aborts
 > at startup from `target/classes` with a message (`RuntimeClasspathGuard`), see

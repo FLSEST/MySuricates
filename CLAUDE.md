@@ -317,6 +317,12 @@ Nach Code-Änderungen immer `test-promote` (oder `test-snapshot`) verwenden, son
 der Test-Container mit einem veralteten Backend-JAR (aktuelles Frontend + altes Backend
 → neue Endpoints liefern 404 → UI hängt auf „loading").
 
+**KI-Anbieter und Docker-Socket in Stable/Test** kommen aus `scripts/lib/host-mounts.sh` — derselben Stelle wie bei
+`instance.sh` und dem Dev-Container, auch beim Start aus der Oberfläche (`StagingComposeCommand`). Schalter in
+`~/.config/mysuricates/staging.env`: `STABLE_`/`TEST_` + `AI_FROM_HOST` (`login` = Programme + je Anbieter nur die
+Anmeldung, Standard; Claude per Token aus `~/.config/mysuricates/ai.env`), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 1).
+Nie wieder ganze Provider-Verzeichnisse fest in eine Compose-Datei schreiben. Details: [docs/deployment.md](docs/deployment.md) → „KI-Anbieter im Container“.
+
 Vollständige Dokumentation (Auto-Start, Definition-Sync, Key-Files): [docs/deployment.md](docs/deployment.md)
 
 ## Detailed Documentation

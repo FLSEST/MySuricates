@@ -47,7 +47,16 @@ zur Laufzeit, und zwar nur die, die es auf diesem Rechner gibt; findet er keinen
 Der Vite-Dev-Server bleibt in beiden Fällen auf dem Host. Parametrierbar über
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`,
 `AUTOTRIGGER_DEV_COMPOSE_PROJECT`, `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` —
-damit eine Probeinstanz neben der echten laufen kann.
+damit eine Probeinstanz neben der echten laufen kann. Eine Probe auf anderem Port braucht zusätzlich
+`MYSURICATES_API_BASE=http://localhost:<port>/api/v1`, sonst prüft der Starter Port 9090.
+
+Was von den KI-Anbietern des Rechners in den Container kommt, entscheidet
+`AUTOTRIGGER_DEV_AI_FROM_HOST` (`login` = Programme und je Anbieter nur die Anmeldung, der Standard;
+`programs`; `all` = ganze Anbieter-Verzeichnisse wie früher), dazu `AUTOTRIGGER_DEV_AI_PROVIDERS`
+(Auswahl aus `claude,codex,pi`) und `AUTOTRIGGER_DEV_DOCKER_SOCKET` (Standard `1`). Claude braucht
+dafür einmal `claude setup-token` — Hintergrund in
+[deployment.md → KI-Anbieter im Container](deployment.md#ki-anbieter-im-container). Die Karte
+„Startkonfiguration“ in den Einstellungen zeigt, womit der Container läuft.
 
 > **Nicht** `mvn spring-boot:run` verwenden — der Befehl ist **absichtlich blockiert**: Das Backend
 > bricht beim Start aus `target/classes` mit einer Meldung ab (`RuntimeClasspathGuard`), siehe

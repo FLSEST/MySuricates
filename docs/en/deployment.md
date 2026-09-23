@@ -21,20 +21,67 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes
 | `MYSURICATES_PRESET` | `core` (default), `research`, `full` |
 | `MYSURICATES_PROJECTS` | projects folder, default: the folder above the clone, never all of `$HOME` |
 | `MYSURICATES_DOCKER_SOCKET` | `1` mounts the Docker socket (for shell blocks with `container_image`) — gives the instance full control over Docker on the machine |
+| `MYSURICATES_AI_FROM_HOST` | what of the machine's AI providers goes into the container: `login` (default), `programs`, `all` — see [AI providers in the container](#ai-providers-in-the-container) |
+| `MYSURICATES_AI_PROVIDERS` | selection from `claude,codex,pi`, default: all present |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
 
-The instance uses the host's AI CLIs including their login, so nobody logs in twice: on Linux the
-program and the login, on macOS only the login (a Mac binary does not start in a Linux container).
+The instance uses the machine's AI CLIs, so nobody logs in twice. How much of them goes into the
+container is set by `MYSURICATES_AI_FROM_HOST` ([AI providers in the container](#ai-providers-in-the-container));
+on macOS only logins go in, no programs (a Mac binary does not start in a Linux container).
 The user ID comes from `id(1)` at start, so files in mounted folders belong to the right user. Data
 lives in the volume `mysuricates-<name>-data`, the integration key separately in
 `mysuricates-<name>-secrets`. Without the Docker socket the instance reports Docker as "not set
 up" — that is not an error.
 
-Several instances — say Dev · Test · Prod — are several env files with their own ports. The
-existing files `docker-compose.stable.yml` and `docker-compose.test.yml` are unaffected. Script
-tests without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-instance.sh`,
-`bash scripts/tests/test-deploy-files.sh`.
+Several instances — say Dev · Test · Prod — are several env files with their own ports. Stable and
+Test (`docker-compose.stable.yml`, `docker-compose.test.yml`) stay separate files but take AI providers
+and the Docker socket from the same place. Script tests without Docker:
+`bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-instance.sh`,
+`bash scripts/tests/test-deploy-files.sh`, `bash scripts/tests/test-staging-override.sh`.
+
+## AI providers in the container
+
+What a container gets from the machine is decided in one place: `scripts/lib/host-mounts.sh` (262948a4).
+It applies to instances run by `instance.sh`, to Stable and Test run by `staging.sh` — also when they are
+started from the UI — and to the dev container. The switches live outside the app and take effect on the
+next start: neither a workflow nor anyone with the API key can change them. The "Startup configuration"
+card in the settings shows them, read-only.
+
+| `…AI_FROM_HOST` | From the machine into the container | Setup | What an AI in the container can do with it |
+|---|---|---|---|
+| `login` (default) | the programs, read-only; exactly one login per provider: Codex `~/.codex/auth.json`, Pi `~/.pi/agent/auth.json`, Claude a token (below) | once `claude setup-token` for Claude | use and read the login. Settings, hooks, plugins, memory and transcripts of the machine stay outside. |
+| `programs` | the programs only | log in once per instance: `scripts/instance.sh login --name X claude` or `scripts/staging.sh login stable claude` | the least. Every login lives in the instance's volume and can be revoked on its own. |
+| `all` | all of `~/.claude`, `~/.codex`, `~/.pi` writable, plus `~/.local/bin` — the previous behaviour | none | see and change settings, hooks, plugins, memory and the transcripts of every project; changes there take effect on the machine later. Useful when workflows need your own Claude plugins or MCP servers. |
+
+`…AI_PROVIDERS` picks the providers from `claude,codex,pi` (default: all); the others get neither program
+nor login. With `login` and `programs` every provider has its own directory on the data volume
+(`/app/data/providers/<provider>`, via `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `PI_CODING_AGENT_DIR`):
+whatever the programs write there — sessions, caches — never reaches the machine.
+
+**Why Claude needs a token.** Claude replaces `~/.claude/.credentials.json` every time it refreshes the
+login (new file, then rename). A file mounted on its own would keep pointing at the old one inside the
+container, and after the next refresh on the machine the container would be logged out. Codex and Pi
+write their `auth.json` in place, so the file is enough there. `claude setup-token` creates the token
+once (valid for a year); it goes into `~/.config/mysuricates/ai.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` with
+mode 600, and the installer offers to do that. Compose passes the file on as environment at start. It
+lands neither in the image nor in the volume, but anyone with Docker access can read it via
+`docker inspect`.
+
+| Way | Switches | Docker socket without a switch |
+|---|---|---|
+| `scripts/instance.sh`, including the installer mode "Dev · Test · Prod" | `MYSURICATES_AI_FROM_HOST`, `MYSURICATES_AI_PROVIDERS`, `MYSURICATES_DOCKER_SOCKET` in `deploy/instances/<name>.env` | off |
+| Stable and Test (`scripts/staging.sh`, start from the UI) | `STABLE_…` or `TEST_…` with `AI_FROM_HOST`, `AI_PROVIDERS`, `DOCKER_SOCKET` in `~/.config/mysuricates/staging.env` — read line by line, never executed; an environment variable of the same name wins | on |
+| Dev container (`scripts/start-autotrigger-dev.sh --container`) | `AUTOTRIGGER_DEV_AI_FROM_HOST`, `AUTOTRIGGER_DEV_AI_PROVIDERS`, `AUTOTRIGGER_DEV_DOCKER_SOCKET` | on |
+
+With the socket a workflow can reach the whole machine via `docker run -v /:/host …`; the boundary above
+then only guards against mistakes. Stable, Test and the dev container keep it so container blocks keep
+running there — if you take the boundary seriously, switch it off there.
+
+Limits: a Claude installed via npm (instead of the native installer) is not mounted with `login` and
+`programs`. On macOS no programs are mounted (3dd32594). Codex's own sandbox (`--sandbox read-only`)
+starts neither on the machine nor in the container (`bwrap`), independent of these switches. Tests
+without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/test-staging-override.sh`.
 
 ## Tryout image
 
@@ -161,7 +208,7 @@ Backend + agent images (build-only). Network: `automation` (bridge).
 Stable environment on port 9091:
 - Container: `mysuricates-stable`
 - Profile: `SPRING_PROFILES_ACTIVE=stable`
-- Volumes: `stable-data` (persistent DB), `stable-frontend/` (read-only), Docker socket, Claude CLI directories from host, host project directories, backup volume (`~/.autotrigger/backups/stable`)
+- Volumes: `stable-data` (persistent DB), `stable-frontend/` (read-only), host project directories, backup volume (`~/.autotrigger/backups/stable`); AI providers and the Docker socket come from the override file of `scripts/staging.sh` ([AI providers in the container](#ai-providers-in-the-container))
 - Named Volume: `stable-data`
 
 ### `docker-compose.test.yml`
@@ -170,7 +217,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 - Container: `mysuricates-test`
 - Image: `ai-automation-backend-test`
 - Profile: `SPRING_PROFILES_ACTIVE=test`
-- Volumes: `test-data` (persistent DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), Docker socket, Claude CLI directories from host, backup volume (`~/.autotrigger/backups/test`)
+- Volumes: `test-data` (persistent DB), `stable-frontend/` (read-only), `application-test.yml` (read-only), backup volume (`~/.autotrigger/backups/test`); AI providers and the Docker socket as for Stable
 - Healthcheck: `curl -f http://localhost:8090/api/v1/system/health`
 - Named Volume: `test-data`
 
@@ -567,9 +614,10 @@ These two are easily confused:
 1. **`AUTOMATION_ALLOW_DOCKER_SOCKET_MOUNT`** (default `false`) is a server-side switch for whether a
    shell block with `mount_docker_socket: true` gets the socket inside a **spawned agent container**.
    A denial is written to the activity log as a SECURITY entry.
-2. **The shipped `docker-compose.yml`** instead mounts the host Docker socket straight into the
-   **backend container** (`/var/run/docker.sock`). This is independent of point 1 and gives the
-   application full control over Docker on the host.
+2. **The socket in the backend container** (`/var/run/docker.sock`) is independent of point 1 and gives
+   the application full control over Docker on the host. For `instance.sh`, Stable, Test and the dev
+   container a switch decides it ([AI providers in the container](#ai-providers-in-the-container)); the
+   lean `docker-compose.yml` still mounts it unconditionally.
 
 ### Container Image Allowlist
 
@@ -586,7 +634,7 @@ of the image. An image starting with `-` is always rejected (regardless of the a
 
 - Only run it on a network you trust; for remote access put a VPN in front instead of opening the port.
 - Set your own API key and verify it is not empty.
-- Remove the Docker socket mount from the compose file if you do not need container blocks.
+- Switch the Docker socket off (`…DOCKER_SOCKET=0`) if you do not need container blocks.
 - In production, set `AUTOMATION_ALLOWED_CONTAINER_IMAGES` to the images you actually need instead
   of staying on the empty default (= all images allowed).
 - Do not run workflows from an untrusted source unread — they run with your privileges.
@@ -634,7 +682,7 @@ The stable environment is a Docker container containing the backend + embedded R
 
 **Key Files:**
 - `ai-automation-backend/docker/Dockerfile.stable` — Ubuntu-based (glibc for Claude CLI)
-- `ai-automation-backend/docker-compose.stable.yml` — Volume mounts for Claude CLI + projects
+- `ai-automation-backend/docker-compose.stable.yml` — data, frontend, projects; AI providers and the socket via `scripts/staging.sh write-override stable`
 - `ai-automation-backend/src/main/resources/application-stable.yml` — Port 9091, auto-start disabled, frontend serving enabled
 
 ### Test Instance (Port 8090)
@@ -660,6 +708,8 @@ The test instance is a dedicated Docker container for automated workflow tests:
 ./scripts/staging.sh db-seed     # Raw DB copy (emergency only, overwrites everything)
 ./scripts/staging.sh clean       # Remove container + volume + image
 ./scripts/staging.sh promote     # stop → snapshot → start (one-liner)
+./scripts/staging.sh write-override stable|test   # write the override file (what comes from the machine), print its path
+./scripts/staging.sh login stable|test claude     # own login inside the container (only *_AI_FROM_HOST=programs)
 ```
 
 ### Definition Sync (Dev → Stable / Dev → Test)
