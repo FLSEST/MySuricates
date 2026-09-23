@@ -1971,6 +1971,25 @@ Authentifizierungsstatus abfragen.
 
 **Response:** `{ "securityEnabled": true }`
 
+### `GET /api/v1/system/jvm-memory` (Öffentlich)
+
+Heap-Belegung der JVM als genau drei Zahlen — für Shell-Blöcke wie den Performance-Audit, die keinen
+API-Key haben. Die übrige Metrik-Oberfläche unter `/actuator/metrics` verlangt den Key.
+
+**Response:**
+
+```json
+{
+  "jvm_memory_used_bytes": 268435456,
+  "jvm_memory_max_bytes": 1073741824,
+  "jvm_heap_used_percent": 25.0
+}
+```
+
+Die Werte beziehen sich auf den Heap (`MemoryMXBean`), der Anteil ist auf eine Nachkommastelle
+gerundet. Kennt die JVM kein Heap-Maximum, sind `jvm_memory_max_bytes` und `jvm_heap_used_percent`
+`null`.
+
 ### `GET /api/v1/system/ai-providers`
 
 Verfügbare KI-Provider und Standard-Provider abfragen.

@@ -179,4 +179,33 @@ class ApiKeyAuthFilterTest {
 
         verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
     }
+
+    @Test
+    void securityEnabled_noKey_jvmMemoryPath_noSecurityLog() throws Exception {
+        // c2cda5ed: der Performance-Audit liest die Heap-Zahlen ohne Key — jeder Lauf waere
+        // sonst ein SECURITY-Eintrag "no API key provided".
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/system/jvm-memory");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void securityEnabled_noKey_otherSystemMetricsPath_stillLogsSecurityEvent() throws Exception {
+        // Die Ausnahme ist genau ein Pfad: der Nachbar mit den Request-Kosten bleibt geschuetzt.
+        ReflectionTestUtils.setField(filter, "securityEnabled", true);
+        when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getRequestURI()).thenReturn("/api/v1/system/request-metrics");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(activityLogService).warn(any(), contains("no API key"), eq("ApiKeyAuthFilter"), isNull());
+    }
 }

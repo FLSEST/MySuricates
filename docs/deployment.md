@@ -588,7 +588,26 @@ lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Der Compose-Die
 `9090:9090` ohne Host-IP-Präfix, also auf allen Adressen — und Dockers Portfreigabe umgeht dabei
 die üblichen Host-Firewall-Regeln.
 
-CORS erlaubt per Default neben `localhost` auch Tailscale-Muster (`100.*` und `*.tail*.ts.net`).
+**CORS** betrifft eine installierte Instanz nicht: Das Backend liefert die Oberfläche selbst aus,
+Seite und API haben denselben Ursprung. Eine Rolle spielt die Liste nur, wo beide verschiedene
+Ursprünge haben — beim Vite-Dev-Server (sein Proxy schreibt den Host um, nicht den `Origin`) und
+hinter einem Reverse-Proxy, der den Host umschreibt. Zugelassen sind dann:
+
+- per Default nur die Dev-Server auf diesem Rechner: `localhost:3000` und `localhost:5173`, jeweils per
+  http und https;
+- mit dem Modul `remote-access` zusätzlich die **eigene** Tailscale-Adresse der Instanz — die IPv4 aus
+  `tailscale ip -4` und der MagicDNS-Name aus `tailscale status --json`, auf jedem Port, per http und
+  https. Die Instanz fragt Tailscale zur Laufzeit und merkt sich die Antwort eine Minute; ohne
+  laufendes Tailscale kommt nichts dazu. Fremde Tailnets und andere `100.*`-Hosts bleiben draußen;
+- was `AUTOMATION_CORS_ORIGINS` (`automation.cors.allowed-origins`) nennt. Die Variable ersetzt die
+  Default-Liste — wer den Dev-Server etwa über die LAN-IP aufruft, trägt diese Adresse samt der
+  localhost-Einträge ein. Muster mit `*` sind möglich, aber `*` deckt auch Punkte ab:
+  `http://100.*:3000` passt auf `http://100.evil.example:3000`. Genaue Ursprünge sind die sichere Wahl.
+
+Dieselbe Regel gilt für die WebSocket-Handshakes (`/ws`, `/ws/terminal/**`) und für das Ziel des
+OAuth-Popups. Credentials gibt CORS nicht frei: Authentifiziert wird über den Header `X-API-Key`,
+Cookies gibt es nicht.
+
 **CORS ist keine Zugriffskontrolle** — es steuert nur, welche Herkunft ein Browser akzeptiert, und
 hält niemanden von einem direkten Aufruf ab. Ein vorhandener Tailscale-Zugang macht die Anwendung
 nicht zu einem abgesicherten System.
@@ -601,10 +620,15 @@ Ausgenommen sind:
 | Pfad | Zweck |
 |---|---|
 | `/api/v1/system/health`, `/system/info`, `/system/auth-status` | Statusabfragen vor dem Login |
+| `/api/v1/system/jvm-memory` | Heap-Belegung als genau drei Zahlen (`jvm_memory_used_bytes`, `jvm_memory_max_bytes`, `jvm_heap_used_percent`) für den Performance-Audit |
 | `/actuator/health` | Healthcheck für Docker |
 | `/ws/**` | WebSocket-Handshake (der Key wird dort als Query-Parameter geprüft) |
 | `/api/v1/webhook/trigger/**` | Oeffentlicher Webhook-Eingang |
 | `/api/v1/integrations/*/callback` | OAuth-Rückleitungen |
+
+Die übrige Actuator-Oberfläche (`/actuator/metrics`, `/actuator/info`) verlangt den Key: Metriken
+verraten Routennamen, Lastprofil und Speicherlage an jeden, der den Port erreicht. Wer ohne Key den
+Speicher messen will, bekommt deshalb nur die drei Zahlen von `/api/v1/system/jvm-memory`.
 
 Alles ausserhalb von `/api/**` und `/actuator/**` ist ebenfalls offen (`anyRequest().permitAll()`) —
 das betrifft das ausgelieferte Frontend und jeden nicht gemappten Pfad.

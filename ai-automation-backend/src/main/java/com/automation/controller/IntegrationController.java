@@ -5,6 +5,7 @@ import com.automation.dto.response.IntegrationProviderResponse;
 import com.automation.entity.IntegrationConnection;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
+import com.automation.security.AllowedOrigins;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
@@ -14,7 +15,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,9 +32,8 @@ public class IntegrationController {
     private final IntegrationRegistry registry;
     private final IntegrationOAuthService oAuthService;
     private final ObjectMapper objectMapper;
-
-    @Value("${automation.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
-    private String allowedOrigins;
+    /** The OAuth popup posts its result only to an origin CORS would let in as well (a8056256). */
+    private final AllowedOrigins allowedOrigins;
 
     @GetMapping
     public List<IntegrationProviderResponse> listProviders() {
@@ -55,7 +54,7 @@ public class IntegrationController {
             @RequestParam(required = false) String frontendOrigin,
             HttpServletRequest request) {
         String redirectUri = buildCallbackUrl(providerId, request);
-        String origin = OAuthCallbackPage.validateOrigin(frontendOrigin, redirectUri, allowedOrigins);
+        String origin = OAuthCallbackPage.validateOrigin(frontendOrigin, redirectUri, allowedOrigins::isAllowed);
         String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri, scopes, origin);
         java.net.URI callback = java.net.URI.create(redirectUri);
         return Map.of("authorizationUrl", authUrl,

@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.sql.DataSource;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.Instant;
@@ -19,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Kern-Auskunft unter /api/v1/system: Health, Plattform-Info, Auth-Status und
+ * Kern-Auskunft unter /api/v1/system: Health, Plattform-Info, Auth-Status, Heap-Belegung und
  * Client-Fehler-Meldungen. Die übrigen /system-Endpunkte sind nach Zuständigkeit
  * aufgeteilt: {@link SystemAiProviderController}, {@link SystemMaintenanceController},
  * {@link SystemSettingsController}, {@link SystemAccessController}.
@@ -94,6 +96,29 @@ public class SystemController {
             case NOT_CONFIGURED -> "NOT_CONFIGURED";
         });
         result.put("components", components);
+        return result;
+    }
+
+    /**
+     * Heap-Belegung als genau drei Zahlen, ohne API-Key (c2cda5ed): der Performance-Audit misst
+     * damit den Speicher, ohne dass die ganze Metrik-Oberfläche unter {@code /actuator/metrics}
+     * frei wird — die verrät Routen und Lastprofil und bleibt hinter dem Key. Quelle ist der
+     * MemoryMXBean, nicht Micrometer: {@code jvm.memory.max} summiert über Pools, deren Maximum
+     * undefiniert ({@code -1}) ist.
+     */
+    @GetMapping("/jvm-memory")
+    public Map<String, Object> jvmMemory() {
+        return jvmMemory(ManagementFactory.getMemoryMXBean().getHeapMemoryUsage());
+    }
+
+    /** Ohne bekanntes Maximum ({@code -1}) bleiben Maximum und Anteil leer statt erfunden. */
+    static Map<String, Object> jvmMemory(MemoryUsage heap) {
+        long used = heap.getUsed();
+        Long max = heap.getMax() > 0 ? heap.getMax() : null;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("jvm_memory_used_bytes", used);
+        result.put("jvm_memory_max_bytes", max);
+        result.put("jvm_heap_used_percent", max == null ? null : Math.round(used * 1000.0 / max) / 10.0);
         return result;
     }
 

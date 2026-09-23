@@ -400,8 +400,67 @@ check "Request-Kosten im Blatt"        'grep -qx "FAKT request_metrics_slowest_r
 check "SQL-Zahl im Blatt"              'grep -qx "FAKT request_metrics_max_sql_statements: 47" "$TMP/perf-facts.out"'
 check "Wartezeit-Anteil im Blatt"      'grep -qx "FAKT request_metrics_max_wait_share_percent: 41.2" "$TMP/perf-facts.out"'
 check "Drift im Blatt"                 'grep -qx "FAKT request_metrics_drift_detail: GET /api/v1/todos x7.5" "$TMP/perf-facts.out"'
-check "Blatt ruft die REST-API nicht"  '! grep -q "localhost:9090/api/v1" "$TMP/perf-facts.sh"'
+# Kein Endpunkt mit API-Key: jeder /api/v1-Pfad im Messblock steht auf derselben Liste
+# schluesselfreier Sonden, die pool-neutrality.sh erlaubt (scripts/lib/hygiene-rules.sh).
+# Geprueft wird der Block vor dem Rendern — gerendert stehen die request_metrics-Daten
+# (GET /api/v1/todos ...) darin, und die sind Messwerte, keine Aufrufe.
+# shellcheck source=../lib/hygiene-rules.sh
+. "$REPO/scripts/lib/hygiene-rules.sh"
+PERF_API_PATHS="$(python3 - "$PERF" <<'PY'
+import json, re, sys
+definition = json.load(open(sys.argv[1], encoding='utf-8'))
+command = next(b['config']['command'] for b in definition['blocks'] if b.get('name') == 'facts')
+print('\n'.join(sorted(set(re.findall(r'/api/v1/[A-Za-z0-9_][A-Za-z0-9/_.-]*', command)))))
+PY
+)"
+KEYED_PATHS=""
+for P in $PERF_API_PATHS; do
+  printf '%s\n' "${HYGIENE_POOL_API_ALLOWED[@]}" | grep -qxF "$P" || KEYED_PATHS="$KEYED_PATHS $P"
+done
+check "Blatt ruft nur schluesselfreie Endpunkte" '[ -n "$PERF_API_PATHS" ] && [ -z "$KEYED_PATHS" ]'
+# c2cda5ed: /actuator/metrics verlangt den Key — die Heap-Zahlen kommen vom schmalen Endpunkt.
+check "Heap-Zahlen vom Endpunkt jvm-memory"    'grep -q "localhost:9090/api/v1/system/jvm-memory" "$TMP/perf-facts.sh"'
+check "keine Actuator-Metriken (brauchen Key)" '! grep -qE "(localhost:9090|for E in).*actuator/metrics" "$TMP/perf-facts.sh"'
 check "Pflichtfeld-Liste im Blatt"             'grep -q "^PFLICHT-FAKTEN: " "$TMP/perf-facts.out"'
+
+echo "6b) Performance-Audit: Heap-Zahlen aus /api/v1/system/jvm-memory (c2cda5ed)"
+# curl-Stellvertreter ohne Netz: die Latenz-Sonde (-w) bekommt eine feste Zeit, der
+# Heap-Endpunkt die Antwort aus FAKE_JVM_MEMORY; leer heisst "keine Verbindung" (curl-Exit 7).
+mkdir -p "$TMP/fakebin"
+cat > "$TMP/fakebin/curl" <<'CURL'
+#!/usr/bin/env bash
+for arg in "$@"; do
+  if [ "$arg" = "-w" ]; then printf '0.004 (http 200)'; exit 0; fi
+done
+case "$*" in
+  *"/api/v1/system/jvm-memory"*) [ -n "${FAKE_JVM_MEMORY:-}" ] || exit 7; printf '%s' "$FAKE_JVM_MEMORY" ;;
+  *) exit 7 ;;
+esac
+CURL
+chmod +x "$TMP/fakebin/curl"
+run_perf_facts_with() {  # $1 = Antwort des Heap-Endpunkts (leer = keine Verbindung)
+  FAKE_JVM_MEMORY="$1" PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts.sh" > "$TMP/perf-jvm.out" 2> "$TMP/perf-jvm.err"
+}
+run_perf_facts_with '{"jvm_memory_used_bytes":268435456,"jvm_memory_max_bytes":1073741824,"jvm_heap_used_percent":25.0}'
+check "FAKT jvm_memory_used_bytes: 268435456"  'grep -qx "FAKT jvm_memory_used_bytes: 268435456" "$TMP/perf-jvm.out"'
+check "FAKT jvm_memory_max_bytes: 1073741824"  'grep -qx "FAKT jvm_memory_max_bytes: 1073741824" "$TMP/perf-jvm.out"'
+check "FAKT jvm_heap_used_percent: 25.0"       'grep -qx "FAKT jvm_heap_used_percent: 25.0" "$TMP/perf-jvm.out"'
+check "keine JVM-Luecke mehr"                  '! grep -q "^NICHT GEMESSEN: jvm_" "$TMP/perf-jvm.out"'
+check "Latenz des Heap-Endpunkts im Blatt" \
+  'grep -qx "FAKT api_latency_seconds_api_v1_system_jvm_memory: 0.004 (http 200)" "$TMP/perf-jvm.out"'
+check "laeuft mit Endpunkt ohne stderr"        '[ ! -s "$TMP/perf-jvm.err" ]'
+run_perf_facts_with '{"jvm_memory_used_bytes":1000,"jvm_memory_max_bytes":null,"jvm_heap_used_percent":null}'
+check "ohne Heap-Maximum: used gemessen"       'grep -qx "FAKT jvm_memory_used_bytes: 1000" "$TMP/perf-jvm.out"'
+check "ohne Heap-Maximum: max als Luecke"      'grep -q "^NICHT GEMESSEN: jvm_memory_max_bytes (.*Heap-Maximum" "$TMP/perf-jvm.out"'
+check "ohne Heap-Maximum: Anteil als Luecke"   'grep -q "^NICHT GEMESSEN: jvm_heap_used_percent (.*Heap-Maximum" "$TMP/perf-jvm.out"'
+run_perf_facts_with ''
+check "ohne Backend: alle drei als Luecke" \
+  '[ "$(grep -cE "^NICHT GEMESSEN: jvm_(memory_used_bytes|memory_max_bytes|heap_used_percent) \(" "$TMP/perf-jvm.out")" -eq 3 ]'
+# Ein Backend vor c2cda5ed antwortet ohne Key mit 403 und Fehler-JSON — daraus wird keine Zahl.
+run_perf_facts_with '{"status":403,"error":"Forbidden","path":"/api/v1/system/jvm-memory"}'
+check "403-Antwort: keine erfundene JVM-Zahl"  '! grep -q "^FAKT jvm_" "$TMP/perf-jvm.out"'
+check "403-Antwort: drei Luecken mit Grund" \
+  '[ "$(grep -c "^NICHT GEMESSEN: jvm_.*Backend aus oder aelter als der Endpunkt" "$TMP/perf-jvm.out")" -eq 3 ]'
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei

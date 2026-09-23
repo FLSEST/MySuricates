@@ -299,7 +299,7 @@ com.automation
 | `WishController` | `/api/v1/wishes` | CRUD, Cancel, Respond, Crystallize |
 | `StagingController` | `/api/v1/staging` | Status, Start, Stop, Promote, Promote-Cancel, Sync-Preview, Sync-Definitions |
 | `TestingController` | `/api/v1/testing` | Status, Start, Stop, Reset, Sync-Preview, Sync-Definitions, Report-Result, Pull-Changes |
-| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, Settings, Execution-Config, AI-Providers, AI-Provider-Katalog, Capabilities, Backup, Backups, Remote-Access, Vacuum, Browse, Open-Path, Repair, Client-Errors, Integration-Snippet |
+| `SystemController` | `/api/v1/system` | Health, Auth-Status, Info, JVM-Memory, Settings, Execution-Config, AI-Providers, AI-Provider-Katalog, Capabilities, Backup, Backups, Remote-Access, Vacuum, Browse, Open-Path, Repair, Client-Errors, Integration-Snippet |
 | `IntegrationController` | `/api/v1/integrations` | OAuth-Flow, Credentials, Actions, Provider-Liste, Task-Export-Ziele |
 | `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding-Profile CRUD, Reset, History |
 | `ReportsController` | `/api/v1/reports` | Report-Generierung und -Abruf |
@@ -971,6 +971,7 @@ Response (DTO) → React Query Cache → UI-Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
+- `GET /api/v1/system/jvm-memory` (nur die drei Heap-Zahlen; `/actuator/metrics` verlangt den Key)
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)
@@ -1066,9 +1067,12 @@ Weder SockJS noch ein rohes Browser-WebSocket kann beim Handshake eigene Header 
 
 ### CORS
 
-- Origin-Patterns konfigurierbar via `automation.cors.allowed-origins` (Default: localhost:3000/5173 + Tailscale-Patterns)
+- Eine Antwort für CORS-Filter, WebSocket-Handshakes und OAuth-Popup: `security/AllowedOrigins`
+- Konfigurierte Liste `automation.cors.allowed-origins` (Default: `http(s)://localhost:3000` und `:5173`)
+- Mit dem Modul `remote-access` zusätzlich die eigene Tailscale-IPv4 und der eigene MagicDNS-Name, jeder Port (`service/system/OwnTailnetAddresses`: `tailscale ip -4` / `tailscale status --json`, 60 s gemerkt)
+- WebSocket: `AllowedOriginHandshakeInterceptor` prüft vor dem Ticket; Springs eigene Prüfung bekommt `*`, weil sie nur eine feste Startliste kennt
 - Alle HTTP-Methoden (GET, POST, PUT, PATCH, DELETE, OPTIONS)
-- Credentials erlaubt
+- Keine Credentials (Auth über `X-API-Key`, keine Cookies)
 
 ## Datenbankmigrationen (Flyway)
 

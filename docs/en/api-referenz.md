@@ -1966,6 +1966,24 @@ Query authentication status.
 
 **Response:** `{ "securityEnabled": true }`
 
+### `GET /api/v1/system/jvm-memory` (Public)
+
+The JVM's heap usage as exactly three numbers — for shell blocks such as the performance audit, which
+have no API key. The rest of the metrics surface under `/actuator/metrics` requires the key.
+
+**Response:**
+
+```json
+{
+  "jvm_memory_used_bytes": 268435456,
+  "jvm_memory_max_bytes": 1073741824,
+  "jvm_heap_used_percent": 25.0
+}
+```
+
+The values refer to the heap (`MemoryMXBean`); the share is rounded to one decimal. If the JVM knows
+no heap maximum, `jvm_memory_max_bytes` and `jvm_heap_used_percent` are `null`.
+
 ### `GET /api/v1/system/ai-providers`
 
 Query available AI providers and default provider.

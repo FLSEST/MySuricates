@@ -1,8 +1,8 @@
 package com.automation.config;
 
+import com.automation.security.AllowedOriginHandshakeInterceptor;
 import com.automation.security.WebSocketAuthInterceptor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -15,9 +15,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
-
-    @Value("${automation.cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
-    private String allowedOrigins;
+    private final AllowedOriginHandshakeInterceptor originInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -30,9 +28,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // Origin first, then the ticket. Spring's own origin check only knows a fixed startup list and
+        // would turn away this instance's Tailscale address — the interceptor decides (a8056256).
         registry.addEndpoint("/ws")
-                .addInterceptors(webSocketAuthInterceptor)
-                .setAllowedOriginPatterns(allowedOrigins.split(","))
-                .withSockJS();
+                .addInterceptors(originInterceptor, webSocketAuthInterceptor)
+                .setAllowedOriginPatterns(AllowedOriginHandshakeInterceptor.CHECKED_HERE)
+                .withSockJS()
+                // CORS for /ws runs through the global CorsFilter; SockJS' own rules would add credentials.
+                .setSuppressCors(true);
     }
 }

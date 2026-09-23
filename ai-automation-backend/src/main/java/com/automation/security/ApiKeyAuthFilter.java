@@ -74,6 +74,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                 && !uri.equals("/api/v1/system/health")
                 && !uri.equals("/api/v1/system/info")
                 && !uri.equals("/api/v1/system/auth-status")
+                && !uri.equals("/api/v1/system/jvm-memory")
                 && !uri.startsWith("/api/v1/webhook/trigger/");
     }
 

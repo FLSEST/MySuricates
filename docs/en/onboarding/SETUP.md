@@ -60,7 +60,7 @@ The default configuration in `src/main/resources/application.yml` works out-of-t
 | `AUTOMATION_DB_PATH` | `./data/automation.db` | SQLite database path |
 | `AUTOMATION_SECURITY_ENABLED` | `true` | API key authentication |
 | `AUTOMATION_API_KEY` | (empty) | API key (generated on first start) |
-| `AUTOMATION_CORS_ORIGINS` | `localhost:3000,localhost:5173` | Allowed CORS origins |
+| `AUTOMATION_CORS_ORIGINS` | `http(s)://localhost:3000` and `:5173` | Allowed CORS origins (replaces the list); the instance's own Tailscale address is added automatically with `remote-access` |
 | `AUTOMATION_MAX_CONCURRENT_RUNS` | `10` | Maximum parallel workflow executions |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Timeout for Claude CLI (seconds) |
 
@@ -246,5 +246,5 @@ If `AUTOMATION_SECURITY_ENABLED=true`:
 | `SQLite BUSY` | Only start one backend instance at a time |
 | `Claude CLI not found` | Ensure `claude` is in PATH |
 | `Docker socket permission denied` | Add user to the `docker` group: `sudo usermod -aG docker $USER` |
-| `CORS error in browser` | Check `AUTOMATION_CORS_ORIGINS` or disable security |
+| `CORS error in browser` (403 `Invalid CORS request`) | Add the address you open the UI under to `AUTOMATION_CORS_ORIGINS`, together with the localhost entries — disabling security does not change CORS |
 | `mvn: command not found` | Install Maven or use the Maven wrapper: `./mvnw` |

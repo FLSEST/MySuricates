@@ -97,7 +97,7 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `CONTEXT-PII` | no personal key in `defaultContext` (children, address, IBAN, CV …) | token comparison; the key is the signal — even with a placeholder as its value |
 | `BLOCK-TYPE` | every block type is in the registry, including those nested inside a `switch` (`cases[].blocks` and `default` — the only places where a block contains a block; the other wrappers run strings) | list comparison |
 | `REPO-DEP` | an entry with `scope: portable` mentions none of the repo markers (`ai-automation-backend`, `ai-automation-frontend`, `scripts/`, `mvnw`, `workflow-pool/`) | substring search |
-| `SELF-API` | the definition does not call our own REST API | an `/api/v1/<endpoint>` together with a caller (`curl`, `wget`, `requests.`, `urllib`, `fetch(`, `http.client`) or an HTTP verb in front of it; the auth-free `/api/v1/system/{health,info,auth-status}` are allowed as a liveness probe |
+| `SELF-API` | the definition does not call our own REST API | an `/api/v1/<endpoint>` together with a caller (`curl`, `wget`, `requests.`, `urllib`, `fetch(`, `http.client`) or an HTTP verb in front of it; allowed are the auth-free `/api/v1/system/{health,info,auth-status}` as a liveness probe and `/api/v1/system/jvm-memory` (three heap numbers) |
 | `CREDENTIAL` | the definition neither reads nor sets credentials | substring `X-API-Key` or `app_settings` — no exceptions |
 | `DB-DIRECT` | the definition does not read the database directly | `sqlite3` anywhere, or `automation.db` together with a read access (`SELECT`, `INSERT INTO`, `.tables`, …); looking at the file size (`stat`, `du`) stays allowed |
 | `PARSE` | the file is valid JSON and an object | `json.load` |

@@ -294,7 +294,7 @@ com.automation
 | `WishController` | `/api/v1/wishes` | CRUD, cancel, respond, crystallize |
 | `StagingController` | `/api/v1/staging` | Status, start, stop, promote, promote-cancel, sync-preview, sync-definitions |
 | `TestingController` | `/api/v1/testing` | Status, start, stop, reset, sync-preview, sync-definitions, report-result, pull-changes |
-| `SystemController` | `/api/v1/system` | Health, auth-status, info, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
+| `SystemController` | `/api/v1/system` | Health, auth-status, info, jvm-memory, settings, execution-config, AI-providers, AI-provider-catalog, capabilities, backup, backups, remote-access, vacuum, browse, open-path, repair, client-errors, integration-snippet |
 | `IntegrationController` | `/api/v1/integrations` | OAuth flow, credentials, actions, provider list, task export targets |
 | `OnboardingProfileController` | `/api/v1/onboarding-profiles` | Onboarding profiles CRUD, reset, history |
 | `ReportsController` | `/api/v1/reports` | Report generation and retrieval |
@@ -916,6 +916,7 @@ Response (DTO) → React Query Cache → UI Update
 - `GET /api/v1/system/health`
 - `GET /api/v1/system/info`
 - `GET /api/v1/system/auth-status`
+- `GET /api/v1/system/jvm-memory` (only the three heap numbers; `/actuator/metrics` requires the key)
 - `POST /api/v1/webhook/trigger/{token}`
 - `/api/v1/integrations/*/callback` (OAuth2 Callbacks)
 - `/ws/**` (WebSocket)
@@ -1008,9 +1009,12 @@ Neither SockJS nor a raw browser WebSocket can send its own headers during the h
 
 ### CORS
 
-- Origin patterns configurable via `automation.cors.allowed-origins` (default: localhost:3000/5173 + Tailscale patterns)
+- One answer for the CORS filter, WebSocket handshakes and OAuth popup: `security/AllowedOrigins`
+- Configured list `automation.cors.allowed-origins` (default: `http(s)://localhost:3000` and `:5173`)
+- With the module `remote-access`, additionally the instance's own Tailscale IPv4 and MagicDNS name, any port (`service/system/OwnTailnetAddresses`: `tailscale ip -4` / `tailscale status --json`, kept for 60 s)
+- WebSocket: `AllowedOriginHandshakeInterceptor` checks before the ticket; Spring's own check gets `*` because it only knows a fixed startup list
 - All HTTP methods (GET, POST, PUT, PATCH, DELETE, OPTIONS)
-- Credentials allowed
+- No credentials (auth via `X-API-Key`, no cookies)
 
 ## Database Migrations (Flyway)
 

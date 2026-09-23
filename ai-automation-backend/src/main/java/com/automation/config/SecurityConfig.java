@@ -29,6 +29,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/system/health").permitAll()
                         .requestMatchers("/api/v1/system/info").permitAll()
                         .requestMatchers("/api/v1/system/auth-status").permitAll()
+                        // Genau drei Heap-Zahlen für den Performance-Audit (c2cda5ed); die
+                        // Metrik-Oberfläche unter /actuator/metrics bleibt hinter dem Key.
+                        .requestMatchers("/api/v1/system/jvm-memory").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").authenticated()
                         // WebSocket endpoint

@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.config.RateLimitConfig;
 import com.automation.entity.IntegrationConnection;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.AllowedOrigins;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationOAuthService;
@@ -10,6 +11,7 @@ import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.integration.OAuthConfig;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.system.OwnTailnetAddresses;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(IntegrationController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, AllowedOrigins.class})
 @AutoConfigureMockMvc(addFilters = false)
 class IntegrationControllerTest {
 
@@ -49,6 +52,7 @@ class IntegrationControllerTest {
     @MockitoBean private ActivityLogService activityLogService;
     @MockitoBean private ApiKeyService apiKeyService;
     @MockitoBean private RateLimitConfig rateLimitConfig;
+    @MockitoBean private OwnTailnetAddresses ownTailnet;
 
     @Test
     void listProviders_returnsConnectionMetadataOptionalScopesAndActions() throws Exception {
@@ -126,6 +130,21 @@ class IntegrationControllerTest {
                         .param("frontendOrigin", "https://evil.example"))
                 .andExpect(status().isBadRequest());
         org.mockito.Mockito.verifyNoInteractions(oAuthService);
+    }
+
+    @Test
+    void getAuthorizationUrl_acceptsThisInstancesOwnTailscaleName_butNoForeignTailnet() throws Exception {
+        // a8056256: same answer as CORS — the own MagicDNS name yes, a foreign tailnet no
+        when(ownTailnet.hosts()).thenReturn(Set.of("mine.tail1234.ts.net"));
+        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), any(), eq(null),
+                eq("https://mine.tail1234.ts.net:3000"))).thenReturn("https://auth.example/authorize");
+
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
+                        .param("frontendOrigin", "https://mine.tail1234.ts.net:3000"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
+                        .param("frontendOrigin", "https://evil.tail0000.ts.net:3000"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
