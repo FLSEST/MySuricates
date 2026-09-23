@@ -68,6 +68,8 @@ class GoalApiIntegrationTest {
         assertThat(assigned.at("/goal/progress/total").asInt()).isEqualTo(3);
         assertThat(assigned.at("/goal/targetDate").asText()).startsWith("2026-10-15T00:00");
         assertThat(assigned.get("byProject")).hasSize(2);
+        assertThat(assigned.at("/todos/0").has("description"))
+                .as("die Zielansicht laedt keine Beschreibungen (schlanke Projektion)").isFalse();
 
         JsonNode ordered = json(perform(put("/api/v1/goals/" + goalId + "/order"),
                 Map.of("todoIds", List.of(low.getId(), site.getId()))).andExpect(status().isOk()));
@@ -128,6 +130,17 @@ class GoalApiIntegrationTest {
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.goalId").doesNotExist());
+    }
+
+    @Test
+    void goalWithTodosWithoutProject_showsThemUnderNoProject() throws Exception {
+        String goalId = createGoal("Ohne Projekt", null);
+        Todo loose = todoRepository.save(Todo.builder().title("Lose").priority(Todo.Priority.LOW).build());
+        perform(post("/api/v1/goals/" + goalId + "/todos"), Map.of("todoIds", List.of(loose.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todos[0].projectName").doesNotExist())
+                .andExpect(jsonPath("$.byProject[0].total").value(1));
+        mockMvc.perform(get("/api/v1/goals/" + goalId)).andExpect(status().isOk());
     }
 
     @Test
