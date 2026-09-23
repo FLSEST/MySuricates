@@ -1,10 +1,10 @@
 [Deutsch](README.de.md) | **English**
 
-<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Build your own workflows with your suricates and let them help you watch every step. Deterministic if possible. Any provider: change it and keep your flow. Keep track of what you did and what you do. Put your suricates to work the way you need them. Workflows, chains, skills, templates, schedules, TODOs, integrations, webhooks, human-in-the-loop, assistant, BPMN, versions, gates, memory, dashboard, audit, highly configurable, fully customizable, features can be switched off, and more."></p>
+<p align="center"><img src="docs/assets/readme-banner-en.svg" alt="MySuricates – Build your own workflows with your suricates and let them help you keep an eye on every step. Deterministic wherever possible. Any provider: swap it out and keep your flow. Keep track of what you have done and what you are doing. Put your suricates to work the way you need them. Workflows, chains, skills, templates, schedules, TODOs, integrations, webhooks, human-in-the-loop, assistant, BPMN, versions, gates, memory, dashboard, audit, highly configurable, fully customizable, features can be switched off, and more."></p>
 
 # MySuricates
 
-A research project on the question of how far software development can be operated in a controlled
+A research project on the question of how far software development can be run in a controlled
 way with AI agents — and a working system in which this can be observed.
 
 MySuricates is a local workflow platform: workflows consist of blocks that are either
@@ -50,7 +50,7 @@ It does not mean that the question has been answered.
 |---|---|
 | Can a system identify and work through its own need for improvement without anyone giving it the initial push? | **Self-Improvement Loop**: audit workflow → machine evaluation by a gate (last row of this table) → automatically created TODO → the `TodoTrigger` starts a fix workflow for it → verification. Three layers prevent the loop from chasing itself: a fix run is marked as such and may not create a TODO itself, the number of fix attempts is limited per TODO, and as long as one fix run is running, no second one starts. [Details](docs/en/architektur.md#todo-triggers--self-improvement-loop-v51v52) |
 | What does an agent need to know about a project, and where does that knowledge come from if nobody writes it down? | **Workflow Memory**: knowledge is extracted from completed runs and injected as context before the next run. |
-| How do you retain control over an agent that plans several steps by itself? | **Agentic blocks** separate reason and act — first one call decides what to do, a second executes it — and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
+| How do you retain control over an agent that plans several steps by itself? | **Agentic blocks** separate Reason and Act — first one call decides what to do, a second executes it — and run against hard budgets: iterations, time, cumulative tokens, repetition detection. |
 | Can the quality of an AI output be evaluated by machine instead of by reading it? | **Gates**: blocks output `gate_status: GREEN\|YELLOW\|RED`. RED creates a high-priority TODO, YELLOW a medium-priority one. The evaluation lives in the workflow, not in the platform. |
 
 The most honest answer after seven months: the mechanisms hold up, but they need guardrails,
@@ -117,8 +117,9 @@ Shell blocks and AI calls run **with your privileges** — directly on the machi
 instance in a container, with your mounted folders and logins — not in a separate sandbox per block;
 the AI CLIs usually do not ask before using tools. When started from source, backend and frontend
 listen on all network interfaces (the instance set up by the installer binds only to `127.0.0.1` by
-default), and some endpoints do not need an API key. MySuricates is built for local operation by a
-trusted person — for remote access, put a VPN in front of it, not an open port. Full details:
+default), and some endpoints do not need an API key. MySuricates
+is built for local operation by a trusted person — for remote access, put a VPN in front of it,
+not an open port. Full details:
 [Trust model and network exposure](docs/en/deployment.md#trust-model-and-network-exposure).
 
 ## Tech stack
@@ -138,9 +139,13 @@ trusted person — for remote access, put a VPN in front of it, not an open port
 | Integrations | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior — module, in the `full` preset |
 
 Execution happens where the instance runs — in the container (recommended) or directly on the
-machine: shell blocks through the user's shell, AI blocks through the installed CLI (in the container
-with the login from the machine mounted in, without a second login). A dedicated container per shell
-block (`container_image`) exists only if the Docker socket is explicitly made available.
+machine: shell blocks through the user's shell, AI blocks through the installed CLI (mounted into
+the container from the machine). A dedicated container per shell block (`container_image`) exists
+only if the Docker socket is explicitly made available. What gets into the container from the AI
+providers is controlled by a switch: by default, only the programs and, per provider, the login
+(for Claude, a one-time token from `claude setup-token`), not the machine's settings, plugins,
+memory, or histories. If you want to share less or everything, see the variants under
+[AI providers in the container](docs/en/deployment.md#ai-providers-in-the-container).
 
 ## Quickstart
 
@@ -160,7 +165,8 @@ Just trying it out: In the cloned repository, `scripts/tryout.sh build && script
 starts a container with all tools at http://localhost:9095 — all it needs is Docker. The container
 mounts no folders and no login from the machine; for AI blocks you log in once **inside the container**
 (`scripts/tryout.sh login claude`, likewise `codex` or `pi`), and the login remains in a dedicated
-Docker volume ([Getting Started](docs/en/GETTING-STARTED.md#just-trying-it-out--no-installation)).
+Docker volume
+([Getting Started](docs/en/GETTING-STARTED.md#just-trying-it-out--no-installation)).
 
 Set up permanently:
 
