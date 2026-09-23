@@ -66,7 +66,9 @@ Codex und Pi schreiben ihre `auth.json` an Ort und Stelle, dort genügt die Date
 `claude setup-token` einmal (er gilt ein Jahr); er gehört als `CLAUDE_CODE_OAUTH_TOKEN=…` nach
 `~/.config/mysuricates/ai.env` mit den Rechten 600, der Installer bietet das an. Compose reicht die
 Datei beim Start als Umgebung durch. Sie landet weder im Image noch im Volume, ist aber für jeden mit
-Docker-Zugriff per `docker inspect` lesbar.
+Docker-Zugriff per `docker inspect` lesbar. Als Anmeldung zählt nur ein Wert, der ein Token sein kann:
+mindestens 40 Zeichen, ohne Leerzeichen und ohne spitze Klammern. Ein Platzhalter wie `<token>` bleibt
+draußen; Starter, Installer und die Einstellungen melden ihn als fehlende Anmeldung.
 
 | Weg | Schalter | Docker-Socket ohne Schalter |
 |---|---|---|

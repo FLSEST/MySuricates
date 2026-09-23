@@ -103,6 +103,8 @@ M_ai_token_q="Claude braucht im Container einen eigenen Token (claude setup-toke
 M_ai_token_paste="Token einfügen (wird nicht angezeigt)"
 M_ai_token_saved="Token gespeichert in %s (nur für dich lesbar)"
 M_ai_token_hint="Claude im Container: einmal claude setup-token ausführen, dann CLAUDE_CODE_OAUTH_TOKEN=… nach %s (chmod 600)"
+M_ai_token_implausible="In %s steht bei CLAUDE_CODE_OAUTH_TOKEN kein Token (Platzhalter, Leerzeichen oder unter 40 Zeichen) — das zählt nicht als Anmeldung."
+M_ai_token_rejected="Das sieht nicht wie ein Token aus (Platzhalter, Leerzeichen oder unter 40 Zeichen) — nicht gespeichert."
 
 # Ports und Ordner
 M_ports_title="Ports und Ordner"

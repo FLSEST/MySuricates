@@ -104,6 +104,8 @@ M_ai_token_q="Claude needs its own token in a container (claude setup-token, val
 M_ai_token_paste="Paste the token (not shown)"
 M_ai_token_saved="Token saved in %s (readable only by you)"
 M_ai_token_hint="Claude in a container: run claude setup-token once, then put CLAUDE_CODE_OAUTH_TOKEN=… into %s (chmod 600)"
+M_ai_token_implausible="CLAUDE_CODE_OAUTH_TOKEN in %s is not a token (placeholder, spaces or under 40 characters) — it does not count as a login."
+M_ai_token_rejected="That does not look like a token (placeholder, spaces or under 40 characters) — not saved."
 
 # Ports and folders
 M_ports_title="Ports and folders"

@@ -66,7 +66,9 @@ write their `auth.json` in place, so the file is enough there. `claude setup-tok
 once (valid for a year); it goes into `~/.config/mysuricates/ai.env` as `CLAUDE_CODE_OAUTH_TOKEN=…` with
 mode 600, and the installer offers to do that. Compose passes the file on as environment at start. It
 lands neither in the image nor in the volume, but anyone with Docker access can read it via
-`docker inspect`.
+`docker inspect`. Only a value that can be a token counts as a login: at least 40 characters, no spaces
+and no angle brackets. A placeholder such as `<token>` stays out; the starters, the installer and the
+settings report it as a missing login.
 
 | Way | Switches | Docker socket without a switch |
 |---|---|---|

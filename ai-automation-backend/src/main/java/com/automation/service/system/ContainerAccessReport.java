@@ -3,6 +3,7 @@ package com.automation.service.system;
 import com.automation.dto.response.SystemCapabilitiesResponse.ContainerAccessResponse;
 import com.automation.dto.response.SystemCapabilitiesResponse.ProviderAccessResponse;
 import com.automation.service.project.DockerExpectation;
+import com.automation.util.ClaudeOAuthToken;
 import com.automation.util.HostProcessUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -67,7 +68,8 @@ public class ContainerAccessReport {
     /** Where each CLI looks for its login — the provider directory the generator set, else its default. */
     private Boolean loginPresent(String id) {
         return switch (id) {
-            case "claude" -> !isBlank(env.apply("CLAUDE_CODE_OAUTH_TOKEN"))
+            // A placeholder from a copied instruction is no login (9bef7e8c)
+            case "claude" -> ClaudeOAuthToken.isPlausible(env.apply(ClaudeOAuthToken.VARIABLE))
                     || Files.isRegularFile(dir("CLAUDE_CONFIG_DIR", ".claude").resolve(".credentials.json"));
             case "codex" -> Files.isRegularFile(dir("CODEX_HOME", ".codex").resolve("auth.json"));
             default -> Files.isRegularFile(dir("PI_CODING_AGENT_DIR", ".pi/agent").resolve("auth.json"));

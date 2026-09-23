@@ -25,6 +25,9 @@ class ContainerAccessReportTest {
     @TempDir
     Path tmp;
 
+    /** Plausible by length and characters; "secret" in it lets the leak check below find it. */
+    private static final String TOKEN = "sk-ant-oat01-secret-value-0123456789abcdefghij";
+
     private final Map<String, String> env = new HashMap<>();
     private HostProcessUtils processUtils;
     private DockerExpectation docker;
@@ -72,7 +75,7 @@ class ContainerAccessReportTest {
                 "MYSURICATES_AI_PROVIDERS", "claude,codex",
                 "MYSURICATES_SWITCH_SOURCE", "/home/u/.config/mysuricates/staging.env",
                 "MYSURICATES_SWITCH_PREFIX", "STABLE_",
-                "CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat-secret-value",
+                "CLAUDE_CODE_OAUTH_TOKEN", TOKEN,
                 "CODEX_HOME", codexHome.toString(),
                 "PI_CODING_AGENT_DIR", tmp.resolve("providers/pi").toString()));
         when(processUtils.isOnPath("pi")).thenReturn(false);
@@ -93,11 +96,24 @@ class ContainerAccessReportTest {
         Path claudeDir = Files.createDirectories(tmp.resolve("providers/claude"));
         Files.writeString(claudeDir.resolve(".credentials.json"), "{\"claudeAiOauth\":\"file-secret\"}");
         env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "programs",
-                "CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat-secret-value", "CLAUDE_CONFIG_DIR", claudeDir.toString()));
+                "CLAUDE_CODE_OAUTH_TOKEN", TOKEN, "CLAUDE_CONFIG_DIR", claudeDir.toString()));
 
         String json = new ObjectMapper().writeValueAsString(report());
 
         assertThat(json).doesNotContain("secret");
+        assertThat(provider(report(), "claude").login()).isTrue();
+    }
+
+    @Test
+    void aPlaceholderTokenIsNoLogin() {
+        env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "login",
+                "CLAUDE_CONFIG_DIR", tmp.resolve("providers/claude").toString()));
+
+        for (String placeholder : new String[]{"<token>", "…", "sk-ant-oat-secret-value"}) {
+            env.put("CLAUDE_CODE_OAUTH_TOKEN", placeholder);
+            assertThat(provider(report(), "claude").login()).as(placeholder).isFalse();
+        }
+        env.put("CLAUDE_CODE_OAUTH_TOKEN", TOKEN);
         assertThat(provider(report(), "claude").login()).isTrue();
     }
 

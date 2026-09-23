@@ -57,7 +57,7 @@ check "claude without token: no login"  '! has "env_file:" && has "#count=2" && 
 check "hint names claude setup-token"   'has "#text=  claude:" && has "claude setup-token"'
 
 echo "3) login with a token in ai.env"
-printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token\n' > "$TMP/config/ai.env"
+printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0)"
 check "token file passed as env_file"   'grep -q "^    env_file:" <<<"$OUT" && line "      - \"$TMP/config/ai.env\""'
 check "token value never in override"   '! has "secret-test-token"'
@@ -65,7 +65,32 @@ check "all three ready"                 'has "#count=3" && has "#ready=claude co
 printf 'SOMETHING_ELSE=1\n' > "$TMP/config/ai.env"
 OUT="$(run Linux svc "" 0)"
 check "no token line: no env_file"      '! has "env_file:" && has "#missing=claude:login"'
-printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token\n' > "$TMP/config/ai.env"
+printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
+
+echo "3b) only a plausible token counts as a login (9bef7e8c)"
+tok() { printf '%s\n' "$@" > "$TMP/config/ai.env"; OUT="$(run Linux svc "" 0)"; }
+tok 'CLAUDE_CODE_OAUTH_TOKEN=<token>'
+check "placeholder: no env_file, reason token" '! has "env_file:" && has "#count=2" && has "#missing=claude:token"'
+check "placeholder: hint says why"             'has "sieht nicht wie ein Token aus" && has "claude setup-token"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN=abc123'
+check "too short: reason token"                '! has "env_file:" && has "#missing=claude:token"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN=sk ant oat token with some words in it right'
+check "spaces: reason token"                   '! has "env_file:" && has "#missing=claude:token"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN='
+check "empty value: plain missing login"       '! has "env_file:" && has "#missing=claude:login"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN="secret-test-token-0123456789-abcdefghijklmnop"'
+check "double quotes come off"                 'grep -q "^    env_file:" <<<"$OUT" && has "#count=3"'
+tok "CLAUDE_CODE_OAUTH_TOKEN='secret-test-token-0123456789-abcdefghijklmnop'"
+check "single quotes come off"                 'grep -q "^    env_file:" <<<"$OUT" && has "#count=3"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN=<token>' 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop'
+check "last line wins (valid last)"            'grep -q "^    env_file:" <<<"$OUT" && has "#count=3"'
+tok 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop' 'CLAUDE_CODE_OAUTH_TOKEN=<token>'
+check "last line wins (placeholder last)"      '! has "env_file:" && has "#missing=claude:token"'
+plaus() { ( . "$HERE/../lib/host-mounts.sh"; claude_token_plausible "$1" ); }
+check "39 characters are not enough"           '! plaus "$(printf "%039d" 0)"'
+check "40 characters are"                      'plaus "$(printf "%040d" 0)"'
+check "an ellipsis is not a token"             '! plaus "…"'
+printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/config/ai.env"
 
 echo "4) programs: no login from the host at all"
 OUT="$(run Linux svc "" 0 programs)"

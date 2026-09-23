@@ -24,7 +24,7 @@
 HOST_MOUNTS_KNOWN_PROVIDERS="claude codex pi"
 HOST_MOUNTS_PROVIDER_COUNT=0   # selected providers that can run: program, and a login unless `programs`
 HOST_MOUNTS_READY=""           # their ids, space-separated
-HOST_MOUNTS_MISSING=""         # "<id>:program" / "<id>:login" for the caller's warning
+HOST_MOUNTS_MISSING=""         # "<id>:program" / "<id>:login" / "claude:token" (implausible) for the caller's warning
 
 _hm_q() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 # Both append to the caller's locals (bash scoping is dynamic).
@@ -32,7 +32,29 @@ _hm_vol() { vols="${vols}      - \"$(_hm_q "$1")\"
 "; }
 _hm_env() { local e; for e in "$@"; do envs="${envs}      - \"$(_hm_q "$e")\"
 "; done; }
-_hm_has_claude_token() { [ -f "$1" ] && grep -Eq '^CLAUDE_CODE_OAUTH_TOKEN=.+' "$1"; }
+# claude_token_from_file FILE — the CLAUDE_CODE_OAUTH_TOKEN value compose would read from FILE: the last
+# such line wins, one pair of surrounding quotes comes off. Prints nothing when there is none.
+claude_token_from_file() {
+  local v
+  [ -f "$1" ] || return 0
+  v="$(grep -E '^CLAUDE_CODE_OAUTH_TOKEN=' "$1" | tail -n 1)"; v="${v#CLAUDE_CODE_OAUTH_TOKEN=}"
+  case "$v" in
+    \"*\") v="${v#\"}"; v="${v%\"}" ;;
+    \'*\') v="${v#\'}"; v="${v%\'}" ;;
+  esac
+  printf '%s' "$v"
+}
+
+# claude_token_plausible VALUE — whether VALUE can be a token from `claude setup-token` at all (9bef7e8c):
+# at least 40 characters, no whitespace, no angle brackets. Catches what a copied instruction leaves
+# behind (<token>, …, a sentence). No fixed prefix: the token format belongs to Anthropic.
+# Same rule in Java: com.automation.util.ClaudeOAuthToken.
+claude_token_plausible() {
+  case "$1" in *[[:space:]]*|*'<'*|*'>'*) return 1 ;; esac
+  [ "${#1}" -ge 40 ]
+}
+
+_hm_has_claude_token() { claude_token_plausible "$(claude_token_from_file "$1")"; }
 
 # host_mounts_yaml SERVICE PROJECTS_DIR DOCKER_SOCKET [AI_FROM_HOST] [AI_PROVIDERS] [SWITCH_SOURCE] [SWITCH_PREFIX]
 #   AI_FROM_HOST   programs | login (default) | all
@@ -47,7 +69,7 @@ host_mounts_yaml() {
   local os="${HOST_MOUNTS_OS:-$(uname -s)}"
   local ai_env="${HOST_MOUNTS_AI_ENV:-${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env}"
   local home_in=/app/data/providers nm_in=/usr/lib/node_modules
-  local vols="" envs="" envfile="" selected="" nm="" id p bin prog login socket_on=0
+  local vols="" envs="" envfile="" selected="" nm="" id p bin prog login why socket_on=0
   HOST_MOUNTS_PROVIDER_COUNT=0; HOST_MOUNTS_READY=""; HOST_MOUNTS_MISSING=""
 
   case "$access" in
@@ -70,7 +92,7 @@ host_mounts_yaml() {
   fi
 
   for id in $selected; do
-    prog=""; login=""
+    prog=""; login=""; why=login
     case "$id" in
       claude)
         if [ "$os" = "Linux" ] && [ -e "$HOME/.local/bin/claude" ]; then
@@ -88,7 +110,8 @@ host_mounts_yaml() {
             [ -f "$HOME/.claude.json" ] && _hm_vol "$HOME/.claude.json:/seed/.claude.json:ro"
             if [ -d "$HOME/.claude" ]; then _hm_vol "$HOME/.claude:$HOME/.claude"; login=1; fi ;;
           login)
-            if _hm_has_claude_token "$ai_env"; then envfile="$ai_env"; login=1; fi
+            if _hm_has_claude_token "$ai_env"; then envfile="$ai_env"; login=1
+            elif [ -n "$(claude_token_from_file "$ai_env")" ]; then why=token; fi
             _hm_env "CLAUDE_CONFIG_DIR=$home_in/claude" ;;
           programs)
             _hm_env "CLAUDE_CONFIG_DIR=$home_in/claude" ;;
@@ -117,7 +140,7 @@ host_mounts_yaml() {
     if [ -z "$prog" ]; then
       HOST_MOUNTS_MISSING="${HOST_MOUNTS_MISSING:+$HOST_MOUNTS_MISSING }$id:program"
     elif [ "$access" != programs ] && [ -z "$login" ]; then
-      HOST_MOUNTS_MISSING="${HOST_MOUNTS_MISSING:+$HOST_MOUNTS_MISSING }$id:login"
+      HOST_MOUNTS_MISSING="${HOST_MOUNTS_MISSING:+$HOST_MOUNTS_MISSING }$id:$why"
     else
       HOST_MOUNTS_READY="${HOST_MOUNTS_READY:+$HOST_MOUNTS_READY }$id"
       HOST_MOUNTS_PROVIDER_COUNT=$((HOST_MOUNTS_PROVIDER_COUNT + 1))
@@ -167,6 +190,7 @@ host_mounts_missing_text() {
   for item in $HOST_MOUNTS_MISSING; do
     id="${item%%:*}"; what="${item#*:}"
     case "$id:$what" in
+      claude:token) echo "  $id: CLAUDE_CODE_OAUTH_TOKEN in ~/.config/mysuricates/ai.env sieht nicht wie ein Token aus (Platzhalter, Leerzeichen oder unter 40 Zeichen) — neu mit \`claude setup-token\`" ;;
       claude:login) echo "  $id: keine Anmeldung fuer Container — einmal \`claude setup-token\`, den Token als CLAUDE_CODE_OAUTH_TOKEN=... nach ~/.config/mysuricates/ai.env (chmod 600)" ;;
       *:login)      echo "  $id: keine Anmeldung auf diesem Rechner gefunden" ;;
       *)            echo "  $id: Programm auf diesem Rechner nicht gefunden" ;;

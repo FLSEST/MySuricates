@@ -24,6 +24,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 . "$LIB/module-preset.sh"
 # shellcheck source=lib/netaddr.sh
 . "$LIB/netaddr.sh"
+# shellcheck source=lib/host-mounts.sh
+. "$LIB/host-mounts.sh"   # claude_token_from_file / claude_token_plausible — dieselbe Regel wie beim Start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
 
 # --- Flags ------------------------------------------------------------------------------------------
@@ -401,15 +403,21 @@ ai_container() {
 }
 
 ai_claude_token() {
-  local token=""
+  local token="" have
   [ "$AI_FROM_HOST" = login ] || return 0
   case ",${AI_PROVIDERS:-claude}," in *,claude,*) ;; *) return 0 ;; esac
   provider_present claude || return 0
-  grep -Eq '^CLAUDE_CODE_OAUTH_TOKEN=.+' "$AI_ENV" 2>/dev/null && return 0
+  have="$(claude_token_from_file "$AI_ENV")"
+  claude_token_plausible "$have" && return 0
+  # Ein Platzhalter aus einer Anleitung zaehlt nicht als Anmeldung (9bef7e8c)
+  [ -n "$have" ] && printf '  %s\n' "$(msg ai_token_implausible "$AI_ENV")"
   if [ "$INTERACTIVE" = 1 ] && [ "$DRY" = 0 ] && tui_confirm "$(msg ai_token_q)" y; then
     claude setup-token || true   # Browser-Anmeldung; zeigt den Token nur an
     tui_secret token "$(msg ai_token_paste)"
     token="$(printf '%s' "$token" | tr -d '[:space:]')"
+    if [ -n "$token" ] && ! claude_token_plausible "$token"; then
+      printf '  %s\n' "$(msg ai_token_rejected)"; token=""
+    fi
   fi
   if [ -z "$token" ]; then printf '  %s\n' "$(msg ai_token_hint "$AI_ENV")"; return 0; fi
   mkdir -p "$(dirname "$AI_ENV")"

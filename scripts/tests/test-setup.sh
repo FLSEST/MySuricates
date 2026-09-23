@@ -85,9 +85,13 @@ rm -rf "$INST"
 check "claude without token: hint, nothing written"     '[ "$(run --yes --dry-run)" = 0 ] && out | grep -F "claude setup-token" >/dev/null && [ ! -e "$TMP/home/.config/mysuricates/ai.env" ]'
 rm -rf "$INST"
 check "no hint when claude is not selected"             '[ "$(run --yes --dry-run --ai-providers codex)" = 0 ] && ! out | grep -F "claude setup-token" >/dev/null'
-mkdir -p "$TMP/home/.config/mysuricates"; printf 'CLAUDE_CODE_OAUTH_TOKEN=x\n' > "$TMP/home/.config/mysuricates/ai.env"
+mkdir -p "$TMP/home/.config/mysuricates"; printf 'CLAUDE_CODE_OAUTH_TOKEN=secret-test-token-0123456789-abcdefghijklmnop\n' > "$TMP/home/.config/mysuricates/ai.env"
 rm -rf "$INST"
 check "claude with a token: no hint"                    '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep -F "claude setup-token" >/dev/null'
+printf 'CLAUDE_CODE_OAUTH_TOKEN=<token>\n' > "$TMP/home/.config/mysuricates/ai.env"
+rm -rf "$INST"
+check "placeholder token: named, hint, file kept"       '[ "$(run --yes --dry-run)" = 0 ] && out | grep -E "CLAUDE_CODE_OAUTH_TOKEN.*40" >/dev/null && out | grep -F "claude setup-token" >/dev/null && grep -qxF "CLAUDE_CODE_OAUTH_TOKEN=<token>" "$TMP/home/.config/mysuricates/ai.env"'
+check "a pasted token is checked before it is saved"    'grep -F "claude_token_plausible \"\$token\"" "$SETUP" >/dev/null'
 rm -rf "$TMP/home/.config"; unstub claude
 
 echo "5) staged — Dev · Test · Prod"
