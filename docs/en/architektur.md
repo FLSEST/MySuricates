@@ -592,6 +592,8 @@ All block executors (simple, retry, conditional, foreach, while, switch, skill-c
 
 `AiProviderRegistry.resolve()` falls back to the configured default provider (not hardcoded CLAUDE) when an unknown provider ID is passed.
 
+Whether a provider is ready is reported by `GET /api/v1/system/ai-providers/status` (`service/ai/status/AiProviderStatusService`): program on the `PATH` and a login via login file or environment variable — the same rule as the installer (`scripts/lib/providers.sh`), from `AiProvider#setup()` (`ProviderSetup`). Container instances move the login directories (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`), and the check follows them (`ProviderSetup.loginDir`/`loginDirEnv`). No CLI call, cached (`automation.ai-provider-status.ttl-seconds`, default 60 s), `POST …/status/refresh` checks at once. The answer holds only names and commands, never a value. The start page shows the status while there is no project or the default provider is not ready (`AiProviderStartCard`), the settings always (`AiProviderStatusCard`).
+
 ## Per-Block Skills
 
 Blocks can bring their own skills via the `skillIds` field, which apply additively to the workflow-level skills:

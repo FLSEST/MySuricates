@@ -36,7 +36,8 @@ public class ClaudeAiProvider implements AiProvider {
                 "claude auth login",
                 java.util.List.of(".claude/.credentials.json", ".claude.json:oauthAccount"),
                 // claude setup-token bzw. API-Schluessel statt Anmeldedatei
-                java.util.List.of("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"));
+                java.util.List.of("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"),
+                ".claude", "CLAUDE_CONFIG_DIR");
     }
 
     @Override

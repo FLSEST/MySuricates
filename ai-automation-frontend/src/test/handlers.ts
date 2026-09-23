@@ -171,6 +171,17 @@ export const handlers = [
   http.get(`${BASE}/system/ai-providers`, () =>
     HttpResponse.json({ providers: ['CLAUDE', 'CODEX'], default: 'CLAUDE' }),
   ),
+  // AI providers ready by default — with a project, the start page then shows no AI card
+  http.get(`${BASE}/system/ai-providers/status`, () =>
+    HttpResponse.json({
+      container: false,
+      checkedAt: '2026-09-24T10:00:00Z',
+      providers: [
+        { id: 'CLAUDE', cli: 'claude', state: 'READY', installed: true, loggedIn: true, loginVia: 'FILE', loginSource: '~/.claude/.credentials.json', install: 'npm install -g @anthropic-ai/claude-code', login: 'claude auth login', defaultProvider: true },
+        { id: 'CODEX', cli: 'codex', state: 'READY', installed: true, loggedIn: true, loginVia: 'FILE', loginSource: '~/.codex/auth.json', install: 'npm install -g @openai/codex', login: 'codex login', defaultProvider: false },
+      ],
+    }),
+  ),
   http.get(`${BASE}/system/ai-providers/:id/models`, ({ params }) =>
     HttpResponse.json({
       providerId: String(params.id).toUpperCase(),

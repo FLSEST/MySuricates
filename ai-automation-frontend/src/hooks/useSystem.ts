@@ -141,6 +141,51 @@ export function useRefreshProviderModels() {
   });
 }
 
+/** READY = program and login found; LOGIN_MISSING = program found, no login; NOT_INSTALLED = no program. */
+export type AiProviderState = 'READY' | 'LOGIN_MISSING' | 'NOT_INSTALLED';
+
+/** One AI CLI on the machine the backend runs on — names and commands only, never a token. */
+export interface AiProviderStatus {
+  id: string;
+  cli: string;
+  state: AiProviderState;
+  installed: boolean;
+  loggedIn: boolean;
+  loginVia: 'ENVIRONMENT' | 'FILE' | null;
+  /** The variable name, or the login file as `~/…` / `$VARIABLE/…`. */
+  loginSource: string | null;
+  install: string;
+  login: string;
+  /** The provider a workflow uses when it names none. */
+  defaultProvider: boolean;
+}
+
+export interface AiProviderStatusReport {
+  /** The backend runs in a container: logins count in there, the start path decides how they get in. */
+  container: boolean;
+  checkedAt: string;
+  providers: AiProviderStatus[];
+}
+
+const aiProviderStatusKey = ['system', 'ai-providers', 'status'];
+
+/** Whether the AI CLIs are ready (f5a273ae). The backend caches the answer; refresh looks again at once. */
+export function useAiProviderStatus() {
+  return useQuery({
+    queryKey: aiProviderStatusKey,
+    queryFn: () => api.get<AiProviderStatusReport>('/system/ai-providers/status'),
+    staleTime: 60_000,
+  });
+}
+
+export function useRefreshAiProviderStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<AiProviderStatusReport>('/system/ai-providers/status/refresh'),
+    onSuccess: (data) => qc.setQueryData(aiProviderStatusKey, data),
+  });
+}
+
 export function useUpdateSystemSetting() {
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>

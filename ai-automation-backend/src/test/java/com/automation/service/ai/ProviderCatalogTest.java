@@ -52,6 +52,17 @@ class ProviderCatalogTest {
             // Namen landen unquotiert in ${!name} des Installers — nur Grossbuchstaben, Ziffern, _
             assertThat(setup.loginEnv()).as(provider.getId() + ": loginEnv")
                     .allSatisfy(v -> assertThat(v).matches("[A-Z][A-Z0-9_]*"));
+            // Umlenkbares Anmeldeverzeichnis (Statusanzeige, f5a273ae): beides oder keins, und es lenkt
+            // mindestens eine Anmeldedatei um — sonst schaute die Anzeige im Container am falschen Ort
+            assertThat(setup.loginDir() == null).as(provider.getId() + ": loginDir nur mit loginDirEnv")
+                    .isEqualTo(setup.loginDirEnv() == null);
+            if (setup.loginDirEnv() != null) {
+                assertThat(setup.loginDirEnv()).as(provider.getId() + ": loginDirEnv").matches("[A-Z][A-Z0-9_]*");
+                assertThat(setup.loginDir()).as(provider.getId() + ": loginDir relativ zu $HOME")
+                        .doesNotStartWith("/").doesNotStartWith("~").doesNotEndWith("/");
+                assertThat(setup.loginFiles()).as(provider.getId() + ": eine Anmeldedatei liegt in loginDir")
+                        .anySatisfy(f -> assertThat(f).startsWith(setup.loginDir() + "/"));
+            }
         });
     }
 

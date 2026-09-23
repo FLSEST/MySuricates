@@ -60,6 +60,7 @@ Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, 
 Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegistry.ts`: Kennzahlen, Diagramme, Todos, letzte Runs und Schnellaktionen.
 
 - **Widget = Registry-Eintrag** `{ id, label, description, category, size, module?, multiple?, catalogOnly?, configForm?, component }` (Typ in `widgetDefinition.ts`). Die Komponente lädt ihre Daten selbst über Query-Hooks und bekommt `{ instanceId, config }` als Props. Prop-basierte Karten, die Insights mit eigenem Zeitraum nutzt, bekommen einen Wrapper (`DashboardDataWidgets.tsx`, `InsightsWidgets.tsx`). Die Insights-Widgets (Quality Gates, Fehleranalyse, Kosten pro Workflow, Block-Typen, Trigger-Verteilung, Kosten- und Dauerverlauf, Tokens) sind `React.lazy`-Einträge (`insightsWidgetDefs.ts`, ein gemeinsamer Chunk). Rendert ein Widget nichts, fällt sein Slot weg (`empty:hidden`).
+- **KI-Anbieter:** Über den Widgets zeigt `AiProviderStartCard` (auch auf der Simple-Startseite), ob die KI-CLIs bereit sind — solange es kein Projekt gibt oder der Standard-Anbieter nicht bereit ist, mit dem Befehl für das, was fehlt. Im Container nennt die Karte keine Befehle, sondern den Startweg. „Ausblenden“ gilt genau für den gezeigten Status (`aiStatusDismissed` im Settings-Store); ändert er sich, erscheint die Karte wieder.
 - **Robust:** Jedes Widget liegt in einer Fehlergrenze (`WidgetFrame`) mit `Suspense` darin: Lazy Widgets zeigen ein Skeleton, bis ihr Code geladen ist, ein gescheiterter Chunk die Fehlerkarte. Die Kennzahlen, die Widgets auf Basis von `/learning/dashboard`, „Letzte Ausführungen", Todos, das Todo-Diagramm und „Geplant" zeigen beim Laden ein `WidgetSkeleton`. Scheitert `/learning/dashboard`, erscheint ein Banner mit Retry; die übrigen Widgets bleiben nutzbar.
 - **Widget-Arten:** Ein Layout speichert `WidgetInstance { instanceId, type, hidden?, size?, config? }`. *Standard-Singletons* (Default, `instanceId = type`) sind automatisch in jeder Ansicht und lassen sich nur ausblenden; ihre Menge ist in `widgetRegistry.test.ts` festgeschrieben (`DEFAULT_WIDGET_IDS`). *Katalog-Singletons* (`catalogOnly`, z. B. alle Insights-Widgets) kommen nur über den Katalog in eine Ansicht. *Mehrfach-Widgets* (`multiple`) werden mit eigener Konfiguration angelegt. Katalog- und Mehrfach-Widgets lassen sich entfernen, nicht nur ausblenden. `config` enthält nur primitive Werte; die Keys sind sortiert wie im Backend.
 - **Größenklassen** `stat | chart | third | twoThirds | full` bestimmen die Flex-Basis pro Breakpoint (`WIDGET_SIZE_CLASSES`). Zeilen mit weniger Widgets verbreitern diese, statt Lücken zu lassen. Im Bearbeiten-Modus setzt das Größenmenü am Widget `instance.size`; die Registry-Größe („Standard") entfernt das Feld wieder.
@@ -177,6 +178,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 ### Settings (`/settings`)
 
 - Allgemein: Sprache (EN/DE), Advanced Mode
+- KI-Anbieter (`AiProviderStatusCard`, auch im Simple Mode): je Anbieter Programm und Anmeldung gefunden oder der Befehl dafür, „Neu prüfen“ (`POST /system/ai-providers/status/refresh`)
 - Aussehen (eigene, einklappbare Sektion): Theme-Auswahl (18 Themes nach bekannten Paletten, gruppiert Dunkel/Hell), eigene Farben pro Theme
 - Sicherheit: API-Key-Eingabe (maskiert)
 - Remote-Access: Tailscale-Status + Enable/Disable
@@ -443,6 +445,8 @@ Alle API-Daten werden über React Query verwaltet:
 | `useBackupList()` | Query | Datenbank-Backups |
 | `useAiProviders()` | Query | AI-Provider und Default |
 | `usePiCatalog()` | Query | Pi-Provider-Katalog |
+| `useAiProviderStatus()` | Query (60 s stale) | Bereitschaft der KI-CLIs je Anbieter |
+| `useRefreshAiProviderStatus()` | Mutation | Bereitschaft sofort neu prüfen |
 | `useUpdateSystemSetting()` | Mutation | System-Einstellung ändern |
 | `useAssistantModelSetting()` | Query | Assistenten-Modell-Einstellung |
 | `useAutoRepairModeSetting()` | Query | Auto-Repair-Modus-Einstellung |

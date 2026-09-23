@@ -43,6 +43,7 @@ docker exec -it -u 1000 mysuricates-tryout claude                               
 ```
 
 Instead of logging in you can pass a key as an environment variable (`-e ANTHROPIC_API_KEY=…`).
+The start page shows whether a login has arrived.
 Without a login only shell and deterministic blocks run — enough for the blueprints outside the
 `AI` category. For working on your own projects on the machine, the installer (section 2) is the
 right way. Details: [Deployment → Tryout image](deployment.md#tryout-image).
@@ -63,7 +64,8 @@ without sudo when the package manager is too old).
 
 For AI workflows you need **an AI CLI of your choice** — `claude`, `codex` or `pi` — that you are
 logged in to — via its login file or an environment variable (`CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates starts without one; the installer shows which it finds.
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` …). MySuricates starts without one; the installer shows which it finds,
+and so does the start page of the interface — with the command for whatever is missing.
 
 ---
 
@@ -220,7 +222,7 @@ in the repo — SSL off with the default password remains allowed.
 | `permission denied` on the Docker socket | the installer added you to the `docker` group — log out and back in once |
 | Docker installed but not running | Linux: `sudo systemctl start docker`, macOS: open Docker Desktop |
 | Port in use | the installer takes the next free one; change it in `deploy/instances/main.env` |
-| AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login` |
+| AI block fails, "not logged in" | log in to the CLI: `claude auth login`, `codex login` or `pi` → `/login`; the start page and the settings show per provider whether program and login are found |
 | Instance does not start | `scripts/instance.sh logs --name main`; setup logs in `~/.local/state/mysuricates/setup-logs/` |
 | Settings show "Docker not set up" | not an error — only shell blocks with `container_image` need Docker |
 
