@@ -10,12 +10,12 @@ import java.util.Map;
 /**
  * Arbeitspräferenzen für KI-Prompts — und nur die (TODO d49fbde0).
  *
- * <p><b>Was hier hinein darf und was nicht.</b> Entscheidung Flo (2026-09-15): In einen KI-Prompt
- * dürfen ausschließlich <em>Arbeits</em>präferenzen — Antwortsprache, Antwortstil, Tech-Stack und
- * Werkzeuge. Ausdrücklich nicht: Namen, Kontaktdaten, Lebenslauf, Berufsprofil. Deshalb gibt es
- * hier eine feste Liste von drei Schlüsseln und kein freies Profil-Objekt: Was nicht vorgesehen
- * ist, kann auch nicht versehentlich mitgeschickt werden. Ein zusätzlicher Schlüssel ist eine
- * bewusste Code-Änderung, keine Konfigurationsfrage.
+ * <p><b>Was hier hinein darf und was nicht.</b> Entscheidung des Maintainers (2026-09-15,
+ * TODO d49fbde0): In einen KI-Prompt dürfen ausschließlich <em>Arbeits</em>präferenzen —
+ * Antwortsprache, Antwortstil, Tech-Stack und Werkzeuge. Ausdrücklich nicht: Namen, Kontaktdaten,
+ * Lebenslauf, Berufsprofil. Deshalb gibt es hier eine feste Liste von drei Schlüsseln und kein
+ * freies Profil-Objekt: Was nicht vorgesehen ist, kann auch nicht versehentlich mitgeschickt
+ * werden. Ein zusätzlicher Schlüssel ist eine bewusste Code-Änderung, keine Konfigurationsfrage.
  *
  * <p><b>Opt-in pro Workflow.</b> Der Block entsteht nur, wenn ein Workflow ihn über
  * {@code metadata.userPreferences = true} anfordert — siehe

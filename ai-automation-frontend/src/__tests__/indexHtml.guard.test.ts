@@ -5,8 +5,8 @@ import path from 'node:path';
 
 // CSP-Wächter: index.html darf keine Google-Fonts-Links und kein Inline-Script
 // (ohne src-Attribut) enthalten. Beides verletzt eine strikte Content-Security-Policy.
-// Siehe Entscheidung Flo (2026-09-15): System-Fontstack statt Google Fonts,
-// Vite `define: { global: 'globalThis' }` statt Inline-Shim.
+// Siehe Entscheidung des Maintainers (2026-09-15, TODO bdd164a1): System-Fontstack statt
+// Google Fonts, Vite `define: { global: 'globalThis' }` statt Inline-Shim.
 describe('index.html CSP guard', () => {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const indexHtmlPath = path.resolve(currentDir, '../../index.html');
