@@ -41,6 +41,7 @@ out() { cat "$TMP/out"; }
 echo "1) flags and compatibility"
 check "bash -n"                                         'bash -n "$SETUP"'
 check "--help names the new ways"                       'bash "$SETUP" --help | grep -- "--runtime container|host" >/dev/null && bash "$SETUP" --help | grep -- "--mode one|staged" >/dev/null'
+check "--help documents --ai-from-host and --ai-providers" 'bash "$SETUP" --help | grep -- "--ai-from-host" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--ai-providers" >/dev/null'
 check "--help still documents --preset core, --lang de, --force" 'H="$(bash "$SETUP" --help)"; [[ "$H" == *"--preset core"* && "$H" == *"--lang de"* && "$H" == *"--force"* ]]'
 check "unknown preset exits 2"                          '[ "$(run --preset everything)" = 2 ]'
 check "--force without --preset exits 2 and says why"   '[ "$(run --force)" = 2 ] && out | grep -- "--preset" >/dev/null'
@@ -62,6 +63,7 @@ check "--yes --dry-run --runtime host → exit 0"         '[ "$(run --yes --dry-
 check "instance file for host"                          '[ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ] && [ "$(val main MYSURICATES_PRESET)" = core ]'
 check "default provider is the one installed (codex)"   '[ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
 check "dry run names the start command"                 'out | grep "instance.sh up --name main" >/dev/null'
+check "host: no container switches for the AI"          '[ -z "$(val main MYSURICATES_AI_FROM_HOST)" ]'
 
 echo "4) one instance in a container (default)"
 rm -rf "$INST"
@@ -70,6 +72,23 @@ check "projects: folder above the clone"                '[ "$(val main MYSURICAT
 check "docker socket off by default"                    '[ "$(val main MYSURICATES_DOCKER_SOCKET)" = 0 ]'
 rm -rf "$INST"
 check "--docker-socket mounts it on request"            '[ "$(run --yes --dry-run --docker-socket)" = 0 ] && [ "$(val main MYSURICATES_DOCKER_SOCKET)" = 1 ]'
+
+echo "4b) what of the AI providers goes into the container (262948a4)"
+rm -rf "$INST"
+check "default: only the login, all providers"          '[ "$(run --yes --dry-run)" = 0 ] && [ "$(val main MYSURICATES_AI_FROM_HOST)" = login ] && [ -z "$(val main MYSURICATES_AI_PROVIDERS)" ]'
+rm -rf "$INST"
+check "--ai-from-host / --ai-providers are written"     '[ "$(run --yes --dry-run --ai-from-host programs --ai-providers "Codex, pi")" = 0 ] && [ "$(val main MYSURICATES_AI_FROM_HOST)" = programs ] && [ "$(val main MYSURICATES_AI_PROVIDERS)" = codex,pi ]'
+check "unknown --ai-from-host exits 2"                  '[ "$(run --yes --dry-run --ai-from-host everything)" = 2 ] && out | grep -- "--ai-from-host" >/dev/null'
+check "unknown --ai-providers exits 2"                  '[ "$(run --yes --dry-run --ai-providers gemini)" = 2 ] && out | grep gemini >/dev/null'
+stub claude 'exit 0'
+rm -rf "$INST"
+check "claude without token: hint, nothing written"     '[ "$(run --yes --dry-run)" = 0 ] && out | grep -F "claude setup-token" >/dev/null && [ ! -e "$TMP/home/.config/mysuricates/ai.env" ]'
+rm -rf "$INST"
+check "no hint when claude is not selected"             '[ "$(run --yes --dry-run --ai-providers codex)" = 0 ] && ! out | grep -F "claude setup-token" >/dev/null'
+mkdir -p "$TMP/home/.config/mysuricates"; printf 'CLAUDE_CODE_OAUTH_TOKEN=x\n' > "$TMP/home/.config/mysuricates/ai.env"
+rm -rf "$INST"
+check "claude with a token: no hint"                    '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep -F "claude setup-token" >/dev/null'
+rm -rf "$TMP/home/.config"; unstub claude
 
 echo "5) staged — Dev · Test · Prod"
 rm -rf "$INST"
@@ -81,6 +100,7 @@ check "dev has all modules, prod is hardened"           '[ "$(val dev MYSURICATE
 check "test is like prod"                               '[ "$(val test MYSURICATES_PRESET)" = core ] && [ "$(val test MYSURICATES_HARDENING_SEALING)" = true ]'
 check "display names Dev / Test / Prod"                 '[ "$(val prod MYSURICATES_ENVIRONMENT)" = Prod ] && [ "$(val dev MYSURICATES_ENVIRONMENT)" = Dev ]'
 check "staged runs in containers"                       '[ "$(val test MYSURICATES_RUNTIME)" = container ]'
+check "staged: only the login in all three"             '[ "$(val dev MYSURICATES_AI_FROM_HOST)" = login ] && [ "$(val prod MYSURICATES_AI_FROM_HOST)" = login ]'
 
 echo "6) choices as flags"
 rm -rf "$INST"
@@ -129,6 +149,9 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
     check "mode menu shown and complete ($l)"             'grep -E "(Step|Schritt) 2 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
     pty_setup "$l" q --runtime host
     check "module menu shown and complete ($l)"           'grep -E "(Step|Schritt) 4 (of|von)" "$TMP/menu" >/dev/null && ! cut "$TMP/menu"'
+    pty_setup "$l" q --runtime container --preset core --provider codex
+    sed "s/$(printf "\033")\[[0-9;?]*[A-Za-z]//g" "$TMP/menu" | tr -d "\r" | grep -A4 -E "(in den Container|into the container)\?" > "$TMP/ai-menu"
+    check "AI access menu shown and complete ($l)"       '[ -s "$TMP/ai-menu" ] && ! cut "$TMP/ai-menu"'
   done
 else
   echo "  skip (no usable script command)"

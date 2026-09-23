@@ -29,7 +29,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 # --- Flags ------------------------------------------------------------------------------------------
 MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; NAME="main"; BIND="127.0.0.1"
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
-HELP=0; SOCKET_FLAG=0
+HELP=0; SOCKET_FLAG=0; AI_FROM_HOST=""; AI_PROVIDERS=""
+AI_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env"
 die() { echo "setup.sh: $*" >&2; exit 2; }
 _prev=""
 for _a in "$@"; do
@@ -45,6 +46,8 @@ while [ "$#" -gt 0 ]; do
     --preset) PRESET="${2:-}"; shift ;;      --preset=*) PRESET="${1#*=}" ;;
     --modules) MODULES="${2:-}"; shift ;;    --modules=*) MODULES="${1#*=}" ;;
     --provider) PROVIDER="${2:-}"; shift ;;  --provider=*) PROVIDER="${1#*=}" ;;
+    --ai-from-host) AI_FROM_HOST="${2:-}"; shift ;;  --ai-from-host=*) AI_FROM_HOST="${1#*=}" ;;
+    --ai-providers) AI_PROVIDERS="${2:-}"; shift ;;  --ai-providers=*) AI_PROVIDERS="${1#*=}" ;;
     --port) PORT="${2:-}"; shift ;;          --port=*) PORT="${1#*=}" ;;
     --bind) BIND="${2:-}"; shift ;;          --bind=*) BIND="${1#*=}" ;;
     --projects) PROJECTS="${2:-}"; shift ;;  --projects=*) PROJECTS="${1#*=}" ;;
@@ -77,6 +80,11 @@ if [ -n "$PROVIDER" ]; then
   PROVIDER="$(printf '%s' "$PROVIDER" | tr 'A-Z' 'a-z')"
   providers_ids | grep -x "$PROVIDER" >/dev/null || die "$(msg err_provider "$PROVIDER" "$(providers_ids | tr '\n' ' ')")"
 fi
+case "$AI_FROM_HOST" in ""|programs|login|all) ;; *) die "$(msg err_ai_from_host "$AI_FROM_HOST")" ;; esac
+AI_PROVIDERS="$(printf '%s' "$AI_PROVIDERS" | tr 'A-Z ' 'a-z,' | tr -s ',' | sed 's/^,//; s/,$//')"
+for p in $(printf '%s' "$AI_PROVIDERS" | tr ',' ' '); do
+  providers_ids | grep -x "$p" >/dev/null || die "$(msg err_ai_providers "$p" "$(providers_ids | tr '\n' ' ')")"
+done
 for m in $(printf '%s' "$MODULES" | tr ',' ' '); do
   printf '%s\n' "${MODULE_CATALOG_FEATURE_KEYS[@]}" | grep -x "$m" >/dev/null || die "$(msg err_module "$m")"
 done
@@ -359,7 +367,56 @@ EOF
     fi
   fi
   tui_done "$(msg step_ai)" "$PROVIDER"
+  ai_container
+}
+
+# Container: was von den KI-Anbietern dieses Rechners hineinkommt (262948a4) — die Zugangsart, die
+# Auswahl und bei `login` fuer Claude der Token (Claude ersetzt seine Anmeldedatei bei jedem Erneuern,
+# eine eingebundene Datei ginge im Container veraltet).
+ai_container() {
+  local choice rc sel id items present all_present
+  [ "$RUNTIME" = container ] || return 0
+  if [ -z "$AI_FROM_HOST" ]; then
+    # Erst nach der Auswahl setzen: wer hier zurueckgeht, bekommt die Frage beim naechsten Mal wieder
+    if [ "$INTERACTIVE" = 1 ]; then
+      tui_select choice "$(msg ai_access_q)" 0 "$(msg ai_access_login)" "$(msg ai_access_programs)" "$(msg ai_access_all)"
+      rc=$?; [ "$rc" = 0 ] || return "$rc"
+      case "$choice" in 1) AI_FROM_HOST=programs ;; 2) AI_FROM_HOST=all ;; *) AI_FROM_HOST=login ;; esac
+    else
+      AI_FROM_HOST=login
+    fi
+  fi
+  present="$(providers_status | awk '$2=="present"{print $1}')"
+  all_present="$(echo $present)"
+  if [ -z "$AI_PROVIDERS" ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
+    items=()
+    for id in $present; do items[${#items[@]}]="on:$id:$id"; done
+    tui_checklist sel "$(msg ai_providers_q)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
+    # Alle abgewaehlt ist fast immer ein Versehen — dann bleiben alle
+    if [ -n "$sel" ] && [ "$sel" != "$all_present" ]; then AI_PROVIDERS="$(printf '%s' "$sel" | tr ' ' ',')"; fi
+  fi
+  ai_claude_token
+  tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}"
   return 0
+}
+
+ai_claude_token() {
+  local token=""
+  [ "$AI_FROM_HOST" = login ] || return 0
+  case ",${AI_PROVIDERS:-claude}," in *,claude,*) ;; *) return 0 ;; esac
+  provider_present claude || return 0
+  grep -Eq '^CLAUDE_CODE_OAUTH_TOKEN=.+' "$AI_ENV" 2>/dev/null && return 0
+  if [ "$INTERACTIVE" = 1 ] && [ "$DRY" = 0 ] && tui_confirm "$(msg ai_token_q)" y; then
+    claude setup-token || true   # Browser-Anmeldung; zeigt den Token nur an
+    tui_secret token "$(msg ai_token_paste)"
+    token="$(printf '%s' "$token" | tr -d '[:space:]')"
+  fi
+  if [ -z "$token" ]; then printf '  %s\n' "$(msg ai_token_hint "$AI_ENV")"; return 0; fi
+  mkdir -p "$(dirname "$AI_ENV")"
+  ( umask 077
+    { grep -v '^CLAUDE_CODE_OAUTH_TOKEN=' "$AI_ENV" 2>/dev/null; printf 'CLAUDE_CODE_OAUTH_TOKEN=%s\n' "$token"; } > "$AI_ENV.tmp" ) \
+    && mv "$AI_ENV.tmp" "$AI_ENV" && chmod 600 "$AI_ENV"
+  printf '  %s\n' "$(msg ai_token_saved "$AI_ENV")"
 }
 
 # --- Schritt 6: Ports und Ordner --------------------------------------------------------------------
@@ -401,7 +458,12 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
     printf '# Werte aendern, dann: scripts/instance.sh up --name %s   (AUTOMATION_*-Zeilen gehen an die Instanz)\n' "$1"
     printf 'MYSURICATES_RUNTIME=%s\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=%s\nMYSURICATES_PRESET=%s\n' "$2" "$3" "$BIND" "$4"
     [ -n "$5" ] && printf 'MYSURICATES_ENVIRONMENT=%s\n' "$5"
-    if [ "$2" = container ]; then printf 'MYSURICATES_PROJECTS=%s\nMYSURICATES_DOCKER_SOCKET=%s\n' "${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${SOCKET:-0}"; fi
+    if [ "$2" = container ]; then
+      printf 'MYSURICATES_PROJECTS=%s\nMYSURICATES_DOCKER_SOCKET=%s\n' "${PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${SOCKET:-0}"
+      # Was von den KI-Anbietern des Rechners in den Container kommt (262948a4)
+      printf 'MYSURICATES_AI_FROM_HOST=%s\n' "${AI_FROM_HOST:-login}"
+      [ -n "$AI_PROVIDERS" ] && printf 'MYSURICATES_AI_PROVIDERS=%s\n' "$AI_PROVIDERS"
+    fi
     printf 'MYSURICATES_HARDENING_SEALING=%s\nMYSURICATES_HARDENING_REQUIRE_SEALED=%s\n' "${6:-false}" "${7:-false}"
     printf 'AUTOMATION_AI_DEFAULT_PROVIDER=%s\n' "$(printf '%s' "$PROVIDER" | tr 'a-z' 'A-Z')"
     [ "$1" = "$NAME" ] && [ -n "${CUSTOM_LINES:-}" ] && printf '%s' "$CUSTOM_LINES"

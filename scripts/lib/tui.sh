@@ -297,6 +297,17 @@ tui_input() {
   printf -v "$var" '%s' "${answer:-$def}"
 }
 
+# tui_secret VAR FRAGE — verdeckte Eingabe (etwa ein Token); ohne Terminal leer
+tui_secret() {
+  local var="$1" question="$2" answer=""
+  if [ "$TUI_TTY" = 1 ]; then
+    printf '  %s%s%s: ' "$C_BOLD" "$question" "$C_RESET"
+    IFS= read -rs answer || answer=""
+    printf '\n'
+  fi
+  printf -v "$var" '%s' "$answer"
+}
+
 # --- Befehle ----------------------------------------------------------------------------------------
 
 # tui_run TITEL LOGDATEI BEFEHL… — Ausgabe ins Log; im Terminal Spinner, Dauer und die jeweils

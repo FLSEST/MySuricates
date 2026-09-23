@@ -94,6 +94,16 @@ M_ai_choose="Which provider should workflows use by default?"
 M_ai_none="No AI CLI found. MySuricates starts anyway; AI blocks need one of these:"
 M_ai_install="%s — install: %s   log in: %s"
 M_ai_login_hint="Log in to %s before the first AI workflow: %s"
+M_ai_access_q="What of this machine's AI providers goes into the container?"
+M_ai_access_login="Just the login|programs plus the logins (recommended)"
+M_ai_access_programs="Just the programs|every instance logs in on its own"
+M_ai_access_all="Everything, as before|the whole provider directories, writable"
+M_ai_providers_q="Which providers go into the container?"
+M_ai_access_done="AI in the container"
+M_ai_token_q="Claude needs its own token in a container (claude setup-token, valid for a year). Create it now?"
+M_ai_token_paste="Paste the token (not shown)"
+M_ai_token_saved="Token saved in %s (readable only by you)"
+M_ai_token_hint="Claude in a container: run claude setup-token once, then put CLAUDE_CODE_OAUTH_TOKEN=… into %s (chmod 600)"
 
 # Ports and folders
 M_ports_title="Ports and folders"
@@ -133,6 +143,8 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --bind ADDR                  address (default 127.0.0.1; 0.0.0.0 = from the network, VPN in front)
   --projects DIR               projects folder for the container (default: the folder above the clone)
   --docker-socket              container: allow shell blocks with container_image (full Docker control)
+  --ai-from-host MODE          container: what of the AI providers goes in — login (default), programs, all
+  --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)
   --lang de                    Deutsch (default English)
   --reconfigure                rewrite an existing instance file
@@ -154,4 +166,6 @@ M_err_name="--name only from a-z, 0-9 and -"
 M_err_bind="--bind needs an IP address"
 M_err_port="--port needs a number"
 M_err_provider="Unknown provider: %s (known: %s)"
+M_err_ai_from_host="Unknown value for --ai-from-host: %s (programs|login|all)"
+M_err_ai_providers="Unknown provider in --ai-providers: %s (known: %s)"
 M_err_module="Unknown module: %s"

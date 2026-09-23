@@ -49,6 +49,8 @@ OUT="$(plain 'tui_confirm "Install now?" y && echo YES || echo NO')"
 check "confirm → default"                        'printf "%s" "$OUT" | grep YES >/dev/null'
 OUT="$(plain 'tui_input PORT "Port" 9090; echo "port=$PORT"')"
 check "input → default"                          'printf "%s" "$OUT" | grep "port=9090" >/dev/null'
+OUT="$(plain 'tui_secret T "Token"; echo "token=[$T]"')"
+check "secret → empty, never asks"               'printf "%s" "$OUT" | grep -x "token=\[\]" >/dev/null'
 
 echo "5) menus in a terminal (pseudo terminal via script)"
 if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1; then
@@ -64,6 +66,10 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
   check "space toggles, arrows move"             'printf "%s" "$OUT" | grep "sel=x$" >/dev/null'
   OUT="$(pty 'b' 'tui_select C "Mode" 0 "A|a" "B|b"; echo "rc=$?"')"
   check "b means back (rc 2)"                    'printf "%s" "$OUT" | grep "rc=2" >/dev/null'
+  # Die Eingabe kommt erst, wenn read -s das Echo abgeschaltet hat — frueher getippt echot das Terminal
+  printf '%s\n' ". \"$LIB/tui.sh\"; tui_init; tui_secret T Token; echo \"len=\${#T}\"" > "$TMP/secret.sh"
+  OUT="$( (sleep 1; printf 'sk-geheim\n') | script -qec "bash $TMP/secret.sh" /dev/null 2>&1 | visible | tr -d '\r')"
+  check "secret is read but not echoed"          'printf "%s" "$OUT" | grep "len=9" >/dev/null && ! printf "%s" "$OUT" | grep "sk-geheim" >/dev/null'
   OUT="$(pty 'n\n' 'tui_confirm "Go?" y && echo YES || echo NO')"
   check "confirm reads n"                        'printf "%s" "$OUT" | grep NO >/dev/null'
   OUT="$(pty '\n' 'tui_checklist S "M" "on:a:Härtung:xhint" "off:b:Module:xhint"; echo "sel=$S"')"

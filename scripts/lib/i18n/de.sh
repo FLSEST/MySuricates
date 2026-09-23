@@ -93,6 +93,16 @@ M_ai_choose="Welchen Anbieter sollen Workflows standardmäßig nutzen?"
 M_ai_none="Keine KI-CLI gefunden. MySuricates startet trotzdem; KI-Blöcke brauchen eine davon:"
 M_ai_install="%s — installieren: %s   anmelden: %s"
 M_ai_login_hint="Vor dem ersten KI-Workflow bei %s anmelden: %s"
+M_ai_access_q="Was soll von den KI-Anbietern dieses Rechners in den Container?"
+M_ai_access_login="Nur die Anmeldung|Programme und je Anbieter die Anmeldung (empfohlen)"
+M_ai_access_programs="Nur die Programme|jede Instanz meldet sich selbst an"
+M_ai_access_all="Alles wie früher|ganze Anbieter-Verzeichnisse, im Container änderbar"
+M_ai_providers_q="Welche Anbieter kommen in den Container?"
+M_ai_access_done="KI im Container"
+M_ai_token_q="Claude braucht im Container einen eigenen Token (claude setup-token, gilt ein Jahr). Jetzt erzeugen?"
+M_ai_token_paste="Token einfügen (wird nicht angezeigt)"
+M_ai_token_saved="Token gespeichert in %s (nur für dich lesbar)"
+M_ai_token_hint="Claude im Container: einmal claude setup-token ausführen, dann CLAUDE_CODE_OAUTH_TOKEN=… nach %s (chmod 600)"
 
 # Ports und Ordner
 M_ports_title="Ports und Ordner"
@@ -132,6 +142,8 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = aus dem Netz, VPN davor)
   --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
   --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)
+  --ai-from-host MODUS         Container: was von den KI-Anbietern hineinkommt — login (Default), programs, all
+  --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)
   --lang de                    Deutsch (Default Englisch)
   --reconfigure                vorhandene Instanz-Datei neu schreiben
@@ -153,4 +165,6 @@ M_err_name="--name nur aus a-z, 0-9 und -"
 M_err_bind="--bind braucht eine IP-Adresse"
 M_err_port="--port braucht eine Zahl"
 M_err_provider="Unbekannter Anbieter: %s (bekannt: %s)"
+M_err_ai_from_host="Unbekannter Wert für --ai-from-host: %s (programs|login|all)"
+M_err_ai_providers="Unbekannter Anbieter in --ai-providers: %s (bekannt: %s)"
 M_err_module="Unbekanntes Modul: %s"
