@@ -1,8 +1,10 @@
 {
   "_comment": [
     "Erlaubte ruleKeys je auditKey — erhoben aus den Audit-Prompts in workflow-pool/mysuricates-*.json.",
-    "Ein auditKey ohne Eintrag wird nicht geprueft; ein unbekannter ruleKey wird normalisiert und",
-    "sonst trotzdem ingestiert (WARN im Activity-Log). AuditRuleKeyCatalogTest haelt den Katalog",
+    "Ein auditKey ohne Eintrag wird nicht geprueft. Fuer ein geprueftes Audit weist die Ingestion",
+    "einen Bericht mit unbekanntem ruleKey als Ganzes ab (AuditIngestionService.unknownRuleKeyError);",
+    "der Katalog liegt im JAR — ein neuer Key wirkt erst nach Neustart des Backends, vorher landet",
+    "der naechste Lauf als ungueltiger Bericht. AuditRuleKeyCatalogTest haelt den Katalog",
     "mit den Pool-Prompts synchron: jeder dort woertlich vergebene ruleKey muss hier stehen.",
     "Schluessel, die mit _ beginnen, sind Kommentare.",
     "",
