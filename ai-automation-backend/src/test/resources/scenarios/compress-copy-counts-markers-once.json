@@ -1,0 +1,62 @@
+{
+  "id": "compress-copy-counts-markers-once",
+  "title": "compress kopiert Gate- und TODO-Marker, gezählt werden sie nur am Originalschritt",
+  "derivedFrom": {
+    "spec": "RunCompletionHandler: Schritte mit derivedOutput werden nicht auf Marker ausgewertet; WORKFLOW-GUIDE compress: maßgeblich bleibt der Originalschritt",
+    "incidents": [
+      "6e5d6e2c (Marker aus abgeleiteten Schritten doppelt gewertet, 348b7b3b)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe die Doku. Schreibe todo_item-Zeilen und gate_status: GREEN|YELLOW|RED."
+        }
+      },
+      {
+        "type": "compress",
+        "name": "kurz",
+        "config": {
+          "source": "pruefen",
+          "stages": [
+            {
+              "op": "text.normalize"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "Doku zur Kette fehlt.\ntodo_item: Doku zur Kette ergänzen | MEDIUM | documentation | Abschnitt Ketten fehlt\ngate_status: YELLOW\ngate_category: documentation\ngate_description: Doku unvollständig"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": {
+      "status": "YELLOW",
+      "category": "documentation"
+    },
+    "markers": {
+      "gates": 1,
+      "todos": 1
+    },
+    "steps": [
+      {
+        "index": 1,
+        "status": "COMPLETED",
+        "outputContains": [
+          "gate_status: YELLOW",
+          "todo_item: Doku zur Kette ergänzen"
+        ]
+      }
+    ]
+  }
+}
