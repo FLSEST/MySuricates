@@ -134,14 +134,15 @@ class GateTest(unittest.TestCase):
         # README.md und docs/en/ sind der englische Pfad. Ein Verweis von dort auf eine
         # rein deutsche Seite ist ein Hinweis fuers Audit, das Gate bleibt gruen (TODO 1b84ecab).
         with tempfile.TemporaryDirectory() as tmp:
-            root = self.build(tmp, en_extra="[Konzepte](../konzepte/README.md)\n[A](a.md)")
-            (root / "docs" / "konzepte").mkdir()
-            (root / "docs" / "konzepte" / "README.md").write_text("# Konzepte\n")
+            # `plans/` ist kein gespiegelter Ordner (anders als konzepte/, siehe MIRRORED_SUBDIRS).
+            root = self.build(tmp, en_extra="[Plan](../plans/README.md)\n[A](a.md)")
+            (root / "docs" / "plans").mkdir()
+            (root / "docs" / "plans" / "README.md").write_text("# Plan\n")
             (root / "README.md").write_text("# R\n\n[Diagramme](docs/a.md)\n[Guide](docs/en/a.md)\n")
             code, out = run_script(root)
             self.assertEqual(code, 0, out)
             self.assertIn("en_links_to_german: 2", out)
-            self.assertIn("HINWEIS: en-verweist-auf-deutsch docs/en/a.md:4 -> docs/konzepte/README.md", out)
+            self.assertIn("HINWEIS: en-verweist-auf-deutsch docs/en/a.md:4 -> docs/plans/README.md", out)
             self.assertIn("HINWEIS: en-verweist-auf-deutsch README.md:3 -> docs/a.md", out)
             self.assertNotIn("-> docs/en/a.md", out)
 
@@ -149,6 +150,46 @@ class GateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp, extra_de_file="b.md", link="[B](b.md)")
             (root / "docs" / "en" / "b.md").write_text("# Extra\n")
+            code, out = run_script(root)
+            self.assertIn("en_links_to_german: 0", out)
+
+
+class MirroredSubdirTest(unittest.TestCase):
+    """Unterordner wie docs/konzepte/ werden gespiegelt geprueft wie docs/ selbst (TODO b94beaed)."""
+
+    def build(self, tmp, *, de_body="# K\n\n## Eins\n", en_body="# K\n\n## One\n", en_file=True):
+        root = Path(tmp)
+        (root / "docs" / "en" / "konzepte").mkdir(parents=True)
+        (root / "docs" / "konzepte").mkdir(parents=True)
+        (root / "docs" / "a.md").write_text("# A\n")
+        (root / "docs" / "en" / "a.md").write_text("# A\n")
+        (root / "docs" / "konzepte" / "k.md").write_text(de_body)
+        if en_file:
+            (root / "docs" / "en" / "konzepte" / "k.md").write_text(en_body)
+        return root
+
+    def test_mirrored_pair_is_green(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp))
+            self.assertEqual(code, 0, out)
+
+    def test_missing_en_file_in_subdir_is_yellow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, en_file=False))
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: kein-en-gegenstueck docs/konzepte/k.md", out)
+
+    def test_missing_en_section_in_subdir_is_yellow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, out = run_script(self.build(tmp, de_body="# K\n\n## Eins\n\n## Zwei\n"))
+            self.assertEqual(code, 1, out)
+            self.assertIn("BEFUND: abschnitt-fehlt-en konzepte/k.md '## Zwei'", out)
+
+    def test_english_link_to_data_file_is_not_reported(self):
+        # Messdaten (JSON) sind sprachneutral – nur Seiten (.md) zaehlen als "deutsch".
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp, en_body="# K\n\n## One\n[Daten](../../konzepte/daten.json)\n")
+            (root / "docs" / "konzepte" / "daten.json").write_text("{}\n")
             code, out = run_script(root)
             self.assertIn("en_links_to_german: 0", out)
 

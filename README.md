@@ -23,7 +23,7 @@ architectural debt is known and is tracked within the system itself as audit fin
 | Document | Content |
 |---|---|
 | [Getting Started](docs/en/GETTING-STARTED.md) | Try it out without installation (tryout image) and first installation with the guided installer (container, machine, or dev · test · prod) |
-| [Concepts](docs/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
+| [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
 | [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
 | [Diagrams](docs/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
@@ -57,7 +57,7 @@ The most honest answer after seven months: the mechanisms hold up, but they need
 and those guardrails are the real outcome. A gate that merely asks a language model whether something
 is good reliably delivers findings — including fabricated ones. Deterministic measurement before
 AI evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram,
-code evidence, and limits: [Concepts](docs/konzepte/README.md).
+code evidence, and limits: [Concepts](docs/en/konzepte/README.md).
 
 Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
 startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
