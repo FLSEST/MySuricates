@@ -7,9 +7,11 @@ import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
+import com.automation.executor.StepFailureSummary;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.ExecutionBroadcaster;
+import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,11 @@ public class ForEachBlockExecutor implements BlockExecutor {
     /** Upper bound for the per-item summary persisted in the step metadata (keeps the row small). */
     static final int MAX_RECORDED_ITEMS = 500;
     private static final int ITEM_LABEL_MAX_CHARS = 120;
+    /** Budget of the failure summary: failed item names, then the error of the first one (head + tail). */
+    private static final int FAILED_LABEL_MAX_CHARS = 60;
+    private static final int FAILED_NAMES_MAX_CHARS = 160;
+    private static final int ERROR_HEAD_CHARS = 80;
+    private static final int ERROR_TAIL_CHARS = 240;
 
     private final CommandExecutorService commandExecutor;
     private final ExecutionBroadcaster broadcaster;
@@ -80,6 +87,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         StringBuilder outputs = new StringBuilder();
         boolean anyFailed = false;
         List<String> failedItems = new ArrayList<>();
+        String firstFailureOutput = null;
         List<Map<String, Object>> recordedItems = new ArrayList<>();
         String runId = context.getWorkflowRunId();
         int stepIndex = aggregateResult.getStepIndex();
@@ -152,14 +160,21 @@ public class ForEachBlockExecutor implements BlockExecutor {
             if (failed) {
                 anyFailed = true;
                 failedItems.add(item);
+                if (firstFailureOutput == null) {
+                    firstFailureOutput = itemResult.getOutput() != null ? itemResult.getOutput() : "";
+                }
             }
         }
 
-        if (continueOnError && anyFailed) {
-            outputs.append("\n[continue_on_error] ").append(failedItems.size()).append("/").append(totalItems)
-                    .append(" items failed: ").append(String.join(", ", failedItems));
+        if (anyFailed) {
             StepAiMetadata.put(aggregateResult, "failedItemCount", failedItems.size());
             StepAiMetadata.put(aggregateResult, "failedItems", List.copyOf(failedItems));
+            if (continueOnError) {
+                outputs.append("\n[continue_on_error] ").append(failedItems.size()).append("/").append(totalItems)
+                        .append(" items failed: ").append(String.join(", ", failedItems));
+            } else {
+                StepFailureSummary.put(aggregateResult, failureSummary(failedItems, firstFailureOutput, totalItems));
+            }
         }
         StepAiMetadata.put(aggregateResult, "totalItems", totalItems);
         StepAiMetadata.put(aggregateResult, "items", List.copyOf(recordedItems));
@@ -172,6 +187,28 @@ public class ForEachBlockExecutor implements BlockExecutor {
         );
 
         return aggregateResult;
+    }
+
+    /**
+     * Where the block failed, for the run error (TODO 4a8cabc4): the failed items first, then the
+     * first one with its error — {@code "2/5 items failed: a, b\n[a]: <error>"}. The output cannot
+     * say that: it lists every item in order, so a failed item sits between successful ones.
+     */
+    static String failureSummary(List<String> failedItems, String firstFailureOutput, int totalItems) {
+        StringBuilder names = new StringBuilder();
+        int listed = 0;
+        for (String item : failedItems) {
+            String label = truncate(item, FAILED_LABEL_MAX_CHARS);
+            if (listed > 0 && names.length() + label.length() > FAILED_NAMES_MAX_CHARS) break;
+            names.append(listed > 0 ? ", " : "").append(label);
+            listed++;
+        }
+        if (listed < failedItems.size()) {
+            names.append(", … (+").append(failedItems.size() - listed).append(")");
+        }
+        String error = TruncationUtil.smart(firstFailureOutput.strip(), ERROR_HEAD_CHARS, ERROR_TAIL_CHARS);
+        return failedItems.size() + "/" + totalItems + " items failed: " + names
+                + "\n[" + truncate(failedItems.get(0), ITEM_LABEL_MAX_CHARS) + "]: " + error;
     }
 
     /**

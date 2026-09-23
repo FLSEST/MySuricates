@@ -56,7 +56,7 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/staging/TestingService.java", 450),
             entry("com/automation/service/trigger/TodoTriggerService.java", 383),
             entry("com/automation/service/wish/WishDecomposePromptBuilder.java", 338),
-            entry("com/automation/service/workflow/WorkflowExecutor.java", 540)
+            entry("com/automation/service/workflow/WorkflowExecutor.java", 529)
     );
 
     @Test

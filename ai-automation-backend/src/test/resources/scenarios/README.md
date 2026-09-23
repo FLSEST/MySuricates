@@ -7,8 +7,9 @@ in der deterministischen Verrohrung rund ums Modell. Genau die prüfen die Szena
 Prompt, Platzhalter, Timeout, Modell, Effort und Provider; nach dem Aufruf Marker, Gate, Auto-TODO
 und Laufstatus.
 
-Runner: `ScenarioIntegrationTest` (Paket `com.automation.integration.scenario`). Eine neue Datei in
-diesem Ordner ist ein neuer Testfall, Code braucht es dafür nicht.
+Runner: `ScenarioIntegrationTest` (Paket `com.automation.integration.scenario`), die Prüfungen der
+`expect`-Schlüssel stehen daneben in `ScenarioChecks`. Eine neue Datei in diesem Ordner ist ein neuer
+Testfall, Code braucht es dafür nicht.
 
 ## Wie die Fälle entstehen
 
@@ -48,12 +49,10 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 11 | Der Workflow-Provider gilt für jeden KI-Block (24680e80) | `workflow-provider-reaches-every-block` |
 | 12 | foreach-Präfix `[item]:` verschluckt keine Marker (8671d03b) | `foreach-marker-behind-item-prefix` |
 | 13 | Leere `items_command`-Ausgabe ergibt null Durchläufe (838cad00) | `foreach-empty-items-command` |
+| 14 | Scheitert ein foreach-Item, nennt die Lauf-Fehlermeldung es zuerst, nicht die erfolgreichen davor (4a8cabc4) | `foreach-failed-item-named-first` |
 
 ### Aus der Historie, noch ohne Szenario
 
-- **foreach-Iteration FAILED trotz „GATE PASS“ in der Ausgabe.** Vier Läufe von „Hunt Quality
-  Rebuild“. Die Ursache ist noch nicht geklärt, deshalb gibt es erst ein Szenario, wenn klar ist,
-  was richtig wäre.
 - **Approval:** Die Frage wird vor der Anzeige aufgelöst (e2efb393), und eine Ablehnung zählt nicht
   nur beim englischen „No“ (50c7b5d5). Dafür braucht der Runner einen Schritt, der auf eine Freigabe
   antwortet.
@@ -80,6 +79,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
   "ai": { "SCRIPTED": [ { "match": "Teil des Prompts", "respond": "Antwort", "exitCode": 0 } ] },
   "expect": {
     "runStatus": "COMPLETED",
+    "runError": { "startsWith": "Step 0 (foreach) failed: …", "contains": ["…"], "notContains": ["…"] },
     "gate": { "status": "YELLOW", "category": "gate-missing" },
     "analyzerRules": ["unwired-output"],
     "aiCallCount": { "SCRIPTED": 1 },
@@ -98,8 +98,12 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
   jeden Prompt. Beantwortet keine Regel den Prompt, endet der Aufruf mit Exit-Code 1. Ein Szenario
   besteht also nie durch eine stille Standardantwort.
 - **`gate`:** `"none"` heißt: Der Lauf trägt kein `gate_status`.
+- **`runError`:** prüft die Fehlermeldung des Laufs (`error.message`). Ein fehlender Fehler zählt als
+  leere Meldung.
 - **`execute: false`:** Es läuft nur der Analyzer über die Definition, kein Lauf.
 - **`model: null`** in `aiCalls` prüft, dass kein Modell übergeben wurde.
 
 Eine Prüfung, die nicht rot wird, wenn sie soll, ist Dekoration. Beim Anlegen des Runners wurde
-deshalb jede Prüfart einmal mit einer absichtlich falschen Erwartung gefahren, und alle wurden rot.
+deshalb jede Prüfart einmal mit einer absichtlich falschen Erwartung gefahren, und alle wurden rot. Für
+`runError` gilt das ebenso: `startsWith` war vor dem Fix aus 4a8cabc4 rot, `contains` und
+`notContains` wurden es mit einer falschen Erwartung.

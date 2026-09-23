@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepFailureSummary;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -128,6 +130,47 @@ class ForEachBlockExecutorTest {
     }
 
     @Test
+    void execute_itemFailsBetweenPassingOnes_summaryNamesItFirst() {
+        // 4a8cabc4: "Hunt Quality Rebuild" reported "failed: [oberwesel]: GATE PASS …" — the failed
+        // item sat between successful ones and was cut out of the run error
+        StepResult pass = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("GATE PASS").build();
+        StepResult broken = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)
+                .output("API Error: Connection closed mid-response.\n").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class))).thenReturn(pass, broken, pass);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("items", List.of("bad-zwischenahn", "erkner", "etzenrot"));
+        config.put("command", "rebuild {{ item }}");
+        BlockDefinition block = BlockDefinition.builder().type("foreach").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata())
+                .containsEntry("failedItemCount", 1)
+                .containsEntry("failedItems", List.of("erkner"))
+                .containsEntry(StepFailureSummary.KEY,
+                        "1/3 items failed: erkner\n[erkner]: API Error: Connection closed mid-response.");
+        // The output stays the transcript of every item, in order
+        assertThat(result.getOutput()).startsWith("[bad-zwischenahn]: GATE PASS").doesNotContain("items failed");
+        verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
+    }
+
+    @Test
+    void failureSummary_manyFailedItems_staysWithinBudgetAndKeepsTheErrorTail() {
+        List<String> failed = IntStream.range(0, 37).mapToObj(i -> "ort-" + i).toList();
+        String longError = "x".repeat(2_000) + "You've hit your session limit";
+
+        String summary = ForEachBlockExecutor.failureSummary(failed, longError, 50);
+
+        assertThat(summary).startsWith("37/50 items failed: ort-0, ort-1, ")
+                .contains("… (+")
+                .contains("\n[ort-0]: ")
+                .endsWith("You've hit your session limit");
+        assertThat(summary.length()).isLessThan(600);
+    }
+
+    @Test
     void execute_continueOnError_failedItemDoesNotFailBlock() {
         StepResult failed = StepResult.builder()
                 .stepIndex(0).status(StepStatus.FAILED).output("timeout").build();
@@ -153,6 +196,8 @@ class ForEachBlockExecutorTest {
         assertThat(result.getOutput()).contains("1/3 items failed", "bad-langensalza");
         assertThat(result.getMetadata().get("failedItemCount")).isEqualTo(1);
         assertThat(result.getMetadata().get("failedItems")).isEqualTo(List.of("bad-langensalza"));
+        assertThat(result.getMetadata()).as("a COMPLETED step has no run error to explain")
+                .doesNotContainKey(StepFailureSummary.KEY);
         verify(commandExecutor, times(3)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
