@@ -42,8 +42,14 @@ through `docker compose` from `ai-automation-backend/docker-compose.dev-containe
 **without** Node, where no AI CLI runs). The Vite dev server stays on the host either way. Tunable via
 `AUTOTRIGGER_DEV_CONTAINER_PORT`, `AUTOTRIGGER_DEV_CONTAINER_NAME`, `AUTOTRIGGER_DEV_COMPOSE_PROJECT`,
 `AUTOTRIGGER_DEV_PROJECT_ROOT`, `AUTOTRIGGER_DEV_PRESET` — so a probe instance can run next to the real
-one. A probe on another port also needs `MYSURICATES_API_BASE=http://localhost:<port>/api/v1`,
-otherwise the starter checks port 9090.
+one. In container mode the starter's checks (is a backend already running?, readiness, run check
+before `restart`) follow the port from `AUTOTRIGGER_DEV_CONTAINER_PORT`; `MYSURICATES_API_BASE` still
+overrides it.
+
+The image (`Dockerfile.stable`) compiles nothing, it copies the JAR from
+`ai-automation-backend/target/`. That is why `restart --container` builds the JAR first
+(`mvn clean package -DskipTests`, the container is only stopped afterwards), `start --container` only
+with `--rebuild` or when there is none yet, and `build --container` builds just the JAR (3bfa4e10).
 
 What of the machine's AI providers goes into the container is set by `AUTOTRIGGER_DEV_AI_FROM_HOST`
 (`login` = the programs and just the login of each provider, the default; `programs`; `all` = whole

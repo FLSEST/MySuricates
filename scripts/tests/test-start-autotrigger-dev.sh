@@ -114,7 +114,6 @@ check "build exits 0"                                    '[ "$(sed -n 1p <<<"$OU
 check "build installs current.jar from target/"          '[ "$(sed -n 2p <<<"$OUT")" = fat ]'
 check "build starts neither backend nor frontend"        '[ "$(sed -n 3p <<<"$OUT")" = nothing-started ]'
 check "build runs clean package once, tests skipped"     '[ "$(grep -c "clean package -DskipTests" "$TMP/backend/mvn-calls.log")" -eq 1 ]'
-check "build refuses the container mode"                 '[ "$(run_in_script "COMMAND=build; RUNTIME_MODE=container; ( main >/dev/null 2>&1 ); echo \$?")" = 2 ]'
 
 echo "7) the frontend outlives the terminal it was started from (454f8ac5)"
 # Node resets signal dispositions at startup, so `nohup` alone did not protect Vite: closing the
@@ -157,6 +156,64 @@ check "all + socket off are honored"        'grep -q "/.claude:" <<<"$OUT" && ! 
 RC="$(run_in_script "$OVR"'; AUTOTRIGGER_DEV_AI_FROM_HOST=everything write_compose_override >/dev/null 2>&1; echo $?')"
 check "invalid mode refuses the start"      '[ "$RC" = 2 ]'
 check "compose file no longer hard-wires the socket" '! grep -q "docker.sock:/var/run/docker.sock" "$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"'
+
+echo "9) --container builds the JAR the image copies (3bfa4e10)"
+# Dockerfile.stable kopiert target/ai-automation-backend-*.jar und kompiliert nichts. Ohne Maven-Lauf
+# lief nach einer Code-Aenderung still das zuletzt auf dem Host gebaute JAR.
+mkdir -p "$TMP/cbin" "$TMP/cnm"
+cat > "$TMP/cbin/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "docker $*" >> "$CALLS"
+case "$*" in *" up "*) touch "$UP_MARKER" ;; *" down"*) rm -f "$UP_MARKER" ;; esac
+exit 0
+STUB
+cat > "$TMP/cbin/curl" <<'STUB'
+#!/usr/bin/env bash
+# Antwortet erst, wenn der Container "laeuft" (der docker-Stub legt die Marke an)
+[[ "$*" == *"/system/info"* && -e "$UP_MARKER" ]] && exit 0
+exit 7
+STUB
+cat > "$TMP/backend/mvnw" <<'STUB'
+#!/usr/bin/env bash
+echo "mvn $*" >> "$CALLS"
+mkdir -p "$(dirname "$0")/target" && echo "fat" > "$(dirname "$0")/target/ai-automation-backend-9.9.9.jar"
+STUB
+chmod +x "$TMP/cbin/docker" "$TMP/cbin/curl" "$TMP/backend/mvnw"
+CTX='export PATH="'"$TMP"'/cbin:$PATH" CALLS="'"$TMP"'/calls.log" UP_MARKER="'"$TMP"'/up.marker" AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/cnm"
+  BACKEND_DIR="'"$TMP"'/backend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMPOSE_OVERRIDE="'"$TMP"'/cov.yml"; RUNTIME_MODE=container'
+fresh() { rm -rf "$TMP/backend/target" "$TMP/up.marker" "$TMP/state/autotrigger-dev/runtime"; : > "$TMP/calls.log"; }
+fresh
+RC="$(run_in_script "$CTX; COMMAND=build; ( main >/dev/null 2>&1 ); echo \$?")"
+check "build --container: exit 0, maven once"            '[ "$RC" = 0 ] && [ "$(grep -c "^mvn .*clean package -DskipTests" "$TMP/calls.log")" = 1 ]'
+check "build --container: no image, nothing started"     '! grep -q "^docker" "$TMP/calls.log" && [ ! -e "$TMP/state/autotrigger-dev/runtime/current.jar" ]'
+fresh
+RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
+check "restart --container: exit 0"                      '[ "$RC" = 0 ]'
+check "restart --container: build, then down, then up"   '[ "$(awk "/^mvn .*clean package/{print \"mvn\"} /^docker compose .* down\$/{print \"down\"} /^docker compose .* up -d --build\$/{print \"up\"}" "$TMP/calls.log" | tr "\n" " ")" = "mvn down up " ]'
+fresh; mkdir -p "$TMP/backend/target"; echo alt > "$TMP/backend/target/ai-automation-backend-9.9.9.jar"
+OUT="$(run_in_script "$CTX; start_backend_container missing 2>&1")"
+check "start --container with a JAR: no build, names it" '! grep -q "^mvn" "$TMP/calls.log" && grep -q "Verwende vorhandenes JAR" <<<"$OUT" && grep -q "up -d --build" "$TMP/calls.log"'
+fresh
+OUT="$(run_in_script "$CTX; start_backend_container missing 2>&1")"
+check "start --container without a JAR: builds first"   '[ "$(head -1 "$TMP/calls.log" | cut -c1-3)" = mvn ] && grep -q "up -d --build" "$TMP/calls.log"'
+fresh; mkdir -p "$TMP/backend/target"; echo alt > "$TMP/backend/target/ai-automation-backend-9.9.9.jar"
+OUT="$(run_in_script "$CTX; REBUILD=1; start_backend_container missing 2>&1")"
+check "start --container --rebuild: builds"              'grep -q "^mvn" "$TMP/calls.log"'
+fresh
+cat > "$TMP/backend/mvnw" <<'STUB'
+#!/usr/bin/env bash
+echo "mvn $*" >> "$CALLS"; exit 1
+STUB
+RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
+check "maven fails: restart stops before touching the container" '[ "$RC" != 0 ] && ! grep -q "^docker" "$TMP/calls.log"'
+
+echo "10) --container: the checks follow AUTOTRIGGER_DEV_CONTAINER_PORT (3bfa4e10)"
+URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
+check "container port 9190 → readiness on :9190"         '[ "$URL" = "http://localhost:9190/api/v1/system/info" ]'
+URL="$(AUTOTRIGGER_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"
+check "host mode keeps :9090"                            '[ "$URL" = "http://localhost:9090/api/v1/system/info" ]'
+URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 MYSURICATES_API_BASE=http://x:1/api/v1 run_in_script 'echo "$BACKEND_READY_URL"')"
+check "MYSURICATES_API_BASE still wins"                  '[ "$URL" = "http://x:1/api/v1/system/info" ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"
