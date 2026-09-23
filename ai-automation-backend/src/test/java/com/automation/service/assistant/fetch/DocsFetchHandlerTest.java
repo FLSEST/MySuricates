@@ -2,6 +2,9 @@ package com.automation.service.assistant.fetch;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -98,14 +101,41 @@ class DocsFetchHandlerTest {
                 .contains("shell").contains("compress-ai").contains("human-input");
     }
 
-    /** The four types that answered "Unknown block type" (TODO 321b414e) name their required config. */
+    /**
+     * The four types that answered "Unknown block type" (TODO 321b414e) name their required config.
+     * Keys stand in backticks since TODO c4b81017 — the convention BlockSpecConfigKeysGateTest reads.
+     */
     @Test
     void formatBlockSpec_todoAndDashboardBlocks_nameTheirRequiredConfig() {
         assertThat(handler.formatBlockSpec("todo-create"))
-                .contains("Required config: title").contains("variable_name (default \"todo_id\")");
-        assertThat(handler.formatBlockSpec("todo-update")).contains("Required config: id");
-        assertThat(handler.formatBlockSpec("todo-close")).contains("Required config: id").contains("{{ todo_id }}");
-        assertThat(handler.formatBlockSpec("dashboard-report")).contains("Required config: status (GREEN/YELLOW/RED");
+                .contains("Required config: `title`").contains("`variable_name` (default \"todo_id\")");
+        assertThat(handler.formatBlockSpec("todo-update")).contains("Required config: `id`");
+        assertThat(handler.formatBlockSpec("todo-close")).contains("Required config: `id`").contains("{{ todo_id }}");
+        assertThat(handler.formatBlockSpec("dashboard-report")).contains("Required config: `status` (GREEN/YELLOW/RED");
+    }
+
+    /**
+     * The keys the executors read, where the older texts named others (TODO c4b81017). The drift gate
+     * BlockSpecConfigKeysGateTest proves that a named key is read — this pins that the right ones are named.
+     */
+    @Test
+    void formatBlockSpec_namesTheKeysTheExecutorsRead() {
+        Map<String, List<String>> expected = Map.ofEntries(
+                Map.entry("agentic", List.of("Required config: `goal`", "`max_total_tokens`")),
+                Map.entry("conditional", List.of("Required config: `condition`", "`then_command`", "`else_command`")),
+                Map.entry("foreach", List.of("Required config: `command`", "`items_source`", "`items_command`")),
+                Map.entry("while", List.of("Required config: `command`", "`condition_command`", "`max_iterations`")),
+                Map.entry("retry", List.of("Required config: `command`", "`max_retries`", "`delay`")),
+                Map.entry("switch", List.of("Required config: `expression`", "`cases`", "Optional: `default`")),
+                Map.entry("approval", List.of("`timeout_minutes`", "`reject_options`", "`on_no`", "`mode`")),
+                Map.entry("skill-capability", List.of("Required config: `capability`", "`params`", "`allow_writes`")),
+                Map.entry("integration", List.of("Required config: `provider`", "`action`", "`params`")),
+                Map.entry("document", List.of("Required config: `file_path`", "`fail_on_empty`", "`min_characters`")),
+                Map.entry("human-input", List.of("`default_value`", "`use_default_on_timeout`")),
+                Map.entry("sub-workflow", List.of("Required config: `workflow_id`", "no input mapping")));
+
+        expected.forEach((type, parts) ->
+                assertThat(handler.formatBlockSpec(type)).as("block-spec %s", type).contains(parts));
     }
 
     @Test

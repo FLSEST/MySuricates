@@ -232,22 +232,23 @@ The table below describes the base schema (V1-V19). V20-V85 mostly add columns a
 | `simple` | `SimpleBlockExecutor` | A single AI call with a prompt, uses the workflow model |
 | `shell` | `ShellBlockExecutor` | Execute a shell command (no API access, no DB access) |
 | `agentic` | `AgenticBlockExecutor` | Multi-step agent with REASON+ACT phases and a token budget |
-| `conditional` | `ConditionalBlockExecutor` | Branch: `branch_true` / `branch_false` |
-| `foreach` | `ForEachBlockExecutor` | Iteration over a list, sub-blocks per element |
+| `conditional` | `ConditionalBlockExecutor` | Branch: `condition`, then `then_command` or `else_command` |
+| `foreach` | `ForEachBlockExecutor` | Iteration over a list, `command` per element |
 | `while` | `WhileBlockExecutor` | Loop with exit condition and `max_iterations` |
 | `switch` | `SwitchBlockExecutor` | Multi-way branch based on a match value |
-| `retry` | `RetryBlockExecutor` | Retries a sub-block with backoff |
+| `retry` | `RetryBlockExecutor` | Runs `command` again on failure, optionally with backoff |
 | `approval` | `ApprovalBlockExecutor` | Pauses until approval (optionally with choices) |
 | `sub-workflow` | `SubWorkflowBlockExecutor` | Calls another workflow |
 | `skill-capability` | `SkillCapabilityBlockExecutor` | Runs a capability of a skill |
 | `human-input` | `HumanInputBlockExecutor` | Asks the user for values, pauses until answered |
 | `integration` | `IntegrationBlockExecutor` | Action of an integration provider (e.g. `github:create_issue`) |
-| `document` | `DocumentBlockExecutor` | OCR / document processing (PDF, images) |
+| `document` | `DocumentBlockExecutor` | Text extraction from PDF/DOCX/XLSX/HTML/TXT via Apache Tika (no OCR) |
 | `todo-create` | `TodoCreateBlockExecutor` | Creates a TODO and stores its id in a variable |
 | `todo-update` | `TodoUpdateBlockExecutor` | Updates fields of an existing TODO by id |
 | `todo-close` | `TodoCloseBlockExecutor` | Sets an existing TODO to DONE by id |
 | `compress` | `CompressBlockExecutor` | Deterministic compression of an earlier block output (no AI) |
 | `compress-ai` | `CompressAiBlockExecutor` | AI compression of an earlier block output (one capped call) |
+| `dashboard-report` | `DashboardReportBlockExecutor` | Reports traffic light, KPIs and items to the dashboard, without AI and without a marker |
 
 The list is bound to the registered executors: `BlockTypeListsGuardTest` (backend) and `types/__tests__/blockTypes.test.ts` (frontend) enforce parity with `BLOCK_TYPES`. Per-type configuration details: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md).
 

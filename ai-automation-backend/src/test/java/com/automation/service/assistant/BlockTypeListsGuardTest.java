@@ -138,7 +138,8 @@ class BlockTypeListsGuardTest {
         return types;
     }
 
-    private static List<Class<?>> executorClasses() {
+    /** The concrete BlockExecutor classes (also used by {@code BlockSpecConfigKeysGateTest}). */
+    static List<Class<?>> executorClasses() {
         var scanner = new ClassPathScanningCandidateComponentProvider(false);
         scanner.addIncludeFilter(new AssignableTypeFilter(BlockExecutor.class));
         List<Class<?>> classes = new java.util.ArrayList<>();
