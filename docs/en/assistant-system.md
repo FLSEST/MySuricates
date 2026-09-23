@@ -256,7 +256,7 @@ The assistant can load additional data via `<fetch type="..." id="..."/>` tags. 
 | `skill` | Skill detail | Desc: 200, AI context: 400, Capability desc: 100 |
 | `integration` | Integration detail | Desc: 200, Account: 80, Action desc: 100 |
 | `chain` | Chain detail | Desc: 200 |
-| `block-spec` | Block type specification per type (`BlockSpecs`, one for every type of the registry; `BlockTypeListsGuardTest` keeps it complete) | — |
+| `block-spec` | Block type specification per type (`BlockSpecs`, one for every type of the registry; `BlockTypeListsGuardTest` keeps it complete, `BlockSpecConfigKeysGateTest` checks every config key it names against the executor source) | — |
 
 Doc files: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 
@@ -303,7 +303,7 @@ All implement `AssistantContextSection` with `append(StringBuilder sb, boolean c
 5. **SkillsIndexSection** — Max 20 entries, desc: 80 characters
 6. **IntegrationsIndexSection** — All providers with connected/disconnected status
 7. **ChainsIndexSection** — Max 15 entries, desc: 80 characters
-8. **BlockTypesIndexSection** — 20 block types (static list; in sync with the 20 registered block executors, pinned by `BlockTypeListsGuardTest`)
+8. **BlockTypesIndexSection** — 20 block types (static list; in sync with the 20 registered block executors, pinned by `BlockTypeListsGuardTest`; `BlockSpecConfigKeysGateTest` checks the config keys in the summaries)
 9. **FailedWorkflowsContextSection** — Broken workflows via `WorkflowDebugService`, error: 160 characters
 
 ### Additional on **OVERVIEW** Pages

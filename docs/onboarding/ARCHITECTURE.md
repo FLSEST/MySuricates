@@ -230,22 +230,23 @@ Die folgende Tabelle beschreibt das Grundschema (V1-V19). V20-V85 ergaenzen uebe
 | `simple` | `SimpleBlockExecutor` | Ein KI-Aufruf mit Prompt, nutzt das Workflow-Modell |
 | `shell` | `ShellBlockExecutor` | Shell-Befehl ausfuehren (kein API-, kein DB-Zugriff) |
 | `agentic` | `AgenticBlockExecutor` | Mehrschrittiger Agent mit REASON+ACT, Token-Budget |
-| `conditional` | `ConditionalBlockExecutor` | Verzweigung: `branch_true` / `branch_false` |
-| `foreach` | `ForEachBlockExecutor` | Iteration ueber eine Liste, Sub-Bloecke je Element |
+| `conditional` | `ConditionalBlockExecutor` | Verzweigung: `condition`, dann `then_command` oder `else_command` |
+| `foreach` | `ForEachBlockExecutor` | Iteration ueber eine Liste, `command` je Element |
 | `while` | `WhileBlockExecutor` | Schleife mit Abbruchbedingung und `max_iterations` |
 | `switch` | `SwitchBlockExecutor` | Mehrfachverzweigung anhand eines Vergleichswerts |
-| `retry` | `RetryBlockExecutor` | Wiederholt einen Sub-Block mit Backoff |
+| `retry` | `RetryBlockExecutor` | Wiederholt `command` bei Fehler, optional mit Backoff |
 | `approval` | `ApprovalBlockExecutor` | Pausiert bis zur Freigabe (optional mit Auswahl) |
 | `sub-workflow` | `SubWorkflowBlockExecutor` | Ruft einen anderen Workflow auf |
 | `skill-capability` | `SkillCapabilityBlockExecutor` | Fuehrt eine Capability eines Skills aus |
 | `human-input` | `HumanInputBlockExecutor` | Fragt Werte beim Benutzer ab, pausiert bis zur Antwort |
 | `integration` | `IntegrationBlockExecutor` | Aktion eines Integrations-Providers (z.B. `github:create_issue`) |
-| `document` | `DocumentBlockExecutor` | OCR / Dokumentverarbeitung (PDF, Bilder) |
+| `document` | `DocumentBlockExecutor` | Textextraktion aus PDF/DOCX/XLSX/HTML/TXT via Apache Tika (kein OCR) |
 | `todo-create` | `TodoCreateBlockExecutor` | Legt ein TODO an und merkt sich die ID in einer Variablen |
 | `todo-update` | `TodoUpdateBlockExecutor` | Aendert Felder eines TODOs anhand seiner ID |
 | `todo-close` | `TodoCloseBlockExecutor` | Setzt ein TODO anhand seiner ID auf DONE |
 | `compress` | `CompressBlockExecutor` | Deterministische Komprimierung einer frueheren Block-Ausgabe (ohne KI) |
 | `compress-ai` | `CompressAiBlockExecutor` | KI-Komprimierung einer frueheren Block-Ausgabe (ein Aufruf, gedeckelt) |
+| `dashboard-report` | `DashboardReportBlockExecutor` | Meldet Ampel, Kennzahlen und Punkte ans Dashboard, ohne KI und ohne Marker |
 
 Die Liste ist an die registrierten Executoren gebunden: `BlockTypeListsGuardTest` (Backend) und `types/__tests__/blockTypes.test.ts` (Frontend) erzwingen den Gleichstand mit `BLOCK_TYPES`. Konfigurationsdetails je Typ: [WORKFLOW-GUIDE.md](../WORKFLOW-GUIDE.md).
 

@@ -260,7 +260,7 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 | `skill` | Skill-Detail | Desc: 200, AI-Context: 400, Capability-Desc: 100 |
 | `integration` | Integration-Detail | Desc: 200, Account: 80, Action-Desc: 100 |
 | `chain` | Chain-Detail | Desc: 200 |
-| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig) | — |
+| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig, `BlockSpecConfigKeysGateTest` prüft jeden genannten Config-Schlüssel gegen den Quelltext des Executors) | — |
 
 Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 
@@ -307,7 +307,7 @@ Alle implementieren `AssistantContextSection` mit `append(StringBuilder sb, bool
 5. **SkillsIndexSection** — Max 20 Einträge, Desc: 80 Zeichen
 6. **IntegrationsIndexSection** — Alle Provider mit Connected/Disconnected-Status
 7. **ChainsIndexSection** — Max 15 Einträge, Desc: 80 Zeichen
-8. **BlockTypesIndexSection** — 20 Block-Typen (statische Liste; deckungsgleich mit den 20 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`)
+8. **BlockTypesIndexSection** — 20 Block-Typen (statische Liste; deckungsgleich mit den 20 registrierten Block-Executoren, gepinnt durch `BlockTypeListsGuardTest`; Config-Schlüssel in den Kurzbeschreibungen prüft `BlockSpecConfigKeysGateTest`)
 9. **FailedWorkflowsContextSection** — Kaputte Workflows via `WorkflowDebugService`, Error: 160 Zeichen
 
 ### Zusätzlich auf **OVERVIEW**-Seiten

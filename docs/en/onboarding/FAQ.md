@@ -78,7 +78,7 @@ The complete API reference is at `docs/en/api-referenz.md`.
        public StepResult execute(BlockDefinition block, ExecutionContext ctx) { ... }
    }
    ```
-3. **Keep the lists in sync:** The type must appear in all three lists -- `BLOCK_TYPES` in `ai-automation-frontend/src/types/index.ts`, `BlockTypesIndexSection` (assistant context) and `AssistantToolValidator.KNOWN_BLOCK_TYPES`. `BlockTypeListsGuardTest` (backend) and `types/__tests__/blockTypes.test.ts` (frontend) enforce parity with the executors.
+3. **Keep the lists in sync:** The type must appear in all three lists -- `BLOCK_TYPES` in `ai-automation-frontend/src/types/index.ts`, `BlockTypesIndexSection` (assistant context) and `AssistantToolValidator.KNOWN_BLOCK_TYPES`. `BlockTypeListsGuardTest` (backend) and `types/__tests__/blockTypes.test.ts` (frontend) enforce parity with the executors. The type also needs a specification in `BlockSpecs` (assistant, `fetch block-spec`); `BlockSpecConfigKeysGateTest` checks that the executor reads every config key named there.
 4. **Optional:** Create a configuration dialog
 
 Spring automatically detects the new executor via component scan.
