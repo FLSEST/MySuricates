@@ -299,6 +299,49 @@ class WorkflowExecutorDeterministicIntegrationTest {
                 .containsExactly(0, 1, 2, 2, 3);
     }
 
+    /**
+     * TODO cd0ea0f9: a resume keeps the interrupted attempt of a block next to its new one, so after
+     * the first resume there is no longer exactly one step per block. The second resume must still
+     * find the block that never finished instead of counting the stale attempt as a passed block.
+     */
+    @Test
+    void secondResume_runsTheBlockInterruptedInTheFirstResumedSegment() {
+        Project project = createProject("resume-twice");
+        Workflow workflow = createWorkflow(project, "resume twice",
+                block("foreach", Map.of(
+                        "variable_name", "item",
+                        "items", List.of("one", "two"),
+                        "command", "echo item-{{ item }}",
+                        "execution_mode", "shell",
+                        "timeout_seconds", 5
+                )),
+                shell("echo a >> a.log"),
+                shell("if [ -f b.flag ]; then echo b >> b.log; else touch b.flag; exit 1; fi"),
+                shell("if [ -f c.flag ]; then echo c >> c.log; else touch c.flag; exit 1; fi"),
+                shell("echo d >> d.log"));
+
+        WorkflowRun run = executeAndWait(workflow, Map.of());
+        assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
+        List<StepResult> firstSegment = stepsFor(run);
+        markInterrupted(run, firstSegment.get(firstSegment.size() - 1));   // b interrupted
+
+        WorkflowRun afterFirstResume = resumeAndWait(run);
+        assertThat(afterFirstResume.getStatus()).isEqualTo(RunStatus.FAILED);   // c failed once
+        List<StepResult> secondSegment = stepsFor(afterFirstResume);
+        markInterrupted(run, secondSegment.get(secondSegment.size() - 1)); // c interrupted
+
+        WorkflowRun afterSecondResume = resumeAndWait(run);
+
+        assertThat(afterSecondResume.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(lineCount(project, "a.log")).as("a ran in the first segment only").isEqualTo(1);
+        assertThat(lineCount(project, "b.log")).as("b completed in the first resume only").isEqualTo(1);
+        assertThat(lineCount(project, "c.log")).as("c never finished before — it must run now").isEqualTo(1);
+        assertThat(lineCount(project, "d.log")).as("d runs exactly once, after c").isEqualTo(1);
+        assertThat(stepsFor(afterSecondResume)).extracting(StepResult::getStepIndex).doesNotHaveDuplicates();
+        assertThat(stepsFor(afterSecondResume)).extracting(s -> s.getMetadata().get("blockIndex"))
+                .containsExactly(0, 1, 2, 2, 3, 3, 4);
+    }
+
     /** Puts the run into the state an application restart leaves behind: run INTERRUPTED, last step still RUNNING. */
     private void markInterrupted(WorkflowRun run, StepResult lastStep) {
         StepResult step = stepResultRepository.findById(lastStep.getId()).orElseThrow();

@@ -4,7 +4,9 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,6 +72,36 @@ class ResumePlanTest {
         assertThat(plan.resuming()).isTrue();
         assertThat(plan.blocksToSkip()).isZero();
         assertThat(plan.firstStepIndex()).isZero();
+    }
+
+    @Test
+    void secondResume_countsBlocksNotStaleAttempts() {
+        // TODO cd0ea0f9 — foreach(0), a(1), b interrupted (2), b resumed (3), c interrupted (4)
+        ResumePlan plan = ResumePlan.after(List.of(
+                step(0, StepStatus.COMPLETED, 0),
+                step(3, StepStatus.COMPLETED, 1),
+                step(4, StepStatus.RUNNING, 2),
+                step(5, StepStatus.COMPLETED, 2),
+                step(6, StepStatus.RUNNING, 3)));
+
+        assertThat(plan.blocksToSkip()).isEqualTo(3);      // c (block 3) runs again — not skipped
+        assertThat(plan.firstStepIndex()).isEqualTo(7);
+    }
+
+    @Test
+    void stepsWithoutBlockIndex_fallBackToTheirPosition() {
+        ResumePlan plan = ResumePlan.after(List.of(
+                step(0, StepStatus.COMPLETED, 0),
+                step(3, StepStatus.COMPLETED),
+                step(4, StepStatus.RUNNING)));
+
+        assertThat(plan.blocksToSkip()).isEqualTo(2);
+    }
+
+    private static StepResult step(int index, StepStatus status, int blockIndex) {
+        StepResult step = step(index, status);
+        step.setMetadata(new HashMap<>(Map.of("blockIndex", blockIndex)));
+        return step;
     }
 
     private static StepResult step(int index, StepStatus status) {
