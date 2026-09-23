@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditRuleKeyCatalogTest {
 
     private static final String COVERAGE = "mysuricates.test-coverage";
+    private static final String PUBLIC_READINESS = "project.public-readiness";
 
     private final AuditRuleKeyCatalog catalog = new AuditRuleKeyCatalog(new ObjectMapper());
 
@@ -111,6 +112,54 @@ class AuditRuleKeyCatalogTest {
         assertThat(found).as("das Gate laeuft sonst stumm gruen, wenn sich das Prompt-Format aendert")
                 .isNotEmpty();
         assertThat(violations).as("Katalog und Pool-Prompts duerfen nicht auseinanderlaufen").isEmpty();
+    }
+
+    /**
+     * Gate: der Evidenz-Prompt (project.public-readiness) legt je ruleKey auch das subject fest —
+     * einen festen Wert fuer Regeln, die das Repository als Ganzes betreffen, sonst die Pfadregel
+     * (TODO 3a9e275b). Ohne diese Vorgabe waehlte das Modell zwischen zwei Laeufen fuer denselben
+     * Befund ein anderes subject, und der Befund kam als Wiedergaenger ohne seine Disposition zurueck.
+     * Ein fester Wert muss die Normalisierung unveraendert ueberstehen — sonst ist er selbst die Drift.
+     */
+    @Test
+    void publicReadinessPromptFixesTheSubjectOfEveryRuleKey() throws IOException {
+        Pattern entry = Pattern.compile("(?m)^- ruleKey \"([a-z0-9][a-z0-9.\\-]*)\"(.*)$");
+        Pattern fixedSubject = Pattern.compile("subject \"([^\"]*)\"");
+        List<String> violations = new ArrayList<>();
+        Set<String> entries = new LinkedHashSet<>();
+        for (Path file : poolDefinitions()) {
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                JsonNode root = variant.root();
+                if (!PUBLIC_READINESS.equals(root.path("metadata").path("audit").path("key").asText(""))) {
+                    continue;
+                }
+                for (JsonNode block : blocks(root)) {
+                    Matcher matcher = entry.matcher(block.path("config").path("command").asText(""));
+                    while (matcher.find()) {
+                        String ruleKey = matcher.group(1);
+                        String rest = matcher.group(2);
+                        entries.add(ruleKey);
+                        Matcher fixed = fixedSubject.matcher(rest);
+                        boolean hasFixed = false;
+                        while (fixed.find()) {
+                            hasFixed = true;
+                            String value = fixed.group(1);
+                            if (value.isBlank() || !value.equals(AuditSubjectNormalizer.normalize(value))) {
+                                violations.add(variant.label() + ": ruleKey '" + ruleKey + "' — fester subject-Wert '"
+                                        + value + "' uebersteht die Normalisierung nicht");
+                            }
+                        }
+                        if (!hasFixed && !rest.contains("subject = Pfad")) {
+                            violations.add(variant.label() + ": ruleKey '" + ruleKey
+                                    + "' legt kein subject fest (subject \"<wert>\" oder subject = Pfad …)");
+                        }
+                    }
+                }
+            }
+        }
+        assertThat(entries).as("keine ruleKey-Eintraege im Evidenz-Prompt gefunden — Listenformat geaendert?")
+                .isNotEmpty();
+        assertThat(violations).as("jeder ruleKey des Evidenz-Prompts nennt sein subject").isEmpty();
     }
 
     /**

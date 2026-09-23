@@ -698,6 +698,12 @@ What is checked:
    also found by clones and by the isolated run workspaces of the evidence workflows. Matching is
    literal and case-insensitive; the message names the list line, not the term. Without a list (CI,
    someone else's clone) the check is skipped with a notice.
+   A line prefixed with `low:` (`low: <term>`) marks a **weak** term: it stays on the list, but a
+   hit is only a warning ("privater Begriff, schwach (Zeile N …)") — no violation, no exit 1,
+   neither in the tracked set nor on commit or push; the evidence workflow rates it LOW. Meant for
+   terms that should stay visible without holding up a release. Every reader of the list (tracked
+   set, added lines, commit messages in the pre-push gate) parses it through the same helper
+   `hygiene_private_terms_load` in `scripts/lib/hygiene-rules.sh`.
 
 `scripts/install-hooks.sh` installs the hooks (`pre-commit`, `commit-msg`, `pre-push`) via
 `core.hooksPath` (and runs as part of `setup.sh`).
@@ -721,10 +727,11 @@ Checked per push range (remote state..local; for a new branch everything no remo
 
 1. **Commit metadata.** Author and committer carry the GitHub noreply form
    (`<id>+<login>@users.noreply.github.com`, `HYGIENE_COMMIT_EMAIL_REGEX`); the message contains no
-   forbidden literals, no private terms and no e-mail address outside a trailer (`Co-Authored-By`,
-   `Generated-By`, `Signed-off-by`, …). The address itself appears nowhere in the repository, only
-   its form.
-2. **Hygiene gate on the range** (`public-hygiene.sh --range`): what is newly added.
+   forbidden literals, no private terms (weak ones, prefix `low:`, only as a warning) and no e-mail
+   address outside a trailer (`Co-Authored-By`, `Generated-By`, `Signed-off-by`, …). The address
+   itself appears nowhere in the repository, only its form.
+2. **Hygiene gate on the range** (`public-hygiene.sh --range`): what is newly added. Its warnings
+   show up even when the range is clean.
 3. **CI tree gates that depend on the code:** documentation numbers, documentation links with DE/EN
    parity, diagram drift. A missing gate script is a hard error.
 4. **gitleaks on the range** — only if installed, otherwise skipped with a notice. Nothing is

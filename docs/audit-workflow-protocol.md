@@ -51,6 +51,15 @@ JSON-Envelope:
 Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
+Überlässt der Prompt das `subject` dem Modell, driftet es: Zwischen zwei Läufen wurde aus
+`docs/deployment.md` `host-reaching-endpoints`, und der Befund kam als Wiedergänger ohne seine
+Disposition zurück. Ein Prompt legt das `subject` deshalb je `ruleKey` fest — einen festen Wert
+für Regeln, die das Repository oder ein Modul als Ganzes betreffen (Dateien und Zahlen gehören
+dann in `description`/`evidence`), sonst den Pfad relativ zur Repo-Wurzel, je Datei ein Finding.
+Vorbild ist die ruleKey-Liste im Evidenz-Prompt von „Public Readiness“ (`subject "<wert>"` bzw.
+`subject = Pfad` je Eintrag); `AuditRuleKeyCatalogTest` hält fest, dass dort kein Eintrag die
+Angabe vergisst (TODO `3a9e275b` — Evidenz-Prompt: subject je ruleKey festschreiben).
+
 ### Optional: `expectedFindings`
 
 Ein Audit, dessen Messblock die Soll-Zahl kennt (etwa `ERWARTETE FINDINGS` in der

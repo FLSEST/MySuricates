@@ -6,7 +6,8 @@
 # bis zu einer Minute:
 #   1. Commit-Metadaten des Push-Bereichs: Autor und Committer tragen nur die
 #      GitHub-noreply-Form; die Nachricht enthaelt keine verbotenen Literale, keine privaten
-#      Begriffe und keine Mailadresse ausserhalb eines Trailers.
+#      Begriffe (schwache, Praefix low:, nur als Warnung) und keine Mailadresse ausserhalb
+#      eines Trailers.
 #   2. Hygiene-Gate auf den Push-Bereich (public-hygiene.sh --range): was NEU dazukommt.
 #   3. Bestands-Gates der CI, die vom Code abhaengen: Doku-Zahlen, Doku-Verweise mit
 #      DE/EN-Gleichstand, Diagramm-Drift.
@@ -67,6 +68,7 @@ case ",${MYSURICATES_PREPUSH_SKIP:-}," in *,build,*) SKIP_BUILD=1 ;; esac
 
 FAIL=0
 COUNT=0
+WARN=0
 ZERO="0000000000000000000000000000000000000000"
 
 fail() {  # $1 = meldung
@@ -74,31 +76,28 @@ fail() {  # $1 = meldung
   FAIL=1
   COUNT=$((COUNT + 1))
 }
+# Sichtbar, aber kein Verstoss — etwa ein schwacher privater Begriff (Praefix low:).
+warn() {  # $1 = meldung
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::warning::${1}"; else echo "  ! ${1}" >&2; fi
+  WARN=$((WARN + 1))
+}
 note() { echo "  – $1"; }
 step() { echo "▶ $1"; }
 
 # ---------------------------------------------------------------------------
-# Private Begriffsliste — einmal laden, Meldungen nennen die Listenzeile, nie den Begriff.
+# Private Begriffsliste — einmal laden (Parser: hygiene_private_terms_load, derselbe wie im
+# Hygiene-Gate), Meldungen nennen die Listenzeile, nie den Begriff.
 # ---------------------------------------------------------------------------
-TERMS=()
-TERM_LINES=()
 TERMS_LOADED=0
 load_private_terms() {
   [ "$TERMS_LOADED" -eq 1 ] && return 0
   TERMS_LOADED=1
-  local list term lineno=0
+  local list
   if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
     note "${HYGIENE_PRIVATE_TERMS_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_TERMS und keine ~/.config/mysuricates/hygiene-private-terms.txt) — private Begriffe in Commit-Nachrichten werden nicht geprueft (uebersprungen)"
     return 0
   fi
-  while IFS= read -r term || [ -n "$term" ]; do
-    lineno=$((lineno + 1))
-    term="${term%%#*}"
-    term="${term#"${term%%[![:space:]]*}"}"
-    term="${term%"${term##*[![:space:]]}"}"
-    [ -z "$term" ] && continue
-    TERMS+=("$term"); TERM_LINES+=("$lineno")
-  done < "$list"
+  hygiene_private_terms_load "$list"
 }
 
 # ---------------------------------------------------------------------------
@@ -121,9 +120,17 @@ check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
       case "$line" in *"$pat"*) fail "${label}: Nachricht enthaelt '${pat}' (${desc})" ;; esac
     done
     lc="${line,,}"
-    for i in "${!TERMS[@]}"; do
-      lc_term="${TERMS[$i],,}"
-      case "$lc" in *"$lc_term"*) fail "${label}: Nachricht enthaelt einen privaten Begriff (Zeile ${TERM_LINES[$i]} der privaten Begriffsliste)" ;; esac
+    for i in "${!HYGIENE_TERMS[@]}"; do
+      lc_term="${HYGIENE_TERMS[$i],,}"
+      case "$lc" in
+        *"$lc_term"*)
+          if [ "${HYGIENE_TERM_WEAK[$i]}" -eq 1 ]; then
+            warn "${label}: Nachricht enthaelt einen privaten Begriff, schwach (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste) — zaehlt LOW, blockiert nicht"
+          else
+            fail "${label}: Nachricht enthaelt einen privaten Begriff (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste)"
+          fi
+          ;;
+      esac
     done
     if [[ "$line" =~ $HYGIENE_EMAIL_REGEX ]]; then
       fail "${label}: Nachricht enthaelt eine Mailadresse ausserhalb eines Trailers"
@@ -151,14 +158,26 @@ check_commits() {  # $@ = rev-list-Argumente
 # 2 — Hygiene auf den Bereich, 4 — gitleaks, 5 — Bauprüfung
 # ---------------------------------------------------------------------------
 check_hygiene_range() {  # $1 = A..B
-  local out rc
+  local out rc warns n
   if [ ! -f "$HYGIENE_GATE" ]; then
     echo "Pre-Push-Gate: Hygiene-Gate fehlt: $HYGIENE_GATE" >&2
     exit 2
   fi
   out="$(bash "$HYGIENE_GATE" --range "$1" 2>&1)"; rc=$?
   case "$rc" in
-    0) note "Hygiene-Gate auf ${1}: OK" ;;
+    0)
+      # Warnungen (etwa ein schwacher privater Begriff) blockieren nicht, sollen aber nicht
+      # im OK verschwinden — sonst sieht sie vor dem Push niemand.
+      warns="$(printf '%s\n' "$out" | grep -E '^(  ! |::warning)' || true)"
+      if [ -n "$warns" ]; then
+        n="$(printf '%s\n' "$warns" | grep -c .)"
+        printf '%s\n' "$warns" | sed 's/^/    /'
+        WARN=$((WARN + n))
+        note "Hygiene-Gate auf ${1}: OK — ${n} Warnung(en), kein Verstoss"
+      else
+        note "Hygiene-Gate auf ${1}: OK"
+      fi
+      ;;
     1) printf '%s\n' "$out" | sed 's/^/    /'; fail "Hygiene-Gate auf ${1} meldet Verstoesse" ;;
     *) printf '%s\n' "$out" >&2; echo "Pre-Push-Gate: Hygiene-Gate nicht lauffaehig (exit ${rc})" >&2; exit 2 ;;
   esac
@@ -322,4 +341,8 @@ if [ "$FAIL" -ne 0 ]; then
   echo "Kein Bypass per Reflex — git push --no-verify nur, wenn der Befund bewusst gepruft ist."
   exit 1
 fi
-echo "Pre-Push-Gate OK"
+if [ "$WARN" -ne 0 ]; then
+  echo "Pre-Push-Gate OK — ${WARN} Warnung(en), kein Verstoss."
+else
+  echo "Pre-Push-Gate OK"
+fi

@@ -53,6 +53,15 @@ JSON envelope:
 Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
+A prompt that leaves the `subject` to the model gets drift: between two runs `docs/deployment.md`
+became `host-reaching-endpoints`, and the finding came back as a repeat finding without its
+disposition. A prompt therefore fixes the `subject` per `ruleKey` — a fixed value for rules that
+concern the repository or a module as a whole (files and numbers then go into
+`description`/`evidence`), otherwise the path relative to the repository root, one finding per
+file. The model to follow is the ruleKey list in the "Public Readiness" evidence prompt
+(`subject "<value>"` or `subject = Pfad` per entry); `AuditRuleKeyCatalogTest` makes sure no entry
+there leaves it out (TODO `3a9e275b` — evidence prompt: fix the subject per ruleKey).
+
 ### Optional: `expectedFindings`
 
 An audit whose measurement block knows the target count (such as `ERWARTETE FINDINGS` in the test

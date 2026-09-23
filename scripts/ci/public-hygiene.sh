@@ -145,28 +145,29 @@ check_patterns_staged() {
 
 # Private Begriffe in hinzugefuegten Zeilen (--staged/--range). Der Bestandslauf
 # (check_private_terms) beantwortet die Release-Frage; hier geht es darum, dass kein
-# neuer Treffer dazukommt — beim Commit und noch einmal vor dem Push.
+# neuer Treffer dazukommt — beim Commit und noch einmal vor dem Push. Ein schwacher
+# Begriff (Praefix low:, siehe hygiene_private_terms_load) warnt nur, wie im Bestand.
 check_private_terms_diff() {
-  local list term lineno=0 file
+  local list i file
   if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
     echo "  – ${HYGIENE_PRIVATE_TERMS_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_TERMS und keine" \
          "~/.config/mysuricates/hygiene-private-terms.txt) — private Begriffe werden nicht geprueft" \
          "(uebersprungen)"
     return 0
   fi
+  hygiene_private_terms_load "$list"
   ensure_added_lines_file
-  while IFS= read -r term || [ -n "$term" ]; do
-    lineno=$((lineno + 1))
-    term="${term%%#*}"
-    term="${term#"${term%%[![:space:]]*}"}"
-    term="${term%"${term##*[![:space:]]}"}"
-    [ -z "$term" ] && continue
+  for i in "${!HYGIENE_TERMS[@]}"; do
     while IFS=$'\t' read -r file _; do
       [ -z "$file" ] && continue
       hygiene_is_allowlisted "$file" && continue
-      annotate "$file" 1 "neue Zeile enthaelt einen privaten Begriff (Zeile ${lineno} der privaten Begriffsliste)"
-    done < <(grep -iF -- "$term" "$ADDED_LINES_FILE" 2>/dev/null || true)
-  done < "$list"
+      if [ "${HYGIENE_TERM_WEAK[$i]}" -eq 1 ]; then
+        warn "$file" 1 "neue Zeile enthaelt einen privaten Begriff, schwach (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste) — zaehlt LOW, blockiert nicht"
+      else
+        annotate "$file" 1 "neue Zeile enthaelt einen privaten Begriff (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste)"
+      fi
+    done < <(grep -iF -- "${HYGIENE_TERMS[$i]}" "$ADDED_LINES_FILE" 2>/dev/null || true)
+  done
 }
 
 # Gestagte Dateien, die unter eine Ignore-Regel fallen oder wie eine Sicherung aussehen.
@@ -442,30 +443,32 @@ check_private_pool_list() {
 # Namen privater Projekte, Arbeitgeber oder Personen lassen sich nicht als
 # Literal in hygiene-rules.sh fuehren, ohne sie damit zu veroeffentlichen. Die
 # Liste liegt deshalb ausserhalb des Repositorys (hygiene_private_terms_path).
-# Nur --tracked/--worktree: die Frage ist der Zustand vor der Veroeffentlichung,
-# nicht jeder einzelne Commit. Die Meldung nennt die Listenzeile, nicht den
-# Begriff — die Ausgabe wandert in den Evidenz-Bericht und ins Audit.
+# Hier der Bestand (--tracked/--worktree): die Frage ist der Zustand vor der
+# Veroeffentlichung. Hinzugefuegte Zeilen prueft check_private_terms_diff (--staged/
+# --range). Die Meldung nennt die Listenzeile, nicht den Begriff — die Ausgabe
+# wandert in den Evidenz-Bericht und ins Audit. Ein schwacher Begriff (Praefix low:)
+# ist eine Warnung "privater Begriff, schwach": sichtbar, aber kein Verstoss.
 # ---------------------------------------------------------------------------
 check_private_terms() {
-  local list term file line lineno=0
+  local list i file line
   if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
     echo "  – ${HYGIENE_PRIVATE_TERMS_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_TERMS und keine" \
          "~/.config/mysuricates/hygiene-private-terms.txt) — private Begriffe werden nicht geprueft" \
          "(uebersprungen)"
     return 0
   fi
-  while IFS= read -r term || [ -n "$term" ]; do
-    lineno=$((lineno + 1))
-    term="${term%%#*}"
-    term="${term#"${term%%[![:space:]]*}"}"
-    term="${term%"${term##*[![:space:]]}"}"
-    [ -z "$term" ] && continue
+  hygiene_private_terms_load "$list"
+  for i in "${!HYGIENE_TERMS[@]}"; do
     while IFS=: read -r file line _; do
       [ -z "$file" ] && continue
       hygiene_is_allowlisted "$file" && continue
-      annotate "$file" "$line" "privater Begriff (Zeile ${lineno} der privaten Begriffsliste) — neutralisieren oder die Datei aus dem Bestand nehmen"
-    done < <(git grep -nIi -F -- "$term" 2>/dev/null || true)
-  done < "$list"
+      if [ "${HYGIENE_TERM_WEAK[$i]}" -eq 1 ]; then
+        warn "$file" "$line" "privater Begriff, schwach (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste) — zaehlt LOW, blockiert nicht; bei Gelegenheit neutralisieren"
+      else
+        annotate "$file" "$line" "privater Begriff (Zeile ${HYGIENE_TERM_LINES[$i]} der privaten Begriffsliste) — neutralisieren oder die Datei aus dem Bestand nehmen"
+      fi
+    done < <(git grep -nIi -F -- "${HYGIENE_TERMS[$i]}" 2>/dev/null || true)
+  done
 }
 
 # Verstoesse aus check_symlinks als Fehler melden.
