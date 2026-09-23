@@ -132,7 +132,7 @@ ein VPN davor, kein offener Port. Vollstaendig:
 | Backend | Spring Boot 3.5, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
-| Container | Docker (Java Docker Client 3.4.1) — optional, nur fuer Shell-Bloecke mit `container_image` |
+| Container | Docker (Java Docker Client 3.7.1) — optional, nur fuer Shell-Bloecke mit `container_image` |
 | Styling | Tailwind CSS 4, CSS-Variablen |
 | State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP ueber SockJS |

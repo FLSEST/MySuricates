@@ -21,16 +21,21 @@
         <java.version>21</java.version>
         <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <docker-java.version>3.4.1</docker-java.version>
+        <docker-java.version>3.7.1</docker-java.version>
         <sqlite-jdbc.version>3.50.3.0</sqlite-jdbc.version>
         <sqlite-dialect.version>0.1.4</sqlite-dialect.version>
         <tika.version>3.3.0</tika.version>
         <!-- Boot 3.5.16 verwaltet Tomcat 10.1.55, noch mit CRITICAL-Advisories (Fix ab 10.1.58), e15bb23d -->
         <tomcat.version>10.1.60</tomcat.version>
+        <!-- Boot 3.5.16 verwaltet noch Versionen mit MODERATE-Advisories (OSV), 3e2121d6:
+             jackson-databind 2.21.4, commons-lang3 3.17.0, log4j-api 2.24.3 -->
+        <jackson-bom.version>2.21.7</jackson-bom.version>
+        <commons-lang3.version>3.20.0</commons-lang3.version>
+        <log4j2.version>2.25.5</log4j2.version>
         <!-- Transitive Pins (nicht von Boot verwaltet), siehe <dependencyManagement> -->
         <bouncycastle.version>1.86</bouncycastle.version>
         <commons-io.version>2.22.0</commons-io.version>
-        <commons-compress.version>1.28.0</commons-compress.version>
+        <jsoup.version>1.23.2</jsoup.version>
         <guava.version>33.7.1-jre</guava.version>
     </properties>
 
@@ -40,16 +45,19 @@
         217863b8 (bcprov (ueber Tika) und commons-io (ueber docker-java) auf Versionen ohne high/critical heben):
           - bcprov/bcjmail 1.83 kommen ueber tika-parser-pdf-module 3.3.0 (OSV: 2x CRITICAL, 2x HIGH).
             Auch Tika 3.3.2 bringt erst 1.85, daher Pin statt Tika-Update.
-          - commons-io 2.13.0 kommt ueber docker-java-core 3.4.1 (OSV: HIGH) und gewinnt, weil
-            docker-java im pom vor Tika steht (Tika selbst will 2.20+).
+          - commons-io kam als 2.13.0 ueber docker-java-core 3.4.1 (OSV: HIGH); docker-java 3.7.1 bringt
+            2.21.0, der Pin haelt die neuere Linie, die auch Tika erwartet.
         17b79580 (Veraltete transitive Abhaengigkeiten ueber docker-java (commons-compress 1.21, guava 19.0, bcpkix 1.76)):
-          - commons-compress 1.21 (CVE-2024-25710, CVE-2024-26308) gewann ueber docker-java und brach
-            OOXML-Schreiben/-Lesen in POI 5.5.1/Tika 3.3.0 (NoSuchMethodError; die erwarten 1.27+).
           - guava 19.0 (docker-java) auf 33; die reinen Annotations-Artefakte von guava 33 sind
             ausgeschlossen (zur Laufzeit nicht noetig), nur failureaccess (aus guava ausgelagert) kommt hinzu.
-          - bcpkix/bcutil 1.76 (docker-java) auf dieselbe BC-Version wie bcprov, kein Versions-Mix.
+            Seit docker-java 3.7.1 kaeme guava 33.4.8 ohnehin — der Eintrag bleibt fuer die Exclusions,
+            sonst zoegen jspecify/error_prone/j2objc als neue Pakete ein.
+          - bcpkix/bcutil (docker-java 3.7.1: 1.82) auf dieselbe BC-Version wie bcprov, kein Versions-Mix.
+          - commons-compress: Pin entfernt (3e2121d6) — docker-java 3.7.1 bringt selbst 1.28.0.
+        3e2121d6 (Moderate Schwachstellen in jackson-databind, commons-lang3, log4j-api, jsoup):
+          - jsoup 1.22.1 kommt ueber tika-parser-html-module 3.3.0 (OSV: MODERATE, Fix ab 1.23.1).
         Beim Heben von Tika/docker-java pruefen, ob die Pins noch noetig sind:
-        mvn dependency:tree -Dincludes=org.bouncycastle,commons-io,org.apache.commons:commons-compress,com.google.guava
+        mvn dependency:tree -Dincludes=org.bouncycastle,commons-io,org.apache.commons:commons-compress,com.google.guava,org.jsoup
     -->
     <dependencyManagement>
         <dependencies>
@@ -74,9 +82,9 @@
                 <version>${bouncycastle.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>${commons-compress.version}</version>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.guava</groupId>
