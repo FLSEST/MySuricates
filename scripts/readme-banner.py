@@ -16,7 +16,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-W, H = 1280, 500
+W, H = 1280, 530
 
 SAND = "#d4a060"
 FAWN = "#a87840"
@@ -39,7 +39,8 @@ TEXT = {
         ],
         "things": [["Workflows", "Ketten", "Skills", "Vorlagen", "Zeitpläne"],
                    ["TODOs", "Integrationen", "Webhooks", "Human-in-the-Loop", "Assistent"],
-                   ["BPMN", "Versionen", "Gates", "Memory", "Dashboard", "Audit", "…"]],
+                   ["BPMN", "Versionen", "Gates", "Memory", "Dashboard", "Audit"],
+                   ["Hoch konfigurierbar", "Komplett individualisierbar", "Features abschaltbar", "…"]],
     },
     "en": {
         "tagline": ["Build your own workflows with your suricates",
@@ -52,7 +53,8 @@ TEXT = {
         ],
         "things": [["Workflows", "Chains", "Skills", "Templates", "Schedules"],
                    ["TODOs", "Integrations", "Webhooks", "Human-in-the-loop", "Assistant"],
-                   ["BPMN", "Versions", "Gates", "Memory", "Dashboard", "Audit", "…"]],
+                   ["BPMN", "Versions", "Gates", "Memory", "Dashboard", "Audit"],
+                   ["Highly configurable", "Fully customizable", "Features can be switched off", "…"]],
     },
 }
 
@@ -97,6 +99,13 @@ ICONS = [[
     '<path d="M-7 7V1M-2.3 7V-5M2.3 7V-1M7 7V-7"/>',
     # Audit: Lupe
     '<circle cx="-2" cy="-2" r="5.5"/><path d="M2 2l5 5"/>',
+], [
+    # Hoch konfigurierbar: Schieberegler
+    '<path d="M-8-4h16M-8 4h16"/><circle cx="-2" cy="-4" r="2.4" fill="#1f160f"/><circle cx="3" cy="4" r="2.4" fill="#1f160f"/>',
+    # Komplett individualisierbar: Puzzleteil
+    '<path d="M-6-7h4a2 2 0 0 1 4 0h4v4a2 2 0 0 1 0 4v4h-4a2 2 0 0 1-4 0h-4v-4a2 2 0 0 1 0-4Z"/>',
+    # Features abschaltbar: Kippschalter
+    '<rect x="-9" y="-4.5" width="18" height="9" rx="4.5"/><circle cx="-4.5" r="2.6" fill="#1f160f"/>',
     # "...": kein Symbol, das Wort steht fuer sich
     '',
 ]]
@@ -360,8 +369,8 @@ def build(lang, book, demi):
         p, _ = text(book, label, 16, lx + 24, ly, CREAM, tracking=.3)
         add(p)
         lx += 24 + w + 26
-    if row > 2:
-        raise SystemExit(f"{lang}: mehr als drei Reihen unten")
+    if row > 3:
+        raise SystemExit(f"{lang}: mehr als vier Reihen unten")
 
     add("</g>")
     add(f'<rect x=".75" y=".75" width="{W - 1.5}" height="{H - 1.5}" rx="27.5" fill="none" '

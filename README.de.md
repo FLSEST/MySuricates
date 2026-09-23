@@ -1,6 +1,6 @@
 **Deutsch** | [English](README.md)
 
-<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Baue deine eigenen Workflows mit deinen Erdmännchen und lass sie dir helfen, jeden Schritt im Blick zu behalten. Deterministisch, wo es geht. Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf. Behalte im Blick, was du getan hast und was du tust. Setze deine Erdmännchen ein, so wie du sie brauchst. Workflows, Ketten, Skills, Vorlagen, Zeitpläne, TODOs, Integrationen, Webhooks, Human-in-the-Loop, Assistent, BPMN, Versionen, Gates, Memory, Dashboard, Audit und mehr."></p>
+<p align="center"><img src="docs/assets/readme-banner-de.svg" alt="MySuricates – Baue deine eigenen Workflows mit deinen Erdmännchen und lass sie dir helfen, jeden Schritt im Blick zu behalten. Deterministisch, wo es geht. Jeder Anbieter: Wechsle ihn und behalte deinen Ablauf. Behalte im Blick, was du getan hast und was du tust. Setze deine Erdmännchen ein, so wie du sie brauchst. Workflows, Ketten, Skills, Vorlagen, Zeitpläne, TODOs, Integrationen, Webhooks, Human-in-the-Loop, Assistent, BPMN, Versionen, Gates, Memory, Dashboard, Audit, hoch konfigurierbar, komplett individualisierbar, Features abschaltbar und mehr."></p>
 
 # MySuricates
 
