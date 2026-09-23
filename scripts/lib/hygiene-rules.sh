@@ -220,6 +220,33 @@ hygiene_private_list_path() {
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# Private Begriffsliste (TODO 1b84ecab)
+#
+# Die verbotenen Literale oben stehen im Klartext im Repository — fuer Namen
+# privater Projekte, Arbeitgeber oder Personen taugt das nicht: die Liste waere
+# selbst die Preisgabe. Diese Liste liegt deshalb wie die private Pool-Liste
+# ausserhalb des Bestands und wird ueber dieselben Ausweichorte gefunden. Fehlt
+# sie (CI, fremder Clone), wird der Check hoerbar uebersprungen.
+#
+# Format: ein Begriff je Zeile, Kommentare mit #. Gesucht wird woertlich und ohne
+# Ruecksicht auf Gross-/Kleinschreibung. Meldungen nennen den Begriff nicht,
+# nur seine Zeilennummer in der Liste — die Ausgabe landet im Evidenz-Bericht.
+# ---------------------------------------------------------------------------
+HYGIENE_PRIVATE_TERMS_FILE="scripts/ci/hygiene-private-terms.txt"
+
+# hygiene_private_terms_path <repo-root> — wie hygiene_private_list_path, fuer
+# die Begriffsliste ($HYGIENE_PRIVATE_TERMS, dann die Nutzerkonfiguration).
+hygiene_private_terms_path() {
+  local root="$1" c
+  for c in "$root/$HYGIENE_PRIVATE_TERMS_FILE" \
+           "${HYGIENE_PRIVATE_TERMS:-}" \
+           "${XDG_CONFIG_HOME:-${HOME:-}/.config}/mysuricates/hygiene-private-terms.txt"; do
+    [ -n "$c" ] && [ -f "$c" ] && { printf '%s\n' "$c"; return 0; }
+  done
+  return 1
+}
+
 # Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).
 hygiene_allowlist_paths() {
   [ -f "$HYGIENE_ALLOWLIST_FILE" ] || return 0

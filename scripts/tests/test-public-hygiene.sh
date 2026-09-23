@@ -10,7 +10,7 @@ PASS=0; FAIL=0
 # Die Ausweichorte der Privatliste (hygiene_private_list_path) liegen ausserhalb
 # des Repos. Ohne diese Isolation faende das Gate die echte Liste des Rechners.
 export XDG_CONFIG_HOME="$TMP/xdg"
-unset HYGIENE_PRIVATE_LIST
+unset HYGIENE_PRIVATE_LIST HYGIENE_PRIVATE_TERMS
 
 check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
@@ -27,7 +27,7 @@ make_repo() {  # $1 = pfad
   cp -r "$REPO/scripts/ci" "$REPO/scripts/lib" "$REPO/scripts/git-hooks" "$1/scripts/"
   # Die private Ausschlussliste ist untrackt und liegt nur lokal — sie darf nicht
   # mit in die Testrepos wandern, sonst haengt das Ergebnis am Rechner.
-  rm -f "$1/scripts/ci/hygiene-private.txt"
+  rm -f "$1/scripts/ci/hygiene-private.txt" "$1/scripts/ci/hygiene-private-terms.txt"
   ( cd "$1" && $GIT add . && $GIT commit -q -m init && git config core.hooksPath scripts/git-hooks )
 }
 
@@ -541,6 +541,29 @@ printf 'workflow-pool/etwas-anderes-*.json
 ' > "$TMP/priv/scripts/ci/hygiene-private.txt"
 OUT=$(cd "$TMP/priv" && HYGIENE_PRIVATE_LIST="$TMP/env-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
 check "Repo-Liste hat Vorrang vor der Env-Liste (exit 0)" '[ "$RC" -eq 0 ]'
+
+echo "35) Private Begriffsliste: Treffer im getrackten Bestand, Begriff bleibt ungenannt (TODO 1b84ecab)"
+make_repo "$TMP/terms"
+( cd "$TMP/terms" && printf 'Notiz zu Geheimprojekt Zebrafink\n' > notiz.md && $GIT add notiz.md && $GIT commit -q -m notiz )
+OUT=$(cd "$TMP/terms" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "ohne Liste: hoerbar uebersprungen"                'grep -q "hygiene-private-terms.txt fehlt" <<<"$OUT"'
+check "ohne Liste: kein Begriffsbefund"                  '! grep -q "privater Begriff" <<<"$OUT"'
+printf '# Kommentar\n\nzebrafink\n' > "$TMP/terms-liste.txt"
+OUT=$(cd "$TMP/terms" && HYGIENE_PRIVATE_TERMS="$TMP/terms-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Treffer ohne Gross-/Kleinschreibung (exit 1)"     '[ "$RC" -eq 1 ]'
+check "Gate nennt Datei und Zeile"                       'grep -q "notiz.md:1" <<<"$OUT"'
+check "Gate nennt die Listenzeile"                       'grep -q "Zeile 3 der privaten Begriffsliste" <<<"$OUT"'
+check "Gate nennt den Begriff nicht"                     '! grep -qi "zebrafink" <<<"$OUT"'
+mkdir -p "$XDG_CONFIG_HOME/mysuricates"
+cp "$TMP/terms-liste.txt" "$XDG_CONFIG_HOME/mysuricates/hygiene-private-terms.txt"
+OUT=$(cd "$TMP/terms" && bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "XDG-Begriffsliste greift (exit 1)"                '[ "$RC" -eq 1 ]'
+OUT=$(cd "$TMP/terms" && printf 'zebrafink\n' > neu.md && git add neu.md && bash scripts/ci/public-hygiene.sh --staged 2>&1); RC=$?
+check "--staged prueft die Begriffe nicht"               '! grep -q "privater Begriff" <<<"$OUT"'
+rm -f "$XDG_CONFIG_HOME/mysuricates/hygiene-private-terms.txt"
+printf 'Schnecke\n' > "$TMP/terms-liste.txt"
+OUT=$(cd "$TMP/terms" && HYGIENE_PRIVATE_TERMS="$TMP/terms-liste.txt" bash scripts/ci/public-hygiene.sh --tracked 2>&1); RC=$?
+check "Liste ohne Treffer: kein Begriffsbefund"          '! grep -q "privater Begriff" <<<"$OUT"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

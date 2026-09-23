@@ -130,6 +130,28 @@ class GateTest(unittest.TestCase):
             self.assertIn("bekannt: kein-en-gegenstueck docs/diagramme.md", out)
             self.assertIn("gate_status: GREEN", out)
 
+    def test_english_link_to_german_page_is_reported_not_failed(self):
+        # README.md und docs/en/ sind der englische Pfad. Ein Verweis von dort auf eine
+        # rein deutsche Seite ist ein Hinweis fuers Audit, das Gate bleibt gruen (TODO 1b84ecab).
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp, en_extra="[Konzepte](../konzepte/README.md)\n[A](a.md)")
+            (root / "docs" / "konzepte").mkdir()
+            (root / "docs" / "konzepte" / "README.md").write_text("# Konzepte\n")
+            (root / "README.md").write_text("# R\n\n[Diagramme](docs/a.md)\n[Guide](docs/en/a.md)\n")
+            code, out = run_script(root)
+            self.assertEqual(code, 0, out)
+            self.assertIn("en_links_to_german: 2", out)
+            self.assertIn("HINWEIS: en-verweist-auf-deutsch docs/en/a.md:4 -> docs/konzepte/README.md", out)
+            self.assertIn("HINWEIS: en-verweist-auf-deutsch README.md:3 -> docs/a.md", out)
+            self.assertNotIn("-> docs/en/a.md", out)
+
+    def test_german_page_linking_german_is_not_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(tmp, extra_de_file="b.md", link="[B](b.md)")
+            (root / "docs" / "en" / "b.md").write_text("# Extra\n")
+            code, out = run_script(root)
+            self.assertIn("en_links_to_german: 0", out)
+
 
 class RepoTest(unittest.TestCase):
     def test_this_repository_is_green(self):

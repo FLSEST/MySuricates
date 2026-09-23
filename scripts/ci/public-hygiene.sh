@@ -388,6 +388,38 @@ check_private_pool_list() {
   done < "$list"
 }
 
+# ---------------------------------------------------------------------------
+# Check 10 — Begriffe aus der privaten Begriffsliste im getrackten Bestand
+#
+# Namen privater Projekte, Arbeitgeber oder Personen lassen sich nicht als
+# Literal in hygiene-rules.sh fuehren, ohne sie damit zu veroeffentlichen. Die
+# Liste liegt deshalb ausserhalb des Repositorys (hygiene_private_terms_path).
+# Nur --tracked/--worktree: die Frage ist der Zustand vor der Veroeffentlichung,
+# nicht jeder einzelne Commit. Die Meldung nennt die Listenzeile, nicht den
+# Begriff — die Ausgabe wandert in den Evidenz-Bericht und ins Audit.
+# ---------------------------------------------------------------------------
+check_private_terms() {
+  local list term file line lineno=0
+  if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
+    echo "  – ${HYGIENE_PRIVATE_TERMS_FILE} fehlt (auch kein \$HYGIENE_PRIVATE_TERMS und keine" \
+         "~/.config/mysuricates/hygiene-private-terms.txt) — private Begriffe werden nicht geprueft" \
+         "(uebersprungen)"
+    return 0
+  fi
+  while IFS= read -r term || [ -n "$term" ]; do
+    lineno=$((lineno + 1))
+    term="${term%%#*}"
+    term="${term#"${term%%[![:space:]]*}"}"
+    term="${term%"${term##*[![:space:]]}"}"
+    [ -z "$term" ] && continue
+    while IFS=: read -r file line _; do
+      [ -z "$file" ] && continue
+      hygiene_is_allowlisted "$file" && continue
+      annotate "$file" "$line" "privater Begriff (Zeile ${lineno} der privaten Begriffsliste) — neutralisieren oder die Datei aus dem Bestand nehmen"
+    done < <(git grep -nIi -F -- "$term" 2>/dev/null || true)
+  done < "$list"
+}
+
 # Verstoesse aus check_symlinks als Fehler melden.
 report_symlinks() {
   local kind path target
@@ -423,6 +455,7 @@ else
   done < <(check_weight)
   check_gitignore_leaks
   check_private_pool_list
+  check_private_terms
   check_security_md
   report_symlinks
   [ "$MODE" = "worktree" ] && check_worktree_strays

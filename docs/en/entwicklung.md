@@ -668,6 +668,13 @@ What is checked:
    at the original checkout instead of its own tree in every clone, worktree and run snapshot.
    Example: `ai-automation-backend/workflow-pool` must point at `../workflow-pool`, because the
    backend runs with cwd `ai-automation-backend/` and resolves the pool relatively.
+8. **Private terms** (`--tracked`/`--worktree` only). Names of private projects, employers or people
+   cannot go into check 2 without publishing them in the repository. They live in a list outside the
+   tracked set instead: `scripts/ci/hygiene-private-terms.txt` (untracked, in `.git/info/exclude`),
+   `$HYGIENE_PRIVATE_TERMS` or `~/.config/mysuricates/hygiene-private-terms.txt` — the last one is
+   also found by clones and by the isolated run workspaces of the evidence workflows. Matching is
+   literal and case-insensitive; the message names the list line, not the term. Without a list (CI,
+   someone else's clone) the check is skipped with a notice.
 
 `scripts/install-hooks.sh` installs the hook via `core.hooksPath` (and runs as part of `setup.sh`).
 

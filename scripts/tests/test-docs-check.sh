@@ -30,6 +30,8 @@ mkdir -p "$FAKE/docs"
 for f in README.md README.de.md LICENSE NOTICE SECURITY.md CONTRIBUTING.md; do
   echo "# $f" > "$FAKE/$f"
 done
+# Ein README ohne Ueberschrift zum Ausprobieren ist seit TODO 1b84ecab ein Befund.
+for f in README.md README.de.md; do printf '# %s\n\nKurz.\n\n## Quickstart\n' "$f" > "$FAKE/$f"; done
 for f in GETTING-STARTED.md architektur.md vision.md workflow-pool-kuratierung.md; do
   echo "# $f" > "$FAKE/docs/$f"
 done
@@ -71,6 +73,36 @@ rm "$FAKE/docs/vision.md"
 OUT="$(run_gate)"
 check "gate_status YELLOW"           'grep -q "^gate_status: YELLOW" <<< "$OUT"'
 check "docs/vision.md als missing"   'grep -q "^missing: docs/vision.md$" <<< "$OUT"'
+
+echo "Fall 6: Schnellstart hinter zu viel Text -> YELLOW ohne todo_item (TODO 1b84ecab)"
+echo "# vision.md" > "$FAKE/docs/vision.md"
+{ echo "# README"; for i in $(seq 1 60); do echo "eins zwei drei vier fuenf sechs sieben acht neun zehn"; done
+  echo "<!-- ein langer Kommentar"; for i in $(seq 1 60); do echo "wort wort wort wort wort wort wort wort wort wort"; done; echo "-->"
+  echo "## Quickstart"; } > "$FAKE/README.md"
+OUT="$(run_gate)"
+check "gate_status YELLOW"                  'grep -q "^gate_status: YELLOW" <<< "$OUT"'
+check "schnellstart-spaet gemeldet"         'grep -q "BEFUND: schnellstart-spaet README.md:" <<< "$OUT"'
+check "Kommentar zaehlt nicht mit (602)"    'grep -q "602 Woerter davor" <<< "$OUT"'
+check "kein todo_item"                      '! grep -q "^todo_item:" <<< "$OUT"'
+OUT="$(PUBLIC_READINESS_QUICKSTART_MAX_WORDS=700 PUBLIC_READINESS_ROOT="$FAKE" bash "$SCRIPT" 2>/dev/null)"
+check "Grenze per Umgebung einstellbar"     'grep -q "^gate_status: GREEN" <<< "$OUT"'
+
+echo "Fall 7: README ohne Ueberschrift zum Ausprobieren -> Befund"
+printf '# README\n\n## Ueber das Projekt\n' > "$FAKE/README.md"
+OUT="$(run_gate)"
+check "readme-ohne-schnellstart gemeldet"   'grep -q "BEFUND: readme-ohne-schnellstart README.md" <<< "$OUT"'
+printf '# README\n\n### Ausprobieren\n' > "$FAKE/README.md"
+OUT="$(run_gate)"
+check "deutsche Ueberschrift wird erkannt"  'grep -q "^gate_status: GREEN" <<< "$OUT"'
+
+echo "Fall 8: Maintainer-Marker in CLAUDE.md -> Befund, API-Beispiel in AGENTS.md nicht"
+printf 'sessionId: $SHELL_SESSION_ID\n`claude --resume <uuid>`\n' > "$FAKE/CLAUDE.md"
+printf '{"sourceAgent": "Codex CLI"}\n' > "$FAKE/AGENTS.md"
+OUT="$(run_gate)"
+check "SHELL_SESSION_ID gemeldet"           'grep -q "BEFUND: maintainer-anweisung CLAUDE.md .*SHELL_SESSION_ID" <<< "$OUT"'
+check "claude --resume gemeldet"            'grep -q "BEFUND: maintainer-anweisung CLAUDE.md .*claude --resume" <<< "$OUT"'
+check "AGENTS.md ohne Befund"               '! grep -q "BEFUND: maintainer-anweisung AGENTS.md" <<< "$OUT"'
+check "gate_status YELLOW"                  'grep -q "^gate_status: YELLOW" <<< "$OUT"'
 
 echo
 echo "PASS=$PASS FAIL=$FAIL"

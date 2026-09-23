@@ -690,6 +690,14 @@ Geprüft wird:
    Link in jedem Clone, Worktree und Run-Snapshot auf den Original-Checkout statt in den eigenen Baum.
    Beispiel: `ai-automation-backend/workflow-pool` muss auf `../workflow-pool` zeigen, weil das Backend
    mit cwd `ai-automation-backend/` läuft und den Pool relativ auflöst.
+8. **Private Begriffe** (nur `--tracked`/`--worktree`). Namen privater Projekte, Arbeitgeber oder
+   Personen kann Check 2 nicht führen, ohne sie im Repository zu veröffentlichen. Sie stehen deshalb
+   in einer Liste außerhalb des Bestands: `scripts/ci/hygiene-private-terms.txt` (untrackt, in
+   `.git/info/exclude`), `$HYGIENE_PRIVATE_TERMS` oder
+   `~/.config/mysuricates/hygiene-private-terms.txt` — letzteres erreichen auch Klone und die
+   isolierten Run-Workspaces der Evidenz-Workflows. Gesucht wird wörtlich, ohne Groß-/Kleinschreibung;
+   die Meldung nennt die Listenzeile, nicht den Begriff. Fehlt die Liste (CI, fremder Clone), wird
+   der Check hörbar übersprungen.
 
 Den Hook installiert `scripts/install-hooks.sh` über `core.hooksPath` (läuft in `setup.sh` mit).
 

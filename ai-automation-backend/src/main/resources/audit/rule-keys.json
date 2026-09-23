@@ -84,7 +84,11 @@
     "public.evidence.dependency-audit-missing",
     "public.evidence.claude-dir-tracking",
     "public.evidence.git-status-empty",
-    "public.evidence.script-inconsistency"
+    "public.evidence.script-inconsistency",
+    "public.privacy.private-terms",
+    "public.onboarding.quickstart-buried",
+    "public.docs.maintainer-agent-instructions",
+    "public.docs.en-links-to-german"
   ],
   "mysuricates.docs": [
     "docs.orphan",

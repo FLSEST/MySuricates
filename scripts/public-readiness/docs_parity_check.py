@@ -83,6 +83,33 @@ def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
     return findings, checked
 
 
+def check_en_to_de(root: Path, files: list[str]) -> list[str]:
+    """Englische Seiten, die auf eine rein deutsche Doku-Seite verweisen (TODO 1b84ecab).
+
+    Englisch sind README.md und alles unter docs/en/. Ein Verweis zaehlt, wenn sein Ziel
+    unter docs/ liegt, aber nicht unter docs/en/ — der englische Leser landet dann auf
+    Deutsch. Das ist ein Befund fuers Audit, kein Grund fuer ein rotes Gate: die Luecke
+    ist bekannt und steht als Uebersetzungsarbeit an, nicht als Fehler im Commit.
+    """
+    docs_dir, en_dir = (root / "docs").resolve(), (root / "docs" / "en").resolve()
+    hits: list[str] = []
+    for rel in files:
+        if rel != "README.md" and not rel.startswith("docs/en/"):
+            continue
+        path = root / rel
+        if not path.exists():
+            continue
+        for no, href in iter_links(path):
+            path_part = href.partition("#")[0]
+            if not path_part:
+                continue
+            target = (path.parent / path_part).resolve()
+            if not target.exists() or not target.is_relative_to(docs_dir) or target.is_relative_to(en_dir):
+                continue
+            hits.append(f"en-verweist-auf-deutsch {rel}:{no} -> {target.relative_to(root.resolve()).as_posix()}")
+    return hits
+
+
 def check_parity(root: Path) -> tuple[list[str], list[str]]:
     """Liefert (neue Befunde, bekannte Luecken)."""
     de_dir, en_dir = root / "docs", root / "docs" / "en"
@@ -134,6 +161,7 @@ def main() -> int:
     files = tracked_markdown(root)
     link_findings, checked = check_links(root, files)
     parity_new, parity_known = check_parity(root)
+    en_to_de = check_en_to_de(root, files)
     findings = link_findings + parity_new
 
     print("## Doku-Verweise und DE/EN-Gleichstand")
@@ -145,6 +173,10 @@ def main() -> int:
         print(f"bekannt: {item}")
     for item in findings:
         print(f"BEFUND: {item}")
+    # Nur gemeldet, nicht gewertet: siehe check_en_to_de.
+    print(f"en_links_to_german: {len(en_to_de)}")
+    for item in en_to_de:
+        print(f"HINWEIS: {item}")
 
     print()
     print("## Gate status")
