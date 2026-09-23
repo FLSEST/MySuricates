@@ -22,6 +22,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.cli.ContainerShellService;
+import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +66,9 @@ public class ExecutionSettingsService {
     private final TodoSimilarityConfig todoSimilarityConfig;
     private final RequestMetricsConfig requestMetricsConfig;
     private final DashboardReportAssistConfig dashboardReportAssistConfig;
+    private final RunDeletionPolicy runDeletionPolicy;
+
+    private static final String RUN_RETENTION_DAYS = "run-retention-days";
 
     /** Canonical key → runtime setter, in the order the DB overrides are applied at startup. */
     private final Map<String, Consumer<String>> appliers;
@@ -102,7 +106,8 @@ public class ExecutionSettingsService {
             CompressionConfig compressionConfig,
             TodoSimilarityConfig todoSimilarityConfig,
             RequestMetricsConfig requestMetricsConfig,
-            DashboardReportAssistConfig dashboardReportAssistConfig) {
+            DashboardReportAssistConfig dashboardReportAssistConfig,
+            RunDeletionPolicy runDeletionPolicy) {
         this.appSettingsRepository = appSettingsRepository;
         this.executionSemaphore = executionSemaphore;
         this.hostClaudeService = hostClaudeService;
@@ -126,6 +131,7 @@ public class ExecutionSettingsService {
         this.todoSimilarityConfig = todoSimilarityConfig;
         this.requestMetricsConfig = requestMetricsConfig;
         this.dashboardReportAssistConfig = dashboardReportAssistConfig;
+        this.runDeletionPolicy = runDeletionPolicy;
         this.appliers = buildAppliers();
     }
 
@@ -148,7 +154,7 @@ public class ExecutionSettingsService {
         m.put("todo-hygiene-enabled", v -> todoHygieneConfig.setEnabled(Integer.parseInt(v) == 1));
         m.put("todo-stale-days", v -> todoHygieneConfig.setStaleDays(Integer.parseInt(v)));
         m.put("todo-hygiene-max-per-run", v -> todoHygieneConfig.setMaxPerRun(Integer.parseInt(v)));
-        m.put("run-retention-days", v -> runRetentionConfig.setRetentionDays(Integer.parseInt(v)));
+        m.put(RUN_RETENTION_DAYS, v -> runRetentionConfig.setRetentionDays(Integer.parseInt(v)));
         m.put("run-retention-max-per-night", v -> runRetentionConfig.setMaxPerNight(Integer.parseInt(v)));
         m.put("dashboard-layout-retention-count", v -> dashboardLayoutConfig.setRetentionCount(Integer.parseInt(v)));
         m.put("todo-watchdog-enabled", v -> todoGhostWatchdogConfig.setEnabled(Integer.parseInt(v) == 1));
@@ -190,6 +196,8 @@ public class ExecutionSettingsService {
     }
 
     public void updateAll(Map<String, String> settings) {
+        // Refuse before anything is applied — a batch must not land half-way (TODO 8dbd7e10)
+        settings.forEach(this::guardRetention);
         for (var entry : settings.entrySet()) {
             validateAndApply(entry.getKey(), entry.getValue());
         }
@@ -198,10 +206,18 @@ public class ExecutionSettingsService {
     public void validateAndApply(String key, String value) {
         key = ExecutionSettingKeys.resolve(key);
         ExecutionSettingKeys.validate(key, value);
+        guardRetention(key, value);
 
         appSettingsRepository.set(key, value);
         appliers.get(key).accept(value);
         log.info("Execution setting updated: {} = {}", key, value);
+    }
+
+    private void guardRetention(String key, String value) {
+        if (RUN_RETENTION_DAYS.equals(ExecutionSettingKeys.resolve(key))) {
+            ExecutionSettingKeys.validate(RUN_RETENTION_DAYS, value);
+            runDeletionPolicy.requireRetentionChangeAllowed(runRetentionConfig.getRetentionDays(), Integer.parseInt(value));
+        }
     }
 
     public Map<String, Object> getCurrentSettings() {

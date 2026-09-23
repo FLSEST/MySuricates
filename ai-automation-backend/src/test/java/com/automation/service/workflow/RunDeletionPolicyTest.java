@@ -35,4 +35,25 @@ class RunDeletionPolicyTest {
             assertThat(ErrorCode.RUN_DELETION_DISABLED.getHttpStatus().value()).isEqualTo(403);
         });
     }
+
+    /** 8dbd7e10: with deletion off, the retention may only grow — 0 (off) counts as the longest. */
+    @Test
+    void retentionChange_whileDeletionIsOff_onlyExtends() {
+        RunDeletionPolicy locked = new RunDeletionPolicy(false);
+
+        assertThatCode(() -> locked.requireRetentionChangeAllowed(90, 90)).doesNotThrowAnyException();
+        assertThatCode(() -> locked.requireRetentionChangeAllowed(90, 365)).doesNotThrowAnyException();
+        assertThatCode(() -> locked.requireRetentionChangeAllowed(90, 0)).doesNotThrowAnyException();
+        assertThatCode(() -> locked.requireRetentionChangeAllowed(0, 0)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> locked.requireRetentionChangeAllowed(90, 30))
+                .isInstanceOf(HardeningException.class)
+                .extracting(e -> ((HardeningException) e).getCode())
+                .isEqualTo(ErrorCode.RUN_DELETION_DISABLED);
+        assertThatThrownBy(() -> locked.requireRetentionChangeAllowed(0, 730)).isInstanceOf(HardeningException.class);
+    }
+
+    @Test
+    void retentionChange_whileDeletionIsAllowed_isFree() {
+        assertThatCode(() -> new RunDeletionPolicy(true).requireRetentionChangeAllowed(90, 1)).doesNotThrowAnyException();
+    }
 }

@@ -873,7 +873,7 @@ Laufende). Query: `afterSeq` (Default `-1` = alles). Ohne Puffer `200` mit `avai
 
 Lauf samt Schritten und den losen Verweisen darauf löschen. `409`, wenn der Lauf noch aktiv ist oder ein Audit-Bericht an ihm hängt. TODOs und Audit-Daten werden nie mitgelöscht.
 
-`403 RUN_DELETION_DISABLED`, wenn die Instanz mit `automation.executions.allow-delete: false` (Env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, Default `true`) gestartet wurde — geprüft vor jedem Lookup, für jede ID. Nur Startkonfiguration, kein REST- oder Settings-Schalter. `GET /api/v1/system/capabilities` meldet den Stand als `runDeletionAllowed`; die UI blendet die Löschknöpfe dann aus. Die Run-Retention (`run-retention-days`) und das nächtliche Aufräumen von INTERRUPTED-Läufen gelten weiter — wer gar nichts verlieren will, setzt zusätzlich `run-retention-days` auf `0`.
+`403 RUN_DELETION_DISABLED`, wenn die Instanz mit `automation.executions.allow-delete: false` (Env `AUTOMATION_EXECUTIONS_ALLOW_DELETE`, Default `true`) gestartet wurde — geprüft vor jedem Lookup, für jede ID. Nur Startkonfiguration, kein REST- oder Settings-Schalter. `GET /api/v1/system/capabilities` meldet den Stand als `runDeletionAllowed`; die UI blendet die Löschknöpfe dann aus. Die Run-Retention (`run-retention-days`) und das nächtliche Aufräumen von INTERRUPTED-Läufen gelten weiter — wer gar nichts verlieren will, setzt zusätzlich `run-retention-days` auf `0`. Solange die Löschung abgeschaltet ist, nimmt `PUT /api/v1/system/execution-config` für `run-retention-days` nur eine gleich lange oder längere Retention an (`0` gilt als längste), sonst `403 RUN_DELETION_DISABLED` — der ganze Aufruf wird dann nicht angewendet.
 
 **Response:** `204 No Content`
 

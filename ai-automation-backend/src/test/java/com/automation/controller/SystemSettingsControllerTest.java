@@ -1,6 +1,8 @@
 package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.exception.ErrorCode;
+import com.automation.exception.HardeningException;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
@@ -18,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -165,5 +168,17 @@ class SystemSettingsControllerTest {
                         .content("{\"publicUrl\":\"http://example.com\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("publicUrl must use HTTPS"));
+    }
+
+    /** 8dbd7e10: a refused retention change answers 403, not 400 or 500. */
+    @Test
+    void updateExecutionConfig_shorterRetentionWhileDeletionIsOff_returns403() throws Exception {
+        doThrow(new HardeningException(ErrorCode.RUN_DELETION_DISABLED, "only extend"))
+                .when(executionSettingsService).updateAll(anyMap());
+
+        mockMvc.perform(put("/api/v1/system/execution-config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"run-retention-days\":\"7\"}"))
+                .andExpect(status().isForbidden());
     }
 }
