@@ -33,6 +33,11 @@ Hence the decision rule for a new workflow:
 - It is tailored to a person, a household or someone else's project → **neither**; it stays in
   the instance and is not tracked.
 
+The rules against the platform's own REST API, credentials and home or user paths (`SELF-API`,
+`CREDENTIAL`, `PATH-HOME`, `PATH-ABS` in §3) apply to built-ins just the same. There,
+`BuiltinTemplateGateTest` checks them in the backend build — with the pool gate's patterns, plus
+the key file (`…/api-key`), `$HOME` and the address `localhost:9090`.
+
 ## 2. The categories: `scope`
 
 Every entry carries a mandatory `scope` field with exactly one of two values:

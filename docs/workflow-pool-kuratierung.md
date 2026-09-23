@@ -33,6 +33,11 @@ Daraus folgt die Entscheidungsregel für einen neuen Workflow:
 - Er ist auf eine Person, einen Haushalt oder ein fremdes Projekt zugeschnitten → **keins von
   beidem**; er bleibt in der Instanz und wird nicht getrackt.
 
+Die Regeln gegen die eigene REST-API, Zugangsdaten und Home- oder Benutzerpfade (`SELF-API`,
+`CREDENTIAL`, `PATH-HOME`, `PATH-ABS` in §3) gelten für Built-ins genauso. Dort prüft sie
+`BuiltinTemplateGateTest` im Backend-Build — mit den Mustern des Pool-Gates, ergänzt um die
+Key-Datei (`…/api-key`), `$HOME` und die Adresse `localhost:9090`.
+
 ## 2. Welche Kategorien es gibt: `scope`
 
 Jeder Eintrag trägt ein Pflichtfeld `scope` mit genau einem von zwei Werten:
