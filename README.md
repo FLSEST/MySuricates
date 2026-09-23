@@ -11,8 +11,8 @@ MySuricates is a local workflow platform: workflows consist of blocks that are e
 deterministic (shell, branch, loop) or call an AI. From this mix, a control loop has emerged
 that produces findings about its own codebase, turns them into TODOs, triggers fix workflows,
 and then verifies the result again. The code was created largely in AI sessions:
-1,354 of 1,825 commits carry an AI trailer, 340 of them the trailer of the control loop
-itself (`Generated-By: MySuricates`, as of 2026-09-23).
+1,641 of 1,825 commits carry at least one AI trailer — 1,354 Claude's, 340 the control loop's
+own (`Generated-By: MySuricates`), 53 both (as of commit `c421f2e3`).
 
 **What this is not:** not a product, not a service, no support, no promise of stability. The
 architectural debt is known and is tracked within the system itself as audit findings — see

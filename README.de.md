@@ -11,8 +11,8 @@ MySuricates ist eine lokale Workflow-Plattform: Workflows bestehen aus Bloecken,
 deterministisch sind (Shell, Verzweigung, Schleife) oder eine KI aufrufen. Aus dieser Mischung ist
 ein Regelkreis entstanden, der Befunde ueber die eigene Codebasis erzeugt, daraus TODOs macht,
 Fix-Workflows anstoesst und das Ergebnis wieder prueft. Der Code ist weitgehend in KI-Sitzungen
-entstanden: 1 354 von 1 825 Commits tragen einen KI-Trailer, 340 davon den Trailer des Regelkreises
-selbst (`Generated-By: MySuricates`, Stand 2026-09-23).
+entstanden: 1 641 von 1 825 Commits tragen mindestens einen KI-Trailer — 1 354 den von Claude,
+340 den des Regelkreises selbst (`Generated-By: MySuricates`), 53 beide (Stand Commit `c421f2e3`).
 
 **Was das nicht ist:** kein Produkt, kein Dienst, kein Support, keine Stabilitaetszusage. Die
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
