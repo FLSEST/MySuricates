@@ -379,6 +379,7 @@ Executes a command for each item in a list.
 | `command` | string | **required** | Command per item |
 | `execution_mode` | string | `"ai"` | `"ai"` (AI, provider from `provider` on the block/workflow) or `"shell"`; `"claude"` still means `"ai"`, other values are rejected |
 | `timeout_seconds` | int | 300 | Timeout per iteration |
+| `continue_on_error` | bool | `false` | `true`: failed items do not fail the block — it completes, follow-up blocks run. Failures are summarised in the output (`N/M items failed: ...`). `false`: a failed item fails the block, the remaining items still run. In both cases the step metadata lists the failures (`failedItemCount`, `failedItems`, `totalItems`) |
 
 ```json
 {
@@ -397,6 +398,10 @@ Executes a command for each item in a list.
 **Note**: `items_command` is always executed as a shell command (regardless of `execution_mode`), since it only collects the iteration targets.
 
 **Empty item lists**: Empty and whitespace-only lines are discarded — in the `items_command` output as well as in inline `items`. An empty output therefore yields **zero** iterations (the block completes with metadata `totalItems: 0`) instead of one iteration with an empty item. An empty list is thus the clean way to skip a loop.
+
+**`continue_on_error` vs. `on_failure`**: `continue_on_error: true` tolerates item failures *inside* the block (the block completes, e.g. 29/30 items succeeded → follow-up blocks such as commit/gate run). The block-level `on_failure: "continue"` only lets the workflow go on despite a FAILED block — the block itself stays FAILED.
+
+**Error message**: When the block fails, the run's error message starts with the failed items and the error of the first one, e.g. `Step 1 (foreach) failed: 1/37 items failed: erkner` followed by `[erkner]: API Error: …`. The block output stays the transcript of all items in their order, so a failed item sits between successful ones there; their text alone ("GATE PASS …") does not tell why the block failed.
 
 **When to use**: Processing multiple files, repos, or items with the same operation.
 

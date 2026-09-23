@@ -1,0 +1,65 @@
+{
+  "id": "sub-workflow-copy-counts-markers-once",
+  "title": "sub-workflow reicht die Kind-Ausgabe durch, ihre Marker zählt nur der Kind-Lauf",
+  "derivedFrom": {
+    "spec": "SubWorkflowBlockExecutor: derivedOutput, Marker nur im Kind-Lauf; die Gate-Zusammenfassung des Parent enthält Kind-Gates bewusst nicht",
+    "incidents": [
+      "6e5d6e2c (Sub-Workflow-Ausgabe im Parent erneut auf Marker ausgewertet, 40471709)"
+    ]
+  },
+  "workflows": {
+    "kind": {
+      "provider": "SCRIPTED",
+      "blocks": [
+        {
+          "type": "simple",
+          "name": "bauen",
+          "config": {
+            "command": "Kind: baue und schreibe gate_status: GREEN|YELLOW|RED."
+          }
+        }
+      ]
+    }
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "sub-workflow",
+        "name": "kind_laufen",
+        "config": {
+          "workflow_id": "@kind"
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Kind: baue",
+        "respond": "Build rot.\ntodo_item: Build reparieren | HIGH | build | Kompilierfehler im Kind\ngate_status: RED\ngate_category: build\ngate_description: Kompilierfehler"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "gate": "none",
+    "markers": {
+      "gates": 0,
+      "todos": 0
+    },
+    "aiCallCount": {
+      "SCRIPTED": 1
+    },
+    "steps": [
+      {
+        "index": 0,
+        "status": "COMPLETED",
+        "outputContains": [
+          "gate_status: RED",
+          "todo_item: Build reparieren"
+        ]
+      }
+    ]
+  }
+}

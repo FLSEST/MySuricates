@@ -7,8 +7,10 @@ in der deterministischen Verrohrung rund ums Modell. Genau die prüfen die Szena
 Prompt, Platzhalter, Timeout, Modell, Effort und Provider; nach dem Aufruf Marker, Gate, Auto-TODO
 und Laufstatus.
 
-Runner: `ScenarioIntegrationTest` (Paket `com.automation.integration.scenario`). Eine neue Datei in
-diesem Ordner ist ein neuer Testfall, Code braucht es dafür nicht.
+Runner: `ScenarioIntegrationTest` (Paket `com.automation.integration.scenario`). Daneben liegen der
+Aufbau (`ScenarioFixtures`: Projekt, Workflows, Kette), die Prüfungen der `expect`-Schlüssel
+(`ScenarioChecks`) und die Antworten auf Freigaben (`ScenarioApprovals`). Eine neue Datei in diesem
+Ordner ist ein neuer Testfall, Code braucht es dafür nicht.
 
 ## Wie die Fälle entstehen
 
@@ -40,24 +42,24 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 3 | `{{ previous_chain_output }}` im Einzellauf | `chain-only-placeholder-in-single-run` — **als Analyzer-Befund, nicht zur Laufzeit.** Der `TemplateResolver` lässt unbekannte Platzhalter bewusst stehen. Die Sicherung ist deshalb die Analyzer-Regel `chain-only-placeholder`. |
 | 4 | Blockausgabe ohne Leser (Analyzer R1) | `unwired-output` |
 | 5 | `timeout_seconds` je Block kommt am Host-Aufruf an | `block-timeout-reaches-host-call` (dazu Modell und Effort) |
-| 6 | Kette: Stufe 2 sieht die Ausgabe von Stufe 1 | offen — `ChainExecutorTest` prüft die Weitergabe als Unit-Test; der Pfad braucht einen Ketten-Runner im Szenario-Format |
+| 6 | Kette: Stufe 2 sieht die Ausgabe von Stufe 1, Stufe 1 einen leeren Platzhalter (0775c5e6) | `chain-passes-previous-output` |
 | 7 | YELLOW legt ein Auto-TODO mit den richtigen Tags an | `yellow-gate-creates-auto-todo` |
-| 8 | Audit-Envelope: stabile Identität, RESOLVED beim Verschwinden, Regression bei Wiederkehr | offen als Pfad — Unit-Tests `AuditIngestionServiceTest`, `AuditFindingMergerTest` |
+| 8 | Audit-Envelope: stabile Identität, RESOLVED beim Verschwinden, Regression bei Wiederkehr; ein gekürzter Snapshot löst nichts auf (e39379a9) | `audit-finding-lifecycle` (vier Läufe) |
 | 9 | Resume nach `foreach`/`while` überspringt keine Blöcke | `WorkflowExecutorDeterministicIntegrationTest` (`resumeAfterWrapperBlock…`, `secondResume…` aus cd0ea0f9) |
 | 10 | Block-`provider` abweichend, ohne `model`: das Workflow-Modell wird nicht geerbt | `block-provider-does-not-inherit-model` |
 | 11 | Der Workflow-Provider gilt für jeden KI-Block (24680e80) | `workflow-provider-reaches-every-block` |
 | 12 | foreach-Präfix `[item]:` verschluckt keine Marker (8671d03b) | `foreach-marker-behind-item-prefix` |
 | 13 | Leere `items_command`-Ausgabe ergibt null Durchläufe (838cad00) | `foreach-empty-items-command` |
+| 14 | Scheitert ein foreach-Item, nennt die Lauf-Fehlermeldung es zuerst, nicht die erfolgreichen davor (4a8cabc4) | `foreach-failed-item-named-first` |
+| 15 | Freigabe: die Frage kommt aufgelöst an (e2efb393), „Nein“ lehnt ab, nicht nur „No“ (50c7b5d5) | `approval-question-resolved-and-german-rejection` |
+| 16 | Kopierte Marker zählen nur am Originalschritt: `compress` (348b7b3b) und `sub-workflow` (40471709), beides 6e5d6e2c | `compress-copy-counts-markers-once`, `sub-workflow-copy-counts-markers-once` |
 
 ### Aus der Historie, noch ohne Szenario
 
-- **foreach-Iteration FAILED trotz „GATE PASS“ in der Ausgabe.** Vier Läufe von „Hunt Quality
-  Rebuild“. Die Ursache ist noch nicht geklärt, deshalb gibt es erst ein Szenario, wenn klar ist,
-  was richtig wäre.
-- **Approval:** Die Frage wird vor der Anzeige aufgelöst (e2efb393), und eine Ablehnung zählt nicht
-  nur beim englischen „No“ (50c7b5d5). Dafür braucht der Runner einen Schritt, der auf eine Freigabe
-  antwortet.
-- **Marker aus kopierten Ausgaben nicht doppelt werten** (6e5d6e2c, c0cf21db).
+- **Marker, die ein Shell-Block kopiert** (c0cf21db): Ein Shell-Block ist kein abgeleiteter Schritt,
+  seine Marker zählen mit Absicht. Der Fall lag im Workflow (Faktenblatt echote fremde Gate-Header)
+  und wurde dort behoben (ea5bd405). Ein Szenario würde nur festhalten, dass die Plattform ihn nicht
+  abfängt.
 - **Abbrechen vor der Thread-Registrierung** (45d09d19). Das ist ein Timing-Fall und passt schlecht
   zu einem Datenformat.
 - **Nicht hier:** Fehler in der Ausgabe eines Providers, etwa Hook-JSON als Blockausgabe oder
@@ -71,15 +73,20 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
   "title": "Was der Fall zeigt",
   "derivedFrom": { "spec": "…", "incidents": ["<todo-id> (Titel)", "…"] },
   "execute": true,
+  "workflows": { "kind": { "provider": "SCRIPTED", "blocks": [ "…" ] } },
   "workflow": {
     "provider": "SCRIPTED", "model": "sonnet", "instructions": null,
     "metadata": { "autoTodo": { "enabled": true, "mode": "auto" } },
-    "blocks": [ { "type": "simple", "name": "pruefen", "config": { "command": "…" } } ]
+    "blocks": [ { "type": "simple", "name": "pruefen", "config": { "command": "…" } },
+                { "type": "sub-workflow", "name": "kind_laufen", "config": { "workflow_id": "@kind" } } ]
   },
   "context": { "variable": "wert" },
   "ai": { "SCRIPTED": [ { "match": "Teil des Prompts", "respond": "Antwort", "exitCode": 0 } ] },
+  "answers": [ { "answer": "Nein", "questionContains": ["…"], "questionNotContains": ["{{"],
+                 "rejectOptions": ["Nein"] } ],
   "expect": {
     "runStatus": "COMPLETED",
+    "runError": { "startsWith": "Step 0 (foreach) failed: …", "contains": ["…"], "notContains": ["…"] },
     "gate": { "status": "YELLOW", "category": "gate-missing" },
     "analyzerRules": ["unwired-output"],
     "aiCallCount": { "SCRIPTED": 1 },
@@ -87,8 +94,23 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
                                  "promptContains": ["…"], "promptNotContains": ["{{"] } ] },
     "steps": [ { "index": 0, "status": "COMPLETED", "outputContains": ["…"], "outputNotContains": ["…"] } ],
     "todos": [ { "titleContains": "…", "priority": "MEDIUM", "tags": ["gate:yellow"] } ],
-    "noTodos": true
+    "noTodos": true,
+    "markers": { "gates": 1, "todos": 1 },
+    "auditReport": "VALID",
+    "auditFindingCount": 2,
+    "auditFindings": [ { "subject": "…", "status": "RESOLVED", "occurrenceCount": 1, "regressionCount": 0 } ]
   }
+}
+```
+
+Statt eines Laufs sind auch mehrere Läufe desselben Workflows oder eine Kette möglich:
+
+```json
+{
+  "runs": [ { "ai": { "…": [] }, "context": { }, "answers": [ ], "expect": { } } ],
+  "chain": { "stopOnFailure": true,
+             "entries": [ { "workflow": "@stufe1", "context": { } }, { "workflow": "@stufe2" } ] },
+  "expect": { "chainStatus": "COMPLETED", "entries": [ { "runStatus": "COMPLETED" }, { } ] }
 }
 ```
 
@@ -98,8 +120,34 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
   jeden Prompt. Beantwortet keine Regel den Prompt, endet der Aufruf mit Exit-Code 1. Ein Szenario
   besteht also nie durch eine stille Standardantwort.
 - **`gate`:** `"none"` heißt: Der Lauf trägt kein `gate_status`.
+- **`runError`:** prüft die Fehlermeldung des Laufs (`error.message`). Ein fehlender Fehler zählt als
+  leere Meldung.
+- **`workflows`:** weitere Workflows im selben Projekt, angelegt vor dem Hauptworkflow. Jeder
+  Textwert `"@name"` in einer Block-Config oder einem Ketteneintrag wird durch die ID des Workflows
+  `name` ersetzt, etwa `workflow_id` eines `sub-workflow`-Blocks.
+- **`runs`:** Läufe desselben Workflows nacheinander, jeder mit eigenem `ai`, `context` und
+  `answers` (sonst gelten die des Szenarios) und eigenem `expect`. Das `expect` des Szenarios wird
+  nach dem letzten Lauf geprüft. Schreibt der Workflow einen Audit-Envelope (`metadata.audit`),
+  wartet der Runner vor dem nächsten Lauf auf dessen Auswertung.
+- **`chain`:** startet statt des Workflows eine Kette über den `ChainExecutor`. Die Einträge nennen
+  Workflows aus `workflows`. `expect.chainStatus` prüft die Kette, `expect.entries[i]` den Lauf des
+  i-ten Eintrags mit denselben Schlüsseln wie ein Einzellauf. `aiCalls` zählt über alle Läufe.
+- **`answers`:** Der Runner wartet, bis der Lauf eine Freigabe verlangt, prüft die Frage so, wie sie
+  angezeigt wird, und antwortet wie `POST /executions/{id}/approve`. Verlangt der Lauf keine
+  Freigabe mehr, ist das ein Fehler.
+- **`markers`:** wie viele `gate_status`- und `todo_item`-Marker der Lauf gezählt hat
+  (`gate_summary.items`, `todo_items`). Eine Kopie darf nicht noch einmal zählen.
+- **`auditReport`**, **`auditFindingCount`**, **`auditFindings`:** was die Audit-Auswertung aus dem
+  Lauf gemacht hat: den Status des Reports (`VALID`/`INVALID`), die Zahl der Findings im Projekt
+  (eines je Identität) und einzelne Findings, gefunden über ihr `subject`.
 - **`execute: false`:** Es läuft nur der Analyzer über die Definition, kein Lauf.
 - **`model: null`** in `aiCalls` prüft, dass kein Modell übergeben wurde.
 
 Eine Prüfung, die nicht rot wird, wenn sie soll, ist Dekoration. Beim Anlegen des Runners wurde
-deshalb jede Prüfart einmal mit einer absichtlich falschen Erwartung gefahren, und alle wurden rot.
+deshalb jede Prüfart einmal mit einer absichtlich falschen Erwartung gefahren, und alle wurden rot. Für
+`runError` gilt das ebenso: `startsWith` war vor dem Fix aus 4a8cabc4 rot, `contains` und
+`notContains` wurden es mit einer falschen Erwartung. Die Erweiterung aus 0fc5073b ebenfalls: 17
+Varianten der fünf neuen Fälle mit je einer falschen Erwartung, alle 17 rot, jede an der erwarteten
+Stelle (Kette, Eintrag, Prompt der zweiten Stufe; Report-Status, Anzahl, Vorkommen, RESOLVED,
+Regression; Frage, Ablehnungsoptionen, Laufstatus, eine nie gestellte zweite Freigabe; gezählte
+Gate- und TODO-Marker bei `compress` und `sub-workflow`).

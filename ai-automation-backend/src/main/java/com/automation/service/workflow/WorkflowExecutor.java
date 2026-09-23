@@ -7,13 +7,13 @@ import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepFailureSummary;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.project.ContainerService;
-import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -249,10 +249,8 @@ public class WorkflowExecutor {
 
                 if (step.getStatus() == StepStatus.FAILED && block.shouldStopOnFailure()) {
                     run.setStatus(RunStatus.FAILED);
-                    String output = step.getOutput() != null ? step.getOutput() : "";
-                    // Tail-biased: the actual error (HTTP status, exception) usually sits at the END of the output.
-                    String message = "Step " + step.getStepIndex() + " (" + block.getType() + ") failed: "
-                            + TruncationUtil.smart(output, 100, 400);
+                    // Where the step failed first: a foreach names its failed items (4a8cabc4), else the output tail
+                    String message = StepFailureSummary.runError(step, block.getType());
                     run.setError(Map.of("step", step.getStepIndex(), "blockType", block.getType(), "message", message));
                     break;
                 }

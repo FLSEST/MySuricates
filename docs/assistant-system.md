@@ -260,7 +260,7 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 | `skill` | Skill-Detail | Desc: 200, AI-Context: 400, Capability-Desc: 100 |
 | `integration` | Integration-Detail | Desc: 200, Account: 80, Action-Desc: 100 |
 | `chain` | Chain-Detail | Desc: 200 |
-| `block-spec` | Block-Typ-Spezifikation je Typ (`DocsFetchHandler.BLOCK_SPECS`; noch ohne `todo-create`/`-update`/`-close` und `dashboard-report`) | — |
+| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig) | — |
 
 Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 

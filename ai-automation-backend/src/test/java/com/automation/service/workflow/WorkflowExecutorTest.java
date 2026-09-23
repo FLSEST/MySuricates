@@ -6,6 +6,7 @@ import com.automation.exception.ContainerException;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.StepFailureSummary;
 import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.WorkflowRunRepository;
@@ -1031,6 +1032,22 @@ class WorkflowExecutorTest {
         String message = (String) saved.getError().get("message");
         assertThat(message).endsWith("HTTP 500 Internal Server Error");
         assertThat(message).contains("[... skipped 500 of 1000 characters ...]");
+    }
+
+    @Test
+    void execute_failedStepWithFailureSummary_runErrorStartsWithIt() {
+        // 4a8cabc4: a block that knows where it failed (foreach: which item) beats the output cut
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("[a]: GATE PASS\n[b]: API Error\n[c]: GATE PASS").build();
+        StepFailureSummary.put(failed, "1/3 items failed: b\n[b]: API Error");
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(failed);
+
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getError().get("message"))
+                .isEqualTo("Step 0 (simple) failed: 1/3 items failed: b\n[b]: API Error");
     }
 
     @Test

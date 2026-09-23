@@ -1,0 +1,146 @@
+{
+  "id": "audit-finding-lifecycle",
+  "title": "Audit-Envelope über vier Läufe: stabile Identität, gekürzter Snapshot löst nichts auf, RESOLVED beim Verschwinden, Regression bei Wiederkehr",
+  "derivedFrom": {
+    "spec": "AuditIngestionService: Identität = Projekt, Audit, ruleKey, normalisiertes subject; fehlt ein Befund im vollständigen Snapshot, RESOLVED; kehrt er wieder, OPEN mit regressionCount + 1; ein ungültiger Report ändert nichts",
+    "incidents": [
+      "e39379a9 (gekürzter Snapshot löste nicht gelieferte Findings auf, 26fcde8a)",
+      "0e19648d (subject-Drift erzeugte neue Identitäten, Wiedergänger-Findings)",
+      "fdf79a86 (Integrationstests aus Spec und Vorfallshistorie ableiten): bisher nur Unit-Tests AuditIngestionServiceTest, AuditFindingMergerTest"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "metadata": {
+      "audit": {
+        "enabled": true,
+        "key": "scenario.lifecycle",
+        "category": "quality",
+        "reportBlock": "bericht"
+      }
+    },
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "bericht",
+        "config": {
+          "command": "Prüfe den Stand und liefere den Audit-Envelope."
+        }
+      }
+    ]
+  },
+  "runs": [
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "respond": "## Befunde\n\n2 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette ohne Pfad-Test\"}, {\"ruleKey\": \"missing-path-test\", \"subject\": \"ApprovalBlockExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Freigabe ohne Pfad-Test\"}]} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "VALID",
+        "auditFindingCount": 2,
+        "auditFindings": [
+          {
+            "subject": "ChainExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 1,
+            "regressionCount": 0
+          },
+          {
+            "subject": "ApprovalBlockExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 1,
+            "regressionCount": 0
+          }
+        ]
+      }
+    },
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "respond": "## Befunde\n\n1 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette ohne Pfad-Test\"}], \"expectedFindings\": 2} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "INVALID",
+        "auditFindingCount": 2,
+        "auditFindings": [
+          {
+            "subject": "ChainExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 1
+          },
+          {
+            "subject": "ApprovalBlockExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 1
+          }
+        ]
+      }
+    },
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "respond": "## Befunde\n\n1 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette weiterhin ohne Pfad-Test\"}]} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "VALID",
+        "auditFindingCount": 2,
+        "auditFindings": [
+          {
+            "subject": "ChainExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 2,
+            "regressionCount": 0
+          },
+          {
+            "subject": "ApprovalBlockExecutor",
+            "status": "RESOLVED",
+            "occurrenceCount": 1
+          }
+        ]
+      }
+    },
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "respond": "## Befunde\n\n2 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette weiterhin ohne Pfad-Test\"}, {\"ruleKey\": \"missing-path-test\", \"subject\": \"ApprovalBlockExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Freigabe ohne Pfad-Test\"}]} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "VALID",
+        "auditFindingCount": 2,
+        "auditFindings": [
+          {
+            "subject": "ChainExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 3,
+            "regressionCount": 0
+          },
+          {
+            "subject": "ApprovalBlockExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 2,
+            "regressionCount": 1
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "auditFindingCount": 2
+  }
+}

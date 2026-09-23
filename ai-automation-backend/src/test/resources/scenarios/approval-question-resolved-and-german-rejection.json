@@ -1,0 +1,86 @@
+{
+  "id": "approval-question-resolved-and-german-rejection",
+  "title": "Freigabe: die Frage kommt aufgelöst an, „Nein“ lehnt ab und on_no: fail beendet den Lauf",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE approval: Platzhalter in question werden aufgelöst; reject_options, Vorgabe No/Nein; on_no: fail lässt den Schritt scheitern",
+    "incidents": [
+      "e2efb393 (approval zeigte {{ block.X.output }} wörtlich im Dialog, e6d804af)",
+      "50c7b5d5 (nur „No“ galt als Ablehnung, Ja/Nein mit on_no: fail gab bei „Nein“ still frei, e6d804af)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe die Änderungen."
+        }
+      },
+      {
+        "type": "approval",
+        "name": "freigabe",
+        "config": {
+          "question": "Änderungen übernehmen? Befund: {{ block.pruefen.output }}",
+          "options": [
+            "Ja",
+            "Nein"
+          ],
+          "on_no": "fail"
+        }
+      },
+      {
+        "type": "simple",
+        "name": "uebernehmen",
+        "config": {
+          "command": "Übernimm die Änderungen."
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Prüfe die Änderungen.",
+        "respond": "3 Dateien geändert, Tests grün"
+      },
+      {
+        "match": "Übernimm die Änderungen.",
+        "respond": "übernommen"
+      }
+    ]
+  },
+  "answers": [
+    {
+      "answer": "Nein",
+      "questionContains": [
+        "Befund: 3 Dateien geändert, Tests grün"
+      ],
+      "questionNotContains": [
+        "{{"
+      ],
+      "rejectOptions": [
+        "Nein"
+      ]
+    }
+  ],
+  "expect": {
+    "runStatus": "FAILED",
+    "runError": {
+      "startsWith": "Step 1 (approval) failed: Approval denied: Nein"
+    },
+    "aiCallCount": {
+      "SCRIPTED": 1
+    },
+    "steps": [
+      {
+        "index": 1,
+        "status": "FAILED",
+        "outputContains": [
+          "Approval denied: Nein"
+        ]
+      }
+    ]
+  }
+}

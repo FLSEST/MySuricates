@@ -390,7 +390,7 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 | `command` | string | **erforderlich** | Befehl pro Item |
 | `execution_mode` | string | `"ai"` | `"ai"` (KI, Provider aus `provider` am Block/Workflow) oder `"shell"`; `"claude"` gilt weiter als `"ai"`, andere Werte werden abgelehnt |
 | `timeout_seconds` | int | 300 | Timeout pro Iteration |
-| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`) und in den Step-Metadaten (`failedItemCount`, `failedItems`, `totalItems`) gelistet |
+| `continue_on_error` | bool | `false` | `true`: fehlgeschlagene Items lassen den Block nicht scheitern — er endet COMPLETED, Folge-Blöcke laufen. Fehler werden im Output zusammengefasst (`N/M items failed: ...`). `false`: ein fehlgeschlagenes Item lässt den Block scheitern, die übrigen Items laufen trotzdem. In beiden Fällen listen die Step-Metadaten die Fehler (`failedItemCount`, `failedItems`, `totalItems`) |
 
 ```json
 {
@@ -411,6 +411,8 @@ Führt einen Befehl für jedes Item in einer Liste aus.
 **Leere Item-Listen**: Leere und reine Whitespace-Zeilen werden verworfen — in der `items_command`-Ausgabe wie in inline `items`. Eine leere Ausgabe ergibt damit **null** Iterationen (Block endet COMPLETED, Metadaten `totalItems: 0`) statt einer Iteration mit leerem Item. Eine leere Liste ist also der saubere Weg, eine Schleife zu überspringen.
 
 **Abgrenzung `continue_on_error` vs. `on_failure`**: `continue_on_error: true` toleriert Item-Fehler *innerhalb* des Blocks (Block endet COMPLETED, z. B. 29/30 Items erfolgreich → Folge-Blöcke wie Commit/Gate laufen). Das blockweite `on_failure: "continue"` lässt dagegen nur den Workflow trotz FAILED-Block weiterlaufen — der Block selbst bleibt FAILED.
+
+**Fehlermeldung**: Scheitert der Block, beginnt die Fehlermeldung des Laufs mit den gescheiterten Items und dem Fehler des ersten, z. B. `Step 1 (foreach) failed: 1/37 items failed: erkner` und darunter `[erkner]: API Error: …`. Die Ausgabe des Blocks bleibt das Protokoll aller Items in ihrer Reihenfolge. Ein gescheitertes Item steht dort also zwischen erfolgreichen; aus deren Text allein („GATE PASS …“) lässt sich nicht ablesen, warum der Block scheiterte.
 
 **Wann verwenden**: Verarbeitung mehrerer Dateien, Repos oder Items mit derselben Operation.
 

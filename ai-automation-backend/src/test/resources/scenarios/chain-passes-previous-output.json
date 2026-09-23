@@ -1,0 +1,101 @@
+{
+  "id": "chain-passes-previous-output",
+  "title": "Kette: Stufe 2 sieht die Ausgabe von Stufe 1, Stufe 1 bekommt einen leeren Platzhalter statt des wörtlichen",
+  "derivedFrom": {
+    "spec": "ChainExecutor: jeder Eintrag bekommt previous_chain_output = letzte Ausgabe des vorigen Eintrags, der erste einen leeren Wert",
+    "incidents": [
+      "0775c5e6 (fix(chain): previous_chain_output für Entry-1 auflösen + zombie entryRuns bereinigen)",
+      "fdf79a86 (Integrationstests aus Spec und Vorfallshistorie ableiten): Weitergabe bisher nur als Unit-Test ChainExecutorTest"
+    ]
+  },
+  "workflows": {
+    "stufe1": {
+      "provider": "SCRIPTED",
+      "blocks": [
+        {
+          "type": "simple",
+          "name": "sammeln",
+          "config": {
+            "command": "Stufe 1. Vorher: [{{ previous_chain_output }}]. Sammle die offenen Punkte."
+          }
+        }
+      ]
+    },
+    "stufe2": {
+      "provider": "SCRIPTED",
+      "blocks": [
+        {
+          "type": "simple",
+          "name": "bewerten",
+          "config": {
+            "command": "Stufe 2. Bewerte: {{ previous_chain_output }}"
+          }
+        }
+      ]
+    }
+  },
+  "chain": {
+    "entries": [
+      {
+        "workflow": "@stufe1"
+      },
+      {
+        "workflow": "@stufe2"
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Stufe 1.",
+        "respond": "Offene Punkte: Doku zur Kette, Test für Freigaben, Zähler im Audit"
+      },
+      {
+        "match": "Stufe 2.",
+        "respond": "Bewertung: zwei davon dringend"
+      }
+    ]
+  },
+  "expect": {
+    "chainStatus": "COMPLETED",
+    "entries": [
+      {
+        "runStatus": "COMPLETED"
+      },
+      {
+        "runStatus": "COMPLETED",
+        "steps": [
+          {
+            "index": 0,
+            "outputContains": [
+              "Bewertung: zwei davon dringend"
+            ]
+          }
+        ]
+      }
+    ],
+    "aiCallCount": {
+      "SCRIPTED": 2
+    },
+    "aiCalls": {
+      "SCRIPTED": [
+        {
+          "promptContains": [
+            "Stufe 1. Vorher: []."
+          ],
+          "promptNotContains": [
+            "{{"
+          ]
+        },
+        {
+          "promptContains": [
+            "Stufe 2. Bewerte: Offene Punkte: Doku zur Kette, Test für Freigaben, Zähler im Audit"
+          ],
+          "promptNotContains": [
+            "{{"
+          ]
+        }
+      ]
+    }
+  }
+}
