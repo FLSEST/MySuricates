@@ -125,7 +125,7 @@ export function SkillEditorModal({
             value={initialContext}
             onChange={(v) => { aiContext.current = v; }}
             language="markdown"
-            wordWrap
+            prose
             fill
           />
         </div>

@@ -132,7 +132,9 @@ export function useDeleteSkill() {
   const t = useT();
   return useMutation({
     mutationFn: (id: string) => api.delete(`/skills/${id}`),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      // Its own queries (capabilities, history) would otherwise refetch into a 404 while the detail closes
+      qc.removeQueries({ queryKey: ['skills', id] });
       invalidate();
       // Activated skills vanish from workflows (ON DELETE CASCADE)
       qc.invalidateQueries({ queryKey: ['workflows'] });

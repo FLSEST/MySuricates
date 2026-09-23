@@ -87,18 +87,24 @@ describe('skill mutations', () => {
     expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Failed to save skill');
   });
 
-  it('deletes a skill with DELETE /skills/{id}', async () => {
+  it('deletes a skill with DELETE /skills/{id} and drops its cached queries', async () => {
     let called = false;
     server.use(http.delete('/api/v1/skills/n1', () => {
       called = true;
       return new HttpResponse(null, { status: 204 });
     }));
-    const { result } = renderHook(() => useDeleteSkill(), { wrapper: createWrapper() });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    qc.setQueryData(['skills', 'n1', 'capabilities'], []);
+    qc.setQueryData(['skills', 'other', 'capabilities'], []);
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: qc }, children);
+    const { result } = renderHook(() => useDeleteSkill(), { wrapper });
 
     result.current.mutate('n1');
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(called).toBe(true);
+    expect(qc.getQueryCache().find({ queryKey: ['skills', 'n1', 'capabilities'] })).toBeUndefined();
+    expect(qc.getQueryCache().find({ queryKey: ['skills', 'other', 'capabilities'] })).toBeDefined();
   });
 
   it('imports an export file with POST /skills/import', async () => {

@@ -24,8 +24,11 @@ interface MonacoEditorProps {
   jsonSchema?: object;
   /** Fill the parent's height instead of a fixed `height` (parent must give the editor a height). */
   fill?: boolean;
-  /** Wrap long lines at the editor width — for prose such as Markdown. */
-  wordWrap?: boolean;
+  /**
+   * Prose such as Markdown: wrap long lines and offer no word suggestions — with them, Enter at the
+   * end of a word that already occurs in the text accepts the suggestion instead of breaking the line.
+   */
+  prose?: boolean;
   /** `{{ … }}` bound at this block: suggestions after `{{`, origin hint and hover, warnings. */
   placeholders?: PlaceholderContext;
 }
@@ -59,6 +62,13 @@ type MonacoApi = {
   };
 };
 
+const PROSE_OPTIONS = {
+  wordWrap: 'on',
+  quickSuggestions: false,
+  wordBasedSuggestions: 'off',
+  suggestOnTriggerCharacters: false,
+} as const;
+
 export function MonacoEditor({
   value,
   onChange,
@@ -69,7 +79,7 @@ export function MonacoEditor({
   revealNonce = 0,
   jsonSchema,
   fill = false,
-  wordWrap = false,
+  prose = false,
   placeholders,
 }: MonacoEditorProps) {
   const t = useT();
@@ -184,7 +194,7 @@ export function MonacoEditor({
               value={value}
               onChange={(val) => onChange?.(val ?? '')}
               onMount={handleMount}
-              options={{ readOnly, wordWrap: wordWrap ? 'on' : 'off' }}
+              options={prose ? { readOnly, ...PROSE_OPTIONS } : { readOnly }}
             />
           ) : (
             <div style={{ height: editorHeight }} aria-busy="true" />
