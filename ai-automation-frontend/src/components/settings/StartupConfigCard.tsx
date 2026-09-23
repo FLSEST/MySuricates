@@ -1,6 +1,7 @@
 import { Info, ShieldAlert } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { ConfigSnippet } from './ConfigSnippet';
+import { ContainerAccessSection } from './ContainerAccessSection';
 import { useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
 import { useModuleName } from '../../i18n/modules';
@@ -37,6 +38,7 @@ export function StartupConfigCard() {
 
         <ModuleStateList title={t.modules.featureGroup} modules={features} />
         <ModuleStateList title={t.modules.hardeningGroup} modules={hardening} />
+        <ContainerAccessSection />
 
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-secondary">{t.startupConfig.uiEditableLabel}:</span>

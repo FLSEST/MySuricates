@@ -1,6 +1,7 @@
 package com.automation.controller;
 
 import com.automation.config.RateLimitConfig;
+import com.automation.dto.response.SystemCapabilitiesResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
@@ -10,6 +11,7 @@ import com.automation.service.ai.PiCatalogService;
 import com.automation.service.ai.catalog.ModelCatalog;
 import com.automation.service.ai.catalog.ModelCatalogService;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.system.ContainerAccessReport;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.workflow.RunDeletionPolicy;
 import org.junit.jupiter.api.Test;
@@ -65,6 +67,9 @@ class SystemAiProviderControllerTest {
     @MockitoBean
     private RunDeletionPolicy runDeletionPolicy;
 
+    @MockitoBean
+    private ContainerAccessReport containerAccessReport;
+
     /**
      * Real registry, not a mock: preset research with webhooks switched on by override, and
      * ui-editable so {@link #capabilities_blockTypesRespectTheModuleGate} can flip a module at
@@ -107,6 +112,22 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.routes[*].path", hasItem("/api/v1/system/capabilities")))
                 .andExpect(jsonPath("$.blockTypes[*].type", hasItem("shell")))
                 .andExpect(jsonPath("$.generatedAt").exists());
+    }
+
+    @Test
+    void capabilities_reportWhatCameFromTheHost() throws Exception {
+        when(containerAccessReport.report()).thenReturn(new SystemCapabilitiesResponse.ContainerAccessResponse(
+                "container", "login", true, "/home/u/.config/mysuricates/staging.env", "STABLE_",
+                java.util.List.of(new SystemCapabilitiesResponse.ProviderAccessResponse("claude", true, true, false))));
+
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.containerAccess.runtime").value("container"))
+                .andExpect(jsonPath("$.containerAccess.aiFromHost").value("login"))
+                .andExpect(jsonPath("$.containerAccess.dockerSocket").value(true))
+                .andExpect(jsonPath("$.containerAccess.switchPrefix").value("STABLE_"))
+                .andExpect(jsonPath("$.containerAccess.providers[0].id").value("claude"))
+                .andExpect(jsonPath("$.containerAccess.providers[0].login").value(false));
     }
 
     @Test

@@ -24,6 +24,32 @@ export interface SystemCapabilities {
   blockTypes?: Array<{ type?: string }>;
   /** `automation.executions.allow-delete` (startup-only); absent on older backends = allowed. */
   runDeletionAllowed?: boolean;
+  /** What this instance got from the host for the AI CLIs; absent on older backends. */
+  containerAccess?: ContainerAccess | null;
+}
+
+export type AiFromHost = 'programs' | 'login' | 'all';
+
+/**
+ * Decided before the start by scripts/lib/host-mounts.sh (262948a4) — the app can show it, never
+ * change it. Only names and yes/no values: the backend never sends a token or file content.
+ */
+export interface ContainerAccess {
+  runtime: 'container' | 'host';
+  /** null on the host */
+  aiFromHost: AiFromHost | null;
+  dockerSocket: boolean;
+  /** Where the switches are changed (a file, or how the starter is called); null on the host. */
+  switchSource: string | null;
+  /** Prefix of the switch names there, e.g. `STABLE_`; null on the host. */
+  switchPrefix: string | null;
+  providers: Array<{
+    id: 'claude' | 'codex' | 'pi';
+    selected: boolean;
+    program: boolean;
+    /** null where the instance cannot tell (host) */
+    login: boolean | null;
+  }>;
 }
 
 export const SYSTEM_CAPABILITIES_KEY = ['system', 'capabilities'] as const;
@@ -122,6 +148,12 @@ export function useSystemCapabilities<T>(
 }
 
 const selectRunDeletionAllowed = (caps: SystemCapabilities) => caps.runDeletionAllowed !== false;
+const selectContainerAccess = (caps: SystemCapabilities) => caps.containerAccess ?? null;
+
+/** What this instance got from the host for the AI CLIs (read-only); null on older backends. */
+export function useContainerAccess(): UseQueryResult<ContainerAccess | null, Error> {
+  return useSystemCapabilities(selectContainerAccess);
+}
 
 /**
  * Whether this instance lets runs be deleted (`automation.executions.allow-delete`). Only hides the
