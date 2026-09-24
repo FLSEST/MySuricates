@@ -6,6 +6,8 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { ProHandoff } from '../components/simple/ProHandoff';
+import { RunReportCard } from '../components/simple/RunResultCard';
+import { SectionLabel } from '../components/simple/kit';
 import {
   useWorkflow, useWorkflowRuns, useExecuteWorkflow,
 } from '../hooks/useWorkflows';
@@ -13,6 +15,7 @@ import { useT, useI18nStore } from '../i18n';
 import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
 import { readContextSchema } from '../utils/contextSchema';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
+import { readRunReport } from '../utils/runResult';
 
 export function SimpleWorkflowDetail() {
   const { id } = useParams<{ id: string }>();
@@ -64,6 +67,9 @@ export function SimpleWorkflowDetail() {
   };
 
   const recentRuns = runs?.content?.slice(0, 6) ?? [];
+  // The list already carries run metadata, so the latest report costs no extra request.
+  const lastSuccess = runs?.content?.find((run) => run.status === 'COMPLETED' || run.status === 'COMPLETED_WITH_ERRORS');
+  const lastReport = lastSuccess ? readRunReport(lastSuccess) : null;
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -97,6 +103,23 @@ export function SimpleWorkflowDetail() {
       >
         {t.workflows.execute}
       </Button>
+
+      {/* Latest report, if the newest successful run delivered one */}
+      {lastSuccess && lastReport && (
+        <section aria-label={t.simple.result.lastResult}>
+          <div className="flex items-center justify-between gap-3">
+            <SectionLabel>{t.simple.result.lastResult}</SectionLabel>
+            <button
+              type="button"
+              onClick={() => navigate(`/workflows/${workflow.id}/run/${lastSuccess.id}`)}
+              className="mb-3 text-xs text-accent hover:text-accent-hover"
+            >
+              {t.simple.result.openRun}
+            </button>
+          </div>
+          <RunReportCard report={lastReport} />
+        </section>
+      )}
 
       {/* Info */}
       <Card>

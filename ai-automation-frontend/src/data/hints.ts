@@ -43,6 +43,7 @@ export const HINTS = {
   'audit-findings': { version: 1 },
   'insights-numbers': { version: 1 },
   'onboarding-profiles': { version: 1 },
+  'simple-result': { version: 1 },
 } as const satisfies Record<string, { version: number }>;
 
 export type HintId = keyof typeof HINTS;

@@ -17,8 +17,11 @@ export function ProBadge({ className = '' }: { className?: string }) {
   );
 }
 
-/** One row: why this needs Pro + a button that switches to Pro (and opens `to`, if given). */
-export function ProHandoff({ reason, to }: { reason: string; to?: string }) {
+/**
+ * One row: why this needs Pro + a button that switches to Pro (and opens `to`, if given).
+ * `action` replaces the button's default label ("Open in Pro mode").
+ */
+export function ProHandoff({ reason, to, action }: { reason: string; to?: string; action?: string }) {
   const t = useT();
   const openInPro = useOpenInPro();
   return (
@@ -30,7 +33,7 @@ export function ProHandoff({ reason, to }: { reason: string; to?: string }) {
         icon={<Sparkles className="w-3.5 h-3.5" />}
         onClick={() => openInPro(to)}
       >
-        {t.simple.handoff.openInPro}
+        {action ?? t.simple.handoff.openInPro}
       </Button>
     </div>
   );

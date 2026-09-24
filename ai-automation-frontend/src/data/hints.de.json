@@ -204,5 +204,12 @@
       "Die Basis kommt immer mit; welche Profile dazukommen und in welcher Sprache, legt jedes Projekt fest",
       "Adresse und Weg zum API-Key setzt die Instanz selbst ein; eine fremde AGENTS.md wird nie überschrieben"
     ]
+  },
+  "simple-result": {
+    "title": "Erst das Ergebnis, dann der Weg",
+    "points": [
+      "Oben steht, was der Lauf ergeben hat: sein Bericht, seine letzte Ausgabe oder der Grund, warum er scheiterte",
+      "Wie er dahin kam, steht Schritt für Schritt in den Details, die zugeklappt bleiben, bis du sie brauchst"
+    ]
   }
 }

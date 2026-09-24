@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Pause, Play, XCircle, CheckCircle2, AlertCircle,
+  ArrowLeft, Pause, Play, XCircle, CheckCircle2, AlertCircle, CircleSlash,
 } from 'lucide-react';
-import { Card, CardHeader, Button, Spinner } from '../components/ui';
+import { Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ApprovalDialog } from '../components/shared/ApprovalDialog';
@@ -19,47 +19,33 @@ import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
-import type { StepResult, PendingHumanInput } from '../types';
-import { stepMetadataSummary } from '../components/workflow/stepMetadata';
+import type { StepResult, PendingHumanInput, RunStatus } from '../types';
 import { StepCardFrame, StepCardHeader } from '../components/workflow/StepCardChrome';
+import { Hint } from '../components/hints/Hint';
+import { Disclosure } from '../components/simple/Disclosure';
+import { SectionLabel } from '../components/simple/kit';
+import { RunResultCard } from '../components/simple/RunResultCard';
+import { RunFailureCard } from '../components/simple/RunFailureCard';
+import { stepDisplayName } from '../utils/runResult';
 
+function StepStatusIcon({ status }: { status: StepResult['status'] }) {
+  if (status === 'COMPLETED') return <CheckCircle2 className="w-5 h-5 text-success" />;
+  if (status === 'FAILED') return <AlertCircle className="w-5 h-5 text-danger" />;
+  if (status === 'RUNNING') {
+    return <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />;
+  }
+  return <div className="w-5 h-5 rounded-full border-2 border-border" />;
+}
+
+/** One step in the details: what it was and what it printed — no provider/model facts (those live in Pro). */
 function StepCard({ step }: { step: StepResult }) {
-  const { provider, model, requestedModel, showRequestedModel } = stepMetadataSummary(step);
-
   return (
     <StepCardFrame step={step}>
       <div className="pt-0.5">
-        {step.status === 'COMPLETED' ? (
-          <CheckCircle2 className="w-5 h-5 text-success" />
-        ) : step.status === 'FAILED' ? (
-          <AlertCircle className="w-5 h-5 text-danger" />
-        ) : step.status === 'RUNNING' ? (
-          <div className="w-5 h-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-        ) : (
-          <div className="w-5 h-5 rounded-full border-2 border-border" />
-        )}
+        <StepStatusIcon status={step.status} />
       </div>
       <div className="flex-1 min-w-0">
         <StepCardHeader step={step} />
-        {(provider || model || showRequestedModel) && (
-          <div className="flex flex-wrap gap-2 mb-2">
-            {provider && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text-tertiary">
-                provider={provider}
-              </span>
-            )}
-            {model && (
-              <span className="px-2 py-0.5 rounded-full bg-surface-raised text-[11px] font-mono text-text">
-                model={model}
-              </span>
-            )}
-            {showRequestedModel && (
-              <span className="px-2 py-0.5 rounded-full bg-warning/10 text-[11px] font-mono text-warning">
-                requested={requestedModel}
-              </span>
-            )}
-          </div>
-        )}
         {step.output && (
           <pre className="text-xs text-text font-mono bg-surface rounded-lg p-3 overflow-x-auto max-h-48 whitespace-pre-wrap">
             <PathLinkedOutput text={step.output} />
@@ -72,6 +58,29 @@ function StepCard({ step }: { step: StepResult }) {
     </StepCardFrame>
   );
 }
+
+/** While the run is going: which step it is at, nothing more. */
+function ProgressList({ steps, emptyText }: { steps: StepResult[]; emptyText: string }) {
+  const t = useT();
+  const sorted = [...steps].sort((a, b) => a.stepIndex - b.stepIndex);
+  if (sorted.length === 0) {
+    return <p className="py-4 text-sm text-text-tertiary">{emptyText}</p>;
+  }
+  return (
+    <ol className="space-y-2" data-testid="run-progress">
+      {sorted.map((step) => (
+        <li key={step.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-2.5">
+          <StepStatusIcon status={step.status} />
+          <span className="min-w-0 truncate text-sm text-text">{stepDisplayName(step, t)}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const SUCCESS_STATUSES: ReadonlySet<RunStatus> = new Set(['COMPLETED', 'COMPLETED_WITH_ERRORS']);
+const FAILURE_STATUSES: ReadonlySet<RunStatus> = new Set(['FAILED', 'INTERRUPTED']);
+const ACTIVE_STATUSES: ReadonlySet<RunStatus> = new Set(['PENDING', 'RUNNING', 'PAUSED']);
 
 export function SimpleWorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
@@ -203,31 +212,31 @@ export function SimpleWorkflowExecution() {
         )}
       </div>
 
-      {/* Steps */}
-      <Card padding={false}>
-        <div className="p-5 pb-0">
-          <CardHeader title={`${t.workflows.execution.steps} (${run.steps.length})`} />
-        </div>
-        <div className="px-5 pb-5 divide-y divide-border">
-          {run.steps.map((step) => <StepCard key={step.id} step={step} />)}
-          {run.steps.length === 0 && (
-            <div className="py-8 text-center text-sm text-text-tertiary">
-              {isRunning ? t.workflows.execution.waitingSteps : t.workflows.execution.noSteps}
-            </div>
+      {ACTIVE_STATUSES.has(run.status) ? (
+        <section aria-label={t.simple.result.progress}>
+          <SectionLabel>{t.simple.result.progress}</SectionLabel>
+          <ProgressList steps={run.steps} emptyText={t.workflows.execution.waitingSteps} />
+        </section>
+      ) : (
+        <>
+          <Hint id="simple-result" />
+          {SUCCESS_STATUSES.has(run.status) && <RunResultCard run={run} />}
+          {FAILURE_STATUSES.has(run.status) && <RunFailureCard run={run} />}
+          {run.status === 'CANCELLED' && (
+            <p className="flex items-center gap-2 text-sm text-text-secondary">
+              <CircleSlash className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {t.simple.result.cancelled}
+            </p>
           )}
-        </div>
-      </Card>
-
-      {/* Error */}
-      {run.error && Object.keys(run.error).length > 0 && (
-        <Card className="border-danger/30 bg-danger-subtle">
-          <CardHeader title={t.workflows.execution.error} />
-          <pre className="text-sm text-danger font-mono whitespace-pre-wrap">
-            {typeof run.error.message === 'string'
-              ? run.error.message
-              : JSON.stringify(run.error, null, 2)}
-          </pre>
-        </Card>
+          <Disclosure label={`${t.simple.result.details} · ${run.steps.length}`}>
+            <div className="divide-y divide-border" data-testid="run-details">
+              {[...run.steps].sort((a, b) => a.stepIndex - b.stepIndex).map((step) => <StepCard key={step.id} step={step} />)}
+              {run.steps.length === 0 && (
+                <div className="py-8 text-center text-sm text-text-tertiary">{t.workflows.execution.noSteps}</div>
+              )}
+            </div>
+          </Disclosure>
+        </>
       )}
 
       {/* Approval Dialog */}

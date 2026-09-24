@@ -204,5 +204,12 @@
       "The base always comes along; which profiles are added and in which language is set per project",
       "The instance fills in its own address and how to read the API key; a foreign AGENTS.md is never overwritten"
     ]
+  },
+  "simple-result": {
+    "title": "The result first, then the way there",
+    "points": [
+      "The top shows what the run came to: its report, its last output or the reason it failed",
+      "How it got there is in the details, step by step, kept closed until you need them"
+    ]
   }
 }
