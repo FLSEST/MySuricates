@@ -60,6 +60,13 @@ java_class "$MAIN/controller/ThinTwo.java" 70 10
 # dessen Messzeile die alte Variante verstuemmelt hat
 { echo "package com.automation.controller;"; echo "enum NoPublicUntested { A, B }"; } \
   > "$MAIN/controller/NoPublicUntested.java"
+# Records und Interfaces als Top-Level-Typ sind keine Testgegenstaende (59e22c53) — auch ohne public.
+{ echo "package com.automation.service.deep;"; echo "public record PlainRecord(String a) {}"; } \
+  > "$MAIN/service/deep/PlainRecord.java"
+{ echo "package com.automation.service.deep;"; echo "interface PlainPort {"; echo "    void run();"; echo "}"; } \
+  > "$MAIN/service/deep/PlainPort.java"
+{ echo "package com.automation.service.deep;"; echo "public sealed interface Shape permits Circle {}"; } \
+  > "$MAIN/service/deep/Shape.java"
 echo "export const x = 1;" > "$FIX/ai-automation-frontend/src/x.ts"
 git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.invalid \
   add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
@@ -90,6 +97,9 @@ check "kleinste Klasse (Rang 20) gelistet"    'grep -q "Untested01.java" "$UNTES
 check "groesste Klasse gelistet"              'grep -q "Untested20.java" "$UNTESTED_ROWS"'
 check "Klasse ohne public-Zeile gelistet"     'grep -q "^controller/NoPublicUntested\.java${TAB}[0-9]\+$" "$UNTESTED_ROWS"'
 check "kein head -15 im Messblock"            '! grep -q "head -15" "$TMP/command.sh"'
+check "Record/Interface nicht gelistet"       '! grep -qE "PlainRecord|PlainPort|Shape" "$UNTESTED_ROWS"'
+check "Record/Interface als ausgenommen gezaehlt" \
+  'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 3" "$TMP/out.txt"'
 
 echo "2) Kompaktes, stabiles Zeilenformat (paket/Klasse.java<TAB>LOC)"
 check "jede Zeile paket/Klasse.java<TAB>LOC" \
