@@ -1290,6 +1290,18 @@ export const de: TranslationKeys = {
           add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
         },
       },
+      gitlab: {
+        displayName: 'GitLab',
+        description: 'GitLab-Issues (gitlab.com oder eigene Instanz): auflisten, erstellen, aktualisieren und kommentieren',
+        actions: {
+          list_projects: 'Projekte auflisten, in denen du Mitglied bist',
+          list_issues: 'Issues eines Projekts auflisten',
+          get_issue: 'Ein einzelnes Issue abrufen',
+          create_issue: 'Ein neues Issue erstellen',
+          update_issue: 'Ein Issue aktualisieren (inkl. schliessen/wieder öffnen)',
+          add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
+        },
+      },
     },
   },
   calendar: {

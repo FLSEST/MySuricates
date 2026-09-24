@@ -24,7 +24,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
   const saveCredentials = useSaveCredentials();
   const [openStep, setOpenStep] = useState(0);
   const [copied, setCopied] = useState<number | null>(null);
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(guide?.credentialLabels?.clientIdDefault ?? '');
   const [clientSecret, setClientSecret] = useState('');
 
   if (!guide) return null;

@@ -1288,6 +1288,18 @@ export const en = {
           add_comment: 'Add a comment to an issue',
         },
       },
+      gitlab: {
+        displayName: 'GitLab',
+        description: 'GitLab issues (gitlab.com or your own instance): list, create, update and comment',
+        actions: {
+          list_projects: 'List the projects you are a member of',
+          list_issues: 'List issues of a project',
+          get_issue: 'Fetch a single issue',
+          create_issue: 'Create a new issue',
+          update_issue: 'Update an issue (incl. close/reopen)',
+          add_comment: 'Add a comment to an issue',
+        },
+      },
     },
   },
   calendar: {

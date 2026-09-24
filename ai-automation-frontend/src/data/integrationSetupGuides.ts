@@ -8,6 +8,8 @@ export interface SetupStep {
 export interface CredentialLabels {
   clientIdPlaceholder: { de: string; en: string };
   clientSecretPlaceholder: { de: string; en: string };
+  /** Prefills the first field, e.g. the public server of a self-hostable service; the user may overwrite it. */
+  clientIdDefault?: string;
 }
 
 export interface SetupGuide {
@@ -600,6 +602,60 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
             'Access token in the second field',
             'Click "Save credentials" — the status turns green once server and token match',
             'Labels are given by name in workflows; they must already exist in the repository',
+          ],
+        },
+      },
+    ],
+  },
+
+  'gitlab': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Server-URL (https://gitlab.com oder eigene Instanz)', en: 'Server URL (https://gitlab.com or your own instance)' },
+      clientSecretPlaceholder: { de: 'Access Token (glpat-…)', en: 'Access token (glpat-…)' },
+      clientIdDefault: 'https://gitlab.com',
+    },
+    steps: [
+      {
+        title: {
+          de: 'Access Token erstellen',
+          en: 'Create an access token',
+        },
+        instructions: {
+          de: [
+            'In GitLab: Profilbild → "Einstellungen" → "Zugriffstoken" (Link unten gilt für gitlab.com)',
+            'Empfohlen für ein einzelnes Projekt: stattdessen ein Projekt-Access-Token unter Projekt → "Einstellungen" → "Zugriffstoken"',
+            'Scope "api" zum Anlegen, Ändern und Kommentieren; "read_api" reicht, wenn nur gelesen wird',
+            'Ablaufdatum setzen, Token erzeugen und sofort kopieren — er wird nur einmal angezeigt',
+          ],
+          en: [
+            'In GitLab: avatar → "Preferences" → "Access tokens" (the link below is for gitlab.com)',
+            'Recommended for a single project: a project access token instead, under project → "Settings" → "Access tokens"',
+            'Scope "api" to create, change and comment; "read_api" is enough for reading only',
+            'Set an expiry date, create the token and copy it immediately — it is shown only once',
+          ],
+        },
+        link: {
+          url: 'https://gitlab.com/-/user_settings/personal_access_tokens',
+          label: { de: 'GitLab Access Tokens', en: 'GitLab access tokens' },
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Server-URL im ersten Feld: https://gitlab.com ist vorausgefüllt, bei eigener Instanz deren Basisadresse ohne /api/v4',
+            'Access Token in das zweite Feld',
+            '"Zugangsdaten speichern" klicken — der Status wird grün, sobald Server und Token passen',
+            'Projekte gibst du in Workflows als Pfad an (gruppe/projekt, auch Untergruppen) oder als numerische ID',
+          ],
+          en: [
+            'Server URL in the first field: https://gitlab.com is prefilled; for your own instance use its base address without /api/v4',
+            'Access token in the second field',
+            'Click "Save credentials" — the status turns green once server and token match',
+            'Workflows address projects by path (group/project, subgroups too) or by numeric ID',
           ],
         },
       },

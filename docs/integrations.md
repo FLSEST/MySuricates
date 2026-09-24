@@ -110,11 +110,13 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | Taskwarrior | `taskwarrior` | Lokales CLI (kein OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | geprüft |
 | GitHub | `github` | Personal Access Token (kein OAuth-Flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft |
 | Gitea / Forgejo | `gitea` | Server-URL + Zugangstoken (kein OAuth-Flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft (lokaler Container) |
+| GitLab | `gitlab` | Server-URL (Standard `https://gitlab.com`) + Access Token (kein OAuth-Flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simuliert |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
 **Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Gitea/Forgejo (Issue,
-Target `owner/repo`; Tags werden als Labels übernommen, soweit es sie im Repository gibt), Jira (Issue vom
+Target `owner/repo`; Tags werden als Labels übernommen, soweit es sie im Repository gibt), GitLab (Issue,
+Target = Projektpfad `gruppe/projekt` oder numerische ID; Tags werden Labels), Jira (Issue vom
 Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den accessible-resources) und Trello
 (Karte, Target = Listen-ID, `listTargets` liefert „Board / Liste"; Tags werden nicht als Labels übertragen, weil
 Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
@@ -164,6 +166,16 @@ Hinweise:
   lässt sie weg; Zahlen gelten als IDs, so auch Organisations-Labels). Labels ändert `update_issue`
   über `PUT …/issues/{n}/labels`, weil der Edit-Endpunkt kein Label-Feld hat. Geprüft gegen Gitea 1.27.3
   und Forgejo 14.0.5 im lokalen Container.
+- **GitLab** (gitlab.com oder eigene Instanz, API v4) braucht keinen OAuth-Flow: Feld 1 ist die
+  Server-URL (im Formular mit `https://gitlab.com` vorausgefüllt; leer gespeichert gilt ebenfalls
+  gitlab.com), Feld 2 ein Personal-, Projekt- oder Gruppen-Access-Token; Header `PRIVATE-TOKEN`.
+  Validierung per `GET /api/v4/user`, die Scopes liest `fetchGrantedScopes` aus
+  `GET /api/v4/personal_access_tokens/self` (ab GitLab 15.5; sonst `null`). `create_issue`,
+  `update_issue` und `add_comment` verlangen `api`, Lesen geht mit `read_api` oder `api`.
+  Projekte werden als Pfad (URL-kodiert zu einem Segment, `gruppe%2Fprojekt`) oder numerische ID
+  angesprochen, Issues über die projektlokale IID; Bearbeiter nur als numerische Benutzer-IDs
+  (`assigneeIds`). `update_issue` mit `state` open/closed setzt `state_event` reopen/close.
+  Nur simuliert getestet (Anfrageformen nach der offiziellen API-Doku).
 
 ---
 

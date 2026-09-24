@@ -111,11 +111,13 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | verified |
 | GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified |
 | Gitea / Forgejo | `gitea` | Server URL + access token (no OAuth flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified (local container) |
+| GitLab | `gitlab` | Server URL (default `https://gitlab.com`) + access token (no OAuth flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simulated |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
 **Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Gitea/Forgejo
-(issue, target `owner/repo`; tags become labels where the repository has them), Jira (issue of type Task,
+(issue, target `owner/repo`; tags become labels where the repository has them), GitLab (issue, target =
+project path `group/project` or numeric ID; tags become labels), Jira (issue of type Task,
 target = project key, labels without spaces; browse URL from the accessible resources) and Trello (card,
 target = list ID, `listTargets` returns "board / list"; tags are not transferred as labels because Trello
 expects label IDs). Discovery via `instanceof`, contract test `TaskExportContractTest`.
@@ -164,6 +166,16 @@ Notes:
   export drops them; numbers count as IDs, which also covers organisation labels). `update_issue`
   changes labels via `PUT …/issues/{n}/labels` because the edit endpoint has no labels field.
   Checked against Gitea 1.27.3 and Forgejo 14.0.5 in a local container.
+- **GitLab** (gitlab.com or self-managed, API v4) needs no OAuth flow: field 1 is the server URL
+  (prefilled with `https://gitlab.com` in the form; an empty stored value also means gitlab.com),
+  field 2 a personal, project or group access token; header `PRIVATE-TOKEN`. Validation via
+  `GET /api/v4/user`; `fetchGrantedScopes` reads the scopes from
+  `GET /api/v4/personal_access_tokens/self` (GitLab 15.5+; otherwise `null`). `create_issue`,
+  `update_issue` and `add_comment` require `api`; reading works with `read_api` or `api`.
+  Projects are addressed by path (URL-encoded into one segment, `group%2Fproject`) or numeric ID,
+  issues by their project-local IID; assignees only as numeric user IDs (`assigneeIds`).
+  `update_issue` with `state` open/closed sets `state_event` reopen/close.
+  Simulated tests only (request shapes follow the official API docs).
 
 ---
 

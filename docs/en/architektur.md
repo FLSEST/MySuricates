@@ -230,7 +230,7 @@ com.automation
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 8 Providers in subdirectories (confluence/, gitea/, github/, google/, jira/, taskwarrior/, trello/)
+│   ├── integration/providers/ 9 Providers in subdirectories (confluence/, gitea/, github/, gitlab/, google/, jira/, taskwarrior/, trello/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
@@ -732,7 +732,7 @@ Plugin framework for external services:
 - `IntegrationEncryptionService` — credential encryption (AES-GCM)
 - `IntegrationConnection` entity — connection status (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` with OAuth callback, credentials, actions
-- 8 providers in subdirectories: Confluence, Gitea, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
+- 9 providers in subdirectories: Confluence, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
 - `IntegrationBlockExecutor` — executes provider actions as workflow blocks
 - `TaskExportCapable` — interface for providers that support TODO export
 

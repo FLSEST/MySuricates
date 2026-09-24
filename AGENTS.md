@@ -165,7 +165,7 @@ Response: 201 Created
 | `sub-workflow` | `description`, `workflow_id` | Verschachtelter Workflow (max 5 Ebenen) |
 | `skill-capability` | `description`, `capability`, `input?`, `params?`, `allow_writes?` | Skill-Ausführung (ohne `allow_writes` nur lesend) |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
-| `integration` | `description`, `provider`, `action`, `params?` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, Taskwarrior) |
+| `integration` | `description`, `provider`, `action`, `params?` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior) |
 | `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Text-Extraktion aus Dokumenten via Tika (PDF mit Text-Layer, DOCX, …) — kein OCR |
 | `compress` | `description`, `source`, `stages`, `max_chars?`, `timeout_seconds?` | Regelbasierte Komprimierung einer Blockausgabe |
 | `compress-ai` | `description`, `source`, `instruction?`, `max_chars?`, `model?`, `effort?`, `provider` (nur `CLAUDE`; setzen, wenn der Workflow einen anderen Provider nutzt), `timeout_seconds?` | KI-Komprimierung einer Blockausgabe (nur CLAUDE, ohne Tools) |
