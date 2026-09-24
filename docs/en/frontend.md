@@ -96,7 +96,8 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Project cards with type icon and color coding
 - Start/stop buttons for Docker containers
 - Detail page: project info, container status, associated workflows
-- Modals: create, edit, delete confirmation
+- Modals: create, edit, archive confirmation (`ConfirmModal`)
+- Building blocks of the detail page in `components/project/`: `ProjectContainerCard` (image, status, start/stop) and `ProjectAiContextCard` (AI context with its editor dialog and "Auto-generate"); the edit dialog uses the same `ProjectFormFields` as creating a project
 
 ### Workflows (`/workflows`, `/workflows/:id`)
 
@@ -134,6 +135,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - "New skill" and "Edit" open `SkillEditorModal` (name, category, icon via `EmojiPicker` — curated grid, "None", own input —, description, AI context in the Monaco Markdown editor); "Import" reads an export file, "Export" downloads it
 - Built-in skills are read-only and can be copied as a custom skill (without capabilities)
 - If a sealed workflow uses the skill, editing and deleting are locked — regardless of the `sealing` module; the hint names the way out (unseal, unsealing switched off, or `seal-immutable`)
+- Building blocks in `components/skills/`: `SkillCard` (card in the grid), `SkillDetail` (slide-over with actions, capabilities, AI context), `SkillHistory` (history) and `SkillIcon`; the page keeps search, category filter, import and the editor state
 
 ### Schedules (`/schedules`)
 
@@ -145,6 +147,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Table: workflow, URL (copyable), token (masked + copyable), trigger count, status
 - CopyButton component with success feedback
 - Create modal: workflow selection + description
+- Building blocks in `components/webhooks/`: the table columns `webhookColumns.tsx` (new token, rotating/removing the secret and deleting ask through the page's `ConfirmModal`), `WebhookCreateModal` and `SecretRevealModal`, which shows URL and token after creating/regenerating, or the signing secret after setting it, exactly once, each value with a copy button. Afterwards no mutation holds the value either: create, regenerate token and set secret run with `gcTime: 0` and are reset when the reveal closes (create: when it hands the webhook over)
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
@@ -171,12 +174,14 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Enter natural language wishes and have them fulfilled asynchronously
 - Iteration display, provide feedback, cancel or crystallize wishes
+- Detail (`components/wishes/WishDetail.tsx`): the head with actions, status timeline and iteration counter is `WishHeaderCard.tsx`, the collapsible iteration history `WishIterationHistory.tsx`; `WishDetail` holds whether it is open, so it stays open when another wish is selected
 
 ### WorkflowFactory (`/factory`)
 
 - Generate workflow from topic category
 - Full pipeline: generate → test instance → verify → promote
 - Topic category selection
+- Form state, "Create Workflow" and "Create & Test" (topic and project required, testing only with the test instance up, invalid JSON in the test inputs is reported and sent as `{}`) live in `hooks/useFactoryForm.ts`; the form is `components/factory/FactoryCreateForm.tsx`, the result list `FactoryResultsList.tsx` (this session's results before earlier generated workflows, status icons in the tones of the status badges)
 
 ### DialogImport (`/dialogs`)
 
@@ -226,6 +231,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Floating chat panel, globally overlaid on the layout
 - Context-sensitive chat with page suggestions
 - Persisted sessions, WebSocket integration
+- Resizing at the left and top edge (desktop only) via `hooks/usePanelResize.ts`: dragging away from the bottom-right anchor enlarges, each edge between its minimum and the window minus a margin; the auto-growing input (Enter sends, Shift+Enter breaks the line, at most 240 px) is `assistant/AssistantComposer.tsx`
 - See [Assistant System](assistant-system.md) for details
 
 ### `src/components/settings/`
@@ -233,7 +239,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Settings sub-components for the modular settings page
 - Separate components: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation via `SettingsNav`, shared layout via `SettingsSection`
-- `SyncSelectModal`: selection modal for the definition sync (`StagingCard`, `TestingCard`)
+- `SyncSelectModal`: selection modal for the definition sync (`StagingCard`, `TestingCard`); the selection (everything that changes is preselected; toggling, collapsing, the request per kind) lives in `useSyncSelection.ts`, section and row including the diff details in `SyncSelectRows.tsx`
 
 ### Shared Components (`src/components/shared/`)
 
@@ -748,6 +754,10 @@ Aggregates events from multiple sources (Google Calendar, Trello, Taskwarrior, s
 
 Manages custom colors per calendar source (persisted in `localStorage`).
 
+### `useCalendarNavigation.ts`
+
+What `UnifiedCalendarGrid` shows: the view (month, week, day), the month with its selected day, the date of the week and day view and the range loaded for it (`from`/`to`, ISO); plus back/forward, "Today" and `getMonday()`. Week and day open on the selected day, without a selection on the 1st of the month; a month step clears the selection. The month view is `calendar/CalendarMonthView.tsx`, next to `CalendarWeekView` and `CalendarDayView`.
+
 ### `useConversion.ts`
 
 | Hook | Type | Description |
@@ -797,6 +807,10 @@ Manages custom colors per calendar source (persisted in `localStorage`).
 | Hook | Type | Description |
 |---|---|---|
 | `usePaletteHistory(contextId)` | Hook | Recent/pinned IDs for the command palette (localStorage-based) |
+
+### `usePaletteSelection.ts` (`components/palette/`)
+
+Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 

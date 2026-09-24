@@ -96,7 +96,8 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Projekt-Cards mit Typ-Icon und Farbcodierung
 - Start/Stop-Buttons für Docker-Container
 - Detail-Seite: Projektinfo, Container-Status, zugehörige Workflows
-- Modals: Erstellen, Bearbeiten, Löschen-Bestätigung
+- Modals: Erstellen, Bearbeiten, Archivieren-Bestätigung (`ConfirmModal`)
+- Bausteine der Detail-Seite in `components/project/`: `ProjectContainerCard` (Image, Status, Start/Stop) und `ProjectAiContextCard` (KI-Kontext samt Editor-Dialog und „Automatisch erzeugen“); der Bearbeiten-Dialog nutzt dieselben `ProjectFormFields` wie das Anlegen
 
 ### Workflows (`/workflows`, `/workflows/:id`)
 
@@ -134,6 +135,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - „Neuer Skill“ und „Bearbeiten“ öffnen `SkillEditorModal` (Name, Kategorie, Icon über `EmojiPicker` — kuratiertes Raster, „Keine“, eigene Eingabe —, Beschreibung, AI-Context im Monaco-Markdown-Editor); „Importieren“ liest eine Export-Datei, „Exportieren“ lädt sie herunter
 - Built-in-Skills sind schreibgeschützt und lassen sich als eigener Skill kopieren (ohne Capabilities)
 - Nutzt ein versiegelter Workflow den Skill, sind Bearbeiten und Löschen gesperrt — unabhängig vom Modul `sealing`; der Hinweis nennt den Ausweg (entsiegeln, Entsiegeln abgeschaltet oder `seal-immutable`)
+- Bausteine in `components/skills/`: `SkillCard` (Karte im Raster), `SkillDetail` (Slide-Over mit Aktionen, Capabilities, AI-Context), `SkillHistory` (Verlauf) und `SkillIcon`; die Seite hält Suche, Kategorie-Filter, Import und den Editor-Zustand
 
 ### Schedules (`/schedules`)
 
@@ -145,6 +147,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Tabelle: Workflow, URL (kopierbar), Token (maskiert + kopierbar), Trigger-Count, Status
 - CopyButton-Komponente mit Erfolgsfeedback
 - Erstellen-Modal: Workflow-Auswahl + Beschreibung
+- Bausteine in `components/webhooks/`: die Tabellenspalten `webhookColumns.tsx` (neues Token, Secret rotieren/entfernen und Löschen fragen über das `ConfirmModal` der Seite), `WebhookCreateModal` und `SecretRevealModal`, das URL und Token nach Anlegen/Neu-Erzeugen bzw. das Signatur-Secret nach dem Setzen genau einmal zeigt, je Wert mit Kopierknopf. Danach hält auch keine Mutation den Wert mehr: Anlegen, Token neu erzeugen und Secret setzen laufen mit `gcTime: 0` und werden beim Schließen der Anzeige (Anlegen: bei der Übergabe) zurückgesetzt
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
@@ -171,12 +174,14 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - Natürlichsprachige Wünsche eingeben und asynchron erfüllen lassen
 - Iterationsanzeige, Feedback geben, Wunsch abbrechen oder kristallisieren
+- Detail (`components/wishes/WishDetail.tsx`): Kopf mit Aktionen, Status-Zeitleiste und Iterationszähler ist `WishHeaderCard.tsx`, der aufklappbare Iterationsverlauf `WishIterationHistory.tsx`; ob er offen ist, hält `WishDetail`, deshalb bleibt er beim Wechsel zu einem anderen Wunsch offen
 
 ### WorkflowFactory (`/factory`)
 
 - Workflow aus Topic-Kategorie generieren
 - Vollständige Pipeline: Generieren → Test-Instanz → Verifizieren → Promoten
 - Topic-Kategorien-Auswahl
+- Formularzustand, „Workflow erstellen“ und „Erstellen & Testen“ (Thema und Projekt Pflicht, Testen nur mit laufender Test-Instanz, ungültiges JSON der Test-Eingaben wird gemeldet und als `{}` gesendet) liegen in `hooks/useFactoryForm.ts`; das Formular ist `components/factory/FactoryCreateForm.tsx`, die Ergebnisliste `FactoryResultsList.tsx` (Ergebnisse der Sitzung vor früher erzeugten Workflows, Status-Icons in den Tönen der Status-Badges)
 
 ### DialogImport (`/dialogs`)
 
@@ -226,6 +231,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Floating-Chat-Panel, global über dem Layout eingeblendet
 - Kontext-sensitiver Chat mit Page Suggestions
 - Persistierte Sessions, WebSocket-Integration
+- Größenänderung an linker und oberer Kante (nur Desktop) über `hooks/usePanelResize.ts`: Ziehen vom Anker unten rechts weg vergrößert, je Kante zwischen Mindestmaß und Fenster minus Rand; das Eingabefeld mit Auto-Grow (Enter sendet, Shift+Enter bricht um, höchstens 240 px) ist `assistant/AssistantComposer.tsx`
 - Siehe [Assistant System](assistant-system.md) für Details
 
 ### `src/components/settings/`
@@ -233,7 +239,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Settings-Unterkomponenten für die modulare Settings-Seite
 - Separate Komponenten: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation über `SettingsNav`, gemeinsames Layout via `SettingsSection`
-- `SyncSelectModal`: Auswahl-Modal für den Definition-Sync (`StagingCard`, `TestingCard`)
+- `SyncSelectModal`: Auswahl-Modal für den Definition-Sync (`StagingCard`, `TestingCard`); die Auswahl (vorausgewählt ist alles, was sich ändert; Umschalten, Einklappen, Anfrage je Art) liegt in `useSyncSelection.ts`, Abschnitt und Zeile samt Diff-Angaben in `SyncSelectRows.tsx`
 
 ### Shared-Komponenten (`src/components/shared/`)
 
@@ -748,6 +754,10 @@ Aggregiert Events aus mehreren Quellen (Google Calendar, Trello, Taskwarrior, Sc
 
 Verwaltet benutzerdefinierte Farben pro Kalender-Quelle (persistiert in `localStorage`).
 
+### `useCalendarNavigation.ts`
+
+Was `UnifiedCalendarGrid` zeigt: Ansicht (Monat, Woche, Tag), Monat mit gewähltem Tag, Datum der Wochen- und Tagesansicht und der daraus geladene Zeitraum (`from`/`to`, ISO); dazu Vor/Zurück, „Heute“ und `getMonday()`. Woche und Tag öffnen auf dem gewählten Tag, ohne Auswahl auf dem Ersten des Monats; ein Monatsschritt hebt die Auswahl auf. Die Monatsansicht ist `calendar/CalendarMonthView.tsx`, neben `CalendarWeekView` und `CalendarDayView`.
+
 ### `useConversion.ts`
 
 | Hook | Typ | Beschreibung |
@@ -797,6 +807,10 @@ Verwaltet benutzerdefinierte Farben pro Kalender-Quelle (persistiert in `localSt
 | Hook | Typ | Beschreibung |
 |---|---|---|
 | `usePaletteHistory(contextId)` | Hook | Recent/Pinned-IDs für die Command-Palette (localStorage-basiert) |
+
+### `usePaletteSelection.ts` (`components/palette/`)
+
+Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 

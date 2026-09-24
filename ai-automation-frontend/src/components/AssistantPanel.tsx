@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { X, Send, Clock, Plus, Square } from 'lucide-react';
+import { X, Clock, Plus, Square } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useAssistantConversation } from '../hooks/useAssistantConversation';
 import { useAssistantWebSocket } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
-import { MeerkatIcon } from './layout/Sidebar';
+import { usePanelResize } from '../hooks/usePanelResize';
+import { MeerkatIcon } from './layout/MeerkatIcon';
 import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
 import { AssistantHistory } from './assistant/AssistantHistory';
+import { AssistantComposer } from './assistant/AssistantComposer';
 import { StatusIndicator, AssistantEmptyState, ContextChips } from './assistant/AssistantWelcome';
 import { useT } from '../i18n';
 
@@ -36,10 +38,11 @@ export function AssistantPanel() {
 
   const ctx = pendingContext ?? parsePageContext(location.pathname);
 
-  // Resize drag state
-  const [isResizing, setIsResizing] = useState(false);
-  const dragInfo = useRef<{ startX: number; startWidth: number } | null>(null);
-  const heightDragInfo = useRef<{ startY: number; startHeight: number } | null>(null);
+  // Resize via the left and top edge (desktop only). 80px = sm:right-20 offset of the panel.
+  const { isResizing, widthHandle, heightHandle } = usePanelResize({
+    width: { size: panelWidth, onChange: setPanelWidth, min: 280, margin: 80 },
+    height: { size: panelHeight, onChange: setPanelHeight, min: 300, margin: 60 },
+  });
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const messages = useMemo(() => activeSession?.messages ?? [], [activeSession]);
@@ -69,64 +72,12 @@ export function AssistantPanel() {
     }
   }, [open, pendingInput, setPendingInput]);
 
-  // Auto-grow the input to fit its content (typing, paste, or a programmatic prefill like the
-  // Diagnose button) up to a max height, then scroll. The textarea's onInput handler only fires
-  // on real keystrokes/paste, not on programmatic value changes — this effect covers those.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-  }, [input]);
-
   // ESC to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [setOpen]);
-
-  // Resize via pointer capture — browser keeps the pointer locked to the element
-  const onResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragInfo.current = { startX: e.clientX, startWidth: panelWidth };
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const onResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragInfo.current) return;
-    const delta = dragInfo.current.startX - e.clientX;
-    const maxWidth = window.innerWidth - 80; // 80px = sm:right-20 offset
-    const newWidth = Math.min(maxWidth, Math.max(280, dragInfo.current.startWidth + delta));
-    setPanelWidth(newWidth);
-  };
-
-  const onResizePointerUp = () => {
-    dragInfo.current = null;
-    setIsResizing(false);
-  };
-
-  // Height resize (top edge)
-  const onHeightPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    heightDragInfo.current = { startY: e.clientY, startHeight: panelHeight };
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const onHeightPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!heightDragInfo.current) return;
-    const delta = heightDragInfo.current.startY - e.clientY; // drag up = taller
-    const maxHeight = window.innerHeight - 60;
-    const newHeight = Math.min(maxHeight, Math.max(300, heightDragInfo.current.startHeight + delta));
-    setPanelHeight(newHeight);
-  };
-
-  const onHeightPointerUp = () => {
-    heightDragInfo.current = null;
-    setIsResizing(false);
-  };
 
   const handleSendText = (text: string) => {
     if (!text) return;
@@ -159,13 +110,6 @@ export function AssistantPanel() {
         setOpen(false);
       },
     });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
   };
 
   const handleNewSession = () => {
@@ -214,9 +158,7 @@ export function AssistantPanel() {
         {/* Width resize handle — left edge (desktop only) */}
         {!isMobile && (
           <div
-            onPointerDown={onResizePointerDown}
-            onPointerMove={onResizePointerMove}
-            onPointerUp={onResizePointerUp}
+            {...widthHandle}
             className={`absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 transition-colors
                         ${isResizing ? 'bg-accent/60' : 'bg-transparent hover:bg-accent/30'}`}
             title={t.assistant.resizeWidth}
@@ -226,9 +168,7 @@ export function AssistantPanel() {
         {/* Height resize handle — top edge (desktop only) */}
         {!isMobile && (
           <div
-            onPointerDown={onHeightPointerDown}
-            onPointerMove={onHeightPointerMove}
-            onPointerUp={onHeightPointerUp}
+            {...heightHandle}
             className={`absolute left-0 right-0 top-0 h-2 cursor-ns-resize z-10 transition-colors
                         ${isResizing ? 'bg-accent/60' : 'bg-transparent hover:bg-accent/30'}`}
             title={t.assistant.resizeHeight}
@@ -329,48 +269,7 @@ export function AssistantPanel() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Input */}
-            <div
-              className="px-3 py-3 shrink-0"
-              style={{ borderTop: '1px solid var(--color-assistant-border)' }}
-            >
-              <div
-                className="flex items-end gap-2 rounded-xl px-3 py-2
-                           focus-within:ring-1 focus-within:ring-accent/40 transition-all"
-                style={{
-                  backgroundColor: 'var(--color-assistant)',
-                  border: '1px solid var(--color-assistant-border)',
-                }}
-              >
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t.assistant.inputPlaceholder}
-                  rows={1}
-                  className="flex-1 resize-none bg-transparent text-sm text-text placeholder-text-tertiary
-                             outline-none min-h-[24px] max-h-[240px] leading-6 py-0 overflow-y-auto"
-                  style={{ height: 'auto' }}
-                  onInput={(e) => {
-                    const el = e.currentTarget;
-                    el.style.height = 'auto';
-                    el.style.height = Math.min(el.scrollHeight, 240) + 'px';
-                  }}
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!input.trim()}
-                  className="shrink-0 w-7 h-7 rounded-lg bg-accent text-text-inverse flex items-center justify-center
-                             disabled:opacity-40 hover:bg-accent-hover transition-colors"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <p className="text-[10px] text-text-tertiary text-center mt-1.5">
-                Shift+Enter für Zeilenumbruch
-              </p>
-            </div>
+            <AssistantComposer value={input} onChange={setInput} onSend={handleSend} inputRef={inputRef} />
           </>
         )}
       </div>
