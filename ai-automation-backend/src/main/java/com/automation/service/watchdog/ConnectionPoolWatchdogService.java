@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class ConnectionPoolWatchdogService {
     private final ActivityLogService activityLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final HikariDataSource hikariDataSource;
+    private final Clock clock;
     private final ThreadDumpCollector threadDumpCollector = new ThreadDumpCollector();
 
     @Value("${automation.watchdog.dump-stacks-on-exhaustion:true}")
@@ -52,10 +54,12 @@ public class ConnectionPoolWatchdogService {
 
     public ConnectionPoolWatchdogService(DataSource dataSource,
                                           ActivityLogService activityLogService,
-                                          SimpMessagingTemplate messagingTemplate) {
+                                          SimpMessagingTemplate messagingTemplate,
+                                          Clock clock) {
         this.activityLogService = activityLogService;
         this.messagingTemplate = messagingTemplate;
         this.hikariDataSource = unwrapHikariDataSource(dataSource);
+        this.clock = clock;
     }
 
     @Scheduled(fixedRate = 15_000, initialDelay = 30_000)
@@ -74,7 +78,7 @@ public class ConnectionPoolWatchdogService {
 
         if (active >= 1 && waiting > 0) {
             if (exhaustionDetectedAt == null) {
-                exhaustionDetectedAt = Instant.now();
+                exhaustionDetectedAt = clock.instant();
             }
             exhaustedSamples++;
             if (!warned && exhaustedSamples >= SAMPLES_BEFORE_WARN) {
@@ -86,14 +90,14 @@ public class ConnectionPoolWatchdogService {
                 }
             }
 
-            Duration elapsed = Duration.between(exhaustionDetectedAt, Instant.now());
+            Duration elapsed = Duration.between(exhaustionDetectedAt, clock.instant());
             if (elapsed.compareTo(EXHAUSTION_THRESHOLD) > 0 && !alerted) {
                 handleExhaustion(active, waiting, idle, total, elapsed);
                 alerted = true;
             }
         } else {
             if (exhaustionDetectedAt != null) {
-                Duration elapsed = Duration.between(exhaustionDetectedAt, Instant.now());
+                Duration elapsed = Duration.between(exhaustionDetectedAt, clock.instant());
                 if (warned) {
                     log.info("Pool exhaustion resolved after {}s", elapsed.toSeconds());
                 } else {
@@ -165,7 +169,7 @@ public class ConnectionPoolWatchdogService {
     private void broadcastAlert(String message) {
         try {
             messagingTemplate.convertAndSend("/topic/activity-log", Map.of(
-                    "timestamp", Instant.now().toString(),
+                    "timestamp", clock.instant().toString(),
                     "level", "ERROR",
                     "category", "SYSTEM",
                     "message", message,
