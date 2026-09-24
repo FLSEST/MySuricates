@@ -186,7 +186,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 49 Controllers)
+Controller (REST API, 51 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -206,7 +206,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          49 REST Controllers
+├── controller/          51 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -263,7 +263,7 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 49 REST Controllers
+### All 51 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|

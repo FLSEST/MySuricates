@@ -187,7 +187,7 @@ Chains und Sub-Workflows geben die Herkunft ihres Auslösers im reservierten Kon
 ### Schichtenmodell
 
 ```
-Controller (REST API, 49 Controller)
+Controller (REST API, 51 Controller)
     ↓ DTO (Request/Response Records)
 Service (Geschäftslogik)
     ↓ Entity (JPA)
@@ -207,7 +207,7 @@ SQLite (Datei: data/automation.db)
 
 ```
 com.automation
-├── controller/          49 REST-Controller
+├── controller/          51 REST-Controller
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -265,7 +265,7 @@ com.automation
 └── util/                JPA-Converter (JSON, BlockDefinitions)
 ```
 
-### Alle 49 REST-Controller
+### Alle 51 REST-Controller
 
 | Controller | Base-Path | Beschreibung |
 |---|---|---|
