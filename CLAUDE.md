@@ -51,7 +51,7 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
 BEVOR du das Backend neu startest (Prozess killen, Port 9090 neu binden), MUSST du prüfen, ob noch Workflow-Runs laufen. `scripts/start-autotrigger-dev.sh restart` macht diese Prüfung selbst und bricht bei laufenden Runs ab; für andere Wege:
 
 ```bash
-curl -s http://localhost:9090/api/v1/executions?status=RUNNING -H "X-API-Key: <key>" | python3 -c "import sys,json; data=json.load(sys.stdin); runs=data.get('content',data) if isinstance(data,dict) else data; count=len(runs) if isinstance(runs,list) else data.get('totalElements',0); print(f'{count} laufende Runs') if count else print('Keine laufenden Runs')"
+curl -s --noproxy '*' "http://localhost:9090/api/v1/executions?status=RUNNING" -H "X-API-Key: <key>" | python3 -c "import sys,json; data=json.load(sys.stdin); runs=data.get('content',data) if isinstance(data,dict) else data; count=len(runs) if isinstance(runs,list) else data.get('totalElements',0); print(f'{count} laufende Runs') if count else print('Keine laufenden Runs')"
 ```
 
 - **Runs laufen** → User fragen: „Es laufen noch X Workflow-Runs. Soll ich das Backend trotzdem neu starten?"

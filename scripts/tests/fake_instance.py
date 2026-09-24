@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """Stand-ins with real HTTP for the script tests — Python standard library only.
 
-  fake_instance.py api PORT KEY RUNS   a MySuricates instance: health and info answer 200, the query for
-                                       running workflow runs counts RUNS, and only with X-API-Key: KEY
+  fake_instance.py api PORT KEY RUNS   a MySuricates instance: health and info answer 200 (info as a JAR
+                                       build BUILD), the query for running workflow runs counts RUNS and
+                                       a single run is RUNNING — both only with X-API-Key: KEY
   fake_instance.py proxy PORT LOG      a proxy that must not get anything (bb4f60a5): it writes every
                                        request it gets, CONNECT included, with its headers to LOG and
                                        answers 502
+
+With FAKE_INSTANCE_LOG set, the instance writes each request to that file as "GET PATH key=ok|wrong|none"
+— who got the request, and with which key (cf662c01).
 
 Both accept every connection — a bare listen() without accept() fills its queue after two probes, and
 the next /dev/tcp probe hangs until the kernel gives up. Each ends by itself after FAKE_INSTANCE_TTL
 seconds (default 600), so an aborted test leaves nothing running.
 
-Used by test-instance.sh, test-start-autotrigger-dev.sh and test-setup.sh.
+Used by test-instance.sh, test-start-autotrigger-dev.sh, test-setup.sh and test_local_api_proxy.py.
 """
 import http.server
 import json
@@ -19,18 +23,32 @@ import os
 import sys
 import threading
 
+BUILD = "fake-build"  # buildTimestamp in /system/info
+
 
 class Api(http.server.BaseHTTPRequestHandler):
     key = ""
     runs = 0
+    log = os.environ.get("FAKE_INSTANCE_LOG", "")
 
     def do_GET(self):
-        if self.path in ("/api/v1/system/health", "/api/v1/system/info"):
+        given = self.headers.get("X-API-Key")
+        if self.log:
+            with open(self.log, "a") as f:
+                f.write("%s %s key=%s\n" % (self.command, self.path,
+                                            "none" if given is None else "ok" if given == self.key else "wrong"))
+        if self.path == "/api/v1/system/health":
             return self.answer(200, {"status": "UP"})
+        if self.path == "/api/v1/system/info":
+            return self.answer(200, {"status": "UP", "runtimeMode": "jar", "buildTimestamp": BUILD})
+        if not self.path.startswith("/api/v1/executions"):
+            return self.answer(404, {})
+        if given != self.key:
+            return self.answer(401, {"error": "Unauthorized"})
+        if self.path.startswith("/api/v1/executions/"):  # one run (workspace-isolation/prune-workspaces.py)
+            return self.answer(200, {"id": self.path.split("?")[0].split("/")[4], "status": "RUNNING"})
         if not self.path.startswith("/api/v1/executions?"):
             return self.answer(404, {})
-        if self.headers.get("X-API-Key") != self.key:
-            return self.answer(401, {"error": "Unauthorized"})
         if "status=RUNNING" not in self.path:
             return self.answer(400, {})
         # A workflow name that looks like the field must not change the count (scripts/lib/instance-runs.sh)

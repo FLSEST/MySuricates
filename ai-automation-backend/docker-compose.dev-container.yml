@@ -53,7 +53,9 @@ services:
       - HOME=${HOME}
     restart: "no"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/api/v1/system/health"]
+      # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
+      # ueber sie — der Container wurde nie gesund (cf662c01)
+      test: ["CMD", "curl", "--noproxy", "*", "-f", "http://localhost:9090/api/v1/system/health"]
       interval: 15s
       timeout: 5s
       retries: 5

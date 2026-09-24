@@ -22,7 +22,9 @@ services:
       - AUTOMATION_MODULES_PRESET=${AUTOMATION_MODULES_PRESET:-core}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/api/v1/system/health"]
+      # --noproxy: Docker reicht Proxy-Variablen in den Container, curl schickt auch localhost
+      # ueber sie — der Container wurde nie gesund (cf662c01)
+      test: ["CMD", "curl", "--noproxy", "*", "-f", "http://localhost:9090/api/v1/system/health"]
       interval: 30s
       timeout: 5s
       retries: 3
