@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PaletteItem } from './contexts/types';
 
 /** What the palette's keys trigger; the selection itself stays inside the hook. */
@@ -114,9 +114,11 @@ export function usePaletteSelection({
   };
 
   // The window listener stays for the palette's lifetime and always calls the handler of the
-  // latest render — it sees the current rows, selection and query without re-subscribing.
+  // latest render — it sees the current rows, selection and query without re-subscribing. The
+  // ref is updated during the commit (layout effect), so no key can reach the rows of a previous
+  // render once the new ones are on screen.
   const handleKeyRef = useRef(handleKey);
-  useEffect(() => {
+  useLayoutEffect(() => {
     handleKeyRef.current = handleKey;
   });
   useEffect(() => {
