@@ -22,6 +22,12 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.ContainerShellService;
 import com.automation.exception.HardeningException;
+import com.automation.service.system.settings.AccessLimitSettings;
+import com.automation.service.system.settings.ExecutionCapacitySettings;
+import com.automation.service.system.settings.FeatureSettings;
+import com.automation.service.system.settings.HousekeepingSettings;
+import com.automation.service.system.settings.RequestMetricsSettings;
+import com.automation.service.system.settings.RuntimeSettingsGroup;
 import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -89,15 +96,20 @@ class ExecutionSettingsServiceTest {
         todoSimilarityConfig = new TodoSimilarityConfig();
         requestMetricsConfig = new RequestMetricsConfig();
 
-        service = new ExecutionSettingsService(
-                appSettingsRepository, executionSemaphore,
-                hostClaudeService, hostClaudeConfig, chainConfig,
-                rateLimitConfig, executionRegistry, containerShellService,
-                schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig,
-                new RunDeletionPolicy(true)
-        );
+        service = newService(new RunDeletionPolicy(true));
+    }
+
+    /** Die fuenf Themen-Gruppen so, wie Spring sie in @Order-Reihenfolge injiziert. */
+    private ExecutionSettingsService newService(RunDeletionPolicy runDeletionPolicy) {
+        return new ExecutionSettingsService(appSettingsRepository, List.of(
+                new ExecutionCapacitySettings(executionSemaphore, hostClaudeService, hostClaudeConfig,
+                        chainConfig, taskCommandConfig, executionRegistry),
+                new AccessLimitSettings(rateLimitConfig, containerShellService, assistantGuardrailsConfig),
+                new HousekeepingSettings(todoHygieneConfig, runRetentionConfig, dashboardLayoutConfig,
+                        todoGhostWatchdogConfig, todoSimilarityConfig, runDeletionPolicy),
+                new FeatureSettings(schedulerConfig, summarizationConfig, factoryConfig, wishConfig,
+                        modelCatalogService, compressionConfig, dashboardReportAssistConfig),
+                new RequestMetricsSettings(requestMetricsConfig)));
     }
 
     @Test
@@ -120,8 +132,6 @@ class ExecutionSettingsServiceTest {
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.of("600"));
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.of("100"));
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.of("60"));
-        when(appSettingsRepository.get("rate-limit-enabled")).thenReturn(Optional.empty());
-        when(appSettingsRepository.get("rate-limit-requests-per-minute")).thenReturn(Optional.empty());
 
         service.init();
 
@@ -622,8 +632,6 @@ class ExecutionSettingsServiceTest {
         when(appSettingsRepository.get("claude-timeout-seconds")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("claude-inter-call-delay-ms")).thenReturn(Optional.empty());
         when(appSettingsRepository.get("chain-workflow-timeout-minutes")).thenReturn(Optional.empty());
-        when(appSettingsRepository.get("rate-limit-enabled")).thenReturn(Optional.empty());
-        when(appSettingsRepository.get("rate-limit-requests-per-minute")).thenReturn(Optional.empty());
 
         service.init();
 
@@ -674,6 +682,36 @@ class ExecutionSettingsServiceTest {
                         .contains(key));
     }
 
+    @Test
+    void sameKeyInTwoGroups_isRefusedAtConstruction() {
+        RuntimeSettingsGroup duplicate = new RuntimeSettingsGroup() {
+            @Override public Map<String, java.util.function.Consumer<String>> appliers() {
+                return Map.of("execution-max-concurrent", v -> { });
+            }
+            @Override public void currentValues(Map<String, Object> out) { }
+        };
+
+        assertThatThrownBy(() -> new ExecutionSettingsService(appSettingsRepository, List.of(
+                new ExecutionCapacitySettings(executionSemaphore, hostClaudeService, hostClaudeConfig,
+                        chainConfig, taskCommandConfig, executionRegistry),
+                duplicate)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("execution-max-concurrent");
+    }
+
+    /** Ein Batch wird vorab komplett geprueft — ein ungueltiger Wert laesst auch die gueltigen davor ungesetzt. */
+    @Test
+    void batchWithInvalidValue_appliesNothing() {
+        LinkedHashMap<String, String> batch = new LinkedHashMap<>();
+        batch.put("execution-max-concurrent", "3");
+        batch.put("claude-timeout-seconds", "-1");
+
+        assertThatThrownBy(() -> service.updateAll(batch)).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(executionSemaphore.getMaxPermits()).isEqualTo(10);
+        verify(appSettingsRepository, never()).set(anyString(), anyString());
+    }
+
     /** 8dbd7e10: a leaked key must not delete runs through a shortened retention. */
     @Nested
     class RetentionWhileDeletionIsDisabled {
@@ -683,14 +721,7 @@ class ExecutionSettingsServiceTest {
         @BeforeEach
         void lock() {
             runRetentionConfig.setRetentionDays(90);
-            locked = new ExecutionSettingsService(
-                    appSettingsRepository, executionSemaphore,
-                    hostClaudeService, hostClaudeConfig, chainConfig,
-                    rateLimitConfig, executionRegistry, containerShellService,
-                    schedulerConfig, todoHygieneConfig, todoGhostWatchdogConfig, assistantGuardrailsConfig, taskCommandConfig,
-                    summarizationConfig, factoryConfig, wishConfig, runRetentionConfig, dashboardLayoutConfig, modelCatalogService,
-                    compressionConfig, todoSimilarityConfig, requestMetricsConfig, dashboardReportAssistConfig,
-                    new RunDeletionPolicy(false));
+            locked = newService(new RunDeletionPolicy(false));
         }
 
         @Test

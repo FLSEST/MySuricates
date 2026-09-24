@@ -215,7 +215,7 @@ com.automation
 │   ├── scheduler/       SchedulerService (+ SchedulerTick, SchedulerMaintenanceMode, UpcomingRunsCalculator, ScheduleSkipPolicy, SchedulerPause, ScheduleDefinitionParser, CatchUpQueue), ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser
 │   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
-│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService
+│   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys; Setter je Thema in `settings/`: ExecutionCapacitySettings, AccessLimitSettings, HousekeepingSettings, FeatureSettings, RequestMetricsSettings), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService
 │   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
 │   ├── cli/             CommandExecutorService, CliSessionManager, CliSession, ClaudeOutputParser, ClaudeJsonResponse, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
 │   ├── chain/           ChainService, ChainExecutor (+ ChainRunWaiter, ChainZombieRunCleaner), ChainTemplateService, BuiltInChainTemplate
@@ -798,7 +798,7 @@ Plugin-Framework für externe Dienste:
 ## Dead Letter Queue (V63)
 
 Fehlgeschlagene asynchrone Operationen werden in einer Dead-Letter-Queue gespeichert:
-- `DeadLetterService` — Verwaltung von Dead-Letter-Entries (CRUD, Retry, Discard)
+- `DeadLetterService` — legt für jeden FAILED-Run einen Eintrag an, per `@EventListener` auf `WorkflowRunCompletedEvent` (nicht per Aufruf aus `service.workflow`, das hielt einen Paketzyklus); Verwaltung von Dead-Letter-Entries (CRUD, Retry, Discard)
 - `DeadLetterController` — `/api/v1/dlq`
 - `DeadLetterEntry`-Entity mit Status: OPEN, RETRIED, DISCARDED
 
