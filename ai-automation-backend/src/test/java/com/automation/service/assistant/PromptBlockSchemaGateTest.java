@@ -59,6 +59,12 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>Spelling</b>: a word that is a block type in other case, with {@code _} or without {@code -}
  * ({@code forEach}, {@code sub_workflow}) is an error; a capital first letter is not.
+ *
+ * <p><b>Execution mode</b> (TODO ce4abac1): retry, foreach, while and conditional hand their command to
+ * the AI unless {@code execution_mode} is "shell", and an AI builds what an example shows. So an example
+ * of these types that carries a command names its mode — whether a command is meant for the shell
+ * cannot be told from its text reliably. An example is a JSON object on the line: from each
+ * {@code "type": "X"} to the next, or the object on a line whose section or list item names the type.
  */
 class PromptBlockSchemaGateTest {
 
@@ -74,6 +80,12 @@ class PromptBlockSchemaGateTest {
     private static final Pattern KEY = Pattern.compile("[a-z][a-z0-9_]*");
     private static final Pattern SNAKE_CASE = Pattern.compile("\\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\\b");
     private static final Set<String> BLOCK_FIELDS = Set.of("type", "config", "name");
+    /** The types whose command runs as an AI prompt unless {@code execution_mode} is "shell" ({@code ExecutionMode}). */
+    private static final Set<String> MODE_SWITCHED = Set.of("retry", "foreach", "while", "conditional");
+    private static final Pattern JSON_OBJECT = Pattern.compile("\\{\\s*\"");
+    private static final Pattern COMMAND_KEY = Pattern.compile(
+            "\"(?:command|condition|condition_command|then_command|else_command)\"\\s*:");
+    private static final Pattern EXECUTION_MODE_KEY = Pattern.compile("\"execution_mode\"\\s*:");
 
     @Test
     void everyBlockTypeAndConfigKeyAWorkflowBuildingPromptNamesExists() throws IOException {
@@ -84,7 +96,7 @@ class PromptBlockSchemaGateTest {
         assertThat(problems).as(BlockSpecConfigKeysGateTest.HINT).isEmpty();
     }
 
-    /** What the gate sees — the three kinds of type attribution, spelling, and the fall-back to every type. */
+    /** What the gate sees — the three kinds of type attribution, spelling, the fall-back to every type, the execution mode. */
     @Test
     void check_attributesKeysToTheirTypeAndCatchesTheOldSchema() throws IOException {
         List<String> problems = new ArrayList<>();
@@ -101,9 +113,37 @@ class PromptBlockSchemaGateTest {
         assertThat(problems).extracting(p -> p.replaceAll(" — .*", "")).containsExactlyInAnyOrder(
                 "sample:1 spells block type 'foreach' as 'forEach'",
                 "sample:1 names `variable` for [foreach], but none reads it",
+                "sample:1 shows a foreach example without `execution_mode`",
                 "sample:2 names `if_true` for [conditional], but none reads it",
+                "sample:2 shows a conditional example without `execution_mode`",
                 "sample:5 names `delay_seconds` for [retry], but none reads it",
+                "sample:5 shows a retry example without `execution_mode`",
                 "sample:7 names `invented_key`, but no block type reads it");
+    }
+
+    /**
+     * TODO ce4abac1: retry, foreach, while and conditional hand their command to the AI unless
+     * {@code execution_mode} is "shell". The conversion prompt showed a retry with "npm test" and no mode,
+     * and the AI copied it — the shell command ran as a prompt (b07704ca). Line 2 is that example.
+     */
+    @Test
+    void check_demandsTheExecutionModeInExamplesOfTheWrapperTypes() throws IOException {
+        List<String> problems = new ArrayList<>();
+        check("sample", """
+                {"type": "shell", "config": {"command": "npm ci"}}
+                {"type": "retry", "config": {"command": "npm test", "max_retries": 3, "on_failure": "stop"}}
+                {"type": "retry", "config": {"command": "npm test", "execution_mode": "shell", "max_retries": 3}}
+                {"type": "foreach", "config": {"items": ["a"], "command": "Summarize {{ item }}", "execution_mode": "ai"}}, \
+                {"type": "while", "config": {"command": "./next-batch.sh"}}
+                **Block type: conditional** — If/else.
+                Example config: {"condition": "test -f package.json", "then_command": "npm test"}
+                Required config: `condition` (string) — shell mode: exit code 0 = true.
+                """, problems);
+
+        assertThat(problems).extracting(p -> p.replaceAll(" — .*", "")).containsExactlyInAnyOrder(
+                "sample:2 shows a retry example without `execution_mode`",
+                "sample:4 shows a while example without `execution_mode`",
+                "sample:6 shows a conditional example without `execution_mode`");
     }
 
     // ---- the prompts -----------------------------------------------------------------------------
@@ -155,6 +195,7 @@ class PromptBlockSchemaGateTest {
             types.stream().filter(type -> !ExecutorConfigReads.types().contains(type)).forEach(type ->
                     problems.add(at + " names block type '" + type + "', which no executor supports"));
             checkKeys(line, at, types.stream().filter(ExecutorConfigReads.types()::contains).toList(), problems);
+            missingExecutionMode(line, at, section != null, types, problems);
             if (line.isBlank()) {
                 section = null;
             }
@@ -227,6 +268,39 @@ class PromptBlockSchemaGateTest {
         }
         keys.stream().filter(key -> !read.contains(key)).forEach(key ->
                 problems.add(at + " names `" + key + "` for " + types + ", but none reads it — " + line.strip()));
+    }
+
+    /** {@code types}: what the line is about — its section, or a list item; block objects are split per object. */
+    private static void missingExecutionMode(String line, String at, boolean inSection, List<String> types,
+                                             List<String> problems) {
+        Matcher object = JSON_OBJECT.matcher(line);
+        if (!object.find()) {
+            return;
+        }
+        String json = line.substring(object.start());
+        Map<String, List<String>> examples = new LinkedHashMap<>();
+        Matcher field = TYPE_FIELD.matcher(json);
+        if (!inSection && field.find()) {
+            List<Integer> starts = new ArrayList<>();
+            List<List<String>> objectTypes = new ArrayList<>();
+            do {
+                starts.add(field.start());
+                objectTypes.add(List.of(field.group(1).split("\\|")));
+            } while (field.find());
+            for (int k = 0; k < starts.size(); k++) {
+                int end = k + 1 < starts.size() ? starts.get(k + 1) : json.length();
+                examples.put(json.substring(starts.get(k), end), objectTypes.get(k));
+            }
+        } else {
+            examples.put(json, types);
+        }
+        examples.forEach((example, exampleTypes) -> {
+            if (COMMAND_KEY.matcher(example).find() && !EXECUTION_MODE_KEY.matcher(example).find()) {
+                exampleTypes.stream().filter(MODE_SWITCHED::contains).forEach(type -> problems.add(at + " shows a "
+                        + type + " example without `execution_mode` — its command runs as an AI prompt; name the "
+                        + "mode (\"shell\" for a shell command, \"ai\" for a prompt): " + line.strip()));
+            }
+        });
     }
 
     private static String normalized(String word) {

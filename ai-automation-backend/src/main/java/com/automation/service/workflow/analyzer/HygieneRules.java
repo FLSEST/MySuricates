@@ -3,7 +3,9 @@ package com.automation.service.workflow.analyzer;
 import com.automation.entity.BlockDefinition;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
@@ -54,22 +56,28 @@ final class HygieneRules {
     }
 
     /**
-     * Der KI-Auftrag des Blocks ({@link BlockText#instructions}) wiederholt wörtlich, was ohnehin
+     * Der KI-Auftrag des Blocks ({@link BlockText#instructions}) oder eines in ihm verschachtelten
+     * Blocks ({@link BlockText#nestedInstructions}, TODO ce4abac1) wiederholt wörtlich, was ohnehin
      * über {@code workflow.instructions} in jeden Aufruf geht: dieselben Regeln zweimal im Kontext,
      * doppelt bezahlt.
      */
     private static void duplicatedInstructions(BlockDefinition block, String instructions, int i,
                                                String name, List<AnalyzerFinding> out) {
         if (instructions == null || instructions.isBlank()) return;
-        List<String> prompts = BlockText.instructions(block);
-        if (prompts.isEmpty()) return;
+        Map<String, List<String>> prompts = new LinkedHashMap<>();
+        prompts.put("", BlockText.instructions(block));
+        prompts.putAll(BlockText.nestedInstructions(block));
         for (String paragraph : instructions.split("\n\\s*\n")) {
             String trimmed = paragraph.strip();
-            if (trimmed.length() >= 80 && prompts.stream().anyMatch(prompt -> prompt.contains(trimmed))) {
-                out.add(AnalyzerFinding.of("duplicated-instructions", Severity.MEDIUM, i, name,
-                        "wiederholt wörtlich einen Absatz aus workflow.instructions ("
-                                + trimmed.length() + " Zeichen) — die Regeln gehen zweimal in den Kontext"));
-                return;
+            if (trimmed.length() < 80) continue;
+            for (Map.Entry<String, List<String>> source : prompts.entrySet()) {
+                if (source.getValue().stream().anyMatch(prompt -> prompt.contains(trimmed))) {
+                    String where = source.getKey().isEmpty() ? "" : " im verschachtelten Block '" + source.getKey() + "'";
+                    out.add(AnalyzerFinding.of("duplicated-instructions", Severity.MEDIUM, i, name,
+                            "wiederholt" + where + " wörtlich einen Absatz aus workflow.instructions ("
+                                    + trimmed.length() + " Zeichen) — die Regeln gehen zweimal in den Kontext"));
+                    return;
+                }
             }
         }
     }

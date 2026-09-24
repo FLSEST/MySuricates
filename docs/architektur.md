@@ -744,7 +744,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 ## Workflow Factory
 
-Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Block-Schema in den Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung kommt aus `BlockSpecs` (dieselben Texte wie `fetch block-spec` des Assistenten); `PromptBlockSchemaGateTest` prüft jeden dort genannten Blocktyp und Config-Schlüssel gegen die Executoren — die alten Prompts nannten `forEach`, `then_blocks`, `if_true` und andere Schlüssel, die kein Executor liest.
+Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Block-Schema in den Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung kommt aus `BlockSpecs` (dieselben Texte wie `fetch block-spec` des Assistenten); `PromptBlockSchemaGateTest` prüft jeden dort genannten Blocktyp und Config-Schlüssel gegen die Executoren — die alten Prompts nannten `forEach`, `then_blocks`, `if_true` und andere Schlüssel, die kein Executor liest. Ein Beispiel für retry, foreach, while oder conditional mit Befehl muss außerdem `execution_mode` nennen: Ohne geht der Befehl als Prompt an die KI, und die KI baut nach, was das Beispiel zeigt (der Konvertierungs-Prompt zeigte so ein retry mit `npm test`).
 - `WorkflowFactoryService` — orchestriert den gesamten Factory-Prozess
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-basierte Workflow-Generierung
 - `WorkflowTextGenerator` — Textbasierte Workflow-Generierung

@@ -7,6 +7,7 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.mapper.ActivityLogMapper;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.util.EnumParameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,8 +29,8 @@ public class ActivityLogController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String workflowId) {
 
-        LogLevel logLevel = level != null && !level.isBlank() ? LogLevel.valueOf(level) : null;
-        LogCategory logCategory = category != null && !category.isBlank() ? LogCategory.valueOf(category) : null;
+        LogLevel logLevel = EnumParameter.parseOptional(LogLevel.class, "level", level);
+        LogCategory logCategory = EnumParameter.parseOptional(LogCategory.class, "category", category);
         String wfId = workflowId != null && !workflowId.isBlank() ? workflowId : null;
 
         var result = activityLogService.findAll(page, size, logLevel, logCategory, wfId);

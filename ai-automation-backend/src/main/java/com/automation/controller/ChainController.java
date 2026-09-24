@@ -13,6 +13,7 @@ import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
+import com.automation.util.EnumParameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -80,8 +81,7 @@ public class ChainController {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        RunStatus runStatus = (status != null && !status.isBlank())
-                ? RunStatus.valueOf(status.toUpperCase()) : null;
+        RunStatus runStatus = EnumParameter.parseOptional(RunStatus.class, "status", status);
         String q = (search != null && !search.isBlank()) ? search.trim() : null;
 
         Page<ChainRun> result = chainService.findRunsFiltered(runStatus, q, pageable);

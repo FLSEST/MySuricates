@@ -145,12 +145,47 @@ class ControllerIntegrationTest {
                 .andExpect(jsonPath("$.error").value(containsString("USER, AI oder WORKFLOW")));
     }
 
-    // Spot check from 4e7a7401: the run list parses its status before the query, so it already says 400.
+    // Spot check from 4e7a7401: the run list parses its status before the query, so it already said 400 —
+    // but, like /chains/runs and /activity-log, with "No enum constant com.automation.entity.RunStatus.FOO":
+    // a class name instead of the allowed values (TODO b22c4db0).
     @Test
-    void executionList_unknownStatus_returns400() throws Exception {
+    void executionList_unknownStatus_returns400NamingTheAllowedValues() throws Exception {
         mockMvc.perform(get("/api/v1/executions").param("status", "FOO"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value("status muss PENDING, RUNNING, PAUSED, COMPLETED, "
+                        + "COMPLETED_WITH_ERRORS, FAILED, CANCELLED oder INTERRUPTED sein, nicht 'FOO'"));
+        mockMvc.perform(get("/api/v1/executions").param("status", " completed "))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void chainRunList_unknownStatus_returns400NamingTheAllowedValues() throws Exception {
+        mockMvc.perform(get("/api/v1/chains/runs").param("status", "FOO"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value(allOf(
+                        containsString("PENDING, RUNNING, PAUSED, COMPLETED, COMPLETED_WITH_ERRORS, FAILED, "
+                                + "CANCELLED oder INTERRUPTED"),
+                        containsString("'FOO'"), not(containsString("com.automation")))));
+        mockMvc.perform(get("/api/v1/chains/runs").param("status", "failed"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void activityLog_unknownLevelOrCategory_returns400NamingTheAllowedValues() throws Exception {
+        mockMvc.perform(get("/api/v1/activity-log").param("level", "TRACE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value("level muss DEBUG, INFO, WARN oder ERROR sein, nicht 'TRACE'"));
+        mockMvc.perform(get("/api/v1/activity-log").param("category", "AUDIT"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(allOf(
+                        containsString("SYSTEM, EXECUTION, SCHEDULE, WEBHOOK, SECURITY, CONTAINER oder PLUGIN"),
+                        containsString("'AUDIT'"), not(containsString("com.automation")))));
+        // Same rules as the todo list: case and surrounding blanks do not matter.
+        mockMvc.perform(get("/api/v1/activity-log").param("level", "info").param("category", " system"))
+                .andExpect(status().isOk());
     }
 
     @Test

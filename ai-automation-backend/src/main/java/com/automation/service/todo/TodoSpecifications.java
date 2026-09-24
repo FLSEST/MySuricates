@@ -1,15 +1,14 @@
 package com.automation.service.todo;
 
 import com.automation.entity.Todo;
+import com.automation.util.EnumParameter;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * JPA {@link Specification} for the todo list filters (project, status, priority, source, tag,
@@ -76,12 +75,10 @@ public final class TodoSpecifications {
     public static Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {
         List<Todo.Status> statuses = status == null ? List.of() : status.stream()
                 .filter(value -> value != null && !value.isBlank())
-                .map(value -> parseFilter(Todo.Status.class, "status", value))
+                .map(value -> EnumParameter.parse(Todo.Status.class, "status", value))
                 .toList();
-        Todo.Priority priorityFilter = priority == null || priority.isBlank()
-                ? null : parseFilter(Todo.Priority.class, "priority", priority);
-        Todo.Source sourceFilter = source == null || source.isBlank()
-                ? null : parseFilter(Todo.Source.class, "source", source);
+        Todo.Priority priorityFilter = EnumParameter.parseOptional(Todo.Priority.class, "priority", priority);
+        Todo.Source sourceFilter = EnumParameter.parseOptional(Todo.Source.class, "source", source);
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -120,18 +117,6 @@ public final class TodoSpecifications {
     /** Nur TODOs dieses Ziels (TODO dc0566f8); ohne ID keine Einschraenkung. */
     public static Specification<Todo> inGoal(String goalId) {
         return (root, query, cb) -> goalId == null || goalId.isBlank() ? null : cb.equal(root.get("goalId"), goalId);
-    }
-
-    /** A filter value as enum constant, trimmed and in any case — like {@code TodoPlanningService.parseComplexity}. */
-    static <E extends Enum<E>> E parseFilter(Class<E> type, String parameter, String value) {
-        try {
-            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            List<String> allowed = Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
-            throw new IllegalArgumentException(parameter + " muss "
-                    + String.join(", ", allowed.subList(0, allowed.size() - 1)) + " oder " + allowed.getLast()
-                    + " sein, nicht '" + value + "'");
-        }
     }
 
     static String escapeLikePattern(String input) {
