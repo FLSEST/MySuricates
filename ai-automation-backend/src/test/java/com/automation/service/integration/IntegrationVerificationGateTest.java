@@ -49,7 +49,7 @@ class IntegrationVerificationGateTest {
     @Test
     void scanFindsTheShippedProviders() throws Exception {
         assertThat(shippedProviders()).extracting(IntegrationProvider::getProviderId)
-                .contains("github", "jira", "trello", "google-calendar");
+                .contains("github", "jira", "trello", "google-calendar", "todoist");
     }
 
     @Test
@@ -72,6 +72,16 @@ class IntegrationVerificationGateTest {
         var shippedIds = shippedProviders().stream().map(IntegrationProvider::getProviderId).toList();
         assertThat(shippedIds).as("every VerifiedProviders entry must name a shipped provider")
                 .containsAll(VerifiedProviders.providerIds());
+    }
+
+    @Test
+    void providersWithoutRealAccountStaySimulated() throws Exception {
+        for (IntegrationProvider p : shippedProviders()) {
+            if (java.util.Set.of("todoist", "slack", "telegram").contains(p.getProviderId())) {
+                assertThat(p.getVerification()).as("%s was only tested against simulated responses", p.getProviderId())
+                        .isEqualTo(IntegrationVerification.SIMULATED);
+            }
+        }
     }
 
     @Test

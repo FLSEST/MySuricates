@@ -1008,4 +1008,57 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+
+  'todoist': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Bezeichnung (optional, z.B. „Privat“)', en: 'Label (optional, e.g. "Personal")' },
+      clientSecretPlaceholder: { de: 'Todoist-API-Token', en: 'Todoist API token' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'API-Token kopieren',
+          en: 'Copy the API token',
+        },
+        instructions: {
+          de: [
+            'Todoist im Browser öffnen → Einstellungen → Integrationen',
+            'Reiter "Entwickler" wählen (Link unten führt direkt dorthin)',
+            'Unter "API-Token" auf "API-Token kopieren" klicken',
+            'Der Token hat vollen Zugriff auf dein Konto — wie ein Passwort behandeln; "Neu generieren" macht den alten ungültig',
+          ],
+          en: [
+            'Open Todoist in the browser → Settings → Integrations',
+            'Choose the "Developer" tab (the link below goes straight there)',
+            'Under "API token" click "Copy API token"',
+            'The token has full access to your account — treat it like a password; "Regenerate" invalidates the old one',
+          ],
+        },
+        link: {
+          url: 'https://app.todoist.com/app/settings/integrations/developer',
+          label: { de: 'Todoist-Einstellungen → Integrationen → Entwickler', en: 'Todoist settings → Integrations → Developer' },
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Erstes Feld: eine Bezeichnung zur Anzeige (optional)',
+            'Zweites Feld: den API-Token einfügen',
+            '"Zugangsdaten speichern" klicken — der Status wird grün, sobald Todoist den Token annimmt',
+            'Für den Aufgaben-Export aus einem TODO wählst du anschließend das Todoist-Projekt als Ziel',
+          ],
+          en: [
+            'First field: a label for display (optional)',
+            'Second field: paste the API token',
+            'Click "Save credentials" — the status turns green once Todoist accepts the token',
+            'When exporting a TODO as a task you then pick the Todoist project as the target',
+          ],
+        },
+      },
+    ],
+  },
 };

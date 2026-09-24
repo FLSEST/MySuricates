@@ -126,6 +126,14 @@ project path `group/project` or numeric ID; tags become labels), Jira (issue of 
 target = project key, labels without spaces; browse URL from the accessible resources) and Trello (card,
 target = list ID, `listTargets` returns "board / list"; tags are not transferred as labels because Trello
 expects label IDs). Discovery via `instanceof`, contract test `TaskExportContractTest`.
+| Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
+
+
+**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Jira (issue of type
+Task, target = project key, labels without spaces; browse URL from the accessible resources), Trello (card, target =
+list ID, `listTargets` returns "Board / List"; tags are not sent as labels because Trello expects label IDs) and
+Todoist (task, target = project ID, `listTargets` returns the projects; tags become label names, link
+`app.todoist.com/app/task/<id>`). Detected via `instanceof`, contract test `TaskExportContractTest`.
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 
@@ -244,6 +252,13 @@ Notes:
   gives `results: []`). Parameters are checked before any request, variable names only
   `[a-z0-9_]`. Responses pass through unchanged; API errors carry the response's `reason`.
   Internally: `OpenMeteoParams`, `OpenMeteoHttpClient` (base URLs via constructor for tests).
+- **Todoist (API token)** uses the unified **Todoist API v1** (`https://api.todoist.com/api/v1`); the former
+  REST API v2 has been shut down. The personal token (Settings → Integrations → Developer) is validated via
+  `GET /user` when saved; only name and e-mail are kept from the answer (it also contains the token). Lists are
+  paginated (`results` + `next_cursor`, `limit` 1–200), `list_tasks` takes either `project_id` (`GET /tasks`) or a
+  Todoist filter (`GET /tasks/filter?query=…`). Since v1 errors are JSON (`error`, `error_tag`,
+  `error_extra.retry_after`); only `error` and `error_tag` reach the message. Todoist tokens have no scopes
+  (`scopes = null`). Split into `TodoistHttpClient`, `TodoistParams`, `TodoistActionCatalog`.
 
 ---
 

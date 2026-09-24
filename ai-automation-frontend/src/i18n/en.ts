@@ -1340,6 +1340,19 @@ export const en = {
           geocode: 'Search places by name (coordinates, country, time zone)',
         },
       },
+      todoist: {
+        displayName: 'Todoist',
+        description: 'List, create, update, complete and comment on Todoist tasks',
+        actions: {
+          list_projects: 'List projects',
+          list_tasks: 'List open tasks (by project or Todoist filter)',
+          get_task: 'Fetch a single task',
+          create_task: 'Create a new task',
+          update_task: 'Update a task',
+          close_task: 'Complete a task',
+          add_comment: 'Add a comment to a task',
+        },
+      },
     },
   },
   calendar: {

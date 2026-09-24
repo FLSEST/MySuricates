@@ -1342,6 +1342,19 @@ export const de: TranslationKeys = {
           geocode: 'Orte nach Namen suchen (Koordinaten, Land, Zeitzone)',
         },
       },
+      todoist: {
+        displayName: 'Todoist',
+        description: 'Todoist-Aufgaben auflisten, anlegen, ändern, abhaken und kommentieren',
+        actions: {
+          list_projects: 'Projekte auflisten',
+          list_tasks: 'Offene Aufgaben auflisten (nach Projekt oder Todoist-Filter)',
+          get_task: 'Eine einzelne Aufgabe abrufen',
+          create_task: 'Eine neue Aufgabe anlegen',
+          update_task: 'Eine Aufgabe ändern',
+          close_task: 'Eine Aufgabe abhaken',
+          add_comment: 'Einen Kommentar zu einer Aufgabe hinzufügen',
+        },
+      },
     },
   },
   calendar: {

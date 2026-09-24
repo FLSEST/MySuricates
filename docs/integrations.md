@@ -116,6 +116,7 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | ntfy | `ntfy` | Server-URL + optionaler Access-Token (kein OAuth-Flow, beides optional) | `providers/ntfy/` | `publish` | geprüft |
 | RSS/Atom | `feed` | keine (öffentliche Feeds) | `providers/feed/` | `fetch_feed` | geprüft |
 | Open-Meteo | `open-meteo` | keine (freie API ohne Key) | `providers/openmeteo/` | `forecast`, `geocode` | geprüft |
+| Todoist | `todoist` | API-Token (kein OAuth-Flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | nur simuliert |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
@@ -124,7 +125,8 @@ Target `owner/repo`; Tags werden als Labels übernommen, soweit es sie im Reposi
 Target = Projektpfad `gruppe/projekt` oder numerische ID; Tags werden Labels), Jira (Issue vom
 Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den accessible-resources) und Trello
 (Karte, Target = Listen-ID, `listTargets` liefert „Board / Liste"; Tags werden nicht als Labels übertragen, weil
-Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
+Trello Label-IDs erwartet) und Todoist (Aufgabe, Target = Projekt-ID, `listTargets` liefert die Projekte; Tags werden
+Label-Namen, Link `app.todoist.com/app/task/<id>`). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
 
 > **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist; sonst bleibt die Verbindung „Setup required". Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
 
@@ -245,6 +247,14 @@ Hinweise:
   Treffer `results: []`). Parameter werden vor jedem Request geprüft, Variablennamen nur
   `[a-z0-9_]`. Antworten gehen unverändert durch; API-Fehler liefern den `reason` der Antwort.
   Intern: `OpenMeteoParams`, `OpenMeteoHttpClient` (Basis-URLs per Konstruktor für Tests).
+- **Todoist (API-Token)** nutzt die vereinheitlichte **Todoist API v1** (`https://api.todoist.com/api/v1`);
+  die frühere REST API v2 ist abgeschaltet. Der persönliche Token (Einstellungen → Integrationen → Entwickler)
+  wird beim Speichern per `GET /user` geprüft; aus der Antwort bleiben nur Name und E-Mail (sie enthält auch den
+  Token). Listen sind seitenweise (`results` + `next_cursor`, `limit` 1–200), `list_tasks` nimmt entweder
+  `project_id` (`GET /tasks`) oder einen Todoist-Filter (`GET /tasks/filter?query=…`). Fehler kommen seit v1 als
+  JSON (`error`, `error_tag`, `error_extra.retry_after`); in die Meldung gehen nur `error` und `error_tag`.
+  Todoist-Tokens haben keine Scopes (`scopes = null`). Aufgeteilt in `TodoistHttpClient`, `TodoistParams`,
+  `TodoistActionCatalog`.
 
 ---
 
