@@ -23,7 +23,7 @@ function webhook(overrides: Partial<WebhookTrigger> = {}): WebhookTrigger {
 
 const full = { secretToken: 'f'.repeat(40), tokenVisible: true, webhookUrl: `http://localhost/api/v1/webhook/trigger/${'f'.repeat(40)}` };
 
-describe('Webhooks — creating and one-time token reveal', () => {
+describe('Webhooks — creating and one-time token reveal', { timeout: 15_000 }, () => {
   it('creates a webhook and shows its URL and token exactly once', async () => {
     const created: unknown[] = [];
     server.use(

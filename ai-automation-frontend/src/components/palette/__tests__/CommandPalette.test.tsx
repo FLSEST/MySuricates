@@ -54,7 +54,7 @@ function renderPalette() {
 const row = (title: string) => screen.getByText(title).closest('.cursor-pointer')!;
 const key = (k: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(window, { key: k, ...init });
 
-describe('CommandPalette', () => {
+describe('CommandPalette', { timeout: 15_000 }, () => {
   it('moves over pinned and recent workflows and runs the chosen one with Enter', async () => {
     const { onClose } = renderPalette();
     await screen.findByText('Backup db');

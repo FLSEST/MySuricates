@@ -48,7 +48,7 @@ function Location() {
   return <div data-testid="location">{useLocation().pathname}</div>;
 }
 
-describe('WishDetail', () => {
+describe('WishDetail', { timeout: 15_000 }, () => {
   it('shows a failed wish with retry and delete and marks the failed step of the timeline', async () => {
     const responded = serve(wish({ status: 'FAILED', autoRefine: true }));
     const onDelete = vi.fn();

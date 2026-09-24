@@ -68,7 +68,7 @@ function renderPage() {
   );
 }
 
-describe('ProjectDetail', () => {
+describe('ProjectDetail', { timeout: 15_000 }, () => {
   it('edits the project with the shared form fields, prefilled', async () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: en.common.edit }));

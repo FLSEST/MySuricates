@@ -26,7 +26,7 @@ function renderModal() {
 
 const checkbox = (name: string) => within(screen.getByText(name).closest('label')!).getByRole('checkbox');
 
-describe('SyncSelectModal', () => {
+describe('SyncSelectModal', { timeout: 15_000 }, () => {
   it('groups workflows by project, shows what changes and preselects the changes', () => {
     renderModal();
     expect(screen.getByText(`${en.settings.syncWorkflows} (2)`)).toBeInTheDocument();

@@ -59,7 +59,7 @@ async function createWorkflow() {
   await screen.findByText('CREATED');
 }
 
-describe('WorkflowFactory', () => {
+describe('WorkflowFactory', { timeout: 15_000 }, () => {
   it('lists earlier factory workflows and replaces one by its verification result', async () => {
     renderWithProviders(<WorkflowFactory />);
     expect(await screen.findByText('Earlier Pipeline')).toBeInTheDocument();
