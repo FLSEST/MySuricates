@@ -43,15 +43,6 @@
       "name": "report"
     },
     {
-      "type": "simple",
-      "config": {
-        "label": "Ergebnis erklären",
-        "timeout_seconds": 120,
-        "command": "Fasse in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Coverage-Ratio und Trend\n- Ob der letzte Rat befolgt wurde\n- Der naechste empfohlene Schritt\n- Prognose fuer Milestone\n\nNur Fliesstext: keine gate_-Zeilen, keinen Envelope und keine Tabelle wiedergeben.",
-        "model": "haiku"
-      }
-    },
-    {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",

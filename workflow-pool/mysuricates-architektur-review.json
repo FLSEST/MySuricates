@@ -64,15 +64,6 @@
       "name": "report"
     },
     {
-      "type": "simple",
-      "config": {
-        "label": "Ergebnis erklären",
-        "timeout_seconds": 120,
-        "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Architektur-Score und Trend\n- Anzahl NEUE vs BEKANNTE Findings\n- Wichtigstes neues Finding\n- Modus (Voll/Delta)\n\nNur Fliesstext: keine gate_-Zeilen, keinen Envelope und keine Tabelle wiedergeben.",
-        "model": "haiku"
-      }
-    },
-    {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
