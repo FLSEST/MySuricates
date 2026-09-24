@@ -9,6 +9,7 @@ import { ScheduleFormModal } from '../components/schedule/ScheduleFormModal';
 import { ScheduleRunsPanel } from '../components/schedule/ScheduleRunsPanel';
 import { useScheduleColumns } from '../components/schedule/scheduleColumns';
 import { CatchUpQueueBanner } from '../components/schedule/CatchUpQueueBanner';
+import { SkipUntilBanner } from '../components/schedule/SkipUntilBanner';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode, useCatchUpQueue } from '../hooks/useSchedules';
 import { useScheduleFilters } from '../hooks/useScheduleFilters';
 import { useScheduleForm } from '../hooks/useScheduleForm';
@@ -120,6 +121,9 @@ export function Schedules() {
           <span className="text-sm font-medium">{t.schedules.maintenanceModeActive}</span>
         </div>
       )}
+
+      {/* Skip-until pause from the configuration: due schedules are skipped until its end */}
+      <SkipUntilBanner pausedUntil={maintenanceData?.pausedUntil} />
 
       {/* Sequential catch-up after resume / cold start */}
       <CatchUpQueueBanner queue={catchUpQueue} />

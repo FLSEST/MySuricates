@@ -1067,22 +1067,31 @@ Alle Schedules auflisten.
     "runCount": 0,
     "conflictBehavior": "SKIP",
     "catchUpOnResume": false,
+    "pausedUntil": null,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
 ```
 
+`nextRunAt` ist der nächste Lauf, den der Scheduler tatsächlich startet. Liegt der gespeicherte Termin
+in einer aktiven `skip-until`-Pause (`automation.scheduler.skip-until`), steht hier der erste Termin nach
+der Pause — bei einem einmaligen Zeitplan `null`, er verfällt — und `pausedUntil` nennt das Pausenende;
+sonst ist `pausedUntil` `null`. Der Tick spult den Termin erst weiter, wenn er fällig wird; ohne diese
+Umrechnung zeigten Liste, Kalender und Workflow-Seite bis dahin einen Lauf, der nie stattfindet (seit
+2026-09-24, TODO a776fd2a). Dasselbe gilt für alle Routen, die `ScheduledWorkflowResponse` liefern.
+
 ### `GET /api/v1/schedules/remaining-today`
 
 Verbleibende geplante Ausführungen für heute.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`). Termine in einer aktiven
+`skip-until`-Pause fehlen — der Tick überspringt sie —, `pausedUntil` nennt dann das Pausenende, sonst `null`.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
 Verbleibende geplante Ausführungen für diese Woche.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (wie `remaining-today`, einschließlich `pausedUntil`)
 
 ### `GET /api/v1/schedules/{id}`
 
@@ -1130,8 +1139,8 @@ Kalender-Daten: geplante Ausführungen und vergangene Runs in einem Zeitraum.
 | `from` | Instant | Ja |
 | `to` | Instant | Ja |
 
-**Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne mit
-nächstem Termin im Zeitraum) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
+**Response:** `CalendarDataResponse` mit `upcoming` (`ScheduledWorkflowResponse[]`, Zeitpläne, deren
+nächster tatsächlicher Lauf im Zeitraum liegt — während einer `skip-until`-Pause also nach der Pause) und `pastRuns` (`WorkflowRunListItemResponse[]` — **ohne Steps**, dieselben
 Listenzeilen wie `GET /api/v1/executions`; bis 2026-09-23 mit allen Schritten jedes Runs im Zeitraum)
 
 ### `POST /api/v1/schedules/preview`
@@ -1146,7 +1155,8 @@ Vorschau der nächsten 5 Ausführungszeitpunkte für einen Cron-Ausdruck.
 }
 ```
 
-**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }`
+**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }` — während einer aktiven `skip-until`-Pause
+beginnen die Termine nach der Pause, und die Antwort trägt zusätzlich `"pausedUntil"`.
 
 ### `POST /api/v1/schedules`
 
@@ -1238,9 +1248,10 @@ Sequenzielle Catch-up-Warteschlange abfragen: der gerade laufende nachgeholte Te
 
 ### `GET /api/v1/schedules/maintenance`
 
-Wartungsmodus-Status abfragen.
+Wartungsmodus-Status abfragen, zusammen mit einer aktiven `skip-until`-Pause aus der Konfiguration.
 
-**Response:** `{ "enabled": false }`
+**Response:** `{ "enabled": false, "pausedUntil": null }` — `pausedUntil` ist das Ende der Pause, solange
+sie noch vor uns liegt, sonst `null`.
 
 ### `POST /api/v1/schedules/maintenance`
 
@@ -1256,7 +1267,7 @@ gleichzeitig, ohne Catch-up-Warteschlange.
 }
 ```
 
-**Response:** `{ "enabled": true }`
+**Response:** `{ "enabled": true, "pausedUntil": null }`
 
 ---
 

@@ -1,5 +1,6 @@
 package com.automation.service.scheduler;
 
+import com.automation.config.SchedulerConfig;
 import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.entity.Project;
 import com.automation.entity.ScheduledWorkflow;
@@ -8,6 +9,7 @@ import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowChain;
 import com.automation.repository.ScheduledWorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -36,16 +39,23 @@ class UpcomingRunsCalculatorTest {
     @Mock
     private ScheduledWorkflowRepository scheduledRepository;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
     private final Clock clock = Clock.fixed(FIXED_NOW, ZoneId.of("UTC"));
+
+    /** Real config: skip-until is empty unless a test sets a pause. */
+    private final SchedulerConfig schedulerConfig = new SchedulerConfig();
 
     private UpcomingRunsCalculator calculator;
     private Workflow testWorkflow;
 
     @BeforeEach
     void setUp() {
-        calculator = new UpcomingRunsCalculator(scheduledRepository, clock);
+        calculator = new UpcomingRunsCalculator(scheduledRepository, clock,
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService));
         testWorkflow = Workflow.builder()
                 .id("wf-1")
                 .name("Test Workflow")
@@ -384,5 +394,123 @@ class UpcomingRunsCalculatorTest {
 
         assertThat(runs).containsExactly(
                 LocalDateTime.of(2026, 4, 26, 13, 0).atZone(ZoneId.systemDefault()).toInstant());
+    }
+
+    // --- skip-until pause (TODO a776fd2a): runs inside it are skipped, not upcoming ---
+
+    @Test
+    void remainingThisWeek_duringPause_startsAtItsEnd_andSaysUntilWhen() {
+        Instant pauseEnd = FIXED_NOW.plus(3, ChronoUnit.HOURS);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder().id("s").workflow(testWorkflow)
+                .cronExpression("0 * * * * *").scheduleType(ScheduleType.CRON).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(everyMinute));
+
+        UpcomingScheduleResponse result = calculator.getRemainingThisWeek();
+
+        assertThat(result.pausedUntil()).isEqualTo(pauseEnd);
+        assertThat(result.schedules()).isNotEmpty()
+                .allMatch(run -> !run.scheduledAt().isBefore(pauseEnd));
+        // An occurrence exactly at the end of the pause runs — the tick lets it through.
+        assertThat(result.schedules().get(0).scheduledAt()).isEqualTo(pauseEnd);
+    }
+
+    @Test
+    void remainingToday_pauseBeyondToday_leavesNoRunToday() {
+        Instant pauseEnd = FIXED_NOW.plus(3, ChronoUnit.DAYS);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder().id("s").workflow(testWorkflow)
+                .cronExpression("0 * * * * *").scheduleType(ScheduleType.CRON).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(everyMinute, once(FIXED_NOW.plus(1, ChronoUnit.HOURS))));
+
+        UpcomingScheduleResponse result = calculator.getRemainingToday();
+
+        assertThat(result.count()).isZero();
+        assertThat(result.pausedUntil()).isEqualTo(pauseEnd);
+    }
+
+    @Test
+    void remainingToday_oneOffInsideThePauseIsDropped_oneOffAfterItStays() {
+        schedulerConfig.setSkipUntil(FIXED_NOW.plus(2, ChronoUnit.HOURS).toString());
+        ScheduledWorkflow inside = once(FIXED_NOW.plus(1, ChronoUnit.HOURS));
+        ScheduledWorkflow after = ScheduledWorkflow.builder().id("once-after").workflow(testWorkflow).cronExpression("")
+                .scheduleType(ScheduleType.ONCE).scheduledAt(FIXED_NOW.plus(3, ChronoUnit.HOURS)).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(inside, after));
+
+        UpcomingScheduleResponse result = calculator.getRemainingToday();
+
+        assertThat(result.schedules()).extracting(UpcomingScheduleResponse.UpcomingRun::scheduleId)
+                .containsExactly("once-after");
+    }
+
+    @Test
+    void pauseInThePast_orUnparseable_changesNothing_andLogsNothing() {
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(once(FIXED_NOW.plus(1, ChronoUnit.HOURS))));
+
+        schedulerConfig.setSkipUntil(FIXED_NOW.minus(1, ChronoUnit.HOURS).toString());
+        UpcomingScheduleResponse past = calculator.getRemainingToday();
+        schedulerConfig.setSkipUntil("next tuesday");
+        UpcomingScheduleResponse garbage = calculator.getRemainingToday();
+
+        assertThat(past.count()).isEqualTo(1);
+        assertThat(past.pausedUntil()).isNull();
+        assertThat(garbage.count()).isEqualTo(1);
+        assertThat(garbage.pausedUntil()).isNull();
+        assertThat(calculator.pausedUntil()).isEmpty();
+        // A read path writes no activity-log rows; warning about the bad value is the tick's job.
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void getNextRuns_duringPause_startAfterIt() {
+        Instant pauseEnd = FIXED_NOW.plus(5, ChronoUnit.HOURS).plus(30, ChronoUnit.MINUTES);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+
+        List<Instant> runs = calculator.getNextRuns("0 0 * * * *", 3);
+
+        assertThat(runs).hasSize(3).allMatch(run -> !run.isBefore(pauseEnd));
+        assertThat(runs.get(0)).isBefore(pauseEnd.plus(1, ChronoUnit.HOURS));
+    }
+
+    @Test
+    void findWithNextRunBetween_withoutPause_isTheStoredRange() {
+        // Moved from SchedulerServiceTest.findSchedulesInRange_delegatesToRepository.
+        Instant from = FIXED_NOW;
+        Instant to = FIXED_NOW.plus(1, ChronoUnit.DAYS);
+        ScheduledWorkflow stored = ScheduledWorkflow.builder().id("s").workflow(testWorkflow)
+                .cronExpression("0 0 * * * *").scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(FIXED_NOW.plus(1, ChronoUnit.HOURS)).build();
+        when(scheduledRepository.findSchedulesInRange(from, to)).thenReturn(List.of(stored));
+
+        assertThat(calculator.findWithNextRunBetween(from, to)).containsExactly(stored);
+    }
+
+    @Test
+    void findWithNextRunBetween_duringPause_placesSchedulesAtTheRunThatReallyComes() {
+        Instant pauseEnd = FIXED_NOW.plus(2, ChronoUnit.DAYS);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+        ScheduledWorkflow heldCron = ScheduledWorkflow.builder().id("held-cron").workflow(testWorkflow)
+                .cronExpression("0 0 * * * *").scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(FIXED_NOW.plus(1, ChronoUnit.HOURS)).build();
+        ScheduledWorkflow heldOnce = ScheduledWorkflow.builder().id("held-once").workflow(testWorkflow)
+                .cronExpression("").scheduleType(ScheduleType.ONCE).enabled(true)
+                .scheduledAt(FIXED_NOW.plus(1, ChronoUnit.HOURS)).nextRunAt(FIXED_NOW.plus(1, ChronoUnit.HOURS)).build();
+        ScheduledWorkflow later = ScheduledWorkflow.builder().id("later").workflow(testWorkflow)
+                .cronExpression("0 0 * * * *").scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(FIXED_NOW.plus(3, ChronoUnit.DAYS)).build();
+        // The repository answers by the stored next run: everything stored up to "to".
+        when(scheduledRepository.findSchedulesInRange(Instant.EPOCH, FIXED_NOW.plus(1, ChronoUnit.DAYS)))
+                .thenReturn(List.of(heldCron, heldOnce));
+        when(scheduledRepository.findSchedulesInRange(Instant.EPOCH, FIXED_NOW.plus(4, ChronoUnit.DAYS)))
+                .thenReturn(List.of(heldCron, heldOnce, later));
+
+        // The next day: the held runs never happen there, the one-off expires.
+        assertThat(calculator.findWithNextRunBetween(FIXED_NOW, FIXED_NOW.plus(1, ChronoUnit.DAYS))).isEmpty();
+        // The days after the pause: the held CRON schedule shows up there, next to the later one.
+        assertThat(calculator.findWithNextRunBetween(FIXED_NOW.plus(1, ChronoUnit.DAYS), FIXED_NOW.plus(4, ChronoUnit.DAYS)))
+                .containsExactly(heldCron, later);
+        assertThat(calculator.nextRun(heldCron)).isAfterOrEqualTo(pauseEnd).isBefore(pauseEnd.plus(1, ChronoUnit.HOURS));
+        assertThat(calculator.nextRun(heldOnce)).isNull();
+        assertThat(calculator.nextRun(later)).isEqualTo(FIXED_NOW.plus(3, ChronoUnit.DAYS));
     }
 }

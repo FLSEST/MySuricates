@@ -5,6 +5,7 @@ import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.CalendarDataResponse;
 import com.automation.dto.response.ChainRunResponse;
 import com.automation.dto.response.ScheduledWorkflowResponse;
+import com.automation.dto.response.SchedulerPauseResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.mapper.ChainMapper;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -82,12 +84,13 @@ public class ScheduleController {
         return scheduleMapper.toResponseList(schedulerService.findByChainId(chainId));
     }
 
+    /** Upcoming = schedules whose next real run lies in the period (behind a skip-until pause). */
     @GetMapping("/calendar")
     @Transactional(readOnly = true)
     public CalendarDataResponse getCalendarData(
             @RequestParam Instant from,
             @RequestParam Instant to) {
-        var upcoming = scheduleMapper.toResponseList(schedulerService.findSchedulesInRange(from, to));
+        var upcoming = scheduleMapper.toResponseList(upcomingRunsCalculator.findWithNextRunBetween(from, to));
         var pastRuns = workflowMapper.toRunListItemsWithOwners(schedulerService.findWorkflowRunsBetween(from, to));
         return new CalendarDataResponse(upcoming, pastRuns);
     }
@@ -100,7 +103,11 @@ public class ScheduleController {
         }
         try {
             List<Instant> runs = upcomingRunsCalculator.getNextRuns(cronExpression, 5);
-            return ResponseEntity.ok(Map.of("runs", runs));
+            Map<String, Object> preview = new LinkedHashMap<>();
+            preview.put("runs", runs);
+            // The runs start after an active skip-until pause; say so, or the list looks wrong.
+            upcomingRunsCalculator.pausedUntil().ifPresent(until -> preview.put("pausedUntil", until));
+            return ResponseEntity.ok(preview);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -148,15 +155,17 @@ public class ScheduleController {
         return catchUpQueue.snapshot();
     }
 
+    /** Both pauses: the maintenance switch and an active skip-until window from the configuration. */
     @GetMapping("/maintenance")
-    public Map<String, Object> getMaintenanceMode() {
-        return Map.of("enabled", maintenanceMode.isEnabled());
+    public SchedulerPauseResponse getMaintenanceMode() {
+        return new SchedulerPauseResponse(maintenanceMode.isEnabled(),
+                upcomingRunsCalculator.pausedUntil().orElse(null));
     }
 
     @PostMapping("/maintenance")
-    public Map<String, Object> setMaintenanceMode(@RequestBody Map<String, Boolean> body) {
+    public SchedulerPauseResponse setMaintenanceMode(@RequestBody Map<String, Boolean> body) {
         boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
         maintenanceMode.setEnabled(enabled);
-        return Map.of("enabled", enabled);
+        return new SchedulerPauseResponse(enabled, upcomingRunsCalculator.pausedUntil().orElse(null));
     }
 }

@@ -1,7 +1,8 @@
 import { CalendarClock } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
-import { useT } from '../../i18n';
+import { useT, useI18nStore } from '../../i18n';
+import { formatDateTime } from '../../utils/formatTime';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
 function formatTime(iso: string): string {
@@ -24,9 +25,13 @@ function formatDate(iso: string): string {
 
 export function UpcomingSchedulesCard() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: today, isLoading: todayLoading } = useRemainingToday();
   const { data: week, isLoading: weekLoading } = useRemainingThisWeek();
   if (todayLoading || weekLoading) return <WidgetSkeleton size="chart" />;
+
+  // Runs inside a skip-until pause are already left out by the backend (a776fd2a); say why.
+  const pausedUntil = today?.pausedUntil ?? week?.pausedUntil ?? null;
 
   // Combine today + rest-of-week, deduplicate by scheduleId, limit to 5
   const allSchedules = [
@@ -39,6 +44,11 @@ export function UpcomingSchedulesCard() {
   return (
     <Card>
       <CardHeader title={t.dashboard.upcomingSchedules} />
+      {pausedUntil && (
+        <p className="mb-2 text-[10px] text-info" data-testid="upcoming-schedules-paused">
+          {t.dashboard.schedulesPausedUntil.replace('{until}', () => formatDateTime(pausedUntil, locale))}
+        </p>
+      )}
       {allSchedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-text-tertiary">
           <CalendarClock className="w-7 h-7 mb-2 opacity-40" />

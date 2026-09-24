@@ -1,9 +1,13 @@
 package com.automation.mapper;
 
+import com.automation.config.SchedulerConfig;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.entity.*;
 import com.automation.repository.ChainRunRepository;
+import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.ScheduleSkipPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,7 +15,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,12 +33,88 @@ class ScheduleMapperTest {
 
     @Mock private WorkflowRunRepository workflowRunRepository;
     @Mock private ChainRunRepository chainRunRepository;
+    @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
+    @Mock private ActivityLogService activityLogService;
+
+    private static final Instant NOW = LocalDateTime.of(2026, 9, 24, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
+
+    /** Real config: without skip-until the mapper passes the stored next run through. */
+    private final SchedulerConfig schedulerConfig = new SchedulerConfig();
 
     private ScheduleMapper mapper;
 
     @BeforeEach
     void setUp() {
-        mapper = new ScheduleMapper(workflowRunRepository, chainRunRepository);
+        mapper = new ScheduleMapper(workflowRunRepository, chainRunRepository,
+                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService),
+                Clock.fixed(NOW, ZoneId.systemDefault()));
+    }
+
+    private static Instant local(int day, int hour) {
+        return LocalDateTime.of(2026, 9, day, hour, 0).atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    /**
+     * Mit aktiver skip-until-Pause zeigt kein Zeitplan einen Termin in der Pause als naechsten Lauf
+     * (TODO a776fd2a): der Tick ueberspringt ihn erst, wenn er faellig wird.
+     */
+    @Nested
+    class SkipUntilPause {
+
+        private ScheduledWorkflow daily(String id, Instant storedNextRun) {
+            return ScheduledWorkflow.builder().id(id).workflow(Workflow.builder().id("wf-" + id).name("Daily").build())
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW).cronExpression("0 0 8 * * *")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON).enabled(true).nextRunAt(storedNextRun).build();
+        }
+
+        @Test
+        void storedRunInsideThePause_showsTheFirstRunAfterIt_andTheEnd() {
+            schedulerConfig.setSkipUntil(local(26, 12).toString());
+
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(daily("s-1", local(25, 8)))).get(0);
+
+            assertThat(response.nextRunAt()).isEqualTo(local(27, 8));
+            assertThat(response.pausedUntil()).isEqualTo(local(26, 12));
+        }
+
+        @Test
+        void storedRunAfterThePause_staysAsItIs() {
+            schedulerConfig.setSkipUntil(local(26, 12).toString());
+
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(daily("s-2", local(27, 8)))).get(0);
+
+            assertThat(response.nextRunAt()).isEqualTo(local(27, 8));
+            assertThat(response.pausedUntil()).isNull();
+        }
+
+        @Test
+        void oneOffInsideThePause_hasNoNextRun() {
+            schedulerConfig.setSkipUntil(local(26, 12).toString());
+            ScheduledWorkflow once = ScheduledWorkflow.builder().id("s-3")
+                    .workflow(Workflow.builder().id("wf-3").name("Once").build())
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW).cronExpression("")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.ONCE).scheduledAt(local(25, 9))
+                    .nextRunAt(local(25, 9)).enabled(true).build();
+
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(once)).get(0);
+
+            assertThat(response.nextRunAt()).isNull();
+            assertThat(response.pausedUntil()).isEqualTo(local(26, 12));
+            assertThat(response.scheduledAt()).isEqualTo(local(25, 9));
+        }
+
+        @Test
+        void pauseThatAlreadyEnded_changesNothing() {
+            schedulerConfig.setSkipUntil(local(20, 12).toString());
+            ScheduledWorkflow stale = daily("s-4", local(24, 8));
+            when(workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-4")).thenReturn(List.of());
+            when(chainRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc("s-4")).thenReturn(List.of());
+
+            ScheduledWorkflowResponse response = mapper.toResponse(stale);
+
+            assertThat(response.nextRunAt()).isEqualTo(local(24, 8));
+            assertThat(response.pausedUntil()).isNull();
+        }
     }
 
     @Nested

@@ -514,6 +514,17 @@ export interface ScheduledWorkflow {
   runCount?: number;
   conflictBehavior?: 'SKIP' | 'OVERLAP';
   catchUpOnResume?: boolean;
+  /**
+   * End of an active skip-until pause that holds the stored next run; `nextRunAt` is then the first
+   * run after the pause (null for a one-off, which expires). Null otherwise (a776fd2a).
+   */
+  pausedUntil?: string | null;
+}
+
+/** GET/POST /schedules/maintenance: the maintenance switch and an active skip-until pause. */
+export interface SchedulerPauseStatus {
+  enabled: boolean;
+  pausedUntil?: string | null;
 }
 
 export interface CreateScheduleRequest {
@@ -569,6 +580,8 @@ export interface CatchUpQueueStatus {
 
 export interface UpcomingScheduleData {
   count: number;
+  /** End of an active skip-until pause; runs inside it are left out (a776fd2a). */
+  pausedUntil?: string | null;
   schedules: Array<{
     scheduleId: string;
     workflowName: string | null;

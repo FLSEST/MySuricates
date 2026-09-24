@@ -9,7 +9,7 @@
  */
 
 import { api } from '../../api/client';
-import type { CalendarDataResponse, UnifiedCalendarEvent } from '../../types';
+import type { CalendarDataResponse, ScheduledWorkflow, UnifiedCalendarEvent } from '../../types';
 import type { CalendarSourceAdapter } from './types';
 
 export const schedulesAdapter: CalendarSourceAdapter = {
@@ -24,12 +24,15 @@ export const schedulesAdapter: CalendarSourceAdapter = {
       `/schedules/calendar?from=${from}&to=${to}`
     );
 
+    // nextRunAt is the run that really comes: behind an active skip-until pause, and null for a
+    // one-off the pause lets expire — then scheduledAt is no fallback (a776fd2a).
+    const dateOf = (s: ScheduledWorkflow) => (s.pausedUntil ? s.nextRunAt : s.nextRunAt || s.scheduledAt);
     return (data.upcoming ?? [])
-      .filter((s) => s.nextRunAt || s.scheduledAt)
+      .filter((s) => dateOf(s))
       .map((s): UnifiedCalendarEvent => ({
         id: `sched-${s.id}`,
         title: s.workflowName ?? s.chainName ?? '',
-        start: new Date(s.nextRunAt || s.scheduledAt!),
+        start: new Date(dateOf(s)!),
         allDay: false,
         source: 'schedules',
         sourceLabel: 'Zeitpläne',

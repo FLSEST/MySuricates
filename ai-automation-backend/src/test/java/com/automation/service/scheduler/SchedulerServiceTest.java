@@ -297,18 +297,8 @@ class SchedulerServiceTest {
         assertThat(result).hasSize(1);
     }
 
-    // --- findSchedulesInRange ---
-
-    @Test
-    void findSchedulesInRange_delegatesToRepository() {
-        Instant from = FIXED_NOW;
-        Instant to = FIXED_NOW.plus(1, ChronoUnit.DAYS);
-        when(scheduledRepository.findSchedulesInRange(from, to)).thenReturn(List.of(testScheduled));
-
-        List<ScheduledWorkflow> result = schedulerService.findSchedulesInRange(from, to);
-
-        assertThat(result).hasSize(1);
-    }
+    // findSchedulesInRange moved to UpcomingRunsCalculator.findWithNextRunBetween (TODO a776fd2a),
+    // its delegation test with it: UpcomingRunsCalculatorTest.findWithNextRunBetween_withoutPause_*.
 
     // --- findWorkflowRunsByScheduleId ---
 

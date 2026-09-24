@@ -214,7 +214,11 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
       {/* Next runs preview */}
       {previewData?.runs && previewData.runs.length > 0 && (
         <div className="p-2.5 rounded-lg bg-surface-secondary border border-border text-xs space-y-1">
-          <span className="text-text-tertiary font-medium">{t.schedules.nextRunsPreview}:</span>
+          <span className="text-text-tertiary font-medium">
+            {previewData.pausedUntil
+              ? t.schedules.nextRunsAfterPause.replace('{until}', () => new Date(previewData.pausedUntil!).toLocaleString())
+              : t.schedules.nextRunsPreview}:
+          </span>
           {previewData.runs.map((run) => (
             <div key={run} className="text-text-secondary pl-2">
               {new Date(run).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

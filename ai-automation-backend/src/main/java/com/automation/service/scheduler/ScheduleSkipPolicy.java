@@ -23,7 +23,8 @@ import java.util.Optional;
 /**
  * Skip policy of the scheduler tick: the configured manual skip-until window (fail-open on a
  * bad value, warned once per distinct value) and advancing a due schedule past a window without
- * firing it — for the skip-until window and for a detected system suspend/resume.
+ * firing it — for the skip-until window and for a detected system suspend/resume. The read views
+ * use the same rules to show the next run the scheduler will actually start (TODO a776fd2a).
  *
  * <p>Extracted from {@code SchedulerService} (Audit-TODO 05dbd0e9). Resume detection and the
  * catch-up decision stay in the service; this class only moves schedules and logs the skip.
@@ -66,6 +67,61 @@ public class ScheduleSkipPolicy {
         }
     }
 
+    /**
+     * End of the skip-until window while it is still ahead of {@code now}, for the read views.
+     * Parsed without side effects: the tick warns about an unparseable value, a GET must not write
+     * activity-log rows from inside a read-only transaction.
+     */
+    public Optional<Instant> activeSkipUntil(Instant now) {
+        String raw = schedulerConfig.getSkipUntil();
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Instant.parse(raw.trim())).filter(now::isBefore);
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Where a schedule lands when it is skipped past {@code until}: a CRON schedule at its first
+     * occurrence at or after {@code until}, a ONCE/DELAYED schedule nowhere ({@code null}) — its
+     * single firing is dropped.
+     */
+    public Instant nextRunAfter(ScheduledWorkflow scheduled, Instant until) {
+        if (scheduled.getScheduleType() != ScheduleType.CRON) {
+            return null;
+        }
+        CronExpression cron = CronExpression.parse(scheduled.getCronExpression());
+        LocalDateTime next = cron.next(LocalDateTime.ofInstant(until, ZoneId.systemDefault()).minusNanos(1));
+        return next != null ? next.atZone(ZoneId.systemDefault()).toInstant() : null;
+    }
+
+    /** True when the stored next run lies inside the window: the tick will skip it, not start it. */
+    public boolean heldBySkipUntil(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
+        return skipUntil.isPresent() && scheduled.getNextRunAt() != null
+                && scheduled.getNextRunAt().isBefore(skipUntil.get());
+    }
+
+    /**
+     * The next run the scheduler will actually start. The tick advances a schedule past the
+     * skip-until window only in the tick in which it becomes due; until then the stored
+     * {@code nextRunAt} may lie inside the window — a run that never happens. For such a schedule
+     * this is {@link #nextRunAfter} (null for a one-off, which expires); otherwise the stored value.
+     * A cron expression that no longer parses keeps the stored value instead of failing the view.
+     */
+    public Instant effectiveNextRun(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
+        if (!heldBySkipUntil(scheduled, skipUntil)) {
+            return scheduled.getNextRunAt();
+        }
+        try {
+            return nextRunAfter(scheduled, skipUntil.get());
+        } catch (IllegalArgumentException e) {
+            return scheduled.getNextRunAt();
+        }
+    }
+
     /** Skip a schedule forward past a manual skip-until maintenance window. */
     public void skipScheduleUntil(ScheduledWorkflow scheduled, Instant until) {
         Map<String, Object> extra = new HashMap<>();
@@ -100,10 +156,7 @@ public class ScheduleSkipPolicy {
         Instant previousNextRunAt = scheduled.getNextRunAt();
 
         if (scheduled.getScheduleType() == ScheduleType.CRON) {
-            CronExpression cron = CronExpression.parse(scheduled.getCronExpression());
-            LocalDateTime cursor = LocalDateTime.ofInstant(until, ZoneId.systemDefault()).minusNanos(1);
-            LocalDateTime next = cron.next(cursor);
-            scheduled.setNextRunAt(next != null ? next.atZone(ZoneId.systemDefault()).toInstant() : null);
+            scheduled.setNextRunAt(nextRunAfter(scheduled, until));
         } else if (scheduled.getScheduleType() == ScheduleType.ONCE
                 || scheduled.getScheduleType() == ScheduleType.DELAYED) {
             // Intentional: a one-off schedule that falls inside the skip window is permanently

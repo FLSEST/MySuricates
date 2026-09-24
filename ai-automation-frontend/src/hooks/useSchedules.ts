@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
-import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse, CatchUpQueueStatus } from '../types';
+import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse, CatchUpQueueStatus, SchedulerPauseStatus } from '../types';
 
 export function useSchedules() {
   return useQuery({
@@ -20,10 +20,11 @@ export function useSchedulesForWorkflow(workflowId: string) {
   });
 }
 
+/** Maintenance switch plus an active skip-until pause from the configuration (`pausedUntil`). */
 export function useMaintenanceMode() {
   return useQuery({
     queryKey: ['schedules', 'maintenance'],
-    queryFn: () => api.get<{ enabled: boolean }>('/schedules/maintenance'),
+    queryFn: () => api.get<SchedulerPauseStatus>('/schedules/maintenance'),
     staleTime: 15_000,
   });
 }
@@ -32,7 +33,7 @@ export function useSetMaintenanceMode() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (enabled: boolean) =>
-      api.post<{ enabled: boolean }>('/schedules/maintenance', { enabled }),
+      api.post<SchedulerPauseStatus>('/schedules/maintenance', { enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules', 'maintenance'] });
     },
@@ -75,7 +76,7 @@ export function useRemainingThisWeek() {
 export function useCronPreview(cronExpression: string) {
   return useQuery({
     queryKey: ['schedules', 'preview', cronExpression],
-    queryFn: () => api.post<{ runs: string[] }>('/schedules/preview', { cronExpression }),
+    queryFn: () => api.post<{ runs: string[]; pausedUntil?: string }>('/schedules/preview', { cronExpression }),
     enabled: !!cronExpression,
     staleTime: 30_000,
   });

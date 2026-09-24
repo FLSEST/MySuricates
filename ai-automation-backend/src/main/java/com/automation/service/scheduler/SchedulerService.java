@@ -73,11 +73,6 @@ public class SchedulerService {
     }
 
     @Transactional(readOnly = true)
-    public List<ScheduledWorkflow> findSchedulesInRange(Instant from, Instant to) {
-        return scheduledRepository.findSchedulesInRange(from, to);
-    }
-
-    @Transactional(readOnly = true)
     public List<WorkflowRun> findWorkflowRunsByScheduleId(String scheduleId) {
         return workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
     }

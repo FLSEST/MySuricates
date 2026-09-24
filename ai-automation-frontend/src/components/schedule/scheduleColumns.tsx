@@ -84,6 +84,12 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
           {(s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED') && !s.enabled
             ? (<span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{t.schedules.completed}</span>)
             : s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : '-'}
+          {/* The stored run lies in a skip-until pause: nextRunAt is already the first one after it */}
+          {s.pausedUntil && (
+            <span className="block text-xs text-info" data-testid="next-run-paused">
+              {t.schedules.pausedUntil.replace('{until}', () => new Date(s.pausedUntil!).toLocaleString())}
+            </span>
+          )}
         </span>
       ),
     },

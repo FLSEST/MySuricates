@@ -412,7 +412,7 @@ All API data is managed via React Query:
 | Hook | Type | Description |
 |---|---|---|
 | `useSchedules()` | Query | All schedules |
-| `useMaintenanceMode()` | Query | Maintenance mode status |
+| `useMaintenanceMode()` | Query | Maintenance mode status and an active `skip-until` pause (`pausedUntil`) |
 | `useSetMaintenanceMode()` | Mutation | Toggle maintenance mode |
 | `useCalendarData(start, end)` | Query | Calendar data for time period |
 | `useRemainingToday()` | Query | Remaining runs today |

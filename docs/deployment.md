@@ -689,7 +689,7 @@ Reaktivieren ohne Code-Änderung: `AUTOMATION_STAGING_AUTO_START=true` bzw. `AUT
 
 Für ein befristetes Ruhigstellen des Schedulers gibt es zwei Wege:
 
-- **`automation.scheduler.skip-until`** (`AUTOMATION_SCHEDULER_SKIP_UNTIL`, ISO-Instant, z. B. `2026-07-30T22:00:00Z`) — für Zeitfenster. Fällige Schedules werden übersprungen **und** ihr `nextRunAt` hinter das Fenster gespult, es gibt also am Ende keinen Nachhol-Stau. Läuft am Stichtag von selbst aus; ein unparsebarer Wert wird ignoriert (fail open). Wird nur beim Backend-Start gelesen.
+- **`automation.scheduler.skip-until`** (`AUTOMATION_SCHEDULER_SKIP_UNTIL`, ISO-Instant, z. B. `2026-07-30T22:00:00Z`) — für Zeitfenster. Fällige Schedules werden übersprungen **und** ihr `nextRunAt` hinter das Fenster gespult, es gibt also am Ende keinen Nachhol-Stau. Läuft am Stichtag von selbst aus; ein unparsebarer Wert wird ignoriert (fail open). Wird nur beim Backend-Start gelesen. Die Oberfläche zeigt die Pause: Banner auf der Schedules-Seite, Hinweis im Dashboard, als „nächster Lauf“ in Liste, Kalender und Dashboard der erste Termin nach der Pause (API: `pausedUntil`, siehe [API-Referenz](api-referenz.md#get-apiv1schedules)).
 - **Wartungsmodus** (`POST /api/v1/schedules/maintenance`, Pause-Button auf der Schedules-Seite) — Laufzeit-Schalter ohne Enddatum, persistiert in `app_settings`. Achtung: `nextRunAt` wird dabei *nicht* vorgespult, beim Abschalten feuern also alle inzwischen fällig gewordenen Schedules gemeinsam.
 
 Für lokale, nicht eingecheckte Overrides eignet sich `ai-automation-backend/config/application.yml` — Spring Boot lädt dieses Verzeichnis zusätzlich zur Classpath-Config und mit höherer Priorität (das Verzeichnis ist in `.gitignore`).

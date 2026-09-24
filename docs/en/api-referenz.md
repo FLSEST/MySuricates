@@ -1062,22 +1062,31 @@ List all schedules.
     "runCount": 0,
     "conflictBehavior": "SKIP",
     "catchUpOnResume": false,
+    "pausedUntil": null,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
 ```
 
+`nextRunAt` is the next run the scheduler will actually start. If the stored time lies in an active
+`skip-until` pause (`automation.scheduler.skip-until`), this is the first occurrence after the pause —
+`null` for a one-off schedule, which expires — and `pausedUntil` names the end of the pause; otherwise
+`pausedUntil` is `null`. The tick only advances the stored time once it becomes due; without this, list,
+calendar and workflow page showed a run that never happens until then (since 2026-09-24, TODO a776fd2a).
+The same applies to every route that returns `ScheduledWorkflowResponse`.
+
 ### `GET /api/v1/schedules/remaining-today`
 
 Remaining scheduled executions for today.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`). Occurrences inside an active
+`skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the pause, else `null`.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
 Remaining scheduled executions for this week.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil`)
 
 ### `GET /api/v1/schedules/{id}`
 
@@ -1126,7 +1135,7 @@ Calendar data: scheduled executions and past runs within a time range.
 | `to` | Instant | Yes |
 
 **Response:** `CalendarDataResponse` with `upcoming` (`ScheduledWorkflowResponse[]`, schedules whose next
-date lies in the range) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
+actual run lies in the range — during a `skip-until` pause, that is after the pause) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
 rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range)
 
 ### `POST /api/v1/schedules/preview`
@@ -1141,7 +1150,8 @@ Preview the next 5 execution times for a cron expression.
 }
 ```
 
-**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }`
+**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }` — during an active `skip-until` pause the times
+start after the pause, and the response additionally carries `"pausedUntil"`.
 
 ### `POST /api/v1/schedules`
 
@@ -1233,9 +1243,10 @@ Query the sequential catch-up queue: the missed occurrence currently being caugh
 
 ### `GET /api/v1/schedules/maintenance`
 
-Query maintenance mode status.
+Query maintenance mode status, together with an active `skip-until` pause from the configuration.
 
-**Response:** `{ "enabled": false }`
+**Response:** `{ "enabled": false, "pausedUntil": null }` — `pausedUntil` is the end of the pause while it is
+still ahead, else `null`.
 
 ### `POST /api/v1/schedules/maintenance`
 
@@ -1251,7 +1262,7 @@ the same time, without the catch-up queue.
 }
 ```
 
-**Response:** `{ "enabled": true }`
+**Response:** `{ "enabled": true, "pausedUntil": null }`
 
 ---
 

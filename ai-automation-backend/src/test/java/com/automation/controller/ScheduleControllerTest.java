@@ -108,7 +108,7 @@ class ScheduleControllerTest {
                 true, "Hourly run", Map.of(), null,
                 Instant.parse("2026-02-16T00:00:00Z"), testScheduled.getCreatedAt(),
                 null, null, 0, 0, "SKIP"
-        , false);
+        , false, null);
     }
 
     @Test
@@ -207,7 +207,7 @@ class ScheduleControllerTest {
                 true, null, Map.of(), null,
                 Instant.parse("2026-03-01T10:00:00Z"), null,
                 null, null, 0, 0, "SKIP"
-        , false);
+        , false, null);
 
         when(schedulerService.create(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(onceScheduled);
         when(scheduleMapper.toResponse(onceScheduled)).thenReturn(onceResponse);
@@ -249,7 +249,7 @@ class ScheduleControllerTest {
                 "0 0 * * * *", "CRON", null, null,
                 false, "Hourly run", Map.of(), null, null, testScheduled.getCreatedAt(),
                 null, null, 0, 0, "SKIP"
-        , false);
+        , false, null);
         when(scheduleMapper.toResponse(testScheduled)).thenReturn(disabledResponse);
 
         mockMvc.perform(post("/api/v1/schedules/sched-1/disable"))
@@ -272,7 +272,7 @@ class ScheduleControllerTest {
         var run = new UpcomingScheduleResponse.UpcomingRun(
                 "sched-1", "Test Workflow", null, null, null, "WORKFLOW",
                 Instant.parse("2026-02-16T10:00:00Z"));
-        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run)));
+        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run), null));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-today"))
                 .andExpect(status().isOk())
@@ -283,7 +283,7 @@ class ScheduleControllerTest {
 
     @Test
     void getRemainingThisWeek_returnsCountAndSchedules() throws Exception {
-        when(upcomingRunsCalculator.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of()));
+        when(upcomingRunsCalculator.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of(), null));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-this-week"))
                 .andExpect(status().isOk())
@@ -402,7 +402,7 @@ class ScheduleControllerTest {
     /** Die vergangenen Runs des Kalenders sind Listenzeilen ohne Schritte (TODO 168e3d7f). */
     @Test
     void getCalendarData_returnsUpcomingAndPastRuns() throws Exception {
-        when(schedulerService.findSchedulesInRange(any(), any())).thenReturn(List.of(testScheduled));
+        when(upcomingRunsCalculator.findWithNextRunBetween(any(), any())).thenReturn(List.of(testScheduled));
         when(schedulerService.findWorkflowRunsBetween(any(), any())).thenReturn(List.of());
         when(scheduleMapper.toResponseList(any())).thenReturn(List.of(testResponse));
         when(workflowMapper.toRunListItemsWithOwners(any())).thenReturn(List.of(listItem("run-1")));
@@ -437,6 +437,57 @@ class ScheduleControllerTest {
                 .andExpect(jsonPath("$.enabled").value(true));
 
         verify(maintenanceMode).setEnabled(true);
+    }
+
+    // --- skip-until pause visible to the views (TODO a776fd2a) ---
+
+    @Test
+    void getMaintenanceMode_withoutSkipUntilPause_pausedUntilIsNull() throws Exception {
+        when(maintenanceMode.isEnabled()).thenReturn(false);
+        when(upcomingRunsCalculator.pausedUntil()).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/v1/schedules/maintenance"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.pausedUntil").isEmpty());
+    }
+
+    @Test
+    void getMaintenanceMode_reportsAnActiveSkipUntilPause() throws Exception {
+        when(maintenanceMode.isEnabled()).thenReturn(false);
+        when(upcomingRunsCalculator.pausedUntil())
+                .thenReturn(java.util.Optional.of(Instant.parse("2026-10-01T22:00:00Z")));
+
+        mockMvc.perform(get("/api/v1/schedules/maintenance"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(false))
+                .andExpect(jsonPath("$.pausedUntil").value("2026-10-01T22:00:00Z"));
+    }
+
+    @Test
+    void previewCron_duringSkipUntilPause_saysUntilWhen() throws Exception {
+        when(upcomingRunsCalculator.getNextRuns("0 0 * * * *", 5))
+                .thenReturn(List.of(Instant.parse("2026-10-01T22:00:00Z")));
+        when(upcomingRunsCalculator.pausedUntil())
+                .thenReturn(java.util.Optional.of(Instant.parse("2026-10-01T22:00:00Z")));
+
+        mockMvc.perform(post("/api/v1/schedules/preview")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cronExpression\": \"0 0 * * * *\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runs[0]").value("2026-10-01T22:00:00Z"))
+                .andExpect(jsonPath("$.pausedUntil").value("2026-10-01T22:00:00Z"));
+    }
+
+    @Test
+    void getRemainingToday_carriesPausedUntil() throws Exception {
+        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(
+                new UpcomingScheduleResponse(0, List.of(), Instant.parse("2026-10-01T22:00:00Z")));
+
+        mockMvc.perform(get("/api/v1/schedules/remaining-today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(0))
+                .andExpect(jsonPath("$.pausedUntil").value("2026-10-01T22:00:00Z"));
     }
 
     @Test
