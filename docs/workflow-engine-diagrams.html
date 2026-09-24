@@ -150,12 +150,12 @@
 </header>
 
 <nav>
-  <a href="#systemuebersicht">Systemuebersicht</a>
-  <a href="#ausfuehrung-standard-ki-gestuetzt">Ausfuehrung (Standard, KI-gestuetzt)</a>
-  <a href="#ausfuehrung-ohne-ki">Ausfuehrung (ohne KI)</a>
+  <a href="#systemübersicht">Systemübersicht</a>
+  <a href="#ausführung-standard-ki-gestützt">Ausführung (Standard, KI-gestützt)</a>
+  <a href="#ausführung-ohne-ki">Ausführung (ohne KI)</a>
   <a href="#agentic-loop">Agentic Loop</a>
   <a href="#control-flow">Control Flow</a>
-  <a href="#provider-ausfuehrungsmodi">Provider &amp; Ausfuehrungsmodi</a>
+  <a href="#provider-ausführungsmodi">Provider &amp; Ausführungsmodi</a>
   <a href="#block-matrix">Block-Matrix</a>
   <a href="#konfiguration">Konfiguration</a>
   <a href="#dateistruktur">Dateistruktur</a>
@@ -163,9 +163,9 @@
 
 <main>
 
-<section id="systemuebersicht">
-  <h2>Systemuebersicht <span>High-Level</span></h2>
-  <p>Alle Workflows laufen ueber den WorkflowExecutor. Er orchestriert BlockExecutors, Container-Start, Skill-Kontext und WebSocket-Logs.</p>
+<section id="systemübersicht">
+  <h2>Systemübersicht <span>High-Level</span></h2>
+  <p>Alle Workflows laufen über den <code>WorkflowExecutor</code>: Er lässt den Start von <code>RunAdmission</code> prüfen, legt den Run an und arbeitet die Blöcke auf einem virtuellen Thread ab. KI-Blöcke rufen über den <code>CommandExecutorService</code> die CLI des gewählten Anbieters auf dem Host auf, Shell-Blöcke laufen auf dem Host oder mit <code>container_image</code> in einem Einmal-Container. Logs gehen per WebSocket an die Oberfläche.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph Browser["Browser (React SPA)"]
@@ -176,24 +176,26 @@ flowchart LR
         WE["WorkflowExecutor"]
         BE["BlockExecutors"]
         CES["CommandExecutorService"]
+        HCL["AiProviderRegistry: Claude / Codex / Pi"]
         SCS["ShellCommandService"]
-        HCL["HostClaudeService"]
+        CSS["ContainerShellService"]
         WS["/topic/executions/{runId}/logs"]
     end
 
-    subgraph Runtime["Runtime Target"]
-        CON["Docker Container (Projekt)"]
-        HOST["Host (Fallback)"]
+    subgraph Runtime["Ausführungsort"]
+        HOST["Host (Projektverzeichnis)"]
+        CON["Einmal-Container (docker run --rm)"]
     end
 
     UI --&gt;|"POST /workflows/{id}/execute"| WE
     WE --&gt;|"blocks"| BE
-    BE --&gt;|"claude"| CES
+    BE --&gt;|"KI"| CES
+    CES --&gt; HCL
+    HCL --&gt;|"claude -p / codex exec / pi -p"| HOST
     BE --&gt;|"shell"| SCS
-    CES --&gt;|"CLI"| CON
-    SCS --&gt; CON
-    CES -.fallback.-&gt; HOST
-    SCS -.fallback.-&gt; HOST
+    SCS --&gt;|"/bin/bash -c"| HOST
+    BE --&gt;|"shell + container_image"| CSS
+    CSS --&gt; CON
     WE --&gt; WS
     WS --&gt; UI
 
@@ -203,24 +205,25 @@ flowchart LR
   </pre>
 </section>
 
-<section id="ausfuehrung-standard-ki-gestuetzt">
-  <h2>Ausfuehrung (Standard, KI-gestuetzt) <span>Reason/Act</span></h2>
-  <p>Default: Befehle gehen an Claude-CLI (Host/Container). Instruction-Prefix + Model kommen aus dem Workflow.</p>
+<section id="ausführung-standard-ki-gestützt">
+  <h2>Ausführung (Standard, KI-gestützt) <span>KI-Block</span></h2>
+  <p>Ein KI-Block (etwa <code>simple</code>) schickt seinen Prompt über <code>CommandExecutorService.executeStepOnHost</code> an den Anbieter aus Block oder Workflow, sonst an den Systemstandard; Modell und Effort folgen derselben Rangfolge. Die Anweisungen (Basis aus <code>agent-instructions.md</code> plus Workflow-Anweisungen) gehen als System-Prompt mit.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as Frontend
     participant WE as WorkflowExecutor
     participant BE as BlockExecutor
     participant CES as CommandExecutorService
-    participant CLI as Claude CLI
+    participant CLI as KI-CLI auf dem Host
     participant WS as WebSocket
 
     UI-&gt;&gt;WE: POST /workflows/{id}/execute
-    WE-&gt;&gt;WE: create WorkflowRun (RUNNING)
-    WE-&gt;&gt;WE: ensureContainerRunning()
-    WE-&gt;&gt;BE: for block in blocks
-    BE-&gt;&gt;CES: executeStepOnHost/Container(command, model, instructions)
-    CES-&gt;&gt;CLI: claude -p "&lt;command&gt;"
+    WE-&gt;&gt;WE: RunAdmission prüft den Start (abgewiesen: kein Run)
+    WE-&gt;&gt;WE: create WorkflowRun (RUNNING), Antwort sofort
+    WE-&gt;&gt;WE: Slot abwarten (automation.execution.max-concurrent)
+    WE-&gt;&gt;BE: for block in blocks (BlockStepRunner)
+    BE-&gt;&gt;CES: executeStepOnHost(prompt, provider, model, effort, instructions)
+    CES-&gt;&gt;CLI: claude -p / codex exec / pi -p (Prompt über stdin)
     CLI--&gt;&gt;CES: output + exitCode + usage
     CES--&gt;&gt;BE: StepResult (status by exitCode)
     BE--&gt;&gt;WE: add StepResult, set previous_output
@@ -228,14 +231,14 @@ sequenceDiagram
     alt step failed &amp; on_failure=stop
         WE-&gt;&gt;WE: mark RUN FAILED
     end
-    WE-&gt;&gt;WE: mark RUN COMPLETED/FAILED
+    WE-&gt;&gt;WE: mark RUN COMPLETED / COMPLETED_WITH_ERRORS / FAILED
     WE-&gt;&gt;WS: final status event
   </pre>
 </section>
 
-<section id="ausfuehrung-ohne-ki">
-  <h2>Ausfuehrung (ohne KI) <span>Shell-Pfade</span></h2>
-  <p>Shell-Mode nutzt keine Modelle, keine Instruktions-Prefixe, bewertet nur Exit-Code.</p>
+<section id="ausführung-ohne-ki">
+  <h2>Ausführung (ohne KI) <span>Shell-Pfade</span></h2>
+  <p>Shell-Mode nutzt keine Modelle und keine Anweisungen und bewertet nur den Exit-Code.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant BE as BlockExecutor
@@ -243,10 +246,11 @@ sequenceDiagram
     participant SH as Shell
     participant WE as WorkflowExecutor
 
-    BE-&gt;&gt;SCS: execute(command, workDir, timeout)
-    SCS-&gt;&gt;SH: run command
+    BE-&gt;&gt;SCS: execute(command, projectPath, timeout)
+    SCS-&gt;&gt;SH: /bin/bash -c im Projektverzeichnis
     SH--&gt;&gt;SCS: output + exitCode
-    SCS--&gt;&gt;BE: StepResult (status by exitCode)
+    SCS--&gt;&gt;BE: ShellResult (output, exitCode, durationMs)
+    BE-&gt;&gt;BE: StepResult (status by exitCode, bei Fehler ein Hinweis)
     BE--&gt;&gt;WE: add StepResult
   </pre>
   <div class="grid">
@@ -254,15 +258,16 @@ sequenceDiagram
       <h3>Wann Shell?</h3>
       <ul>
         <li>Blocktyp <code>shell</code></li>
-        <li><code>execution_mode=shell</code> bei foreach/while/retry</li>
+        <li><code>execution_mode: shell</code> bei foreach, while, retry und conditional sowie bei Blöcken in switch-cases</li>
+        <li><code>container_image</code> am Shell-Befehl: derselbe Weg, aber in einem Einmal-Container</li>
       </ul>
     </div>
     <div class="card">
       <h3>Unterschiede</h3>
       <ul>
-        <li>Kein Model / kein Prompt-Limit</li>
-        <li>Deterministisch durch Exit-Code</li>
-        <li>Kein Token-Metadata</li>
+        <li>Kein Modell, keine Tokens</li>
+        <li>Deterministisch durch Exit-Code; nach <code>timeout_seconds</code> (Standard 300) Exit-Code 124</li>
+        <li>Metadaten: <code>exitCode</code>, <code>executionMode</code> (<code>shell</code> oder <code>container:&lt;image&gt;</code>)</li>
       </ul>
     </div>
   </div>
@@ -270,81 +275,99 @@ sequenceDiagram
 
 <section id="agentic-loop">
   <h2>Agentic Loop <span>Reason–Act–Observe</span></h2>
-  <p>Mehrstufige KI-Planung mit Token-/Zeit-Budgets, Wiederholungs-Stopp und optionalem Approval.</p>
+  <p>Mehrstufige KI-Planung mit Token- und Zeitbudgets, Wiederholungs-Stopp und optionaler Freigabe. Beide Phasen laufen über den Anbieter aus Block oder Workflow; bei Claude geht REASON mit <code>--system-prompt</code> und <code>--max-turns 3</code>, ACT mit <code>--append-system-prompt</code> an die CLI.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant AG as AgenticBlockExecutor
-    participant HC as HostClaudeService
-    participant CLI as claude -p (reasonStructured)
-    participant CES as CommandExecutorService (ACT)
-    participant CLI2 as claude -p (action)
+    participant HC as AiProvider (REASON)
+    participant CLI as KI-CLI (REASON)
+    participant CES as AgenticActionRunner (ACT)
+    participant CLI2 as KI-CLI (ACT)
 
-    AG-&gt;&gt;HC: buildConversationPrompt + reasonStructured()
-    HC-&gt;&gt;CLI: stream-json
+    AG-&gt;&gt;HC: buildConversationPrompt + reason()
+    HC-&gt;&gt;CLI: Prompt samt Verlauf
     CLI--&gt;&gt;HC: structured reasoning
-    HC--&gt;&gt;AG: RATIONALE + ACTION
-    alt ACTION empty
+    HC--&gt;&gt;AG: RATIONALE + ACTION + GOAL_STATUS
+    alt GOAL_STATUS ACHIEVED oder IMPOSSIBLE
+        AG-&gt;&gt;AG: Schleife endet
+    else ACTION empty
         AG-&gt;&gt;AG: ask for clearer action
     else ACTION present
-        AG-&gt;&gt;CES: executeCommandOnHost(action, model, sysPrompt)
-        CES-&gt;&gt;CLI2: run action
+        opt require_approval
+            AG-&gt;&gt;AG: Freigabe abwarten (No: neuer Vorschlag)
+        end
+        AG-&gt;&gt;CES: run(action)
+        CES-&gt;&gt;CLI2: executeAction(action, model, instructions)
         CLI2--&gt;&gt;CES: output + exitCode + usage
         CES--&gt;&gt;AG: result
+        AG-&gt;&gt;AG: Beobachtung in den Verlauf (OBSERVE)
     end
     AG-&gt;&gt;AG: record iteration, token budget, repetition check
-    AG-&gt;&gt;AG: stop if goal ACHIEVED/IMPOSSIBLE/timeout/repeat/token
+    AG-&gt;&gt;AG: stop at goal ACHIEVED/IMPOSSIBLE, timeout, repeat, token budget, max_iterations
   </pre>
 </section>
 
 <section id="control-flow">
-  <h2>Control Flow <span>Conditional &amp; Approval</span></h2>
-  <p>Branching und User-Gates innerhalb eines Runs.</p>
+  <h2>Control Flow <span>Conditional, Switch &amp; Approval</span></h2>
+  <p>Verzweigungen und Freigaben innerhalb eines Runs.</p>
   <pre class="mermaid">
 flowchart LR
-    A["conditional block<br/>condition -&gt; Claude TRUE/FALSE"] --&gt;|then| T["run then_command (simple)"]
-    A --&gt;|else| E["run else_command (simple)"]
     subgraph Approval
         Q["approval block<br/>question + options"] --&gt; MEM["remember 'Yes always' per run"]
         Q --&gt; OUTC["answer stored as variable"]
-        Q --&gt; DEC{"on_no"}
+        Q --&gt; DEC{"Ablehnung: on_no"}
         DEC --&gt;|fail| FAIL["Step FAILED"]
         DEC --&gt;|skip| SKIP["Step SKIPPED"]
-        DEC --&gt;|continue| CONT["Step COMPLETED"]
+        DEC --&gt;|"continue (Standard)"| CONT["Step COMPLETED"]
+    end
+    subgraph Switch
+        S["switch block<br/>expression gegen cases[].value"] --&gt;|"erster Treffer"| CASE["Blöcke dieses case (shell/simple)"]
+        S --&gt;|"kein Treffer"| DEF["default-Blöcke"]
+    end
+    subgraph Conditional
+        A["conditional block<br/>condition: KI antwortet TRUE/FALSE<br/>oder Shell-Exit-Code 0"] --&gt;|then| T["then_command (KI oder Shell)"]
+        A --&gt;|else| E["else_command (KI oder Shell)"]
+        A --&gt;|"kein Befehl für den Zweig"| NOP["Step SKIPPED"]
     end
   </pre>
 </section>
 
-<section id="provider-ausfuehrungsmodi">
-  <h2>Provider &amp; Ausfuehrungsmodi <span>KI vs. Kein KI</span></h2>
+<section id="provider-ausführungsmodi">
+  <h2>Provider &amp; Ausführungsmodi <span>KI vs. Kein KI</span></h2>
   <table>
-    <thead><tr><th>Merkmal</th><th>KI (Claude)</th><th>Ohne KI (Shell)</th></tr></thead>
+    <thead><tr><th>Merkmal</th><th>KI (Claude, Codex, Pi)</th><th>Ohne KI (Shell)</th></tr></thead>
     <tbody>
-      <tr><td>CLI</td><td><code>claude -p</code></td><td>System-Shell</td></tr>
-      <tr><td>Kontext</td><td>Instruction-Prefix, Skill-Context, previous_output</td><td>Nur Shell-Kommandostring</td></tr>
+      <tr><td>CLI</td><td><code>claude -p</code>, <code>codex exec</code>, <code>pi -p</code></td><td><code>/bin/bash -c</code></td></tr>
+      <tr><td>Anbieter</td><td><code>provider</code> am Block &gt; am Workflow &gt; Systemstandard</td><td>—</td></tr>
+      <tr><td>Kontext</td><td>Anweisungen als System-Prompt, <code>.claude/rules/</code> (Skills, Memory, Projektkontext), <code>{{ previous_output }}</code></td><td>Nur der Befehl mit aufgelösten Platzhaltern</td></tr>
       <tr><td>Determinismus</td><td>Niedriger (LLM)</td><td>Hoch (Exit-Code)</td></tr>
-      <tr><td>Telemetry</td><td>Token/Cost in StepResult.metadata</td><td>exitCode + duration</td></tr>
-      <tr><td>Fallback</td><td>Host, falls Container nicht startet</td><td>Host gleicher Pfad</td></tr>
+      <tr><td>Telemetrie</td><td>Tokens, Kosten, Modell in <code>StepResult.metadata</code> (<code>aiRequest</code>)</td><td><code>exitCode</code>, <code>executionMode</code>, Dauer</td></tr>
+      <tr><td>Ort</td><td>Host, Projektverzeichnis</td><td>Host, Projektverzeichnis; mit <code>container_image</code> ein Einmal-Container</td></tr>
     </tbody>
   </table>
 </section>
 
 <section id="block-matrix">
   <h2>Block-Matrix <span>Typ → Exec-Modus</span></h2>
+  <p>Ein Schritt mit Status FAILED beendet den Run, solange <code>on_failure</code> nicht <code>"continue"</code> ist.</p>
   <table>
-    <thead><tr><th>Block</th><th>Default</th><th>Optionen</th><th>Stop on failure</th></tr></thead>
+    <thead><tr><th>Block</th><th>Standard</th><th>Optionen (Auswahl)</th><th>Schritt FAILED, wenn …</th></tr></thead>
     <tbody>
-      <tr><td><code>simple</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Ja (default)</td></tr>
-      <tr><td><code>shell</code></td><td>shell</td><td><code>timeout_seconds</code></td><td>Ja</td></tr>
-      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/ai, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>Ja (wenn alle Fehlversuche)</td></tr>
-      <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command, <code>timeout_seconds</code></td><td>Aggregiertes Ergebnis</td></tr>
-      <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code>, <code>timeout_seconds</code></td><td>Ja bei innerem Fail</td></tr>
-      <tr><td><code>conditional</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Branch-spezifisch</td></tr>
-      <tr><td><code>approval</code></td><td>-</td><td><code>mode</code>=ask/auto, <code>on_no</code>=fail/skip/continue</td><td>on_no=fail</td></tr>
-      <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code>, <code>timeout_seconds</code></td><td>Ja</td></tr>
-      <tr><td><code>sub-workflow</code></td><td>depends</td><td>Tiefe&lt;=5, Timeout 30 min</td><td>Ja bei Timeout/Zyklus</td></tr>
-      <tr><td><code>agentic</code></td><td>claude</td><td>Budget, Iterationen, Approval, <code>timeout_seconds</code></td><td>Ja bei Stoppgründen</td></tr>
+      <tr><td><code>simple</code></td><td>KI</td><td><code>timeout_seconds</code>, <code>provider</code>, <code>model</code>, <code>effort</code></td><td>die KI-CLI mit Fehler endet</td></tr>
+      <tr><td><code>shell</code></td><td>Shell</td><td><code>timeout_seconds</code>, <code>container_image</code>, <code>checked_command</code>, <code>shell_escape_variables</code></td><td>der Exit-Code nicht 0 ist</td></tr>
+      <tr><td><code>retry</code></td><td>KI</td><td><code>execution_mode</code>=ai/shell, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>alle Versuche scheitern</td></tr>
+      <tr><td><code>foreach</code></td><td>KI</td><td><code>execution_mode</code>=ai/shell, <code>items_source</code>=list/command, <code>continue_on_error</code>, <code>timeout_seconds</code></td><td>ein Item scheitert (außer mit <code>continue_on_error</code>)</td></tr>
+      <tr><td><code>while</code></td><td>KI</td><td><code>execution_mode</code>=ai/shell, <code>condition_command</code>, <code>max_iterations</code>, <code>timeout_seconds</code></td><td>eine Iteration scheitert</td></tr>
+      <tr><td><code>conditional</code></td><td>KI</td><td><code>execution_mode</code>=ai/shell, <code>then_command</code>, <code>else_command</code>, <code>timeout_seconds</code></td><td>der gewählte Befehl scheitert</td></tr>
+      <tr><td><code>switch</code></td><td>–</td><td><code>expression</code>, <code>cases</code>, <code>default</code></td><td>ein Block im gewählten case scheitert</td></tr>
+      <tr><td><code>approval</code></td><td>–</td><td><code>mode</code>=ask/auto, <code>on_no</code>=continue/skip/fail, <code>timeout_minutes</code></td><td>abgelehnt mit <code>on_no: fail</code>, Timeout oder Abbruch</td></tr>
+      <tr><td><code>human-input</code></td><td>–</td><td><code>input_type</code>, <code>fields</code>, <code>timeout_minutes</code></td><td>Timeout ohne Standardwert</td></tr>
+      <tr><td><code>skill-capability</code></td><td>KI</td><td><code>capability</code>, <code>params</code>, <code>input</code>, <code>allow_writes</code>, <code>timeout_seconds</code></td><td>eine schreibende Capability ohne <code>allow_writes</code> läuft oder der Aufruf scheitert</td></tr>
+      <tr><td><code>sub-workflow</code></td><td>wie der Kind-Workflow</td><td><code>workflow_id</code>; Tiefe ≤ 5, wartet höchstens 30 min</td><td>der Kind-Run nicht COMPLETED endet, Zyklus, Timeout</td></tr>
+      <tr><td><code>agentic</code></td><td>KI</td><td>Budget, Iterationen, <code>require_approval</code>, <code>timeout_seconds</code></td><td>das Ziel nicht erreicht ist</td></tr>
     </tbody>
   </table>
+  <p>Ohne KI und ohne Shell arbeiten <code>integration</code>, <code>document</code>, <code>todo-create</code>, <code>todo-update</code>, <code>todo-close</code>, <code>compress</code> und <code>dashboard-report</code>; <code>compress-ai</code> ist ein einzelner Claude-Aufruf ohne Werkzeuge. Die vollständigen Schlüssel je Typ stehen im <a href="WORKFLOW-GUIDE.md">WORKFLOW-GUIDE.md</a>.</p>
 </section>
 
 <section id="konfiguration">
@@ -352,14 +375,15 @@ flowchart LR
   <div class="grid">
     <div class="card">
       <h3>Execution Limits</h3>
-      <p><code>automation.execution.max-concurrent</code>: parallele Runs</p>
-      <p><code>automation.host-claude.timeout-seconds</code>: CLI Timeout</p>
-      <p><code>docker.container.idle-timeout-minutes</code>: Container Idle Stop</p>
+      <p><code>automation.execution.max-concurrent</code>: parallele Runs (Standard 10)</p>
+      <p><code>automation.host-claude.timeout-seconds</code>: Timeout eines Claude-CLI-Aufrufs (Standard 300); je Block gilt <code>timeout_seconds</code></p>
+      <p><code>automation.host-claude.max-concurrent-calls</code> und <code>reserved-for-interactive</code>: gleichzeitige Claude-Aufrufe (5, davon 1 für den Chat frei)</p>
+      <p><code>docker.container.idle-timeout-minutes</code>: Projekt-Container im Leerlauf stoppen</p>
     </div>
     <div class="card">
       <h3>Security</h3>
       <p><code>automation.security.enabled</code> / <code>api-key</code></p>
-      <p><code>rate-limit</code> defaults disabled</p>
+      <p><code>automation.security.rate-limit.*</code>: standardmäßig an, 120 Anfragen pro Minute</p>
       <p>CORS: <code>automation.cors.allowed-origins</code></p>
     </div>
   </div>
@@ -372,16 +396,24 @@ flowchart LR
 ├── <span class="dir">executor/</span>
 │   ├── ExecutionContext.java
 │   ├── BlockExecutor.java
-│   ├── <span class="dir">blocks/</span> (Simple, Shell, Retry, ForEach, While, Conditional, Approval, SkillCapability, SubWorkflow, Agentic)
+│   └── <span class="dir">blocks/</span>            (*BlockExecutor per block type + helpers)
 ├── <span class="dir">service/workflow/</span>
 │   ├── WorkflowExecutor.java
+│   ├── RunAdmission.java
+│   ├── BlockStepRunner.java
+│   ├── ExecutionContextFactory.java
+│   ├── ExecutionBroadcaster.java
+│   ├── RunCompletionHandler.java
 │   └── AgentInstructionsService.java
 ├── <span class="dir">service/cli/</span>
 │   ├── CommandExecutorService.java
 │   ├── ShellCommandService.java
-│   └── CliSessionManager.java
+│   └── ContainerShellService.java
 └── <span class="dir">service/ai/</span>
-    └── HostClaudeService.java
+    ├── AiProviderRegistry.java
+    ├── HostClaudeService.java
+    ├── HostCodexService.java
+    └── HostPiService.java
   </pre>
 </section>
 
