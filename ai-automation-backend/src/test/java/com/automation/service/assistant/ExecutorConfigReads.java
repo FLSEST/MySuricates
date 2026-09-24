@@ -31,8 +31,10 @@ import static org.mockito.Mockito.withSettings;
  * {@code BlockAiSettings} when it resolves provider/model/effort, of {@code ExecutionMode} when it
  * checks {@code execution_mode}, and of {@code BlockDefinition} ({@code on_failure}, read by the
  * engine for every block).
+ *
+ * <p>Public for {@code BlockSpecsTest}, which asks which executors resolve the AI overrides.
  */
-final class ExecutorConfigReads {
+public final class ExecutorConfigReads {
 
     static final Path MAIN = Path.of("src/main/java");
 
@@ -61,8 +63,16 @@ final class ExecutorConfigReads {
     }
 
     /** The block types the executors support, sorted. */
-    static Set<String> types() {
+    public static Set<String> types() {
         return executorSources().keySet();
+    }
+
+    /**
+     * Whether the executor of {@code type} resolves provider/model/effort itself — calls
+     * {@code providerFor}, {@code modelFor} or {@code effortFor} outside comments.
+     */
+    public static boolean resolvesAiSettings(String type) throws IOException {
+        return RESOLVES_AI_SETTINGS.matcher(withoutComments(Files.readString(executorSource(type)))).find();
     }
 
     /** Adds a problem for every key none of the sources of {@code type} reads. */
@@ -84,14 +94,12 @@ final class ExecutorConfigReads {
     }
 
     static List<Path> sourcesOf(String type) throws IOException {
-        Path executor = executorSources().get(type);
-        assertThat(executor).as("source of the BlockExecutor for '%s'", type).isNotNull().exists();
+        Path executor = executorSource(type);
         List<Path> sources = new ArrayList<>(List.of(executor, MAIN.resolve(ENGINE)));
-        String code = withoutComments(Files.readString(executor));
-        if (RESOLVES_AI_SETTINGS.matcher(code).find()) {
+        if (resolvesAiSettings(type)) {
             sources.add(MAIN.resolve(AI_SETTINGS));
         }
-        if (CHECKS_EXECUTION_MODE.matcher(code).find()) {
+        if (CHECKS_EXECUTION_MODE.matcher(withoutComments(Files.readString(executor))).find()) {
             sources.add(MAIN.resolve(EXECUTION_MODE));
         }
         for (String delegate : DELEGATES.getOrDefault(type, List.of())) {
@@ -105,6 +113,12 @@ final class ExecutorConfigReads {
             }
         }
         return sources;
+    }
+
+    private static Path executorSource(String type) {
+        Path executor = executorSources().get(type);
+        assertThat(executor).as("source of the BlockExecutor for '%s'", type).isNotNull().exists();
+        return executor;
     }
 
     static Set<String> stringLiterals(String javaSource) {
