@@ -164,13 +164,13 @@ export function WorkflowCreateFlow({
             label={t.common.name}
             value={form.name}
             onChange={(e) => onFormChange({ ...form, name: e.target.value })}
-            placeholder="Review Pull Request"
+            placeholder={t.workflows.namePlaceholder}
           />
           <Input
             label={t.common.description}
             value={form.description ?? ''}
             onChange={(e) => onFormChange({ ...form, description: e.target.value })}
-            placeholder="Optional description"
+            placeholder={t.workflows.descriptionPlaceholder}
           />
         </div>
       </Modal>

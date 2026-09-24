@@ -223,7 +223,7 @@ export function SimpleTodos() {
               label={t.simple.todos.priority}
               value={draft.priority}
               onChange={(e) => setDraft({ ...draft, priority: e.target.value as TodoPriority })}
-              options={PRIORITIES.map((p) => ({ value: p, label: p }))}
+              options={PRIORITIES.map((p) => ({ value: p, label: t.todos.priorities[p] }))}
             />
             <Input
               type="date"

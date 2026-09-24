@@ -10,12 +10,14 @@ interface CronPickerProps {
   value: string;
   onChange: (cron: string) => void;
   label?: string;
+  /** Simple mode: no "Advanced" tab and no raw cron line — only the frequency, the time and the next runs. */
+  simple?: boolean;
 }
 
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const WEEKDAY_CRON_VALUES = [1, 2, 3, 4, 5, 6, 0]; // cron: 0=Sun, 1=Mon, ...
 
-export function CronPicker({ value, onChange, label }: CronPickerProps) {
+export function CronPicker({ value, onChange, label, simple = false }: CronPickerProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   // Both follow the external value: re-derived whenever `value` changes, editable in between
@@ -52,7 +54,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
     { key: 'daily', label: t.schedules.daily },
     { key: 'weekly', label: t.schedules.weekly },
     { key: 'monthly', label: t.schedules.monthly },
-    { key: 'advanced', label: t.schedules.advanced },
+    ...(simple ? [] : [{ key: 'advanced' as const, label: t.schedules.advanced }]),
   ];
 
   return (
@@ -147,10 +149,12 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
           )}
 
           {/* Preview */}
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface text-xs">
-            <span className="text-text-tertiary">Cron:</span>
-            <code className="font-mono text-text">{stateToCron(state)}</code>
-          </div>
+          {!simple && (
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface text-xs">
+              <span className="text-text-tertiary">Cron:</span>
+              <code className="font-mono text-text">{stateToCron(state)}</code>
+            </div>
+          )}
         </div>
       )}
 

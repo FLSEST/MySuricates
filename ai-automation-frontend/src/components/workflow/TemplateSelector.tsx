@@ -93,7 +93,7 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
       </div>
 
       {activeTab === 'pool' ? (
-        <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} />
+        <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} variant={variant} />
       ) : activeTab === 'blueprints' ? (
         isLoading ? (
           <div className="flex justify-center py-8">
@@ -195,23 +195,28 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary">
-                            {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
-                          </span>
-                          <ExecutionBadges blocks={tmpl.blocks} />
-                        </div>
+                        {/* Step count, execution kinds and export are build details — Pro only */}
+                        {!simple && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-text-tertiary">
+                              {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
+                            </span>
+                            <ExecutionBadges blocks={tmpl.blocks} />
+                          </div>
+                        )}
                       </div>
-                      <button
-                        className="p-1 rounded text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors shrink-0"
-                        title={t.templates.exportTemplate}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          exportTemplate(tmpl, locale);
-                        }}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
+                      {!simple && (
+                        <button
+                          className="p-1 rounded text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors shrink-0"
+                          title={t.templates.exportTemplate}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            exportTemplate(tmpl, locale);
+                          }}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-text-secondary">
                       {resolveTemplateName(tmpl.description, locale)}

@@ -97,14 +97,10 @@ export function SimpleWorkflowDetail() {
             <dt className="text-text-secondary">{t.common.project}</dt>
             <dd className="text-text font-medium">{workflow.projectName}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-text-secondary">{t.workflows.blocks}</dt>
-            <dd className="text-text font-medium">{workflow.blocks.length}</dd>
-          </div>
-          {workflow.model && (
+          {recentRuns[0]?.startedAt && (
             <div className="flex justify-between">
-              <dt className="text-text-secondary">{t.workflows.model}</dt>
-              <dd className="text-text font-medium font-mono text-xs">{workflow.model}</dd>
+              <dt className="text-text-secondary">{t.schedules.lastRun}</dt>
+              <dd className="text-text font-medium">{formatRelativeTime(recentRuns[0].startedAt, locale)}</dd>
             </div>
           )}
         </dl>

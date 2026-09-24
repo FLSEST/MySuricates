@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useT } from '../../i18n';
 import { ExecuteDialog } from '../workflow/ExecuteDialog';
 import { useExecuteWorkflow } from '../../hooks/useWorkflows';
 import { extractWorkflowVariables } from '../../utils/extractWorkflowVariables';
@@ -12,6 +13,7 @@ import type { Workflow } from '../../types';
  * Render `dialog` once in the page; call `run(workflow)` from any start button.
  */
 export function useSimpleRun() {
+  const t = useT();
   const navigate = useNavigate();
   const executeWorkflow = useExecuteWorkflow();
   const [asking, setAsking] = useState<{ workflow: Workflow; variables: string[] } | null>(null);
@@ -49,6 +51,8 @@ export function useSimpleRun() {
       descriptions={schema.descriptions}
       placeholders={schema.placeholders}
       loading={executeWorkflow.isPending}
+      humanizeLabels
+      title={t.simple.run.inputsTitle}
     />
   );
 

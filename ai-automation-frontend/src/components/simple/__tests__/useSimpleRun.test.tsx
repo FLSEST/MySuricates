@@ -64,15 +64,19 @@ describe('useSimpleRun', () => {
 
   it('asks for inputs first and sends them as the run context', async () => {
     const calls = captureExecute();
-    renderHarness(workflow({ blocks: [{ type: 'simple', config: { prompt: 'Sum up {{ topic }}' } }] as Workflow['blocks'] }));
+    renderHarness(workflow({ blocks: [{ type: 'simple', config: { prompt: 'Sum up {{ news_topic }}' } }] as Workflow['blocks'] }));
 
     fireEvent.click(screen.getByRole('button', { name: 'start' }));
     const dialog = await screen.findByRole('dialog');
+    // Simple mode: a plain title and the variable name as words
+    expect(within(dialog).getByText(en.simple.run.inputsTitle)).toBeInTheDocument();
+    expect(within(dialog).getByText('News topic')).toBeInTheDocument();
+    expect(within(dialog).queryByText('news_topic')).not.toBeInTheDocument();
     fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'weather' } });
     fireEvent.click(within(dialog).getByRole('button', { name: en.workflows.execute }));
 
     expect(await screen.findByText('run page')).toBeInTheDocument();
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(calls[0]).toEqual({ context: { topic: 'weather' } });
+    expect(calls[0]).toEqual({ context: { news_topic: 'weather' } });
   });
 });

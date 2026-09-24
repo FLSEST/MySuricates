@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
+import { en } from '../../i18n/en';
 import type { WorkflowRunListItem } from '../../types';
 import { SimpleWorkflowDetail } from '../SimpleWorkflowDetail';
 
@@ -24,10 +25,10 @@ function listRun(id: string, status: WorkflowRunListItem['status'], metadata: Re
   };
 }
 
-function serve(runs: WorkflowRunListItem[]) {
+function serve(runs: WorkflowRunListItem[], workflow: Record<string, unknown> = {}) {
   server.use(
     http.get('/api/v1/workflows/:id', () => HttpResponse.json({
-      id: 'wf-1', name: 'Weekly report', projectName: 'Home', blocks: [], defaultContext: {},
+      id: 'wf-1', name: 'Weekly report', projectName: 'Home', blocks: [], defaultContext: {}, ...workflow,
     })),
     http.get('/api/v1/workflows/:id/runs', () => HttpResponse.json({
       content: runs, totalElements: runs.length, totalPages: 1, number: 0, size: 50,
@@ -72,5 +73,21 @@ describe('SimpleWorkflowDetail latest result', () => {
     expect(await screen.findByText('Recent Runs (2)')).toBeInTheDocument();
     expect(screen.queryByText('Latest result')).not.toBeInTheDocument();
     expect(screen.queryByText('Sales this week')).not.toBeInTheDocument();
+  });
+});
+
+describe('SimpleWorkflowDetail info card', () => {
+  it('shows project and last run, but neither step count nor model', async () => {
+    serve([listRun('run-1', 'COMPLETED', {})], {
+      model: 'opus',
+      blocks: [{ type: 'shell', config: { command: 'echo hi' } }, { type: 'simple', config: { prompt: 'Sum up' } }],
+    });
+    renderPage();
+
+    expect(await screen.findByText('Home')).toBeInTheDocument();
+    expect(screen.getByText(en.schedules.lastRun)).toBeInTheDocument();
+    expect(screen.queryByText(en.workflows.blocks)).not.toBeInTheDocument();
+    expect(screen.queryByText(en.workflows.model)).not.toBeInTheDocument();
+    expect(screen.queryByText('opus')).not.toBeInTheDocument();
   });
 });

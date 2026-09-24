@@ -12,6 +12,9 @@ export function SimpleActivity() {
   const { data: page, isLoading, error, refetch } = useActivityLog(0, 50);
   const entries = page?.content ?? [];
   const now = new Date();
+  // Unknown categories (a newer backend) keep their raw name instead of vanishing
+  const categories: Record<string, string> = t.activityLog.categories;
+  const categoryLabel = (category: string) => categories[category] ?? category;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner text={t.common.loading} /></div>;
@@ -34,7 +37,7 @@ export function SimpleActivity() {
                 <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: levelColor(e.level) }} />
                 <div className="min-w-0">
                   <p className="text-sm text-text truncate">{e.message}</p>
-                  <p className="text-xs text-text-tertiary truncate">{e.category} · {relativeTime(e.timestamp, now)}</p>
+                  <p className="text-xs text-text-tertiary truncate">{categoryLabel(e.category)} · {relativeTime(e.timestamp, now)}</p>
                 </div>
               </div>
             </SimpleRow>
