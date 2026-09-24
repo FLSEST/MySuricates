@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Locks the skip-until parsing and skip mechanics before extraction (Audit-TODO 05dbd0e9). */
@@ -187,5 +188,81 @@ class ScheduleSkipPolicyTest {
 
         assertThat(parsed).isPresent();
         verify(activityLogService, never()).warn(any(), anyString(), anyString());
+    }
+
+    // --- read views: the run the scheduler will actually start (TODO a776fd2a) ---
+
+    private static Instant local(int day, int hour, int minute) {
+        return LocalDateTime.of(2026, 4, day, hour, minute).atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    private ScheduledWorkflow once(Instant at) {
+        return ScheduledWorkflow.builder().id("s-once").workflow(Workflow.builder().id("wf").name("One").build())
+                .cronExpression("").scheduleType(ScheduleType.ONCE).enabled(true).scheduledAt(at).nextRunAt(at).build();
+    }
+
+    @Test
+    void activeSkipUntil_onlyWhileAhead_andQuietOnABadValue() {
+        Instant until = Instant.parse("2026-05-01T00:00:00Z");
+        when(schedulerConfig.getSkipUntil()).thenReturn(" " + until + " ");
+
+        assertThat(policy.activeSkipUntil(until.minusSeconds(1))).contains(until);
+        assertThat(policy.activeSkipUntil(until)).isEmpty();
+
+        when(schedulerConfig.getSkipUntil()).thenReturn("next tuesday");
+        assertThat(policy.activeSkipUntil(Instant.parse("2026-04-01T00:00:00Z"))).isEmpty();
+        // Views call this on every GET: no activity-log rows, the tick warns about bad values.
+        verifyNoInteractions(activityLogService);
+    }
+
+    @Test
+    void nextRunAfter_cronLandsAtOrAfterTheEnd_oneOffNowhere() {
+        ScheduledWorkflow daily = cron("0 0 8 * * *", local(26, 8, 0));
+
+        assertThat(policy.nextRunAfter(daily, local(28, 8, 0))).isEqualTo(local(28, 8, 0));
+        assertThat(policy.nextRunAfter(daily, local(28, 8, 1))).isEqualTo(local(29, 8, 0));
+        assertThat(policy.nextRunAfter(once(local(27, 9, 0)), local(28, 8, 0))).isNull();
+    }
+
+    @Test
+    void effectiveNextRun_movesAStoredRunInsideThePauseBehindIt() {
+        Optional<Instant> pause = Optional.of(local(28, 12, 0));
+        ScheduledWorkflow held = cron("0 0 8 * * *", local(27, 8, 0));
+        ScheduledWorkflow after = cron("0 0 8 * * *", local(29, 8, 0));
+
+        assertThat(policy.heldBySkipUntil(held, pause)).isTrue();
+        assertThat(policy.effectiveNextRun(held, pause)).isEqualTo(local(29, 8, 0));
+        assertThat(policy.heldBySkipUntil(after, pause)).isFalse();
+        assertThat(policy.effectiveNextRun(after, pause)).isEqualTo(local(29, 8, 0));
+        assertThat(policy.effectiveNextRun(held, Optional.empty())).isEqualTo(local(27, 8, 0));
+        assertThat(held.getNextRunAt()).as("a view never writes").isEqualTo(local(27, 8, 0));
+    }
+
+    @Test
+    void effectiveNextRun_oneOffInsideThePauseExpires_disabledHasNone() {
+        Optional<Instant> pause = Optional.of(local(28, 0, 0));
+        ScheduledWorkflow disabled = cron("0 0 8 * * *", null);
+
+        assertThat(policy.effectiveNextRun(once(local(27, 9, 0)), pause)).isNull();
+        assertThat(policy.heldBySkipUntil(disabled, pause)).isFalse();
+        assertThat(policy.effectiveNextRun(disabled, pause)).isNull();
+    }
+
+    @Test
+    void effectiveNextRun_unparseableCron_keepsTheStoredValue() {
+        ScheduledWorkflow broken = cron("not a cron", local(27, 8, 0));
+
+        assertThat(policy.effectiveNextRun(broken, Optional.of(local(28, 0, 0)))).isEqualTo(local(27, 8, 0));
+    }
+
+    @Test
+    void effectiveNextRun_predictsWhereTheTickPutsTheSchedule() {
+        Instant until = local(28, 12, 0);
+        ScheduledWorkflow sw = cron("0 30 * * * *", local(27, 10, 30));
+        Instant predicted = policy.effectiveNextRun(sw, Optional.of(until));
+
+        policy.skipScheduleUntil(sw, until);
+
+        assertThat(sw.getNextRunAt()).isEqualTo(predicted).isEqualTo(local(28, 12, 30));
     }
 }

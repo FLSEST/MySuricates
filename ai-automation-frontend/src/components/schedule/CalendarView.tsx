@@ -40,7 +40,8 @@ export function CalendarView() {
     const result: CalendarEvent[] = [];
 
     for (const s of data.upcoming) {
-      const date = s.nextRunAt || s.scheduledAt;
+      // A one-off held by a skip-until pause expires: no date to show (a776fd2a).
+      const date = s.pausedUntil ? s.nextRunAt : s.nextRunAt || s.scheduledAt;
       if (date) {
         result.push({
           id: s.id,

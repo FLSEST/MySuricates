@@ -1,5 +1,7 @@
 package com.automation.service.scheduler;
 
+import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.RunStatus;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
@@ -17,6 +19,7 @@ import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -31,6 +34,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -91,7 +95,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-cron")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-cron")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
 
         executor.executeSingleSchedule("sched-cron");
 
@@ -118,7 +122,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-once")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-once")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
 
         executor.executeSingleSchedule("sched-once");
 
@@ -186,7 +190,7 @@ class ScheduledWorkflowExecutorTest {
                 .build();
 
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-ghost")).thenReturn(Optional.of(scheduled));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(true);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
 
         executor.executeSingleSchedule("sched-ghost");
 
@@ -211,7 +215,7 @@ class ScheduledWorkflowExecutorTest {
                 .build();
 
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-chain-ghost")).thenReturn(Optional.of(scheduled));
-        when(chainRunRepository.existsByChainIdAndStatus(eq("chain-1"), eq(RunStatus.RUNNING))).thenReturn(true);
+        when(chainRunRepository.existsByChainIdAndStatusIn(eq("chain-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
 
         executor.executeSingleSchedule("sched-chain-ghost");
 
@@ -259,7 +263,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-throws")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-throws")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
         doThrow(new RuntimeException("LazyInitializationException: no Session"))
                 .when(workflowExecutor).execute(any(), any(), eq(TriggerSource.SCHEDULE));
 
@@ -359,7 +363,7 @@ class ScheduledWorkflowExecutorTest {
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-ref")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.findById("sched-ref")).thenReturn(Optional.of(scheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(false);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(false);
         when(workflowExecutor.execute(eq(testWorkflow), any(), eq("sched-ref"), isNull(), eq(TriggerSource.SCHEDULE)))
                 .thenReturn(com.automation.entity.WorkflowRun.builder().id("run-42").build());
 
@@ -377,10 +381,139 @@ class ScheduledWorkflowExecutorTest {
                 .scheduleType(ScheduleType.CRON).enabled(true)
                 .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
         when(scheduledRepository.findByIdWithWorkflowSkills("sched-busy")).thenReturn(Optional.of(scheduled));
-        when(workflowRunRepository.existsByWorkflowIdAndStatus(eq("wf-1"), eq(RunStatus.RUNNING))).thenReturn(true);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
 
         assertThat(executor.executeSingleSchedule("sched-busy")).isEmpty();
         verify(workflowExecutor, never()).execute(any(), any(), any(), any(), eq(TriggerSource.SCHEDULE));
+    }
+
+    // --- SKIP drops the occurrence instead of retrying every minute (TODO ade3fef8) ---
+
+    private ScheduledWorkflow dueCron(String id) {
+        return ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+    }
+
+    private void stubScheduleLookups(ScheduledWorkflow scheduled) {
+        when(scheduledRepository.findByIdWithWorkflowSkills(scheduled.getId())).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById(scheduled.getId())).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void skipWhileWorkflowRunning_movesNextRunAtPastNow_withoutCountingARun() {
+        ScheduledWorkflow scheduled = dueCron("sched-skip");
+        Instant skippedAt = scheduled.getNextRunAt();
+        stubScheduleLookups(scheduled);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
+
+        assertThat(executor.executeSingleSchedule("sched-skip")).isEmpty();
+
+        verify(workflowExecutor, never()).execute(any(), any(), any(), any(), eq(TriggerSource.SCHEDULE));
+        // The dropped occurrence is gone: the next tick finds nothing due and does not retry.
+        assertThat(scheduled.getNextRunAt()).isAfter(Instant.now());
+        assertThat(scheduled.isEnabled()).isTrue();
+        // Nothing ran: no last run, and the skip does not use up maxRuns.
+        assertThat(scheduled.getLastRunAt()).isNull();
+        assertThat(scheduled.getRunCount()).isZero();
+
+        ArgumentCaptor<Map<String, Object>> meta = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                eq("Schedule skipped (previous run still in progress): Test Workflow"),
+                eq("ScheduledWorkflowExecutor"), eq("sched-skip"), meta.capture());
+        assertThat(meta.getValue())
+                .containsEntry("reason", "target-busy")
+                .containsEntry("previousNextRunAt", skippedAt.toString())
+                .containsEntry("nextRunAt", scheduled.getNextRunAt().toString());
+        verify(activityLogService, never()).info(eq(LogCategory.SCHEDULE), startsWith("Schedule triggered"),
+                any(), any());
+    }
+
+    @Test
+    void busyStates_arePausedAndRunning() {
+        // A paused run resumes later — a second run next to it is the overlap SKIP avoids.
+        assertThat(ScheduledWorkflowExecutor.BUSY_STATES)
+                .containsExactlyInAnyOrder(RunStatus.RUNNING, RunStatus.PAUSED);
+    }
+
+    @Test
+    void skipWhileChainBusy_movesNextRunAtPastNow() {
+        WorkflowChain chain = WorkflowChain.builder().id("chain-1").name("Nightly Chain").build();
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-chain-skip").chain(chain).targetType(TargetType.CHAIN)
+                .cronExpression("0 0 * * * *").scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        stubScheduleLookups(scheduled);
+        when(chainRunRepository.existsByChainIdAndStatusIn(eq("chain-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
+
+        executor.executeSingleSchedule("sched-chain-skip");
+
+        verifyNoInteractions(chainExecutor);
+        assertThat(scheduled.getNextRunAt()).isAfter(Instant.now());
+        assertThat(scheduled.getLastRunAt()).isNull();
+    }
+
+    @Test
+    void skipOnceScheduleWhileTargetBusy_dropsItsSingleOccurrence() {
+        Instant scheduledAt = Instant.now().minusSeconds(60);
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-once-skip").workflow(testWorkflow).cronExpression("")
+                .scheduleType(ScheduleType.ONCE).scheduledAt(scheduledAt).enabled(true)
+                .nextRunAt(scheduledAt).inputContext(Map.of()).build();
+        stubScheduleLookups(scheduled);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
+
+        executor.executeSingleSchedule("sched-once-skip");
+
+        // Like a one-off inside the skip-until window: the single firing is dropped, not deferred.
+        verify(workflowExecutor, never()).execute(any(), any(), any(), any(), eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        assertThat(scheduled.getLastRunAt()).isNull();
+    }
+
+    @Test
+    void skip_leavesTheRunCounterAlone_soMaxRunsCountsStartedRunsOnly() {
+        ScheduledWorkflow scheduled = dueCron("sched-skip-max");
+        scheduled.setMaxRuns(5);
+        scheduled.setRunCount(4);
+        stubScheduleLookups(scheduled);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
+
+        executor.executeSingleSchedule("sched-skip-max");
+
+        assertThat(scheduled.getRunCount()).isEqualTo(4);
+        assertThat(scheduled.isEnabled()).isTrue();
+        assertThat(scheduled.getNextRunAt()).isAfter(Instant.now());
+    }
+
+    @Test
+    void skipAfterEndDate_disablesTheSchedule_likeAfterARun() {
+        ScheduledWorkflow scheduled = dueCron("sched-skip-end");
+        scheduled.setEndDate(Instant.now().minusSeconds(3600));
+        stubScheduleLookups(scheduled);
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
+
+        executor.executeSingleSchedule("sched-skip-end");
+
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void overlapSchedule_startsNextToABusyTarget() {
+        ScheduledWorkflow scheduled = dueCron("sched-overlap");
+        scheduled.setConflictBehavior(ScheduledWorkflow.ConflictBehavior.OVERLAP);
+        stubScheduleLookups(scheduled);
+
+        executor.executeSingleSchedule("sched-overlap");
+
+        verifyNoInteractions(workflowRunRepository);
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), eq("sched-overlap"), isNull(),
+                eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.getRunCount()).isEqualTo(1);
     }
 
     @Test

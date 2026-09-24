@@ -73,11 +73,6 @@ public class SchedulerService {
     }
 
     @Transactional(readOnly = true)
-    public List<ScheduledWorkflow> findSchedulesInRange(Instant from, Instant to) {
-        return scheduledRepository.findSchedulesInRange(from, to);
-    }
-
-    @Transactional(readOnly = true)
     public List<WorkflowRun> findWorkflowRunsByScheduleId(String scheduleId) {
         return workflowRunRepository.findByTriggeredByScheduleIdOrderByStartedAtDesc(scheduleId);
     }
@@ -145,6 +140,9 @@ public class SchedulerService {
         }
         if (request.catchUpOnResume() != null) {
             scheduled.setCatchUpOnResume(request.catchUpOnResume());
+        }
+        if (request.conflictBehavior() != null && !request.conflictBehavior().isBlank()) {
+            scheduled.setConflictBehavior(definitionParser.parseConflictBehavior(request.conflictBehavior()));
         }
 
         if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {

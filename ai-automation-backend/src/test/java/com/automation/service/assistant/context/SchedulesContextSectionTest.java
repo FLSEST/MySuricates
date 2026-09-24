@@ -1,31 +1,51 @@
 package com.automation.service.assistant.context;
 
+import com.automation.config.SchedulerConfig;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.Workflow;
 import com.automation.repository.ScheduledWorkflowRepository;
+import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.scheduler.ScheduleSkipPolicy;
+import com.automation.service.scheduler.UpcomingRunsCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.support.CronExpression;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SchedulesContextSectionTest {
 
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
+    @Mock private ActivityLogService activityLogService;
+
+    private static final DateTimeFormatter FMT =
+            DateTimeFormatter.ofPattern("dd.MM. HH:mm").withZone(ZoneId.systemDefault());
+
+    /** Real config: skip-until is empty unless a test sets a pause. */
+    private final SchedulerConfig schedulerConfig = new SchedulerConfig();
 
     private SchedulesContextSection section;
 
     @BeforeEach
     void setUp() {
-        section = new SchedulesContextSection(scheduledWorkflowRepository);
+        section = new SchedulesContextSection(new UpcomingRunsCalculator(scheduledWorkflowRepository,
+                Clock.systemDefaultZone(),
+                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService)));
     }
 
     private ScheduledWorkflow buildSchedule(String workflowName, Instant nextRun) {
@@ -105,5 +125,31 @@ class SchedulesContextSectionTest {
         section.append(sb, false);
 
         assertThat(sb.toString()).isEmpty();
+    }
+
+    /** During a skip-until pause the assistant names the run that really comes (TODO a776fd2a). */
+    @Test
+    void full_duringSkipUntilPause_namesTheRunAfterThePause_andDropsTheExpiringOneOff() {
+        Instant pauseEnd = Instant.now().plus(2, ChronoUnit.HOURS);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+        Instant stored = Instant.now().plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow hourly = buildSchedule("Hourly Report", stored);
+        hourly.setScheduleType(ScheduledWorkflow.ScheduleType.CRON);
+        hourly.setCronExpression("0 0 * * * *");
+        ScheduledWorkflow oneOff = buildSchedule("One-off Import", stored);
+        oneOff.setScheduleType(ScheduledWorkflow.ScheduleType.ONCE);
+        oneOff.setScheduledAt(stored);
+        when(scheduledWorkflowRepository.findSchedulesInRange(eq(Instant.EPOCH), any()))
+                .thenReturn(List.of(hourly, oneOff));
+        Instant afterPause = CronExpression.parse("0 0 * * * *")
+                .next(LocalDateTime.ofInstant(pauseEnd, ZoneId.systemDefault()).minusNanos(1))
+                .atZone(ZoneId.systemDefault()).toInstant();
+
+        StringBuilder sb = new StringBuilder();
+        section.append(sb, false);
+
+        assertThat(sb.toString())
+                .contains("Hourly Report: " + FMT.format(afterPause))
+                .doesNotContain("One-off Import");
     }
 }

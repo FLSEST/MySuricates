@@ -9,12 +9,14 @@ import { ScheduleFormModal } from '../components/schedule/ScheduleFormModal';
 import { ScheduleRunsPanel } from '../components/schedule/ScheduleRunsPanel';
 import { useScheduleColumns } from '../components/schedule/scheduleColumns';
 import { CatchUpQueueBanner } from '../components/schedule/CatchUpQueueBanner';
+import { SkipUntilBanner } from '../components/schedule/SkipUntilBanner';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useMaintenanceMode, useSetMaintenanceMode, useCatchUpQueue } from '../hooks/useSchedules';
 import { useScheduleFilters } from '../hooks/useScheduleFilters';
 import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useExecutionConfig } from '../hooks/useSystem';
 import { useT } from '../i18n';
 
 export function Schedules() {
@@ -29,6 +31,10 @@ export function Schedules() {
   const { data: catchUpQueue } = useCatchUpQueue();
   const setMaintenance = useSetMaintenanceMode();
   const isMaintenanceMode = maintenanceData?.enabled ?? false;
+  const { data: executionConfig } = useExecutionConfig();
+  const globalCatchUpOnResume = executionConfig?.schedulerCatchUpOnResume === undefined
+    ? undefined
+    : executionConfig.schedulerCatchUpOnResume === 1;
 
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
@@ -115,6 +121,9 @@ export function Schedules() {
           <span className="text-sm font-medium">{t.schedules.maintenanceModeActive}</span>
         </div>
       )}
+
+      {/* Skip-until pause from the configuration: due schedules are skipped until its end */}
+      <SkipUntilBanner pausedUntil={maintenanceData?.pausedUntil} />
 
       {/* Sequential catch-up after resume / cold start */}
       <CatchUpQueueBanner queue={catchUpQueue} />
@@ -253,6 +262,7 @@ export function Schedules() {
         workflows={workflows}
         chains={chains}
         chainsEnabled={chainsModule}
+        globalCatchUpOnResume={globalCatchUpOnResume}
         isLoading={scheduleForm.isSubmitting}
         isFormValid={scheduleForm.isFormValid}
         onClose={scheduleForm.closeModal}

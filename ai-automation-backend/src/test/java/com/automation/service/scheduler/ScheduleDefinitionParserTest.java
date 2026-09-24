@@ -1,5 +1,6 @@
 package com.automation.service.scheduler;
 
+import com.automation.entity.ScheduledWorkflow.ConflictBehavior;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,21 @@ class ScheduleDefinitionParserTest {
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
     private final ScheduleDefinitionParser parser =
             new ScheduleDefinitionParser(Clock.fixed(FIXED_NOW, ZoneId.of("UTC")));
+
+    // --- parseConflictBehavior (TODO ade3fef8: editable after creation) ---
+
+    @Test
+    void parseConflictBehavior_acceptsBothValuesCaseInsensitive() {
+        assertThat(parser.parseConflictBehavior("SKIP")).isEqualTo(ConflictBehavior.SKIP);
+        assertThat(parser.parseConflictBehavior(" overlap ")).isEqualTo(ConflictBehavior.OVERLAP);
+    }
+
+    @Test
+    void parseConflictBehavior_unknownValue_throws() {
+        assertThatThrownBy(() -> parser.parseConflictBehavior("QUEUE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid conflict behavior: QUEUE");
+    }
 
     // --- parseDelay (moved from SchedulerServiceTest) ---
 

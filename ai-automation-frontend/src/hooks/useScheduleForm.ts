@@ -87,6 +87,7 @@ export function useScheduleForm() {
       data.description = form.description;
       data.inputContext = form.inputContext;
       data.catchUpOnResume = form.catchUpOnResume ?? false;
+      data.conflictBehavior = form.conflictBehavior ?? 'SKIP';
       if (editingSchedule.scheduleType === 'CRON' && showEndConditions) {
         data.endDate = form.endDate ?? null;
         data.maxRuns = form.maxRuns ?? null;

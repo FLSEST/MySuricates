@@ -172,7 +172,10 @@ Update a project.
 }
 ```
 
-All fields are optional; only provided fields are updated.
+All fields are optional; only provided fields are updated. Editable are `cronExpression` (`CRON` only),
+`scheduledAt` (`ONCE` only), `description`, `inputContext`, `endDate` and `maxRuns` (`CRON` only),
+`catchUpOnResume` and `conflictBehavior` (`SKIP`/`OVERLAP`, since 2026-09-24; any other value → `400`).
+Target and type of a schedule stay fixed.
 
 **Response:** `ProjectResponse`
 
@@ -1059,22 +1062,31 @@ List all schedules.
     "runCount": 0,
     "conflictBehavior": "SKIP",
     "catchUpOnResume": false,
+    "pausedUntil": null,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
 ```
 
+`nextRunAt` is the next run the scheduler will actually start. If the stored time lies in an active
+`skip-until` pause (`automation.scheduler.skip-until`), this is the first occurrence after the pause —
+`null` for a one-off schedule, which expires — and `pausedUntil` names the end of the pause; otherwise
+`pausedUntil` is `null`. The tick only advances the stored time once it becomes due; without this, list,
+calendar and workflow page showed a run that never happens until then (since 2026-09-24, TODO a776fd2a).
+The same applies to every route that returns `ScheduledWorkflowResponse`.
+
 ### `GET /api/v1/schedules/remaining-today`
 
 Remaining scheduled executions for today.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`). Occurrences inside an active
+`skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the pause, else `null`.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
 Remaining scheduled executions for this week.
 
-**Response:** `UpcomingScheduleResponse`
+**Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil`)
 
 ### `GET /api/v1/schedules/{id}`
 
@@ -1123,7 +1135,7 @@ Calendar data: scheduled executions and past runs within a time range.
 | `to` | Instant | Yes |
 
 **Response:** `CalendarDataResponse` with `upcoming` (`ScheduledWorkflowResponse[]`, schedules whose next
-date lies in the range) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
+actual run lies in the range — during a `skip-until` pause, that is after the pause) and `pastRuns` (`WorkflowRunListItemResponse[]` — **without steps**, the same list
 rows as `GET /api/v1/executions`; until 2026-09-23 with every step of every run in the range)
 
 ### `POST /api/v1/schedules/preview`
@@ -1138,7 +1150,8 @@ Preview the next 5 execution times for a cron expression.
 }
 ```
 
-**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }`
+**Response:** `{ "runs": ["2025-01-16T02:00:00Z", ...] }` — during an active `skip-until` pause the times
+start after the pause, and the response additionally carries `"pausedUntil"`.
 
 ### `POST /api/v1/schedules`
 
@@ -1167,9 +1180,20 @@ Create a new schedule.
 | `scheduledAt` | Instant | No (for `ONCE` schedules) |
 | `delayExpression` | String | No (for `DELAYED` schedules, e.g. `"2h"`, `"30m"`) |
 | `endDate` | Instant | No (optional end date for `CRON` schedules) |
-| `maxRuns` | Integer | No (max executions, 0 = unlimited) |
-| `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP`) |
-| `catchUpOnResume` | boolean | No (default: `false`) |
+| `maxRuns` | Integer | No (max starts, 0 = unlimited — see below) |
+| `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP` — see below) |
+| `catchUpOnResume` | boolean | No (default: `false` — see below) |
+
+- **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
+  `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
+  `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
+  `OVERLAP` starts a second run next to it anyway.
+- **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
+  `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset
+  `runCount` — exactly one more start follows.
+- **`catchUpOnResume`:** catches up occurrences of this schedule that fell into a standby or a restart,
+  even when the global setting `scheduler-catch-up-on-resume` is off. That setting is on by default — then
+  every schedule is caught up anyway, one after another through the catch-up queue.
 
 **Response:** `201` with `ScheduledWorkflowResponse`
 
@@ -1219,13 +1243,16 @@ Query the sequential catch-up queue: the missed occurrence currently being caugh
 
 ### `GET /api/v1/schedules/maintenance`
 
-Query maintenance mode status.
+Query maintenance mode status, together with an active `skip-until` pause from the configuration.
 
-**Response:** `{ "enabled": false }`
+**Response:** `{ "enabled": false, "pausedUntil": null }` — `pausedUntil` is the end of the pause while it is
+still ahead, else `null`.
 
 ### `POST /api/v1/schedules/maintenance`
 
-Toggle maintenance mode on/off. In maintenance mode, no scheduled executions are started.
+Toggle maintenance mode on/off. In maintenance mode no schedule starts; `nextRunAt` stays where it is.
+When it is switched off, every schedule whose time fell into the pause starts once, right away — all at
+the same time, without the catch-up queue.
 
 **Request:**
 
@@ -1235,7 +1262,7 @@ Toggle maintenance mode on/off. In maintenance mode, no scheduled executions are
 }
 ```
 
-**Response:** `{ "enabled": true }`
+**Response:** `{ "enabled": true, "pausedUntil": null }`
 
 ---
 
