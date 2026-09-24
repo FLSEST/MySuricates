@@ -34,7 +34,8 @@ import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useRunDeletionAllowed } from '../hooks/useSystemCapabilities';
 import { useToast } from '../hooks/useToast';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
+import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
 import { api, openPath } from '../api/client';
 import type { PendingHumanInput, PendingTodoItem } from '../types';
@@ -45,6 +46,7 @@ export function WorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const navigate = useNavigate();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
@@ -150,7 +152,7 @@ export function WorkflowExecution() {
 
     const descParts: string[] = [];
     descParts.push(`**Workflow:** ${workflow?.name || run.workflowName}`);
-    descParts.push(`**Run:** [${new Date(run.startedAt).toLocaleString()}](/workflows/${id}/run/${runId})`);
+    descParts.push(`**Run:** [${formatTimestamp(run.startedAt, locale)}](/workflows/${id}/run/${runId})`);
     if (stepInfo) descParts.push(`**Fehlgeschlagener Step:** ${stepInfo}`);
     if (run.error?.message) descParts.push(`**Fehler:** ${run.error.message}`);
     if (failedStep?.error) descParts.push(`**Step-Fehler:** ${failedStep.error}`);
@@ -210,7 +212,7 @@ export function WorkflowExecution() {
               >
                 {workflow?.name}
               </button>
-              {' '}&middot; {new Date(run.startedAt).toLocaleString()}
+              {' '}&middot; {formatTimestamp(run.startedAt, locale)}
             </span>
             {run.projectPath && (
               <button

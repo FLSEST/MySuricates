@@ -17,7 +17,8 @@ import {
 import { OnboardingCard } from '../components/project/OnboardingCard';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useModuleEnabled } from '../hooks/useModules';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
+import { formatDate } from '../utils/localeFormat';
 import type { ProjectType } from '../types';
 
 const PROJECT_TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSONAL'];
@@ -26,6 +27,7 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const { data: project, isLoading, error, refetch } = useProject(id!);
   const { data: workflows } = useWorkflows();
@@ -138,11 +140,11 @@ export function ProjectDetail() {
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">{t.common.created}</span>
-              <span className="text-text">{new Date(project.createdAt).toLocaleDateString()}</span>
+              <span className="text-text">{formatDate(project.createdAt, locale)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">{t.common.updated}</span>
-              <span className="text-text">{new Date(project.updatedAt).toLocaleDateString()}</span>
+              <span className="text-text">{formatDate(project.updatedAt, locale)}</span>
             </div>
           </div>
         </Card>

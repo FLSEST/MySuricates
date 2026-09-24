@@ -2,10 +2,7 @@ import { useMemo } from 'react';
 import { MapPin, ExternalLink } from 'lucide-react';
 import type { UnifiedCalendarEvent } from '../../types';
 import { useI18nStore } from '../../i18n';
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 
 const WEEKDAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const WEEKDAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -17,8 +14,8 @@ interface Props {
 }
 
 export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
-  const isGerman = useI18nStore((s) => s.locale) === 'de';
-  const weekdayLabels = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
+  const locale = useI18nStore((s) => s.locale);
+  const weekdayLabels = locale === 'de' ? WEEKDAYS_DE : WEEKDAYS_EN;
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
@@ -74,7 +71,7 @@ export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
                   {day.getDate()}
                 </span>
                 <span className="text-[10px] text-text-tertiary">
-                  {day.toLocaleDateString(isGerman ? 'de' : 'en', { month: 'short' })}
+                  {formatDate(day, locale, { month: 'short' })}
                 </span>
               </button>
               <div className="flex-1 p-1.5 space-y-1 overflow-y-auto">
@@ -91,7 +88,8 @@ export function CalendarWeekView({ weekStart, events, onDayClick }: Props) {
 }
 
 function WeekEventCard({ event }: { event: UnifiedCalendarEvent }) {
-  const timeLabel = event.allDay ? '' : formatTime(event.start);
+  const locale = useI18nStore((s) => s.locale);
+  const timeLabel = event.allDay ? '' : formatTimeOfDay(event.start, locale, { hour: '2-digit', minute: '2-digit' });
 
   const content = (
     <div className="flex items-start gap-1.5 p-1.5 rounded-md bg-surface-secondary hover:bg-surface-hover transition-colors group text-left">

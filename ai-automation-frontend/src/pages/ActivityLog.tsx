@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { ScrollText, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useActivityLog } from '../hooks/useActivityLog';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
+import { formatTimestamp } from '../utils/localeFormat';
+import { relativeTime } from '../utils/activityLevel';
 import type { ActivityLogLevel, ActivityLogCategory } from '../types';
 
 const LEVELS: ActivityLogLevel[] = ['DEBUG', 'INFO', 'WARN', 'ERROR'];
@@ -16,17 +18,6 @@ const levelColors: Record<ActivityLogLevel, string> = {
   WARN: 'bg-warning-subtle text-warning',
   ERROR: 'bg-danger-subtle text-danger',
 };
-
-function relativeTime(ts: string): string {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'gerade';
-  if (mins < 60) return `${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
 
 function referenceLink(category: ActivityLogCategory, refId: string | null): string | null {
   if (!refId) return null;
@@ -40,6 +31,7 @@ function referenceLink(category: ActivityLogCategory, refId: string | null): str
 
 export function ActivityLog() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const [page, setPage] = useState(0);
   const [level, setLevel] = useState('');
   const [category, setCategory] = useState('');
@@ -55,7 +47,7 @@ export function ActivityLog() {
     return next;
   });
 
-  const formatTime = (ts: string) => new Date(ts).toLocaleString();
+  const formatTime = (ts: string) => formatTimestamp(ts, locale);
 
   const hasDetails = (entry: { metadata?: Record<string, unknown>; referenceId?: string | null }) =>
     (entry.referenceId) || (entry.metadata && Object.keys(entry.metadata).length > 0);
@@ -150,7 +142,7 @@ export function ActivityLog() {
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-xs">
                             <span className="text-text-secondary" title={formatTime(entry.timestamp)}>
-                              {relativeTime(entry.timestamp)}
+                              {relativeTime(entry.timestamp, new Date())}
                             </span>
                           </td>
                           <td className="px-4 py-2.5">

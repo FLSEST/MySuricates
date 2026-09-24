@@ -8,9 +8,21 @@ import { de } from '../../i18n/de';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { OnboardingProfiles } from '../OnboardingProfiles';
 
-vi.mock('../../components/shared/monacoSetup', () => ({ ensureLocalMonaco: () => Promise.resolve() }));
+vi.mock('../../components/shared/monacoSetup', () => ({ ensureLocalMonaco: () => Promise.resolve(), registerJsonSchema: () => () => {} }));
+// The page reaches the library only through the shared wrapper (87c5e9f3); the stand-in shows what it gets.
 vi.mock('@monaco-editor/react', () => ({
-  default: ({ value }: { value: string }) => <textarea aria-label="editor" readOnly value={value} />,
+  default: ({ defaultValue, path, language, options }: {
+    defaultValue?: string; path?: string; language?: string; options?: Record<string, unknown>;
+  }) => (
+    <textarea
+      aria-label="editor"
+      readOnly
+      value={defaultValue ?? ''}
+      data-path={path}
+      data-language={language}
+      data-options={JSON.stringify(options ?? {})}
+    />
+  ),
 }));
 
 function profile(overrides: Record<string, unknown> = {}) {
@@ -71,5 +83,25 @@ describe('OnboardingProfiles', () => {
 
     expect(screen.getByLabelText(de.onboardingProfiles.descriptionDe)).toBeTruthy();
     expect(screen.getByLabelText(de.onboardingProfiles.descriptionEn)).toBeTruthy();
+  });
+
+  // Before 87c5e9f3 the page used Monaco directly and controlled: keystrokes got lost, and Enter at
+  // the end of a known word accepted a suggestion instead of breaking the line.
+  it('edits the content as Markdown prose in the shared editor, one model per language', async () => {
+    server.use(http.get('/api/v1/onboarding-profiles', () => HttpResponse.json([profile({ customized: false })])));
+    renderWithProviders(<OnboardingProfiles />);
+
+    fireEvent.click(await screen.findByText('Entwickler'));
+    const editor = await screen.findByLabelText('editor');
+    expect(editor).toHaveValue('## Von Hand');
+    expect(editor).toHaveAttribute('data-path', 'onboarding-profile-dev-id-de.md');
+    expect(editor).toHaveAttribute('data-language', 'markdown');
+    expect(JSON.parse(editor.getAttribute('data-options')!)).toMatchObject({
+      lineNumbers: 'off', wordWrap: 'on', quickSuggestions: false, wordBasedSuggestions: 'off',
+    });
+
+    fireEvent.click(within(screen.getByRole('group', { name: de.onboardingProfiles.contentLanguage })).getByText('EN'));
+    expect(screen.getByLabelText('editor')).toHaveValue('## By hand');
+    expect(screen.getByLabelText('editor')).toHaveAttribute('data-path', 'onboarding-profile-dev-id-en.md');
   });
 });

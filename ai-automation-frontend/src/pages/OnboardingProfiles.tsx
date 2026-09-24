@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useT } from '../i18n';
 import {
   useOnboardingProfiles,
@@ -18,14 +18,9 @@ import { ModalFooter } from '../components/ui/ModalFooter';
 import { Spinner } from '../components/ui/Spinner';
 import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield, ArrowUpCircle, PencilLine } from 'lucide-react';
 import { useI18nStore } from '../i18n';
-import { ensureLocalMonaco } from '../components/shared/monacoSetup';
+import { formatTimestamp } from '../utils/localeFormat';
+import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { Hint } from '../components/hints/Hint';
-import { useThemeAppearance } from '../stores/themeStore';
-
-// Monaco from our own bundle, never the CDN (see monacoSetup)
-const MonacoEditor = lazy(() =>
-  ensureLocalMonaco().then(() => import('@monaco-editor/react')).then(m => ({ default: m.default }))
-);
 
 function resolveProfileName(profile: OnboardingProfile, locale: string): string {
   return profile.name[locale] || profile.name['en'] || profile.key;
@@ -56,7 +51,6 @@ export function OnboardingProfiles() {
   const [showReset, setShowReset] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showShipped, setShowShipped] = useState(false);
-  const appearance = useThemeAppearance();
   const [editContent, setEditContent] = useState<ContentByLanguage>({ de: '', en: '' });
   const [contentLanguage, setContentLanguage] = useState<ContentLanguage>(locale === 'de' ? 'de' : 'en');
   const [editName, setEditName] = useState({ de: '', en: '' });
@@ -310,25 +304,17 @@ export function OnboardingProfiles() {
                   </div>
                 </div>
                 <p className="text-xs text-text-tertiary mb-1.5">{t.onboardingProfiles.contentFallback}</p>
-                <div className="border border-border rounded-lg overflow-hidden" style={{ height: '400px' }}>
-                  <Suspense fallback={<div className="flex items-center justify-center h-full"><Spinner /></div>}>
-                    <MonacoEditor
-                      height="400px"
-                      language="markdown"
-                      theme={appearance === 'dark' ? 'vs-dark' : 'light'}
-                      path={`onboarding-profile-${selected.id}-${contentLanguage}.md`}
-                      value={editContent[contentLanguage]}
-                      onChange={value => { setEditContent(c => ({ ...c, [contentLanguage]: value || '' })); setHasChanges(true); }}
-                      options={{
-                        minimap: { enabled: false },
-                        wordWrap: 'on',
-                        fontSize: 13,
-                        lineNumbers: 'off',
-                        scrollBeyondLastLine: false,
-                      }}
-                    />
-                  </Suspense>
-                </div>
+                {/* Through the wrapper (87c5e9f3): no lost keystrokes, Enter breaks the line; one model
+                    per profile and language keeps each its own undo history. */}
+                <MonacoEditor
+                  height="400px"
+                  language="markdown"
+                  prose
+                  lineNumbers="off"
+                  path={`onboarding-profile-${selected.id}-${contentLanguage}.md`}
+                  value={editContent[contentLanguage]}
+                  onChange={value => { setEditContent(c => ({ ...c, [contentLanguage]: value })); setHasChanges(true); }}
+                />
               </div>
 
               {/* Actions */}
@@ -531,6 +517,7 @@ function ShippedModal({ profileId, open, onClose, onTakeOver, takingOver }: {
 
 function HistoryModal({ profileId, open, onClose }: { profileId: string; open: boolean; onClose: () => void }) {
   const t = useT();
+  const locale = useI18nStore(s => s.locale);
   const { data: history, isLoading } = useOnboardingProfileHistory(profileId);
 
   return (
@@ -551,7 +538,7 @@ function HistoryModal({ profileId, open, onClose }: { profileId: string; open: b
                 <span className="text-sm font-medium text-text">v{h.version}</span>
                 <div className="flex items-center gap-2 text-xs text-text-tertiary">
                   <span>{h.changedBy}</span>
-                  <span>{new Date(h.changedAt).toLocaleString()}</span>
+                  <span>{formatTimestamp(h.changedAt, locale)}</span>
                 </div>
               </div>
               {Object.entries(h.content ?? {}).map(([lang, text]) => (

@@ -25,13 +25,14 @@ const sizeStyles: Record<Size, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, icon, children, className = '', ...props }, ref) => {
+  ({ variant = 'primary', size = 'md', loading, icon, children, className = '', disabled, ...props }, ref) => {
     return (
       <button
         ref={ref}
         className={`btn-base ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
-        disabled={loading || props.disabled}
         {...props}
+        // After the spread: an explicit disabled={false} must not lift the lock while loading (660706aa)
+        disabled={loading || disabled}
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
         {children}

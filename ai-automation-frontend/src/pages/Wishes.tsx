@@ -11,12 +11,13 @@ import { WishForm } from '../components/wishes/WishForm';
 import { useWishes, useCreateWish, useCancelWish, useDeleteWish } from '../hooks/useWishes';
 import { useProjects } from '../hooks/useProjects';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatRelativeTime } from '../utils/formatTime';
 import type { Wish } from '../types';
 
 export function Wishes() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: wishes, isLoading, error, refetch } = useWishes();
   const { data: projects } = useProjects();
   const createWish = useCreateWish();
@@ -130,7 +131,7 @@ export function Wishes() {
                         )}
                       </div>
                       <span className="text-xs text-text-tertiary whitespace-nowrap">
-                        {formatRelativeTime(wish.createdAt)}
+                        {formatRelativeTime(wish.createdAt, locale)}
                       </span>
                     </div>
                   </div>

@@ -6,7 +6,8 @@ import { useDashboardData } from './dashboardDataContext';
 import { useProjects } from '../../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
 import { useSystemInfo } from '../../hooks/useSystem';
-import { useT } from '../../i18n';
+import { useI18nStore, useT, type Locale } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
 function StatCard({ icon, label, value, accent }: {
@@ -131,11 +132,10 @@ export function PlannedThisWeekStat() {
   );
 }
 
-function formatBuildTime(iso: string | undefined): string {
+function formatBuildTime(iso: string | undefined, locale: Locale): string {
   if (!iso || iso === 'unknown') return '?';
   try {
-    const d = new Date(iso);
-    return d.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return formatTimestamp(iso, locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   } catch {
     return iso;
   }
@@ -143,6 +143,7 @@ function formatBuildTime(iso: string | undefined): string {
 
 export function BuildInfoStat() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: systemInfo } = useSystemInfo();
   // Zwischen zwei Releases steht in beiden Dateien X.Y.Z-SNAPSHOT; das Backend liefert die Nummer
   // schon ohne Suffix (SystemIdentityService), hier faellt es genauso weg.
@@ -175,10 +176,10 @@ export function BuildInfoStat() {
           )}
         </div>
         <div className={`flex gap-2 items-center flex-wrap text-[9px] ${mismatch ? 'text-warning' : 'text-text-tertiary'}`}>
-          <span className="whitespace-nowrap" title={`${t.dashboard.backendBuild}: ${formatBuildTime(systemInfo?.buildTimestamp)}`}>
+          <span className="whitespace-nowrap" title={`${t.dashboard.backendBuild}: ${formatBuildTime(systemInfo?.buildTimestamp, locale)}`}>
             BE {beVersion ?? '?'}
           </span>
-          <span className="whitespace-nowrap" title={`${t.dashboard.frontendBuild}: ${formatBuildTime(__BUILD_TIMESTAMP__)}`}>
+          <span className="whitespace-nowrap" title={`${t.dashboard.frontendBuild}: ${formatBuildTime(__BUILD_TIMESTAMP__, locale)}`}>
             FE {feVersion}
           </span>
           {mismatch && (

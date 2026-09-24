@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CronPicker } from '../CronPicker';
 import { useI18nStore } from '../../../i18n';
+import { formatTimestamp } from '../../../utils/localeFormat';
 
 const preview = vi.hoisted(() => ({
   data: undefined as undefined | { runs: string[]; pausedUntil?: string },
@@ -23,7 +24,7 @@ describe('CronPicker next-runs preview', () => {
     render(<CronPicker value="0 0 8 * * *" onChange={vi.fn()} />);
 
     expect(screen.getByText(/Next runs after the pause/)).toHaveTextContent(
-      `Next runs after the pause (until ${new Date('2026-10-01T22:00:00Z').toLocaleString()})`);
+      `Next runs after the pause (until ${formatTimestamp('2026-10-01T22:00:00Z', 'en')})`);
   });
 
   it('keeps the plain label without a pause', () => {

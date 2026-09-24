@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { XCircle, Trash2, ChevronRight, ChevronDown, ExternalLink, RefreshCw, RotateCcw } from 'lucide-react';
 import { Card, Button, Spinner, Badge } from '../ui';
 import { useWish, useRespondToWish } from '../../hooks/useWishes';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
 import { computeIterationDiff, type IterationEntry } from '../../utils/iterationDiff';
 import type { WishStatus } from '../../types';
@@ -24,6 +24,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
   onDelete: () => void;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const { data: wish } = useWish(wishId);
   // Only the current run's steps are shown — loaded on their own, the run list carries none
@@ -256,7 +257,7 @@ export function WishDetail({ wishId, onCancel, onDelete }: {
                         </span>
                         {timestamp && (
                           <span className="text-xs text-text-tertiary">
-                            {formatRelativeTime(timestamp)}
+                            {formatRelativeTime(timestamp, locale)}
                           </span>
                         )}
                       </div>

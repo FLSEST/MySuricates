@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, Trash2, Pencil, ArrowDown, ChevronRight } from 'lucide-react';
 import { Card, Button, Badge } from '../ui';
 import { useChainRuns } from '../../hooks/useChains';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatDuration, formatRelativeTime } from '../../utils/formatTime';
 import type { WorkflowChain } from '../../types';
 import { ChainStatusBadge } from './ChainStatusBadge';
@@ -16,6 +16,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
   onDelete: () => void;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const { data: runs } = useChainRuns(chain.id);
   const { byWorkflow: sealStatuses } = useSealStatuses();
@@ -130,7 +131,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-text-tertiary">{formatDuration(run.durationMs)}</span>
                     {run.startedAt && (
-                      <span className="text-xs text-text-tertiary">{formatRelativeTime(run.startedAt)}</span>
+                      <span className="text-xs text-text-tertiary">{formatRelativeTime(run.startedAt, locale)}</span>
                     )}
                     <ChevronRight className="w-4 h-4 text-text-tertiary" />
                   </div>

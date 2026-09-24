@@ -7,6 +7,7 @@ import { CalendarWeekView } from './CalendarWeekView';
 import { CalendarDayView } from './CalendarDayView';
 import { useCalendarAggregated } from '../../hooks/useCalendarAggregated';
 import { useT, useI18nStore } from '../../i18n';
+import { formatDate } from '../../utils/localeFormat';
 import type { UnifiedCalendarEvent } from '../../types';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -143,10 +144,10 @@ export function UnifiedCalendarGrid() {
       }
       return `${fmtDay(monday)} – ${fmtDay(sunday)} ${sunday.getFullYear()}`;
     }
-    return currentDate.toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
+    return formatDate(currentDate, locale, {
       weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
-  }, [viewMode, month, year, currentDate, months, isGerman]);
+  }, [viewMode, month, year, currentDate, months, locale]);
 
   const isNotToday = viewMode === 'month'
     ? (year !== now.getFullYear() || month !== now.getMonth())

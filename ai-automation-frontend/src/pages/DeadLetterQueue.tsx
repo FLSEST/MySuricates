@@ -11,7 +11,7 @@ import {
   type DeadLetterEntry,
   type DeadLetterStatus,
 } from '../hooks/useDeadLetters';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatRelativeTime } from '../utils/formatTime';
 
 const PAGE_SIZE = 20;
@@ -167,6 +167,7 @@ function DlqRow({
   onDiscard: () => void;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const isOpen = entry.status === 'OPEN';
 
   return (
@@ -205,7 +206,7 @@ function DlqRow({
           )}
 
           <div className="flex items-center gap-3 mt-2 text-xs text-text-tertiary">
-            <span>{t.dlq.failedAt}: {formatRelativeTime(entry.lastFailureAt)}</span>
+            <span>{t.dlq.failedAt}: {formatRelativeTime(entry.lastFailureAt, locale)}</span>
             {entry.retryCount > 0 && (
               <span>{t.dlq.retryCount}: {entry.retryCount}</span>
             )}

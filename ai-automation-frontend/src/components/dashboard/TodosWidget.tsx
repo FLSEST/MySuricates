@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom';
 import { CheckSquare, ArrowRight, Circle, Bot, Workflow, Clock, RefreshCw } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { useTodoCount, useTodos } from '../../hooks/useTodos';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { todoDeepLink } from '../../utils/todoLinks';
 import type { Todo, TodoPriority } from '../../types';
 import { WidgetSkeleton } from './WidgetSkeleton';
@@ -23,6 +24,8 @@ const sourceIcon: Record<string, React.ReactNode> = {
 
 function TodoRow({ todo }: { todo: Todo }) {
   const navigate = useNavigate();
+  const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   return (
     <div
@@ -55,14 +58,14 @@ function TodoRow({ todo }: { todo: Todo }) {
       </div>
 
       {/* Time */}
-      <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+      <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`${t.common.created}: ${formatTimestamp(todo.createdAt, locale)}`}>
         <Clock className="w-2.5 h-2.5" />
-        {formatRelativeTime(todo.createdAt)}
+        {formatRelativeTime(todo.createdAt, locale)}
       </span>
       {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
-        <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+        <span className="text-[10px] text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`${t.common.updated}: ${formatTimestamp(todo.updatedAt, locale)}`}>
           <RefreshCw className="w-2.5 h-2.5" />
-          {formatRelativeTime(todo.updatedAt)}
+          {formatRelativeTime(todo.updatedAt, locale)}
         </span>
       )}
     </div>

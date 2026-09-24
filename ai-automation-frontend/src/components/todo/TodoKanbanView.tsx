@@ -4,8 +4,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Clock, RefreshCw, ExternalLink, CalendarClock, Wrench } from 'lucide-react';
 import { Badge, Spinner } from '../ui';
-import { useT } from '../../i18n';
-import { priorityColor, formatRelative } from './todoConstants';
+import { useI18nStore, useT } from '../../i18n';
+import { priorityColor } from './todoConstants';
+import { formatRelativeShort } from '../../utils/formatTime';
+import { formatDate, formatTimestamp } from '../../utils/localeFormat';
 import type { Todo, TodoStatus } from '../../types';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children: string }) {
@@ -23,6 +25,7 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
   highlighted?: boolean;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   return (
     <div
       id={`todo-${todo.id}`}
@@ -99,9 +102,9 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
       {/* Quick status change buttons (on hover) */}
       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`${t.common.created}: ${formatTimestamp(todo.createdAt, locale)}`}>
             <Clock className="w-2.5 h-2.5" />
-            {formatRelative(todo.createdAt)}
+            {formatRelativeShort(todo.createdAt, locale)}
           </span>
           {todo.dueDate && (() => {
             const now = new Date();
@@ -114,15 +117,15 @@ const KanbanCard = memo(function KanbanCard({ todo, onEdit, onStatusChange, onRe
             return (
               <span className={`text-[10px] inline-flex items-center gap-0.5 font-medium ${colorClass}`}>
                 <CalendarClock className="w-2.5 h-2.5" />
-                {dueDay.toLocaleDateString()}
+                {formatDate(dueDay, locale)}
               </span>
             );
           })()}
         </div>
         {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
-          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+          <span className="text-[10px] text-text-tertiary inline-flex items-center gap-0.5" title={`${t.common.updated}: ${formatTimestamp(todo.updatedAt, locale)}`}>
             <RefreshCw className="w-2.5 h-2.5" />
-            {formatRelative(todo.updatedAt)}
+            {formatRelativeShort(todo.updatedAt, locale)}
           </span>
         )}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

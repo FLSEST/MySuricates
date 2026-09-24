@@ -4,10 +4,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Pencil, Trash2, Clock, RefreshCw, ExternalLink, CalendarClock, Wrench, Terminal } from 'lucide-react';
 import { Badge } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { ProviderIcon } from '../shared/ProviderIcon';
 import { StatusDots } from './StatusDots';
-import { priorityColor, sourceIcon, formatRelative } from './todoConstants';
+import { priorityColor, sourceIcon } from './todoConstants';
+import { formatRelativeShort } from '../../utils/formatTime';
+import { formatDate, formatTimestamp } from '../../utils/localeFormat';
 import type { Todo, TodoStatus } from '../../types';
 
 const MemoizedMarkdown = memo(function MemoizedMarkdown({ children }: { children: string }) {
@@ -26,6 +28,7 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
   highlighted?: boolean;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   return (
     <div
@@ -183,22 +186,22 @@ export const TodoListItem = memo(function TodoListItem({ todo, onEdit, onStatusC
               const colorClass = isOverdue ? 'text-danger' : isDueToday ? 'text-warning' : 'text-text-tertiary';
               const label = isOverdue ? t.todos.overdue : isDueToday ? t.todos.dueToday : t.todos.dueDate;
               return (
-                <span className={`text-xs shrink-0 inline-flex items-center gap-0.5 font-medium ${colorClass}`} title={`${label}: ${dueDay.toLocaleDateString()}`}>
+                <span className={`text-xs shrink-0 inline-flex items-center gap-0.5 font-medium ${colorClass}`} title={`${label}: ${formatDate(dueDay, locale)}`}>
                   <CalendarClock className="w-3 h-3" />
-                  {dueDay.toLocaleDateString()}
+                  {formatDate(dueDay, locale)}
                 </span>
               );
             })()}
 
             {/* Time */}
-            <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Erstellt: ${new Date(todo.createdAt).toLocaleString()}`}>
+            <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`${t.common.created}: ${formatTimestamp(todo.createdAt, locale)}`}>
               <Clock className="w-3 h-3" />
-              {formatRelative(todo.createdAt)}
+              {formatRelativeShort(todo.createdAt, locale)}
             </span>
             {todo.updatedAt && Math.abs(new Date(todo.updatedAt).getTime() - new Date(todo.createdAt).getTime()) > 1000 && (
-              <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`Aktualisiert: ${new Date(todo.updatedAt).toLocaleString()}`}>
+              <span className="text-xs text-text-tertiary shrink-0 inline-flex items-center gap-0.5" title={`${t.common.updated}: ${formatTimestamp(todo.updatedAt, locale)}`}>
                 <RefreshCw className="w-3 h-3" />
-                {formatRelative(todo.updatedAt)}
+                {formatRelativeShort(todo.updatedAt, locale)}
               </span>
             )}
           </div>

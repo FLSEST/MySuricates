@@ -1,11 +1,13 @@
 import { Card, CardHeader } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 import { useSystemHealth, useSystemInfo } from '../../hooks/useSystem';
 import { Server } from 'lucide-react';
 
 export function SystemInfoCard() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: health } = useSystemHealth();
   const { data: sysInfo } = useSystemInfo();
 
@@ -45,7 +47,7 @@ export function SystemInfoCard() {
             </div>
             <div className="flex justify-between">
               <span className="text-text-secondary">Last Check</span>
-              <span className="text-text-tertiary text-xs">{new Date(health.timestamp).toLocaleTimeString()}</span>
+              <span className="text-text-tertiary text-xs">{formatTimeOfDay(health.timestamp, locale)}</span>
             </div>
           </div>
         )}

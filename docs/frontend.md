@@ -211,7 +211,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 |---|---|
 | `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
 | `LogViewer` | Log-Anzeige im Terminal-Look: Level-Farben, Icons pro Live-Zeilenart, Step-Badge, Auto-Scroll nur solange man am Ende ist (sonst „Zu den neuesten Zeilen“) |
-| `MonacoEditor` | Editor für JSON und Markdown (Monaco, folgt dem Theme). `value` darf jeden Tastendruck über den State zurückreichen: Echos des eigenen `onChange` schreibt der Wrapper nicht ins Modell (`monacoValueSync.ts`), jeder andere Wert ersetzt den Inhalt. `prose` für Fließtext (Umbruch, keine Wortvorschläge, sonst übernimmt Enter einen Vorschlag); `jsonSchema` und `placeholders` für Block-Configs |
+| `MonacoEditor` | Editor für JSON und Markdown (Monaco, folgt dem Theme). `value` darf jeden Tastendruck über den State zurückreichen: Echos des eigenen `onChange` schreibt der Wrapper nicht ins Modell (`monacoValueSync.ts`), jeder andere Wert ersetzt den Inhalt. `prose` für Fließtext (Umbruch, keine Wortvorschläge, sonst übernimmt Enter einen Vorschlag); `jsonSchema` und `placeholders` für Block-Configs; `path` gibt jedem Dokument ein eigenes Modell (eigene Undo-Historie beim Umschalten, z. B. je Onboarding-Profil und Sprache), `lineNumbers="off"` blendet die Zeilennummern aus. Kein Feld nutzt `@monaco-editor/react` direkt (Wächter in `MonacoEditor.test.tsx`) |
 | `ErrorState` | Fehlermeldung mit Icon |
 | `EmptyState` | Leerer Zustand mit Beschreibung |
 | `Pagination` | Seitennavigation für paginierte Listen |
@@ -784,6 +784,8 @@ Responsive-Hook, erkennt Mobile-Breakpoint (max-width: 1023px) für adaptive UI-
 - **Hook:** `useT()` → gibt das aktuelle Übersetzungsobjekt zurück
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
 - **Umschalten:** Button im Header
+- **Datum und Zahl:** nur über `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) bzw. `src/utils/formatTime.ts`, immer mit `locale` aus `useI18nStore` — ohne Locale schreibt der Browser in seiner eigenen Sprache. `src/__tests__/localeFormat.guard.test.ts` lässt `Intl` und die `toLocale…String`-Methoden nirgends sonst zu
+- **`<html lang>`:** folgt der App-Sprache (`syncDocumentLanguage()` in `main.tsx`), für Screenreader und Silbentrennung
 
 ### Übersetzungsstruktur
 

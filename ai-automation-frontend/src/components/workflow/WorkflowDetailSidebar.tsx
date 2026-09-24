@@ -9,7 +9,8 @@ import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
 import { useAiProviders } from '../../hooks/useSystem';
 import { useModuleEnabled } from '../../hooks/useModules';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { formatDuration } from '../../utils/formatTime';
 import type { Workflow } from '../../types';
 
@@ -33,6 +34,7 @@ export function WorkflowDetailSidebar({
   onNavigateToRun,
 }: WorkflowDetailSidebarProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const memoryModule = useModuleEnabled('memory');
   const skillsModule = useModuleEnabled('skills');
   const factoryModule = useModuleEnabled('factory');
@@ -62,7 +64,7 @@ export function WorkflowDetailSidebar({
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">{t.common.created}</span>
-            <span className="text-text">{new Date(workflow.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="text-text">{formatTimestamp(workflow.createdAt, locale, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         </div>
       </Card>

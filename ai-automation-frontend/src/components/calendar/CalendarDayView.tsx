@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { MapPin, ExternalLink } from 'lucide-react';
 import type { UnifiedCalendarEvent } from '../../types';
-import { useT, useI18nStore } from '../../i18n';
+import { useT, useI18nStore, type Locale } from '../../i18n';
+import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function formatTime(date: Date, locale: Locale): string {
+  return formatTimeOfDay(date, locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 interface Props {
@@ -16,9 +17,9 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 export function CalendarDayView({ date, events }: Props) {
   const t = useT();
-  const isGerman = useI18nStore((s) => s.locale) === 'de';
+  const locale = useI18nStore((s) => s.locale);
 
-  const dayLabel = date.toLocaleDateString(isGerman ? 'de-DE' : 'en-US', {
+  const dayLabel = formatDate(date, locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -90,6 +91,7 @@ export function CalendarDayView({ date, events }: Props) {
 }
 
 function DayEventItem({ event, showTime }: { event: UnifiedCalendarEvent; showTime?: boolean }) {
+  const locale = useI18nStore((s) => s.locale);
   const content = (
     <div className="flex items-start gap-2 p-2 rounded-lg bg-surface-secondary hover:bg-surface-hover transition-colors group">
       <span className={`w-1 self-stretch rounded-full shrink-0 ${event.color}`} />
@@ -98,8 +100,8 @@ function DayEventItem({ event, showTime }: { event: UnifiedCalendarEvent; showTi
         <div className="flex items-center gap-2 mt-0.5">
           {showTime && (
             <span className="text-xs text-text-secondary">
-              {formatTime(event.start)}
-              {event.end ? ` – ${formatTime(event.end)}` : ''}
+              {formatTime(event.start, locale)}
+              {event.end ? ` – ${formatTime(event.end, locale)}` : ''}
             </span>
           )}
           <span className="text-xs text-text-tertiary">{event.sourceLabel}</span>

@@ -2,7 +2,8 @@ import { useSyncedState } from '../../hooks/useSyncedState';
 import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import { Modal, Button, Input, Select, TagInput } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { useTaskTargets } from '../../hooks/useIntegrations';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { ProviderIcon } from './ProviderIcon';
@@ -46,6 +47,7 @@ export function TodoEditModal({
   exportLoading,
 }: TodoEditModalProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const integrationsModule = useModuleEnabled('integrations');
   // Export fields start empty for every todo that is opened (reset when the todo id changes)
   const [exportProvider, setExportProvider] = useSyncedState(editTodo?.id, () => '');
@@ -317,10 +319,10 @@ export function TodoEditModal({
               </div>
             )}
             <p className="text-xs text-text-tertiary">
-              {t.common.created}: {new Date(editTodo.createdAt).toLocaleString()}
+              {t.common.created}: {formatTimestamp(editTodo.createdAt, locale)}
             </p>
             <p className="text-xs text-text-tertiary">
-              {t.common.updated}: {new Date(editTodo.updatedAt).toLocaleString()}
+              {t.common.updated}: {formatTimestamp(editTodo.updatedAt, locale)}
             </p>
           </div>
         )}

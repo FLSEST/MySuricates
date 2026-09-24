@@ -2,7 +2,8 @@ import { useMemo, type ReactNode } from 'react';
 import { Link2, Pencil, Trash2 } from 'lucide-react';
 import { Toggle } from '../ui';
 import { statusDot } from './statusDot';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import type { ScheduledWorkflow } from '../../types';
 
 export interface ScheduleColumn {
@@ -21,6 +22,7 @@ interface ScheduleColumnActions {
 /** Column definitions for the schedules list table. */
 export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColumnActions): ScheduleColumn[] {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   return useMemo(() => [
     {
@@ -68,7 +70,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
       render: (s: ScheduledWorkflow) => (
         <span className="font-mono text-xs text-text-secondary">
           {s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED'
-            ? (s.scheduledAt ? new Date(s.scheduledAt).toLocaleString() : '-')
+            ? (s.scheduledAt ? formatTimestamp(s.scheduledAt, locale) : '-')
             : s.cronExpression}
           {s.scheduleType === 'DELAYED' && s.delayExpression && (
             <span className="ml-1 text-orange-500">({s.delayExpression})</span>
@@ -83,7 +85,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
         <span className="text-text-secondary">
           {(s.scheduleType === 'ONCE' || s.scheduleType === 'DELAYED') && !s.enabled
             ? (<span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">{t.schedules.completed}</span>)
-            : s.nextRunAt ? new Date(s.nextRunAt).toLocaleString() : s.maintenance ? null : '-'}
+            : s.nextRunAt ? formatTimestamp(s.nextRunAt, locale) : s.maintenance ? null : '-'}
           {/* The maintenance switch holds the schedule: no next run until it is switched off */}
           {s.maintenance && (
             <span className="block text-xs text-info" data-testid="next-run-maintenance">
@@ -93,7 +95,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
           {/* The stored run lies in a skip-until pause: nextRunAt is already the first one after it */}
           {s.pausedUntil && (
             <span className="block text-xs text-info" data-testid="next-run-paused">
-              {t.schedules.pausedUntil.replace('{until}', () => new Date(s.pausedUntil!).toLocaleString())}
+              {t.schedules.pausedUntil.replace('{until}', () => formatTimestamp(s.pausedUntil!, locale))}
             </span>
           )}
         </span>
@@ -106,7 +108,7 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
         <div className="flex items-center gap-2">
           {s.lastRunStatus && statusDot(s.lastRunStatus)}
           <span className="text-text-secondary">
-            {s.lastRunAt ? new Date(s.lastRunAt).toLocaleString() : '-'}
+            {s.lastRunAt ? formatTimestamp(s.lastRunAt, locale) : '-'}
           </span>
         </div>
       ),
@@ -151,5 +153,5 @@ export function useScheduleColumns({ onEdit, onDelete, onToggle }: ScheduleColum
       ),
       width: '80px',
     },
-  ], [t, onEdit, onDelete, onToggle]);
+  ], [t, locale, onEdit, onDelete, onToggle]);
 }

@@ -1,19 +1,21 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartCard } from '../dashboard/ChartCard';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatDate } from '../../utils/localeFormat';
 import { formatDuration } from '../../utils/formatTime';
 import type { TimeSeriesPoint } from '../../types';
 
 export function DurationOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const chartData = useMemo(
     () => data?.map((p) => ({
-      date: new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      date: formatDate(p.date, locale, { month: 'short', day: 'numeric' }),
       duration: Math.round((p.avgDurationMs ?? 0) / 1000),
       raw: p.avgDurationMs ?? 0,
     })) ?? [],
-    [data]
+    [data, locale]
   );
 
   return (

@@ -5,6 +5,7 @@ import { App } from './App';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { appQueryDefaults, installRateLimitRecovery } from './api/queryDefaults';
 import { useThemeStore } from './stores/themeStore';
+import { syncDocumentLanguage } from './i18n';
 import { installGlobalErrorHandlers } from './utils/errorReporter';
 import './index.css';
 
@@ -18,6 +19,8 @@ installRateLimitRecovery(queryClient);
 
 // Apply persisted theme on load
 useThemeStore.getState().apply();
+// <html lang> follows the app language from now on
+syncDocumentLanguage();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

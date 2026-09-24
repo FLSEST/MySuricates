@@ -211,7 +211,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 |---|---|
 | `StatusBadge` | Maps status strings to badge variants |
 | `LogViewer` | Terminal-style log display: level colors, icons per live line kind, step badge, auto-scroll only while scrolled to the bottom (otherwise "Jump to latest") |
-| `MonacoEditor` | Editor for JSON and Markdown (Monaco, follows the theme). `value` may hand every keystroke back through state: echoes of its own `onChange` are not written into the model (`monacoValueSync.ts`), any other value replaces the content. `prose` for running text (wrapping, no word suggestions, which would make Enter accept a suggestion); `jsonSchema` and `placeholders` for block configs |
+| `MonacoEditor` | Editor for JSON and Markdown (Monaco, follows the theme). `value` may hand every keystroke back through state: echoes of its own `onChange` are not written into the model (`monacoValueSync.ts`), any other value replaces the content. `prose` for running text (wrapping, no word suggestions, which would make Enter accept a suggestion); `jsonSchema` and `placeholders` for block configs; `path` gives each document its own model (its own undo history while switching, e.g. per onboarding profile and language), `lineNumbers="off"` hides the line numbers. No field uses `@monaco-editor/react` directly (guard in `MonacoEditor.test.tsx`) |
 | `ErrorState` | Error message with icon |
 | `EmptyState` | Empty state with description |
 | `Pagination` | Page navigation for paginated lists |
@@ -784,6 +784,8 @@ Responsive hook, detects mobile breakpoint (max-width: 1023px) for adaptive UI a
 - **Hook:** `useT()` → returns the current translation object
 - **Store:** `useI18nStore()` → `locale`, `setLocale()`
 - **Toggle:** Button in the header
+- **Dates and numbers:** only through `src/utils/localeFormat.ts` (`formatDate`, `formatTimeOfDay`, `formatTimestamp`, `formatNumber`, `formatRelativeUnit`) or `src/utils/formatTime.ts`, always with `locale` from `useI18nStore` — without a locale the browser writes in its own language. `src/__tests__/localeFormat.guard.test.ts` allows `Intl` and the `toLocale…String` methods nowhere else
+- **`<html lang>`:** follows the app language (`syncDocumentLanguage()` in `main.tsx`), for screen readers and hyphenation
 
 ### Translation Structure
 

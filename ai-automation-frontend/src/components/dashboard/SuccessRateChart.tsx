@@ -3,7 +3,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { ChartCard } from './ChartCard';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatDate } from '../../utils/localeFormat';
 import type { TimeSeriesPoint } from '../../types';
 
 interface SuccessRateChartProps {
@@ -12,14 +13,15 @@ interface SuccessRateChartProps {
 
 export function SuccessRateChart({ data }: SuccessRateChartProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const chartData = useMemo(
     () =>
       data?.map((p) => ({
-        date: new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        date: formatDate(p.date, locale, { month: 'short', day: 'numeric' }),
         rate: Math.round(p.successRate * 100),
       })) ?? [],
-    [data]
+    [data, locale]
   );
 
   return (

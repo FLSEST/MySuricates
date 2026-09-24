@@ -25,6 +25,22 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 
+  // An explicit disabled={false} (e.g. disabled={!dirty}) overrode the loading state: Save stayed
+  // clickable while saving and could send the PUT twice (660706aa).
+  it('stays disabled while loading even when disabled is false', () => {
+    const onClick = vi.fn();
+    render(<Button loading disabled={false} onClick={onClick}>Save</Button>);
+    expect(screen.getByRole('button')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('is enabled again once loading ends and disabled is false', () => {
+    const { rerender } = render(<Button loading disabled={false}>Save</Button>);
+    rerender(<Button loading={false} disabled={false}>Save</Button>);
+    expect(screen.getByRole('button')).toBeEnabled();
+  });
+
   it('shows spinner when loading', () => {
     const { container } = render(<Button loading>Saving</Button>);
     expect(container.querySelector('.animate-spin')).toBeInTheDocument();

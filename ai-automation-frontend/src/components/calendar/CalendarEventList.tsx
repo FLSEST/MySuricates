@@ -1,9 +1,10 @@
 import { MapPin, ExternalLink } from 'lucide-react';
 import type { UnifiedCalendarEvent } from '../../types';
-import { useT } from '../../i18n';
+import { useI18nStore, useT, type Locale } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function formatTime(date: Date, locale: Locale): string {
+  return formatTimeOfDay(date, locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export function CalendarEventList({ events, dayLabel }: Props) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   if (events.length === 0) {
     return (
@@ -37,7 +39,7 @@ export function CalendarEventList({ events, dayLabel }: Props) {
           <EventItem
             key={ev.id}
             event={ev}
-            timeLabel={`${formatTime(ev.start)}${ev.end ? ` – ${formatTime(ev.end)}` : ''}`}
+            timeLabel={`${formatTime(ev.start, locale)}${ev.end ? ` – ${formatTime(ev.end, locale)}` : ''}`}
           />
         ))}
       </div>

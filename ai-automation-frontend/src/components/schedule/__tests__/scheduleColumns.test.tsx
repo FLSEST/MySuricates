@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, renderHook, screen } from '@testing-library/react';
 import { useScheduleColumns } from '../scheduleColumns';
+import { useI18nStore } from '../../../i18n';
+import { formatTimestamp } from '../../../utils/localeFormat';
 import type { ScheduledWorkflow } from '../../../types';
 
 const base: ScheduledWorkflow = {
@@ -17,21 +19,23 @@ function nextRunCell(s: ScheduledWorkflow) {
   return render(<div data-testid="cell">{column.render(s)}</div>);
 }
 
+beforeEach(() => useI18nStore.setState({ locale: 'en' }));
+
 /** "Next run" never shows a date inside a skip-until pause (a776fd2a). */
 describe('schedule list — next run column', () => {
   it('shows the run after the pause and says until when the schedule is paused', () => {
     nextRunCell({ ...base, pausedUntil: '2026-10-01T22:00:00Z' });
 
     const cell = screen.getByTestId('cell');
-    expect(cell).toHaveTextContent(new Date('2026-10-02T06:00:00Z').toLocaleString());
+    expect(cell).toHaveTextContent(formatTimestamp('2026-10-02T06:00:00Z', 'en'));
     expect(screen.getByTestId('next-run-paused'))
-      .toHaveTextContent(`paused until ${new Date('2026-10-01T22:00:00Z').toLocaleString()}`);
+      .toHaveTextContent(`paused until ${formatTimestamp('2026-10-01T22:00:00Z', 'en')}`);
   });
 
   it('shows no pause note for a schedule the pause does not hold', () => {
     nextRunCell({ ...base, pausedUntil: null });
 
-    expect(screen.getByTestId('cell')).toHaveTextContent(new Date('2026-10-02T06:00:00Z').toLocaleString());
+    expect(screen.getByTestId('cell')).toHaveTextContent(formatTimestamp('2026-10-02T06:00:00Z', 'en'));
     expect(screen.queryByTestId('next-run-paused')).not.toBeInTheDocument();
     expect(screen.queryByTestId('next-run-maintenance')).not.toBeInTheDocument();
   });
@@ -52,7 +56,17 @@ describe('schedule list — next run column', () => {
     });
 
     const cell = screen.getByTestId('cell');
-    expect(cell).not.toHaveTextContent(new Date('2026-09-30T09:00:00Z').toLocaleString());
+    expect(cell).not.toHaveTextContent(formatTimestamp('2026-09-30T09:00:00Z', 'en'));
     expect(screen.getByTestId('next-run-paused')).toBeInTheDocument();
+  });
+
+  // Dates follow the app language, not the browser's (e86f6544).
+  it('writes the dates in the app language', () => {
+    useI18nStore.setState({ locale: 'de' });
+    nextRunCell({ ...base, pausedUntil: '2026-10-01T22:00:00Z' });
+
+    expect(screen.getByTestId('cell')).toHaveTextContent(formatTimestamp('2026-10-02T06:00:00Z', 'de'));
+    expect(screen.getByTestId('next-run-paused')).toHaveTextContent(formatTimestamp('2026-10-01T22:00:00Z', 'de'));
+    expect(formatTimestamp('2026-10-02T06:00:00Z', 'de')).toMatch(/^2\.10\.2026, \d{2}:00:00$/);
   });
 });

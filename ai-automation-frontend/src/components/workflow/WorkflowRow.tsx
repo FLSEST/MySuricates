@@ -8,7 +8,8 @@ import {
   Cloud,
   Workflow as WorkflowFlowIcon,
 } from 'lucide-react';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { WorkflowIcon } from '../../utils/workflowIcon';
 import { SealStateIcon } from './SealStateIcon';
@@ -42,6 +43,7 @@ export function WorkflowRow({
   showDetails = false,
 }: WorkflowRowProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const sealStatus = useSealStatus(workflow.id);
   const handleClick = () => {
     if (selectMode) {
@@ -95,22 +97,22 @@ export function WorkflowRow({
         <Bell className="w-3 h-3 text-accent/50 shrink-0" />
       )}
       {!selectMode && workflow.testStatus === 'PASSED' && (
-        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? formatTimestamp(workflow.lastTestedAt, locale) : undefined}>
           <FlaskConical className="w-2.5 h-2.5" />
         </span>
       )}
       {!selectMode && workflow.testStatus === 'FAILED' && (
-        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-danger/10 text-danger text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-danger/10 text-danger text-[9px] font-medium shrink-0" title={workflow.lastTestedAt ? formatTimestamp(workflow.lastTestedAt, locale) : undefined}>
           <FlaskConical className="w-2.5 h-2.5" />
         </span>
       )}
       {!selectMode && workflow.stableSyncedAt && workflow.updatedAt <= workflow.stableSyncedAt && (
-        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={`Auf Stable deployed — ${new Date(workflow.stableSyncedAt).toLocaleString()}`}>
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-success/10 text-success text-[9px] font-medium shrink-0" title={t.workflows.stableSynced.replace('{date}', formatTimestamp(workflow.stableSyncedAt, locale))}>
           <Cloud className="w-2.5 h-2.5" />
         </span>
       )}
       {!selectMode && workflow.stableSyncedAt && workflow.updatedAt > workflow.stableSyncedAt && (
-        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-warning/10 text-warning text-[9px] font-medium shrink-0" title={`Lokal verändert seit letztem Stable-Deploy — ${new Date(workflow.stableSyncedAt).toLocaleString()}`}>
+        <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded-sm bg-warning/10 text-warning text-[9px] font-medium shrink-0" title={t.workflows.stableChangedSince.replace('{date}', formatTimestamp(workflow.stableSyncedAt, locale))}>
           <Cloud className="w-2.5 h-2.5" />
         </span>
       )}

@@ -36,6 +36,14 @@ interface MonacoEditorProps {
   prose?: boolean;
   /** `{{ … }}` bound at this block: suggestions after `{{`, origin hint and hover, warnings. */
   placeholders?: PlaceholderContext;
+  /**
+   * Model path. One path per document (e.g. per profile and language) gives each its own model,
+   * undo history and scroll position while the parent switches between them. Without it the editor
+   * keeps one model per instance.
+   */
+  path?: string;
+  /** Line numbers in the gutter — prose that nobody refers to by line can do without them. */
+  lineNumbers?: 'on' | 'off';
 }
 
 // Monaco-Editor-Instanz (locker typisiert, um keine monaco-Typen zu importieren)
@@ -91,12 +99,15 @@ export function MonacoEditor({
   fill = false,
   prose = false,
   placeholders,
+  path,
+  lineNumbers = 'on',
 }: MonacoEditorProps) {
   const t = useT();
   const appearance = useThemeAppearance();
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   // Own model path per editor instance, so the schema binds to exactly this editor (fileMatch)
-  const modelPath = `editor-${useId().replace(/[^a-zA-Z0-9]/g, '')}.json`;
+  const instancePath = `editor-${useId().replace(/[^a-zA-Z0-9]/g, '')}.json`;
+  const modelPath = path ?? instancePath;
   const [problemCount, setProblemCount] = useState(0);
   const markerListener = useRef<{ dispose: () => void } | null>(null);
   const placeholderHandle = useRef<ReturnType<typeof attachPlaceholders> | null>(null);
@@ -108,7 +119,10 @@ export function MonacoEditor({
   const [mounted, setMounted] = useState(false);
   const valueSync = useRef(new MonacoValueSync());
   const applyingValue = useRef(false);
-  const editorOptions = useMemo(() => (prose ? { readOnly, ...PROSE_OPTIONS } : { readOnly }), [prose, readOnly]);
+  const editorOptions = useMemo(
+    () => (prose ? { readOnly, lineNumbers, ...PROSE_OPTIONS } : { readOnly, lineNumbers }),
+    [prose, readOnly, lineNumbers],
+  );
 
   useEffect(() => {
     let active = true;
@@ -165,7 +179,7 @@ export function MonacoEditor({
     editor.updateOptions({
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      lineNumbers: 'on',
+      lineNumbers,
       fontFamily: "ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace",
       fontSize: 13,
       tabSize: 2,
@@ -230,7 +244,7 @@ export function MonacoEditor({
           {monacoReady ? (
             <Editor
               height={editorHeight}
-              path={jsonSchema ? modelPath : undefined}
+              path={path ?? (jsonSchema ? modelPath : undefined)}
               language={language}
               theme={appearance === 'dark' ? 'vs-dark' : 'light'}
               defaultValue={value}

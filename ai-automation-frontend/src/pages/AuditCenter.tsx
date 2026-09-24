@@ -15,8 +15,9 @@ import {
   useAuditFinding, useAuditFindings, useAuditReports, useAudits, useCreateAuditTodo, useLinkAuditTodo,
   useUpdateAuditFinding,
 } from '../hooks/useAuditCenter';
-import { useI18nStore, useT } from '../i18n';
+import { useI18nStore, useT, type Locale } from '../i18n';
 import { formatDateTime, formatRelativeTime } from '../utils/formatTime';
+import { formatDate } from '../utils/localeFormat';
 import { todoDeepLink } from '../utils/todoLinks';
 
 type MainView = 'overview' | 'audit' | 'legacy';
@@ -86,7 +87,7 @@ export function AuditCenter() {
 }
 
 function AuditOverview({ audits, loading, projectNames, locale, onOpen }: {
-  audits: AuditSummary[]; loading: boolean; projectNames: Map<string, string>; locale: string;
+  audits: AuditSummary[]; loading: boolean; projectNames: Map<string, string>; locale: Locale;
   onOpen: (audit: AuditSummary) => void;
 }) {
   const t = useT();
@@ -126,7 +127,7 @@ function AuditOverview({ audits, loading, projectNames, locale, onOpen }: {
 }
 
 function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding }: {
-  audit: AuditSummary; tab: AuditTab; setTab: (tab: AuditTab) => void; locale: string;
+  audit: AuditSummary; tab: AuditTab; setTab: (tab: AuditTab) => void; locale: Locale;
   projectName?: string; requestedFinding: string | null;
 }) {
   const t = useT();
@@ -180,7 +181,7 @@ function ReportContent({ report }: { report: AuditReport }) {
   </div>;
 }
 
-function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]; locale: string; workflowId: string }) {
+function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]; locale: Locale; workflowId: string }) {
   const t = useT();
   return <div className="divide-y divide-border">
     {reports.map((report) => <div key={report.id} className="py-4 flex items-start justify-between gap-4">
@@ -197,7 +198,7 @@ function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]
   </div>;
 }
 
-function Findings({ findings, requestedFinding, workflowId, locale }: { findings: AuditFinding[]; requestedFinding: string | null; workflowId: string; locale: string }) {
+function Findings({ findings, requestedFinding, workflowId, locale }: { findings: AuditFinding[]; requestedFinding: string | null; workflowId: string; locale: Locale }) {
   const t = useT();
   const update = useUpdateAuditFinding();
   const createTodo = useCreateAuditTodo();
@@ -327,10 +328,10 @@ function FindingCounts({ counts, accepted }: { counts: Record<string, number>; a
 
 const REVIEW_INTERVAL_MS = 180 * 24 * 60 * 60 * 1000;
 
-function Disposition({ finding, locale }: { finding: AuditFinding; locale: string }) {
+function Disposition({ finding, locale }: { finding: AuditFinding; locale: Locale }) {
   const t = useT();
   if (!finding.dispositionAt && !finding.dispositionEvidence && !finding.dispositionNote) return null;
-  const formatDay = (value: string | Date) => new Date(value).toLocaleDateString(locale === 'de' ? 'de-DE' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formatDay = (value: string | Date) => formatDate(value, locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
   const reviewDue = finding.dispositionAt ? new Date(new Date(finding.dispositionAt).getTime() + REVIEW_INTERVAL_MS) : null;
   return <div className="mt-3 text-xs text-text-tertiary border-l-2 border-warning/60 pl-3 space-y-1" data-testid="disposition">
     {finding.dispositionAt && <p>
