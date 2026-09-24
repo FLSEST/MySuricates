@@ -148,6 +148,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Status-Workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
 - Erkennt automatisch von AI erstellte TODOs (source: AI, sourceAgent: claude-code)
 - Badge-Anzeige in der Sidebar für offene TODOs
+- Filter-, Ansichts- und Seitenzustand (persistiert, Suche entprellt, `?projectId=` aus dem Cockpit) liefert `hooks/useTodoFilters.ts`; die Quick-Add-Leiste ist `components/todo/TodoQuickAdd.tsx`, ihr Zustand und das Kürzel `n` (fokussiert den Titel außerhalb von Eingabefeldern) liegen in `hooks/useTodoQuickAdd.ts` und damit in der Seite — Eingaben überstehen den Lade-Spinner beim Filterwechsel
 
 ### ActivityLog (`/activity`)
 

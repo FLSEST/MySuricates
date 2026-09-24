@@ -148,6 +148,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Status workflow: OPEN → IN_PROGRESS → DONE / CANCELLED
 - Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
 - Badge display in the sidebar for open TODOs
+- Filter, view and page state (persisted, debounced search, `?projectId=` from the cockpit) comes from `hooks/useTodoFilters.ts`; the quick-add bar is `components/todo/TodoQuickAdd.tsx`, its state and the `n` shortcut (focuses the title outside of form fields) live in `hooks/useTodoQuickAdd.ts` and therefore in the page — input survives the loading spinner when a filter changes
 
 ### ActivityLog (`/activity`)
 

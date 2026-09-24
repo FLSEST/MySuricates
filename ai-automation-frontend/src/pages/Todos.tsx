@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { usePersistedState } from '../hooks/usePersistedState';
+import { useNavigate } from 'react-router-dom';
 import {
-  CheckSquare, Plus, Search,
+  CheckSquare, Search,
   X, List, LayoutGrid,
 } from 'lucide-react';
-import { Card, Button, Spinner, TagInput } from '../components/ui';
+import { Card, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/hints/Hint';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -13,83 +12,51 @@ import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/shared/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
 import {
-  STATUSES, PRIORITIES, SOURCES, MAX_VISIBLE_TAGS, SEARCH_DEBOUNCE_MS,
+  STATUSES, SOURCES, MAX_VISIBLE_TAGS,
   ACTIVE_STATUSES, KANBAN_COLUMN_STATUSES, filterShowsStatus,
-  type ViewMode, type TodoStatusFilter,
 } from '../components/todo/todoConstants';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { TodoKanbanView, type TodoKanbanColumn } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
+import { TodoQuickAdd } from '../components/todo/TodoQuickAdd';
 import {
-  useTodos, useTodoColumn, useTodo, useTodoCount, useCreateTodo, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
+  useTodos, useTodoColumn, useTodo, useTodoCount, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
 } from '../hooks/useTodos';
+import { useTodoFilters } from '../hooks/useTodoFilters';
+import { useTodoQuickAdd } from '../hooks/useTodoQuickAdd';
 import { useProjects } from '../hooks/useProjects';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useT } from '../i18n';
-import type { Todo, TodoStatus, TodoPriority, TodoSource, CreateTodoRequest, UpdateTodoRequest } from '../types';
+import type { Todo, TodoStatus, TodoSource, UpdateTodoRequest } from '../types';
 
 /* ─── Main Todos Page ───────────────────────────────────── */
 export function Todos() {
   const t = useT();
   const navigate = useNavigate();
   // Filter state (declared before useTodos so we can pass filters to the API)
-  // Default: what is actually being worked on. With a 90 %-DONE backlog, ALL is a long,
-  // useless page — ALL stays selectable, and a persisted choice is never overwritten.
-  const [statusFilter, setStatusFilter] = usePersistedState<TodoStatusFilter>('todos-status-filter', 'ACTIVE');
-  const [sourceFilter, setSourceFilter] = usePersistedState<TodoSource | 'ALL'>('todos-source-filter', 'ALL');
-  const [projectFilter, setProjectFilter] = usePersistedState('todos-project-filter', '');
-
-  // Deep-link from the cockpit: ?projectId=… focuses that project (additive — persisted filter wins when absent)
-  const [searchParams] = useSearchParams();
-  useEffect(() => {
-    const pid = searchParams.get('projectId');
-    if (pid) setProjectFilter(pid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  const {
+    searchParams,
+    statusFilter, setStatusFilter,
+    sourceFilter, setSourceFilter,
+    projectFilter, setProjectFilter,
+    search, setSearch,
+    tagFilter, setTagFilter,
+    viewMode, setViewMode,
+    page, setPage,
+    filterParams, apiParams,
+  } = useTodoFilters();
 
   // Deep-link to a single todo: ?todoId=… is resolved by id (not by searching the
   // paginated list), so it works regardless of persisted filters and page.
   const linkedTodoId = searchParams.get('todoId') ?? '';
   const { data: linkedTodo } = useTodo(linkedTodoId);
-  const [search, setSearch] = usePersistedState('todos-search', '');
-  const [debouncedSearch, setDebouncedSearch] = useState(search);
-  const [tagFilter, setTagFilter] = usePersistedState('todos-tag-filter', '');
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [search]);
   const [showAllTags, setShowAllTags] = useState(false);
 
-  // View mode
-  const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
-
   // Pagination — sizes are user settings, not constants (see TodoSettingsCard)
-  const [page, setPage] = useState(0);
   const listPageSize = useSettingsStore((s) => s.listPageSize);
   const kanbanColumnSize = useSettingsStore((s) => s.kanbanColumnSize);
-
-  // Filters without the status — the board adds the status per column
-  const filterParams = useMemo(() => {
-    const params: Record<string, string> = {};
-    if (sourceFilter !== 'ALL') params.source = sourceFilter;
-    if (projectFilter) params.projectId = projectFilter;
-    if (tagFilter) params.tag = tagFilter;
-    if (debouncedSearch) params.q = debouncedSearch;
-    return params;
-  }, [sourceFilter, projectFilter, tagFilter, debouncedSearch]);
-
-  // Build server-side filter params for the list view
-  const apiParams = useMemo<Record<string, string | string[]>>(() => {
-    if (statusFilter === 'ALL') return filterParams;
-    if (statusFilter === 'ACTIVE') return { ...filterParams, status: ACTIVE_STATUSES };
-    return { ...filterParams, status: statusFilter };
-  }, [filterParams, statusFilter]);
-
-  // Reset page on filter or view mode change
-  useEffect(() => { setPage(0); }, [apiParams, viewMode]);
 
   const isBoard = viewMode === 'board';
 
@@ -141,7 +108,6 @@ export function Todos() {
   const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
   const { data: workflows = [] } = useWorkflows();
-  const createTodo = useCreateTodo();
   const updateTodo = useUpdateTodo();
   const updateStatus = useUpdateTodoStatus();
   const deleteTodo = useDeleteTodo();
@@ -149,14 +115,8 @@ export function Todos() {
   const exportTodo = useExportTodo();
   const { data: integrations } = useIntegrations();
 
-  // Quick-add state
-  const [quickTitle, setQuickTitle] = useState('');
-  const [quickDescription, setQuickDescription] = useState('');
-  const [quickProjectId, setQuickProjectId] = useState('');
-  const [quickPriority, setQuickPriority] = useState<TodoPriority>('MEDIUM');
-  const [quickTags, setQuickTags] = useState<string[]>([]);
-  const [quickDueDate, setQuickDueDate] = useState('');
-  const quickInputRef = useRef<HTMLInputElement>(null);
+  // Quick-add state (lives in the page: survives the loading spinner, 'n' works from mount)
+  const { form: quickAdd, inputRef: quickInputRef } = useTodoQuickAdd();
 
   // Edit modal state
   const [editTodo, setEditTodo] = useState<Todo | null>(null);
@@ -168,20 +128,6 @@ export function Todos() {
   const handledDeepLink = useRef<string | null>(null);
   const highlightTimer = useRef<number | null>(null);
   useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current); }, []);
-
-  // Keyboard shortcut: 'n' focuses quick-add
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        e.preventDefault();
-        quickInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
 
   // Server-side filtering — todos already filtered by API params
   const filtered = todos ?? [];
@@ -199,28 +145,6 @@ export function Todos() {
   const hasAnyTodos = openCount + inProgressCount + doneCount + backlogCount + (counts?.archived ?? 0) > 0;
   /** A board column still loading must not flash the empty state. */
   const boardStillLoading = isBoard && boardColumns.some((column) => column.isLoading);
-
-  const handleQuickAdd = () => {
-    if (!quickTitle.trim()) return;
-    const req: CreateTodoRequest = {
-      title: quickTitle.trim(),
-      description: quickDescription.trim() || undefined,
-      priority: quickPriority,
-      projectId: quickProjectId || undefined,
-      tags: quickTags.length > 0 ? quickTags : undefined,
-      dueDate: quickDueDate ? new Date(quickDueDate + 'T23:59:59').toISOString() : undefined,
-    };
-    createTodo.mutate(req, {
-      onSuccess: () => {
-        setQuickTitle('');
-        setQuickDescription('');
-        setQuickPriority('MEDIUM');
-        setQuickTags([]);
-        setQuickDueDate('');
-        quickInputRef.current?.focus();
-      },
-    });
-  };
 
   const handleStatusChange = (todo: Todo, status: TodoStatus) => {
     if (todo.status === status) return;
@@ -321,72 +245,7 @@ export function Todos() {
       )}
 
       {/* Quick-Add Bar */}
-      <Card>
-        <div className="flex items-center gap-3">
-          {/* Title */}
-          <input
-            ref={quickInputRef}
-            type="text"
-            className="input-base flex-1 min-w-0"
-            placeholder={`${t.todos.create}... (n)`}
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleQuickAdd(); }}
-          />
-          {/* Description */}
-          <input
-            type="text"
-            className="input-base flex-1 min-w-0"
-            placeholder={`${t.todos.description}...`}
-            value={quickDescription}
-            onChange={(e) => setQuickDescription(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleQuickAdd(); }}
-          />
-          <div className="w-48">
-            <TagInput
-              tags={quickTags}
-              onChange={setQuickTags}
-              suggestions={allTags}
-              placeholder={t.todos.tags}
-              compact
-            />
-          </div>
-          <select
-            className="input-base w-40"
-            value={quickProjectId}
-            onChange={(e) => setQuickProjectId(e.target.value)}
-          >
-            <option value="">{t.common.selectProject}</option>
-            {projects?.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          <select
-            className="input-base w-28"
-            value={quickPriority}
-            onChange={(e) => setQuickPriority(e.target.value as TodoPriority)}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>{t.todos.priorities[p]}</option>
-            ))}
-          </select>
-          <input
-            type="date"
-            className="input-base w-36"
-            value={quickDueDate}
-            onChange={(e) => setQuickDueDate(e.target.value)}
-            title={t.todos.dueDate}
-          />
-          <Button
-            icon={<Plus className="w-4 h-4" />}
-            onClick={handleQuickAdd}
-            loading={createTodo.isPending}
-            disabled={!quickTitle.trim()}
-          >
-            {t.common.create}
-          </Button>
-        </div>
-      </Card>
+      <TodoQuickAdd form={quickAdd} inputRef={quickInputRef} projects={projects} allTags={allTags} />
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
