@@ -631,6 +631,13 @@ printf '%s\n' '### Report' 'gate_status: RED' 'gate_category: x' > "$TMP/report-
 printf '%s\n' '### Report' '- gate_status: RED' 'Nachtrag nach erneuter Pruefung:' '**gate_status:** YELLOW' \
   > "$TMP/report-last.txt"
 printf '%s\n' '### Report ohne Urteil' 'Score 8/10' > "$TMP/report-none.txt"
+# Die Schablonenzeile aus dem Prompt, unveraendert zurueckgegeben: kein Urteil. Frueher entschied ihr
+# erstes Wort (GREEN).
+TEMPLATE_LINE='gate_status: GREEN wenn akzeptabel, YELLOW wenn Optimierungsbedarf, RED wenn kritisch'
+printf '%s\n' '### Report' "$TEMPLATE_LINE" 'gate_category: x' > "$TMP/report-template.txt"
+printf '%s\n' '### Report' '**gate_status**: **RED**' > "$TMP/report-bold.txt"
+printf '%s\n' '### Report' "$TEMPLATE_LINE" 'gate_status: YELLOW' > "$TMP/report-template-then-valid.txt"
+printf '%s\n' '### Report' 'gate_status: RED' "$TEMPLATE_LINE" > "$TMP/report-valid-then-template.txt"
 run_gate() {  # $1 = definition, $2 = faktenblatt, $3 = report
   render "$1" label:Gate-Verdict "$(json_values block.report.output="$3" block.facts.output="$2")" > "$TMP/gate.sh"
   bash "$TMP/gate.sh" > "$TMP/gate.out" 2> "$TMP/gate.err"
@@ -648,9 +655,38 @@ gate_verdict_cases() {  # $1 = Anzeigename, $2 = definition, $3 = vollstaendiges
     'grep -qx "gate_status: YELLOW" "$TMP/gate.out" \
        && grep -q "^gate_description: .*keine gate_status-Zeile" "$TMP/gate.out"'
   check "$1: Gate laeuft ohne stderr" '[ ! -s "$TMP/gate.err" ]'
+  run_gate "$2" "$3" "$TMP/report-template.txt"
+  check "$1: Schablonenzeile ist kein Urteil (YELLOW mit Hinweis)" \
+    'grep -qx "gate_status: YELLOW" "$TMP/gate.out" \
+       && grep -q "^gate_description: .*keine gate_status-Zeile" "$TMP/gate.out"'
+  run_gate "$2" "$3" "$TMP/report-bold.txt"
+  check "$1: **gate_status**: **RED** zaehlt als RED" 'grep -qx "gate_status: RED" "$TMP/gate.out"'
+  run_gate "$2" "$3" "$TMP/report-template-then-valid.txt"
+  check "$1: Schablone, danach gueltige Zeile: die gueltige" 'grep -qx "gate_status: YELLOW" "$TMP/gate.out"'
+  run_gate "$2" "$3" "$TMP/report-valid-then-template.txt"
+  check "$1: gueltige Zeile, danach Schablone: die gueltige" 'grep -qx "gate_status: RED" "$TMP/gate.out"'
 }
 gate_verdict_cases "Health" "$HEALTH" "$TMP/health-facts.out" project-health
 gate_verdict_cases "Performance" "$PERF" "$TMP/perf-facts.out" performance
+# Nur Health und Performance laufen hier durch. Der VERDICT-Baustein steht woertlich in jedem
+# Audit-Gate (auch Architektur, Test Coverage, Security): ist er ueberall gleich, gelten die Faelle
+# oben fuer alle — und keine Kopie bleibt beim naechsten Fix zurueck.
+VERDICT_VARIANTS="$(python3 - "$REPO/workflow-pool" <<'PY'
+import glob, json, os, re, sys
+texts = {}
+for path in sorted(glob.glob(os.path.join(sys.argv[1], '*.json'))):
+    definition = json.load(open(path, encoding='utf-8'))
+    if not definition.get('metadata', {}).get('audit', {}).get('enabled'):
+        continue
+    for block in definition['blocks']:
+        match = re.search(r'(?ms)^VERDICT=\$\(.*?\)\n', block.get('config', {}).get('command', ''))
+        if block.get('type') == 'shell' and match:
+            texts[os.path.basename(path)] = match.group(0)
+print(len(texts), len(set(texts.values())))
+PY
+)"
+check "VERDICT-Baustein in mindestens fuenf Audit-Gates" '[ "${VERDICT_VARIANTS%% *}" -ge 5 ]'
+check "VERDICT-Baustein in allen Audit-Gates identisch"  '[ "${VERDICT_VARIANTS##* }" -eq 1 ]'
 
 echo "8) Performance-Audit: Report-Prompt bindet die KI ans Faktenblatt"
 check "Prompt nutzt das Faktenblatt"    'grep -q "block.facts.output" "$TMP/perf-prompt.txt"'
