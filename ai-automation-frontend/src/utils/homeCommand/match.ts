@@ -1,4 +1,4 @@
-import { countHits, normalize } from './query';
+import { countHits } from './query';
 import { cronRunsOnDay } from '../cronSchedule';
 import { resolveTemplateName } from '../templateUtils';
 import type { ParsedQuery } from './types';
@@ -154,9 +154,4 @@ export function pickSchedules(query: ParsedQuery, schedules: readonly ScheduledW
     hits = schedules.filter((s) => countHits(query.tokens, nameOf(s)) > 0);
   }
   return [...hits].sort((a, b) => (a.nextRunAt ?? '￿').localeCompare(b.nextRunAt ?? '￿'));
-}
-
-/** Normalized equality of two labels — to recognize the query itself among the hits. */
-export function sameText(a: string, b: string): boolean {
-  return normalize(a.trim()) === normalize(b.trim());
 }
