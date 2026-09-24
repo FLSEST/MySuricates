@@ -301,6 +301,26 @@ class HostPiServiceTest {
                 .hasMessageContaining("timed out after 2 seconds");
     }
 
+    // --- exit code of a reasoning call (9cc6c615) ---
+
+    /** Like Claude: pi's error message (missing key, limit) with exit code ≠ 0 is no answer. */
+    @Test
+    void reason_piEndsWithNonZeroExitCode_throwsWithExitCodeAndItsMessage() {
+        HostPiService service = ShellScriptCli.piReasoning("No API key found for anthropic", 1);
+
+        assertThatThrownBy(() -> service.reason("summarize", null, null, null, 1, null, null))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("exit code 1")
+                .hasMessageContaining("No API key found for anthropic");
+    }
+
+    @Test
+    void reason_piEndsWithZeroExitCode_returnsItsAnswer() throws IOException {
+        HostPiService service = ShellScriptCli.piReasoning("SAME", 0);
+
+        assertThat(service.reason("compare", null, null, null, 1, null, null).text().strip()).isEqualTo("SAME");
+    }
+
     // --- live output ---
 
     @Test

@@ -339,6 +339,35 @@ class HostClaudeServiceTest {
                 .hasMessageContaining("timed out");
     }
 
+    // --- exit code of a reasoning call (9cc6c615) ---
+
+    /**
+     * At a usage limit, without login or after a crash the CLI prints its message — in stream-json as
+     * the result text — and ends with an exit code ≠ 0. Reasoning callers only get text back, so that
+     * message must not arrive as an answer: the summarizer would store it as workflow memory.
+     */
+    @Test
+    void reasonStructured_cliEndsWithNonZeroExitCode_throwsWithExitCodeAndItsMessage() {
+        HostClaudeService service = ShellScriptCli.claudeReasoning(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Claude AI usage limit reached\"}", 1);
+
+        assertThatThrownBy(() -> service.reasonStructured("summarize", null, null, 1))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("exit code 1")
+                .hasMessageContaining("Claude AI usage limit reached");
+    }
+
+    @Test
+    void reasonStructured_cliEndsWithZeroExitCode_returnsItsAnswer() throws IOException {
+        HostClaudeService service = ShellScriptCli.claudeReasoning(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"result\":\"GOAL_STATUS: ACHIEVED\",\"num_turns\":1}", 0);
+
+        HostClaudeService.ReasoningResult result = service.reasonStructured("think");
+
+        assertThat(result.text()).isEqualTo("GOAL_STATUS: ACHIEVED");
+        assertThat(result.parsed().numTurns()).isEqualTo(1);
+    }
+
     // --- per-block timeout override ---
 
     @Test

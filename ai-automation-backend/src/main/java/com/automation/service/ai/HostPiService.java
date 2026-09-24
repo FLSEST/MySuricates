@@ -69,16 +69,16 @@ public class HostPiService {
     }
 
     /**
-     * Reasoning call: read-only analysis, no tool execution. Uses {@code --no-tools}.
-     * An explicit {@code effort} wins; otherwise the {@code maxTurns} hint is mapped onto
-     * pi's {@code --thinking} level: 1 → low, 3 → medium, ≥5 → high.
+     * Reasoning call: read-only analysis, no tool execution ({@code --no-tools}); an exit code ≠ 0 throws
+     * ({@link CliExit}). An explicit {@code effort} wins; otherwise the {@code maxTurns} hint is mapped
+     * onto pi's {@code --thinking} level: 1 → low, 3 → medium, ≥5 → high.
      */
     public ReasoningResult reason(String prompt, String systemPrompt, String model,
                                    String workingDirectory, Integer maxTurns,
                                    Integer timeoutSeconds, String effort) throws IOException {
         List<String> cmd = buildReasonCommand(systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi reasoning", false);
-        return new ReasoningResult(result.text);
+        return new ReasoningResult(CliExit.answerOrThrow("Host pi reasoning", result.exitCode, result.text));
     }
 
     /** Backwards-compat overload for call-sites written before effort support existed. */

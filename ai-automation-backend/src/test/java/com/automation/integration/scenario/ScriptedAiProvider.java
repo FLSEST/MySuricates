@@ -6,6 +6,7 @@ import com.automation.service.ai.AiResponseMetadata;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.ProviderSetup;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -70,11 +71,15 @@ public class ScriptedAiProvider implements AiProvider {
         return new ProviderSetup("scripted", "(test only)", "(test only)", List.of(), List.of());
     }
 
+    /** Like the real providers, a rule with exit code ≠ 0 is no answer but a failed call (9cc6c615). */
     @Override
-    public ReasoningResult reason(ReasoningRequest request) {
+    public ReasoningResult reason(ReasoningRequest request) throws IOException {
         calls.add(new Call("reason", request.prompt(), request.systemPrompt(), request.model(),
                 request.timeoutSeconds(), request.effort(), request.workingDirectory()));
         Rule rule = answer(request.prompt());
+        if (rule.exitCode() != 0) {
+            throw new IOException("Scripted reasoning failed with exit code " + rule.exitCode() + ": " + rule.respond());
+        }
         return new ReasoningResult(rule.respond(), AiResponseMetadata.estimated(request.prompt(), rule.respond()));
     }
 

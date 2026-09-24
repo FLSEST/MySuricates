@@ -218,7 +218,7 @@ automation:
 | 400         | Unknown provider                            |
 | 404         | Unknown run ID in `runIds`                  |
 | 422         | No runs / no steps found                    |
-| 502         | CLI call failed (timeout, crash)            |
+| 502         | CLI call failed (timeout, crash, exit code ≠ 0 such as a usage limit or missing login) |
 
 ---
 
@@ -265,4 +265,5 @@ after successful workflow runs. Configuration is done per workflow via the
 - Runs asynchronously (`@Async @EventListener`) — does not block the workflow run
 - Only with the `memory` module switched on
 - Always uses provider `CLAUDE`
+- If the CLI call fails (timeout, exit code ≠ 0 such as a usage limit or missing login), no memory is created: the previously active one stays active, `project-memory.md` stays unchanged, and the error is in the log.
 - `autoMemoryExtraction: true` (boolean instead of map) is also supported (uses default interval 5)

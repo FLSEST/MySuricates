@@ -1355,6 +1355,8 @@ Jede Iteration:
 2. **ACT**: Ein **separater** Claude-CLI-Aufruf führt die ACTION aus (nutzt `--append-system-prompt`, `--model`, Projektverzeichnis)
 3. **OBSERVE**: Das Ergebnis wird aufgezeichnet und in die nächste REASON-Phase zurückgeführt
 
+Endet die KI-CLI in der REASON-Phase mit einem Exit-Code ungleich 0 (Limit, fehlende Anmeldung, Absturz), scheitert der Block sofort: Die Ausgabe zeigt `[iteration N - REASON ERROR]` mit der Meldung der CLI. Als ACTION ausgeführt wird die Meldung nicht.
+
 ### Kritisch: ACT hat keinen Kontext aus REASON
 
 Die ACT-Phase ist ein **frischer Claude-CLI-Aufruf**. Sie teilt keinen Gesprächskontext mit REASON. Das bedeutet:
@@ -1401,7 +1403,7 @@ Alte Dateien aus vorherigen Runs können den Kontext des Agentic-Blocks verschmu
 
 ### Action-Komprimierung
 
-Wenn eine ACTION 100.000 Zeichen überschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird.
+Wenn eine ACTION 100.000 Zeichen überschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird. Scheitert dieser Aufruf (Timeout, Exit-Code ungleich 0), wird die ACTION stattdessen auf 100.000 Zeichen gekürzt.
 
 ### Token-Tracking
 

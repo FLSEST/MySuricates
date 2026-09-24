@@ -1335,6 +1335,8 @@ Each iteration:
 2. **ACT**: A **separate** Claude CLI call executes the ACTION (uses `--append-system-prompt`, `--model`, project directory)
 3. **OBSERVE**: The result is recorded and fed back into the next REASON phase
 
+If the AI CLI ends the REASON phase with a non-zero exit code (limit, missing login, crash), the block fails right away: the output shows `[iteration N - REASON ERROR]` with the CLI's message. The message is never executed as an ACTION.
+
 ### Critical: ACT Has No Context from REASON
 
 The ACT phase is a **fresh Claude CLI call**. It shares no conversation context with REASON. This means:
@@ -1381,7 +1383,7 @@ Old files from previous runs can pollute the agentic block's context (e.g. glob 
 
 ### Action Compression
 
-When an ACTION exceeds 100,000 characters, it is compressed via a separate Claude CLI call (60s timeout) before being sent to the ACT phase.
+When an ACTION exceeds 100,000 characters, it is compressed via a separate Claude CLI call (60s timeout) before being sent to the ACT phase. If that call fails (timeout, non-zero exit code), the ACTION is cut to 100,000 characters instead.
 
 ### Token Tracking
 
