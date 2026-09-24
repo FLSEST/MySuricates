@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,15 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BuiltinTemplateGateTest {
 
-    /**
-     * Files that still break the rule, each with the TODO that removes the violation. The list only
-     * shrinks: a new violation fails, and so does an entry whose file is clean by now.
-     */
-    private static final Map<String, String> KNOWN = Map.of(
-            "github-issues-import.json", "7a398822 (github-issues-Vorlagen auf Integrations- und TODO-Blöcke umbauen)",
-            "github-issues-export.json", "7a398822 (github-issues-Vorlagen auf Integrations- und TODO-Blöcke umbauen)",
-            "github-issues-sync.json", "7a398822 (github-issues-Vorlagen auf Integrations- und TODO-Blöcke umbauen)");
-
     private static final Pattern OWN_API_PATH =
             Pattern.compile("/api/v1/(?!system/(?:health|info|auth-status)\\b)[a-z]");
     private static final Pattern API_CALLER =
@@ -46,6 +36,10 @@ class BuiltinTemplateGateTest {
     private static final Pattern PATH_HOME = Pattern.compile("~/[A-Za-z.]|\\$HOME\\b|\\$\\{HOME}");
     private static final Pattern PATH_ABS = Pattern.compile("/home/[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/");
 
+    /**
+     * No exceptions: the three github-issues templates that broke the rule left the built-ins
+     * (TODO 7a398822); their rebuild on integration and todo blocks is TODO 0cc680d6.
+     */
     @Test
     void shippedTemplatesFollowTheWorkflowRule() throws IOException {
         Map<String, List<String>> violations = new TreeMap<>();
@@ -56,16 +50,10 @@ class BuiltinTemplateGateTest {
             }
         }
 
-        TreeSet<String> unexpected = new TreeSet<>(violations.keySet());
-        unexpected.removeAll(KNOWN.keySet());
-        TreeSet<String> nowClean = new TreeSet<>(KNOWN.keySet());
-        nowClean.removeAll(violations.keySet());
-
-        assertThat(unexpected)
-                .as("mitgelieferte Vorlagen, die gegen die Workflow-Regel verstoßen: %s — Plattformdaten kommen "
-                        + "als Kontextvariable oder über integration-/todo-*-Blöcke", violations)
+        assertThat(violations)
+                .as("mitgelieferte Vorlagen, die gegen die Workflow-Regel verstoßen — Plattformdaten kommen "
+                        + "als Kontextvariable oder über integration-/todo-*-Blöcke")
                 .isEmpty();
-        assertThat(nowClean).as("sauber, bitte aus KNOWN streichen").isEmpty();
     }
 
     @Test

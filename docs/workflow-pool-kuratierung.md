@@ -16,7 +16,7 @@ Es gibt zwei Mechanismen nebeneinander, und sie beantworten verschiedene Fragen.
 
 | | Built-in-Templates | Workflow-Pool |
 |---|---|---|
-| Ablage | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (57) | `workflow-pool/*.json` |
+| Ablage | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (54) | `workflow-pool/*.json` |
 | Weg in die Instanz | `WorkflowTemplateSeeder` spielt sie beim Start per Semver-Vergleich in die Datenbank | manuell: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Sichtbar als | Vorlage im Template-Katalog, in jeder Instanz vorhanden | Eintrag im Pool-Browser, erst nach bewusstem Installieren ein Workflow |
 | Aktualisierung | Seeder zieht eine höhere Version nach und entfernt, was nicht mehr ausgeliefert wird | keine; ein installierter Workflow ist eine Kopie und lebt weiter für sich |

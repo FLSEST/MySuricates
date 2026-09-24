@@ -1666,9 +1666,6 @@ All built-in templates with their primary pattern. The SaaS factory workflows (`
 | `auto-fix-typescript` | Multi-Stage + Approval | CODE |
 | `hunt-quality-pipeline` | Multi-Stage Pipeline | CODE |
 | `folder-backup` | Shell Chain | UTILITY |
-| `github-issues-export` | Shell + Approval (preview, redaction) | TEAM |
-| `github-issues-import` | Shell | TEAM |
-| `github-issues-sync` | Shell Chain | TEAM |
 | `github-project-bootstrap` | Shell Chain | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |
 | `log-rotate-cleanup` | Shell Collect + AI Analyze | INFRA |

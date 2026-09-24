@@ -100,7 +100,7 @@ The AI calls of the blocks go to the provider named by the block or the workflow
 
 ### How does the template system work?
 
-- 57 built-in templates as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`)
+- 54 built-in templates as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`)
 - Seeded on startup by `WorkflowTemplateSeeder` (idempotent)
 - Name/description are i18n JSON maps: `{"de":"...", "en":"..."}`
 - Frontend resolves language via `resolveTemplateName()` in `utils/templateUtils.ts`

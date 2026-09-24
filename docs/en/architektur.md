@@ -652,7 +652,7 @@ Claude Code sessions can also serve as templates for workflows:
 ## Workflow Templates
 
 - Templates are stored in the `workflow_templates` DB table (V19 migration), not hardcoded
-- **57 built-in templates** are seeded at startup by `WorkflowTemplateSeeder` (idempotent, inserts missing ones, updates on version bump). Built-in rows whose file no longer ships (moved to the pool, renamed, left-overs with a random id) it removes first; the file names decide (`BuiltInTemplateLoader.shippedIds`), so a file that fails to parse does not lose its row. Verifications go along via `ON DELETE CASCADE`, workflows made from such templates stay and only lose the back-reference (`ON DELETE SET NULL`). User templates are left alone
+- **54 built-in templates** are seeded at startup by `WorkflowTemplateSeeder` (idempotent, inserts missing ones, updates on version bump). Built-in rows whose file no longer ships (moved to the pool, renamed, left-overs with a random id) it removes first; the file names decide (`BuiltInTemplateLoader.shippedIds`), so a file that fails to parse does not lose its row. Verifications go along via `ON DELETE CASCADE`, workflows made from such templates stay and only lose the back-reference (`ON DELETE SET NULL`). User templates are left alone
 - Template definitions are stored as individual JSON files in `src/main/resources/templates/builtin/` (one file per template, loaded by `BuiltInTemplateLoader`)
 - Name and description are i18n JSON maps: `{"de":"...","en":"..."}` — stored via `JsonStringMapConverter`
 - Built-in templates (`builtIn=true`) cannot be deleted; only `sortOrder` and `category` are updatable

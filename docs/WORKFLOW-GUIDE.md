@@ -1686,9 +1686,6 @@ Alle eingebauten Templates mit ihrem primären Pattern. Die SaaS-Factory-Workflo
 | `auto-fix-typescript` | Mehrstufig + Freigabe | CODE |
 | `hunt-quality-pipeline` | Mehrstufige Pipeline | CODE |
 | `folder-backup` | Shell-Kette | UTILITY |
-| `github-issues-export` | Shell + Freigabe (Vorschau, Redaction) | TEAM |
-| `github-issues-import` | Shell | TEAM |
-| `github-issues-sync` | Shell-Kette | TEAM |
 | `github-project-bootstrap` | Shell-Kette | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |
 | `log-rotate-cleanup` | Shell sammeln + KI analysieren | INFRA |
