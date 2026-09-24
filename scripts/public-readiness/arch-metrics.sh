@@ -5,9 +5,11 @@
 # Misst mit Bordmitteln (JDK/git/coreutils/python3, keine neuen Abhaengigkeiten):
 #   ## packages  Paketabhaengigkeiten aus `jdeps -verbose:class` (nur com.automation.*)
 #   ## cycles    Zyklen zwischen Paketen (Tarjan in arch_cycles.py) — dieselben Paar-Kandidaten
-#                stehen zusaetzlich in der Allowlist von PackageCycleRatchetTest.ALLOWED_PAIRS
-#                (ai-automation-backend/src/test/java/com/automation/architecture/). Wer ein
-#                Paket umbenennt oder verschiebt, muss diese Allowlist im selben Commit mitziehen —
+#                stehen zusaetzlich in der Allowlist von PackageCycleRatchetTest.ALLOWED_PAIRS,
+#                die cycle-Komponenten mit mehr als zwei Paketen in dessen CYCLE_COMPONENTS (die
+#                Groesse der groessten in MAX_CYCLE_COMPONENT_SIZE), beides unter
+#                ai-automation-backend/src/test/java/com/automation/architecture/. Wer ein
+#                Paket umbenennt oder verschiebt, muss diese Listen im selben Commit mitziehen —
 #                sonst schlaegt der Ratchet beim naechsten vollen Testlauf fehl, obwohl sich am
 #                tatsaechlichen Zyklus nichts geaendert hat.
 #   ## sizes     Zeilen je Java-Datei, Top 30, plus Schwellenzaehler (300/500)
