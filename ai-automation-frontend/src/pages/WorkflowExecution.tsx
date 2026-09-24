@@ -43,8 +43,10 @@ export function WorkflowExecution() {
   const rateRun = useRateRun();
   const submitApproval = useSubmitApproval();
 
-  // Unsaved notes live here, not in the card: they survive a refetch error or the spinner
-  const [notesText, setNotesText] = useState<string | null>(null);
+  // Unsaved notes live here, not in the card: they survive a refetch error or the spinner. They
+  // belong to one run, so a draft never follows "Run again" onto the next run on this page.
+  const [notes, setNotes] = useState<{ runId: string | undefined; draft: string | null }>({ runId, draft: null });
+  const notesDraft = notes.runId === runId ? notes.draft : null;
   const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
@@ -177,10 +179,11 @@ export function WorkflowExecution() {
 
       {/* Notes */}
       <RunNotesCard
+        key={run.id}
         runId={runId!}
         savedNotes={(run.metadata?.notes as string) ?? ''}
-        draft={notesText}
-        onDraftChange={setNotesText}
+        draft={notesDraft}
+        onDraftChange={(draft) => setNotes({ runId, draft })}
       />
 
       {/* Error */}
