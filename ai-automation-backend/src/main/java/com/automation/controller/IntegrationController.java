@@ -190,7 +190,9 @@ public class IntegrationController {
                 connection != null ? connection.getScopes() : null,
                 optionalScopes,
                 actions,
-                provider instanceof com.automation.service.integration.TaskExportCapable
+                provider instanceof com.automation.service.integration.TaskExportCapable,
+                provider.getVerification().name(),
+                provider.getVerifiedAgainst()
         );
     }
 

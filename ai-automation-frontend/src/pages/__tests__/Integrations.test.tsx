@@ -90,3 +90,44 @@ describe('Integrations — connected state', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Integrations — verification notice', () => {
+  const simulatedGitea: IntegrationProviderInfo = {
+    ...connectedGithub,
+    providerId: 'gitea',
+    displayName: 'Gitea',
+    status: 'DISCONNECTED',
+    configured: true,
+    accountName: null,
+    connectedSince: null,
+    scopes: null,
+    verification: 'SIMULATED',
+    verifiedAgainst: null,
+  };
+
+  it('marks a simulated provider on its card and explains it when selected', async () => {
+    useProviders([simulatedGitea]);
+    renderWithProviders(<Integrations />);
+
+    expect(await screen.findByText('Simulated tests only')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Gitea'));
+    expect(await screen.findByText(/not against the real service/)).toBeInTheDocument();
+  });
+
+  it('shows no simulated badge for a verified provider and names what it was checked against', async () => {
+    useProviders([{ ...connectedGithub, verification: 'VERIFIED', verifiedAgainst: 'GitHub REST API' }]);
+    await selectGithub();
+
+    expect(await screen.findByText('Checked against: GitHub REST API')).toBeInTheDocument();
+    expect(screen.queryByText('Simulated tests only')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when an older backend sends no verification field', async () => {
+    useProviders([connectedGithub]);
+    await selectGithub();
+
+    await screen.findByText('Connection details');
+    expect(screen.queryByText('Simulated tests only')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Checked against/)).not.toBeInTheDocument();
+  });
+});

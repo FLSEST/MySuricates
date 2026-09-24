@@ -17,7 +17,10 @@ public record IntegrationProviderResponse(
         String scopes,
         List<ScopeOptionResponse> optionalScopes,
         List<IntegrationActionResponse> actions,
-        boolean supportsTaskExport
+        boolean supportsTaskExport,
+        /** {@code VERIFIED} or {@code SIMULATED} — see {@code IntegrationVerification}. */
+        String verification,
+        String verifiedAgainst
 ) {
     public record ScopeOptionResponse(String scope, String label, boolean granted) {}
 }

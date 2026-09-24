@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
+import com.automation.service.integration.IntegrationVerification;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -80,6 +81,8 @@ class InventoryFetchHandlerTest {
         when(provider.getProviderId()).thenReturn("taskwarrior");
         when(provider.getDescription()).thenReturn(null);
         when(provider.requiresOAuthFlow()).thenReturn(false);
+        when(provider.getVerification()).thenReturn(IntegrationVerification.VERIFIED);
+        when(provider.getVerifiedAgainst()).thenReturn("Taskwarrior-CLI auf dem Host");
         when(provider.getAvailableActions()).thenReturn(null);
         when(integrationRegistry.hasProvider("taskwarrior")).thenReturn(true);
         when(integrationRegistry.getProvider("taskwarrior")).thenReturn(provider);
@@ -88,7 +91,22 @@ class InventoryFetchHandlerTest {
                         .status(IntegrationConnection.ConnectionStatus.CONNECTED).accountInfo(" ").build()));
 
         assertThat(handler.formatIntegrationDetail("taskwarrior")).isEqualTo(
-                "**Integration: Taskwarrior** (id: taskwarrior)\nStatus: CONNECTED\nOAuth flow required: no (API key/token)\n");
+                "**Integration: Taskwarrior** (id: taskwarrior)\nStatus: CONNECTED\nOAuth flow required: no (API key/token)\n"
+                        + "Verification: checked against the real service (Taskwarrior-CLI auf dem Host)\n");
+    }
+
+    @Test
+    void integration_simulatedProvider_saysItWasNotCheckedAgainstTheRealService() {
+        IntegrationProvider provider = mock(IntegrationProvider.class);
+        when(provider.getDisplayName()).thenReturn("Gitea");
+        when(provider.getProviderId()).thenReturn("gitea");
+        when(provider.getVerification()).thenReturn(IntegrationVerification.SIMULATED);
+        when(integrationRegistry.hasProvider("gitea")).thenReturn(true);
+        when(integrationRegistry.getProvider("gitea")).thenReturn(provider);
+        when(integrationConnectionRepository.findByProviderId("gitea")).thenReturn(Optional.empty());
+
+        assertThat(handler.formatIntegrationDetail("gitea"))
+                .contains("Verification: simulated only — not yet checked against the real service\n");
     }
 
     @Test

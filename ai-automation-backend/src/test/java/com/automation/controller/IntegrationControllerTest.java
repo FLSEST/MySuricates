@@ -9,6 +9,7 @@ import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
+import com.automation.service.integration.IntegrationVerification;
 import com.automation.service.integration.OAuthConfig;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.system.OwnTailnetAddresses;
@@ -78,7 +79,23 @@ class IntegrationControllerTest {
                 .andExpect(jsonPath("$[0].optionalScopes[0].scope").value("calendar.write"))
                 .andExpect(jsonPath("$[0].optionalScopes[0].granted").value(true))
                 .andExpect(jsonPath("$[0].actions[0].name").value("list_events"))
-                .andExpect(jsonPath("$[0].actions[0].available").value(true));
+                .andExpect(jsonPath("$[0].actions[0].available").value(true))
+                .andExpect(jsonPath("$[0].verification").value("SIMULATED"))
+                .andExpect(jsonPath("$[0].verifiedAgainst").doesNotExist());
+    }
+
+    @Test
+    void listProviders_namesWhatAVerifiedProviderWasCheckedAgainst() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(provider.getVerification()).thenReturn(IntegrationVerification.VERIFIED);
+        when(provider.getVerifiedAgainst()).thenReturn("Google Calendar API");
+        when(registry.getAllProviders()).thenReturn(List.of(provider));
+        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/integrations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].verification").value("VERIFIED"))
+                .andExpect(jsonPath("$[0].verifiedAgainst").value("Google Calendar API"));
     }
 
     @Test
@@ -279,6 +296,7 @@ class IntegrationControllerTest {
         when(provider.getDisplayName()).thenReturn("Google Calendar");
         when(provider.getIcon()).thenReturn("Calendar");
         when(provider.getDescription()).thenReturn("Calendar sync");
+        when(provider.getVerification()).thenReturn(IntegrationVerification.SIMULATED);
         when(provider.getOAuthConfig()).thenReturn(new OAuthConfig(
                 "https://auth.example/authorize",
                 "https://auth.example/token",

@@ -10,6 +10,7 @@ import com.automation.service.assistant.AssistantFormatUtils;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
+import com.automation.service.integration.IntegrationVerification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -109,6 +110,9 @@ public class InventoryFetchHandler {
             }
             sb.append("\n");
             sb.append("OAuth flow required: ").append(p.requiresOAuthFlow() ? "yes" : "no (API key/token)").append("\n");
+            sb.append("Verification: ").append(p.getVerification() == IntegrationVerification.VERIFIED
+                    ? "checked against the real service (" + p.getVerifiedAgainst() + ")"
+                    : "simulated only — not yet checked against the real service").append("\n");
             List<IntegrationAction> actions = p.getAvailableActions();
             if (actions != null && !actions.isEmpty()) {
                 sb.append("\nAvailable actions (").append(actions.size()).append("):\n");
