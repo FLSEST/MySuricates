@@ -106,6 +106,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: add block (type + JSON config via Monaco Editor), activate skill
+- The panel of the workflow list (`WorkflowDetailPanel`) and the sidebar of the detail page (`WorkflowDetailSidebar`) share `WorkflowRecentRuns` (`list`: newest runs with start time and duration; `card`: total, gate, notes and paging — the same page feeds the memory panel). More building blocks in `components/workflow/`: `WorkflowBlockList` (block list with the BPMN diagram, a click flashes the entry in the other), `WorkflowAutomationSettings` (auto-todo, auto-repair, auto-memory with `ui/Toggle`), `WorkflowAiSettingsCards` (provider, model, effort) and `DefaultContextEditor`
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`)
 

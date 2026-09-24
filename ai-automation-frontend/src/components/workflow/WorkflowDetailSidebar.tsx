@@ -1,17 +1,14 @@
 import { useState } from 'react';
-import { Plus, Pencil, Zap, Clock, FileText, Bot, Trash2, StickyNote } from 'lucide-react';
-import { Card, CardHeader, Button, Input, Select } from '../ui';
-import { ModelField } from '../shared/ModelField';
-import { StatusBadge } from '../shared/StatusBadge';
-import { GateStatusBadge } from '../shared/GateStatusBadge';
-import { Pagination } from '../shared/Pagination';
+import { Plus, Pencil, Zap, FileText, Trash2 } from 'lucide-react';
+import { Card, CardHeader, Button, Toggle } from '../ui';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
+import { WorkflowAiSettingsCards } from './WorkflowAiSettingsCards';
+import { DefaultContextEditor } from './DefaultContextEditor';
+import { RECENT_RUNS_PAGE_SIZE, WorkflowRecentRuns } from './WorkflowRecentRuns';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
-import { useAiProviders } from '../../hooks/useSystem';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { useI18nStore, useT } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
-import { formatDuration } from '../../utils/formatTime';
 import type { Workflow } from '../../types';
 
 interface WorkflowDetailSidebarProps {
@@ -22,8 +19,6 @@ interface WorkflowDetailSidebarProps {
   onDeactivateSkill: (workflowId: string, skillId: string) => void;
   onNavigateToRun: (runId: string) => void;
 }
-
-const RUN_PAGE_SIZE = 5;
 
 export function WorkflowDetailSidebar({
   workflow,
@@ -41,13 +36,9 @@ export function WorkflowDetailSidebar({
   const updateWorkflow = useUpdateWorkflow();
   // Sealed definitions are read-only; memory and runs stay usable
   const sealed = !!workflow.sealed;
-  const { data: aiProviders } = useAiProviders();
-  const activeProvider = workflow.provider || aiProviders?.default || '';
-  // Show the effort control unless the active provider explicitly declares no support
-  // (Codex). Missing capabilities (older backend) fall back to showing it.
-  const supportsEffort = aiProviders?.capabilities?.[activeProvider]?.supportsEffort !== false;
   const [runPage, setRunPage] = useState(0);
-  const { data: runs } = useWorkflowRuns(workflow.id, runPage, RUN_PAGE_SIZE);
+  // Same page as the recent-runs card (one request); it also feeds the memory panel
+  const { data: runs } = useWorkflowRuns(workflow.id, runPage, RECENT_RUNS_PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -100,66 +91,7 @@ export function WorkflowDetailSidebar({
       {memoryModule && <WorkflowMemoryPanel workflowId={workflow.id} runs={runs?.content} />}
 
       <fieldset disabled={sealed} className="min-w-0 space-y-4" title={sealed ? t.workflows.sealedLocked : undefined}>
-        <Card>
-          <CardHeader title={t.workflows.provider} />
-          <Select
-            value={workflow.provider || ''}
-            onChange={(e) => {
-              const newProvider = e.target.value || undefined;
-              // Reset model when switching providers — values like "anthropic/claude-…" are
-              // pi-only and break Claude/Codex routing if left around.
-              updateWorkflow.mutate({ id: workflow.id, data: { provider: newProvider, model: '' } });
-            }}
-            options={[
-              { value: '', label: t.workflows.providerDefault },
-              ...(aiProviders?.providers ?? []).map((p) => ({
-                value: p,
-                label: p === 'CLAUDE' ? 'Claude CLI' : p === 'CODEX' ? 'Codex CLI' : p === 'PI' ? 'pi (Mario Zechner)' : p,
-              })),
-            ]}
-          />
-          <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
-            <Bot className="w-3.5 h-3.5" />
-            {t.workflows.providerHint}
-          </p>
-        </Card>
-
-        <Card>
-          <CardHeader title={t.workflows.model} />
-          <ModelField
-            providerId={activeProvider || 'CLAUDE'}
-            value={workflow.model || ''}
-            onChange={(model) => updateWorkflow.mutate({ id: workflow.id, data: { model } })}
-            showPiHints={activeProvider === 'PI'}
-          />
-          <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
-            <Bot className="w-3.5 h-3.5" />
-            {t.workflows.modelHint}
-          </p>
-        </Card>
-
-        {supportsEffort && (
-          <Card>
-            <CardHeader title={t.workflows.effort} />
-            <Select
-              value={workflow.effort || ''}
-              onChange={(e) => {
-                updateWorkflow.mutate({ id: workflow.id, data: { effort: e.target.value } });
-              }}
-              options={[
-                { value: '', label: t.workflows.effortDefault },
-                { value: 'low', label: t.workflows.effortLow },
-                { value: 'medium', label: t.workflows.effortMedium },
-                { value: 'high', label: t.workflows.effortHigh },
-                { value: 'xhigh', label: t.workflows.effortXhigh },
-              ]}
-            />
-            <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1.5">
-              <Bot className="w-3.5 h-3.5" />
-              {t.workflows.effortHint}
-            </p>
-          </Card>
-        )}
+        <WorkflowAiSettingsCards workflow={workflow} />
 
         {factoryModule && (
           <Card>
@@ -168,26 +100,16 @@ export function WorkflowDetailSidebar({
                 <span className="text-sm font-medium text-text">{t.workflows.autoRepair}</span>
                 <p className="text-xs text-text-tertiary">{t.workflows.autoRepairDescription}</p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={!!workflow.metadata?.autoRepair?.enabled}
-                onClick={() =>
+              <Toggle
+                enabled={!!workflow.metadata?.autoRepair?.enabled}
+                onChange={(enabled) =>
                   updateWorkflow.mutate({
                     id: workflow.id,
-                    data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, enabled: !workflow.metadata?.autoRepair?.enabled } } },
+                    data: { metadata: { autoRepair: { ...workflow.metadata?.autoRepair, enabled } } },
                   })
                 }
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                  workflow.metadata?.autoRepair?.enabled ? 'bg-accent' : 'bg-border'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform ${
-                    workflow.metadata?.autoRepair?.enabled ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+                ariaLabel={t.workflows.autoRepair}
+              />
             </div>
             {workflow.metadata?.autoRepair?.enabled && (
               <div className="mt-3 space-y-1">
@@ -298,123 +220,14 @@ export function WorkflowDetailSidebar({
         )}
       </fieldset>
 
-      <Card padding={false}>
-        <div className="p-5 pb-0">
-          <CardHeader title={`${t.dashboard.recentRuns} (${runs?.totalElements ?? 0})`} />
-        </div>
-        {!runs?.content?.length ? (
-          <div className="px-5 py-8 text-center text-sm text-text-tertiary">{t.workflows.noRuns}</div>
-        ) : (
-          <>
-            <div className="divide-y divide-border">
-              {runs.content.map((run) => (
-                <div
-                  key={run.id}
-                  className="px-5 py-3 hover:bg-surface transition-colors cursor-pointer"
-                  onClick={() => onNavigateToRun(run.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <StatusBadge status={run.status} />
-                      <GateStatusBadge run={run} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                      <Clock className="w-3 h-3" />
-                      {formatDuration(run.durationMs)}
-                    </div>
-                  </div>
-                  {(run.metadata?.notes as string) && (
-                    <p className="text-xs text-text-tertiary mt-1 truncate">
-                      <StickyNote className="w-3 h-3 text-accent inline mr-1 -mt-0.5" />
-                      {(run.metadata.notes as string).slice(0, 80)}
-                      {(run.metadata.notes as string).length > 80 ? '...' : ''}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-            {runs.totalPages > 1 && (
-              <div className="px-5 py-2">
-                <Pagination
-                  page={runPage}
-                  totalPages={runs.totalPages}
-                  totalElements={runs.totalElements}
-                  label=""
-                  setPage={setRunPage}
-                />
-              </div>
-            )}
-          </>
-        )}
-      </Card>
+      <WorkflowRecentRuns
+        variant="card"
+        workflowId={workflow.id}
+        page={runPage}
+        onPageChange={setRunPage}
+        onOpenRun={onNavigateToRun}
+      />
 
     </div>
-  );
-}
-
-function DefaultContextEditor({
-  workflowId,
-  variables,
-  defaultContext,
-}: {
-  workflowId: string;
-  variables: string[];
-  defaultContext: Record<string, string>;
-}) {
-  const t = useT();
-  const updateWorkflow = useUpdateWorkflow();
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(variables.map((v) => [v, defaultContext[v] ?? '']))
-  );
-
-  const contextKey = JSON.stringify(defaultContext);
-  const [prevContextKey, setPrevContextKey] = useState(contextKey);
-  if (contextKey !== prevContextKey) {
-    setPrevContextKey(contextKey);
-    setValues(Object.fromEntries(variables.map((v) => [v, defaultContext[v] ?? ''])));
-  }
-
-  const hasChanges = variables.some((v) => (values[v] ?? '') !== (defaultContext[v] ?? ''));
-
-  const handleSave = () => {
-    const ctx: Record<string, string> = {};
-    for (const v of variables) {
-      if (values[v]?.trim()) {
-        ctx[v] = values[v];
-      }
-    }
-    updateWorkflow.mutate({ id: workflowId, data: { defaultContext: ctx } });
-  };
-
-  return (
-    <Card>
-      <CardHeader
-        title={t.workflows.defaultValues}
-        action={
-          hasChanges ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleSave}
-              loading={updateWorkflow.isPending}
-            >
-              {t.common.save}
-            </Button>
-          ) : undefined
-        }
-      />
-      <div className="space-y-3">
-        <p className="text-xs text-text-tertiary">{t.workflows.defaultValuesHint}</p>
-        {variables.map((variable) => (
-          <Input
-            key={variable}
-            label={variable}
-            value={values[variable] ?? ''}
-            onChange={(e) => setValues({ ...values, [variable]: e.target.value })}
-            placeholder={`${t.workflows.enterValue} ${variable}`}
-          />
-        ))}
-      </div>
-    </Card>
   );
 }

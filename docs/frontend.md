@@ -106,6 +106,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Memory, Info)
 - Block-Editor mit `@dnd-kit` für Drag-and-Drop-Sortierung
 - Modals: Block hinzufügen (Typ + JSON-Config via Monaco Editor), Skill aktivieren
+- Panel der Workflow-Liste (`WorkflowDetailPanel`) und Sidebar der Detailseite (`WorkflowDetailSidebar`) teilen `WorkflowRecentRuns` (`list`: neueste Läufe mit Startzeit und Dauer; `card`: Gesamtzahl, Gate, Notizen und Blättern — dieselbe Seite speist das Memory-Panel). Weitere Bausteine in `components/workflow/`: `WorkflowBlockList` (Blockliste mit BPMN-Diagramm, Klick blinkt im jeweils anderen), `WorkflowAutomationSettings` (Auto-Todo, Auto-Repair, Auto-Memory mit `ui/Toggle`), `WorkflowAiSettingsCards` (Anbieter, Modell, Aufwand) und `DefaultContextEditor`
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`)
 
