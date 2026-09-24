@@ -32,6 +32,9 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Die Probe-Instanz nie ueber einen Proxy aus der Umgebung fragen (bb4f60a5)
+# shellcheck source=lib/local-curl.sh
+. "${SCRIPT_DIR}/lib/local-curl.sh"
 REPO="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 REF="HEAD"
 IMAGE="ubuntu:24.04"
@@ -220,10 +223,10 @@ fi
 if [ "$RC2" = 0 ]; then check "Phase 2: ein Durchgang bis zur laufenden Instanz (Exit 0)" ok ""
 else check "Phase 2: ein Durchgang bis zur laufenden Instanz (Exit 0)" fail "Exit ${RC2}"; fi
 
-HEALTH="$(curl -s --max-time 10 "http://127.0.0.1:${BPORT}/api/v1/system/health" 2>/dev/null)"
+HEALTH="$(local_curl -s --max-time 10 "http://127.0.0.1:${BPORT}/api/v1/system/health" 2>/dev/null)"
 if grep '"status":"UP"' <<<"$HEALTH" >/dev/null; then check "Health UP — ohne Docker kein Fehler" ok "$(grep -o '"docker":"[A-Z_]*"' <<<"$HEALTH")"
 else check "Health UP — ohne Docker kein Fehler" fail "${HEALTH:-keine Antwort}"; fi
-HTTP="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:${FPORT}/" 2>/dev/null)"
+HTTP="$(local_curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:${FPORT}/" 2>/dev/null)"
 if [ "$HTTP" = 200 ]; then check "Oberfläche auf demselben Port (HTTP 200)" ok ""; else check "Oberfläche auf demselben Port (HTTP 200)" fail "HTTP ${HTTP:-—}"; fi
 
 SETUP_LOGS="${USER_HOME}/.local/state/mysuricates/setup-logs"

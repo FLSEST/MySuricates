@@ -215,6 +215,50 @@ check "host mode keeps :9090"                            '[ "$URL" = "http://loc
 URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 MYSURICATES_API_BASE=http://x:1/api/v1 run_in_script 'echo "$BACKEND_READY_URL"')"
 check "MYSURICATES_API_BASE still wins"                  '[ "$URL" = "http://x:1/api/v1/system/info" ]'
 
+echo "11) a proxy from the environment never gets a request meant for the dev backend (bb4f60a5)"
+# curl 8.5 schickt auch localhost ueber http_proxy/https_proxy: die Bereitschaftspruefung lief ueber den
+# Proxy, und der Run-Waechter vor restart schickte ihm den API-Key — der zudem in den curl-Argumenten
+# stand, sichtbar in der Prozessliste. Echte HTTP-Antworten fuer das echte curl: tests/fake_instance.py;
+# der Fake-Proxy schreibt alles auf, was bei ihm ankommt, und antwortet 502 — er darf nichts bekommen.
+if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+  FAKE="$HERE/fake_instance.py"; PXLOG="$TMP/proxy.log"; RKEY="key-bb4f60a5-$$"
+  freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
+  serve() {  # MODUS PORT … — fake_instance.py losgeloest starten; gibt die PID aus, sobald der Port antwortet
+    local pid
+    pid="$( (python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
+    for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$2") 2>/dev/null && break; sleep 0.05; done
+    echo "$pid"
+  }
+  APORT="$(freeport 19480)"; API_PID="$(serve api "$APORT" "$RKEY" 2)"
+  PXPORT="$(freeport $((APORT + 1)))"; PX_PID="$(serve proxy "$PXPORT" "$PXLOG")"
+  trap 'kill "$API_PID" "$PX_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
+  PX="http://127.0.0.1:$PXPORT"
+  # proxied CODE — CODE im Starter (run_in_script) mit dem Fake-Proxy in jeder Variablen, die curl liest
+  proxied() {
+    : > "$PXLOG"
+    run_in_script "export http_proxy=$PX https_proxy=$PX all_proxy=$PX HTTP_PROXY=$PX HTTPS_PROXY=$PX ALL_PROXY=$PX; unset no_proxy NO_PROXY; $1"
+  }
+  untouched() { [ ! -s "$PXLOG" ]; }
+  proxied "curl -s --max-time 3 http://127.0.0.1:$APORT/api/v1/system/info" >/dev/null
+  check "control: a plain curl goes through the fake proxy" '! untouched'
+  RC="$(proxied "endpoint_is_ready http://127.0.0.1:$APORT/api/v1/system/info; echo \$?")"
+  check "readiness: answered directly, the proxy gets nothing" '[ "$RC" = 0 ] && untouched'
+  CLOSED="$(freeport $((PXPORT + 1)))"
+  proxied "endpoint_is_ready https://127.0.0.1:$CLOSED/" >/dev/null
+  check "https probe (frontend): no CONNECT through the proxy" 'untouched'
+  mkdir -p "$TMP/curlspy"; : > "$TMP/curlspy.log"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s"\nexec "%s" "$@"\n' "$TMP/curlspy.log" "$(command -v curl)" > "$TMP/curlspy/curl"; chmod +x "$TMP/curlspy/curl"
+  GUARD="export PATH=\"$TMP/curlspy:\$PATH\" MYSURICATES_API_KEY=$RKEY; API_BASE=http://127.0.0.1:$APORT/api/v1"
+  N="$(proxied "$GUARD; running_runs_count")"
+  check "run guard: counts the runs, asked directly"      '[ "$N" = 2 ] && untouched'
+  check "run guard: the key never shows in curl's arguments" '[ -s "$TMP/curlspy.log" ] && ! grep -qF "$RKEY" "$TMP/curlspy.log"'
+  RC="$(proxied "$GUARD; FORCE=0; refuse_restart_if_runs_active >/dev/null 2>&1; echo \$?")"
+  check "restart refused (exit 3) although a proxy is set" '[ "$RC" = 3 ] && untouched'
+  kill "$API_PID" "$PX_PID" 2>/dev/null
+else
+  echo "  skip (no python3 or curl)"
+fi
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

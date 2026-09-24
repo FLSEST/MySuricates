@@ -256,10 +256,11 @@ check "without git: compose builds from the folder" 'grep -q "compose .* build$"
 mv "$CREPO/.git-weg" "$CREPO/.git"
 
 echo "7) running workflow runs: asked read-only, named before down stops them (29820f58)"
-# Die Instanz-API spielt ein kleiner Server aus der Python-Standardbibliothek — echte HTTP-Antworten
-# fuer das echte curl. Er zaehlt nur mit dem richtigen Key; ein Workflow-Name, der wie das Feld
-# aussieht, darf die Zahl nicht verfaelschen.
+# Die Instanz-API spielt ein kleiner Server aus der Python-Standardbibliothek (fake_instance.py) —
+# echte HTTP-Antworten fuer das echte curl. Er zaehlt nur mit dem richtigen Key; ein Workflow-Name,
+# der wie das Feld aussieht, darf die Zahl nicht verfaelschen.
 LIBRUNS="$HERE/../lib/instance-runs.sh"
+FAKE="$HERE/fake_instance.py"
 check "lib: bash -n"                           'bash -n "$LIBRUNS"'
 base() { ( . "$LIBRUNS"; instance_api_base "$1" 19999 ); }
 check "address: loopback and wildcard → 127.0.0.1" '[ "$(base "")" = http://127.0.0.1:19999 ] && [ "$(base 127.0.0.1)" = http://127.0.0.1:19999 ] && [ "$(base 0.0.0.0)" = http://127.0.0.1:19999 ] && [ "$(base ::)" = http://127.0.0.1:19999 ]'
@@ -267,36 +268,12 @@ check "address: a bound address as it is"      '[ "$(base 100.64.1.2)" = http://
 printf 'MYSURICATES_PORT=1\nMYSURICATES_BIND=0.0.0.0\n' > "$TMP/a.env"; printf 'MYSURICATES_PORT=2\n' > "$TMP/b.env"
 check "address before a rewrite: the first per name counts" '( . "$LIBRUNS"; instance_remember_addr x "$TMP/a.env"; instance_remember_addr x "$TMP/b.env"; instance_remember_addr y-1 "$TMP/b.env"; [ "$(instance_prev_addr x)" = "1,0.0.0.0" ] && [ "$(instance_prev_addr y-1)" = "2," ] && [ -z "$(instance_prev_addr z)" ] )'
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
-  cat > "$TMP/fakeapi.py" <<'PY'
-import http.server, json, sys
-port, key, runs = int(sys.argv[1]), sys.argv[2], int(sys.argv[3])
-class Api(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        if not self.path.startswith("/api/v1/executions?"):
-            return self.answer(404, {})
-        if self.headers.get("X-API-Key") != key:
-            return self.answer(401, {"error": "Unauthorized"})
-        if "status=RUNNING" not in self.path:
-            return self.answer(400, {})
-        content = [{"id": "r1", "workflowName": 'x "totalElements":99', "status": "RUNNING"}] if runs else []
-        self.answer(200, {"content": content, "page": 0, "size": 1, "totalElements": runs, "totalPages": runs})
-    def answer(self, code, body):
-        data = json.dumps(body).encode()
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-    def log_message(self, *args):
-        pass
-http.server.HTTPServer(("127.0.0.1", port), Api).serve_forever()
-PY
   freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
   APID=""
   # Losgeloest gestartet (kein Kind dieser Shell): beendet ihn down, bleibt kein Zombie zurueck, den
   # kill -0 noch fuer lebendig hielte. stopapi wartet, bis er weg ist — der naechste nimmt denselben Port.
   fakeapi() {  # PORT KEY RUNS — startet die Fake-API und wartet, bis sie antwortet
-    APID="$( (python3 "$TMP/fakeapi.py" "$1" "$2" "$3" > /dev/null 2>&1 & echo $!) )"
+    APID="$( (python3 "$FAKE" api "$1" "$2" "$3" > /dev/null 2>&1 & echo $!) )"
     for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0; sleep 0.05; done
     return 1
   }
@@ -350,6 +327,63 @@ PY
 else
   echo "  skip (no python3 or curl)"
 fi
+
+echo "8) a proxy from the environment never gets a request meant for the own instance (bb4f60a5)"
+# curl 8.5 schickt auch 127.0.0.1 ueber http_proxy/all_proxy: hinter einem Proxy scheiterte health_ok —
+# up wartete 300 s und meldete „nicht gesund“ —, und ein Key ginge an ihn mit. Der Fake-Proxy schreibt
+# alles auf, was bei ihm ankommt, und antwortet 502: er darf nichts bekommen.
+LIBCURL="$HERE/../lib/local-curl.sh"
+check "lib local-curl: bash -n"                'bash -n "$LIBCURL"'
+if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+  PXLOG="$TMP/proxy.log"; : > "$PXLOG"
+  fakeapi "$RPORT" "$RKEY" 2
+  PXPORT="$(freeport $((RPORT + 1)))"
+  PXPID="$( (python3 "$FAKE" proxy "$PXPORT" "$PXLOG" > /dev/null 2>&1 & echo $!) )"
+  for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$PXPORT") 2>/dev/null && break; sleep 0.05; done
+  UPSTATE="$TMP/state/mysuricates/pxup"
+  trap 'stopapi; kill "$PXPID" $(cat "$UPSTATE/instance.pid" 2>/dev/null) 2>/dev/null; rm -rf "$TMP"' EXIT
+  PX="http://127.0.0.1:$PXPORT"
+  # proxied BEFEHL… — mit dem Fake-Proxy in jeder Variablen, die curl liest; der Log beginnt leer
+  proxied() { : > "$PXLOG"; env -u no_proxy -u NO_PROXY http_proxy="$PX" https_proxy="$PX" all_proxy="$PX" HTTP_PROXY="$PX" HTTPS_PROXY="$PX" ALL_PROXY="$PX" "$@"; }
+  untouched() { [ ! -s "$PXLOG" ]; }   # der Proxy hat seit dem letzten proxied nichts bekommen
+  proxied curl -s --max-time 3 "http://127.0.0.1:$RPORT/api/v1/system/health" >/dev/null
+  check "control: a plain curl goes through the fake proxy" '! untouched'
+  lib() { proxied env PATH="$TMP/curlspy:$PATH" bash -c ". '$LIBCURL'; $1"; }
+  RUNS_URL="http://127.0.0.1:$RPORT/api/v1/executions?status=RUNNING&size=1"
+  check "lib: local_curl reaches the instance directly"  'lib "local_curl -fsS --max-time 3 http://127.0.0.1:$RPORT/api/v1/system/health" | grep -q UP && untouched'
+  : > "$TMP/curlspy.log"
+  check "lib: local_curl_key — the key reaches the instance" 'lib "local_curl_key $RKEY -fsS --max-time 3 \"$RUNS_URL\"" | grep -q "\"totalElements\": 2" && untouched'
+  check "... never curl's arguments"             '[ -s "$TMP/curlspy.log" ] && ! grep -qF "$RKEY" "$TMP/curlspy.log"'
+  check "lib: empty key → no header (401)"       '[ "$(lib "local_curl_key \"\" -s -o /dev/null -w %{http_code} \"$RUNS_URL\"")" = 401 ] && untouched'
+  # Host: die Fake-API ist der Prozess der Instanz
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/px.env"
+  PXSTATE="$TMP/state/mysuricates/px"; mkdir -p "$PXSTATE/home/.autotrigger"
+  printf '%s\n' "$RKEY" > "$PXSTATE/home/.autotrigger/api-key"; echo "$APID" > "$PXSTATE/instance.pid"
+  check "host status: healthy although a proxy is set" '[ "$(proxied bash "$SCRIPT" status --name px)" = "running healthy" ] && untouched'
+  OUT="$(proxied bash "$SCRIPT" down --name px 2>&1)"
+  check "host down: runs asked directly, then stopped" 'printf "%s" "$OUT" | grep -qF "mysuricates-px: 2 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt && untouched'
+  stopapi
+  # up wartet auf Health — der java-Stub startet die Fake-API auf dem Port der Instanz
+  mkdir -p "$TMP/pxbin" "$UPSTATE/frontend"; echo jar > "$UPSTATE/app.jar"
+  printf '#!/bin/sh\nexec python3 "%s" api "$AUTOMATION_PORT" "%s" 0\n' "$FAKE" "$RKEY" > "$TMP/pxbin/java"; chmod +x "$TMP/pxbin/java"
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/pxup.env"
+  OUT="$(proxied env PATH="$TMP/pxbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" up --name pxup 2>&1)"; RC=$?
+  check "host up: healthy although a proxy is set" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -qF "mysuricates-pxup läuft: http://localhost:$RPORT" && untouched'
+  env PATH="$TMP/pxbin:$PATH" bash "$HSCRIPT" down --name pxup >/dev/null 2>&1
+  kill "$PXPID" 2>/dev/null
+  rm -f "$TMP/inst/px.env" "$TMP/inst/pxup.env"
+else
+  echo "  skip (no python3 or curl)"
+fi
+# Jeder Aufruf gegen die eigene Instanz geht ueber lib/local-curl.sh — ein neues nacktes curl faellt hier
+# auf. Ausgenommen: Downloads aus dem Netz (lib/deps.sh, sie brauchen den Proxy), Installationshinweise
+# als Text (lib/provider-catalog.generated.sh) und die Tests mit ihren Stubs. git grep --untracked: auch
+# neue Dateien, aber keine ignorierten wie die private Kopie scripts/seed-workflows.sh. Der Aufruf im
+# Helfer selbst muss gefunden werden — sonst hat die Suche nichts gesehen.
+CURLS="$(cd "$HERE/.." && git grep --untracked -nIE "(^|[^[:alnum:]_-])curl[[:space:]]+(-|\"|'|\\\$|http|\\\\)" -- . 2>/dev/null)"
+NAKED="$(printf '%s\n' "$CURLS" | grep -vE '^(tests/|lib/local-curl\.sh:|lib/deps\.sh:|lib/provider-catalog\.generated\.sh:)' \
+  | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
+check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep -q "^lib/local-curl.sh:" && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'
 
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Stand-ins with real HTTP for the script tests — Python standard library only.
+
+  fake_instance.py api PORT KEY RUNS   a MySuricates instance: health and info answer 200, the query for
+                                       running workflow runs counts RUNS, and only with X-API-Key: KEY
+  fake_instance.py proxy PORT LOG      a proxy that must not get anything (bb4f60a5): it writes every
+                                       request it gets, CONNECT included, with its headers to LOG and
+                                       answers 502
+
+Used by test-instance.sh and test-start-autotrigger-dev.sh.
+"""
+import http.server
+import json
+import sys
+
+
+class Api(http.server.BaseHTTPRequestHandler):
+    key = ""
+    runs = 0
+
+    def do_GET(self):
+        if self.path in ("/api/v1/system/health", "/api/v1/system/info"):
+            return self.answer(200, {"status": "UP"})
+        if not self.path.startswith("/api/v1/executions?"):
+            return self.answer(404, {})
+        if self.headers.get("X-API-Key") != self.key:
+            return self.answer(401, {"error": "Unauthorized"})
+        if "status=RUNNING" not in self.path:
+            return self.answer(400, {})
+        # A workflow name that looks like the field must not change the count (scripts/lib/instance-runs.sh)
+        content = [{"id": "r1", "workflowName": 'x "totalElements":99', "status": "RUNNING"}] if self.runs else []
+        self.answer(200, {"content": content, "page": 0, "size": 1,
+                          "totalElements": self.runs, "totalPages": self.runs})
+
+    def answer(self, code, body):
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, *args):
+        pass
+
+
+class Proxy(http.server.BaseHTTPRequestHandler):
+    log = ""
+
+    def record(self):
+        with open(self.log, "a") as f:
+            f.write(self.command + " " + self.path + "\n")
+            for name, value in self.headers.items():
+                f.write("  " + name + ": " + value + "\n")
+        self.send_response(502)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = do_HEAD = do_CONNECT = record
+
+    def log_message(self, *args):
+        pass
+
+
+def main(argv):
+    if len(argv) == 5 and argv[1] == "api":
+        Api.key, Api.runs = argv[3], int(argv[4])
+        handler = Api
+    elif len(argv) == 4 and argv[1] == "proxy":
+        Proxy.log = argv[3]
+        handler = Proxy
+    else:
+        sys.exit(__doc__)
+    http.server.HTTPServer(("127.0.0.1", int(argv[2])), handler).serve_forever()
+
+
+if __name__ == "__main__":
+    main(sys.argv)

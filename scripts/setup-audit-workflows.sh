@@ -15,6 +15,9 @@ if [[ -z "$PROJECT_ID" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# No proxy from the environment, the key via stdin instead of curl's arguments (bb4f60a5)
+# shellcheck source=lib/local-curl.sh
+. "${SCRIPT_DIR}/lib/local-curl.sh"
 
 # Colors for output (all logs go to stderr)
 info()  { echo -e "\033[0;34m[INFO]\033[0m  $*" >&2; }
@@ -22,18 +25,12 @@ ok()    { echo -e "\033[0;32m[OK]\033[0m    $*" >&2; }
 warn()  { echo -e "\033[1;33m[WARN]\033[0m  $*" >&2; }
 error() { echo -e "\033[0;31m[ERROR]\033[0m $*" >&2; }
 
-# Authenticated curl wrapper
-acurl() {
-  if [[ -n "$API_KEY" ]]; then
-    curl -sf -H "X-API-Key: ${API_KEY}" "$@"
-  else
-    curl -sf "$@"
-  fi
-}
+# Authenticated curl wrapper (without a key: no header)
+acurl() { local_curl_key "$API_KEY" -sf "$@"; }
 
 # Check API is reachable and resolve API key
 check_api() {
-  if ! curl -sf "${BASE_URL}/system/health" > /dev/null 2>&1; then
+  if ! local_curl -sf "${BASE_URL}/system/health" > /dev/null 2>&1; then
     error "AutoPilot API not reachable at ${BASE_URL}"
     error "Start the backend first: scripts/start-autotrigger-dev.sh"
     exit 1
