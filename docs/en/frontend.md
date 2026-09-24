@@ -171,6 +171,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Enter natural language wishes and have them fulfilled asynchronously
 - Iteration display, provide feedback, cancel or crystallize wishes
+- Detail (`components/wishes/WishDetail.tsx`): the head with actions, status timeline and iteration counter is `WishHeaderCard.tsx`, the collapsible iteration history `WishIterationHistory.tsx`; `WishDetail` holds whether it is open, so it stays open when another wish is selected
 
 ### WorkflowFactory (`/factory`)
 
