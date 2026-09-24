@@ -43,7 +43,6 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/assistant/AssistantActionSuggestionService.java", 427),
             entry("com/automation/service/cli/CommandExecutorService.java", 365),
             entry("com/automation/service/cli/ContainerShellService.java", 350),
-            entry("com/automation/service/dialog/DialogConversionService.java", 329),
             entry("com/automation/service/dialog/DialogSessionScanner.java", 348),
             entry("com/automation/service/factory/WorkflowFactoryService.java", 317),
             entry("com/automation/service/integration/providers/confluence/ConfluenceProvider.java", 315),
@@ -55,7 +54,6 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/staging/StagingService.java", 428),
             entry("com/automation/service/staging/TestingService.java", 450),
             entry("com/automation/service/trigger/TodoTriggerService.java", 383),
-            entry("com/automation/service/wish/WishDecomposePromptBuilder.java", 338),
             entry("com/automation/service/workflow/WorkflowExecutor.java", 529)
     );
 

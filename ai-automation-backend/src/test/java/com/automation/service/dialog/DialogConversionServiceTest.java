@@ -11,6 +11,7 @@ import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -219,5 +220,24 @@ class DialogConversionServiceTest {
         assertThat(result.suggestedName()).isEqualTo("Build Pipeline");
         assertThat(result.confidence()).isEqualTo(0.9);
         assertThat(result.blocks()).hasSize(2);
+    }
+
+    /** The prompt names the block types as the executors do — it said "forEach" (TODO cf8db6f8). */
+    @Test
+    void suggestFromSession_promptCarriesTheBlockSpecifications() throws IOException {
+        var msg1 = new ClaudeJsonlParser.DialogMessage("tool_use", null, "Bash", "npm test", null, null);
+        var msg2 = new ClaudeJsonlParser.DialogMessage("tool_use", null, "Bash", "npm build", null, null);
+        var turn = new ClaudeJsonlParser.DialogTurn("t1", null, "assistant", Instant.now(), List.of(msg1, msg2));
+        when(parser.parse(any())).thenReturn(
+                new ClaudeJsonlParser.ParsedSession("s1", "/project", Instant.now(), Instant.now(), List.of(turn)));
+        lenient().when(conversationPreprocessor.processOutput(any())).thenAnswer(inv -> inv.getArgument(0));
+        ArgumentCaptor<AiProvider.ReasoningRequest> request = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+        when(aiProvider.reason(request.capture())).thenThrow(new RuntimeException("AI unavailable"));
+
+        service.suggestFromSession("/path/to/session.jsonl");
+
+        assertThat(request.getValue().prompt()).contains("[Bash] npm test")
+                .contains("**Block type: shell**", "**Block type: retry**", "**Block type: foreach**")
+                .contains("\"foreach\" NUR wenn").doesNotContain("forEach");
     }
 }

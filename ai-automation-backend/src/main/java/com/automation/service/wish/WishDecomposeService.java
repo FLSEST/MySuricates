@@ -250,7 +250,7 @@ public class WishDecomposeService {
                 config.putIfAbsent("total_timeout_seconds", wishConfig.getDefaultAgenticTotalTimeoutSeconds());
             }
             case "simple" -> config.putIfAbsent("timeout_seconds", wishConfig.getDefaultShellTimeoutSeconds());
-            default -> { /* no defaults for conditional, forEach, etc. */ }
+            default -> { /* no defaults for conditional, foreach, etc. */ }
         }
     }
 }

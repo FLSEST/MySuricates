@@ -1,20 +1,28 @@
 package com.automation.service.factory;
 
 import com.automation.dto.request.WorkflowFactoryRequest;
+import com.automation.service.assistant.fetch.BlockSpecs;
 import com.automation.service.workflow.AgentInstructionsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * The three prompts of the workflow factory: the architect system prompt (with the agent base
  * instructions in front), the generation prompt for a topic, and the auto-fix prompt for a
  * failed test run.
  *
- * <p>Extracted from {@code WorkflowFactoryService} (Audit-TODO 3b0a021c). Pure text assembly.
+ * <p>Extracted from {@code WorkflowFactoryService} (Audit-TODO 3b0a021c). Pure text assembly. The
+ * block schema comes from {@link BlockSpecs}: the old list named the type forEach and keys no executor
+ * reads (TODO cf8db6f8); {@code PromptBlockSchemaGateTest} holds the prompts to the executors.
  */
 @Service
 @RequiredArgsConstructor
 public class FactoryPromptBuilder {
+
+    /** The block types a factory workflow may use. */
+    static final List<String> BLOCK_TYPES = List.of("simple", "shell", "retry", "conditional", "foreach", "agentic");
 
     private final AgentInstructionsService agentInstructionsService;
 
@@ -31,20 +39,17 @@ public class FactoryPromptBuilder {
                 You are a workflow architect for MySuricates, an AI-powered workflow automation platform.
                 You create workflow definitions as JSON.
 
-                Available block types:
-                - simple: AI-powered tasks (analysis, summarization, generation). Config: { "command": "..." }
-                - shell: Execute shell commands. Config: { "command": "...", "container_image": "image:tag" }. See "Ausfuehrungsumgebung" section for available host tools and container images.
-                - retry: Wraps a command with retry logic. Config: { "command": "...", "max_retries": 3, "delay_seconds": 5 }
-                - conditional: Branch based on condition. Config: { "condition": "...", "if_true": "...", "if_false": "..." }
-                - forEach: Loop over items. Config: { "items_expression": "...", "item_variable": "item", "command": "..." }
-                - agentic: Complex multi-step AI task with goal. Config: { "goal": "...", "max_iterations": 5 }
+                Available block types: use only these types and config keys, spelled exactly as below — a block of \
+                another type is refused, and the executors ignore any other key.
 
+                """).append(BlockSpecs.reference(BLOCK_TYPES)).append("""
                 Rules:
                 - Use {{ variable_name }} syntax for variables
                 - Use {{ previous_output }} to pass data between steps
                 - Shell blocks for concrete commands (npm, git, curl, find, etc.)
                 - Simple blocks for AI tasks (analysis, summarization, generation)
                 - Retry blocks when failures are likely (API calls, network, tests)
+                - conditional, foreach and retry run their commands as an AI prompt unless `execution_mode` is "shell"
                 - Agentic blocks only for complex, multi-step autonomous tasks
                 - Keep workflows practical and focused (3-7 blocks typical)
                 - Follow the "Ausfuehrungsumgebung" rules for shell block container_image
@@ -75,13 +80,14 @@ public class FactoryPromptBuilder {
                   "description": "What the workflow does",
                   "icon": "fitting emoji",
                   "blocks": [
-                    { "type": "simple|shell|retry|conditional|forEach|agentic", "config": { "command": "..." } }
+                    { "type": "shell", "config": { "command": "set -euo pipefail; npm test" } }
                   ],
                   "defaultContext": { "variable": "default_value" },
                   "instructions": "Workflow-specific instructions for the AI agent",
                   "testInputs": { "variable": "test_value" }
                 }
-                """);
+                Each block's type is one of %s; its config holds the keys of that type from the block types above.
+                """.formatted(String.join(", ", BLOCK_TYPES)));
         return sb.toString();
     }
 

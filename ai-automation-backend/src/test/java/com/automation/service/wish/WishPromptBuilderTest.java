@@ -1,5 +1,6 @@
 package com.automation.service.wish;
 
+import com.automation.config.WishConfig;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.*;
 import com.automation.repository.*;
@@ -43,7 +44,7 @@ class WishPromptBuilderTest {
         );
         WishDecomposePromptBuilder decomposeBuilder = new WishDecomposePromptBuilder(
                 workflowRepository, projectRepository, templateRepository,
-                memoryRepository, workflowPoolService, agentInstructionsService, helper
+                memoryRepository, workflowPoolService, agentInstructionsService, helper, new WishConfig()
         );
         WishEvaluatePromptBuilder evaluateBuilder = new WishEvaluatePromptBuilder(
                 workflowRunRepository, chainRunRepository, stepResultRepository, learningService

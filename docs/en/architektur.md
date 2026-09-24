@@ -219,10 +219,10 @@ com.automation
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
 │   ├── todo/            TodoService (+ TodoSpecifications, TodoTrackerExportService, TodoResolutionService, TodoResponseAssembler), AutoTodoService (+ AutoTodoTextBuilder, PendingTodoApprovalService, GranularTodoService), GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService, WorkflowSuggestion, DialogWorkflowSuggestion
-│   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
+│   ├── dialog/          DialogSessionScanner, DialogConversionService (+ DialogConversionPrompt), ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog), ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
+│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder (+ WishSystemPrompt), WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
@@ -636,7 +636,7 @@ Successful agentic runs can be converted into deterministic workflows:
 
 Claude Code sessions can also serve as templates for workflows:
 - `DialogSessionScanner` — scans `~/.claude/projects/` for JSONL session files
-- `DialogConversionService` — analyzes a session with Claude and generates a workflow suggestion
+- `DialogConversionService` — analyzes a session with Claude and generates a workflow suggestion; `DialogConversionPrompt` builds the AI request
 - `ClaudeJsonlParser` — parses JSONL session files
 - `DialogController` — `/api/v1/dialog` with session list, analysis and workflow creation
 - Path traversal protection: only paths under `~/.claude/projects/` with `.jsonl` extension are allowed
@@ -678,11 +678,12 @@ Claude Code sessions can also serve as templates for workflows:
 
 ## Workflow Factory
 
-Automatic generation and verification of workflows from a topic:
+Automatic generation and verification of workflows from a topic. The block schema in the prompts of the factory, wishes and dialog import comes from `BlockSpecs` (the same texts as the assistant's `fetch block-spec`); `PromptBlockSchemaGateTest` checks every block type and config key named there against the executors — the old prompts named `forEach`, `then_blocks`, `if_true` and other keys no executor reads.
 - `WorkflowFactoryService` — orchestrates the entire factory process
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-based workflow generation
 - `WorkflowTextGenerator` — text-based workflow generation
 - `FactorySetupService` — configuration and setup of the factory environment
+- `FactoryPromptBuilder` — architect, generator and auto-fix prompt; the Codex `AGENTS.md` refers to the prompt for the block types
 - `WorkflowFactoryController` — `/api/v1/factory` with endpoints:
   - `POST /generate` — generate workflow from topic
   - `POST /run` — run generated workflow on test instance
@@ -710,6 +711,7 @@ Natural language wishes are automatically converted into workflows/chains:
 - `WishFulfillmentLoop` — asynchronous meta-loop (decompose → execute → evaluate) incl. cancel flags and total timeout
 - `WishEvaluationService` — evaluation phase (AI verdict → AWAITING_APPROVAL / REFINING / FAILED)
 - `WishWatchdogService` — monitors running wishes for stale/timeout states
+- `WishDecomposePromptBuilder` + `WishSystemPrompt` — decomposition prompt; its timeout guidelines are the `automation.wish.*` values `WishDecomposeService` fills in on creation
 - Iterative process: Decomposition → Workflow/Chain generation → Execution → Feedback
 - Supports up to `max_iterations` iterations for improvements
 - `crystallize()` — promotes successful wish as template

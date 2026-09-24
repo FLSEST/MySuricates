@@ -256,7 +256,7 @@ The assistant can load additional data via `<fetch type="..." id="..."/>` tags. 
 | `skill` | Skill detail | Desc: 200, AI context: 400, Capability desc: 100 |
 | `integration` | Integration detail | Desc: 200, Account: 80, Action desc: 100 |
 | `chain` | Chain detail | Desc: 200 |
-| `block-spec` | Block type specification per type (`BlockSpecs`, one for every type of the registry; `BlockTypeListsGuardTest` keeps it complete, `BlockSpecConfigKeysGateTest` checks every config key it names against the executor source) | — |
+| `block-spec` | Block type specification per type (`BlockSpecs`, one for every type of the registry; `BlockTypeListsGuardTest` keeps it complete, `BlockSpecConfigKeysGateTest` checks every config key it names against the executor source; the prompts of the factory, wishes and dialog import render the same texts with `BlockSpecs.reference`) | — |
 
 Doc files: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 

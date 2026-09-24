@@ -1,11 +1,13 @@
 package com.automation.service.assistant.fetch;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * The block type specifications the assistant fetches with {@code <fetch type="block-spec" id="…"/>}:
- * required config, options and an example per type. One entry per type of
+ * The block type specifications the assistant fetches with {@code <fetch type="block-spec" id="…"/>}
+ * and the prompts that build whole workflows render with {@link #reference}: required config,
+ * options and an example per type. One entry per type of
  * {@code BlockTypesIndexSection.BLOCK_TYPES}; {@code BlockTypeListsGuardTest} fails the build when a
  * type has none (TODO 321b414e: four types answered "Unknown block type").
  *
@@ -20,6 +22,8 @@ import java.util.Set;
  * </ul>
  */
 public final class BlockSpecs {
+
+    private static final String AI_OVERRIDES_LINE = "AI overrides:";
 
     /** provider/model/effort — {@code BlockAiSettings}, for every block that calls an AI. */
     private static final String AI_OVERRIDES = """
@@ -258,6 +262,28 @@ public final class BlockSpecs {
     /** The block types that have a specification. */
     public static Set<String> types() {
         return SPECS.keySet();
+    }
+
+    /**
+     * The specifications of {@code types} for a prompt that builds whole workflows — wish, factory,
+     * dialog import, which described a schema of their own (TODO cf8db6f8). The texts of
+     * {@code <fetch type="block-spec"/>} without the AI override line (those workflows set the model per
+     * workflow), a blank line after each type.
+     *
+     * @throws IllegalArgumentException for a type without a specification
+     */
+    public static String reference(List<String> types) {
+        StringBuilder sb = new StringBuilder();
+        for (String type : types) {
+            String spec = SPECS.get(type);
+            if (spec == null) {
+                throw new IllegalArgumentException("No block specification for '" + type + "'");
+            }
+            spec.lines().filter(line -> !line.startsWith(AI_OVERRIDES_LINE))
+                    .forEach(line -> sb.append(line).append('\n'));
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     static String format(String blockType) {
