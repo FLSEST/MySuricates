@@ -153,7 +153,7 @@ public class AssistantActionSuggestionService {
                 .orElse(true);
     }
 
-    /** Called by {@code SystemSettingsService} when relevant settings change. */
+    /** Called by {@code AssistantSettingsListener} when the suggestions model or switch changes. */
     public void refreshCache() {
         cachedSuggestionsModel = appSettingsRepository.get("suggestions-model")
                 .filter(m -> !m.isBlank()).orElse(null);

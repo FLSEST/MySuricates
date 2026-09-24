@@ -2,21 +2,16 @@ package com.automation.service.system;
 
 import com.automation.config.BackupConfig;
 import com.automation.repository.AppSettingsRepository;
-import com.automation.service.AssistantService;
-import com.automation.service.PageSuggestionService;
-import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.assistant.AssistantActionSuggestionService;
-import com.automation.service.search.SemanticWorkflowSearchService;
-import com.automation.service.workflow.WorkflowTaggingService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 import java.util.Set;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class SystemSettingsService {
 
@@ -30,34 +25,8 @@ public class SystemSettingsService {
     );
 
     private final AppSettingsRepository appSettingsRepository;
-    private final AiProviderRegistry aiProviderRegistry;
     private final BackupConfig backupConfig;
-
-    @Autowired
-    @Lazy
-    private AssistantService assistantService;
-
-    @Autowired
-    @Lazy
-    private PageSuggestionService pageSuggestionService;
-
-    @Autowired
-    @Lazy
-    private AssistantActionSuggestionService actionSuggestionService;
-
-    @Autowired
-    @Lazy
-    private WorkflowTaggingService workflowTaggingService;
-
-    @Autowired
-    @Lazy
-    private SemanticWorkflowSearchService semanticSearchService;
-
-    public SystemSettingsService(AppSettingsRepository appSettingsRepository, AiProviderRegistry aiProviderRegistry, BackupConfig backupConfig) {
-        this.appSettingsRepository = appSettingsRepository;
-        this.aiProviderRegistry = aiProviderRegistry;
-        this.backupConfig = backupConfig;
-    }
+    private final ApplicationEventPublisher eventPublisher;
 
     public boolean isAllowedKey(String key) {
         return ALLOWED_SETTINGS.contains(key);
@@ -86,20 +55,8 @@ public class SystemSettingsService {
             }
             backupConfig.setRetainCount(count);
         }
-        if ("assistant-model".equals(key)) {
-            assistantService.refreshCachedModel();
-        }
-        if ("suggestions-model".equals(key)) {
-            pageSuggestionService.refreshCachedModel();
-            actionSuggestionService.refreshCache();
-            workflowTaggingService.refreshCache();
-            semanticSearchService.refreshCache();
-        }
-        if ("suggestions-enabled".equals(key)) {
-            actionSuggestionService.refreshCache();
-        }
-        if ("default-ai-provider".equals(key)) {
-            aiProviderRegistry.refreshDefaultProviderCache();
-        }
+        // Services that cache a setting re-read it here: AiProviderRegistry, WorkflowTaggingService,
+        // SemanticWorkflowSearchService and the assistant module (AssistantSettingsListener).
+        eventPublisher.publishEvent(new AppSettingChangedEvent(key));
     }
 }

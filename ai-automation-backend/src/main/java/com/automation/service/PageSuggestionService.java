@@ -88,7 +88,7 @@ public class PageSuggestionService {
                 );
     }
 
-    /** Called by SystemController when suggestions-model setting changes. */
+    /** Called by {@link AssistantSettingsListener} when {@code suggestions-model} changes. */
     public void refreshCachedModel() {
         cachedSuggestionsModel = appSettingsRepository.get("suggestions-model")
                 .filter(m -> !m.isBlank()).orElse(null);

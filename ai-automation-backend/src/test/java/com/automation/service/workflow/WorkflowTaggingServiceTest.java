@@ -5,6 +5,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.system.AppSettingChangedEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,6 +94,23 @@ class WorkflowTaggingServiceTest {
 
         service.refreshCache();
         assertThat(ReflectionTestUtils.getField(service, "cachedSuggestionsModel")).isEqualTo("second");
+    }
+
+    @Test
+    void should_refreshCache_when_suggestionsModelSettingChanged() {
+        when(appSettingsRepository.get("suggestions-model")).thenReturn(Optional.of("opus"));
+
+        service.onSettingChanged(new AppSettingChangedEvent("suggestions-model"));
+
+        assertThat(ReflectionTestUtils.getField(service, "cachedSuggestionsModel")).isEqualTo("opus");
+    }
+
+    @Test
+    void should_ignore_when_otherSettingChanged() {
+        service.onSettingChanged(new AppSettingChangedEvent("assistant-model"));
+        service.onSettingChanged(new AppSettingChangedEvent("suggestions-enabled"));
+
+        verifyNoInteractions(appSettingsRepository);
     }
 
     // -------- isEnabled --------

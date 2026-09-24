@@ -6,6 +6,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.system.AppSettingChangedEvent;
 import com.automation.service.workflow.WorkflowContentChangedEvent;
 import com.automation.testsupport.FakeTransactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -104,6 +105,22 @@ class SemanticWorkflowSearchServiceTest {
         assertThat(ReflectionTestUtils.getField(service, "cachedSuggestionsModel"))
                 .isEqualTo("claude-opus-4-6");
         verify(appSettingsRepository).get("suggestions-model");
+    }
+
+    @Test
+    void should_refresh_cache_when_suggestions_model_setting_changed() {
+        when(appSettingsRepository.get("suggestions-model")).thenReturn(Optional.of("opus"));
+
+        service.onSettingChanged(new AppSettingChangedEvent("suggestions-model"));
+
+        assertThat(ReflectionTestUtils.getField(service, "cachedSuggestionsModel")).isEqualTo("opus");
+    }
+
+    @Test
+    void should_ignore_other_setting_changes() {
+        service.onSettingChanged(new AppSettingChangedEvent("default-ai-provider"));
+
+        verify(appSettingsRepository, never()).get(any());
     }
 
     // ── invalidate / onContentChanged ──────────────────────────────────────

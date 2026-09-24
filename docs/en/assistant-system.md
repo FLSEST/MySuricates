@@ -318,7 +318,7 @@ All implement `AssistantContextSection` with `append(StringBuilder sb, boolean c
 
 - **Chat model** (`assistant-model` setting): Default `sonnet`, cached in `AssistantService.cachedAssistantModel`
 - **Suggestions model** (`suggestions-model` setting): Default `sonnet`, used by `PageSuggestionService` and `AssistantActionSuggestionService`
-- Both models are seeded into `app_settings` on startup and can be changed at runtime via the Settings API (`refreshCachedModel()`)
+- Both models are seeded into `app_settings` on startup and can be changed at runtime via the Settings API: `SystemSettingsService` announces the change as `AppSettingChangedEvent`, `AssistantSettingsListener` calls `refreshCachedModel()`/`refreshCache()` — only while the assistant module is on; switching it on at runtime re-reads all three values
 - Haiku (`haiku`) is too imprecise for assistant tasks
 - Opus (`opus`) is too slow for interactive chats
 

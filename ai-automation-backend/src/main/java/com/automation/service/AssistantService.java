@@ -109,7 +109,7 @@ public class AssistantService {
         }
     }
 
-    /** Called by SystemController when assistant-model setting changes. */
+    /** Called by {@link AssistantSettingsListener} when {@code assistant-model} changes. */
     public void refreshCachedModel() {
         cachedAssistantModel = appSettingsRepository.get("assistant-model")
                 .filter(m -> !m.isBlank()).orElse(null);
