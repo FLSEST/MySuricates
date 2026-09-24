@@ -66,6 +66,7 @@ export function ProjectGroup({
         )}
         <button
           onClick={onToggle}
+          aria-expanded={!collapsed}
           className="flex items-center gap-1.5 flex-1 px-2 py-1.5 text-left rounded-md hover:bg-surface-raised transition-colors group"
         >
           {collapsed ? (

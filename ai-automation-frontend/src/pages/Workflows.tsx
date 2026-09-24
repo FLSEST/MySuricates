@@ -168,34 +168,39 @@ export function Workflows() {
     );
   }, [filtered, t.common.project]);
 
+  // Without a stored choice ('__all__') the projects of the first load start collapsed. Resolved
+  // against the unfiltered list, so an active search does not decide it; projects that appear later
+  // (created, imported, installed) are not in the set and show open.
+  if (collapsedProjects.has('__all__') && workflows?.length) {
+    setCollapsedProjects(new Set(workflows.map((w) => w.projectId)));
+  }
+
   const selectedWorkflow = useMemo(() => {
     if (!filtered.length) return null;
     const found = selectedWorkflowId ? filtered.find((w) => w.id === selectedWorkflowId) : null;
     return found ?? filtered[0];
   }, [filtered, selectedWorkflowId]);
 
-  // '__all__' (the default until the first toggle) collapses every project; a toggle expands it
-  // into the ids of the projects shown
   const isProjectCollapsed = useCallback(
-    (projectId: string) => collapsedProjects.has('__all__') || collapsedProjects.has(projectId),
+    (projectId: string) => collapsedProjects.has(projectId),
     [collapsedProjects],
   );
 
   const toggleProject = useCallback((projectId: string) => {
     setCollapsedProjects((prev) => {
-      const next = prev.has('__all__') ? new Set(groupedByProject.map((g) => g.projectId)) : new Set(prev);
+      const next = new Set(prev);
       if (next.has(projectId)) next.delete(projectId);
       else next.add(projectId);
       return next;
     });
-  }, [groupedByProject]);
+  }, []);
 
-  const allCollapsed = groupedByProject.length > 0 && groupedByProject.every((g) => isProjectCollapsed(g.projectId));
+  const allCollapsed = groupedByProject.length > 0 && groupedByProject.every((g) => collapsedProjects.has(g.projectId));
 
   const toggleAll = useCallback(() => {
     setCollapsedProjects((prev) => {
       const allIds = groupedByProject.map((g) => g.projectId);
-      const allAreCollapsed = prev.has('__all__') || allIds.every((id) => prev.has(id));
+      const allAreCollapsed = allIds.every((id) => prev.has(id));
       return allAreCollapsed ? new Set() : new Set(allIds);
     });
   }, [groupedByProject]);
@@ -535,6 +540,7 @@ export function Workflows() {
         confirmIcon={<Trash2 className="w-4 h-4" />}
         variant="danger"
         isPending={deleting}
+        cancelDisabled={deleting}
       >
         <div className="space-y-3">
           <p className="text-sm text-text-secondary">{t.workflows.deleteConfirm}</p>
