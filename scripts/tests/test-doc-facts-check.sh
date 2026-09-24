@@ -659,6 +659,24 @@ check "Abgrenzungen und richtige Zahlen: kein Befund" '! grep -q "docs/fliesstex
 check "Abgrenzungen und richtige Zahlen: exit 0"       '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/fliesstext.md"
 
+echo "16) Produktname im Seitentitel (TODO e3101cd6)"
+# Bis e3101cd6 hiessen alle Diagramm-Seiten "AutoPilot — …". AutoPilot ist nur der Name des
+# Projekts, unter dem MySuricates seine TODOs fuehrt; im Fliesstext darf er stehen bleiben.
+cat > "$FAKE/docs/titel-diagrams.md" <<'MD_EOF'
+# AutoPilot — Scheduler & Cron
+## AutoPilot - Frontend Flow
+AutoPilot ist der Name des Projekts, unter dem MySuricates seine eigenen TODOs fuehrt.
+# MySuricates — Scheduler & Cron
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Seitentitel mit altem Produktnamen gemeldet" \
+  'grep -qE "^DRIFT docs/titel-diagrams.md:1 verbotenes-muster.*MySuricates" <<<"$OUT"'
+check "auch als Unterueberschrift mit Bindestrich gemeldet" \
+  'grep -qE "^DRIFT docs/titel-diagrams.md:2 verbotenes-muster" <<<"$OUT"'
+check "Projektname im Fliesstext bleibt frei"  '! grep -q "titel-diagrams.md:3" <<<"$OUT"'
+check "Titel mit MySuricates bleibt frei"      '! grep -q "titel-diagrams.md:4" <<<"$OUT"'
+rm "$FAKE/docs/titel-diagrams.md"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
