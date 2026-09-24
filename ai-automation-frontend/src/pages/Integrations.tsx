@@ -1,6 +1,6 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
-import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo } from 'lucide-react';
+import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo, GitMerge, GitPullRequest, CalendarDays, Rss, Bell, CloudSun, SquareCheck, Hash, Send, Globe } from 'lucide-react';
 import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -9,14 +9,26 @@ import { useT } from '../i18n';
 import { useI18nStore } from '../i18n';
 import { formatDateTime } from '../utils/formatTime';
 import { SetupGuidePanel } from '../components/integrations/SetupGuidePanel';
+import { ConnectionsPanel } from '../components/integrations/ConnectionsPanel';
+import { VerificationBadge, VerificationNotice } from '../components/integrations/IntegrationVerification';
 import type { IntegrationProviderInfo, IntegrationActionInfo } from '../types';
 
 const ICON_MAP: Record<string, typeof Calendar> = {
   Calendar,
+  CalendarDays,
+  Rss,
   KanbanSquare,
   TicketCheck,
   Mail,
   ListTodo,
+  GitMerge,
+  GitPullRequest,
+  Bell,
+  CloudSun,
+  CheckSquare: SquareCheck,
+  Hash,
+  Send,
+  Globe,
 };
 
 function ProviderIcon({ icon }: { icon: string }) {
@@ -181,9 +193,10 @@ export function Integrations() {
                 <ProviderIcon icon={provider.icon} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
                   <h3 className="font-semibold text-text">{localizedName(provider)}</h3>
                   <ProviderStatusBadge provider={provider} />
+                  <VerificationBadge provider={provider} />
                 </div>
                 <p className="text-sm text-text-secondary mb-3">{localizedDesc(provider)}</p>
 
@@ -260,13 +273,16 @@ export function Integrations() {
 
       {/* Setup Guide (when not yet connected — incl. credentials saved but not connected) */}
       {selected && selected.status !== 'CONNECTED' && (
-        <SetupGuidePanel
-          key={selected.providerId}
-          providerId={selected.providerId}
-          displayName={localizedName(selected)}
-          requiresCredentials={selected.requiresCredentials !== false}
-          onRefresh={() => refetch()}
-        />
+        <>
+          <VerificationNotice provider={selected} />
+          <SetupGuidePanel
+            key={selected.providerId}
+            providerId={selected.providerId}
+            displayName={localizedName(selected)}
+            requiresCredentials={selected.requiresCredentials !== false}
+            onRefresh={() => refetch()}
+          />
+        </>
       )}
 
       {/* Detail Panel (when connected) */}
@@ -276,6 +292,9 @@ export function Integrations() {
             {/* Connection details */}
             <div className="mb-6">
               <h3 className="font-semibold text-text mb-3">{t.integrations.connectionDetails}</h3>
+              <div className="mb-3">
+                <VerificationNotice provider={selected} />
+              </div>
               <dl className="space-y-2 text-sm">
                 {(selected.accountName || selected.accountEmail) && (
                   <div className="flex gap-2">
@@ -377,6 +396,16 @@ export function Integrations() {
             )}
           </div>
         </Card>
+      )}
+
+      {/* Named connections of the selected provider (0b3cbcc3) — from the live list, so a new one shows up after saving */}
+      {selected && (
+        <ConnectionsPanel
+          key={`connections-${selected.providerId}`}
+          provider={providers.find((p) => p.providerId === selected.providerId) ?? selected}
+          displayName={localizedName(selected)}
+          onRefresh={() => refetch()}
+        />
       )}
 
       {/* Disconnect Confirmation */}

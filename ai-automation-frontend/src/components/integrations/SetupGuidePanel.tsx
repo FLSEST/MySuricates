@@ -11,11 +11,13 @@ import type { SetupStep } from '../../data/integrationSetupGuides';
  * Setup guide + credential form for one integration provider. Extracted from
  * pages/Integrations.tsx (audit finding 9c464f6f) — behaviour unchanged.
  */
-export function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, connected = false, onRefresh }: {
+export function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, connected = false, connection, onRefresh }: {
   providerId: string;
   displayName: string;
   requiresCredentials?: boolean;
   connected?: boolean;
+  /** Named connection the credentials belong to; omitted = the provider's default connection. */
+  connection?: string;
   onRefresh: () => void;
 }) {
   const lang = useI18nStore.getState().locale;
@@ -24,7 +26,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
   const saveCredentials = useSaveCredentials();
   const [openStep, setOpenStep] = useState(0);
   const [copied, setCopied] = useState<number | null>(null);
-  const [clientId, setClientId] = useState('');
+  const [clientId, setClientId] = useState(guide?.credentialLabels?.clientIdDefault ?? '');
   const [clientSecret, setClientSecret] = useState('');
 
   if (!guide) return null;
@@ -37,7 +39,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
 
   const handleSaveCredentials = () => {
     saveCredentials.mutate(
-      { providerId, clientId, clientSecret },
+      { providerId, clientId, clientSecret, connection },
       { onSuccess: () => onRefresh() }
     );
   };

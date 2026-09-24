@@ -72,7 +72,7 @@ class IntegrationBlockExecutorTest {
         ExecutionContext context = createContext();
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
                 .thenReturn(Map.of("items", List.of()));
 
@@ -113,7 +113,7 @@ class IntegrationBlockExecutorTest {
         ExecutionContext context = createContext();
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(any(), any(), any()))
                 .thenThrow(new IllegalStateException("API error 401"));
 
@@ -137,7 +137,7 @@ class IntegrationBlockExecutorTest {
         context.setVariable("started_at", "2026-04-07T00:00:00Z");
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
                 .thenAnswer(inv -> {
                     @SuppressWarnings("unchecked")
@@ -181,7 +181,7 @@ class IntegrationBlockExecutorTest {
         ));
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar"))
+        when(oAuthService.getValidAccessToken("google-calendar", "default"))
                 .thenThrow(new IllegalStateException("No valid access token for provider: google-calendar"));
 
         StepResult result = executor.execute(block, createContext());
@@ -201,7 +201,7 @@ class IntegrationBlockExecutorTest {
         ));
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
                 .thenReturn(Map.of("items", List.of()));
 
@@ -224,7 +224,7 @@ class IntegrationBlockExecutorTest {
         ));
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(eq("create_event"), any(), eq("mock-token")))
                 .thenReturn(Map.of("id", "event-123"));
 
@@ -248,7 +248,7 @@ class IntegrationBlockExecutorTest {
         ));
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("mock-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("mock-token");
         when(provider.executeAction(eq("list_events"), any(), eq("mock-token")))
                 .thenThrow(new RuntimeException("Network timeout after 30s"));
 
@@ -257,6 +257,65 @@ class IntegrationBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("Network timeout");
         assertThat(result.getMetadata()).containsEntry("error", "Network timeout after 30s");
+    }
+
+    @Test
+    void usesTheNamedConnectionFromConfig() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of("provider", "github", "action", "list_issues", "connection", "work"));
+
+        when(registry.getProvider("github")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("github", "work")).thenReturn("work-token");
+        when(provider.executeAction(eq("list_issues"), any(), eq("work-token"))).thenReturn(Map.of("ok", true));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("connection", "work");
+        assertThat(result.getInput()).contains("github/work");
+    }
+
+    @Test
+    void withoutConnectionKey_usesDefault_andRecordsIt() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of("provider", "github", "action", "list_issues"));
+
+        when(registry.getProvider("github")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("github", "default")).thenReturn("t");
+        when(provider.executeAction(eq("list_issues"), any(), eq("t"))).thenReturn(Map.of());
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("connection", "default");
+    }
+
+    @Test
+    void invalidConnectionName_failsWithoutTouchingTheProvider() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of("provider", "github", "action", "list_issues", "connection", "Work Account"));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("Invalid connection name");
+        verifyNoInteractions(registry, oAuthService);
+    }
+
+    @Test
+    void nonStringConnection_fails() {
+        BlockDefinition block = new BlockDefinition();
+        block.setType("integration");
+        block.setConfig(Map.of("provider", "github", "action", "list_issues", "connection", 7));
+
+        StepResult result = executor.execute(block, createContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("'connection' must be a string");
+        verifyNoInteractions(registry, oAuthService);
     }
 
     private ExecutionContext createContext() {

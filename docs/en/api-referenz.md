@@ -1504,6 +1504,8 @@ Delete a trigger.
 
 Plugin system for external services (Google Calendar, Gmail, Jira, Confluence, Trello). Each provider is automatically discovered and offers OAuth connection + actions.
 
+**Named connections:** A provider can have several connections (e.g. two accounts). Every endpoint that concerns one connection (`connect`, `credentials`, `connection`, `actions`, `task-targets`) takes the optional query parameter `connection=<name>` (1–40 characters `[a-z0-9-]`, else `400`); without it `default` applies. Details: [integrations.md](integrations.md#several-connections-per-provider).
+
 ### `GET /api/v1/integrations`
 
 List all providers with connection status, actions, and account info.
@@ -1529,10 +1531,21 @@ List all providers with connection status, actions, and account info.
     "supportsTaskExport": false,
     "actions": [
       { "name": "list_events", "description": "...", "inputSchema": {...}, "available": true }
+    ],
+    "requiresOAuthFlow": true,
+    "connections": [
+      { "name": "default", "status": "CONNECTED", "configured": true, "accountEmail": "user@gmail.com", "accountName": "Max Mustermann", "connectedSince": "2026-04-01T10:00:00Z", "scopes": "..." },
+      { "name": "work", "status": "CONNECTED", "configured": true, "accountEmail": "max@company.example", "accountName": null, "connectedSince": "2026-09-24T08:00:00Z", "scopes": "..." }
     ]
   }
 ]
 ```
+
+The top-level fields (`status`, `accountEmail`, …) describe the `default` connection.
+
+### `GET /api/v1/integrations/{providerId}/connections`
+
+All stored connections of a provider, `default` first (fields as in `connections[]` above).
 
 ### `GET /api/v1/integrations/{providerId}`
 

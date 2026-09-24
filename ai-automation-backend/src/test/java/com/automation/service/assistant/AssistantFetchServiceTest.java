@@ -601,7 +601,7 @@ class AssistantFetchServiceTest {
                 .accountInfo("flo@github").build();
         when(integrationRegistry.hasProvider("github")).thenReturn(true);
         when(integrationRegistry.getProvider("github")).thenReturn(provider);
-        when(integrationConnectionRepository.findByProviderId("github")).thenReturn(Optional.of(conn));
+        when(integrationConnectionRepository.findAllByProviderId("github")).thenReturn(List.of(conn));
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("integration", "github"));
 
@@ -624,7 +624,7 @@ class AssistantFetchServiceTest {
         lenient().when(provider.getAvailableActions()).thenReturn(List.of());
         when(integrationRegistry.hasProvider("slack")).thenReturn(true);
         when(integrationRegistry.getProvider("slack")).thenReturn(provider);
-        when(integrationConnectionRepository.findByProviderId("slack")).thenReturn(Optional.empty());
+        when(integrationConnectionRepository.findAllByProviderId("slack")).thenReturn(List.of());
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("integration", "slack"));
 

@@ -102,7 +102,7 @@ class IntegrationOAuthConnectIntegrationTest {
     @AfterEach
     void cleanUp() {
         for (String providerId : List.of(OAUTH_PROVIDER, PAT_PROVIDER)) {
-            connectionRepository.findByProviderId(providerId).ifPresent(connectionRepository::delete);
+            connectionRepository.deleteAll(connectionRepository.findAllByProviderId(providerId));
         }
     }
 
@@ -124,7 +124,7 @@ class IntegrationOAuthConnectIntegrationTest {
         assertThat(txDuringAccountInfo.get()).as("no transaction during account-info lookup").isFalse();
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(OAUTH_PROVIDER).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(OAUTH_PROVIDER, "default").orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         assertThat(encryptionService.decrypt(reloaded.getAccessTokenEncrypted())).isEqualTo("access-1");
         assertThat(encryptionService.decrypt(reloaded.getRefreshTokenEncrypted())).isEqualTo("refresh-1");
@@ -149,7 +149,7 @@ class IntegrationOAuthConnectIntegrationTest {
 
         oAuthService.handleCallback("code-456", state, "http://localhost/callback");
 
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(OAUTH_PROVIDER).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(OAUTH_PROVIDER, "default").orElseThrow();
         assertThat(encryptionService.decrypt(reloaded.getAccessTokenEncrypted())).isEqualTo("access-2");
         assertThat(encryptionService.decrypt(reloaded.getRefreshTokenEncrypted())).isEqualTo("refresh-old");
         assertThat(reloaded.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
@@ -165,7 +165,7 @@ class IntegrationOAuthConnectIntegrationTest {
         assertThat(txDuringScopes.get()).as("no transaction during scope lookup").isFalse();
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(PAT_PROVIDER).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(PAT_PROVIDER, "default").orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         assertThat(encryptionService.decrypt(reloaded.getAccessTokenEncrypted())).isEqualTo("api-key|api-token");
         assertThat(encryptionService.decrypt(reloaded.getClientIdEncrypted())).isEqualTo("api-key");
@@ -180,7 +180,7 @@ class IntegrationOAuthConnectIntegrationTest {
         IntegrationConnection saved = oAuthService.saveCredentials(PAT_PROVIDER, "api-key", "bad-token");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(PAT_PROVIDER).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(PAT_PROVIDER, "default").orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(encryptionService.decrypt(reloaded.getClientSecretEncrypted())).isEqualTo("bad-token");
         assertThat(reloaded.getScopes()).isNull();
@@ -193,9 +193,46 @@ class IntegrationOAuthConnectIntegrationTest {
 
         verify(oauthProvider, org.mockito.Mockito.never()).fetchAccountInfo(any());
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(OAUTH_PROVIDER).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(OAUTH_PROVIDER, "default").orElseThrow();
         assertThat(encryptionService.decrypt(reloaded.getClientIdEncrypted())).isEqualTo("client-id");
         assertThat(encryptionService.decrypt(reloaded.getClientSecretEncrypted())).isEqualTo("client-secret");
         assertThat(reloaded.getAccessTokenEncrypted()).isNull();
+    }
+
+    @Test
+    void handleCallback_forANamedConnection_signsInThroughTheDefaultAppAndFillsItsOwnRow() {
+        connectionRepository.save(IntegrationConnection.builder()
+                .providerId(OAUTH_PROVIDER)
+                .status(ConnectionStatus.CONNECTED)
+                .accessTokenEncrypted(encryptionService.encrypt("private-access"))
+                .tokenExpiry(java.time.Instant.now().plusSeconds(3600))
+                .clientIdEncrypted(encryptionService.encrypt("client-id"))
+                .clientSecretEncrypted(encryptionService.encrypt("client-secret"))
+                .build());
+        String state = stateRegistry.register(OAUTH_PROVIDER, "work", null);
+
+        IntegrationConnection saved = oAuthService.handleCallback("code-work", state, "http://localhost/callback");
+
+        verify(tokenClient).exchangeCodeForTokens(eq(OAUTH_PROVIDER), any(OAuthConfig.class), eq("code-work"),
+                eq("client-id"), eq("client-secret"), eq("http://localhost/callback"));
+        assertThat(saved.getConnectionName()).isEqualTo("work");
+        IntegrationConnection work = connectionRepository.findByProviderIdAndConnectionName(OAUTH_PROVIDER, "work").orElseThrow();
+        assertThat(work.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
+        assertThat(encryptionService.decrypt(work.getAccessTokenEncrypted())).isEqualTo("access-1");
+        IntegrationConnection standard = connectionRepository.findByProviderIdAndConnectionName(OAUTH_PROVIDER, "default").orElseThrow();
+        assertThat(encryptionService.decrypt(standard.getAccessTokenEncrypted())).as("default untouched").isEqualTo("private-access");
+        assertThat(oAuthService.getValidAccessToken(OAUTH_PROVIDER, "work")).isEqualTo("access-1");
+        assertThat(oAuthService.getValidAccessToken(OAUTH_PROVIDER)).isEqualTo("private-access");
+    }
+
+    @Test
+    void saveCredentials_pat_namedConnection_isStoredBesideTheDefault() {
+        oAuthService.saveCredentials(PAT_PROVIDER, "api-key", "api-token");
+        oAuthService.saveCredentials(PAT_PROVIDER, "work", "work-key", "work-token");
+
+        assertThat(oAuthService.listConnections(PAT_PROVIDER))
+                .extracting(IntegrationConnection::getConnectionName).containsExactly("default", "work");
+        assertThat(oAuthService.getValidAccessToken(PAT_PROVIDER, "work")).isEqualTo("work-key|work-token");
+        assertThat(oAuthService.getValidAccessToken(PAT_PROVIDER)).isEqualTo("api-key|api-token");
     }
 }

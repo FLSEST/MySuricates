@@ -91,7 +91,7 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 |---|---|---|
 | `standard` (alle Presets) | `dashboard-report` | stabil |
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
-| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
+| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
 | `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimentell |
 
@@ -232,7 +232,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
+│   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
@@ -794,7 +794,7 @@ Plugin-Framework für externe Dienste:
 - `IntegrationEncryptionService` — Verschlüsselung von Credentials (AES-GCM)
 - `IntegrationConnection`-Entity — Verbindungsstatus (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` mit OAuth-Callback, Credentials, Actions
-- 7 Provider in Unterverzeichnissen: Confluence, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
+- 18 Provider in Unterverzeichnissen: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, HttpApi, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
 - `IntegrationBlockExecutor` — Führt Provider-Aktionen als Workflow-Block aus
 - `TaskExportCapable` — Interface für Provider, die TODO-Export unterstützen
 
@@ -1171,6 +1171,8 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V82 | Siegelstand am Run: `workflow_runs.sealed`, `sealed_skill_pins` |
 | V83 | Bearbeitete Onboarding-Profile: `customized`, `shipped_version` |
 | V84 | Siegel-Signatur und Siegel-Geschichte: `workflows.sealed_signature`, `workflow_seal_events` |
+| V85 | Ziele: Tabelle `goals`, Einordnung und Einschätzung an `todos` |
+| V86 | Mehrere benannte Verbindungen je Integrations-Anbieter: `integration_connections.connection_name` |
 
 ## Architektur-Gates
 
@@ -1214,7 +1216,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 85 Flyway-Migrationen (V1–V85)
+│           └── db/migration/          ← 86 Flyway-Migrationen (V1–V86)
 │
 └── ai-automation-frontend/
     ├── package.json

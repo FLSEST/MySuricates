@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'accent';
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'accent' | 'info';
 
 interface BadgeProps {
   children: ReactNode;
@@ -14,6 +14,7 @@ const variantStyles: Record<BadgeVariant, string> = {
   warning: 'bg-warning-subtle text-warning border-warning/20',
   danger: 'bg-danger-subtle text-danger border-danger/20',
   accent: 'bg-accent-subtle text-accent border-accent/20',
+  info: 'bg-info-subtle text-info border-info/20',
 };
 
 export function Badge({ children, variant = 'default', dot }: BadgeProps) {
@@ -29,6 +30,7 @@ export function Badge({ children, variant = 'default', dot }: BadgeProps) {
             variant === 'warning' ? 'bg-warning' :
             variant === 'danger' ? 'bg-danger' :
             variant === 'accent' ? 'bg-accent' :
+            variant === 'info' ? 'bg-info' :
             'bg-text-tertiary'
           }`}
         />

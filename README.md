@@ -94,10 +94,10 @@ dated in the table:
 | | |
 |---|---|
 | Created since | 2026-02-15, around 1,800 commits, one author |
-| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 51 REST controllers, 85 Flyway migrations |
+| Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 51 REST controllers, 86 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
 | Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
-| Building blocks | 20 block types, 66 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 7 integration providers |
+| Building blocks | 20 block types, 66 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
 
 The test numbers come from the CI run for exactly this commit and are therefore verifiable. The
 CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12,
@@ -152,7 +152,7 @@ not an open port. Full details:
 | Security | API key auth, rate limiting, admission check before every run; optional HMAC-signed workflow seals |
 | i18n | German / English |
 | PWA | Vite PWA Plugin |
-| Integrations | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Taskwarrior — module, in the `full` preset |
+| Integrations | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior — module, in the `full` preset |
 
 Execution happens where the instance runs — in the container (recommended) or directly on the
 machine: shell blocks through the user's shell, AI blocks through the installed CLI (mounted into

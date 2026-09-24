@@ -326,6 +326,7 @@ const SPECS: Record<BlockType, BlockSpec> = {
       provider: { type: 'string', doc: s('Integrations-Anbieter, z. B. `google-calendar` (nicht der KI-Anbieter).', 'Integration provider, e.g. `google-calendar` (not the AI provider).') },
       action: { type: 'string', doc: s('Aktion des Anbieters.', 'Action of the provider.') },
       params: { type: 'object', doc: s('Parameter der Aktion.', 'Parameters of the action.') },
+      connection: { type: 'string', default: 'default', doc: s('Benannte Verbindung des Anbieters, z. B. `arbeit` — wenn mehrere Konten oder Dienste desselben Anbieters eingerichtet sind (Seite Integrationen). Ohne Angabe gilt `default`.', 'Named connection of the provider, e.g. `work` — when several accounts or services of the same provider are set up (Integrations page). Without it, `default` is used.') },
     },
   },
   document: {

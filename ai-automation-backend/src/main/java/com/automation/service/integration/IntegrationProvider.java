@@ -1,5 +1,7 @@
 package com.automation.service.integration;
 
+import com.automation.modules.ModuleCatalog;
+
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +37,6 @@ public interface IntegrationProvider {
         return null;
     }
 
-    /** Whether this provider uses the OAuth2 authorization code flow. False = direct API key/token auth. */
     /**
      * Effective scopes of a credential-based connection (PAT/API key), space-separated, or
      * {@code null} when the provider cannot tell (e.g. GitHub fine-grained tokens send no scope
@@ -45,8 +46,39 @@ public interface IntegrationProvider {
         return null;
     }
 
+    /**
+     * How far this provider has been checked against the real service: VERIFIED when it is listed
+     * in {@link VerifiedProviders}, otherwise SIMULATED — a new provider is marked honestly without
+     * any extra step.
+     */
+    default IntegrationVerification getVerification() {
+        return getVerifiedAgainst() != null ? IntegrationVerification.VERIFIED : IntegrationVerification.SIMULATED;
+    }
+
+    /** What a VERIFIED provider was checked against (from {@link VerifiedProviders}); {@code null} if simulated. */
+    default String getVerifiedAgainst() {
+        return VerifiedProviders.checkedAgainst(getProviderId());
+    }
+
+    /** Whether this provider uses the OAuth2 authorization code flow. False = direct API key/token auth. */
     default boolean requiresOAuthFlow() {
         return true;
+    }
+
+    /**
+     * Module this provider needs on top of {@code integrations}, or {@code null}. While it is off,
+     * {@link IntegrationRegistry} treats the provider as absent — checked per call, so a switch at
+     * runtime takes effect at once.
+     */
+    default ModuleCatalog requiredModule() {
+        return null;
+    }
+
+    /**
+     * Checks the two credential fields before they are stored; throw {@link IllegalArgumentException}
+     * (→ 400) for input the provider can never use. Default: accept everything.
+     */
+    default void validateCredentialInput(String clientId, String clientSecret) {
     }
 
     /**

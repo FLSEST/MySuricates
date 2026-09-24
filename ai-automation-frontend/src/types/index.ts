@@ -656,6 +656,28 @@ export interface IntegrationProviderInfo {
   actions: IntegrationActionInfo[];
   /** Whether this provider can receive a TODO as a task (GitHub issue, Jira issue, Trello card, …). */
   supportsTaskExport?: boolean;
+  /** VERIFIED = checked against the real service; SIMULATED = only against simulated responses. */
+  verification?: 'VERIFIED' | 'SIMULATED';
+  /** What a VERIFIED provider was checked against; null for SIMULATED. */
+  verifiedAgainst?: string | null;
+  /**
+   * Every stored connection of this provider, `default` first. The top-level status/account
+   * fields describe the `default` connection. Missing on backends without named connections.
+   */
+  connections?: IntegrationConnectionInfo[];
+  /** true: connecting runs the OAuth consent; false: the saved credentials are the auth (PAT/API key). */
+  requiresOAuthFlow?: boolean;
+}
+
+/** One named connection of an integration provider. */
+export interface IntegrationConnectionInfo {
+  name: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'EXPIRED';
+  configured: boolean;
+  accountEmail: string | null;
+  accountName: string | null;
+  connectedSince: string | null;
+  scopes: string | null;
 }
 
 /** A selectable export target (GitHub repo, Jira project, Trello list). */

@@ -87,7 +87,7 @@ class IntegrationOAuthServiceTest {
         when(registry.getProvider("trello")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("api-key|api-token")).thenReturn("{\"name\":\"Trello User\"}");
-        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(existing));
+        when(connectionRepository.findByProviderIdAndConnectionName("trello", "default")).thenReturn(Optional.of(existing));
         when(encryptionService.encrypt("api-key")).thenReturn("enc-client");
         when(encryptionService.encrypt("api-token")).thenReturn("enc-secret");
         when(encryptionService.encrypt("api-key|api-token")).thenReturn("enc-access");
@@ -121,7 +121,7 @@ class IntegrationOAuthServiceTest {
                 "GOOGLE_CLIENT_SECRET",
                 Map.of("access_type", "offline")
         ));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(encryptionService.decrypt("enc-client-id")).thenReturn("client-123");
 
         String url = service.getAuthorizationUrl(
@@ -165,7 +165,7 @@ class IntegrationOAuthServiceTest {
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.getOAuthConfig()).thenReturn(config);
         when(provider.fetchAccountInfo("access-1")).thenReturn("{\"email\":\"user@example.com\"}");
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
         when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
         when(encryptionService.encrypt("access-1")).thenReturn("enc-access-1");
@@ -209,7 +209,7 @@ class IntegrationOAuthServiceTest {
                 .accessTokenEncrypted("enc-access")
                 .build();
 
-        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("trello", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("trello")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(encryptionService.decrypt("enc-access")).thenReturn("token-value");
@@ -229,7 +229,7 @@ class IntegrationOAuthServiceTest {
                 .tokenExpiry(Instant.now().minusSeconds(30))
                 .build();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(connectionRepository.save(any(IntegrationConnection.class)))
@@ -266,7 +266,7 @@ class IntegrationOAuthServiceTest {
                 "GOOGLE_CLIENT_SECRET"
         );
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(config);
@@ -310,7 +310,7 @@ class IntegrationOAuthServiceTest {
                 "GOOGLE_CLIENT_SECRET"
         );
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(config);
@@ -350,7 +350,7 @@ class IntegrationOAuthServiceTest {
                 .tokenExpiry(Instant.now().minusSeconds(60))
                 .build();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
@@ -384,7 +384,7 @@ class IntegrationOAuthServiceTest {
                 .tokenExpiry(Instant.now().minusSeconds(60))
                 .build();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
@@ -413,7 +413,7 @@ class IntegrationOAuthServiceTest {
                 .tokenExpiry(Instant.now().plusSeconds(600))
                 .build();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(encryptionService.decrypt("enc-access")).thenReturn("valid-token");
@@ -429,7 +429,7 @@ class IntegrationOAuthServiceTest {
         IntegrationOAuthService service = newService();
 
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
-        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("taskwarrior", "default")).thenReturn(Optional.empty());
         when(provider.requiresCredentials()).thenReturn(false);
 
         String token = service.getValidAccessToken("taskwarrior");
@@ -446,7 +446,7 @@ class IntegrationOAuthServiceTest {
                 .accessTokenEncrypted("enc-broken")
                 .build();
 
-        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("taskwarrior", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.requiresCredentials()).thenReturn(false);
@@ -466,7 +466,7 @@ class IntegrationOAuthServiceTest {
                 .accessTokenEncrypted("enc-access")
                 .build();
 
-        when(connectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("taskwarrior", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(encryptionService.decrypt("enc-access")).thenReturn("/data|/rc");
@@ -485,7 +485,7 @@ class IntegrationOAuthServiceTest {
                 .accessTokenEncrypted("enc-broken")
                 .build();
 
-        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("github", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("github")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.requiresCredentials()).thenReturn(true);
@@ -507,7 +507,7 @@ class IntegrationOAuthServiceTest {
                 .clientSecretEncrypted("enc-client-secret")
                 .build();
 
-        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("trello", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("trello")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
 
@@ -533,7 +533,7 @@ class IntegrationOAuthServiceTest {
                 .clientSecretEncrypted("enc-client-secret")
                 .build();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(encryptionService.decrypt("enc-access")).thenThrow(new RuntimeException("decryption failed"));
@@ -551,7 +551,7 @@ class IntegrationOAuthServiceTest {
     @Test
     void disconnect_noConnection_isNoop() {
         IntegrationOAuthService service = newService();
-        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("trello", "default")).thenReturn(Optional.empty());
 
         service.disconnect("trello");
 
@@ -569,7 +569,7 @@ class IntegrationOAuthServiceTest {
                 .clientSecretEncrypted("enc-client-secret")
                 .build();
 
-        when(connectionRepository.findByProviderId("trello")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("trello", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("trello")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
 
@@ -584,7 +584,7 @@ class IntegrationOAuthServiceTest {
         IntegrationOAuthService service = newService();
         IntegrationConnection connection = connectedGoogleConnection();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(serverUrl("/revoke")));
@@ -613,7 +613,7 @@ class IntegrationOAuthServiceTest {
         IntegrationOAuthService service = newService();
         IntegrationConnection connection = connectedGoogleConnection();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(serverUrl("/revoke")));
@@ -637,7 +637,7 @@ class IntegrationOAuthServiceTest {
                 .clientIdEncrypted("enc-client-id")
                 .build();
 
-        when(connectionRepository.findByProviderId("jira")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("jira", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("jira")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         // Atlassian 3LO has no documented revocation endpoint → revocationUrl stays null.
@@ -667,7 +667,7 @@ class IntegrationOAuthServiceTest {
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
         when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
 
@@ -697,7 +697,7 @@ class IntegrationOAuthServiceTest {
 
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.getOAuthConfig()).thenReturn(googleConfig(null));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(encryptionService.decrypt("enc-client-id")).thenReturn("client-id");
         when(encryptionService.decrypt("enc-client-secret")).thenReturn("client-secret");
 
@@ -744,7 +744,7 @@ class IntegrationOAuthServiceTest {
                 "MYSURICATES_NONEXISTENT_CLIENT_ID_XYZ",
                 "MYSURICATES_NONEXISTENT_CLIENT_SECRET_XYZ"
         ));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getAuthorizationUrl(
                 "google-calendar", "http://localhost/callback", List.of()))
@@ -769,7 +769,7 @@ class IntegrationOAuthServiceTest {
                 "GOOGLE_CLIENT_ID",
                 "GOOGLE_CLIENT_SECRET"
         ));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
 
         assertThat(service.isProviderConfigured("google-calendar")).isTrue();
     }
@@ -786,7 +786,7 @@ class IntegrationOAuthServiceTest {
                 "MYSURICATES_NONEXISTENT_CLIENT_ID_XYZ",
                 "MYSURICATES_NONEXISTENT_CLIENT_SECRET_XYZ"
         ));
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.empty());
 
         assertThat(service.isProviderConfigured("google-calendar")).isFalse();
     }
@@ -795,7 +795,7 @@ class IntegrationOAuthServiceTest {
     void getConnection_returnsEmptyWhenNoConnectionExists() {
         IntegrationOAuthService service = newService();
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.empty());
 
         Optional<IntegrationConnection> result = service.getConnection("google-calendar");
 
@@ -828,7 +828,7 @@ class IntegrationOAuthServiceTest {
                 "GOOGLE_CLIENT_SECRET"
         );
 
-        when(connectionRepository.findByProviderId("google-calendar")).thenReturn(Optional.of(connection));
+        when(connectionRepository.findByProviderIdAndConnectionName("google-calendar", "default")).thenReturn(Optional.of(connection));
         when(registry.getProvider("google-calendar")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(true);
         when(provider.getOAuthConfig()).thenReturn(config);
@@ -913,7 +913,7 @@ class IntegrationOAuthServiceTest {
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("x|ghp_token")).thenReturn("{\"login\":\"flo\"}");
         when(provider.fetchGrantedScopes("x|ghp_token")).thenReturn(scopesFromProvider);
-        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("github", "default")).thenReturn(Optional.empty());
         when(encryptionService.encrypt(any())).thenReturn("enc");
         when(connectionRepository.save(any(IntegrationConnection.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -942,7 +942,7 @@ class IntegrationOAuthServiceTest {
         when(registry.getProvider("github")).thenReturn(provider);
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("x|bad")).thenReturn(null);
-        when(connectionRepository.findByProviderId("github")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("github", "default")).thenReturn(Optional.empty());
         when(encryptionService.encrypt(any())).thenReturn("enc");
         when(connectionRepository.save(any(IntegrationConnection.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));

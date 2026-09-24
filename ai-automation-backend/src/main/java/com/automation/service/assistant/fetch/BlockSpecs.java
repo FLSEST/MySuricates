@@ -184,7 +184,9 @@ public final class BlockSpecs {
                     **Block type: integration** — Calls an action of a connected integration provider. No AI, 0 tokens.
                     Required config: `provider` (string) — integration provider id such as "google-calendar", "github" or \
                     "trello" (not the AI provider), `action` (string) — action name such as "list_events".
-                    Optional: `params` (map) — the inputs of the action; placeholders in string values are resolved.
+                    Optional: `params` (map) — the inputs of the action; placeholders in string values are resolved. \
+                    `connection` (string, default "default") — which named connection of the provider to use when \
+                    several are set up (e.g. "work"); placeholders resolved.
                     Example config: {"provider": "google-calendar", "action": "list_events", \
                     "params": {"timeMin": "{{ started_at }}", "maxResults": 5}}
                     Output: the action result as JSON. Actions and their inputs: <fetch type="integration" \

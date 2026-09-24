@@ -1530,6 +1530,7 @@ Invokes actions from connected external services (Google Calendar, Trello, etc.)
 | `provider` | Yes | Provider ID: `google-calendar`, `trello`, etc. |
 | `action` | Yes | Action name, e.g. `list_events`, `create_card` |
 | `params` | No | Parameters as key-value, supports `{{ template_vars }}` |
+| `connection` | No | Named connection of the provider, e.g. `work` — when several accounts/services of the same provider are set up (Integrations page → "Connections"). Default `default`, placeholders allowed |
 
 ### Example: Fetch Next Google Calendar Events
 

@@ -4,18 +4,26 @@ import com.automation.entity.IntegrationConnection;
 import com.automation.entity.IntegrationConnection.ConnectionStatus;
 import com.automation.repository.IntegrationConnectionRepository;
 import com.automation.service.integration.OAuthStateRegistry.PendingAuthorization;
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
+/**
+ * Credentials, OAuth flow and tokens of the integration connections. A provider may have several
+ * named connections ({@link IntegrationConnectionNames}); every method without a connection name
+ * works on the {@code default} one, so pre-V86 callers keep their behaviour.
+ */
 @Service
 @Slf4j
 public class IntegrationOAuthService {
+
+    private static final String DEFAULT = IntegrationConnectionNames.DEFAULT;
 
     private final IntegrationConnectionRepository connectionRepository;
     private final IntegrationEncryptionService encryptionService;
@@ -24,6 +32,7 @@ public class IntegrationOAuthService {
     private final OAuthStateRegistry stateRegistry;
     private final TransactionTemplate transactionTemplate;
     private final IntegrationOAuthConnectFlow connectFlow;
+    private final IntegrationTokenRefresher tokenRefresher;
 
     public IntegrationOAuthService(IntegrationConnectionRepository connectionRepository,
                                    IntegrationEncryptionService encryptionService,
@@ -39,6 +48,8 @@ public class IntegrationOAuthService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.connectFlow = new IntegrationOAuthConnectFlow(
                 connectionRepository, encryptionService, registry, tokenClient, this.transactionTemplate);
+        this.tokenRefresher = new IntegrationTokenRefresher(
+                connectionRepository, encryptionService, registry, tokenClient, connectFlow);
     }
 
     /**
@@ -47,54 +58,81 @@ public class IntegrationOAuthService {
      * {@link IntegrationOAuthConnectFlow}; deliberately not {@code @Transactional}.
      */
     public IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
-        return connectFlow.saveCredentials(providerId, clientId, clientSecret);
+        return saveCredentials(providerId, DEFAULT, clientId, clientSecret);
+    }
+
+    /** {@link #saveCredentials(String, String, String)} for a named connection (created if new). */
+    public IntegrationConnection saveCredentials(String providerId, String connectionName, String clientId, String clientSecret) {
+        return connectFlow.saveCredentials(providerId, name(connectionName), clientId, clientSecret);
     }
 
     /** Check if a provider has credentials configured (DB or env var). */
     public boolean isProviderConfigured(String providerId) {
+        return isProviderConfigured(providerId, DEFAULT);
+    }
+
+    /**
+     * Whether a connection has credentials: its own row, for an OAuth provider also the app
+     * credentials of the {@code default} row or the env vars (a second account signs in through
+     * the same OAuth app).
+     */
+    public boolean isProviderConfigured(String providerId, String connectionName) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
-
-        // Check DB first
-        Optional<IntegrationConnection> conn = connectionRepository.findByProviderId(providerId);
-        if (conn.isPresent() && conn.get().getClientIdEncrypted() != null && conn.get().getClientSecretEncrypted() != null) {
-            return true;
+        String name = name(connectionName);
+        if (hasStoredCredentials(providerId, name)) return true;
+        if (!IntegrationConnectionNames.isDefault(name)) {
+            if (!provider.requiresOAuthFlow()) return false;
+            if (hasStoredCredentials(providerId, DEFAULT)) return true;
         }
 
-        // Fallback: env vars
         return System.getenv(config.clientIdEnvVar()) != null
                 && System.getenv(config.clientSecretEnvVar()) != null;
     }
 
+    private boolean hasStoredCredentials(String providerId, String connectionName) {
+        return connectionRepository.findByProviderIdAndConnectionName(providerId, connectionName)
+                .filter(c -> c.getClientIdEncrypted() != null && c.getClientSecretEncrypted() != null)
+                .isPresent();
+    }
+
     /** Generate an OAuth2 authorization URL for the given provider. */
-    public String getAuthorizationUrl(String providerId, String redirectUri, java.util.List<String> additionalScopes) {
+    public String getAuthorizationUrl(String providerId, String redirectUri, List<String> additionalScopes) {
         return getAuthorizationUrl(providerId, redirectUri, additionalScopes, null);
     }
 
     public String getAuthorizationUrl(String providerId, String redirectUri,
-                                      java.util.List<String> additionalScopes, String callbackOrigin) {
+                                      List<String> additionalScopes, String callbackOrigin) {
+        return getAuthorizationUrl(providerId, DEFAULT, redirectUri, additionalScopes, callbackOrigin);
+    }
+
+    /** Authorization URL for a named connection; the name travels in the OAuth {@code state}, not in the URL. */
+    public String getAuthorizationUrl(String providerId, String connectionName, String redirectUri,
+                                      List<String> additionalScopes, String callbackOrigin) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
+        String name = name(connectionName);
 
-        String clientId = connectFlow.resolveClientId(providerId, config);
+        String clientId = connectFlow.resolveClientId(providerId, name, config);
         if (clientId == null) {
-            throw new IllegalStateException("No client credentials configured for provider: " + providerId);
+            throw new IllegalStateException("No client credentials configured for provider: "
+                    + IntegrationConnectionNames.label(providerId, name));
         }
 
-        String state = stateRegistry.register(providerId, callbackOrigin);
+        String state = stateRegistry.register(providerId, name, callbackOrigin);
 
         return OAuthAuthorizationUrl.build(config, clientId, redirectUri, additionalScopes, state);
     }
 
     /**
-     * Handle the OAuth2 callback: exchange code for tokens and store them. The exchange and the
-     * account-info lookup are provider HTTP and run outside any transaction — see
-     * {@link IntegrationOAuthConnectFlow}; deliberately not {@code @Transactional}.
+     * Handle the OAuth2 callback: exchange code for tokens and store them in the connection named
+     * in the state. The exchange and the account-info lookup are provider HTTP and run outside any
+     * transaction — see {@link IntegrationOAuthConnectFlow}; deliberately not {@code @Transactional}.
      */
     public IntegrationConnection handleCallback(String code, String state, String redirectUri) {
         PendingAuthorization pending = stateRegistry.consume(state)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid or expired OAuth state"));
-        return connectFlow.handleCallback(pending.providerId(), code, redirectUri);
+        return connectFlow.handleCallback(pending.providerId(), pending.connectionName(), code, redirectUri);
     }
 
     /** Read before consuming the state in handleCallback; never supplied by the callback request. */
@@ -106,16 +144,23 @@ public class IntegrationOAuthService {
 
     /** Get a valid access token, refreshing if necessary; null for a credential-less provider with none stored. */
     public String getValidAccessToken(String providerId) {
+        return getValidAccessToken(providerId, DEFAULT);
+    }
+
+    /** {@link #getValidAccessToken(String)} for a named connection. */
+    public String getValidAccessToken(String providerId, String connectionName) {
         IntegrationProvider provider = registry.getProvider(providerId);
-        IntegrationConnection connection = connectionRepository.findByProviderId(providerId).orElse(null);
+        String name = name(connectionName);
+        String label = IntegrationConnectionNames.label(providerId, name);
+        IntegrationConnection connection = connectionRepository.findByProviderIdAndConnectionName(providerId, name).orElse(null);
         if (connection == null) {
-            if (provider.requiresCredentials()) throw new IllegalStateException("No connection for provider: " + providerId);
-            log.debug("Provider {} requires no credentials — proceeding without token", providerId);
+            if (provider.requiresCredentials()) throw new IllegalStateException("No connection for provider: " + label);
+            log.debug("Provider {} requires no credentials — proceeding without token", label);
             return null;
         }
 
         if (connection.getStatus() == ConnectionStatus.DISCONNECTED) {
-            throw new IllegalStateException("Provider " + providerId + " is not connected");
+            throw new IllegalStateException("Provider " + label + " is not connected");
         }
 
         // Non-OAuth providers use stored credentials directly (no expiry/refresh)
@@ -124,7 +169,7 @@ public class IntegrationOAuthService {
                 return encryptionService.decrypt(connection.getAccessTokenEncrypted());
             } catch (IllegalStateException e) {
                 if (provider.requiresCredentials()) throw e;
-                log.debug("Provider {} requires no credentials — proceeding without token", providerId);
+                log.debug("Provider {} requires no credentials — proceeding without token", label);
                 return null;
             }
         }
@@ -133,7 +178,7 @@ public class IntegrationOAuthService {
             return encryptionService.decrypt(connection.getAccessTokenEncrypted());
         }
 
-        return refreshAccessToken(connection);
+        return tokenRefresher.refresh(connection);
     }
 
     /**
@@ -147,33 +192,57 @@ public class IntegrationOAuthService {
      * afterwards — so a failing or hanging provider cannot leave the row "revoked but CONNECTED".
      */
     public void disconnect(String providerId) {
+        disconnect(providerId, DEFAULT);
+    }
+
+    /** {@link #disconnect(String)} for a named connection; the other connections stay untouched. */
+    public void disconnect(String providerId, String connectionName) {
+        String name = name(connectionName);
         String token = transactionTemplate.execute(status ->
-                connectionRepository.findByProviderId(providerId).map(connection -> {
+                connectionRepository.findByProviderIdAndConnectionName(providerId, name).map(connection -> {
                     String revocable = revocableToken(providerId, connection);
                     clearTokens(connection);
                     connectionRepository.save(connection);
                     return revocable;
                 }).orElse(null));
         revoke(providerId, token);
-        log.info("Disconnected integration (kept credentials): {}", providerId);
+        log.info("Disconnected integration (kept credentials): {}", IntegrationConnectionNames.label(providerId, name));
     }
 
     /** Delete the connection row entirely (app credentials included); reconnect requires re-entering them.
      * Same burst-then-revoke shape as {@link #disconnect} — deliberately not {@code @Transactional}. */
     public void deleteCredentials(String providerId) {
+        deleteCredentials(providerId, DEFAULT);
+    }
+
+    /** {@link #deleteCredentials(String)} for a named connection; the other connections stay untouched. */
+    public void deleteCredentials(String providerId, String connectionName) {
+        String name = name(connectionName);
         String token = transactionTemplate.execute(status ->
-                connectionRepository.findByProviderId(providerId).map(connection -> {
+                connectionRepository.findByProviderIdAndConnectionName(providerId, name).map(connection -> {
                     String revocable = revocableToken(providerId, connection);
                     connectionRepository.delete(connection);
                     return revocable;
                 }).orElse(null));
         revoke(providerId, token);
-        log.info("Deleted integration credentials: {}", providerId);
+        log.info("Deleted integration credentials: {}", IntegrationConnectionNames.label(providerId, name));
     }
 
     /** Get the current connection status for a provider. */
     public Optional<IntegrationConnection> getConnection(String providerId) {
-        return connectionRepository.findByProviderId(providerId);
+        return getConnection(providerId, DEFAULT);
+    }
+
+    /** The named connection of a provider, if it exists. */
+    public Optional<IntegrationConnection> getConnection(String providerId, String connectionName) {
+        return connectionRepository.findByProviderIdAndConnectionName(providerId, name(connectionName));
+    }
+
+    /** Every stored connection of a provider, {@code default} first, the others by name. */
+    public List<IntegrationConnection> listConnections(String providerId) {
+        return connectionRepository.findAllByProviderId(providerId).stream()
+                .sorted(Comparator.comparing(IntegrationConnection::getConnectionName, IntegrationConnectionNames.ORDER))
+                .toList();
     }
 
     /**
@@ -208,50 +277,7 @@ public class IntegrationOAuthService {
         connection.setStatus(ConnectionStatus.DISCONNECTED);
     }
 
-    private String refreshAccessToken(IntegrationConnection connection) {
-        String providerId = connection.getProviderId();
-        String refreshToken = encryptionService.decrypt(connection.getRefreshTokenEncrypted());
-        if (refreshToken == null) {
-            markExpired(connection);
-            throw new IllegalStateException("No refresh token available for provider: " + providerId);
-        }
-
-        OAuthConfig config = registry.getProvider(providerId).getOAuthConfig();
-        String clientId = connectFlow.resolveClientId(providerId, config);
-        String clientSecret = connectFlow.resolveClientSecret(providerId, config);
-
-        JsonNode json;
-        try {
-            json = tokenClient.refreshAccessToken(providerId, config, refreshToken, clientId, clientSecret);
-        } catch (IllegalStateException e) {
-            markExpired(connection);
-            throw e;
-        }
-
-        String newAccessToken = json.path("access_token").asText(null);
-        if (newAccessToken == null) {
-            markExpired(connection);
-            throw new IllegalStateException("Token refresh failed for " + providerId + " (no access_token in response)");
-        }
-
-        int expiresIn = json.has("expires_in") ? json.get("expires_in").asInt() : 3600;
-
-        connection.setAccessTokenEncrypted(encryptionService.encrypt(newAccessToken));
-        connection.setTokenExpiry(Instant.now().plusSeconds(expiresIn));
-        connection.setStatus(ConnectionStatus.CONNECTED);
-
-        if (json.has("refresh_token")) {
-            connection.setRefreshTokenEncrypted(encryptionService.encrypt(json.get("refresh_token").asText()));
-        }
-
-        connectionRepository.save(connection);
-        log.debug("Refreshed access token for {}", providerId);
-        return newAccessToken;
+    private static String name(String connectionName) {
+        return IntegrationConnectionNames.normalize(connectionName);
     }
-
-    private void markExpired(IntegrationConnection connection) {
-        connection.setStatus(ConnectionStatus.EXPIRED);
-        connectionRepository.save(connection);
-    }
-
 }

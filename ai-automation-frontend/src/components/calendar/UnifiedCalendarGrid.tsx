@@ -55,7 +55,7 @@ export function UnifiedCalendarGrid() {
   const [selectedDay, setSelectedDay] = useState<number | null>(now.getDate());
   const [currentDate, setCurrentDate] = useState(now);
   const [enabledSources, setEnabledSources] = useState<Set<string>>(
-    new Set(['google-calendar', 'trello', 'schedules', 'runs'])
+    new Set(['google-calendar', 'caldav', 'trello', 'schedules', 'runs'])
   );
 
   // Compute date range based on view mode

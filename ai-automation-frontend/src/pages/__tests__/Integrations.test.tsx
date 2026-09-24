@@ -90,3 +90,87 @@ describe('Integrations — connected state', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Integrations — verification notice', () => {
+  // A made-up provider id: shipped ids get a localized display name from i18n.
+  const simulatedProvider: IntegrationProviderInfo = {
+    ...connectedGithub,
+    providerId: 'example-forge',
+    displayName: 'Example Forge',
+    status: 'DISCONNECTED',
+    configured: true,
+    accountName: null,
+    connectedSince: null,
+    scopes: null,
+    verification: 'SIMULATED',
+    verifiedAgainst: null,
+  };
+
+  it('marks a simulated provider on its card and explains it when selected', async () => {
+    useProviders([simulatedProvider]);
+    renderWithProviders(<Integrations />);
+
+    expect(await screen.findByText('Simulated tests only')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Example Forge'));
+    expect(await screen.findByText(/not against the real service/)).toBeInTheDocument();
+  });
+
+  it('shows no simulated badge for a verified provider and names what it was checked against', async () => {
+    useProviders([{ ...connectedGithub, verification: 'VERIFIED', verifiedAgainst: 'GitHub REST API' }]);
+    await selectGithub();
+
+    expect(await screen.findByText('Checked against: GitHub REST API')).toBeInTheDocument();
+    expect(screen.queryByText('Simulated tests only')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when an older backend sends no verification field', async () => {
+    useProviders([connectedGithub]);
+    await selectGithub();
+
+    await screen.findByText('Connection details');
+    expect(screen.queryByText('Simulated tests only')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Checked against/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Integrations — named connections', () => {
+  it('shows the connections of the selected provider from the live list', async () => {
+    useProviders([{
+      ...connectedGithub,
+      connections: [
+        { name: 'default', status: 'CONNECTED', configured: true, accountEmail: null, accountName: 'octocat', connectedSince: null, scopes: null },
+        { name: 'work', status: 'EXPIRED', configured: true, accountEmail: null, accountName: null, connectedSince: null, scopes: null },
+      ],
+    }]);
+    await selectGithub();
+
+    expect(await screen.findByText('Connections')).toBeInTheDocument();
+    expect(screen.getByTestId('connection-work')).toHaveTextContent('Expired');
+    expect(screen.getByText('Add connection')).toBeInTheDocument();
+  });
+});
+
+describe('Integrations — HTTP API provider', () => {
+  it('shows the setup guide with base-URL and auth-header fields', async () => {
+    useProviders([{
+      ...connectedGithub,
+      providerId: 'http-api',
+      displayName: 'HTTP API',
+      icon: 'Globe',
+      status: 'DISCONNECTED',
+      configured: false,
+      requiresCredentials: false,
+      requiresOAuthFlow: false,
+      accountName: null,
+      connectedSince: null,
+      scopes: null,
+      connections: [],
+    }]);
+    renderWithProviders(<Integrations />);
+    fireEvent.click(await screen.findByText('HTTP API'));
+
+    expect(await screen.findByPlaceholderText(/Base URL, e\.g\. https:\/\/api\.example\.com\/v1/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Auth header \(optional\)/)).toHaveAttribute('type', 'password');
+    expect(screen.getByText('Several services: named connections')).toBeInTheDocument();
+  });
+});

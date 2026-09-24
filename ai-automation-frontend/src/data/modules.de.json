@@ -31,6 +31,10 @@
     "name": "Integrationen",
     "description": "Externe Dienste (GitHub, Jira, Trello, Google, Confluence, Taskwarrior) per OAuth, dazu Integrations-Blöcke, TODO-Tracker-Export und Kalender."
   },
+  "http-api": {
+    "name": "HTTP-API-Verbindung",
+    "description": "Ausgehende HTTP-Aufrufe aus Integrations-Blöcken an selbst eingetragene Dienste (Basis-URL + optionaler Auth-Header, mehrere Dienste als benannte Verbindungen)."
+  },
   "webhooks": {
     "name": "Webhooks",
     "description": "Eingehende Webhook-Trigger, die Workflows von außen starten."

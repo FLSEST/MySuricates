@@ -314,7 +314,8 @@ erDiagram
 
     integration_connections {
         TEXT id PK
-        TEXT provider_id "NOT NULL, UNIQUE"
+        TEXT provider_id "NOT NULL"
+        TEXT connection_name "NOT NULL, DEFAULT default"
         TEXT status "DEFAULT DISCONNECTED"
         TEXT access_token_encrypted
         TEXT refresh_token_encrypted
@@ -868,7 +869,8 @@ KI-generierte Aktionsvorschläge pro Seite, basierend auf Assistenten-Sessions (
 | Spalte | Typ | Constraints | Beschreibung |
 |---|---|---|---|
 | `id` | TEXT | PK | UUID |
-| `provider_id` | TEXT | NOT NULL, UNIQUE | Provider-Identifier (z.B. `google-calendar`, `jira`) |
+| `provider_id` | TEXT | NOT NULL | Provider-Identifier (z.B. `google-calendar`, `jira`) |
+| `connection_name` | TEXT | NOT NULL, DEFAULT 'default'; UNIQUE mit `provider_id` | Name der Verbindung innerhalb des Providers (V86); die Verbindung von vor V86 heißt `default` |
 | `status` | TEXT | NOT NULL, DEFAULT 'DISCONNECTED' | Enum: ConnectionStatus (CONNECTED, DISCONNECTED, EXPIRED) |
 | `access_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Access Token |
 | `refresh_token_encrypted` | TEXT | | AES-256-GCM-verschlüsselter OAuth Refresh Token |
@@ -880,7 +882,7 @@ KI-generierte Aktionsvorschläge pro Seite, basierend auf Assistenten-Sessions (
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. Alle sensiblen Daten sind AES-256-GCM-verschlüsselt (V55 + V56).
+Speichert OAuth-Verbindungen und Client-Credentials für Integration-Provider. Alle sensiblen Daten sind AES-256-GCM-verschlüsselt (V55 + V56). Seit V86 kann ein Provider mehrere benannte Verbindungen haben (`UNIQUE(provider_id, connection_name)`).
 
 ### `onboarding_profiles`
 
@@ -1300,6 +1302,8 @@ Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in 
 | V82 | `V82__run_seal_record.sql` | `sealed`, `sealed_skill_pins` in workflow_runs (Siegelstand beim Start, nicht nachträglich abgeleitet) |
 | V83 | `V83__onboarding_profile_shipped_version.sql` | `customized`, `shipped_version` in onboarding_profiles (bearbeitete Built-in-Profile bekommen neue Fassungen angeboten statt überschrieben) |
 | V84 | `V84__seal_signature_and_history.sql` | `sealed_signature` in workflows (HMAC mit Schlüssel außerhalb der DB), neue Tabelle `workflow_seal_events` (verkettete Historie von Versiegeln und Entsiegeln, ohne Fremdschlüssel) |
+| V85 | `V85__goals_and_todo_planning.sql` | neue Tabelle `goals`; `goal_id`, `goal_rank`, `complexity`, `suggested_effort`, `rating_note`, `rated_by`, `rated_at`, `open_question` in todos |
+| V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (Tabellenneubau: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, Bestand wird `default`) |
 
 ## SQLite-Besonderheiten
 

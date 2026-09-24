@@ -1,10 +1,16 @@
 package com.automation.service.integration;
 
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.integration.providers.gitea.GiteaHttpClient;
+import com.automation.service.integration.providers.gitea.GiteaProvider;
 import com.automation.service.integration.providers.github.GitHubHttpClient;
 import com.automation.service.integration.providers.github.GitHubProvider;
+import com.automation.service.integration.providers.gitlab.GitLabHttpClient;
+import com.automation.service.integration.providers.gitlab.GitLabProvider;
 import com.automation.service.integration.providers.jira.JiraHttpClient;
 import com.automation.service.integration.providers.jira.JiraProvider;
+import com.automation.service.integration.providers.todoist.TodoistHttpClient;
+import com.automation.service.integration.providers.todoist.TodoistProvider;
 import com.automation.service.integration.providers.trello.TrelloHttpClient;
 import com.automation.service.integration.providers.trello.TrelloProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,7 +40,10 @@ class TaskExportContractTest {
         return List.of(
                 new GitHubProvider(new ObjectMapper(), appSettings, mock(GitHubHttpClient.class)),
                 new JiraProvider(new ObjectMapper(), mock(JiraHttpClient.class)),
-                new TrelloProvider(new ObjectMapper(), mock(TrelloHttpClient.class))
+                new TrelloProvider(new ObjectMapper(), mock(TrelloHttpClient.class)),
+                new GiteaProvider(new ObjectMapper(), mock(GiteaHttpClient.class)),
+                new GitLabProvider(new ObjectMapper(), mock(GitLabHttpClient.class)),
+                new TodoistProvider(new ObjectMapper(), mock(TodoistHttpClient.class))
         );
     }
 

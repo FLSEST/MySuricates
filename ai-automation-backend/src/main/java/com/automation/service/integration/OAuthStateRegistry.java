@@ -34,8 +34,16 @@ public class OAuthStateRegistry {
     static final int MAX_PENDING = 1000;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    /** Binds provider and notification origin to the server-generated OAuth state. */
-    public record PendingAuthorization(String providerId, String callbackOrigin, Instant expiresAt) {
+    /**
+     * Binds provider, connection name and notification origin to the server-generated OAuth state.
+     * The connection name travels here, never in the callback URL — the redirect URI registered at
+     * the provider stays the same for every connection.
+     */
+    public record PendingAuthorization(String providerId, String connectionName, String callbackOrigin, Instant expiresAt) {
+        public PendingAuthorization(String providerId, String callbackOrigin, Instant expiresAt) {
+            this(providerId, IntegrationConnectionNames.DEFAULT, callbackOrigin, expiresAt);
+        }
+
         public boolean isExpired() {
             return expiresAt != null && Instant.now().isAfter(expiresAt);
         }
@@ -43,20 +51,26 @@ public class OAuthStateRegistry {
 
     private final ConcurrentHashMap<String, PendingAuthorization> pending = new ConcurrentHashMap<>();
 
+    /** Registers a state for the provider's {@code default} connection. */
+    public String register(String providerId, String callbackOrigin) {
+        return register(providerId, IntegrationConnectionNames.DEFAULT, callbackOrigin);
+    }
+
     /**
-     * Generates a fresh state, binds it to the provider + origin and returns it.
+     * Generates a fresh state, binds it to provider + connection name + origin and returns it.
      *
      * <p>Synchronized: purge → capacity check → put must be one step, otherwise concurrent
      * registrations can push the map past {@link #MAX_PENDING}. Registrations are rare (one per
      * OAuth connect click), so a monitor costs nothing.
      */
-    public synchronized String register(String providerId, String callbackOrigin) {
+    public synchronized String register(String providerId, String connectionName, String callbackOrigin) {
         cleanupExpired();
         if (pending.size() >= MAX_PENDING) {
             throw new IllegalStateException("Too many pending OAuth authorizations — retry later");
         }
         String state = generateState();
-        pending.put(state, new PendingAuthorization(providerId, callbackOrigin, Instant.now().plus(TTL)));
+        pending.put(state, new PendingAuthorization(providerId, IntegrationConnectionNames.normalize(connectionName),
+                callbackOrigin, Instant.now().plus(TTL)));
         return state;
     }
 

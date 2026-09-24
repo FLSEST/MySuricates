@@ -4,6 +4,7 @@ import { MonacoEditor } from '../shared/MonacoEditor';
 import { BlockAiOverrideFields } from './BlockAiOverrideFields';
 import { DashboardReportFields } from './DashboardReportFields';
 import { BlockSkillPicker } from './BlockSkillPicker';
+import { IntegrationBlockVerificationNotice } from '../integrations/IntegrationVerification';
 import { BLOCK_DEFAULT_CONFIG, buildBlockConfigSchema } from './blockConfigSchema';
 import { buildPlaceholderContext } from './placeholderContext';
 import type { BlockDraft } from './blockEdit';
@@ -140,6 +141,7 @@ export function BlockEditorModal({
             ]}
           />
         )}
+        {block.type === 'integration' && <IntegrationBlockVerificationNotice configJson={block.config} />}
         <DashboardReportFields
           blockType={block.type}
           configJson={block.config}

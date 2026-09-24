@@ -59,6 +59,8 @@ Ein Provider implementiert diesen Vertrag (`service/integration/IntegrationProvi
 | `List<IntegrationAction> getAvailableActions()` | ✅ | Unterstützte Actions inkl. Input-Schema |
 | `Object executeAction(String action, Map<String,Object> params, String accessToken)` | ✅ | Führt eine Action gegen die externe API aus |
 | `String fetchAccountInfo(String accessToken)` | ⬜ (default `null`) | Account-Info nach erfolgreicher Authentifizierung (JSON-String) |
+| `IntegrationVerification getVerification()` | ⬜ (aus `VerifiedProviders`) | Prüfstand: `VERIFIED` = gegen den echten Dienst geprüft, `SIMULATED` = nur gegen nachgebaute Antworten |
+| `String getVerifiedAgainst()` | ⬜ (aus `VerifiedProviders`) | Wogegen ein `VERIFIED`-Provider geprüft wurde, z.B. „Gitea 1.24, lokaler Container“ |
 | `boolean requiresOAuthFlow()` | ⬜ (default `true`) | `false` = Direkt-Auth per API-Key/Token statt OAuth2-Authorization-Code-Flow |
 
 ### `IntegrationAction` (Record)
@@ -98,22 +100,118 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 
 ## Verfügbare Provider
 
-| Provider | Provider-ID | Auth-Typ | Paket | Actions (Momentaufnahme) |
-|---|---|---|---|---|
-| Google Calendar | `google-calendar` | OAuth2 (Google) | `providers/google/` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` |
-| Gmail | `google-gmail` | OAuth2 (Google, readonly) | `providers/google/` | `list_messages`, `get_message` |
-| Jira | `jira` | OAuth2 (Atlassian 3LO) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` |
-| Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` |
-| Trello | `trello` | API-Key + Token (kein OAuth-Flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` |
-| Taskwarrior | `taskwarrior` | Lokales CLI (kein OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` |
-| GitHub | `github` | Personal Access Token (kein OAuth-Flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` |
+| Provider | Provider-ID | Auth-Typ | Paket | Actions (Momentaufnahme) | Prüfstand |
+|---|---|---|---|---|---|
+| Google Calendar | `google-calendar` | OAuth2 (Google) | `providers/google/` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` | geprüft |
+| Gmail | `google-gmail` | OAuth2 (Google, readonly) | `providers/google/` | `list_messages`, `get_message` | geprüft |
+| Jira | `jira` | OAuth2 (Atlassian 3LO) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` | geprüft |
+| Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` | geprüft |
+| Trello | `trello` | API-Key + Token (kein OAuth-Flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` | geprüft |
+| Taskwarrior | `taskwarrior` | Lokales CLI (kein OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | geprüft |
+| GitHub | `github` | Personal Access Token (kein OAuth-Flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft |
+| Gitea / Forgejo | `gitea` | Server-URL + Zugangstoken (kein OAuth-Flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft (lokaler Container) |
+| GitLab | `gitlab` | Server-URL (Standard `https://gitlab.com`) + Access Token (kein OAuth-Flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simuliert |
+| CalDAV | `caldav` | URL + Benutzer:App-Passwort (Basic Auth, kein OAuth-Flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | geprüft (Radicale 3.8.0, lokaler Container) |
+| iCal-Feed | `ical-feed` | keine (öffentliche Feed-URL als Parameter) | `providers/icalfeed/` | `list_events` | geprüft (öffentlicher Google-Feiertagsfeed) |
+| ntfy | `ntfy` | Server-URL + optionaler Access-Token (kein OAuth-Flow, beides optional) | `providers/ntfy/` | `publish` | geprüft |
+| RSS/Atom | `feed` | keine (öffentliche Feeds) | `providers/feed/` | `fetch_feed` | geprüft |
+| Open-Meteo | `open-meteo` | keine (freie API ohne Key) | `providers/openmeteo/` | `forecast`, `geocode` | geprüft |
+| Todoist | `todoist` | API-Token (kein OAuth-Flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | nur simuliert |
+| Slack | `slack` | Bot-Token `xoxb-…` (kein OAuth-Flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | nur simuliert |
+| Telegram | `telegram` | Bot-Token von @BotFather (kein OAuth) | `providers/telegram/` | `send_message`, `get_updates` | nur simuliert |
+| HTTP-API | `http-api` | Basis-URL + optionaler Auth-Header (kein OAuth-Flow); **eigenes Modul `http-api`** | `providers/httpapi/` | `request` | geprüft (httpbin.org) |
 
-**Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Jira (Issue vom
+**Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
+
+**Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Gitea/Forgejo (Issue,
+Target `owner/repo`; Tags werden als Labels übernommen, soweit es sie im Repository gibt), GitLab (Issue,
+Target = Projektpfad `gruppe/projekt` oder numerische ID; Tags werden Labels), Jira (Issue vom
 Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den accessible-resources) und Trello
 (Karte, Target = Listen-ID, `listTargets` liefert „Board / Liste"; Tags werden nicht als Labels übertragen, weil
-Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
+Trello Label-IDs erwartet) und Todoist (Aufgabe, Target = Projekt-ID, `listTargets` liefert die Projekte; Tags werden
+Label-Namen, Link `app.todoist.com/app/task/<id>`). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
 
 > **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist; sonst bleibt die Verbindung „Setup required". Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
+
+### CalDAV und iCal-Feed
+
+Beide teilen sich einen kleinen iCalendar-Leser/-Schreiber in `providers/ical/` (keine Fremdbibliothek):
+Zeilenfaltung (75 Oktette, UTF-8-sicher), Text-Escapes, `DTSTART`/`DTEND` als UTC, mit `TZID` oder ganztägig
+(`VALUE=DATE`), `DURATION`, `SUMMARY`/`DESCRIPTION`/`LOCATION`/`UID`; `RRULE` wird nur durchgereicht.
+Serien expandiert MySuricates **nicht** selbst. Zeitangaben kommen im Google-Format (`{date}` bzw.
+`{dateTime, timeZone}`), damit Workflows beide Kalenderquellen gleich lesen.
+
+- **CalDAV** (`caldav`, RFC 4791): Feld 1 = CalDAV-URL (Nextcloud `https://<server>/remote.php/dav`,
+  Radicale `http://<server>:5232/`), Feld 2 = `benutzer:app-passwort`; gespeichert als `url|benutzer:passwort`,
+  geprüft per PROPFIND (`fetchAccountInfo`). Discovery: `current-user-principal` → `calendar-home-set` →
+  Depth-1-PROPFIND. `list_events` schickt einen `calendar-query`-REPORT mit `time-range` und `<C:expand>` —
+  der Server liefert Serien als Einzeltermine (mit `recurrenceId`); ohne `calendar` werden alle Kalender
+  abgefragt, ein kaputter Kalender landet unter `errors` statt die anderen zu verdecken. `create_event` legt
+  `<uuid>.ics` per PUT mit `If-None-Match: *` an (VTIMEZONE aus den JDK-Regeln für jede verwendete TZID),
+  `update_event` holt das Objekt, ändert nur die übergebenen Eigenschaften des Serien-Masters (Teilnehmer,
+  Alarme, Ausnahmen bleiben), erhöht `SEQUENCE` und schreibt mit `If-Match` (ETag aus dem Parameter oder vom
+  GET) — ein zwischenzeitlich geänderter Termin ergibt 412 statt Überschreiben. `delete_event` löscht bei
+  Serien die ganze Serie. Sicherheit: nur http/https, keine Zugangsdaten in der URL, Weiterleitungen werden
+  nicht verfolgt (sie würden den Basic-Auth-Header mitnehmen), jede angefragte URL muss auf dem Server der
+  eingetragenen URL liegen (auch hrefs aus Server-Antworten), XML-Parser ohne DOCTYPE/externe Entities (XXE),
+  Antworten höchstens 10 MB, Passwort nie in Log oder Fehlermeldung. Intern: `CalDavHttpClient`,
+  `CalDavXml`, `CalDavDiscovery`, `CalDavEvents`, `CalDavActionCatalog`.
+  **Prüfstand:** gegen Radicale 3.8.0 im lokalen Container (alle fünf Actions inkl. Serie mit `RRULE` und
+  `expand`, ETag-Konflikt, fremde Origin). Nextcloud, Posteo und iCloud sind **nicht** live geprüft; iCloud
+  verweist auf einen Partitions-Server (`pNN-caldav.icloud.com`), den der Provider wegen der Origin-Regel nicht
+  selbst ansteuert — dort diese Adresse eintragen.
+- **iCal-Feed** (`ical-feed`): keine Zugangsdaten (`requiresCredentials() == false`), die Feed-URL ist
+  Parameter von `list_events` (`url`, `from`, `to`, `limit`, `timeZone`); `webcal://` wird als https gelesen.
+  Download mit 10 s Verbindungs-/20 s Gesamt-Timeout, höchstens 5 MB, nur Antworten mit `BEGIN:VCALENDAR`.
+  Geliefert werden Einzeltermine, die den Zeitraum überschneiden, und Serien-Master mit `rrule` und
+  `recurring: true` (erstes Vorkommen als `start`; `UNTIL` in der Vergangenheit blendet die Serie aus,
+  `EXDATE` bleibt unberücksichtigt) plus ein `note`-Hinweis. Fehler nennen nur den Host, nie Pfad oder Query —
+  private Feed-Links enthalten oft ein Geheimnis.
+
+Die Kalender-Ansicht zeigt CalDAV über `caldavAdapter` (alle Kalender, Serien bereits vom Server expandiert).
+Ein iCal-Feed hat keinen Adapter, weil die Feed-URL erst im Workflow feststeht.
+### HTTP-API-Verbindung (`http-api`)
+
+Allgemeine Verbindung zu einem selbst eingetragenen HTTP-Dienst (TODO 78fae34c). Eigenes
+Feature-Modul **`http-api`** (Stufe `advanced`, Risiken Netzwerk + Zugangsdaten, braucht
+`integrations`), in keinem Preset außer `full` an: `AUTOMATION_MODULES_HTTP_API=true` bzw.
+`automation.modules.http-api: true`. Ist das Modul aus, blendet `IntegrationRegistry` den Provider
+aus (Liste, Lookup, Block), und `executeAction` lehnt zusätzlich selbst ab — beides pro Aufruf
+geprüft, ein Umschalten zur Laufzeit wirkt sofort.
+
+- **Zugangsdaten:** Feld 1 = Basis-URL (nur `http`/`https`, Host Pflicht, kein `user:pass@`, kein
+  `?`/`#`, keine `.`/`..`-Segmente, kein `|`), Feld 2 = Auth-Header `Name: Wert` (z. B.
+  `Authorization: Bearer …`, `X-API-Key: …`) oder leer. Geprüft beim Speichern
+  (`validateCredentialInput` → `400`), ohne Netzwerkaufruf; als Konto erscheint `host/basis-pfad`.
+- **Mehrere Dienste** = mehrere [benannte Verbindungen](#mehrere-verbindungen-je-anbieter), im
+  Block per `"connection": "wetter"`.
+- **Action `request`**, Parameter: `method` (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`, Default `GET`),
+  `path` (relativ zur Basis-URL), `query` (Objekt, Liste wiederholt den Namen), `headers`
+  (Objekt), `body` (Objekt/Array → `application/json`, Text → `text/plain`; nicht bei `GET`,
+  höchstens 1 MiB), `timeout_seconds` (1–120, Default 30), `fail_on_error` (Default `true`:
+  Status ≥ 400 lässt den Step scheitern; `false` liefert ihn als Ergebnis).
+- **Ergebnis:** `status`, `ok`, `content_type`, `body` (JSON geparst, sonst Text, gekürzt auf
+  100 000 Zeichen), `truncated`; bei 3xx zusätzlich `location` und `note`. Gelesen werden
+  höchstens 1 MiB Antwort.
+
+**Sicherheitsentscheidungen:**
+
+- *Pfad bleibt unter der Basis-URL:* abgelehnt werden Schema-Präfixe (`https:`, `javascript:` …),
+  `//host`, Backslash, `?`/`#` (Query nur über `query`), Leer-/Steuerzeichen und jedes Segment,
+  das — auch percent-dekodiert (`%2e%2e`, `%2f`) — `.` oder `..` ist oder einen Schrägstrich
+  enthält. Die fertige URI wird zusätzlich gegen Schema, Host, Port und Basis-Pfad-Präfix geprüft.
+- *Keine automatischen Weiterleitungen* (`Redirect.NEVER`): ein 3xx kommt mit `location` zurück,
+  der Auth-Header geht nie an ein anderes Ziel.
+- *Header-Injection:* Namen müssen HTTP-Tokens sein, Werte ohne CR/LF/Steuerzeichen; der
+  Auth-Header der Verbindung kann im Block nicht überschrieben werden, Hop-by-hop- und
+  Framing-Header (`Host`, `Content-Length`, `Transfer-Encoding`, `Connection`,
+  `Proxy-Authorization` …) sind gesperrt.
+- *Auth-Header nie ausgeben:* verschlüsselt gespeichert, nicht in Logs (geloggt werden nur
+  Methode, Host und Pfad), und sein Wert wird aus Antwort, `location` und Fehlermeldungen durch
+  `***` ersetzt — ein Dienst, der Request-Header zurückspiegelt, verrät ihn nicht.
+- *Bewusst offen:* Ziele im eigenen Netz (localhost, private Adressen) werden nicht gesperrt — die
+  Basis-URL trägt der Betreiber selbst ein, und genau solche Dienste sind oft das Ziel. Wer das
+  nicht will, lässt das Modul aus.
 
 ### OAuth-Endpunkte & Scopes je Provider
 
@@ -148,6 +246,74 @@ Hinweise:
   die benötigten Repositories mit *Issues: Read and write* anlegen statt eines klassischen
   Tokens mit vollem `repo`. Intern aufgeteilt: HTTP über `GitHubHttpClient`, Parameter-Parsing
   in `GitHubParams`.
+- **Gitea / Forgejo** (ein Provider für beide, gleiche API unter `/api/v1`) braucht keinen OAuth-Flow:
+  Feld 1 ist die Server-URL (nur `http`/`https`, ohne Benutzerdaten, Query oder Fragment; ein
+  abschließender Schrägstrich wird entfernt), Feld 2 das Zugangstoken. Beides wird als `url|token`
+  gespeichert (`ServerTokenCredential`) und beim Speichern per `GET /api/v1/user` geprüft; Header
+  `Authorization: token <t>`. Scopes lassen sich mit dem Token allein nicht auslesen (`scopes = null`).
+  Gitea erwartet beim Anlegen und beim Ersetzen von Labels Label-IDs: `GiteaLabels` löst Namen gegen
+  die Labels des Repositories auf (unbekannte Namen: Action schlägt vor dem Schreiben fehl, Task-Export
+  lässt sie weg; Zahlen gelten als IDs, so auch Organisations-Labels). Labels ändert `update_issue`
+  über `PUT …/issues/{n}/labels`, weil der Edit-Endpunkt kein Label-Feld hat. Geprüft gegen Gitea 1.27.3
+  und Forgejo 14.0.5 im lokalen Container.
+- **GitLab** (gitlab.com oder eigene Instanz, API v4) braucht keinen OAuth-Flow: Feld 1 ist die
+  Server-URL (im Formular mit `https://gitlab.com` vorausgefüllt; leer gespeichert gilt ebenfalls
+  gitlab.com), Feld 2 ein Personal-, Projekt- oder Gruppen-Access-Token; Header `PRIVATE-TOKEN`.
+  Validierung per `GET /api/v4/user`, die Scopes liest `fetchGrantedScopes` aus
+  `GET /api/v4/personal_access_tokens/self` (ab GitLab 15.5; sonst `null`). `create_issue`,
+  `update_issue` und `add_comment` verlangen `api`, Lesen geht mit `read_api` oder `api`.
+  Projekte werden als Pfad (URL-kodiert zu einem Segment, `gruppe%2Fprojekt`) oder numerische ID
+  angesprochen, Issues über die projektlokale IID; Bearbeiter nur als numerische Benutzer-IDs
+  (`assigneeIds`). `update_issue` mit `state` open/closed setzt `state_event` reopen/close.
+  Nur simuliert getestet (Anfrageformen nach der offiziellen API-Doku).
+
+### Provider ohne Pflicht-Zugangsdaten
+
+- **ntfy** sendet Push-Benachrichtigungen per JSON-`POST` an die Wurzel des Servers (Topic im
+  Body). Feld 1 = Server-URL (leer ⇒ `https://ntfy.sh`, nur `http`/`https`), Feld 2 = Access-Token
+  (leer ⇒ anonym, dann ohne `Authorization`-Header). `requiresCredentials() == false`: ohne
+  gespeicherte Verbindung wird anonym an ntfy.sh gesendet. `fetchAccountInfo` prüft mit Token
+  `GET /v1/account`, ohne Token `GET /v1/health`. Topic-Namen: Buchstaben, Ziffern, `-`, `_`,
+  höchstens 64 Zeichen; `priority` 1–5 oder `min`/`low`/`default`/`high`/`max`. Achtung: Topics auf
+  ntfy.sh liest jeder, der den Namen kennt. Intern: `NtfyParams` (Parsing, Validierung),
+  `NtfyHttpClient` (HTTP, 401/403 → Token-Hinweis).
+- **RSS/Atom** (`feed`) liest RSS 2.0, Atom 1.0 und RSS 1.0 (RDF). `fetch_feed` liefert je Eintrag
+  Titel, Link, Datum (ISO 8601, UTC; RFC-822- und ISO-Angaben werden normalisiert), Zusammenfassung
+  (HTML entfernt, auf 500 Zeichen gekürzt), Autor und id/guid — neueste zuerst, `limit` Standard 20
+  (höchstens 200); mit `since` fallen ältere und undatierte Einträge weg. Abruf nur über http/https,
+  auch bei jeder Weiterleitung (höchstens 5), Antwort höchstens 5 MB, Timeouts 10 s/20 s. Der
+  XML-Parser lehnt jede DOCTYPE-Deklaration ab (kein XXE, keine Entity-Expansion). Intern:
+  `FeedFetcher` (HTTP-Grenzen), `FeedParser`, `FeedDates`, `FeedText` (HTML → Text).
+- **Open-Meteo** (`open-meteo`): `forecast` gegen `api.open-meteo.com/v1/forecast` (latitude −90…90,
+  longitude −180…180, `days` 1–16 → `forecast_days`, Variablen für `hourly`/`daily`/`current` mit
+  Standardauswahl, leerer Wert lässt den Block weg; `timezone` Standard `auto`; optional
+  `temperature_unit`, `wind_speed_unit`, `precipitation_unit`) und `geocode` gegen
+  `geocoding-api.open-meteo.com/v1/search` (`name`, `count` 1–100, `language` Standard `de`; ohne
+  Treffer `results: []`). Parameter werden vor jedem Request geprüft, Variablennamen nur
+  `[a-z0-9_]`. Antworten gehen unverändert durch; API-Fehler liefern den `reason` der Antwort.
+  Intern: `OpenMeteoParams`, `OpenMeteoHttpClient` (Basis-URLs per Konstruktor für Tests).
+- **Todoist (API-Token)** nutzt die vereinheitlichte **Todoist API v1** (`https://api.todoist.com/api/v1`);
+  die frühere REST API v2 ist abgeschaltet. Der persönliche Token (Einstellungen → Integrationen → Entwickler)
+  wird beim Speichern per `GET /user` geprüft; aus der Antwort bleiben nur Name und E-Mail (sie enthält auch den
+  Token). Listen sind seitenweise (`results` + `next_cursor`, `limit` 1–200), `list_tasks` nimmt entweder
+  `project_id` (`GET /tasks`) oder einen Todoist-Filter (`GET /tasks/filter?query=…`). Fehler kommen seit v1 als
+  JSON (`error`, `error_tag`, `error_extra.retry_after`); in die Meldung gehen nur `error` und `error_tag`.
+  Todoist-Tokens haben keine Scopes (`scopes = null`). Aufgeteilt in `TodoistHttpClient`, `TodoistParams`,
+  `TodoistActionCatalog`.
+- **Slack (Bot-Token)** spricht die Web API (`https://slack.com/api/<methode>`) mit dem Bot-Token einer im
+  Workspace installierten App an: `chat.postMessage` (JSON), `conversations.list` und `conversations.history`
+  (Cursor über `response_metadata.next_cursor`). Slack meldet die meisten Fehler mit HTTP 200 und
+  `{"ok":false,"error":…}` — der Client wertet das als Fehler (`invalid_auth` & Co. → Token-Hinweis,
+  `missing_scope` nennt den fehlenden Scope, 429 mit `Retry-After`). Geprüft wird per `auth.test`, die Scopes
+  kommen aus dessen Header `x-oauth-scopes`; `post_message` braucht `chat:write`, `list_channels`
+  `channels:read`, `get_channel_history` `channels:history`. Aufgeteilt in `SlackHttpClient`, `SlackParams`,
+  `SlackActionCatalog`.
+- **Telegram (Bot-Token)** nutzt die Bot API (`https://api.telegram.org/bot<token>/<methode>`, Stand Bot API 10.3):
+  `sendMessage` (`chat_id` als Zahl oder `@kanal`, Text 1–4096 Zeichen, `parse_mode` MarkdownV2/HTML) und
+  `getUpdates` (Kurzabfrage mit `timeout=0`; kollidiert mit einem gesetzten Webhook → 409). Geprüft wird per
+  `getMe`. Fehler kommen als `{"ok":false,"error_code":…,"description":…}`, 429 mit `parameters.retry_after`.
+  Weil der Token im URL-Pfad steht, prüft `TelegramHttpClient` sein Format, bevor eine URI entsteht, wirft
+  Transportfehler ohne Ursache weiter und ersetzt den Token in jeder Meldung durch `***`.
 
 ---
 
@@ -203,10 +369,37 @@ Für `requiresOAuthFlow() == false` sind die Credentials selbst die Authentifizi
 `saveCredentials` kombiniert sie zu `clientId|clientSecret`, ruft `fetchAccountInfo()` zur
 Validierung auf und setzt bei Erfolg direkt `CONNECTED`. Es gibt keinen Ablauf und kein
 Refresh — `getValidAccessToken()` gibt das gespeicherte Credential unverändert zurück.
-Für einen Provider mit `requiresCredentials() == false` (aktuell nur Taskwarrior) gibt
+Für einen Provider mit `requiresCredentials() == false` (Taskwarrior und iCal-Feed) gibt
+Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy) gibt
+Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom) gibt
+Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom, Open-Meteo) gibt
 `getValidAccessToken()` `null` statt einer Exception zurück, wenn keine Connection-Zeile
 existiert oder die Entschlüsselung fehlschlägt — Provider ohne Pflicht-Credentials dürfen
 ohne Token laufen.
+
+### Mehrere Verbindungen je Anbieter
+
+Ein Anbieter kann mehrere **benannte Verbindungen** haben (seit V86, TODO 0b3cbcc3) — etwa ein
+privates und ein Arbeitskonto bei Google oder zwei GitHub-Tokens. Jede Verbindung ist eine eigene
+Zeile in `integration_connections`, eindeutig über `(provider_id, connection_name)`.
+
+- **Name:** 1–40 Zeichen aus Kleinbuchstaben, Ziffern und Bindestrich, am Anfang Buchstabe oder
+  Ziffer (`IntegrationConnectionNames`). Ohne Angabe (oder leer) gilt `default` — das ist die
+  Verbindung, die es vor V86 als einzige gab; Bestandszeilen heißen so. Ein ungültiger Name wird
+  mit `400 INVALID_ARGUMENT` abgelehnt, bevor irgendetwas gelesen oder geschrieben wird.
+- **Service:** Jede Methode von `IntegrationOAuthService` gibt es mit und ohne Verbindungsnamen;
+  die Variante ohne Namen delegiert mit `default`. `listConnections(providerId)` liefert alle
+  Verbindungen, `default` zuerst.
+- **OAuth:** Der Name reist im serverseitigen `state` (`OAuthStateRegistry`) mit, nicht in der
+  URL — die Redirect-URI beim Anbieter bleibt für alle Verbindungen dieselbe. Eine benannte
+  Verbindung ohne eigene App-Zugangsdaten meldet sich über die Client-ID/-Secret der
+  `default`-Verbindung (danach Env-Var) an: ein zweites Konto braucht keine zweite OAuth-App.
+- **Direkt-Auth (PAT/API-Key):** Jede Verbindung braucht ihre eigenen Zugangsdaten, es gibt
+  keinen Rückgriff auf `default`.
+- **Trennen/Löschen** wirkt nur auf die genannte Verbindung.
+- **UI:** Auf der Integrationen-Seite listet der Abschnitt „Verbindungen“ alle Verbindungen des
+  gewählten Anbieters; „Weitere Verbindung“ fragt den Namen ab und führt durch denselben
+  Setup-/Zugangsdaten-Weg. `default` bleibt über die Anbieter-Karte verwaltet.
 
 ---
 
@@ -238,6 +431,8 @@ ohne Token laufen.
 Block-Typ `integration`. Pflichtfelder in `config`: `provider` und `action`. Optionale
 `params` werden vor der Ausführung durch den `ExecutionContext` aufgelöst — String-Werte
 durchlaufen `resolveTemplate(...)`, sodass `{{ variable }}`-Platzhalter funktionieren.
+Optional wählt `connection` eine benannte Verbindung des Anbieters (Platzhalter erlaubt,
+Default `default`, siehe [Mehrere Verbindungen je Anbieter](#mehrere-verbindungen-je-anbieter)).
 
 ```json
 {
@@ -258,7 +453,9 @@ durchlaufen `resolveTemplate(...)`, sodass `{{ variable }}`-Platzhalter funktion
 Verhalten:
 - Das Ergebnis der Action wird als **hübsch formatiertes JSON** in `StepResult.output`
   geschrieben — nachfolgende Blöcke können es als Kontext referenzieren.
-- `StepResult.metadata` enthält `provider`, `action` und `executionMode: "integration"`.
+- `StepResult.metadata` enthält `provider`, `connection`, `action` und `executionMode: "integration"`.
+- Ein ungültiger `connection`-Name (oder kein String) lässt den Step `FAILED` enden, ohne den
+  Anbieter anzusprechen.
 - Fehlt `provider`/`action` oder schlägt der API-Call fehl, endet der Step mit `FAILED` und
   der Fehlermeldung in `output` + `metadata.error` (der Workflow bricht nicht hart ab,
   sondern liefert einen fehlgeschlagenen Step).
@@ -268,9 +465,14 @@ Verhalten:
 
 ## REST-API (`/api/v1/integrations`)
 
+Alle Endpunkte, die eine Verbindung betreffen (`connect`, `credentials`, `connection`,
+`actions`, `task-targets`), nehmen den optionalen Query-Parameter `connection=<name>`; ohne ihn
+ist `default` gemeint.
+
 | Methode | Pfad | Zweck |
 |---|---|---|
-| `GET` | `/` | Alle Provider inkl. Connection-Status auflisten |
+| `GET` | `/` | Alle Provider inkl. Connection-Status auflisten (Status = `default`-Verbindung, zusätzlich `connections[]` und `requiresOAuthFlow`) |
+| `GET` | `/{providerId}/connections` | Alle Verbindungen eines Providers (Name, Status, `configured`, Account, seit, Scopes), `default` zuerst |
 | `GET` | `/{providerId}` | Einen Provider abrufen |
 | `GET` | `/{providerId}/connect` | OAuth2-Authorize-URL erzeugen (Query: `redirectUri`, optionale `scopes`) |
 | `GET` | `/{providerId}/callback` | OAuth2-Callback — **public, kein API-Key nötig** |
@@ -279,6 +481,7 @@ Verhalten:
 | `DELETE` | `/{providerId}/credentials` | Verbindung samt Credentials vollständig löschen |
 | `GET` | `/{providerId}/actions` | Verfügbare Actions inkl. Input-Schema (**Source of Truth**) |
 | `POST` | `/{providerId}/actions/{action}` | Eine Action testweise ausführen |
+| `GET` | `/{providerId}/task-targets` | Export-Ziele eines Task-fähigen Providers (Repos, Projekte, Listen) |
 
 ---
 
@@ -337,6 +540,7 @@ Hook `useCalendarAggregated`.
 ```ts
 export const CALENDAR_ADAPTERS: CalendarSourceAdapter[] = [
   googleCalendarAdapter,  // Integration: google-calendar
+  caldavAdapter,          // Integration: caldav
   trelloAdapter,          // Integration: trello
   schedulesAdapter,       // System-Quelle: geplante Workflows
   runsAdapter,            // System-Quelle: vergangene Runs

@@ -9,7 +9,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.Instant;
 
 @Entity
-@Table(name = "integration_connections")
+@Table(name = "integration_connections",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"provider_id", "connection_name"}))
 @EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
@@ -22,8 +23,13 @@ public class IntegrationConnection {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    @Column(name = "provider_id", nullable = false, unique = true)
+    @Column(name = "provider_id", nullable = false)
     private String providerId;
+
+    /** Name of this connection within its provider (V86); {@code default} for the pre-V86 single connection. */
+    @Column(name = "connection_name", nullable = false)
+    @Builder.Default
+    private String connectionName = "default";
 
     @Column(nullable = false)
     @Builder.Default

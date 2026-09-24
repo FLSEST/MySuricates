@@ -60,6 +60,8 @@ A provider implements this contract (`service/integration/IntegrationProvider.ja
 | `List<IntegrationAction> getAvailableActions()` | ✅ | Supported actions including input schema |
 | `Object executeAction(String action, Map<String,Object> params, String accessToken)` | ✅ | Executes an action against the external API |
 | `String fetchAccountInfo(String accessToken)` | ⬜ (default `null`) | Account info after successful authentication (JSON string) |
+| `IntegrationVerification getVerification()` | ⬜ (from `VerifiedProviders`) | Verification: `VERIFIED` = checked against the real service, `SIMULATED` = only against simulated responses |
+| `String getVerifiedAgainst()` | ⬜ (from `VerifiedProviders`) | What a `VERIFIED` provider was checked against, e.g. "Gitea 1.24, local container" |
 | `boolean requiresOAuthFlow()` | ⬜ (default `true`) | `false` = direct auth via API key/token instead of OAuth2 authorization code flow |
 
 ### `IntegrationAction` (Record)
@@ -99,17 +101,124 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 
 ## Available Providers
 
-| Provider | Provider ID | Auth Type | Package | Actions (snapshot) |
-|---|---|---|---|---|
-| Google Calendar | `google-calendar` | OAuth2 (Google) | `providers/google/` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` |
-| Gmail | `google-gmail` | OAuth2 (Google, readonly) | `providers/google/` | `list_messages`, `get_message` |
-| Jira | `jira` | OAuth2 (Atlassian 3LO) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` |
-| Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` |
-| Trello | `trello` | API key + token (no OAuth flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` |
-| Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` |
-| GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` |
+| Provider | Provider ID | Auth Type | Package | Actions (snapshot) | Verification |
+|---|---|---|---|---|---|
+| Google Calendar | `google-calendar` | OAuth2 (Google) | `providers/google/` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` | verified |
+| Gmail | `google-gmail` | OAuth2 (Google, readonly) | `providers/google/` | `list_messages`, `get_message` | verified |
+| Jira | `jira` | OAuth2 (Atlassian 3LO) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` | verified |
+| Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` | verified |
+| Trello | `trello` | API key + token (no OAuth flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` | verified |
+| Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | verified |
+| GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified |
+| Gitea / Forgejo | `gitea` | Server URL + access token (no OAuth flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified (local container) |
+| GitLab | `gitlab` | Server URL (default `https://gitlab.com`) + access token (no OAuth flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simulated |
+| CalDAV | `caldav` | URL + user:app-password (Basic auth, no OAuth flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | verified (Radicale 3.8.0, local container) |
+| iCal feed | `ical-feed` | none (public feed URL as parameter) | `providers/icalfeed/` | `list_events` | verified (public Google holiday feed) |
+| ntfy | `ntfy` | Server URL + optional access token (no OAuth flow, both optional) | `providers/ntfy/` | `publish` | verified |
+| RSS/Atom | `feed` | none (public feeds) | `providers/feed/` | `fetch_feed` | verified |
+| Open-Meteo | `open-meteo` | none (free API without key) | `providers/openmeteo/` | `forecast`, `geocode` | verified |
+| Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
+| Slack | `slack` | Bot token `xoxb-…` (no OAuth flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | simulated only |
+| Telegram | `telegram` | Bot token from @BotFather (no OAuth) | `providers/telegram/` | `send_message`, `get_updates` | simulated only |
+| HTTP API | `http-api` | Base URL + optional auth header (no OAuth flow); **own module `http-api`** | `providers/httpapi/` | `request` | verified (httpbin.org) |
+
+**Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
+
+**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Gitea/Forgejo
+(issue, target `owner/repo`; tags become labels where the repository has them), GitLab (issue, target =
+project path `group/project` or numeric ID; tags become labels), Jira (issue of type Task,
+target = project key, labels without spaces; browse URL from the accessible resources) and Trello (card,
+target = list ID, `listTargets` returns "board / list"; tags are not transferred as labels because Trello
+expects label IDs). Discovery via `instanceof`, contract test `TaskExportContractTest`.
+| Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
+
+
+**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Jira (issue of type
+Task, target = project key, labels without spaces; browse URL from the accessible resources), Trello (card, target =
+list ID, `listTargets` returns "Board / List"; tags are not sent as labels because Trello expects label IDs) and
+Todoist (task, target = project ID, `listTargets` returns the projects; tags become label names, link
+`app.todoist.com/app/task/<id>`). Detected via `instanceof`, contract test `TaskExportContractTest`.
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
+
+### CalDAV and iCal feed
+
+Both share a small iCalendar reader/writer in `providers/ical/` (no third-party library): line folding
+(75 octets, UTF-8 safe), text escapes, `DTSTART`/`DTEND` as UTC, with `TZID` or all-day (`VALUE=DATE`),
+`DURATION`, `SUMMARY`/`DESCRIPTION`/`LOCATION`/`UID`; `RRULE` is only passed through. MySuricates does
+**not** expand series itself. Times use the Google shape (`{date}` or `{dateTime, timeZone}`), so workflows
+read both calendar sources the same way.
+
+- **CalDAV** (`caldav`, RFC 4791): field 1 = CalDAV URL (Nextcloud `https://<server>/remote.php/dav`,
+  Radicale `http://<server>:5232/`), field 2 = `user:app-password`; stored as `url|user:password`, checked by
+  a PROPFIND (`fetchAccountInfo`). Discovery: `current-user-principal` → `calendar-home-set` → Depth-1
+  PROPFIND. `list_events` sends a `calendar-query` REPORT with `time-range` and `<C:expand>` — the server
+  returns series as single occurrences (with `recurrenceId`); without `calendar` all calendars are queried, and
+  a broken calendar ends up under `errors` instead of hiding the others. `create_event` PUTs `<uuid>.ics` with
+  `If-None-Match: *` (VTIMEZONE from the JDK rules for every TZID used), `update_event` fetches the object,
+  changes only the given properties of the series master (attendees, alarms, exceptions stay), bumps
+  `SEQUENCE` and writes with `If-Match` (ETag from the parameter or from the GET) — an event changed in the
+  meantime yields 412 instead of being overwritten. `delete_event` removes the whole series for a series.
+  Security: http/https only, no credentials in the URL, redirects are not followed (they would carry the
+  Basic-Auth header), every requested URL must be on the server of the entered URL (hrefs from server
+  responses too), XML parser without DOCTYPE/external entities (XXE), responses at most 10 MB, the password
+  never appears in logs or error messages. Internals: `CalDavHttpClient`, `CalDavXml`, `CalDavDiscovery`,
+  `CalDavEvents`, `CalDavActionCatalog`.
+  **Verification:** against Radicale 3.8.0 in a local container (all five actions incl. a series with `RRULE`
+  and `expand`, ETag conflict, foreign origin). Nextcloud, Posteo and iCloud are **not** checked live; iCloud
+  points to a partition server (`pNN-caldav.icloud.com`) that the provider does not follow because of the
+  origin rule — enter that address there.
+- **iCal feed** (`ical-feed`): no credentials (`requiresCredentials() == false`), the feed URL is a parameter
+  of `list_events` (`url`, `from`, `to`, `limit`, `timeZone`); `webcal://` is read as https. Download with a
+  10 s connect / 20 s total timeout, at most 5 MB, only responses containing `BEGIN:VCALENDAR`. It returns single
+  events overlapping the window and series masters with `rrule` and `recurring: true` (first occurrence as
+  `start`; an `UNTIL` in the past hides the series, `EXDATE` is ignored) plus a `note`. Errors name the host
+  only, never path or query — private feed links often contain a secret.
+
+The calendar view shows CalDAV through `caldavAdapter` (all calendars, series already expanded by the
+server). An iCal feed has no adapter because the feed URL is only known inside a workflow.
+### HTTP API Connection (`http-api`)
+
+General connection to an HTTP service you enter yourself (TODO 78fae34c). Own feature module
+**`http-api`** (tier `advanced`, risks network + credentials, requires `integrations`), on in no
+preset except `full`: `AUTOMATION_MODULES_HTTP_API=true` or `automation.modules.http-api: true`.
+While the module is off, `IntegrationRegistry` hides the provider (list, lookup, block), and
+`executeAction` refuses on its own as well — both checked per call, so a runtime switch takes
+effect at once.
+
+- **Credentials:** field 1 = base URL (only `http`/`https`, host required, no `user:pass@`, no
+  `?`/`#`, no `.`/`..` segments, no `|`), field 2 = auth header `Name: Value` (e.g.
+  `Authorization: Bearer …`, `X-API-Key: …`) or empty. Checked on save
+  (`validateCredentialInput` → `400`) without any network call; the account shown is
+  `host/base-path`.
+- **Several services** = several [named connections](#several-connections-per-provider), chosen in
+  the block via `"connection": "weather"`.
+- **Action `request`**, parameters: `method` (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`, default `GET`),
+  `path` (relative to the base URL), `query` (object, a list repeats the name), `headers`
+  (object), `body` (object/array → `application/json`, text → `text/plain`; not with `GET`,
+  at most 1 MiB), `timeout_seconds` (1–120, default 30), `fail_on_error` (default `true`:
+  status ≥ 400 fails the step; `false` returns it as the result).
+- **Result:** `status`, `ok`, `content_type`, `body` (JSON parsed, else text cut to 100,000
+  characters), `truncated`; for 3xx also `location` and `note`. At most 1 MiB of the answer is read.
+
+**Security decisions:**
+
+- *The path stays below the base URL:* rejected are scheme prefixes (`https:`, `javascript:` …),
+  `//host`, backslash, `?`/`#` (query only via `query`), whitespace/control characters and every
+  segment that — also percent-decoded (`%2e%2e`, `%2f`) — is `.` or `..` or contains a slash. The
+  final URI is additionally checked against scheme, host, port and base-path prefix.
+- *No automatic redirects* (`Redirect.NEVER`): a 3xx comes back with `location`, the auth header
+  never goes to another target.
+- *Header injection:* names must be HTTP tokens, values without CR/LF/control characters; the
+  connection's auth header cannot be overridden in the block, hop-by-hop and framing headers
+  (`Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Proxy-Authorization` …) are
+  blocked.
+- *Never hand out the auth header:* stored encrypted, not in logs (only method, host and path are
+  logged), and its value is replaced by `***` in the answer, `location` and error messages — a
+  service that mirrors request headers does not reveal it.
+- *Deliberately open:* targets in your own network (localhost, private addresses) are not blocked —
+  the operator enters the base URL, and such services are often exactly the target. Whoever does
+  not want that keeps the module off.
 
 ### OAuth Endpoints & Scopes per Provider
 
@@ -143,6 +252,72 @@ Notes:
   execution is not blocked). Least privilege: create a fine-grained PAT limited to the needed
   repositories with *Issues: Read and write* instead of a classic token with full `repo`.
   Split internally: HTTP via `GitHubHttpClient`, parameter parsing in `GitHubParams`.
+- **Gitea / Forgejo** (one provider for both, same API under `/api/v1`) needs no OAuth flow:
+  field 1 is the server URL (`http`/`https` only, no user info, query or fragment; a trailing
+  slash is dropped), field 2 the access token. Both are stored as `url|token`
+  (`ServerTokenCredential`) and checked via `GET /api/v1/user` when saved; header
+  `Authorization: token <t>`. The token alone cannot read its own scopes (`scopes = null`).
+  Gitea expects label IDs when creating an issue or replacing its labels: `GiteaLabels` resolves
+  names against the repository's labels (unknown names: the action fails before writing, the task
+  export drops them; numbers count as IDs, which also covers organisation labels). `update_issue`
+  changes labels via `PUT …/issues/{n}/labels` because the edit endpoint has no labels field.
+  Checked against Gitea 1.27.3 and Forgejo 14.0.5 in a local container.
+- **GitLab** (gitlab.com or self-managed, API v4) needs no OAuth flow: field 1 is the server URL
+  (prefilled with `https://gitlab.com` in the form; an empty stored value also means gitlab.com),
+  field 2 a personal, project or group access token; header `PRIVATE-TOKEN`. Validation via
+  `GET /api/v4/user`; `fetchGrantedScopes` reads the scopes from
+  `GET /api/v4/personal_access_tokens/self` (GitLab 15.5+; otherwise `null`). `create_issue`,
+  `update_issue` and `add_comment` require `api`; reading works with `read_api` or `api`.
+  Projects are addressed by path (URL-encoded into one segment, `group%2Fproject`) or numeric ID,
+  issues by their project-local IID; assignees only as numeric user IDs (`assigneeIds`).
+  `update_issue` with `state` open/closed sets `state_event` reopen/close.
+  Simulated tests only (request shapes follow the official API docs).
+
+### Providers without mandatory credentials
+
+- **ntfy** sends push notifications as a JSON `POST` to the server root (topic in the body).
+  Field 1 = server URL (empty ⇒ `https://ntfy.sh`, `http`/`https` only), field 2 = access token
+  (empty ⇒ anonymous, then no `Authorization` header). `requiresCredentials() == false`: without a
+  saved connection it publishes anonymously to ntfy.sh. `fetchAccountInfo` checks
+  `GET /v1/account` with a token, `GET /v1/health` without one. Topic names: letters, digits, `-`,
+  `_`, at most 64 characters; `priority` 1–5 or `min`/`low`/`default`/`high`/`max`. Note: topics on
+  ntfy.sh can be read by anyone who knows the name. Internally: `NtfyParams` (parsing, validation),
+  `NtfyHttpClient` (HTTP, 401/403 → token hint).
+- **RSS/Atom** (`feed`) reads RSS 2.0, Atom 1.0 and RSS 1.0 (RDF). `fetch_feed` returns per entry
+  title, link, date (ISO 8601, UTC; RFC 822 and ISO values are normalised), summary (HTML removed,
+  cut to 500 characters), author and id/guid — newest first, `limit` default 20 (at most 200); with
+  `since`, older and undated entries are dropped. Fetching uses http/https only, on every redirect
+  too (at most 5), responses of at most 5 MB, timeouts 10 s/20 s. The XML parser rejects any DOCTYPE
+  declaration (no XXE, no entity expansion). Internally: `FeedFetcher` (HTTP limits), `FeedParser`,
+  `FeedDates`, `FeedText` (HTML → text).
+- **Open-Meteo** (`open-meteo`): `forecast` against `api.open-meteo.com/v1/forecast` (latitude
+  −90…90, longitude −180…180, `days` 1–16 → `forecast_days`, variables for `hourly`/`daily`/`current`
+  with a default selection, an empty value leaves the block out; `timezone` default `auto`; optional
+  `temperature_unit`, `wind_speed_unit`, `precipitation_unit`) and `geocode` against
+  `geocoding-api.open-meteo.com/v1/search` (`name`, `count` 1–100, `language` default `de`; no match
+  gives `results: []`). Parameters are checked before any request, variable names only
+  `[a-z0-9_]`. Responses pass through unchanged; API errors carry the response's `reason`.
+  Internally: `OpenMeteoParams`, `OpenMeteoHttpClient` (base URLs via constructor for tests).
+- **Todoist (API token)** uses the unified **Todoist API v1** (`https://api.todoist.com/api/v1`); the former
+  REST API v2 has been shut down. The personal token (Settings → Integrations → Developer) is validated via
+  `GET /user` when saved; only name and e-mail are kept from the answer (it also contains the token). Lists are
+  paginated (`results` + `next_cursor`, `limit` 1–200), `list_tasks` takes either `project_id` (`GET /tasks`) or a
+  Todoist filter (`GET /tasks/filter?query=…`). Since v1 errors are JSON (`error`, `error_tag`,
+  `error_extra.retry_after`); only `error` and `error_tag` reach the message. Todoist tokens have no scopes
+  (`scopes = null`). Split into `TodoistHttpClient`, `TodoistParams`, `TodoistActionCatalog`.
+- **Slack (bot token)** calls the Web API (`https://slack.com/api/<method>`) with the bot token of an app
+  installed in the workspace: `chat.postMessage` (JSON), `conversations.list` and `conversations.history` (cursor
+  via `response_metadata.next_cursor`). Slack reports most errors with HTTP 200 and `{"ok":false,"error":…}` —
+  the client treats that as a failure (`invalid_auth` and friends → token hint, `missing_scope` names the
+  missing scope, 429 with `Retry-After`). Validation uses `auth.test`, the scopes come from its `x-oauth-scopes`
+  header; `post_message` needs `chat:write`, `list_channels` `channels:read`, `get_channel_history`
+  `channels:history`. Split into `SlackHttpClient`, `SlackParams`, `SlackActionCatalog`.
+- **Telegram (bot token)** uses the Bot API (`https://api.telegram.org/bot<token>/<method>`, as of Bot API 10.3):
+  `sendMessage` (`chat_id` as a number or `@channel`, text 1–4096 characters, `parse_mode` MarkdownV2/HTML) and
+  `getUpdates` (short poll with `timeout=0`; clashes with a configured webhook → 409). Validation uses `getMe`.
+  Errors come as `{"ok":false,"error_code":…,"description":…}`, 429 with `parameters.retry_after`. Because the
+  token sits in the URL path, `TelegramHttpClient` checks its format before any URI is built, rethrows transport
+  errors without their cause and replaces the token with `***` in every message.
 
 ---
 
@@ -197,9 +372,36 @@ For `requiresOAuthFlow() == false` the credentials themselves are the authentica
 `saveCredentials` combines them as `clientId|clientSecret`, calls `fetchAccountInfo()` for
 validation, and on success sets the status directly to `CONNECTED`. There is no expiry and no
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
-For a provider with `requiresCredentials() == false` (currently only Taskwarrior),
+For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom, Open-Meteo),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
+
+### Several Connections per Provider
+
+A provider can have several **named connections** (since V86, TODO 0b3cbcc3) — for example a
+private and a work account at Google, or two GitHub tokens. Each connection is its own row in
+`integration_connections`, unique by `(provider_id, connection_name)`.
+
+- **Name:** 1–40 characters of lower-case letters, digits and dashes, starting with a letter or
+  digit (`IntegrationConnectionNames`). Without a name (or blank) `default` applies — the
+  connection that was the only one before V86; existing rows carry that name. An invalid name is
+  rejected with `400 INVALID_ARGUMENT` before anything is read or written.
+- **Service:** Every method of `IntegrationOAuthService` exists with and without a connection
+  name; the variant without a name delegates with `default`. `listConnections(providerId)`
+  returns all connections, `default` first.
+- **OAuth:** The name travels in the server-side `state` (`OAuthStateRegistry`), not in the URL —
+  the redirect URI at the provider stays the same for every connection. A named connection
+  without its own app credentials signs in with the client ID/secret of the `default`
+  connection (then the env var): a second account needs no second OAuth app.
+- **Direct auth (PAT/API key):** Every connection needs its own credentials; there is no fallback
+  to `default`.
+- **Disconnect/delete** affects only the named connection.
+- **UI:** On the Integrations page the "Connections" section lists all connections of the
+  selected provider; "Add connection" asks for the name and leads through the same
+  setup/credentials path. `default` stays managed through the provider card.
 
 ---
 
@@ -230,7 +432,9 @@ decryption fails — providers that need no credentials are allowed to run witho
 
 Block type `integration`. Required fields in `config`: `provider` and `action`. Optional
 `params` are resolved via `ExecutionContext` before execution — string values are passed through
-`resolveTemplate(...)` so that `{{ variable }}` placeholders work.
+`resolveTemplate(...)` so that `{{ variable }}` placeholders work. Optionally `connection`
+selects a named connection of the provider (placeholders allowed, default `default`, see
+[Several Connections per Provider](#several-connections-per-provider)).
 
 ```json
 {
@@ -251,7 +455,9 @@ Block type `integration`. Required fields in `config`: `provider` and `action`. 
 Behavior:
 - The result of the action is written as **nicely formatted JSON** into `StepResult.output`
   — subsequent blocks can reference it as context.
-- `StepResult.metadata` contains `provider`, `action`, and `executionMode: "integration"`.
+- `StepResult.metadata` contains `provider`, `connection`, `action`, and `executionMode: "integration"`.
+- An invalid `connection` name (or a non-string) ends the step `FAILED` without contacting the
+  provider.
 - If `provider`/`action` is missing or the API call fails, the step ends with `FAILED` and
   the error message in `output` + `metadata.error` (the workflow does not hard-abort,
   but delivers a failed step).
@@ -261,9 +467,14 @@ Behavior:
 
 ## REST API (`/api/v1/integrations`)
 
+Every endpoint that concerns one connection (`connect`, `credentials`, `connection`, `actions`,
+`task-targets`) takes the optional query parameter `connection=<name>`; without it `default`
+is meant.
+
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | List all providers including connection status |
+| `GET` | `/` | List all providers including connection status (status = `default` connection, plus `connections[]` and `requiresOAuthFlow`) |
+| `GET` | `/{providerId}/connections` | All connections of a provider (name, status, `configured`, account, since, scopes), `default` first |
 | `GET` | `/{providerId}` | Retrieve a single provider |
 | `GET` | `/{providerId}/connect` | Generate OAuth2 authorize URL (query: `redirectUri`, optional `scopes`) |
 | `GET` | `/{providerId}/callback` | OAuth2 callback — **public, no API key required** |
@@ -272,6 +483,7 @@ Behavior:
 | `DELETE` | `/{providerId}/credentials` | Fully delete connection including credentials |
 | `GET` | `/{providerId}/actions` | Available actions including input schema (**source of truth**) |
 | `POST` | `/{providerId}/actions/{action}` | Execute an action for testing purposes |
+| `GET` | `/{providerId}/task-targets` | Export targets of a task-capable provider (repos, projects, lists) |
 
 ---
 
@@ -329,6 +541,7 @@ hook `useCalendarAggregated`.
 ```ts
 export const CALENDAR_ADAPTERS: CalendarSourceAdapter[] = [
   googleCalendarAdapter,  // integration: google-calendar
+  caldavAdapter,          // integration: caldav
   trelloAdapter,          // integration: trello
   schedulesAdapter,       // system source: scheduled workflows
   runsAdapter,            // system source: past runs

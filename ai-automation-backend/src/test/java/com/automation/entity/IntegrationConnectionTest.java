@@ -164,7 +164,7 @@ class IntegrationConnectionTest {
         Instant updated = Instant.parse("2024-06-15T12:00:00Z");
 
         IntegrationConnection conn = new IntegrationConnection(
-                "conn-id", "google-calendar",
+                "conn-id", "google-calendar", "work",
                 IntegrationConnection.ConnectionStatus.CONNECTED,
                 "enc-access-token", "enc-refresh-token",
                 expiry, "email,calendar",
@@ -175,6 +175,7 @@ class IntegrationConnectionTest {
 
         assertThat(conn.getId()).isEqualTo("conn-id");
         assertThat(conn.getProviderId()).isEqualTo("google-calendar");
+        assertThat(conn.getConnectionName()).isEqualTo("work");
         assertThat(conn.getStatus()).isEqualTo(IntegrationConnection.ConnectionStatus.CONNECTED);
         assertThat(conn.getAccessTokenEncrypted()).isEqualTo("enc-access-token");
         assertThat(conn.getRefreshTokenEncrypted()).isEqualTo("enc-refresh-token");
@@ -185,6 +186,18 @@ class IntegrationConnectionTest {
         assertThat(conn.getAccountInfo()).isEqualTo("{\"email\":\"test@example.com\"}");
         assertThat(conn.getCreatedAt()).isEqualTo(created);
         assertThat(conn.getUpdatedAt()).isEqualTo(updated);
+    }
+
+    @Test
+    void should_nameTheConnectionDefault_when_builtOrCreatedWithoutName() {
+        assertThat(IntegrationConnection.builder().providerId("github").build().getConnectionName()).isEqualTo("default");
+        assertThat(new IntegrationConnection().getConnectionName()).isEqualTo("default");
+    }
+
+    @Test
+    void should_defaultToTheDefaultConnectionName_when_builtOrCreatedWithoutOne() {
+        assertThat(IntegrationConnection.builder().providerId("github").build().getConnectionName()).isEqualTo("default");
+        assertThat(new IntegrationConnection().getConnectionName()).isEqualTo("default");
     }
 
     // --- ConnectionStatus enum ---

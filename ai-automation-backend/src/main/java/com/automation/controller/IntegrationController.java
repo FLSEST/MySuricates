@@ -1,39 +1,51 @@
 package com.automation.controller;
 
 import com.automation.dto.response.IntegrationActionResponse;
+import com.automation.dto.response.IntegrationConnectionResponse;
 import com.automation.dto.response.IntegrationProviderResponse;
 import com.automation.entity.IntegrationConnection;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.security.AllowedOrigins;
 import com.automation.service.integration.IntegrationAction;
+import com.automation.service.integration.IntegrationConnectionNames;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.automation.service.integration.TaskExportCapable;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+/**
+ * Integration providers and their connections. Every endpoint that works on one connection takes
+ * the optional query parameter {@code connection} (0b3cbcc3); without it the provider's
+ * {@code default} connection is meant, exactly as before named connections existed.
+ */
 @RequiresModule(ModuleCatalog.INTEGRATIONS)
 @RestController
 @RequestMapping("/api/v1/integrations")
-@RequiredArgsConstructor
 @Slf4j
 public class IntegrationController {
 
     private final IntegrationRegistry registry;
     private final IntegrationOAuthService oAuthService;
-    private final ObjectMapper objectMapper;
     /** The OAuth popup posts its result only to an origin CORS would let in as well (a8056256). */
     private final AllowedOrigins allowedOrigins;
+    private final IntegrationProviderResponses responses;
+
+    public IntegrationController(IntegrationRegistry registry, IntegrationOAuthService oAuthService,
+                                 ObjectMapper objectMapper, AllowedOrigins allowedOrigins) {
+        this.registry = registry;
+        this.oAuthService = oAuthService;
+        this.allowedOrigins = allowedOrigins;
+        this.responses = new IntegrationProviderResponses(objectMapper);
+    }
 
     @GetMapping
     public List<IntegrationProviderResponse> listProviders() {
@@ -47,15 +59,27 @@ public class IntegrationController {
         return toProviderResponse(registry.getProvider(providerId));
     }
 
+    /** Every stored connection of a provider, {@code default} first. */
+    @GetMapping("/{providerId}/connections")
+    public List<IntegrationConnectionResponse> listConnections(@PathVariable String providerId) {
+        IntegrationProvider provider = registry.getProvider(providerId);
+        boolean defaultConfigured = oAuthService.isProviderConfigured(providerId);
+        return oAuthService.listConnections(providerId).stream()
+                .map(c -> responses.connection(provider, c, defaultConfigured))
+                .toList();
+    }
+
     @GetMapping("/{providerId}/connect")
     public Map<String, String> getAuthorizationUrl(
             @PathVariable String providerId,
             @RequestParam(required = false) List<String> scopes,
             @RequestParam(required = false) String frontendOrigin,
+            @RequestParam(required = false) String connection,
             HttpServletRequest request) {
+        String name = IntegrationConnectionNames.normalize(connection);
         String redirectUri = buildCallbackUrl(providerId, request);
         String origin = OAuthCallbackPage.validateOrigin(frontendOrigin, redirectUri, allowedOrigins::isAllowed);
-        String authUrl = oAuthService.getAuthorizationUrl(providerId, redirectUri, scopes, origin);
+        String authUrl = oAuthService.getAuthorizationUrl(providerId, name, redirectUri, scopes, origin);
         java.net.URI callback = java.net.URI.create(redirectUri);
         return Map.of("authorizationUrl", authUrl,
                 "callbackOrigin", callback.getScheme() + "://" + callback.getRawAuthority());
@@ -64,7 +88,8 @@ public class IntegrationController {
     /**
      * OAuth2 callback endpoint — public (no API key required).
      * Exchanges authorization code for tokens, then returns an HTML page
-     * that notifies the parent window via postMessage.
+     * that notifies the parent window via postMessage. The connection name comes from the
+     * server-side state, never from this request — the callback URL is the same for all connections.
      */
     @GetMapping("/{providerId}/callback")
     public ResponseEntity<String> handleCallback(
@@ -84,8 +109,10 @@ public class IntegrationController {
     @PostMapping("/{providerId}/credentials")
     public IntegrationProviderResponse saveCredentials(
             @PathVariable String providerId,
+            @RequestParam(required = false) String connection,
             @RequestBody Map<String, String> body) {
         IntegrationProvider provider = registry.getProvider(providerId);
+        String name = IntegrationConnectionNames.normalize(connection);
         String clientId = body.getOrDefault("clientId", "");
         String clientSecret = body.getOrDefault("clientSecret", "");
         if (clientId == null) clientId = "";
@@ -94,104 +121,66 @@ public class IntegrationController {
         if (provider.requiresCredentials() && (clientId.isBlank() || clientSecret.isBlank())) {
             throw new IllegalArgumentException("clientId and clientSecret are required");
         }
-        oAuthService.saveCredentials(providerId, clientId, clientSecret);
+        provider.validateCredentialInput(clientId, clientSecret);
+        oAuthService.saveCredentials(providerId, name, clientId, clientSecret);
         return toProviderResponse(provider);
     }
 
     @DeleteMapping("/{providerId}/connection")
-    public ResponseEntity<Void> disconnect(@PathVariable String providerId) {
-        oAuthService.disconnect(providerId);
+    public ResponseEntity<Void> disconnect(@PathVariable String providerId,
+                                           @RequestParam(required = false) String connection) {
+        oAuthService.disconnect(providerId, IntegrationConnectionNames.normalize(connection));
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{providerId}/credentials")
-    public ResponseEntity<Void> deleteCredentials(@PathVariable String providerId) {
-        oAuthService.deleteCredentials(providerId);
+    public ResponseEntity<Void> deleteCredentials(@PathVariable String providerId,
+                                                  @RequestParam(required = false) String connection) {
+        oAuthService.deleteCredentials(providerId, IntegrationConnectionNames.normalize(connection));
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{providerId}/actions")
-    public List<IntegrationActionResponse> getActions(@PathVariable String providerId) {
+    public List<IntegrationActionResponse> getActions(@PathVariable String providerId,
+                                                      @RequestParam(required = false) String connection) {
         IntegrationProvider provider = registry.getProvider(providerId);
-        var connection = oAuthService.getConnection(providerId).orElse(null);
-        String scopes = connection != null ? connection.getScopes() : null;
-        return provider.getAvailableActions().stream()
-                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
-                        isActionAvailable(a, scopes)))
-                .toList();
+        String scopes = oAuthService.getConnection(providerId, IntegrationConnectionNames.normalize(connection))
+                .map(IntegrationConnection::getScopes).orElse(null);
+        return responses.actions(provider, scopes);
     }
 
     @PostMapping("/{providerId}/actions/{action}")
     public ResponseEntity<Object> testAction(
             @PathVariable String providerId,
             @PathVariable String action,
+            @RequestParam(required = false) String connection,
             @RequestBody(required = false) Map<String, Object> params) {
 
         IntegrationProvider provider = registry.getProvider(providerId);
-        String accessToken = oAuthService.getValidAccessToken(providerId);
+        String accessToken = oAuthService.getValidAccessToken(providerId, IntegrationConnectionNames.normalize(connection));
         Object result = provider.executeAction(action, params != null ? params : Map.of(), accessToken);
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/{providerId}/task-targets")
-    public List<com.automation.service.integration.TaskExportCapable.TaskTarget> taskTargets(@PathVariable String providerId) {
+    public List<TaskExportCapable.TaskTarget> taskTargets(@PathVariable String providerId,
+                                                          @RequestParam(required = false) String connection) {
         IntegrationProvider provider = registry.getProvider(providerId);
-        if (!(provider instanceof com.automation.service.integration.TaskExportCapable tc)) {
+        if (!(provider instanceof TaskExportCapable tc)) {
             return List.of();
         }
+        String name = IntegrationConnectionNames.normalize(connection);
         try {
-            return tc.listTargets(oAuthService.getValidAccessToken(providerId));
+            return tc.listTargets(oAuthService.getValidAccessToken(providerId, name));
         } catch (Exception e) {
             return List.of();
         }
     }
 
     private IntegrationProviderResponse toProviderResponse(IntegrationProvider provider) {
-        var connection = oAuthService.getConnection(provider.getProviderId()).orElse(null);
-
-        String status = connection != null ? connection.getStatus().name() : "DISCONNECTED";
-        String accountEmail = null;
-        String accountName = null;
-
-        if (connection != null && connection.getAccountInfo() != null) {
-            try {
-                JsonNode info = objectMapper.readTree(connection.getAccountInfo());
-                accountEmail = info.has("email") ? info.get("email").asText() : null;
-                accountName = info.has("name") ? info.get("name").asText() : null;
-            } catch (Exception e) {
-                log.warn("Failed to parse account info for {}", provider.getProviderId());
-            }
-        }
-
-        String scopes = connection != null ? connection.getScopes() : null;
-        Set<String> grantedScopes = parseScopes(scopes);
-        var config = provider.getOAuthConfig();
-
-        List<IntegrationActionResponse> actions = provider.getAvailableActions().stream()
-                .map(a -> new IntegrationActionResponse(a.name(), a.description(), a.inputSchema(),
-                        isActionAvailable(a, scopes)))
-                .toList();
-
-        List<IntegrationProviderResponse.ScopeOptionResponse> optionalScopes = config.optionalScopes().stream()
-                .map(s -> new IntegrationProviderResponse.ScopeOptionResponse(s, s, grantedScopes.contains(s)))
-                .toList();
-
-        return new IntegrationProviderResponse(
-                provider.getProviderId(),
-                provider.getDisplayName(),
-                provider.getIcon(),
-                provider.getDescription(),
-                status,
-                oAuthService.isProviderConfigured(provider.getProviderId()),
-                provider.requiresCredentials(),
-                accountEmail,
-                accountName,
-                connection != null ? connection.getCreatedAt() : null,
-                connection != null ? connection.getScopes() : null,
-                optionalScopes,
-                actions,
-                provider instanceof com.automation.service.integration.TaskExportCapable
-        );
+        String providerId = provider.getProviderId();
+        return responses.provider(provider, oAuthService.listConnections(providerId),
+                oAuthService.isProviderConfigured(providerId));
     }
 
     /**
@@ -199,14 +188,9 @@ public class IntegrationController {
      * unknown ({@code null}: fine-grained PAT, provider without scope reporting — we cannot prove
      * a gap), or when every required scope was granted. Advisory only: execution is not blocked.
      */
-    static boolean isActionAvailable(com.automation.service.integration.IntegrationAction action, String scopes) {
+    static boolean isActionAvailable(IntegrationAction action, String scopes) {
         if (action.requiredScopes().isEmpty() || scopes == null) return true;
-        return parseScopes(scopes).containsAll(action.requiredScopes());
-    }
-
-    private static Set<String> parseScopes(String scopes) {
-        if (scopes == null || scopes.isBlank()) return Set.of();
-        return Set.of(scopes.split(" "));
+        return IntegrationProviderResponses.parseScopes(scopes).containsAll(action.requiredScopes());
     }
 
     private String buildCallbackUrl(String providerId, HttpServletRequest request) {
