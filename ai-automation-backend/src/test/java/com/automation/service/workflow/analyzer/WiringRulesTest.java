@@ -90,7 +90,7 @@ class WiringRulesTest {
     @Test
     void unbenannterKiBlockNenntKeinenNamensweg() {
         List<AnalyzerFinding> out = apply(
-                block("simple", "  ", Map.of("prompt", "a")),
+                block("simple", "  ", Map.of("command", "a")),
                 block("shell", "x", Map.of("command", "echo")));
 
         assertThat(out).singleElement().extracting(AnalyzerFinding::detail)
@@ -100,14 +100,14 @@ class WiringRulesTest {
     @Test
     void previousOutputImDirektFolgendenBlockGiltAlsGelesen() {
         assertThat(apply(
-                block("simple", "a", Map.of("prompt", "x")),
+                block("simple", "a", Map.of("command", "x")),
                 block("shell", "b", Map.of("command", "echo {{ previous_output }}")))).isEmpty();
     }
 
     @Test
     void namensverweisInEinemSpaeterenBlockGiltAlsGelesen() {
         assertThat(apply(
-                block("skill-capability", "a", Map.of("prompt", "x")),
+                block("skill-capability", "a", Map.of("capability", "analyze", "input", "x")),
                 block("shell", "b", Map.of("command", "echo")),
                 block("shell", "c", Map.of("command", "echo {{ block.a.output }}")))).isEmpty();
     }

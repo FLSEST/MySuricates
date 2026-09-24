@@ -33,7 +33,7 @@ class HygieneRulesTest {
     @Test
     void homePfadNenntDenBenutzernamenUndGiltFuerJedenBlocktyp() {
         List<AnalyzerFinding> out = apply(null,
-                block("simple", "s", Map.of("prompt", "Lies /Users/anna/notes.md")));
+                block("simple", "s", Map.of("command", "Lies /Users/anna/notes.md")));
 
         assertThat(out).singleElement().satisfies(f -> {
             assertThat(f.rule()).isEqualTo("absolute-home-path");
@@ -44,14 +44,14 @@ class HygieneRulesTest {
 
     @Test
     void homeOhneBenutzerverzeichnisIstKeinBefund() {
-        assertThat(apply(null, block("simple", "s", Map.of("prompt", "cd /home und dann $HOME/x"))))
+        assertThat(apply(null, block("simple", "s", Map.of("command", "cd /home und dann $HOME/x"))))
                 .isEmpty();
     }
 
     @Test
     void homePfadWirdJeBlockNurEinmalGemeldet() {
         assertThat(apply(null, block("simple", "s",
-                Map.of("prompt", "/home/a/x /home/b/y")))).hasSize(1);
+                Map.of("command", "/home/a/x /home/b/y")))).hasSize(1);
     }
 
     @Test
@@ -80,7 +80,7 @@ class HygieneRulesTest {
     void woertlicherAbsatzAbAchtzigZeichenIstDoppelt() {
         String instructions = "Kurz.\n\n" + PARAGRAPH + "\n   \nNoch was.";
         List<AnalyzerFinding> out = apply(instructions,
-                block("simple", "s", Map.of("prompt", "Aufgabe.\n" + PARAGRAPH)));
+                block("simple", "s", Map.of("command", "Aufgabe.\n" + PARAGRAPH)));
 
         assertThat(out).singleElement().satisfies(f -> {
             assertThat(f.rule()).isEqualTo("duplicated-instructions");
@@ -92,24 +92,54 @@ class HygieneRulesTest {
     @Test
     void kurzeAbsaetzeZaehlenNichtAlsDoppelt() {
         String kurz = PARAGRAPH.substring(0, 79);
-        assertThat(apply(kurz, block("simple", "s", Map.of("prompt", kurz)))).isEmpty();
+        assertThat(apply(kurz, block("simple", "s", Map.of("command", kurz)))).isEmpty();
     }
 
     @Test
     void mehrereDoppelteAbsaetzeErgebenEinenBefund() {
         String second = PARAGRAPH.replace("Arbeite", "Schreibe");
         List<AnalyzerFinding> out = apply(PARAGRAPH + "\n\n" + second,
-                block("simple", "s", Map.of("prompt", PARAGRAPH + "\n" + second)));
+                block("simple", "s", Map.of("command", PARAGRAPH + "\n" + second)));
 
         assertThat(out).extracting(AnalyzerFinding::rule).containsExactly("duplicated-instructions");
     }
 
     @Test
-    void doppelteAnweisungNutztCommandWennPromptFehlt() {
+    void ohneInstructionsOderOhneAuftragKeinDoppelterAuftrag() {
         assertThat(apply(PARAGRAPH, block("simple", "s", Map.of("command", PARAGRAPH))))
                 .extracting(AnalyzerFinding::rule).containsExactly("duplicated-instructions");
         assertThat(apply("   ", block("simple", "s", Map.of("command", PARAGRAPH)))).isEmpty();
         assertThat(apply(PARAGRAPH, block("simple", "s", Map.of()))).isEmpty();
+    }
+
+    /** TODO c52eba8f: agentic führt seinen Auftrag in goal — die Regel sah ihn nicht. */
+    @Test
+    void agenticZielMitWoertlichemAbsatzIstDoppelt() {
+        assertThat(apply(PARAGRAPH, block("agentic", "plan", Map.of("goal", "Plane.\n" + PARAGRAPH))))
+                .extracting(AnalyzerFinding::rule).containsExactly("duplicated-instructions");
+    }
+
+    /** Wrapper schicken ihren Befehl nur im KI-Modus mit workflow.instructions an die KI; skill-capability ihren input. */
+    @Test
+    void kiAuftraegeDerWrapperUndDerCapabilityZaehlenNurImKiModus() {
+        List<AnalyzerFinding> out = apply(PARAGRAPH,
+                block("retry", "a", Map.of("command", PARAGRAPH)),
+                block("retry", "b", Map.of("command", PARAGRAPH, "execution_mode", "shell")),
+                block("conditional", "c", Map.of("condition", "x", "else_command", PARAGRAPH)),
+                block("conditional", "d", Map.of("condition", "true", "then_command", PARAGRAPH,
+                        "execution_mode", "shell")),
+                block("skill-capability", "e", Map.of("capability", "analyze", "input", PARAGRAPH)));
+
+        assertThat(out).extracting(AnalyzerFinding::blockName).containsExactly("a", "c", "e");
+    }
+
+    /** Ein Shell-Befehl, die Frage an einen Menschen und ein Schlüssel, den kein Executor liest, gehen nicht an die KI. */
+    @Test
+    void shellBefehlFrageAnMenschenUndUngelesenerSchluesselSindKeinDoppelterAuftrag() {
+        assertThat(apply(PARAGRAPH,
+                block("shell", "a", Map.of("command", "set -e\necho '" + PARAGRAPH + "'")),
+                block("human-input", "b", Map.of("prompt", PARAGRAPH)),
+                block("simple", "c", Map.of("prompt", PARAGRAPH, "command", "Fasse zusammen")))).isEmpty();
     }
 
     @Test
@@ -117,7 +147,7 @@ class HygieneRulesTest {
         List<AnalyzerFinding> out = apply(null,
                 block("simple", "a", Map.of("model", "claude-sonnet-4-5")),
                 block("simple", "b", Map.of("model", "sonnet")),
-                block("simple", "c", Map.of("prompt", "nutze claude-opus-4")));
+                block("simple", "c", Map.of("command", "nutze claude-opus-4")));
 
         assertThat(out).singleElement().satisfies(f -> {
             assertThat(f.rule()).isEqualTo("dated-model-id");
