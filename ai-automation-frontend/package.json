@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:e2e:test": "CYPRESS_TARGET=test vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/check-lazy-chunks.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "cy:open": "cypress open",

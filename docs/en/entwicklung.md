@@ -895,3 +895,4 @@ see the [Cypress migration notes](https://www.cypress.io/blog/cypress-15-made-si
 
 - No offline mode (PWA shell is cached, but API data is not).
 - Monaco Editor is served from the app's own bundle (no CDN, the CSP allows `'self'` only), but the PWA does not precache it — offline, it only opens if the browser has already cached the `monaco` chunk.
+- The `monaco` chunk (and the other lazy chunks: Monaco workers, `TerminalPanel`, `BpmnDiagramView`) loads only when the first editor opens. `npm run build` ends with `scripts/check-lazy-chunks.mjs`: the build fails as soon as one of them appears as a `modulepreload` in `dist/index.html` or is statically imported from the entry — for instance because Rolldown put a shared module such as Vite's preload helper into that chunk (groups and priorities: `codeSplitting` in `vite.config.ts`).
