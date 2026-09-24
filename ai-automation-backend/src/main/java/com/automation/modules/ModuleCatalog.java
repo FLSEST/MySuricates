@@ -48,6 +48,9 @@ public enum ModuleCatalog {
     // ── Advanced: outward-facing ─────────────────────────────────────────────
     INTEGRATIONS("integrations", ADVANCED, STABLE, false, Set.of(CREDENTIALS, NETWORK), List.of(),
             "External services (GitHub, Jira, Trello, Google, Confluence, Taskwarrior): OAuth, integration blocks, TODO tracker export, calendar."),
+    HTTP_API("http-api", ADVANCED, EXPERIMENTAL, false, Set.of(CREDENTIALS, NETWORK), List.of("integrations"),
+            "HTTP API connection: outbound HTTP calls from integration blocks to services you enter yourself "
+                    + "(base URL + optional auth header, several services as named connections)."),
     WEBHOOKS("webhooks", ADVANCED, STABLE, false, Set.of(NETWORK), List.of(),
             "Inbound webhook triggers that start workflows from outside."),
     REMOTE_ACCESS("remote-access", ADVANCED, STABLE, false, Set.of(NETWORK), List.of(),

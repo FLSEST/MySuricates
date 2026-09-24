@@ -149,3 +149,28 @@ describe('Integrations — named connections', () => {
     expect(screen.getByText('Add connection')).toBeInTheDocument();
   });
 });
+
+describe('Integrations — HTTP API provider', () => {
+  it('shows the setup guide with base-URL and auth-header fields', async () => {
+    useProviders([{
+      ...connectedGithub,
+      providerId: 'http-api',
+      displayName: 'HTTP API',
+      icon: 'Globe',
+      status: 'DISCONNECTED',
+      configured: false,
+      requiresCredentials: false,
+      requiresOAuthFlow: false,
+      accountName: null,
+      connectedSince: null,
+      scopes: null,
+      connections: [],
+    }]);
+    renderWithProviders(<Integrations />);
+    fireEvent.click(await screen.findByText('HTTP API'));
+
+    expect(await screen.findByPlaceholderText(/Base URL, e\.g\. https:\/\/api\.example\.com\/v1/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Auth header \(optional\)/)).toHaveAttribute('type', 'password');
+    expect(screen.getByText('Several services: named connections')).toBeInTheDocument();
+  });
+});

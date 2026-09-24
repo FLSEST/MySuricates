@@ -1301,6 +1301,13 @@ export const en = {
           list_events: 'Fetch the events of a public iCal feed in a time range (series not expanded)',
         },
       },
+      'http-api': {
+        displayName: 'HTTP API',
+        description: 'Call any HTTP service by base URL and optional auth header — several services as named connections',
+        actions: {
+          request: 'HTTP request to the connection\'s service → status, content type, answer (JSON or text)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'Sync GitHub issues: list, create, update and comment',

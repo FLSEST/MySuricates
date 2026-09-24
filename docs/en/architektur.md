@@ -91,7 +91,7 @@ Environment form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUT
 |---|---|---|
 | `standard` (all presets) | `dashboard-report` | stable |
 | `research` | `chains`, `assistant`, `learning` (analytics endpoints; dashboard data stays core), `memory`, `audit`, `bpmn` | chains stable, others experimental |
-| `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
+| `advanced` (outward-facing) | `integrations` (incl. TODO tracker export, calendar adapters), `http-api` (general HTTP API connection, requires `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (run terminal over WebSocket), `staging` | stable / staging experimental |
 | `advanced` (low use) | `conversion`, `dialog-import` (requires conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (incl. auto-repair), `wishes` (requires chains) | legacy / experimental |
 | `hardening` | `provenance` (on by default), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimental |
 
@@ -230,7 +230,7 @@ com.automation
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 17 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
+│   ├── integration/providers/ 18 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
@@ -732,7 +732,7 @@ Plugin framework for external services:
 - `IntegrationEncryptionService` — credential encryption (AES-GCM)
 - `IntegrationConnection` entity — connection status (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` with OAuth callback, credentials, actions
-- 17 providers in subdirectories: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
+- 18 providers in subdirectories: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, HttpApi, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
 - `IntegrationBlockExecutor` — executes provider actions as workflow blocks
 - `TaskExportCapable` — interface for providers that support TODO export
 

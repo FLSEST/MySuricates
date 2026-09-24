@@ -1303,6 +1303,13 @@ export const de: TranslationKeys = {
           list_events: 'Termine eines öffentlichen iCal-Feeds im Zeitraum abrufen (Serien nicht expandiert)',
         },
       },
+      'http-api': {
+        displayName: 'HTTP-API',
+        description: 'Beliebige HTTP-Dienste per Basis-URL und optionalem Auth-Header aufrufen — mehrere Dienste als benannte Verbindungen',
+        actions: {
+          request: 'HTTP-Anfrage an den Dienst der Verbindung → Status, Content-Type, Antwort (JSON oder Text)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'GitHub-Issues synchronisieren: auflisten, erstellen, aktualisieren und kommentieren',

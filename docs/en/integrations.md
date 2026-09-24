@@ -120,6 +120,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
 | Slack | `slack` | Bot token `xoxb-…` (no OAuth flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | simulated only |
 | Telegram | `telegram` | Bot token from @BotFather (no OAuth) | `providers/telegram/` | `send_message`, `get_updates` | simulated only |
+| HTTP API | `http-api` | Base URL + optional auth header (no OAuth flow); **own module `http-api`** | `providers/httpapi/` | `request` | verified (httpbin.org) |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -176,6 +177,48 @@ read both calendar sources the same way.
 
 The calendar view shows CalDAV through `caldavAdapter` (all calendars, series already expanded by the
 server). An iCal feed has no adapter because the feed URL is only known inside a workflow.
+### HTTP API Connection (`http-api`)
+
+General connection to an HTTP service you enter yourself (TODO 78fae34c). Own feature module
+**`http-api`** (tier `advanced`, risks network + credentials, requires `integrations`), on in no
+preset except `full`: `AUTOMATION_MODULES_HTTP_API=true` or `automation.modules.http-api: true`.
+While the module is off, `IntegrationRegistry` hides the provider (list, lookup, block), and
+`executeAction` refuses on its own as well — both checked per call, so a runtime switch takes
+effect at once.
+
+- **Credentials:** field 1 = base URL (only `http`/`https`, host required, no `user:pass@`, no
+  `?`/`#`, no `.`/`..` segments, no `|`), field 2 = auth header `Name: Value` (e.g.
+  `Authorization: Bearer …`, `X-API-Key: …`) or empty. Checked on save
+  (`validateCredentialInput` → `400`) without any network call; the account shown is
+  `host/base-path`.
+- **Several services** = several [named connections](#several-connections-per-provider), chosen in
+  the block via `"connection": "weather"`.
+- **Action `request`**, parameters: `method` (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`, default `GET`),
+  `path` (relative to the base URL), `query` (object, a list repeats the name), `headers`
+  (object), `body` (object/array → `application/json`, text → `text/plain`; not with `GET`,
+  at most 1 MiB), `timeout_seconds` (1–120, default 30), `fail_on_error` (default `true`:
+  status ≥ 400 fails the step; `false` returns it as the result).
+- **Result:** `status`, `ok`, `content_type`, `body` (JSON parsed, else text cut to 100,000
+  characters), `truncated`; for 3xx also `location` and `note`. At most 1 MiB of the answer is read.
+
+**Security decisions:**
+
+- *The path stays below the base URL:* rejected are scheme prefixes (`https:`, `javascript:` …),
+  `//host`, backslash, `?`/`#` (query only via `query`), whitespace/control characters and every
+  segment that — also percent-decoded (`%2e%2e`, `%2f`) — is `.` or `..` or contains a slash. The
+  final URI is additionally checked against scheme, host, port and base-path prefix.
+- *No automatic redirects* (`Redirect.NEVER`): a 3xx comes back with `location`, the auth header
+  never goes to another target.
+- *Header injection:* names must be HTTP tokens, values without CR/LF/control characters; the
+  connection's auth header cannot be overridden in the block, hop-by-hop and framing headers
+  (`Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Proxy-Authorization` …) are
+  blocked.
+- *Never hand out the auth header:* stored encrypted, not in logs (only method, host and path are
+  logged), and its value is replaced by `***` in the answer, `location` and error messages — a
+  service that mirrors request headers does not reveal it.
+- *Deliberately open:* targets in your own network (localhost, private addresses) are not blocked —
+  the operator enters the base URL, and such services are often exactly the target. Whoever does
+  not want that keeps the module off.
 
 ### OAuth Endpoints & Scopes per Provider
 

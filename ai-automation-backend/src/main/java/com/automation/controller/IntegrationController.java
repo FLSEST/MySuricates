@@ -121,6 +121,7 @@ public class IntegrationController {
         if (provider.requiresCredentials() && (clientId.isBlank() || clientSecret.isBlank())) {
             throw new IllegalArgumentException("clientId and clientSecret are required");
         }
+        provider.validateCredentialInput(clientId, clientSecret);
         oAuthService.saveCredentials(providerId, name, clientId, clientSecret);
         return toProviderResponse(provider);
     }

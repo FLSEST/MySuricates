@@ -98,7 +98,7 @@ datiert in der Tabelle:
 | Backend | Java 21 / Spring Boot 3.5, rund 73 000 Zeilen, 51 REST-Controller, 86 Flyway-Migrationen |
 | Frontend | React 19 / TypeScript, rund 77 000 Zeilen |
 | Tests | Backend 10 476, Frontend 1 580 (192 Dateien) — 0 Fehler, 0 uebersprungen, CI-Lauf 35777382298 vom 2026-09-22 |
-| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 17 Integrations-Provider |
+| Bausteine | 20 Block-Typen, 66 Workflow-Templates, 20 Blaupausen (Grundgerueste zum Ausfuellen), 19 Built-in Skills, 18 Integrations-Provider |
 
 Die Testzahlen stammen aus dem CI-Lauf zu genau diesem Commit und sind damit nachpruefbar. Die
 CI-Definition (`.github/workflows/ci.yml`) faehrt seit dem 2026-09-12 beide Suiten bei jedem Push,

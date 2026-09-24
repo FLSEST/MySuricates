@@ -26,7 +26,8 @@ public final class VerifiedProviders {
             Map.entry("ical-feed", "öffentlicher Feed: Google-Kalender „Feiertage in Deutschland“"),
             Map.entry("ntfy", "ntfy 2.28.0, lokaler Container (anonym und mit Access-Token)"),
             Map.entry("feed", "Öffentliche Feeds: GitHub-Releases (Atom), tagesschau.de und Hacker News (RSS 2.0), debian.org (RSS 1.0/RDF)"),
-            Map.entry("open-meteo", "Open-Meteo API (forecast + geocoding), echte Abfrage für Zürich")
+            Map.entry("open-meteo", "Open-Meteo API (forecast + geocoding), echte Abfrage für Zürich"),
+            Map.entry("http-api", "httpbin.org (öffentliche HTTP-Test-API): alle fünf Methoden, Query, JSON-/Text-Body, ")
     );
 
     private VerifiedProviders() {

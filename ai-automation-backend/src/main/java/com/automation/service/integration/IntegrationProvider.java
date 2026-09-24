@@ -1,5 +1,7 @@
 package com.automation.service.integration;
 
+import com.automation.modules.ModuleCatalog;
+
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +63,22 @@ public interface IntegrationProvider {
     /** Whether this provider uses the OAuth2 authorization code flow. False = direct API key/token auth. */
     default boolean requiresOAuthFlow() {
         return true;
+    }
+
+    /**
+     * Module this provider needs on top of {@code integrations}, or {@code null}. While it is off,
+     * {@link IntegrationRegistry} treats the provider as absent — checked per call, so a switch at
+     * runtime takes effect at once.
+     */
+    default ModuleCatalog requiredModule() {
+        return null;
+    }
+
+    /**
+     * Checks the two credential fields before they are stored; throw {@link IllegalArgumentException}
+     * (→ 400) for input the provider can never use. Default: accept everything.
+     */
+    default void validateCredentialInput(String clientId, String clientSecret) {
     }
 
     /**

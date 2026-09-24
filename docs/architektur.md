@@ -91,7 +91,7 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 |---|---|---|
 | `standard` (alle Presets) | `dashboard-report` | stabil |
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
-| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
+| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
 | `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `webhook-signatures` | experimentell |
 
@@ -232,7 +232,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 17 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
+│   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
@@ -794,7 +794,7 @@ Plugin-Framework für externe Dienste:
 - `IntegrationEncryptionService` — Verschlüsselung von Credentials (AES-GCM)
 - `IntegrationConnection`-Entity — Verbindungsstatus (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` mit OAuth-Callback, Credentials, Actions
-- 17 Provider in Unterverzeichnissen: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
+- 18 Provider in Unterverzeichnissen: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, HttpApi, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
 - `IntegrationBlockExecutor` — Führt Provider-Aktionen als Workflow-Block aus
 - `TaskExportCapable` — Interface für Provider, die TODO-Export unterstützen
 

@@ -119,6 +119,7 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | Todoist | `todoist` | API-Token (kein OAuth-Flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | nur simuliert |
 | Slack | `slack` | Bot-Token `xoxb-…` (kein OAuth-Flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | nur simuliert |
 | Telegram | `telegram` | Bot-Token von @BotFather (kein OAuth) | `providers/telegram/` | `send_message`, `get_updates` | nur simuliert |
+| HTTP-API | `http-api` | Basis-URL + optionaler Auth-Header (kein OAuth-Flow); **eigenes Modul `http-api`** | `providers/httpapi/` | `request` | geprüft (httpbin.org) |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
@@ -169,6 +170,48 @@ Serien expandiert MySuricates **nicht** selbst. Zeitangaben kommen im Google-For
 
 Die Kalender-Ansicht zeigt CalDAV über `caldavAdapter` (alle Kalender, Serien bereits vom Server expandiert).
 Ein iCal-Feed hat keinen Adapter, weil die Feed-URL erst im Workflow feststeht.
+### HTTP-API-Verbindung (`http-api`)
+
+Allgemeine Verbindung zu einem selbst eingetragenen HTTP-Dienst (TODO 78fae34c). Eigenes
+Feature-Modul **`http-api`** (Stufe `advanced`, Risiken Netzwerk + Zugangsdaten, braucht
+`integrations`), in keinem Preset außer `full` an: `AUTOMATION_MODULES_HTTP_API=true` bzw.
+`automation.modules.http-api: true`. Ist das Modul aus, blendet `IntegrationRegistry` den Provider
+aus (Liste, Lookup, Block), und `executeAction` lehnt zusätzlich selbst ab — beides pro Aufruf
+geprüft, ein Umschalten zur Laufzeit wirkt sofort.
+
+- **Zugangsdaten:** Feld 1 = Basis-URL (nur `http`/`https`, Host Pflicht, kein `user:pass@`, kein
+  `?`/`#`, keine `.`/`..`-Segmente, kein `|`), Feld 2 = Auth-Header `Name: Wert` (z. B.
+  `Authorization: Bearer …`, `X-API-Key: …`) oder leer. Geprüft beim Speichern
+  (`validateCredentialInput` → `400`), ohne Netzwerkaufruf; als Konto erscheint `host/basis-pfad`.
+- **Mehrere Dienste** = mehrere [benannte Verbindungen](#mehrere-verbindungen-je-anbieter), im
+  Block per `"connection": "wetter"`.
+- **Action `request`**, Parameter: `method` (`GET`/`POST`/`PUT`/`PATCH`/`DELETE`, Default `GET`),
+  `path` (relativ zur Basis-URL), `query` (Objekt, Liste wiederholt den Namen), `headers`
+  (Objekt), `body` (Objekt/Array → `application/json`, Text → `text/plain`; nicht bei `GET`,
+  höchstens 1 MiB), `timeout_seconds` (1–120, Default 30), `fail_on_error` (Default `true`:
+  Status ≥ 400 lässt den Step scheitern; `false` liefert ihn als Ergebnis).
+- **Ergebnis:** `status`, `ok`, `content_type`, `body` (JSON geparst, sonst Text, gekürzt auf
+  100 000 Zeichen), `truncated`; bei 3xx zusätzlich `location` und `note`. Gelesen werden
+  höchstens 1 MiB Antwort.
+
+**Sicherheitsentscheidungen:**
+
+- *Pfad bleibt unter der Basis-URL:* abgelehnt werden Schema-Präfixe (`https:`, `javascript:` …),
+  `//host`, Backslash, `?`/`#` (Query nur über `query`), Leer-/Steuerzeichen und jedes Segment,
+  das — auch percent-dekodiert (`%2e%2e`, `%2f`) — `.` oder `..` ist oder einen Schrägstrich
+  enthält. Die fertige URI wird zusätzlich gegen Schema, Host, Port und Basis-Pfad-Präfix geprüft.
+- *Keine automatischen Weiterleitungen* (`Redirect.NEVER`): ein 3xx kommt mit `location` zurück,
+  der Auth-Header geht nie an ein anderes Ziel.
+- *Header-Injection:* Namen müssen HTTP-Tokens sein, Werte ohne CR/LF/Steuerzeichen; der
+  Auth-Header der Verbindung kann im Block nicht überschrieben werden, Hop-by-hop- und
+  Framing-Header (`Host`, `Content-Length`, `Transfer-Encoding`, `Connection`,
+  `Proxy-Authorization` …) sind gesperrt.
+- *Auth-Header nie ausgeben:* verschlüsselt gespeichert, nicht in Logs (geloggt werden nur
+  Methode, Host und Pfad), und sein Wert wird aus Antwort, `location` und Fehlermeldungen durch
+  `***` ersetzt — ein Dienst, der Request-Header zurückspiegelt, verrät ihn nicht.
+- *Bewusst offen:* Ziele im eigenen Netz (localhost, private Adressen) werden nicht gesperrt — die
+  Basis-URL trägt der Betreiber selbst ein, und genau solche Dienste sind oft das Ziel. Wer das
+  nicht will, lässt das Modul aus.
 
 ### OAuth-Endpunkte & Scopes je Provider
 

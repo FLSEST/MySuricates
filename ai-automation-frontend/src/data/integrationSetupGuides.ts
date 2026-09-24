@@ -802,6 +802,73 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'http-api': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Basis-URL, z. B. https://api.example.com/v1', en: 'Base URL, e.g. https://api.example.com/v1' },
+      clientSecretPlaceholder: { de: 'Auth-Header (optional), z. B. Authorization: Bearer …', en: 'Auth header (optional), e.g. Authorization: Bearer …' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Dienst und Zugang klären',
+          en: 'Find the service and its access',
+        },
+        instructions: {
+          de: [
+            'Basis-URL des Dienstes aus seiner API-Doku, nur http:// oder https://, ohne ?Parameter und ohne Benutzer:Passwort@',
+            'Alles, was ein Block aufruft, bleibt unterhalb dieser URL — ein Pfad kann sie nicht verlassen',
+            'Braucht der Dienst einen Schlüssel: den Header so notieren, wie die Doku ihn verlangt, z. B. "Authorization: Bearer <token>" oder "X-API-Key: <key>"',
+            'Öffentliche APIs ohne Schlüssel: Auth-Header leer lassen',
+          ],
+          en: [
+            'Base URL of the service from its API docs, only http:// or https://, without ?parameters and without user:password@',
+            'Everything a block calls stays below this URL — a path cannot leave it',
+            'If the service needs a key: note the header the way its docs ask for it, e.g. "Authorization: Bearer <token>" or "X-API-Key: <key>"',
+            'Public APIs without a key: leave the auth header empty',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Basis-URL in das erste Feld, Auth-Header (Name: Wert) in das zweite',
+            '"Zugangsdaten speichern" prüft nur das Format und sendet noch keine Anfrage',
+            'Der Auth-Header wird verschlüsselt gespeichert, nie angezeigt und aus Antworten des Dienstes entfernt',
+          ],
+          en: [
+            'Base URL in the first field, auth header (Name: Value) in the second',
+            '"Save credentials" only checks the format and sends no request yet',
+            'The auth header is stored encrypted, never shown, and scrubbed from the service\'s answers',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Mehrere Dienste: benannte Verbindungen',
+          en: 'Several services: named connections',
+        },
+        instructions: {
+          de: [
+            'Jeder weitere Dienst ist eine eigene Verbindung: unter „Verbindungen“ → „Weitere Verbindung“, Name z. B. "wetter"',
+            'Im integration-Block wählt "connection" den Dienst: {"provider": "http-api", "action": "request", "connection": "wetter", "params": {"path": "forecast", "query": {"city": "Berlin"}}}',
+            'Parameter von "request": method (GET/POST/PUT/PATCH/DELETE), path, query, headers, body, timeout_seconds, fail_on_error',
+            'Weiterleitungen (3xx) werden nicht verfolgt; die Antwort nennt das Ziel unter "location"',
+          ],
+          en: [
+            'Each further service is its own connection: under "Connections" → "Add connection", name e.g. "weather"',
+            'In the integration block "connection" picks the service: {"provider": "http-api", "action": "request", "connection": "weather", "params": {"path": "forecast", "query": {"city": "Berlin"}}}',
+            'Parameters of "request": method (GET/POST/PUT/PATCH/DELETE), path, query, headers, body, timeout_seconds, fail_on_error',
+            'Redirects (3xx) are not followed; the answer names the target under "location"',
+          ],
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {

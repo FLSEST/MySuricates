@@ -395,6 +395,24 @@ class IntegrationControllerTest {
     }
 
     @Test
+    void saveCredentials_letsTheProviderRejectUnusableInput() throws Exception {
+        IntegrationProvider provider = provider("http-api");
+        when(registry.getProvider("http-api")).thenReturn(provider);
+        doThrow(new IllegalArgumentException("Base URL must start with http:// or https://"))
+                .when(provider).validateCredentialInput("ftp://x", "");
+
+        mockMvc.perform(post("/api/v1/integrations/http-api/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clientId":"ftp://x","clientSecret":""}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+        org.mockito.Mockito.verify(oAuthService, org.mockito.Mockito.never())
+                .saveCredentials(any(), any(), any(), any());
+    }
+
+    @Test
     void invalidConnectionName_isRejectedBeforeAnyServiceCall() throws Exception {
         mockMvc.perform(delete("/api/v1/integrations/google-calendar/connection").param("connection", "../Work"))
                 .andExpect(status().isBadRequest())
