@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.WishRespondRequest;
 import com.automation.dto.response.WishResponse;
 import com.automation.entity.Wish;
@@ -8,6 +7,7 @@ import com.automation.entity.WishStatus;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WishMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.wish.WishService;

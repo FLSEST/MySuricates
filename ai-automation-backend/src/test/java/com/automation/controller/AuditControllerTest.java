@@ -1,8 +1,8 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditSeverity;

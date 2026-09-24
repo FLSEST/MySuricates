@@ -1,12 +1,12 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.OnboardingProfileResponse;
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.OnboardingProfileMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.project.OnboardingProfileService;
 import com.automation.service.system.ApiKeyService;

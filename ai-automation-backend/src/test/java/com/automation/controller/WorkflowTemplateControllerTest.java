@@ -1,11 +1,11 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowTemplateResponse;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowTemplateMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.TemplateVerificationService;
 import com.automation.service.workflow.WorkflowTemplateService;

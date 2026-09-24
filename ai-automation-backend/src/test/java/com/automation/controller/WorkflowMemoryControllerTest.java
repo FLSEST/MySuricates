@@ -1,12 +1,12 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.ExtractMemoryRequest;
 import com.automation.dto.request.UpdateMemoryRequest;
 import com.automation.dto.response.WorkflowMemoryResponse;
 import com.automation.entity.WorkflowMemory;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowMemoryMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.ObjectMapper;

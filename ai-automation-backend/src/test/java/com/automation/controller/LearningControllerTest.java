@@ -1,10 +1,10 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.DashboardResponse;
 import com.automation.dto.response.PlatformStatsResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.learning.LearningService;
 import com.automation.service.learning.PlatformStatsService;
 import com.automation.service.system.ApiKeyService;

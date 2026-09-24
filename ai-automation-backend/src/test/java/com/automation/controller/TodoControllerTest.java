@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.PageResponse;
@@ -11,6 +10,7 @@ import com.automation.entity.Todo;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.TodoMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.todo.TodoService;
 import com.fasterxml.jackson.databind.ObjectMapper;

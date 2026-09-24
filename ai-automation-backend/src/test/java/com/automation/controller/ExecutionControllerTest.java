@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
@@ -9,6 +8,7 @@ import com.automation.exception.ErrorCode;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.execution.PendingInputService;

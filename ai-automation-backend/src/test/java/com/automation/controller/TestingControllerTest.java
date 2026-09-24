@@ -1,12 +1,12 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.SyncDefinitionsRequest;
 import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncPreviewItem;
 import com.automation.dto.response.SyncResult;
 import com.automation.dto.response.TestingStatusResponse;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.staging.TestingService;
 import com.automation.service.system.ApiKeyService;

@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.BrokenWorkflowResponse;
 import com.automation.entity.RunStatus;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.execution.WorkflowDebugService;
 import com.automation.service.system.ApiKeyService;

@@ -1,11 +1,11 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.DashboardLayoutVersionListItem;
 import com.automation.entity.DashboardLayoutVersion;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.DashboardLayoutVersionMapperImpl;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardLayoutVersionService;
 import com.automation.service.dashboard.DashboardLayoutVersionService.SaveResult;

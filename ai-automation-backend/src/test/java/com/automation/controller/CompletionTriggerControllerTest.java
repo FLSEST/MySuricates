@@ -1,11 +1,11 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateCompletionTriggerRequest;
 import com.automation.dto.response.CompletionTriggerResponse;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.CompletionTriggerMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.trigger.CompletionTriggerService;

@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.AssistantService;
 import com.automation.service.AssistantSessionService;
 import com.automation.service.PageSuggestionService;

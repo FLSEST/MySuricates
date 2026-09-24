@@ -1,12 +1,12 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.exception.ErrorCode;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ModuleChangeException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleOverrideService;
 import com.automation.modules.ModuleRegistry;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;

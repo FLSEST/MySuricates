@@ -1,4 +1,4 @@
-package com.automation.config;
+package com.automation.security;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

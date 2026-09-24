@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.DashboardWorkflowResultResponse;
 import com.automation.dto.response.DashboardWorkflowResultResponse.Result;
 import com.automation.dto.response.DashboardWorkflowResultResponse.ResultState;
@@ -8,6 +7,7 @@ import com.automation.dto.response.DashboardWorkflowResultResponse.RunSummary;
 import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardWorkflowService;
 import com.automation.service.system.ApiKeyService;

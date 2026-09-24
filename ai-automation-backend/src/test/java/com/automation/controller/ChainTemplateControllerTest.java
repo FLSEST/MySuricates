@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.entity.ChainEntry;
 import com.automation.entity.WorkflowChain;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.BuiltInChainTemplate;
 import com.automation.service.chain.ChainTemplateService;
