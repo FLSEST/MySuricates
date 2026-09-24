@@ -24,12 +24,12 @@ Nur ausprobieren — dafuer braucht es nur Docker:
 
 ```bash
 git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
-scripts/tryout.sh build          # baut das Image aus dem neuesten Release, beim ersten Mal etwa 8 Minuten
+scripts/tryout.sh build          # baut das Image aus dem neuesten Release, beim ersten Mal einige Minuten
 scripts/tryout.sh start          # http://localhost:9095 — die Ausgabe zeigt den API-Key fuer die Anmeldung
 scripts/tryout.sh login claude   # optional, fuer KI-Bloecke; ebenso codex oder pi
 ```
 
-Ein fertiges Image in einer Registry gibt es nicht, `build` baut lokal aus dem Repository. Der
+Das Repository veroeffentlicht kein fertiges Image, `build` baut lokal aus dem Repository. Der
 Container bindet nichts vom Rechner ein — keine Ordner, keine Anmeldungen; die KI-Anmeldung bleibt
 in einem eigenen Docker-Volume. Dauerhaft einrichten: [Installation](#installation) weiter unten
 oder Schritt fuer Schritt in [Getting Started](docs/GETTING-STARTED.md).
