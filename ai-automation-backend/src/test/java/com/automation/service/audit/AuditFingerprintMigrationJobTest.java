@@ -333,6 +333,26 @@ class AuditFingerprintMigrationJobTest {
      * muss die neue Schreibweise wirklich in der DB landen — im Zwillingsfall traegt der
      * ueberlebende Datensatz den kanonischen Key ohnehin, dort beweist nichts die Schreibung.
      */
+    /**
+     * v3 (94fda6ef): Ein {@code <art>:<wert>}-Finding trug bisher den Fingerprint von {@code <art>};
+     * nach der Migration hat es genau den, den der naechste Ingest bildet — sonst entstuende ein
+     * Wiedergaenger und das Altfinding fiele auf RESOLVED.
+     */
+    @Test
+    void rehashesAKindPrefixedSubjectOntoItsFullIdentity() {
+        String subject = "package:com.automation.controller";
+        AuditFinding kindPrefixed = saveFinding(subject, AuditFindingStatus.OPEN, 1, T1, T1, reportOld, "run-old");
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        AuditFinding stored = findingRepository.findById(kindPrefixed.getId()).orElseThrow();
+        assertThat(stored.getFingerprint())
+                .isEqualTo(AuditIngestionService.fingerprint(projectId, AUDIT_KEY, RULE_KEY, subject))
+                .isNotEqualTo(AuditIngestionService.fingerprint(projectId, AUDIT_KEY, RULE_KEY, "package"));
+    }
+
     @Test
     void writesTheCatalogueKeyAndFingerprintOfALoneDriftedFinding() {
         String subject = "service/workflow/RunAdmission.java";

@@ -1,5 +1,7 @@
 package com.automation.service.audit;
 
+import java.util.regex.Pattern;
+
 /**
  * Normalisiert das modellgenerierte {@code subject} eines Audit-Findings, damit der Fingerprint
  * nicht bei jedem Run driftet (Audit-TODO 0e19648d). Beobachtete Drift: {@code ContainerShellService}
@@ -7,7 +9,12 @@ package com.automation.service.audit;
  *
  * <p>Reine Funktion, bewusst konservativ:
  * <ul>
- *   <li>alles ab dem ersten {@code :} faellt weg (Schluessel, Zeilennummer),</li>
+ *   <li>steht vor dem ersten {@code :} ein klein geschriebenes Art-Wort ({@code package},
+ *       {@code keyword}, {@code safe-inventory}), ist {@code <art>:<wert>} die Identitaet und bleibt
+ *       ganz — sonst fielen {@code package:a} und {@code package:b} zusammen und die Ingestion verwarf
+ *       den zweiten Befund (TODO 94fda6ef),</li>
+ *   <li>sonst (Datei, Klasse, Pfad vor dem {@code :}) faellt alles ab dem ersten {@code :} weg
+ *       (Schluessel, Zeilennummer),</li>
  *   <li>ein Suffix hinter dem letzten {@code .} faellt weg, wenn es klein beginnt (Methode) und das
  *       Segment davor gross beginnt (Klassenname) — {@code application.yml} bleibt also ganz,</li>
  *   <li>Subjects mit {@code /} sind Pfade und bleiben unangetastet,</li>
@@ -16,6 +23,9 @@ package com.automation.service.audit;
  * Die Funktion ist idempotent: {@code normalize(normalize(x)).equals(normalize(x))}.
  */
 public final class AuditSubjectNormalizer {
+
+    /** Art-Wort vor dem Doppelpunkt: klein, ohne Punkt und Schraegstrich (also keine Datei, keine Klasse). */
+    private static final Pattern KIND = Pattern.compile("[a-z][a-z0-9-]*");
 
     private AuditSubjectNormalizer() {
     }
@@ -27,7 +37,11 @@ public final class AuditSubjectNormalizer {
         String value = subject.trim();
         int colon = value.indexOf(':');
         if (colon >= 0) {
-            value = value.substring(0, colon).trim();
+            String head = value.substring(0, colon).trim();
+            if (KIND.matcher(head).matches()) {
+                return head + ":" + value.substring(colon + 1).trim();
+            }
+            value = head;
         }
         if (value.isEmpty() || value.indexOf('/') >= 0) {
             return value;
