@@ -27,6 +27,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 . "$LIB/netaddr.sh"
 # shellcheck source=lib/instance-runs.sh
 . "$LIB/instance-runs.sh"
+# shellcheck source=lib/setup-kept.sh
+. "$LIB/setup-kept.sh"    # eine vorhandene Instanz-Datei, die bleibt: ihre Werte gelten (fd4eb89f)
 # shellcheck source=lib/host-mounts.sh
 . "$LIB/host-mounts.sh"   # claude_token_from_file / claude_token_plausible — dieselbe Regel wie beim Start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
@@ -175,11 +177,12 @@ step_mode() {
     rc=$?; [ "$rc" = 0 ] || return "$rc"
     case "$choice" in 0) MODE=one; RUNTIME=container ;; 1) MODE=one; RUNTIME=host ;; 2) MODE=staged; RUNTIME=container ;; esac
   fi
+  kept_load
   MODE="${MODE:-one}"; RUNTIME="${RUNTIME:-container}"; [ "$MODE" = staged ] && RUNTIME=container
   case "$MODE:$RUNTIME" in
-    one:container) tui_done "$(msg step_mode)" "$(msg mode_container)" ;;
-    one:host) tui_done "$(msg step_mode)" "$(msg mode_host)" ;;
-    staged:*) tui_done "$(msg step_mode)" "$(msg mode_staged)" ;;
+    one:container) tui_done "$(msg step_mode)" "$(msg mode_container)$(kept_mark)" ;;
+    one:host) tui_done "$(msg step_mode)" "$(msg mode_host)$(kept_mark)" ;;
+    staged:*) tui_done "$(msg step_mode)" "$(msg mode_staged)$(kept_mark)" ;;
   esac
   return 0
 }
@@ -289,7 +292,7 @@ docker_ready() {
 step_modules() {
   local choice rc items key tier on sel hard label=""
   section 3
-  if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)"; return 0; fi
+  if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
   CUSTOM_LINES=""
   if [ -z "$PRESET" ] && [ "$INTERACTIVE" = 1 ]; then
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" 0 \
@@ -336,7 +339,7 @@ step_modules() {
     CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=true
 "
   done
-  tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}"
+  tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}$(kept_mark modules)"
   return 0
 }
 
@@ -381,7 +384,7 @@ EOF
       eval "PROVIDER=\"\${$((choice + 1))}\""
     fi
   fi
-  tui_done "$(msg step_ai)" "$PROVIDER"
+  tui_done "$(msg step_ai)" "${AI_LABEL:-$PROVIDER}$(kept_mark)"
   ai_container
 }
 
@@ -403,7 +406,7 @@ ai_container() {
   fi
   present="$(providers_status | awk '$2=="present"{print $1}')"
   all_present="$(echo $present)"
-  if [ -z "$AI_PROVIDERS" ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
+  if [ -z "$AI_PROVIDERS" ] && [ "$KEPT" = 0 ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
     items=()
     for id in $present; do items[${#items[@]}]="on:$id:$id"; done
     tui_checklist sel "$(msg ai_providers_q)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
@@ -412,7 +415,7 @@ ai_container() {
   fi
   ai_claude_token
   ai_env_only_hints
-  tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}"
+  tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}$(kept_mark)"
   return 0
 }
 
@@ -525,8 +528,10 @@ step_ports() {
   local p
   section 5
   if [ "$MODE" = staged ]; then
-    P_DEV="$(free_port 9090)"; P_TEST="$(free_port 8090 "$P_DEV")"; P_PROD="$(free_port 9091 "$P_DEV $P_TEST")"
-    tui_done "$(msg step_ports)" "Dev $P_DEV · Test $P_TEST · Prod $P_PROD"
+    # Ports behaltener Dateien stehen fest — die uebrigen weichen ihnen aus (fd4eb89f)
+    p="$(for n in dev test prod; do is_kept "$n" && kept_value "$n" MYSURICATES_PORT; done | tr '\n' ' ')"
+    P_DEV="$(kept_port dev 9090 "$p")"; P_TEST="$(kept_port test 8090 "$p $P_DEV")"; P_PROD="$(kept_port prod 9091 "$p $P_DEV $P_TEST")"
+    tui_done "$(msg step_ports)" "Dev $P_DEV · Test $P_TEST · Prod $P_PROD$(kept_mark)"
     return 0
   fi
   if [ -z "$PORT" ]; then
@@ -538,7 +543,7 @@ step_ports() {
     PROJECTS="$(cd "$REPO_ROOT/.." && pwd)"
     [ "$INTERACTIVE" = 1 ] && tui_input PROJECTS "$(msg projects_q)" "$PROJECTS"
   fi
-  tui_done "$(msg step_ports)" "$PORT${PROJECTS:+ · $PROJECTS}"
+  tui_done "$(msg step_ports)" "$PORT${PROJECTS:+ · $PROJECTS}$(kept_mark)"
   return 0
 }
 

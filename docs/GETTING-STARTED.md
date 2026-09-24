@@ -175,6 +175,9 @@ Eigene Workflows baut man danach am besten mit dem
 ## 4. Einstellungen später ändern
 
 `./scripts/setup.sh` erneut starten → **Einstellungen ändern** (Port, Module, KI-Anbieter).
+Mit `--yes` und ohne `--reconfigure` bleibt eine vorhandene Instanz-Datei, wie sie ist: Die Schritte
+zeigen dann ihre Werte („aus deploy/instances/main.env“), und Flags, die dagegen nicht wirken, nennt
+der Installer; `--reconfigure` schreibt die Datei neu.
 Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu starten
 (`scripts/instance.sh down --name main`, dann `up --name main`):
 

@@ -171,9 +171,11 @@ Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to yo
 
 ## 4. Change settings later
 
-Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). Or edit
-`deploy/instances/main.env` and restart the instance (`scripts/instance.sh down --name main`, then
-`up --name main`):
+Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). With `--yes` and
+without `--reconfigure`, an existing instance file stays as it is: the steps then show its values
+("from deploy/instances/main.env"), and the installer names flags that do not apply against it;
+`--reconfigure` rewrites the file. Or edit `deploy/instances/main.env` and restart the instance
+(`scripts/instance.sh down --name main`, then `up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with

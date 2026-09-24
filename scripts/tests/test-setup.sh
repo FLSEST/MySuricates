@@ -189,6 +189,51 @@ check "kept without --reconfigure"                      '[ "$(run --yes --dry-ru
 check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
 check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
 
+echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
+# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
+# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
+step() {  # LABEL — was hinter „✓ LABEL“ steht; tui_done fuellt LABEL auf 10 Zeichen auf
+  local pre
+  pre="$1$(printf "%$(( ${#1} < 10 ? 11 - ${#1} : 1 ))s" "")"
+  out | sed -n "s/^ *[^ ]* $pre\\(.*\\)\$/\\1/p" | tail -n 1
+}
+rm -rf "$INST"; mkdir -p "$INST"
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' > "$INST/main.env"
+cp "$INST/main.env" "$TMP/kept.env"
+check "kept: exit 0, the file stays as it was"          '[ "$(run --yes --dry-run)" = 0 ] && cmp -s "$INST/main.env" "$TMP/kept.env"'
+check "ports: the port of the file, marked"             '[ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
+check "AI: the provider of the file, marked"            '[ "$(step AI)" = "pi · from deploy/instances/main.env" ]'
+check "mode and modules: from the file, marked"         '[ "$(step Mode)" = "One instance — on this machine · from deploy/instances/main.env" ] && [ "$(step Modules)" = "full · from deploy/instances/main.env" ]'
+check "the login hint names the provider of the file"   'out | grep -qF "Log in to pi before the first AI workflow"'
+check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -qF "not used: --runtime container, --port 9555, --provider codex" && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
+check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep -q "not used"'
+cp "$TMP/kept.env" "$INST/main.env"
+check "German: aus der Datei"                           '[ "$(run --yes --dry-run --lang de)" = 0 ] && [ "$(step Ports)" = "9777 · aus deploy/instances/main.env" ]'
+printf 'MYSURICATES_PORT=19730\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_PROJECTS=/srv/projekte\n' > "$INST/main.env"
+check "container file: access and projects from it"     '[ "$(run --yes --dry-run)" = 0 ] && [ "$(step "AI in the container")" = "programs · from deploy/instances/main.env" ] && [ "$(step Ports)" = "19730 · /srv/projekte · from deploy/instances/main.env" ]'
+if command -v python3 >/dev/null 2>&1; then
+  # Der Fall aus dem TODO: die eigene laufende Instanz belegt den Port der Datei
+  LP="$(firstfree 19740)"
+  ( python3 -c "import socket,time; s=socket.socket(); s.bind(('127.0.0.1', $LP)); s.listen(1); time.sleep(60)" >/dev/null 2>&1 & echo $! > "$TMP/listener.pid" )
+  for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$LP") 2>/dev/null && break; sleep 0.05; done
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$LP" > "$INST/main.env"
+  check "own instance on the port: no 'is in use — taking'" '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep -q "is in use" && [ "$(step Ports)" = "$LP · from deploy/instances/main.env" ]'
+  kill "$(cat "$TMP/listener.pid")" 2>/dev/null
+else
+  echo "  skip (no python3 for a listener)"
+fi
+rm -rf "$INST"; mkdir -p "$INST"
+for f in dev:19710 test:19711 prod:19712; do printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=%s\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' "${f#*:}" > "$INST/${f%%:*}.env"; done
+check "staged, all kept: ports from the files, marked"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(step Ports)" = "Dev 19710 · Test 19711 · Prod 19712 · files kept: dev, test, prod" ]'
+check "staged, all kept: AI from the files"             '[ "$(step AI)" = "pi · files kept: dev, test, prod" ]'
+printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=19711\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' > "$INST/test.env"
+check "staged, differing providers: each named; flags not used are named" '[ "$(run --yes --dry-run --mode staged --provider claude)" = 0 ] && [ "$(step AI)" = "dev pi · test codex · prod pi · files kept: dev, test, prod" ] && out | grep -qF "Keeping deploy/instances/{dev,test,prod}.env — not used: --provider claude"'
+rm -f "$INST/test.env"
+T2="$(firstfree 8090 "19710 19712")"
+check "staged, one new: its port avoids the kept ones"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(val test MYSURICATES_PORT)" = "$T2" ] && [ "$(step Ports)" = "Dev 19710 · Test $T2 · Prod 19712 · files kept: dev, prod" ]'
+check "staged, one new: the provider goes into the new file" '[ "$(val test AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(step AI)" = "codex · files kept: dev, prod" ]'
+rm -rf "$INST"
+
 echo "8) language"
 rm -rf "$INST"
 run --yes --dry-run --runtime host >/dev/null

@@ -143,6 +143,11 @@ M_runs_kept_outdated="%s keeps running state %s, not restarted (the clone is at 
 M_runs_unchecked="%s: running workflow runs could not be checked (no answer or no API key) — going ahead as before"
 M_dry_run="(dry run) would run: %s"
 M_kept_existing="Keeping the existing %s (--reconfigure rewrites it)"
+# A kept instance file: its values count, the steps say so (fd4eb89f)
+M_kept_from="from %s"
+M_kept_into="written into %s"
+M_kept_files="files kept: %s"
+M_kept_ignored="Keeping %s — not used: %s (--reconfigure applies them)"
 M_done_open="→  %s"
 M_done_network="→  %s   (from the network)"
 M_done_network_unknown="→  http://<address of this machine>:%s   (from the network; address not found)"
@@ -175,7 +180,7 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)
   --lang de                    Deutsch (default English)
-  --reconfigure                rewrite an existing instance file
+  --reconfigure                rewrite an existing instance file (otherwise it stays, its values count)
   --preset core --force        in an existing setup change only the preset
   --dry-run                    install, build and start nothing — only show and write the files
   --show-key                   show the full API key at the end (default: masked)

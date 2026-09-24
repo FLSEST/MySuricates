@@ -142,6 +142,11 @@ M_runs_kept_outdated="%s läuft weiter mit Stand %s, nicht neu gestartet (der Kl
 M_runs_unchecked="%s: laufende Workflow-Runs nicht prüfbar (keine Antwort oder kein API-Key) — weiter wie bisher"
 M_dry_run="(Probelauf) würde ausführen: %s"
 M_kept_existing="Vorhandene %s bleibt (--reconfigure schreibt sie neu)"
+# Eine behaltene Instanz-Datei: ihre Werte gelten, die Schritte sagen es (fd4eb89f)
+M_kept_from="aus %s"
+M_kept_into="in %s eingetragen"
+M_kept_files="Dateien bleiben: %s"
+M_kept_ignored="%s bleibt — nicht übernommen: %s (--reconfigure übernimmt sie)"
 M_done_open="→  %s"
 M_done_network="→  %s   (aus dem Netz)"
 M_done_network_unknown="→  http://<Adresse dieses Rechners>:%s   (aus dem Netz; Adresse nicht ermittelbar)"
@@ -174,7 +179,7 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)
   --lang de                    Deutsch (Default Englisch)
-  --reconfigure                vorhandene Instanz-Datei neu schreiben
+  --reconfigure                vorhandene Instanz-Datei neu schreiben (sonst bleibt sie, ihre Werte gelten)
   --preset core --force        in einer vorhandenen Einrichtung nur das Preset ändern
   --dry-run                    nichts installieren, bauen oder starten — nur zeigen und Dateien schreiben
   --show-key                   API-Key am Ende vollständig zeigen (Default: maskiert)
