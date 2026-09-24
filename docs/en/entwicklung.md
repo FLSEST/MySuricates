@@ -28,7 +28,8 @@ Docker is only needed for container-execution workflow blocks — the backend bo
 # From the repo root — builds a fat JAR, copies it to ~/.local/state/autotrigger-dev/runtime/
 # and starts it from there (port 9090). Idempotent; also starts the frontend.
 scripts/start-autotrigger-dev.sh            # start
-scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build JAR → start
+scripts/start-autotrigger-dev.sh restart    # apply code changes: stop → build JAR → start;
+                                            # also starts Vite if it is missing (e.g. after a terminal crash)
 scripts/start-autotrigger-dev.sh stop
 
 # Runtime: host (default) or container — the same commands (TODO a1236a64)
