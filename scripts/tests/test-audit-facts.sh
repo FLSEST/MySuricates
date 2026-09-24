@@ -8,7 +8,9 @@
 #   1. der Faktenblatt-Block misst die Groessen wirklich (Fixture mit bekannten Zahlen),
 #   2. er markiert nicht Messbares als "NICHT GEMESSEN" statt zu raten,
 #   3. der Gate-Block faellt auf RED/audit-invalid, sobald eine Pflicht-FAKT-Zeile fehlt —
-#      ohne diese Pruefung waere ein gruener KI-Report ohne Messwerte moeglich.
+#      ohne diese Pruefung waere ein gruener KI-Report ohne Messwerte moeglich. Sonst folgt
+#      er der letzten gate_status-Zeile des Reports selbst ({{ block.report.output }}, seit
+#      25ed5f84; die Kurzfassung "Ergebnis erklaeren" gibt es nicht mehr).
 #
 # Run: bash scripts/tests/test-audit-facts.sh   (exit 0 = alle Checks ok)
 set -uo pipefail
@@ -194,12 +196,6 @@ npm run lint: exit 1
 
 ✖ 4 problems (1 error, 3 warnings)
 TXT
-cat > "$TMP/metrics-out.txt" <<'TXT'
-  CODE-METRIKEN
-Backend: 4 Sources, 1 Tests (25.0%)
-found 0 vulnerabilities
-Backend: UP
-TXT
 : > "$TMP/empty.txt"
 
 report_prompt "$HEALTH" "$TMP/health-prompt.txt"
@@ -225,8 +221,7 @@ REQMETRICS
 VALUES="$(json_values execution_path="$TMP/base.txt" \
   block.backend_tests.output="$TMP/tests-out.txt" \
   block.frontend_build.output="$TMP/build-out.txt" \
-  block.frontend_lint.output="$TMP/lint-out.txt" \
-  block.metrics.output="$TMP/metrics-out.txt")"
+  block.frontend_lint.output="$TMP/lint-out.txt")"
 render "$HEALTH" name:facts "$VALUES" > "$TMP/health-facts.sh" 2> "$TMP/health-facts-render.err"
 check "Faktenblatt-Block 'facts' extrahierbar" '[ -s "$TMP/health-facts.sh" ]'
 bash "$TMP/health-facts.sh" > "$TMP/health-facts.out" 2> "$TMP/health-facts.err"
@@ -244,7 +239,6 @@ check "FAKT frontend_lint_exit: 1"           'grep -qx "FAKT frontend_lint_exit:
 check "FAKT frontend_lint_errors: 1"         'grep -qx "FAKT frontend_lint_errors: 1" "$TMP/health-facts.out"'
 check "FAKT frontend_lint_warnings: 3"       'grep -qx "FAKT frontend_lint_warnings: 3" "$TMP/health-facts.out"'
 check "FAKT backend_sources: 4"              'grep -qx "FAKT backend_sources: 4" "$TMP/health-facts.out"'
-check "FAKT files_over_300: 1"               'grep -qx "FAKT files_over_300: 1" "$TMP/health-facts.out"'
 
 # TODO c0cf21db: RunCompletionHandler parst jeden Step, der kein derivedOutput ist. Echot das
 # Faktenblatt fremde Gate-Marker weiter, bekommt der facts-Step einen zweiten Gate-Eintrag mit
@@ -260,9 +254,11 @@ check "der Rohlog-Anhang bleibt trotzdem vorhanden" \
   'grep -q "^## ROHLOG backend_tests" "$TMP/health-facts.out"'
 check "und traegt weiter die echten Logzeilen" \
   'grep -q "Surefire: 7 Tests" "$TMP/health-facts.out"'
-check "FAKT frontend_bundle_js_bytes: 4096"  'grep -qx "FAKT frontend_bundle_js_bytes: 4096" "$TMP/health-facts.out"'
-check "FAKT backend_actuator_status: UP"     'grep -qx "FAKT backend_actuator_status: UP" "$TMP/health-facts.out"'
-check "FAKT npm_audit gemessen"              'grep -q "^FAKT npm_audit: .*vulnerabilities" "$TMP/health-facts.out"'
+# Die Actuator-Sonde fragt die echte Instanz: lokal meist UP, in CI (kein Backend) NICHT ERREICHBAR.
+# Welcher Wert, haengt an der Umgebung — dass es genau eine Zeile mit einem Statuscode gibt, nicht.
+check "Actuator-Zeile genau einmal mit gueltigem Wert" \
+  '[ "$(grep -c "^FAKT backend_actuator_status: " "$TMP/health-facts.out")" -eq 1 ] \
+     && grep -qxE "FAKT backend_actuator_status: ([A-Z][A-Z_]*|NICHT ERREICHBAR)" "$TMP/health-facts.out"'
 check "FAKT docs_files: 1"                   'grep -qx "FAKT docs_files: 1" "$TMP/health-facts.out"'
 check "Pflichtfeld-Liste im Blatt"           'grep -q "^PFLICHT-FAKTEN: " "$TMP/health-facts.out"'
 
@@ -271,11 +267,18 @@ check "step_duration_seconds als Luecke" \
   'grep -q "^NICHT GEMESSEN: step_duration_seconds (" "$TMP/health-facts.out"'
 check "Architektur-Kopplung als Luecke" \
   'grep -q "^NICHT GEMESSEN: architecture_coupling (" "$TMP/health-facts.out"'
+# Seit 25ed5f84 misst der Health-Check nur Build, Tests, Doku und Laufzeit: Dateigroessen
+# (Architektur-Review), Bundle (Performance-Audit) und npm audit (Security-Audit) stehen als
+# Luecke mit Grund im Blatt, damit die KI sie nicht aus dem Gedaechtnis auffuellt.
+for GAP in files_over_300 frontend_bundle_js_bytes npm_audit; do
+  check "$GAP als Luecke mit Grund" 'grep -qE "^NICHT GEMESSEN: $GAP \(.+\)$" "$TMP/health-facts.out"'
+done
+check "keine Groessen-, Bundle- oder npm-audit-Messwerte mehr" \
+  '! grep -qE "^FAKT (files_over_300|files_over_500|max_file_lines|frontend_bundle_[a-z_]+|npm_audit):" "$TMP/health-facts.out"'
 EMPTY_VALUES="$(json_values execution_path="$TMP/base.txt" \
   block.backend_tests.output="$TMP/empty.txt" \
   block.frontend_build.output="$TMP/empty.txt" \
-  block.frontend_lint.output="$TMP/empty.txt" \
-  block.metrics.output="$TMP/empty.txt")"
+  block.frontend_lint.output="$TMP/empty.txt")"
 render "$HEALTH" name:facts "$EMPTY_VALUES" > "$TMP/health-facts-empty.sh"
 bash "$TMP/health-facts-empty.sh" > "$TMP/health-facts-empty.out" 2> "$TMP/health-facts-empty.err"
 check "ohne Messbloecke: kein erfundener Exit-Code" \
@@ -289,33 +292,45 @@ check "ohne Messbloecke: keine stille Null bei tsc" \
      && grep -q "^NICHT GEMESSEN: frontend_tsc_errors (" "$TMP/health-facts-empty.out"'
 check "ohne Messbloecke laeuft ohne stderr" '[ ! -s "$TMP/health-facts-empty.err" ]'
 
-# Abgebrochener metrics-Block: seine erste Zeile beginnt ebenfalls mit "Backend: ", enthaelt aber
-# Quellzahlen statt eines Actuator-Status. Ein freies "tail -1" wuerde daraus einen Gesundheits-
-# status erfinden — hier muss eine Luecke stehen.
-printf '  CODE-METRIKEN\nBackend: 767 Sources, 723 Tests (94.3%%)\n' > "$TMP/metrics-abbruch.txt"
-ABBRUCH_VALUES="$(json_values execution_path="$TMP/base.txt" \
-  block.backend_tests.output="$TMP/tests-out.txt" \
-  block.frontend_build.output="$TMP/build-out.txt" \
-  block.frontend_lint.output="$TMP/lint-out.txt" \
-  block.metrics.output="$TMP/metrics-abbruch.txt")"
-render "$HEALTH" name:facts "$ABBRUCH_VALUES" > "$TMP/health-facts-abbruch.sh"
-bash "$TMP/health-facts-abbruch.sh" > "$TMP/health-facts-abbruch.out" 2>/dev/null
-check "abgebrochener metrics-Block: kein erfundener Status" \
-  '! grep -q "^FAKT backend_actuator_status: " "$TMP/health-facts-abbruch.out"'
-check "abgebrochener metrics-Block: Luecke benannt" \
-  'grep -q "^NICHT GEMESSEN: backend_actuator_status (" "$TMP/health-facts-abbruch.out"'
-check "abgebrochener metrics-Block: npm_audit ebenfalls Luecke" \
-  'grep -q "^NICHT GEMESSEN: npm_audit (" "$TMP/health-facts-abbruch.out"'
-printf 'Backend: DOWN\n' > "$TMP/metrics-down.txt"
-DOWN_VALUES="$(json_values execution_path="$TMP/base.txt" \
-  block.backend_tests.output="$TMP/tests-out.txt" \
-  block.frontend_build.output="$TMP/build-out.txt" \
-  block.frontend_lint.output="$TMP/lint-out.txt" \
-  block.metrics.output="$TMP/metrics-down.txt")"
-render "$HEALTH" name:facts "$DOWN_VALUES" > "$TMP/health-facts-down.sh"
-bash "$TMP/health-facts-down.sh" > "$TMP/health-facts-down.out" 2>/dev/null
-check "Statuswert DOWN wird uebernommen" \
-  'grep -qx "FAKT backend_actuator_status: DOWN" "$TMP/health-facts-down.out"'
+# Laufzeitstatus kommt seit 25ed5f84 direkt aus der Actuator-Sonde des Faktenblatts. Ein
+# curl-Stellvertreter antwortet nur auf genau die URL des Workflows (localhost:9090) und
+# protokolliert den Aufruf; leer heisst "keine Verbindung" (curl-Exit 7). Nachfolger der
+# Pruefungen am frueheren metrics-Block: der Statuswert wird uebernommen, und eine Antwort ohne
+# Actuator-Status wird nicht zu einem erfundenen Status.
+mkdir -p "$TMP/fakebin-actuator"
+cat > "$TMP/fakebin-actuator/curl" <<'CURL'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_CURL_LOG"
+case " $* " in
+  *" http://localhost:9090/actuator/health "*) [ -n "${FAKE_ACTUATOR:-}" ] || exit 7; printf '%s' "$FAKE_ACTUATOR" ;;
+  *) exit 7 ;;
+esac
+CURL
+chmod +x "$TMP/fakebin-actuator/curl"
+run_health_facts_with_actuator() {  # $1 = Antwort des Health-Endpunkts (leer = keine Verbindung)
+  : > "$TMP/fake-curl.log"
+  FAKE_ACTUATOR="$1" FAKE_CURL_LOG="$TMP/fake-curl.log" PATH="$TMP/fakebin-actuator:$PATH" \
+    bash "$TMP/health-facts.sh" > "$TMP/health-facts-actuator.out" 2> "$TMP/health-facts-actuator.err"
+}
+actuator_status_is() {  # $1 = erwarteter Wert: genau eine Statuszeile, und zwar diese
+  [ "$(grep -c "^FAKT backend_actuator_status: " "$TMP/health-facts-actuator.out")" -eq 1 ] \
+    && grep -qx "FAKT backend_actuator_status: $1" "$TMP/health-facts-actuator.out"
+}
+run_health_facts_with_actuator '{"status":"DOWN","components":{"db":{"status":"DOWN"}}}'
+check "Statuswert DOWN wird uebernommen"         'actuator_status_is DOWN'
+check "Sonde fragt localhost:9090 ohne Proxy" \
+  'grep -qE -- "(^| )http://localhost:9090/actuator/health( |$)" "$TMP/fake-curl.log" \
+     && grep -qF -- "--noproxy * " "$TMP/fake-curl.log"'
+check "Sonde mit Zeitlimit" 'grep -qE -- "(^| )(-m|--max-time) [0-9]+ " "$TMP/fake-curl.log"'
+check "Sonde laeuft ohne stderr"                 '[ ! -s "$TMP/health-facts-actuator.err" ]'
+run_health_facts_with_actuator ''
+check "ohne Backend: NICHT ERREICHBAR"           'actuator_status_is "NICHT ERREICHBAR"'
+# Eine Fehlerseite (Spring-Fehler-JSON mit HTTP-Code, HTML eines fremden Dienstes) ist keine
+# Antwort des Health-Endpunkts: ihr "status":404 war bis hierher als Laufzeitstatus im Blatt gelandet.
+run_health_facts_with_actuator '{"timestamp":"2026-09-24T10:00:00Z","status":404,"error":"Not Found","path":"/actuator/health"}'
+check "Fehler-JSON: HTTP-Code wird kein Status"  'actuator_status_is "NICHT ERREICHBAR"'
+run_health_facts_with_actuator '<html><body>502 Bad Gateway</body></html>'
+check "HTML-Antwort: kein erfundener Status"     'actuator_status_is "NICHT ERREICHBAR"'
 
 echo "3) Health-Check: Rohlogs nur gekuerzt (80 Zeilen je Block)"
 { echo "mvn test: exit 1 (Log: /nirgends, 200 Zeilen)"
@@ -323,8 +338,7 @@ echo "3) Health-Check: Rohlogs nur gekuerzt (80 Zeilen je Block)"
 LONG_VALUES="$(json_values execution_path="$TMP/base.txt" \
   block.backend_tests.output="$TMP/long-tests-out.txt" \
   block.frontend_build.output="$TMP/build-out.txt" \
-  block.frontend_lint.output="$TMP/lint-out.txt" \
-  block.metrics.output="$TMP/metrics-out.txt")"
+  block.frontend_lint.output="$TMP/lint-out.txt")"
 render "$HEALTH" name:facts "$LONG_VALUES" > "$TMP/health-facts-long.sh"
 bash "$TMP/health-facts-long.sh" > "$TMP/health-facts-long.out" 2>/dev/null
 awk '/^## ROHLOG backend_tests/{f=1;next} f && /^## ROHLOG /{f=0} f' "$TMP/health-facts-long.out" \
@@ -335,9 +349,14 @@ check "Rohlog beginnt nicht am Anfang"              '! grep -qx "logzeile 1" "$T
 check "FAKT maven_build_result: FAILURE bei exit 1" 'grep -qx "FAKT maven_build_result: BUILD FAILURE" "$TMP/health-facts-long.out"'
 
 echo "4) Health-Check: Gate prueft die Pflicht-Fakten deterministisch"
-printf 'Kurzfassung\ngate_status: GREEN\n' > "$TMP/prev-green.txt"
+# Seit 25ed5f84 liest das Gate die letzte gate_status-Zeile des Reports selbst
+# ({{ block.report.output }}), nicht mehr die Kurzfassung in previous_output. Der GREEN-Report
+# steht fuer "die KI haette durchgewunken": fehlt eine Pflicht-FAKT-Zeile, muss das Gate trotzdem
+# RED/audit-invalid setzen.
+printf '%s\n' '### MySuricates Health' '**Gesamtscore: 8.2 / 10**' 'gate_status: GREEN' \
+  'gate_category: project-health' 'gate_description: Score 8.2/10, Trend gleich' > "$TMP/report-green.txt"
 run_health_gate() {  # $1 = faktenblatt-datei
-  GATE_VALUES="$(json_values previous_output="$TMP/prev-green.txt" block.facts.output="$1")"
+  GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
   render "$HEALTH" label:Gate-Verdict "$GATE_VALUES" > "$TMP/health-gate.sh"
   bash "$TMP/health-gate.sh" > "$TMP/health-gate.out" 2> "$TMP/health-gate.err"
 }
@@ -579,7 +598,7 @@ check "Pflicht-Fakten bleiben im Blatt" \
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
-  GATE_VALUES="$(json_values previous_output="$TMP/prev-green.txt" block.facts.output="$1")"
+  GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
   render "$PERF" label:Gate-Verdict "$GATE_VALUES" > "$TMP/perf-gate.sh"
   bash "$TMP/perf-gate.sh" > "$TMP/perf-gate.out" 2> "$TMP/perf-gate.err"
 }
@@ -605,22 +624,63 @@ run_perf_gate "$TMP/empty.txt"
 check "ohne Faktenblatt: RED"           'grep -qx "gate_status: RED" "$TMP/perf-gate.out"'
 check "ohne Faktenblatt: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/perf-gate.out"'
 
+echo "7b) Beide Gates: bei vollstaendigem Blatt entscheidet die letzte gate_status-Zeile des Reports"
+printf '%s\n' '### Report' 'gate_status: RED' 'gate_category: x' > "$TMP/report-red.txt"
+# Zwei Urteilszeilen (etwa ein zitierter Vorlauf und das eigene Urteil in Markdown-Fettdruck):
+# es zaehlt die letzte.
+printf '%s\n' '### Report' '- gate_status: RED' 'Nachtrag nach erneuter Pruefung:' '**gate_status:** YELLOW' \
+  > "$TMP/report-last.txt"
+printf '%s\n' '### Report ohne Urteil' 'Score 8/10' > "$TMP/report-none.txt"
+run_gate() {  # $1 = definition, $2 = faktenblatt, $3 = report
+  render "$1" label:Gate-Verdict "$(json_values block.report.output="$3" block.facts.output="$2")" > "$TMP/gate.sh"
+  bash "$TMP/gate.sh" > "$TMP/gate.out" 2> "$TMP/gate.err"
+}
+gate_verdict_cases() {  # $1 = Anzeigename, $2 = definition, $3 = vollstaendiges Faktenblatt, $4 = gate_category
+  GATE_CATEGORY="$4"
+  run_gate "$2" "$3" "$TMP/report-red.txt"
+  check "$1: RED aus dem Report durchgereicht" \
+    'grep -qx "gate_status: RED" "$TMP/gate.out" && grep -qx "gate_category: $GATE_CATEGORY" "$TMP/gate.out"'
+  run_gate "$2" "$3" "$TMP/report-last.txt"
+  check "$1: die letzte gate_status-Zeile zaehlt, auch in Markdown" \
+    'grep -qx "gate_status: YELLOW" "$TMP/gate.out" && grep -qx "gate_category: $GATE_CATEGORY" "$TMP/gate.out"'
+  run_gate "$2" "$3" "$TMP/report-none.txt"
+  check "$1: Report ohne Urteil wird YELLOW mit Hinweis" \
+    'grep -qx "gate_status: YELLOW" "$TMP/gate.out" \
+       && grep -q "^gate_description: .*keine gate_status-Zeile" "$TMP/gate.out"'
+  check "$1: Gate laeuft ohne stderr" '[ ! -s "$TMP/gate.err" ]'
+}
+gate_verdict_cases "Health" "$HEALTH" "$TMP/health-facts.out" project-health
+gate_verdict_cases "Performance" "$PERF" "$TMP/perf-facts.out" performance
+
 echo "8) Performance-Audit: Report-Prompt bindet die KI ans Faktenblatt"
 check "Prompt nutzt das Faktenblatt"    'grep -q "block.facts.output" "$TMP/perf-prompt.txt"'
 check "Prompt verbietet eigenes Messen" 'grep -qi "schaetze nichts selbst" "$TMP/perf-prompt.txt"'
 check "Prompt kennt NICHT GEMESSEN"     'grep -q "NICHT GEMESSEN" "$TMP/perf-prompt.txt"'
 
 echo "9) Alle Shell-Bloecke beider Definitionen sind syntaktisch gueltig (bash -n)"
+# Rekursiv wie render(): auch ein Shell-Block, der spaeter in einem retry/foreach/conditional steckt,
+# wird geprueft statt still uebergangen.
 python3 - "$HEALTH" "$PERF" "$TMP/syntax" <<'PY'
 import json, os, re, sys
 os.makedirs(sys.argv[3], exist_ok=True)
+
+
+def blocks(node):
+    if isinstance(node, dict):
+        if 'type' in node and isinstance(node.get('config'), dict):
+            yield node
+        for child in node.values():
+            yield from blocks(child)
+    elif isinstance(node, list):
+        for child in node:
+            yield from blocks(child)
+
+
 names = []
 for path in sys.argv[1:3]:
     definition = json.load(open(path, encoding='utf-8'))
     stem = os.path.basename(path).replace('.json', '')
-    for index, block in enumerate(definition['blocks']):
-        if block.get('type') != 'shell':
-            continue
+    for index, block in enumerate(b for b in blocks(definition['blocks']) if b.get('type') == 'shell'):
         command = re.sub(r'\{\{\s*([^{}]+?)\s*}}', "'platzhalter'", block['config']['command'])
         name = '%s-%d.sh' % (stem, index)
         open(os.path.join(sys.argv[3], name), 'w', encoding='utf-8').write(command)
@@ -632,7 +692,16 @@ for SCRIPT in "$TMP"/syntax/*.sh; do
   bash -n "$SCRIPT" 2>> "$TMP/syntax.err" || SYNTAX_FAILED=$((SYNTAX_FAILED + 1))
 done
 check "bash -n fuer jeden Shell-Block" '[ "$SYNTAX_FAILED" -eq 0 ]'
-check "mindestens 8 Shell-Bloecke geprueft" '[ "$(ls "$TMP"/syntax/*.sh | wc -l)" -ge 8 ]'
+# Untergrenze = heutiger Stand, 7 Bloecke: Health backend_tests, frontend_build, frontend_lint,
+# facts und Gate-Verdict; Performance facts und Gate-Verdict. Bis 25ed5f84 waren es 8 — der
+# Health-Block metrics ist entfallen (Dateigroessen, Bundle und npm audit messen andere Audits).
+# Faellt die Zahl darunter, hat die Extraktion Bloecke verloren oder eine Definition ist geschrumpft.
+check "mindestens 7 Shell-Bloecke geprueft" '[ "$(ls "$TMP"/syntax/*.sh | wc -l)" -ge 7 ]'
+# Gegenprobe unabhaengig von der Extraktion: jedes "type": "shell" im Rohtext ist ein Block, der
+# auch geprueft wurde.
+SHELL_TYPES="$(cat "$HEALTH" "$PERF" | grep -oE '"type"[[:space:]]*:[[:space:]]*"shell"' | wc -l | tr -d ' ')"
+check "jeder Shell-Block beider Definitionen erfasst" \
+  '[ "$(ls "$TMP"/syntax/*.sh | wc -l)" -eq "$SHELL_TYPES" ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"
