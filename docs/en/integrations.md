@@ -114,6 +114,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | GitLab | `gitlab` | Server URL (default `https://gitlab.com`) + access token (no OAuth flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simulated |
 | CalDAV | `caldav` | URL + user:app-password (Basic auth, no OAuth flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | verified (Radicale 3.8.0, local container) |
 | iCal feed | `ical-feed` | none (public feed URL as parameter) | `providers/icalfeed/` | `list_events` | verified (public Google holiday feed) |
+| ntfy | `ntfy` | Server URL + optional access token (no OAuth flow, both optional) | `providers/ntfy/` | `publish` | verified |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -216,6 +217,17 @@ Notes:
   `update_issue` with `state` open/closed sets `state_event` reopen/close.
   Simulated tests only (request shapes follow the official API docs).
 
+### Providers without mandatory credentials
+
+- **ntfy** sends push notifications as a JSON `POST` to the server root (topic in the body).
+  Field 1 = server URL (empty ⇒ `https://ntfy.sh`, `http`/`https` only), field 2 = access token
+  (empty ⇒ anonymous, then no `Authorization` header). `requiresCredentials() == false`: without a
+  saved connection it publishes anonymously to ntfy.sh. `fetchAccountInfo` checks
+  `GET /v1/account` with a token, `GET /v1/health` without one. Topic names: letters, digits, `-`,
+  `_`, at most 64 characters; `priority` 1–5 or `min`/`low`/`default`/`high`/`max`. Note: topics on
+  ntfy.sh can be read by anyone who knows the name. Internally: `NtfyParams` (parsing, validation),
+  `NtfyHttpClient` (HTTP, 401/403 → token hint).
+
 ---
 
 ## OAuth2 Flow (Authorization Code)
@@ -270,6 +282,7 @@ For `requiresOAuthFlow() == false` the credentials themselves are the authentica
 validation, and on success sets the status directly to `CONNECTED`. There is no expiry and no
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
 For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 

@@ -1318,6 +1318,13 @@ export const en = {
           add_comment: 'Add a comment to an issue',
         },
       },
+      ntfy: {
+        displayName: 'ntfy',
+        description: 'Send push notifications via ntfy (ntfy.sh or your own server)',
+        actions: {
+          publish: 'Send a push notification to a topic',
+        },
+      },
     },
   },
   calendar: {

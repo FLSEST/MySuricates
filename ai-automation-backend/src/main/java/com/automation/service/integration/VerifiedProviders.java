@@ -23,7 +23,8 @@ public final class VerifiedProviders {
             Map.entry("github", "GitHub REST API, eigener Account"),
             Map.entry("gitea", "Gitea 1.27.3 und Forgejo 14.0.5, lokaler Container"),
             Map.entry("caldav", "Radicale 3.8.0, lokaler Container"),
-            Map.entry("ical-feed", "öffentlicher Feed: Google-Kalender „Feiertage in Deutschland“")
+            Map.entry("ical-feed", "öffentlicher Feed: Google-Kalender „Feiertage in Deutschland“"),
+            Map.entry("ntfy", "ntfy 2.28.0, lokaler Container (anonym und mit Access-Token)")
     );
 
     private VerifiedProviders() {

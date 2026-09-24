@@ -1320,6 +1320,13 @@ export const de: TranslationKeys = {
           add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
         },
       },
+      ntfy: {
+        displayName: 'ntfy',
+        description: 'Push-Benachrichtigungen über ntfy senden (ntfy.sh oder eigener Server)',
+        actions: {
+          publish: 'Eine Push-Benachrichtigung an ein Topic senden',
+        },
+      },
     },
   },
   calendar: {

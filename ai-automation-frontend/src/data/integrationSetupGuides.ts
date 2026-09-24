@@ -662,6 +662,92 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'ntfy': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Server-URL (leer = https://ntfy.sh)', en: 'Server URL (empty = https://ntfy.sh)' },
+      clientSecretPlaceholder: { de: 'Access-Token (optional)', en: 'Access token (optional)' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Server wählen',
+          en: 'Choose a server',
+        },
+        instructions: {
+          de: [
+            'Ohne Eintrag sendet die Integration an den öffentlichen Dienst ntfy.sh',
+            'Auf ntfy.sh kann jeder ein Topic lesen, der seinen Namen kennt — schwer erratbare Topic-Namen verwenden',
+            'Eigener Server: dessen Adresse (z.B. https://ntfy.example.org) ins erste Feld',
+          ],
+          en: [
+            'Without an entry the integration sends to the public ntfy.sh service',
+            'On ntfy.sh anyone who knows a topic name can read it — use hard-to-guess topic names',
+            'Own server: put its address (e.g. https://ntfy.example.org) into the first field',
+          ],
+        },
+        link: {
+          url: 'https://docs.ntfy.sh/',
+          label: { de: 'ntfy-Dokumentation', en: 'ntfy documentation' },
+        },
+      },
+      {
+        title: {
+          de: 'Topic abonnieren',
+          en: 'Subscribe to a topic',
+        },
+        instructions: {
+          de: [
+            'ntfy-App (Android/iOS) oder Web-App öffnen',
+            'Topic abonnieren, an das Workflows später senden (Buchstaben, Ziffern, - und _)',
+          ],
+          en: [
+            'Open the ntfy app (Android/iOS) or the web app',
+            'Subscribe to the topic your workflows will send to (letters, digits, - and _)',
+          ],
+        },
+        link: {
+          url: 'https://docs.ntfy.sh/subscribe/phone/',
+          label: { de: 'Apps und Abonnieren', en: 'Apps and subscribing' },
+        },
+      },
+      {
+        title: {
+          de: 'Access-Token (optional)',
+          en: 'Access token (optional)',
+        },
+        instructions: {
+          de: [
+            'Nur nötig, wenn der Server Topics schützt (Zugriffskontrolle) oder für ein ntfy.sh-Konto',
+            'Web-App: Konto → Access-Tokens → Token erstellen; auf dem eigenen Server alternativ per CLI',
+            'Leer lassen für anonymes Senden — dann wird kein Authorization-Header mitgeschickt',
+          ],
+          en: [
+            'Only needed if the server protects topics (access control) or for an ntfy.sh account',
+            'Web app: Account → Access tokens → create token; on your own server alternatively via CLI',
+            'Leave empty to send anonymously — no Authorization header is sent then',
+          ],
+        },
+        code: 'ntfy token add <user>',
+      },
+      {
+        title: {
+          de: 'Verbinden',
+          en: 'Connect',
+        },
+        instructions: {
+          de: [
+            '"Zugangsdaten speichern" klicken — geprüft wird mit Token das Konto (/v1/account), ohne Token die Erreichbarkeit (/v1/health)',
+            'Im Workflow: Block "integration" mit Aktion "publish" (topic, message, optional title, priority, tags, click, markdown)',
+          ],
+          en: [
+            'Click "Save credentials" — with a token the account is checked (/v1/account), without one the server health (/v1/health)',
+            'In a workflow: block "integration" with action "publish" (topic, message, optional title, priority, tags, click, markdown)',
+          ],
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {
