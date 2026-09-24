@@ -10,7 +10,8 @@ import com.automation.repository.WishRepository;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.chain.ChainService;
-import com.automation.service.factory.WorkflowFactoryService;
+import com.automation.service.factory.FactoryTestResult;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -30,7 +31,7 @@ public class WishDecomposeService {
     private final ProjectRepository projectRepository;
     private final WorkflowService workflowService;
     private final ChainService chainService;
-    private final WorkflowFactoryService workflowFactoryService;
+    private final FactoryVerificationService factoryVerificationService;
     private final WishPromptBuilder promptBuilder;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -41,7 +42,7 @@ public class WishDecomposeService {
             ProjectRepository projectRepository,
             WorkflowService workflowService,
             ChainService chainService,
-            @Lazy WorkflowFactoryService workflowFactoryService,
+            @Lazy FactoryVerificationService factoryVerificationService,
             WishPromptBuilder promptBuilder,
             SimpMessagingTemplate messagingTemplate
     ) {
@@ -51,7 +52,7 @@ public class WishDecomposeService {
         this.projectRepository = projectRepository;
         this.workflowService = workflowService;
         this.chainService = chainService;
-        this.workflowFactoryService = workflowFactoryService;
+        this.factoryVerificationService = factoryVerificationService;
         this.promptBuilder = promptBuilder;
         this.messagingTemplate = messagingTemplate;
     }
@@ -193,8 +194,8 @@ public class WishDecomposeService {
             List<Map<String, String>> results = new ArrayList<>();
             for (String wfId : workflowIds) {
                 try {
-                    WorkflowFactoryService.FactoryTestResult testResult =
-                            workflowFactoryService.verifyAndFix(wfId, 2);
+                    FactoryTestResult testResult =
+                            factoryVerificationService.verifyAndFix(wfId, 2);
                     results.add(Map.of(
                             "workflowId", wfId,
                             "status", testResult.status(),

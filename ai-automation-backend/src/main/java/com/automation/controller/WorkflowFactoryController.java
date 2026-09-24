@@ -7,6 +7,7 @@ import com.automation.mapper.WorkflowMapper;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.factory.FactoryTopicCatalog;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.factory.WorkflowFactoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.util.Map;
 public class WorkflowFactoryController {
 
     private final WorkflowFactoryService factoryService;
+    private final FactoryVerificationService verificationService;
     private final WorkflowMapper workflowMapper;
 
     /**
@@ -50,7 +52,7 @@ public class WorkflowFactoryController {
      */
     @PostMapping("/verify/{id}")
     public ResponseEntity<WorkflowFactoryResult> verify(@PathVariable String id) {
-        WorkflowFactoryResult result = factoryService.verifyWorkflow(id);
+        WorkflowFactoryResult result = verificationService.verifyWorkflow(id);
         return ResponseEntity.ok(result);
     }
 

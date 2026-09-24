@@ -8,6 +8,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.factory.WorkflowFactoryService;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class WorkflowFactoryControllerTest {
 
     @MockitoBean
     private WorkflowFactoryService factoryService;
+
+    @MockitoBean
+    private FactoryVerificationService verificationService;
 
     @MockitoBean
     private WorkflowMapper workflowMapper;
@@ -129,7 +133,7 @@ class WorkflowFactoryControllerTest {
 
     @Test
     void verify_existingId_returnsOk() throws Exception {
-        when(factoryService.verifyWorkflow("wf-1")).thenReturn(createFactoryResult());
+        when(verificationService.verifyWorkflow("wf-1")).thenReturn(createFactoryResult());
 
         mockMvc.perform(post("/api/v1/factory/verify/wf-1"))
                 .andExpect(status().isOk())
@@ -138,7 +142,7 @@ class WorkflowFactoryControllerTest {
 
     @Test
     void verify_nonExistentId_returns404() throws Exception {
-        when(factoryService.verifyWorkflow("unknown"))
+        when(verificationService.verifyWorkflow("unknown"))
                 .thenThrow(new ResourceNotFoundException("Workflow", "unknown"));
 
         mockMvc.perform(post("/api/v1/factory/verify/unknown"))

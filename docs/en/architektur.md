@@ -186,7 +186,7 @@ Chains and sub-workflows pass their starter's origin on in the reserved context 
 ### Layer Model
 
 ```
-Controller (REST API, 49 Controllers)
+Controller (REST API, 51 Controllers)
     ↓ DTO (Request/Response Records)
 Service (Business Logic)
     ↓ Entity (JPA)
@@ -206,7 +206,7 @@ SQLite (File: data/automation.db)
 
 ```
 com.automation
-├── controller/          49 REST Controllers
+├── controller/          51 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
 │   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
@@ -223,7 +223,7 @@ com.automation
 │   ├── todo/            TodoService (+ TodoSpecifications, TodoTrackerExportService, TodoResolutionService, TodoResponseAssembler), AutoTodoService (+ AutoTodoTextBuilder, PendingTodoApprovalService, GranularTodoService), GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService (+ WorkflowConversionPrompt), WorkflowSuggestion, DialogWorkflowSuggestion
 │   ├── dialog/          DialogSessionScanner, DialogConversionService (+ DialogConversionPrompt), ClaudeJsonlParser
-│   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog), ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
+│   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog, FactoryGeneratorResolver), FactoryVerificationService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
 │   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder (+ WishSystemPrompt), WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
@@ -263,12 +263,14 @@ com.automation
 └── util/                JPA Converters (JSON, BlockDefinitions)
 ```
 
-### All 49 REST Controllers
+### All 51 REST Controllers
 
 | Controller | Base Path | Description |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, archiving, container lifecycle, context generation |
-| `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills, optimize, similar, repair, versions |
+| `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills |
+| `WorkflowVersionController` | `/api/v1/workflows` | `/{id}/versions` — version list, single version, restore |
+| `WorkflowAssistController` | `/api/v1/workflows` | `/{id}/optimize`, `/{id}/similar`, `/{id}/repair` (repair only with module `factory`) |
 | `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` and `/analyze` — deterministic build-error check of one definition or the whole stock. Reports only, touches no write path (182bd224) |
 | `WorkflowImportController` | `/api/v1/workflows/import` | BPMN import (`POST /bpmn?projectId=…`, body = BPMN XML) → new workflow (201); foreign BPMN/broken XML/too large → 400 |
 | `ExecutionController` | `/api/v1/executions` | List, detail, pause, resume, resume-from-step, cancel, retry, approve, approval-check, todos-approve, notes, command |
@@ -685,6 +687,7 @@ Claude Code sessions can also serve as templates for workflows:
 
 Automatic generation and verification of workflows from a topic. The block schema in the prompts of the factory, wishes, dialog import, run conversion and workflow optimization comes from `BlockSpecs` (the same texts as the assistant's `fetch block-spec`); `PromptBlockSchemaGateTest` checks every block type and config key named there against the executors — the old prompts named `forEach`, `then_blocks`, `if_true` and other keys no executor reads. An example of retry, foreach, while or conditional with a command must also name `execution_mode`: without it the command goes to the AI as a prompt, and the AI builds what the example shows (the conversion prompt showed such a retry with `npm test`).
 - `WorkflowFactoryService` — orchestrates the entire factory process
+- `FactoryVerificationService` — verify/fix loop: run on the test instance, repair the blocks via AI on failure, report the result to Dev (also used by auto-repair and wishes)
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-based workflow generation
 - `WorkflowTextGenerator` — text-based workflow generation
 - `FactorySetupService` — configuration and setup of the factory environment

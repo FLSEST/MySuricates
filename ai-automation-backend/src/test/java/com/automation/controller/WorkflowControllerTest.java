@@ -12,7 +12,6 @@ import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.export.ProcessFormatAdapter;
 import com.automation.service.project.ProjectService;
 import com.automation.service.workflow.WorkflowExecutor;
-import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,21 +66,8 @@ class WorkflowControllerTest {
     private ApiKeyService apiKeyService;
 
     @MockitoBean
-    private WorkflowOptimizationService optimizationService;
-
-    @MockitoBean
-    private com.automation.service.repair.AutoRepairService autoRepairService;
-
-    @MockitoBean
     private ProjectService projectService;
 
-    @MockitoBean
-    private com.automation.service.workflow.WorkflowVersionService workflowVersionService;
-
-    @MockitoBean
-    private com.automation.mapper.WorkflowVersionMapper workflowVersionMapper;
-    @MockitoBean
-    private com.automation.service.learning.WorkflowSimilarityService workflowSimilarityService;
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
 
@@ -139,19 +125,6 @@ class WorkflowControllerTest {
 
         mockMvc.perform(get("/api/v1/workflows/unknown"))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void repairWorkflow_sealed_returns409WithoutStartingTheRepair() throws Exception {
-        testWorkflow.setSealed(true);
-        when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
-
-        mockMvc.perform(post("/api/v1/workflows/wf-1/repair"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("WORKFLOW_SEALED"))
-                .andExpect(jsonPath("$.error").value(org.hamcrest.Matchers.containsString("unseal it before repairing")));
-
-        verifyNoInteractions(autoRepairService);
     }
 
     @Test
@@ -356,31 +329,5 @@ class WorkflowControllerTest {
 
         mockMvc.perform(delete("/api/v1/workflows/wf-1/skills/skill-1"))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    void getSimilarWorkflows_returnsCappedList() throws Exception {
-        List<Map<String, Object>> matches = List.of(
-                Map.of("workflowId", "wf-2", "workflowName", "Sibling A", "similarity", 90L, "blockTypes", List.of("simple")),
-                Map.of("workflowId", "wf-3", "workflowName", "Sibling B", "similarity", 70L, "blockTypes", List.of("simple")),
-                Map.of("workflowId", "wf-4", "workflowName", "Sibling C", "similarity", 60L, "blockTypes", List.of("simple"))
-        );
-        when(workflowSimilarityService.getSimilarWorkflows("wf-1")).thenReturn(matches);
-
-        mockMvc.perform(get("/api/v1/workflows/wf-1/similar?limit=2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
-                .andExpect(jsonPath("$[0].workflowId").value("wf-2"))
-                .andExpect(jsonPath("$[1].workflowId").value("wf-3"));
-    }
-
-    @Test
-    void getSimilarWorkflows_defaultLimit_returnsOk() throws Exception {
-        when(workflowSimilarityService.getSimilarWorkflows("wf-1")).thenReturn(List.of());
-
-        mockMvc.perform(get("/api/v1/workflows/wf-1/similar"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(0)));
     }
 }

@@ -2,13 +2,11 @@ package com.automation.service.audit;
 
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.*;
-import com.automation.event.TodoCreatedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.*;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,11 +25,9 @@ public class AuditCenterService {
     private final AuditReportRepository reportRepository;
     private final AuditFindingRepository findingRepository;
     private final AuditFindingOccurrenceRepository occurrenceRepository;
-    private final AuditFindingTodoRepository findingTodoRepository;
-    private final TodoRepository todoRepository;
     private final AuditAcceptancePolicy acceptancePolicy;
-    private final ApplicationEventPublisher eventPublisher;
     private final ManagedTodoReconciler managedTodoReconciler;
+    private final AuditFindingTodoLinker todoLinker;
 
     @Transactional(readOnly = true)
     public List<AuditSummary> listAudits(String projectId, String category, GateStatus gateStatus) {
@@ -91,7 +86,7 @@ public class AuditCenterService {
     @Transactional(readOnly = true)
     public AuditFindingResponse getFinding(String id) {
         AuditFinding finding = requireFinding(id);
-        return toFinding(finding, todoLinks(List.of(id)).getOrDefault(id, List.of()));
+        return withTodos(finding);
     }
 
     @Transactional(readOnly = true)
@@ -113,7 +108,7 @@ public class AuditCenterService {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
         Page<AuditFinding> result = findingRepository.findAll(spec, PageRequest.of(page, size));
-        Map<String, List<TodoLink>> links = todoLinks(result.getContent().stream().map(AuditFinding::getId).toList());
+        Map<String, List<TodoLink>> links = todoLinker.todoLinks(result.getContent().stream().map(AuditFinding::getId).toList());
         List<AuditFindingResponse> content = result.getContent().stream()
                 .map(f -> toFinding(f, links.getOrDefault(f.getId(), List.of()))).toList();
         return new PageResponse<>(content, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
@@ -131,73 +126,33 @@ public class AuditCenterService {
         if (dispositionNote != null) finding.setDispositionNote(dispositionNote);
         finding = findingRepository.save(finding);
         managedTodoReconciler.reconcileFinding(id);
-        return toFinding(finding, todoLinks(List.of(id)).getOrDefault(id, List.of()));
+        return withTodos(finding);
     }
 
     @Transactional
     public AuditFindingResponse createManagedTodo(String findingId) {
         AuditFinding finding = requireFinding(findingId);
-        if (findingTodoRepository.findByFindingId(findingId).stream().noneMatch(AuditFindingTodo::isManaged)) {
-            Todo todo = todoRepository.save(Todo.builder()
-                    .title(finding.getTitle())
-                    .description(managedTodoDescription(finding))
-                    .status(Todo.Status.OPEN)
-                    .priority(Todo.Priority.valueOf(finding.getSeverity().name()))
-                    .tags(TodoMapper.listToJson(List.of("audit", "audit:" + finding.getAuditKey(), "auto:workflow")))
-                    .projectId(finding.getProjectId()).source(Todo.Source.WORKFLOW)
-                    .sourceAgent(ManagedTodoWriter.SOURCE_AGENT).workflowRunId(finding.getLastSeenRunId())
-                    .referenceType(ManagedTodoWriter.REFERENCE_TYPE).referenceId(finding.getId()).build());
-            findingTodoRepository.save(AuditFindingTodo.builder()
-                    .findingId(findingId).todoId(todo.getId()).managed(true).build());
-            eventPublisher.publishEvent(new TodoCreatedEvent(this, todo));
-        }
-        return toFinding(finding, todoLinks(List.of(findingId)).getOrDefault(findingId, List.of()));
+        todoLinker.createManagedTodo(finding);
+        return withTodos(finding);
     }
 
     @Transactional
     public AuditFindingResponse linkTodo(String findingId, String todoId) {
         AuditFinding finding = requireFinding(findingId);
-        Todo todo = todoRepository.findById(todoId).orElseThrow(() -> new ResourceNotFoundException("Todo", todoId));
-        if (!Objects.equals(finding.getProjectId(), todo.getProjectId())) {
-            throw new IllegalArgumentException("Finding and TODO must belong to the same project");
-        }
-        findingTodoRepository.findByFindingIdAndTodoId(findingId, todoId)
-                .orElseGet(() -> findingTodoRepository.save(AuditFindingTodo.builder()
-                        .findingId(findingId).todoId(todoId).managed(false).build()));
-        return toFinding(finding, todoLinks(List.of(findingId)).getOrDefault(findingId, List.of()));
+        todoLinker.linkTodo(finding, todoId);
+        return withTodos(finding);
     }
 
     @Transactional
     public AuditFindingResponse unlinkTodo(String findingId, String todoId) {
         AuditFinding finding = requireFinding(findingId);
-        findingTodoRepository.findByFindingIdAndTodoId(findingId, todoId).ifPresent(findingTodoRepository::delete);
-        clearAuditReference(findingId, todoId);
-        return toFinding(finding, todoLinks(List.of(findingId)).getOrDefault(findingId, List.of()));
-    }
-
-    /** Sonst zeigt {@code todo.referenceId} (Deep-Link {@code /reports?finding=…}) auf ein Finding, das nicht mehr verknuepft ist. */
-    private void clearAuditReference(String findingId, String todoId) {
-        todoRepository.findById(todoId).ifPresent(todo -> {
-            if (ManagedTodoWriter.REFERENCE_TYPE.equals(todo.getReferenceType())
-                    && findingId.equals(todo.getReferenceId())) {
-                todo.setReferenceType(null);
-                todo.setReferenceId(null);
-                todoRepository.save(todo);
-            }
-        });
+        todoLinker.unlinkTodo(findingId, todoId);
+        return withTodos(finding);
     }
 
     @Transactional
     public void markAwaitingVerification(String todoId) {
-        for (AuditFindingTodo link : findingTodoRepository.findByTodoId(todoId)) {
-            if (!link.isManaged()) continue;
-            findingRepository.findById(link.getFindingId()).ifPresent(finding -> {
-                if (finding.getStatus() == AuditFindingStatus.OPEN) {
-                    finding.setStatus(AuditFindingStatus.AWAITING_VERIFICATION);
-                    findingRepository.save(finding);
-                }
-            });
-        }
+        todoLinker.markAwaitingVerification(todoId);
     }
 
     private AuditSummary toSummary(AuditReport latest, AuditReport previous, AuditReport latestAttempt,
@@ -222,16 +177,8 @@ public class AuditCenterService {
                 report.getIngestionStatus(), report.getIngestionError(), report.getGeneratedAt(), occurrences.size());
     }
 
-    private Map<String, List<TodoLink>> todoLinks(List<String> findingIds) {
-        if (findingIds.isEmpty()) return Map.of();
-        List<AuditFindingTodo> links = findingTodoRepository.findByFindingIdIn(findingIds);
-        Map<String, Todo> todos = todoRepository.findAllById(links.stream().map(AuditFindingTodo::getTodoId).toList())
-                .stream().collect(Collectors.toMap(Todo::getId, Function.identity()));
-        return links.stream().filter(link -> todos.containsKey(link.getTodoId())).collect(Collectors.groupingBy(
-                AuditFindingTodo::getFindingId, Collectors.mapping(link -> {
-                    Todo todo = todos.get(link.getTodoId());
-                    return new TodoLink(todo.getId(), todo.getTitle(), todo.getStatus(), link.isManaged());
-                }, Collectors.toList())));
+    private AuditFindingResponse withTodos(AuditFinding finding) {
+        return toFinding(finding, todoLinker.todoLinks(List.of(finding.getId())).getOrDefault(finding.getId(), List.of()));
     }
 
     private AuditFindingResponse toFinding(AuditFinding finding, List<TodoLink> links) {
@@ -246,13 +193,6 @@ public class AuditCenterService {
 
     private AuditFinding requireFinding(String id) {
         return findingRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("AuditFinding", id));
-    }
-
-    private static String managedTodoDescription(AuditFinding finding) {
-        return (finding.getDescription() != null ? finding.getDescription() : "Audit finding requires remediation.")
-                + "\n\nEvidence: " + (finding.getEvidence() != null ? finding.getEvidence() : "not provided")
-                + "\n\n[Audit finding](/reports?finding=" + finding.getId() + ")"
-                + " · [Evidence run](/runs/" + finding.getLastSeenRunId() + ")";
     }
 
     private static String trend(GateStatus previous, GateStatus current) {

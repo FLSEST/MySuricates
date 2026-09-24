@@ -57,16 +57,19 @@ class ControllerModuleGateTest {
             // Request-Metriken: ein Diagnosewerkzeug darf nicht mit einem Feature-Modul
             // verschwinden. Er meldet nur und greift in keinen Schreibweg ein (182bd224).
             "WorkflowAnalyzerController",
+            // Aus WorkflowController herausgelöst (6c2a2ad7) — gleiche Einordnung wie dort
+            "WorkflowAssistController",
             "WorkflowPoolController",
             // Siegelstatus lesen: ein Siegel bleibt wirksam, wenn der Schalter aus ist — also sichtbar
             "WorkflowSealStatusController",
-            "WorkflowTemplateController");
+            "WorkflowTemplateController",
+            "WorkflowVersionController");
 
     /** Method-level assignments inside core controllers — pinned so they cannot be dropped unnoticed. */
     private static final Map<String, ModuleCatalog> METHOD_MODULES = Map.ofEntries(
             Map.entry("TodoController#exportTodo", ModuleCatalog.INTEGRATIONS),
             Map.entry("WorkflowController#exportWorkflowAsBpmn", ModuleCatalog.BPMN),
-            Map.entry("WorkflowController#repairWorkflow", ModuleCatalog.FACTORY),
+            Map.entry("WorkflowAssistController#repairWorkflow", ModuleCatalog.FACTORY),
             Map.entry("WorkflowController#activateSkills", ModuleCatalog.SKILLS),
             Map.entry("WorkflowController#deactivateSkill", ModuleCatalog.SKILLS),
             Map.entry("SystemAccessController#enableRemoteAccess", ModuleCatalog.REMOTE_ACCESS),

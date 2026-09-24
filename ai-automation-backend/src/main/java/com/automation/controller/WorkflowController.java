@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.request.ActivateSkillsRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.dto.request.ExecuteWorkflowRequest;
@@ -11,31 +10,20 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
-import com.automation.dto.response.WorkflowVersionResponse;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
-import com.automation.entity.WorkflowVersion;
-import com.automation.exception.ErrorCode;
-import com.automation.exception.HardeningException;
 import com.automation.mapper.WorkflowMapper;
-import com.automation.mapper.WorkflowVersionMapper;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.project.ProjectService;
-import com.automation.service.learning.WorkflowSimilarityService;
 import com.automation.service.export.ProcessFormatAdapter;
-import com.automation.service.repair.AutoRepairService;
 import com.automation.service.workflow.WorkflowExecutor;
-import com.automation.service.workflow.WorkflowOptimizationService;
 import com.automation.service.workflow.WorkflowService;
-import com.automation.service.workflow.WorkflowVersionService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -56,12 +44,6 @@ public class WorkflowController {
     private final ExecutionQueryService executionQueryService;
     private final ProjectService projectService;
     private final WorkflowMapper workflowMapper;
-    private final WorkflowOptimizationService optimizationService;
-    private final AutoRepairService autoRepairService;
-    private final WorkflowVersionService workflowVersionService;
-    private final WorkflowVersionMapper workflowVersionMapper;
-    private final WorkflowSimilarityService workflowSimilarityService;
-    private final ObjectMapper objectMapper;
     private final ProcessFormatAdapter bpmnExportAdapter;
 
     @GetMapping
@@ -117,45 +99,6 @@ public class WorkflowController {
         return executionQueryService.getRunForWorkflow(runId);
     }
 
-    @PostMapping("/{id}/optimize")
-    public ResponseEntity<Map<String, Object>> optimizeWorkflow(@PathVariable String id) {
-        Map<String, Object> suggestion = optimizationService.optimizeWorkflow(id);
-        return ResponseEntity.ok(suggestion);
-    }
-
-    @GetMapping("/{id}/similar")
-    public List<Map<String, Object>> getSimilarWorkflows(
-            @PathVariable String id,
-            @RequestParam(defaultValue = "5") int limit) {
-        List<Map<String, Object>> all = workflowSimilarityService.getSimilarWorkflows(id);
-        int capped = Math.max(1, Math.min(limit, 20));
-        return all.size() > capped ? all.subList(0, capped) : all;
-    }
-
-    @PostMapping("/{id}/repair")
-    @RequiresModule(ModuleCatalog.FACTORY)
-    public ResponseEntity<Map<String, String>> repairWorkflow(@PathVariable String id) {
-        // Verify workflow exists
-        Workflow workflow = workflowService.findById(id);
-        if (workflow.isSealed()) {
-            // Refuse before the async repair starts: it would call the AI and only then fail on saving
-            throw new HardeningException(ErrorCode.WORKFLOW_SEALED,
-                    "Workflow '" + workflow.getName() + "' is sealed — unseal it before repairing it");
-        }
-
-        // Check for FAILED runs
-        if (!executionQueryService.hasFailedRuns(id)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Workflow '" + workflow.getName() + "' has no failed runs"));
-        }
-
-        autoRepairService.repairWorkflow(id);
-        return ResponseEntity.accepted().body(Map.of(
-                "status", "repair_started",
-                "workflowId", id,
-                "workflowName", workflow.getName()));
-    }
-
     @PostMapping("/{id}/skills")
     @RequiresModule(ModuleCatalog.SKILLS)
     public ResponseEntity<WorkflowResponse> activateSkills(
@@ -199,48 +142,6 @@ public class WorkflowController {
                         "attachment; filename=\"" + safeName + "." + bpmnExportAdapter.fileExtension() + "\"")
                 .contentType(MediaType.parseMediaType(bpmnExportAdapter.contentType()))
                 .body(xml);
-    }
-
-    // --- Workflow Versions ---
-
-    @GetMapping("/{id}/versions")
-    public PageResponse<WorkflowVersionResponse> getVersions(
-            @PathVariable String id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        workflowService.findById(id);
-        var result = workflowVersionService.findByWorkflowId(id, PageRequest.of(page, size));
-        return new PageResponse<>(
-                workflowVersionMapper.toResponseList(result.getContent()),
-                result.getNumber(), result.getSize(),
-                result.getTotalElements(), result.getTotalPages()
-        );
-    }
-
-    @GetMapping("/{id}/versions/{versionId}")
-    public WorkflowVersionResponse getVersion(@PathVariable String id, @PathVariable String versionId) {
-        WorkflowVersion version = workflowVersionService.findById(versionId);
-        if (!version.getWorkflowId().equals(id)) {
-            throw new com.automation.exception.ResourceNotFoundException("WorkflowVersion", versionId);
-        }
-        return workflowVersionMapper.toResponse(version);
-    }
-
-    @PostMapping("/{id}/versions/{versionId}/restore")
-    public ResponseEntity<WorkflowResponse> restoreVersion(@PathVariable String id, @PathVariable String versionId) {
-        WorkflowVersion version = workflowVersionService.findById(versionId);
-        if (!version.getWorkflowId().equals(id)) {
-            throw new com.automation.exception.ResourceNotFoundException("WorkflowVersion", versionId);
-        }
-        WorkflowSnapshot snapshot;
-        try {
-            snapshot = objectMapper.readValue(version.getSnapshot(), WorkflowSnapshot.class);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
-        // outside the catch: a sealed workflow must answer 409 WORKFLOW_SEALED, not a bare 500
-        Workflow restored = workflowService.restoreFromSnapshot(id, snapshot, "Restored from version " + version.getVersionNumber());
-        return ResponseEntity.ok(workflowMapper.toResponse(restored));
     }
 
     @PostMapping("/import")

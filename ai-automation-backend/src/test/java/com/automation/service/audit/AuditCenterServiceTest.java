@@ -70,9 +70,12 @@ class AuditCenterServiceTest {
 
     @BeforeEach
     void setUp() {
+        ManagedTodoWriter managedTodoWriter =
+                new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher);
         service = new AuditCenterService(reportRepository, findingRepository, occurrenceRepository,
-                findingTodoRepository, todoRepository, new AuditAcceptancePolicy(), eventPublisher,
-                new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository));
+                new AuditAcceptancePolicy(),
+                new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
+                new AuditFindingTodoLinker(findingRepository, findingTodoRepository, todoRepository, managedTodoWriter));
     }
 
     @Test

@@ -8,8 +8,8 @@ import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.factory.WorkflowFactoryService;
-import com.automation.service.factory.WorkflowFactoryService.FactoryTestResult;
+import com.automation.service.factory.FactoryTestResult;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -36,7 +36,7 @@ public class AutoRepairService {
     private static final long DEFAULT_TIMEOUT_SECONDS = 600;
     private static final long POLLING_INTERVAL_MS = 2000;
 
-    private final WorkflowFactoryService workflowFactoryService;
+    private final FactoryVerificationService factoryVerificationService;
     private final WorkflowService workflowService;
     private final TestingService testingService;
     private final ActivityLogService activityLogService;
@@ -44,14 +44,14 @@ public class AutoRepairService {
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowExecutor workflowExecutor;
 
-    public AutoRepairService(WorkflowFactoryService workflowFactoryService,
+    public AutoRepairService(FactoryVerificationService factoryVerificationService,
                              WorkflowService workflowService,
                              TestingService testingService,
                              ActivityLogService activityLogService,
                              AppSettingsRepository appSettingsRepository,
                              WorkflowRunRepository workflowRunRepository,
                              @Lazy WorkflowExecutor workflowExecutor) {
-        this.workflowFactoryService = workflowFactoryService;
+        this.factoryVerificationService = factoryVerificationService;
         this.workflowService = workflowService;
         this.testingService = testingService;
         this.activityLogService = activityLogService;
@@ -98,7 +98,7 @@ public class AutoRepairService {
         try {
             FactoryTestResult result;
             if (shouldUseTestInstance(mode)) {
-                result = workflowFactoryService.verifyAndFix(workflowId, maxRetries);
+                result = factoryVerificationService.verifyAndFix(workflowId, maxRetries);
             } else {
                 String errorMsg = extractErrorMessage(event.getError());
                 result = repairLocally(workflowId, errorMsg, maxRetries, timeoutSeconds);
@@ -131,7 +131,7 @@ public class AutoRepairService {
         try {
             FactoryTestResult result;
             if (shouldUseTestInstance(mode)) {
-                result = workflowFactoryService.verifyAndFix(workflowId, maxRetries);
+                result = factoryVerificationService.verifyAndFix(workflowId, maxRetries);
             } else {
                 String errorMsg = extractLastFailedRunError(workflowId);
                 result = repairLocally(workflowId, errorMsg, maxRetries, timeoutSeconds);
@@ -263,7 +263,7 @@ public class AutoRepairService {
             log.info("Local repair: attempt {}/{} for workflow '{}'", i + 1, maxRetries, workflow.getName());
 
             try {
-                workflowFactoryService.autoFixWorkflow(workflow, lastError);
+                factoryVerificationService.autoFixWorkflow(workflow, lastError);
                 workflow = workflowService.findById(workflowId);
 
                 Map<String, Object> context = workflow.getDefaultContext() != null
