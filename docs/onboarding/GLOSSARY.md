@@ -105,7 +105,7 @@ Die Frontend-Anwendung ist als PWA konfiguriert (Vite PWA Plugin). Ermoeglicht I
 ## R
 
 **Run (WorkflowRun)**
-Eine einzelne Ausfuehrung eines Workflows. Status: PENDING → RUNNING → COMPLETED/FAILED/CANCELLED. Enthaelt eine Liste von `StepResult`s.
+Eine einzelne Ausfuehrung eines Workflows. Entsteht direkt als RUNNING (zwischendurch PAUSED moeglich) und endet als COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED oder INTERRUPTED. Enthaelt eine Liste von `StepResult`s.
 
 ## S
 

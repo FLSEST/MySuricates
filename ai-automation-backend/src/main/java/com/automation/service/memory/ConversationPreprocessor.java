@@ -10,8 +10,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Regelbasierte Preprocessing-Pipeline, die Step-Outputs vor dem AI-Call komprimiert.
- * Reduziert typischerweise den Input um ~50-70%.
+ * Regelbasierte Preprocessing-Pipeline, die Step-Outputs vor dem AI-Call komprimiert: große
+ * Code-Blöcke und Daten-Dumps werden zu Platzhaltern, Meta-Kommentare entfallen, wiederholte
+ * Zeilen und Agentic-Iterationen werden verdichtet. Wie stark das kürzt, hängt von den Runs ab.
  */
 @Component
 public class ConversationPreprocessor {

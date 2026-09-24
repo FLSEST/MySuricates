@@ -1408,7 +1408,7 @@ Workflows can accumulate knowledge across runs. Memory can be extracted **manual
 
 #### How It Works
 
-1. **Extract** (manually or automatically): After one or more runs, trigger extraction via UI ("Memory" tab on the workflow detail page) or API. Select runs and choose a provider (Claude or Codex). The `ConversationPreprocessor` compresses step outputs by ~50-70% before sending them to the AI, which creates a structured knowledge entry (title, Markdown content, tags).
+1. **Extract** (manually or automatically): After one or more runs, trigger extraction via UI ("Memory" tab on the workflow detail page) or API. Select runs and choose a provider (Claude or Codex). The `ConversationPreprocessor` condenses the step outputs before they go to the AI; the AI turns them into a structured knowledge entry (title, Markdown content, tags).
 2. **Activate** (manually or automatically): With manual extraction, memory starts as `active=false`. With automatic extraction, it is activated immediately. Only one version can be active at a time.
 3. **Used on next run**: Before each workflow execution, the active memory is written to `.claude/rules/project-memory.md` in the project directory. The Claude CLI accesses this file automatically via the rules system; pi and Codex do not read `.claude/rules/`, so they get memory, skills and project context appended to the system prompt (`RunContextFiles`).
 4. **Versioning**: Multiple memory versions per workflow are retained. Older versions can be restored by activating them.

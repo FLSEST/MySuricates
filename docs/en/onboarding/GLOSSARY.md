@@ -107,7 +107,7 @@ The frontend application is configured as a PWA (Vite PWA Plugin). Enables insta
 ## R
 
 **Run (WorkflowRun)**
-A single execution of a workflow. Status: PENDING → RUNNING → COMPLETED/FAILED/CANCELLED. Contains a list of `StepResult`s.
+A single execution of a workflow. Created directly as RUNNING (PAUSED possible in between) and ends as COMPLETED, COMPLETED_WITH_ERRORS, FAILED, CANCELLED or INTERRUPTED. Contains a list of `StepResult`s.
 
 ## S
 
