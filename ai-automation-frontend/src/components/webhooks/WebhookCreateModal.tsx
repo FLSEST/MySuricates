@@ -25,6 +25,8 @@ export function WebhookCreateModal({ open, workflows, onClose, onCreated }: {
         onClose();
         setForm({ workflowId: '' });
         onCreated(webhook);
+        // The page shows the full token once; the dialog keeps no copy of it
+        createWebhook.reset();
       },
     });
   };

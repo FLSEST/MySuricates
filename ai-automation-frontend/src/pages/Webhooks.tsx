@@ -158,12 +158,20 @@ export function Webhooks() {
           { label: t.webhooks.triggerUrl, value: revealedWebhook.webhookUrl },
           { label: t.webhooks.token, value: revealedWebhook.secretToken },
         ]}
-        onClose={() => setRevealedWebhook(null)}
+        onClose={() => {
+          setRevealedWebhook(null);
+          // The token must not outlive the dialog in the mutation either (a created one is
+          // dropped by WebhookCreateModal right after handing it over)
+          regenerateToken.reset();
+        }}
       />
       <SecretRevealModal
         title={t.webhooks.secretShownOnce}
         values={revealedSecret && [{ value: revealedSecret.secret, testId: 'webhook-secret' }]}
-        onClose={() => setRevealedSecret(null)}
+        onClose={() => {
+          setRevealedSecret(null);
+          generateSecret.reset();
+        }}
       >
         <p className="text-sm text-text-secondary">{t.webhooks.secretShownOnceHint}</p>
         <code className="block font-mono text-xs text-text bg-surface-secondary rounded-lg px-3 py-2 break-all">

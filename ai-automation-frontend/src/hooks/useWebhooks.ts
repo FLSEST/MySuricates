@@ -4,6 +4,13 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { WebhookTrigger, CreateWebhookRequest, WebhookSigningSecret } from '../types';
 
+/**
+ * For mutations whose response carries a token or signing secret in full. `reset()` only detaches
+ * the component; the mutation and its result would stay in the mutation cache for the default five
+ * minutes. With gcTime 0 it is dropped as soon as no component observes it (reset or unmount).
+ */
+const ONE_TIME_SECRET = { gcTime: 0 } as const;
+
 export function useWebhooks() {
   return useQuery({
     queryKey: ['webhooks'],
@@ -25,6 +32,7 @@ export function useCreateWebhook() {
   const toast = useToast();
   const t = useT();
   return useMutation({
+    ...ONE_TIME_SECRET,
     mutationFn: (data: CreateWebhookRequest) =>
       api.post<WebhookTrigger>('/webhooks', data),
     onSuccess: () => {
@@ -55,6 +63,7 @@ export function useRegenerateWebhookToken() {
   const toast = useToast();
   const t = useT();
   return useMutation({
+    ...ONE_TIME_SECRET,
     mutationFn: (id: string) => api.post<WebhookTrigger>(`/webhooks/${id}/regenerate-token`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['webhooks'] });
@@ -70,6 +79,7 @@ export function useGenerateWebhookSecret() {
   const toast = useToast();
   const t = useT();
   return useMutation({
+    ...ONE_TIME_SECRET,
     mutationFn: (id: string) => api.post<WebhookSigningSecret>(`/webhooks/${id}/secret`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['webhooks'] }),
     onError: (err) => toast.error(apiErrorMessage(err, t.webhooks.secretFailed)),
