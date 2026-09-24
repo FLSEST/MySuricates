@@ -16,8 +16,9 @@ const FILTER_STATUSES = [
 
 /**
  * Tabs und Filter der Seite „Ausführungen“: gemerkte Filter je Tab (Status, Workflow, Projekt,
- * Suche), die entprellte Suche (setzt die Seite zurück), Seitenzahlen, der Tabwechsel (leert die
- * Filter des verlassenen Tabs) und die Abfrageparameter für `useAllRuns`/`useAllChainRuns`.
+ * Suche), Seitenzahlen (jeder Filterwechsel beginnt wieder bei Seite 0, die Suche entprellt), der
+ * Tabwechsel (leert die Filter des verlassenen Tabs) und die Abfrageparameter für
+ * `useAllRuns`/`useAllChainRuns`.
  * Ist das Modul `chains` aus, gilt immer der Workflow-Tab, auch wenn der Ketten-Tab gemerkt ist.
  */
 export function useRunsFilters(chainsEnabled: boolean) {
@@ -40,15 +41,25 @@ export function useRunsFilters(chainsEnabled: boolean) {
   const [debouncedChainSearch, setDebouncedChainSearch] = useState(chainSearch);
   const [chainPage, setChainPage] = useState(0);
 
+  // A changed search goes out after a short wait and starts at the first page. Nothing changed
+  // (also right after loading): no wait, so a page chosen meanwhile stays.
   useEffect(() => {
+    if (search === debouncedSearch) return;
     const id = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
-  }, [search]);
+  }, [search, debouncedSearch]);
 
   useEffect(() => {
+    if (chainSearch === debouncedChainSearch) return;
     const id = setTimeout(() => { setDebouncedChainSearch(chainSearch); setChainPage(0); }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
-  }, [chainSearch]);
+  }, [chainSearch, debouncedChainSearch]);
+
+  // Every other filter change starts at the first page at once
+  const setStatus = (value: string) => { setStatusFilter(value); setPage(0); };
+  const setWorkflowId = (value: string) => { setWorkflowFilter(value); setPage(0); };
+  const setProjectId = (value: string) => { setProjectFilter(value); setPage(0); };
+  const setChainStatus = (value: string) => { setChainStatusFilter(value); setChainPage(0); };
 
   const changeTab = (mode: RunsViewMode) => {
     setViewMode(mode);
@@ -75,14 +86,14 @@ export function useRunsFilters(chainsEnabled: boolean) {
     changeTab,
     statusOptions,
     workflow: {
-      status: statusFilter, setStatus: setStatusFilter,
-      workflowId: workflowFilter, setWorkflowId: setWorkflowFilter,
-      projectId: projectFilter, setProjectId: setProjectFilter,
+      status: statusFilter, setStatus,
+      workflowId: workflowFilter, setWorkflowId,
+      projectId: projectFilter, setProjectId,
       search, setSearch,
       page, setPage,
     },
     chain: {
-      status: chainStatusFilter, setStatus: setChainStatusFilter,
+      status: chainStatusFilter, setStatus: setChainStatus,
       search: chainSearch, setSearch: setChainSearch,
       page: chainPage, setPage: setChainPage,
     },

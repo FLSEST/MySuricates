@@ -56,6 +56,40 @@ describe('useRunsFilters', () => {
     expect(result.current.chainQuery).toMatchObject({ search: 'nightly', page: 0 });
   });
 
+  it('starts at the first page again after any filter change', () => {
+    const { result } = renderHook(() => useRunsFilters(true));
+    const workflowChanges = [
+      () => result.current.workflow.setStatus('FAILED'),
+      () => result.current.workflow.setWorkflowId('wf-1'),
+      () => result.current.workflow.setProjectId('p1'),
+    ];
+    for (const change of workflowChanges) {
+      act(() => result.current.workflow.setPage(3));
+      act(change);
+      expect(result.current.workflowQuery.page).toBe(0);
+    }
+
+    act(() => result.current.chain.setPage(2));
+    act(() => result.current.chain.setStatus('RUNNING'));
+    expect(result.current.chainQuery.page).toBe(0);
+  });
+
+  it('keeps a page chosen right after loading — only a changed search starts over', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRunsFilters(true));
+    act(() => result.current.workflow.setPage(2));
+    act(() => result.current.chain.setPage(1));
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(result.current.workflowQuery.page).toBe(2);
+    expect(result.current.chainQuery.page).toBe(1);
+
+    // Typing and going back to the same text within the wait sends no new query either
+    act(() => result.current.workflow.setSearch('x'));
+    act(() => result.current.workflow.setSearch(''));
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(result.current.workflowQuery).toMatchObject({ search: undefined, page: 2 });
+  });
+
   it('clears the filters of the tab it leaves', () => {
     const { result } = renderHook(() => useRunsFilters(true));
     act(() => {

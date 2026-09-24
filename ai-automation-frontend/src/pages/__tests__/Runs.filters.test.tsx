@@ -25,12 +25,19 @@ const chainRun: ChainRun = {
   ],
 };
 
-function serve(executionQueries: string[] = []) {
+const workflowRun = {
+  id: 'run-1', workflowId: 'wf-1', workflowName: 'Nightly', projectName: null, projectPath: null, status: 'COMPLETED',
+  startedAt: '2026-09-14T10:00:00Z', completedAt: null, durationMs: 1000, userRating: null, error: null, metadata: {},
+  stepCount: 1, lastStepStatus: 'COMPLETED', lastStepPreview: 'done',
+};
+
+function serve(executionQueries: string[] = [], totalPages = 0) {
   server.use(
     http.get('/api/v1/system/capabilities', () => HttpResponse.json({ routes: [], blockTypes: [], ...modulesFixture('full', []) })),
     http.get('/api/v1/executions', ({ request }) => {
       executionQueries.push(new URL(request.url).search);
-      return HttpResponse.json({ content: [], page: 0, size: 50, totalElements: 0, totalPages: 0 });
+      const content = totalPages > 0 ? [workflowRun] : [];
+      return HttpResponse.json({ content, page: 0, size: 50, totalElements: totalPages * 50, totalPages });
     }),
     http.get('/api/v1/workflows', () => HttpResponse.json([])),
     http.get('/api/v1/projects', () => HttpResponse.json([])),
@@ -64,4 +71,20 @@ describe('Runs page — filters in the app language', () => {
     // Leaving the workflows tab clears its filters, also the remembered ones
     expect(localStorage.getItem('runs-status-filter')).toBe('""');
   });
+
+  it('goes back to the first page when a filter changes', async () => {
+    const queries: string[] = [];
+    serve(queries, 3);
+    renderWithProviders(<Runs />);
+
+    const next = await screen.findByRole('button', { name: '→' });
+    // Past the first wait of the search, so nothing but the filter can reset the page
+    await new Promise((r) => setTimeout(r, 350));
+    fireEvent.click(next);
+    await waitFor(() => expect(queries.at(-1)).toContain('page=1'));
+    fireEvent.change(screen.getByDisplayValue('Alle Status'), { target: { value: 'FAILED' } });
+    await waitFor(() => expect(queries.at(-1)).toContain('status=FAILED'));
+    expect(queries.at(-1)).toContain('page=0');
+  });
 });
+

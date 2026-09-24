@@ -122,7 +122,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 ### Runs (`/runs`)
 
 - Tabs „Workflows“ und „Ketten“ (nur mit Modul `chains`); beide Listen laden unabhängig vom Tab
-- `hooks/useRunsFilters.ts`: gemerkte Filter je Tab, entprellte Suche (setzt die Seite zurück), Tabwechsel leert die Filter des verlassenen Tabs, Statusoptionen in der App-Sprache (`t.runs.statuses`)
+- `hooks/useRunsFilters.ts`: gemerkte Filter je Tab; jeder Filterwechsel beginnt wieder bei Seite 0 (die Suche entprellt, erst eine geänderte Suche setzt zurück); Tabwechsel leert die Filter des verlassenen Tabs; Statusoptionen in der App-Sprache (`t.runs.statuses`)
 - Bausteine in `components/runs/`: `WorkflowsTab`, `ChainsTab`, Spalten in `runColumns.tsx` (`useWorkflowRunColumns`, `useChainRunColumns`; die Löschspalte nur, wenn `automation.executions.allow-delete` es erlaubt), `DeleteRunButton`, `RunResultText`, `ChainProgress`
 
 ### Skills (`/skills`)
