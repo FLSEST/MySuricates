@@ -33,12 +33,8 @@
     "health.build-broken",
     "health.lint-findings",
     "health.type-errors",
-    "health.oversized-sources",
-    "health.bundle-size",
-    "health.db-size",
     "health.log-errors",
     "health.doc-drift",
-    "health.dependency-vulnerability",
     "health.provider-unavailable",
     "health.gate-incident"
   ],
