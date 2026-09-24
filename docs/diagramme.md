@@ -10,7 +10,7 @@ Ablauf- und Architekturdiagramme als Mermaid-Zaeune: GitHub rendert sie direkt i
 | [Frontend Flow](frontend-flow-diagrams.md) | Routing, State, Datenfluss, WebSockets und Cache-Invalidierung | 3 |
 | [Logging & Monitoring](logging-monitoring-diagrams.md) | WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header | 2 |
 | [Request Lifecycle & Security](request-lifecycle-diagrams.md) | Vom Browser bis zur Datenbank: Filter, Fehlerformat, Auth, Rate Limits | 3 |
-| [Scheduler & Cron](scheduler-diagrams.md) | Schedules, InputContext, Ausloesung und Ausfuehrungspipeline | 3 |
+| [Scheduler & Cron](scheduler-diagrams.md) | Zeitpläne, InputContext, Auslösung und Ausführungspipeline | 3 |
 | [Skills & Capabilities](skills-diagrams.md) | Skill-Lebenszyklus, Aktivierung pro Workflow, Ausfuehrung im Skill-Capability Block | 3 |
 | [Workflow Control & States](workflow-control-diagrams.md) | Status-Maschinen, Pause/Resume/Cancel, Approval & Fehlerpfade | 4 |
 | [Workflow Engine](workflow-engine-diagrams.md) | Kernlogik, Ausführungsmodi (mit/ohne KI) und Steuerflüsse | 5 |
