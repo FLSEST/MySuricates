@@ -76,9 +76,6 @@ class WorkflowExecutorTest {
     private WorkflowVersionService workflowVersionService;
 
     @Mock
-    private com.automation.service.dlq.DeadLetterService deadLetterService;
-
-    @Mock
     private ExecutionBroadcaster broadcaster;
 
     @Mock
@@ -191,7 +188,7 @@ class WorkflowExecutorTest {
                                 requestMetricsFactSheet, activityLogService),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
-                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
+                new RunCompletionHandler(templateVerificationService, activityLogService),
                 registry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
@@ -1288,7 +1285,7 @@ class WorkflowExecutorTest {
                                 requestMetricsFactSheet, activityLogService),
                         agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
                 activityLogService,
-                new RunCompletionHandler(templateVerificationService, activityLogService, deadLetterService),
+                new RunCompletionHandler(templateVerificationService, activityLogService),
                 executionRegistry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
@@ -2010,7 +2007,7 @@ class WorkflowExecutorTest {
         AtomicReference<WorkflowRun> stored = statefulRunRepository();
         GhostRunWatchdogService watchdog = new GhostRunWatchdogService(
                 runRepository, liveRegistry, singleSlot, broadcaster, activityLogService,
-                mock(com.automation.service.scheduler.SuspendState.class));
+                mock(SuspendState.class));
 
         realThreads = Executors.newVirtualThreadPerTaskExecutor();
         WorkflowExecutor executor =

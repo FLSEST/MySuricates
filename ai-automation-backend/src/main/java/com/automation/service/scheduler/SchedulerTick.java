@@ -5,6 +5,7 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ScheduledWorkflow;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.workflow.SuspendState;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -8,7 +8,6 @@ import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.dlq.DeadLetterService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +34,6 @@ class RunCompletionHandlerTest {
 
     @Mock private TemplateVerificationService templateVerificationService;
     @Mock private ActivityLogService activityLogService;
-    @Mock private DeadLetterService deadLetterService;
 
     @InjectMocks private RunCompletionHandler handler;
 
@@ -64,7 +62,7 @@ class RunCompletionHandlerTest {
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(activityLogService).info(eq(LogCategory.EXECUTION), contains("completed"),
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
-        verifyNoInteractions(deadLetterService, templateVerificationService);
+        verifyNoInteractions(templateVerificationService);
         assertThat(ctx.getRunMetadata()).doesNotContainKeys("gate_status", "todo_items");
     }
 
@@ -154,7 +152,7 @@ class RunCompletionHandlerTest {
     }
 
     @Test
-    void complete_failedRun_logsError_andRecordsDeadLetter() {
+    void complete_failedRun_logsError() {
         WorkflowRun run = run(RunStatus.FAILED, "boom");
 
         handler.complete(run, ctx, "wf-1", "Demo", "tpl-1", "proj-1", List.of());
@@ -162,17 +160,7 @@ class RunCompletionHandlerTest {
         assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
         verify(activityLogService).error(eq(LogCategory.EXECUTION), contains("failed"),
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
-        verify(deadLetterService).recordFailure(run);
         verifyNoInteractions(templateVerificationService);
-    }
-
-    @Test
-    void complete_deadLetterThrows_doesNotPropagate() {
-        WorkflowRun run = run(RunStatus.FAILED, "boom");
-        doThrow(new RuntimeException("dlq down")).when(deadLetterService).recordFailure(run);
-
-        assertThatCode(() -> handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of()))
-                .doesNotThrowAnyException();
     }
 
     @Test
@@ -182,7 +170,7 @@ class RunCompletionHandlerTest {
         handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.CANCELLED);
-        verifyNoInteractions(deadLetterService, templateVerificationService, activityLogService);
+        verifyNoInteractions(templateVerificationService, activityLogService);
     }
 
     @Test

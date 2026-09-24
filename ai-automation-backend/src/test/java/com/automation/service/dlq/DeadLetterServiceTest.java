@@ -1,10 +1,8 @@
 package com.automation.service.dlq;
 
 import com.automation.entity.DeadLetterEntry;
-import com.automation.entity.StepResult;
-import com.automation.entity.StepStatus;
-import com.automation.entity.Workflow;
-import com.automation.entity.WorkflowRun;
+import com.automation.entity.RunStatus;
+import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.DeadLetterRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,8 +16,10 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,18 +37,9 @@ class DeadLetterServiceTest {
     @Test
     void recordFailure_capturesRunDetails() {
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        Workflow workflow = Workflow.builder().id("wf-1").name("My Workflow").build();
-        WorkflowRun run = WorkflowRun.builder()
-                .id("run-1")
-                .workflow(workflow)
-                .workflowName("My Workflow")
-                .error(Map.of("message", "Step 0 (shell) failed: command not found"))
-                .steps(List.of(
-                        StepResult.builder().stepIndex(0).status(StepStatus.FAILED).build()
-                ))
-                .build();
 
-        DeadLetterEntry result = service.recordFailure(run);
+        DeadLetterEntry result = service.recordFailure(failedEvent("run-1",
+                Map.of("step", 0, "blockType", "shell", "message", "Step 0 (shell) failed: command not found")));
 
         ArgumentCaptor<DeadLetterEntry> captor = ArgumentCaptor.forClass(DeadLetterEntry.class);
         verify(repository).save(captor.capture());
@@ -67,15 +58,47 @@ class DeadLetterServiceTest {
     @Test
     void recordFailure_handlesMissingError() {
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        WorkflowRun run = WorkflowRun.builder()
-                .id("run-2")
-                .steps(List.of())
-                .build();
 
-        DeadLetterEntry saved = service.recordFailure(run);
+        DeadLetterEntry saved = service.recordFailure(failedEvent("run-2", null));
 
         assertThat(saved.getErrorMessage()).isNull();
         assertThat(saved.getFailedStepIndex()).isNull();
+    }
+
+    @Test
+    void onWorkflowRunCompleted_recordsFailedRun() {
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.onWorkflowRunCompleted(failedEvent("run-3", Map.of("message", "boom")));
+
+        verify(repository).save(argThat(e -> "run-3".equals(e.getWorkflowRunId())));
+    }
+
+    @Test
+    void onWorkflowRunCompleted_ignoresRunsThatDidNotFail() {
+        for (RunStatus status : List.of(RunStatus.COMPLETED, RunStatus.CANCELLED)) {
+            service.onWorkflowRunCompleted(event("run-4", status, null));
+        }
+
+        verifyNoInteractions(repository);
+    }
+
+    /** Synchrone Listener laufen nacheinander — ein Fehler hier darf die folgenden nicht abschneiden. */
+    @Test
+    void onWorkflowRunCompleted_swallowsRepositoryFailure() {
+        when(repository.save(any())).thenThrow(new RuntimeException("dlq down"));
+
+        assertThatCode(() -> service.onWorkflowRunCompleted(failedEvent("run-5", Map.of("message", "boom"))))
+                .doesNotThrowAnyException();
+    }
+
+    private static WorkflowRunCompletedEvent failedEvent(String runId, Map<String, Object> error) {
+        return event(runId, RunStatus.FAILED, error);
+    }
+
+    private static WorkflowRunCompletedEvent event(String runId, RunStatus status, Map<String, Object> error) {
+        return new WorkflowRunCompletedEvent(new Object(), runId, "wf-1", "My Workflow", "proj-1", "/tmp/p",
+                status, Map.of(), Map.of(), error);
     }
 
     @Test

@@ -6,7 +6,6 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.scheduler.SuspendState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
