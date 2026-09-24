@@ -146,20 +146,31 @@ describe('Todos', () => {
     });
 
     it('edits a todo title', () => {
+      cy.intercept('PUT', '**/api/v1/todos/*').as('saveTodo');
       cy.contains('Cypress Gamma Todo').click();
       cy.get('[role="dialog"]').within(() => {
         cy.get('input').first().clear().type('Cypress Updated Todo');
-        cy.contains('button', 'Save').click();
+        // The dialog's own Save: the planning panel above it has a separate "Save planning" button
+        cy.contains('button', /^Save$/).click();
+      });
+      cy.wait('@saveTodo').then(({ request, response }) => {
+        expect(request.body.title).to.eq('Cypress Updated Todo');
+        expect(response?.statusCode).to.eq(200);
       });
       cy.shouldShowToast('Todo updated');
       cy.contains('Cypress Updated Todo').should('be.visible');
     });
 
     it('changes todo status in edit modal', () => {
+      cy.intercept('PUT', '**/api/v1/todos/*').as('saveTodo');
       cy.contains('Cypress Beta Todo').click();
       cy.get('[role="dialog"]').within(() => {
         cy.contains('button', 'In Progress').click();
-        cy.contains('button', 'Save').click();
+        cy.contains('button', /^Save$/).click();
+      });
+      cy.wait('@saveTodo').then(({ request, response }) => {
+        expect(request.body.status).to.eq('IN_PROGRESS');
+        expect(response?.statusCode).to.eq(200);
       });
       cy.shouldShowToast('Todo updated');
       // Filter to "In Progress" to verify

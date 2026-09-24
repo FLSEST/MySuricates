@@ -1,4 +1,16 @@
 describe('Wishes', () => {
+  // A wish belongs to a project: the form and the API (CreateWishRequest) require one
+  const projectName = `Cypress Wishes Project ${Date.now()}`;
+
+  before(() => {
+    cy.apiCleanup();
+    cy.apiCreateProject(projectName);
+  });
+
+  after(() => {
+    cy.apiCleanup();
+  });
+
   beforeEach(() => {
     cy.visit('/wishes');
   });
@@ -19,8 +31,11 @@ describe('Wishes', () => {
     cy.contains('button', 'Submit').should('be.visible').and('be.disabled');
   });
 
-  it('enables submit button when text is entered', () => {
-    cy.get('textarea').type('Build a dashboard for my project');
+  it('enables submit button once text and a project are given', () => {
+    cy.get('textarea[placeholder*="Describe your wish"]').type('Build a dashboard for my project');
+    // Text alone is not enough
+    cy.contains('button', 'Submit').should('be.disabled');
+    cy.contains('option', 'Select a project').parent().select(projectName);
     cy.contains('button', 'Submit').should('not.be.disabled');
   });
 
