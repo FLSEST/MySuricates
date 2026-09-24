@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Play, Eye, Sparkles, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, MessageCircle, Check, X, Loader2, ShieldAlert } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
-import { MeerkatIcon } from '../layout/Sidebar';
+import { MeerkatIcon } from '../layout/MeerkatIcon';
 import { formatAssistantTime, formatAssistantResponseTime, visibleActions } from '../assistantPanelUtils';
 import { isInternalAppPath } from '../../utils/internalAppPath';
 import { useT } from '../../i18n';

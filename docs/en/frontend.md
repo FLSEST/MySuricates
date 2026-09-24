@@ -250,6 +250,11 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 | `TerminalPanel` | Interactive xterm.js terminal with WebSocket connection |
 | `ErrorBoundary` | React error boundary with fallback UI |
 
+### Sidebar (`src/components/layout/`)
+
+- `Sidebar.tsx` only wires things up: the page list and the indentation rule for sub-entries (`isNestedAt`) live in `navItems.ts`, the logo in `MeerkatIcon.tsx`, the Simple/Pro switch in `SidebarModeToggle.tsx` (a pill, collapsed one icon button)
+- `hooks/useSidebarOrder.ts` provides the menu, the edit list and the hidden pages plus moving, adding/removing dividers, hiding/showing and resetting; pages of disabled modules are left out but keep their place in the stored order
+
 ## UI Component Library
 
 All components in `src/components/ui/`:

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useT } from '../../i18n';
-import { MeerkatIcon } from './Sidebar';
+import { MeerkatIcon } from './MeerkatIcon';
 import { api, fetchAuthStatus, validateApiKey } from '../../api/client';
 
 export function ApiKeyGuard({ children }: { children: React.ReactNode }) {

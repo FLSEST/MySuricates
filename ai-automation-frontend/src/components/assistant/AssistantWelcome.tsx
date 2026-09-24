@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useAssistantSuggestions } from '../../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../../hooks/useSystem';
-import { MeerkatIcon } from '../layout/Sidebar';
+import { MeerkatIcon } from '../layout/MeerkatIcon';
 import { assistantPhaseLabel } from '../assistantPanelUtils';
 import type { AssistantStatus } from '../../hooks/useAssistantWebSocket';
 import { useT } from '../../i18n';

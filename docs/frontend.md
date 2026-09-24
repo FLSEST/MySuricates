@@ -250,6 +250,11 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 | `TerminalPanel` | Interaktives xterm.js-Terminal mit WebSocket-Anbindung |
 | `ErrorBoundary` | React Error Boundary mit Fallback-UI |
 
+### Sidebar (`src/components/layout/`)
+
+- `Sidebar.tsx` verdrahtet nur: Seitenliste und Einrückungsregel für Untereinträge (`isNestedAt`) in `navItems.ts`, Logo in `MeerkatIcon.tsx`, Einfach/Pro-Schalter in `SidebarModeToggle.tsx` (Pille, eingeklappt ein Symbolknopf)
+- `hooks/useSidebarOrder.ts` liefert Menü, Bearbeiten-Liste und ausgeblendete Seiten samt Verschieben, Unterteiler anlegen/entfernen, Aus-/Einblenden und Zurücksetzen; Seiten abgeschalteter Module fehlen, behalten aber ihren Platz in der gespeicherten Reihenfolge
+
 ## UI-Komponentenbibliothek
 
 Alle Komponenten in `src/components/ui/`:
