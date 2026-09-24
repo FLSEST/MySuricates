@@ -149,7 +149,7 @@ For full architecture documentation: [docs/architektur.md](docs/architektur.md)
 ## CLI Concurrency & Chat Priority
 
 - **Two-tier semaphore**: `callSemaphore` (default: 5, total concurrent CLI processes) + `backgroundSemaphore` (default: 4, non-interactive calls). Chat calls only acquire `callSemaphore` → at least 1 slot reserved for interactive use.
-- `HostExecutionRequest.priority(true)` marks a call as interactive (used by `AssistantService`)
+- `HostExecutionRequest.priority(true)` marks a call as interactive (used by the assistant chat, `AssistantChatCaller`)
 - Configurable at runtime via Settings UI or `ExecutionSettingsService`: `claude-max-concurrent-calls` (1–20), `claude-reserved-for-interactive` (0–10)
 
 ## Integration / Plugin System
