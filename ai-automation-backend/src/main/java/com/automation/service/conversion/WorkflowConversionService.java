@@ -13,15 +13,14 @@ import com.automation.service.workflow.WorkflowService;
 import com.automation.util.JsonRepairUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class WorkflowConversionService {
 
@@ -30,31 +29,41 @@ public class WorkflowConversionService {
     private final WorkflowMapper workflowMapper;
     private final AiProviderRegistry aiProviderRegistry;
     private final AgentInstructionsService agentInstructionsService;
+    private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate readOnlyTransactionTemplate;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Transactional(readOnly = true)
+    public WorkflowConversionService(WorkflowRunRepository runRepository,
+                                     WorkflowService workflowService,
+                                     WorkflowMapper workflowMapper,
+                                     AiProviderRegistry aiProviderRegistry,
+                                     AgentInstructionsService agentInstructionsService,
+                                     PlatformTransactionManager transactionManager) {
+        this.runRepository = runRepository;
+        this.workflowService = workflowService;
+        this.workflowMapper = workflowMapper;
+        this.aiProviderRegistry = aiProviderRegistry;
+        this.agentInstructionsService = agentInstructionsService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
+
+    /**
+     * Deliberately not {@code @Transactional}: the AI-assisted conversion asks the model, and with
+     * HikariCP pool-size 1 an enclosing transaction would hold the only DB connection for that whole
+     * call. The run is read in a short read-only burst before it.
+     */
     public WorkflowSuggestion suggestWorkflow(String runId) {
-        WorkflowRun run = runRepository.findById(runId)
-                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
-
-        if (run.getStatus() != RunStatus.COMPLETED) {
-            return WorkflowSuggestion.notAvailable();
-        }
-
-        // Find agentic steps with iteration data
-        List<StepResult> agenticSteps = run.getSteps().stream()
-                .filter(s -> s.getMetadata() != null
-                        && "agentic".equals(s.getMetadata().get("blockType"))
-                        && Boolean.TRUE.equals(s.getMetadata().get("goalAchieved")))
-                .toList();
-
-        if (agenticSteps.isEmpty()) {
+        List<StepResult> agenticSteps =
+                readOnlyTransactionTemplate.execute(status -> goalAchievedAgenticSteps(runId));
+        if (agenticSteps == null || agenticSteps.isEmpty()) {
             return WorkflowSuggestion.notAvailable();
         }
 
         // Try AI-assisted conversion first, fall back to rule-based
         try {
-            WorkflowSuggestion aiSuggestion = suggestWorkflowAI(run, agenticSteps);
+            WorkflowSuggestion aiSuggestion = suggestWorkflowAI(agenticSteps);
             if (aiSuggestion.available()) {
                 return aiSuggestion;
             }
@@ -62,11 +71,31 @@ public class WorkflowConversionService {
             log.debug("AI-assisted conversion failed, falling back to rule-based: {}", e.getMessage());
         }
 
-        return suggestWorkflowRuleBased(run, agenticSteps);
+        return suggestWorkflowRuleBased(agenticSteps);
+    }
+
+    /**
+     * Read burst of {@link #suggestWorkflow}: the agentic steps of a completed run that reached their
+     * goal, copied out of the lazy {@code steps} collection before the transaction closes (OSIV is
+     * off). Empty when the run did not complete.
+     */
+    private List<StepResult> goalAchievedAgenticSteps(String runId) {
+        WorkflowRun run = runRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
+
+        if (run.getStatus() != RunStatus.COMPLETED) {
+            return List.of();
+        }
+
+        return run.getSteps().stream()
+                .filter(s -> s.getMetadata() != null
+                        && "agentic".equals(s.getMetadata().get("blockType"))
+                        && Boolean.TRUE.equals(s.getMetadata().get("goalAchieved")))
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
-    private WorkflowSuggestion suggestWorkflowRuleBased(WorkflowRun run, List<StepResult> agenticSteps) {
+    private WorkflowSuggestion suggestWorkflowRuleBased(List<StepResult> agenticSteps) {
         List<BlockDefinition> blocks = new ArrayList<>();
         String goal = "";
         int totalActionsAnalyzed = 0;
@@ -114,7 +143,7 @@ public class WorkflowConversionService {
     }
 
     @SuppressWarnings("unchecked")
-    private WorkflowSuggestion suggestWorkflowAI(WorkflowRun run, List<StepResult> agenticSteps) throws Exception {
+    private WorkflowSuggestion suggestWorkflowAI(List<StepResult> agenticSteps) throws Exception {
         // Build action sequence description for the AI
         StringBuilder actionDesc = new StringBuilder();
         String goal = "";
@@ -177,7 +206,10 @@ public class WorkflowConversionService {
         return new WorkflowSuggestion(sugName, sugDesc, blocks, goal, blocks.size(), true);
     }
 
-    @Transactional
+    /**
+     * Not {@code @Transactional} either, for the model call inside {@link #suggestWorkflow}: only
+     * creating the workflow and mapping the response share one transaction, after that call.
+     */
     public WorkflowResponse createWorkflowFromSuggestion(String runId, String projectId, String name) {
         WorkflowSuggestion suggestion = suggestWorkflow(runId);
 
@@ -203,8 +235,8 @@ public class WorkflowConversionService {
                 null
         );
 
-        Workflow created = workflowService.create(request, ChangeSource.CONVERSION);
-        return workflowMapper.toResponse(created);
+        return transactionTemplate.execute(status ->
+                workflowMapper.toResponse(workflowService.create(request, ChangeSource.CONVERSION)));
     }
 
     private String extractJson(String text) {

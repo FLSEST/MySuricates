@@ -9,15 +9,18 @@ import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.workflow.AgentInstructionsService;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.testsupport.FakeTransactions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,8 +52,8 @@ class WorkflowConversionServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        conversionService = new WorkflowConversionService(
-                runRepository, workflowService, workflowMapper, aiProviderRegistry, agentInstructionsService);
+        conversionService = new WorkflowConversionService(runRepository, workflowService, workflowMapper,
+                aiProviderRegistry, agentInstructionsService, FakeTransactions.manager());
         lenient().when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("");
         lenient().when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
     }
@@ -255,5 +258,66 @@ class WorkflowConversionServiceTest {
         }
         assertThat(prompt.lines().filter(line -> line.contains("\"type\": \"retry\"")).toList())
                 .isNotEmpty().allMatch(line -> line.contains("\"execution_mode\": \"shell\""));
+    }
+
+    // ── transaction boundaries (HikariCP pool-size 1) ──────────────────────
+
+    private WorkflowConversionService proxiedWithFakeTransactions() {
+        PlatformTransactionManager transactions = FakeTransactions.manager();
+        return FakeTransactions.proxy(new WorkflowConversionService(runRepository, workflowService,
+                workflowMapper, aiProviderRegistry, agentInstructionsService, transactions), transactions);
+    }
+
+    @Test
+    void suggestWorkflow_readsTheRunInsideATransactionButAsksTheModelOutsideAny() throws Exception {
+        WorkflowRun run = buildCompletedRunWithAgenticSteps();
+        AtomicReference<Boolean> txDuringRead = new AtomicReference<>();
+        AtomicReference<Boolean> txDuringModelCall = new AtomicReference<>();
+        when(runRepository.findById("run-1")).thenAnswer(inv -> {
+            txDuringRead.set(FakeTransactions.active());
+            return Optional.of(run);
+        });
+        when(aiProvider.reason(any())).thenAnswer(inv -> {
+            txDuringModelCall.set(FakeTransactions.active());
+            throw new RuntimeException("no AI");
+        });
+
+        WorkflowSuggestion suggestion = proxiedWithFakeTransactions().suggestWorkflow("run-1");
+
+        assertThat(txDuringModelCall.get()).as("the model call must not hold the only DB connection").isFalse();
+        assertThat(txDuringRead.get()).as("the run is read in a short transaction").isTrue();
+        assertThat(suggestion.available()).isTrue();
+        assertThat(suggestion.blocks()).hasSize(2);
+    }
+
+    @Test
+    void createWorkflowFromSuggestion_asksTheModelOutsideAnyTransactionAndCreatesInsideOne() throws Exception {
+        WorkflowRun run = buildCompletedRunWithAgenticSteps();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        AtomicReference<Boolean> txDuringModelCall = new AtomicReference<>();
+        AtomicReference<Boolean> txDuringCreate = new AtomicReference<>();
+        AtomicReference<Boolean> txDuringMapping = new AtomicReference<>();
+        when(aiProvider.reason(any())).thenAnswer(inv -> {
+            txDuringModelCall.set(FakeTransactions.active());
+            throw new RuntimeException("no AI");
+        });
+        Workflow created = Workflow.builder().id("new-wf").name("My Workflow").build();
+        when(workflowService.create(any(), eq(ChangeSource.CONVERSION))).thenAnswer(inv -> {
+            txDuringCreate.set(FakeTransactions.active());
+            return created;
+        });
+        WorkflowResponse response = mock(WorkflowResponse.class);
+        when(workflowMapper.toResponse(created)).thenAnswer(inv -> {
+            txDuringMapping.set(FakeTransactions.active());
+            return response;
+        });
+
+        WorkflowResponse result = proxiedWithFakeTransactions()
+                .createWorkflowFromSuggestion("run-1", "proj-1", "My Workflow");
+
+        assertThat(txDuringModelCall.get()).as("the model call must not hold the only DB connection").isFalse();
+        assertThat(txDuringCreate.get()).as("the workflow is created in a transaction").isTrue();
+        assertThat(txDuringMapping.get()).as("the response is mapped in the same transaction").isTrue();
+        assertThat(result).isSameAs(response);
     }
 }

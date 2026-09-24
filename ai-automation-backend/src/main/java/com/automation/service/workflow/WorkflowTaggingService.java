@@ -71,8 +71,9 @@ public class WorkflowTaggingService {
     /**
      * Self-reference via {@code @Lazy} so {@code @Transactional} on
      * {@link #loadAndBuildPrompt(String)} and {@link #persistTags(String, TagResult)}
-     * is actually applied when called from {@link #tagSingle(String)} — direct
-     * this.method() would bypass the Spring AOP proxy and silently skip the tx.
+     * is actually applied when called from {@link #tagSingle(String)}, and {@code @Async} on
+     * {@link #backfillUntagged()} when {@link #onAppReady()} starts it — direct this.method()
+     * would bypass the Spring AOP proxy and silently skip the tx or run synchronously.
      */
     private final WorkflowTaggingService self;
 
@@ -111,9 +112,10 @@ public class WorkflowTaggingService {
         return autoTaggingEnabled;
     }
 
+    /** Starts the backfill through the proxy, so the startup does not wait for its model calls. */
     @EventListener(ApplicationReadyEvent.class)
     public void onAppReady() {
-        backfillUntagged();
+        self.backfillUntagged();
     }
 
     @Async

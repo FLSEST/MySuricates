@@ -17,7 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +48,8 @@ public class PageSuggestionService {
     private final AppSettingsRepository appSettingsRepository;
     private final CommandExecutorService commandExecutorService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final TransactionTemplate readOnlyTransactionTemplate;
 
     /** Tracks last refresh time per page to throttle AI calls. */
     private final Map<String, Instant> lastRefreshAt = new ConcurrentHashMap<>();
@@ -62,13 +65,17 @@ public class PageSuggestionService {
                                   WorkflowMemoryRepository workflowMemoryRepository,
                                   AppSettingsRepository appSettingsRepository,
                                   CommandExecutorService commandExecutorService,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper,
+                                  PlatformTransactionManager transactionManager) {
         this.sessionRepository = sessionRepository;
         this.suggestionRepository = suggestionRepository;
         this.workflowMemoryRepository = workflowMemoryRepository;
         this.appSettingsRepository = appSettingsRepository;
         this.commandExecutorService = commandExecutorService;
         this.objectMapper = objectMapper;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
     }
 
     @PostConstruct
@@ -105,14 +112,24 @@ public class PageSuggestionService {
                 .orElseGet(() -> getDefaults(page));
     }
 
-    @Transactional
+    /**
+     * Deliberately not {@code @Transactional}: the model call takes up to 60 s, and with HikariCP
+     * pool-size 1 an enclosing transaction would hold the only DB connection for all of it. The
+     * prompt is built in a short read burst, the result written in a short write burst.
+     */
     public List<String> refreshSuggestions(String page) {
-        List<AssistantSession> sessions = sessionRepository.findTop10ByPageOrderByStartedAtDesc(page);
-        List<String> suggestions = generateViaClaude(page, sessions);
-        persist(page, suggestions, sessions.size());
+        PromptInput input = readOnlyTransactionTemplate.execute(status -> {
+            List<AssistantSession> sessions = sessionRepository.findTop10ByPageOrderByStartedAtDesc(page);
+            return new PromptInput(buildPrompt(page, sessions), sessions.size());
+        });
+        List<String> suggestions = generateViaClaude(page, input.prompt());
+        transactionTemplate.executeWithoutResult(status -> persist(page, suggestions, input.sessionCount()));
         lastRefreshAt.put(page, Instant.now());
         return suggestions;
     }
+
+    /** What the read burst of {@link #refreshSuggestions} hands over to the model call. */
+    private record PromptInput(String prompt, int sessionCount) {}
 
     // ── Event listener (async, throttled) ───────────────────────────────────
 
@@ -138,8 +155,7 @@ public class PageSuggestionService {
 
     // ── Generation ───────────────────────────────────────────────────────────
 
-    private List<String> generateViaClaude(String page, List<AssistantSession> sessions) {
-        String prompt = buildPrompt(page, sessions);
+    private List<String> generateViaClaude(String page, String prompt) {
         try {
             var result = commandExecutorService.executeOnHost(
                     HostExecutionRequest.builder()
