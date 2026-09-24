@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { X, Send, Clock, Plus, Square } from 'lucide-react';
 import { useAssistantStore } from '../stores/assistantStore';
-import { useAssistantChat, type ChatMessage } from '../hooks/useAssistant';
+import { useAssistantConversation } from '../hooks/useAssistantConversation';
 import { useAssistantWebSocket } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
-import { useSettingsStore } from '../stores/settingsStore';
-import { generateId } from '../utils/uuid';
 import { MeerkatIcon } from './layout/Sidebar';
 import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
 import { AssistantHistory } from './assistant/AssistantHistory';
 import { StatusIndicator, AssistantEmptyState, ContextChips } from './assistant/AssistantWelcome';
-import { useT, useI18nStore } from '../i18n';
+import { useT } from '../i18n';
 
 export function AssistantPanel() {
   const {
@@ -21,27 +18,21 @@ export function AssistantPanel() {
     sessions, activeSessionId, showHistory, panelWidth, panelHeight,
     pendingInput, setPendingInput,
     pendingContext, setPendingContext,
-    startNewSession, appendMessage,
+    startNewSession,
     setShowHistory, setPanelWidth, setPanelHeight,
+    lastModel,
   } = useAssistantStore();
-  const updateMessageStatus = useAssistantStore((s) => s.updateMessageStatus);
-  const defaultAiProvider = useSettingsStore((s) => s.defaultAiProvider);
   const t = useT();
-  const locale = useI18nStore((s) => s.locale);
 
   const location = useLocation();
   const [input, setInput] = useState('');
-  const [lastModel, setLastModel] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { mutate: sendMessage, isPending } = useAssistantChat();
+  // Sending, queueing and cancelling are shared with the Simple home's field
+  const { send, cancel, isPending, inFlight } = useAssistantConversation();
   const { mutate: executeWorkflow } = useExecuteWorkflow();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const abortRef = useRef<AbortController | null>(null);
-  const queueRef = useRef<{ text: string; sessionId: string }[]>([]);
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
-  const { currentPhase } = useAssistantWebSocket(activeRequestId, activeSessionId);
+  const { currentPhase } = useAssistantWebSocket(inFlight?.requestId ?? null, activeSessionId);
 
   const ctx = pendingContext ?? parsePageContext(location.pathname);
 
@@ -137,77 +128,6 @@ export function AssistantPanel() {
     setIsResizing(false);
   };
 
-  const dispatchChat = (text: string, sessionId: string, userMsgId: string) => {
-    const currentSession = useAssistantStore.getState().sessions.find((s) => s.id === sessionId);
-    const history = (currentSession?.messages ?? [])
-      .filter((m) => m.id !== userMsgId && m.role !== 'assistant' || m.role === 'assistant')
-      .filter((m) => m.id !== userMsgId)
-      .map((m) => ({ role: m.role, content: m.content }));
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const requestId = generateId();
-    setActiveRequestId(requestId);
-
-    sendMessage(
-      { req: { message: text, history, context: ctx, provider: defaultAiProvider || undefined, language: locale, sessionId, requestId }, signal: controller.signal },
-      {
-        onSuccess: (res) => {
-          abortRef.current = null;
-          setActiveRequestId(null);
-          updateMessageStatus(sessionId, userMsgId, 'sent');
-          if (res.model) setLastModel(res.model);
-          appendMessage(sessionId, {
-            id: generateId(),
-            role: 'assistant',
-            content: res.message,
-            actions: res.actions,
-            responseTimeMs: res.responseTimeMs ?? undefined,
-            provider: res.provider ?? undefined,
-            model: res.model ?? undefined,
-            pendingTools: res.pendingTools,
-            timestamp: Date.now(),
-          });
-          queryClient.invalidateQueries({ queryKey: ['assistant-sessions-api'] });
-          processQueue();
-        },
-        onError: (err) => {
-          abortRef.current = null;
-          setActiveRequestId(null);
-          // AbortError = user cancelled, don't show error bubble
-          const isAbort = err instanceof DOMException && err.name === 'AbortError';
-          if (isAbort) {
-            updateMessageStatus(sessionId, userMsgId, undefined as unknown as 'sending');
-            // Clear status silently — message stays but no error shown
-            processQueue();
-            return;
-          }
-          updateMessageStatus(sessionId, userMsgId, 'error');
-          appendMessage(sessionId, {
-            id: generateId(),
-            role: 'assistant',
-            content: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
-            timestamp: Date.now(),
-            isError: true,
-          });
-          processQueue();
-        },
-      }
-    );
-    // Per-message context (e.g. a Diagnose run) applies once, then we revert to the URL context.
-    if (pendingContext) setPendingContext(null);
-  };
-
-  const processQueue = () => {
-    const next = queueRef.current.shift();
-    if (next) {
-      const now = +new Date();
-      const userMsg: ChatMessage = { id: generateId(), role: 'user', content: next.text, timestamp: now, status: 'sending' };
-      appendMessage(next.sessionId, userMsg);
-      dispatchChat(next.text, next.sessionId, userMsg.id);
-    }
-  };
-
   const handleSendText = (text: string) => {
     if (!text) return;
 
@@ -217,24 +137,13 @@ export function AssistantPanel() {
       sessionId = startNewSession();
     }
 
-    const now = +new Date();
-    const userMsg: ChatMessage = { id: generateId(), role: 'user', content: text, timestamp: now, status: 'sending' };
-    appendMessage(sessionId, userMsg);
-
-    if (isPending) {
-      // Queue for later — message is already visible with ⏳
-      queueRef.current.push({ text, sessionId });
-      return;
-    }
-
-    dispatchChat(text, sessionId, userMsg.id);
+    // While another request is on its way the message is queued — already visible with ⏳
+    send(text, sessionId, ctx);
+    // Per-message context (e.g. a Diagnose run) applies once, then we revert to the URL context.
+    if (pendingContext) setPendingContext(null);
   };
 
-  const handleCancel = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setActiveRequestId(null);
-  };
+  const handleCancel = () => cancel();
 
   const handleSend = () => {
     const text = input.trim();
