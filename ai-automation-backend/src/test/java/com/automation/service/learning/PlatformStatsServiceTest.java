@@ -84,10 +84,8 @@ class PlatformStatsServiceTest {
     @Test
     void getPlatformStats_projectCounts() {
         stubAllEmpty();
-        when(projectRepository.findByArchivedAtIsNull()).thenReturn(
-                List.of(Project.builder().build(), Project.builder().build()));
-        when(projectRepository.findByArchivedAtIsNotNull()).thenReturn(
-                List.of(Project.builder().build()));
+        when(projectRepository.countByArchivedAtIsNull()).thenReturn(2L);
+        when(projectRepository.countByArchivedAtIsNotNull()).thenReturn(1L);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -146,10 +144,7 @@ class PlatformStatsServiceTest {
     void getPlatformStats_templateCounts() {
         stubAllEmpty();
         when(templateRepository.count()).thenReturn(10L);
-        when(templateRepository.findByBuiltInTrue()).thenReturn(
-                List.of(WorkflowTemplate.builder().build(),
-                        WorkflowTemplate.builder().build(),
-                        WorkflowTemplate.builder().build()));
+        when(templateRepository.countByBuiltInTrue()).thenReturn(3L);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -162,9 +157,7 @@ class PlatformStatsServiceTest {
     void getPlatformStats_scheduleCounts() {
         stubAllEmpty();
         when(scheduleRepository.count()).thenReturn(5L);
-        when(scheduleRepository.findByEnabledTrue()).thenReturn(
-                List.of(ScheduledWorkflow.builder().build(),
-                        ScheduledWorkflow.builder().build()));
+        when(scheduleRepository.countByEnabledTrue()).thenReturn(2L);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -204,8 +197,7 @@ class PlatformStatsServiceTest {
     @Test
     void getPlatformStats_triggerCounts() {
         stubAllEmpty();
-        when(todoTriggerRepository.findByEnabledTrue()).thenReturn(
-                List.of(TodoTrigger.builder().build()));
+        when(todoTriggerRepository.countByEnabledTrue()).thenReturn(1L);
         when(completionTriggerRepository.countByEnabledTrue()).thenReturn(3L);
 
         PlatformStatsResponse result = service.getPlatformStats();
@@ -217,9 +209,7 @@ class PlatformStatsServiceTest {
     @Test
     void getPlatformStats_memoryEntries() {
         stubAllEmpty();
-        when(memoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(
-                List.of(WorkflowMemory.builder().build(),
-                        WorkflowMemory.builder().build()));
+        when(memoryRepository.countByActiveTrue()).thenReturn(2L);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -250,13 +240,9 @@ class PlatformStatsServiceTest {
     @Test
     void getPlatformStats_wishStats() {
         stubAllEmpty();
-        Wish completed = Wish.builder().status(WishStatus.COMPLETED).build();
-        Wish failed = Wish.builder().status(WishStatus.FAILED).build();
-        Wish cancelled = Wish.builder().status(WishStatus.CANCELLED).build();
-        Wish inProgress = Wish.builder().status(WishStatus.EXECUTING).build();
-        Wish received = Wish.builder().status(WishStatus.RECEIVED).build();
-        when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(
-                List.of(completed, failed, cancelled, inProgress, received));
+        when(wishRepository.count()).thenReturn(5L);
+        when(wishRepository.countByStatusIn(List.of(WishStatus.COMPLETED))).thenReturn(1L);
+        when(wishRepository.countByStatusIn(List.of(WishStatus.FAILED, WishStatus.CANCELLED))).thenReturn(2L);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -282,10 +268,7 @@ class PlatformStatsServiceTest {
     void getPlatformStats_assistantStats_withSessions() {
         stubAllEmpty();
         when(assistantSessionRepository.count()).thenReturn(3L);
-        when(assistantSessionRepository.findAll()).thenReturn(List.of(
-                AssistantSession.builder().messageCount(10).build(),
-                AssistantSession.builder().messageCount(20).build(),
-                AssistantSession.builder().messageCount(30).build()));
+        when(assistantSessionRepository.averageMessageCount()).thenReturn(20.0);
 
         PlatformStatsResponse result = service.getPlatformStats();
 
@@ -369,28 +352,21 @@ class PlatformStatsServiceTest {
      * only need to override the repos they care about.
      */
     private void stubAllEmpty() {
-        when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-        when(projectRepository.findByArchivedAtIsNotNull()).thenReturn(List.of());
         when(workflowRepository.count()).thenReturn(0L);
         when(skillRepository.findAll()).thenReturn(List.of());
         when(templateRepository.count()).thenReturn(0L);
-        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of());
         when(scheduleRepository.count()).thenReturn(0L);
-        when(scheduleRepository.findByEnabledTrue()).thenReturn(List.of());
         when(webhookRepository.count()).thenReturn(0L);
         when(webhookRepository.countByEnabledTrue()).thenReturn(0L);
         when(chainRepository.count()).thenReturn(0L);
         when(chainRunRepository.count()).thenReturn(0L);
         when(chainRunRepository.countByStatus(RunStatus.COMPLETED)).thenReturn(0L);
         when(chainRunRepository.countByStatus(RunStatus.FAILED)).thenReturn(0L);
-        when(todoTriggerRepository.findByEnabledTrue()).thenReturn(List.of());
         when(completionTriggerRepository.countByEnabledTrue()).thenReturn(0L);
-        when(memoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
         when(todoRepository.countGroupedByStatus()).thenReturn(new TodoCountResponse(0, 0, 0, 0, 0));
         when(todoRepository.countBySource(Todo.Source.USER)).thenReturn(0L);
         when(todoRepository.countBySource(Todo.Source.AI)).thenReturn(0L);
         when(todoRepository.countBySource(Todo.Source.WORKFLOW)).thenReturn(0L);
-        when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
         when(assistantSessionRepository.count()).thenReturn(0L);
     }
 }

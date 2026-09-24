@@ -29,7 +29,8 @@ class PackageCycleRatchetTest {
     /**
      * Canonical form {@code "a <-> b"} with {@code a} lexicographically before {@code b}.
      * State on 2026-09-18 (commit 3c984b58): the 13 pairs that arch-metrics.sh reports as
-     * {@code cycle_pairs=13}.
+     * {@code cycle_pairs=13}. 2026-09-24: scheduler and dlq no longer pair with service.workflow
+     * (SuspendState moved, DLQ entries via WorkflowRunCompletedEvent) — 11 pairs.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
             "com.automation.config <-> com.automation.security",
@@ -40,9 +41,7 @@ class PackageCycleRatchetTest {
             "com.automation.service.ai <-> com.automation.service.system",
             "com.automation.service.assistant <-> com.automation.service.assistant.context",
             "com.automation.service.assistant <-> com.automation.service.assistant.fetch",
-            "com.automation.service.dlq <-> com.automation.service.workflow",
             "com.automation.service.project <-> com.automation.service.workflow",
-            "com.automation.service.scheduler <-> com.automation.service.workflow",
             "com.automation.service.system <-> com.automation.service.workflow",
             "com.automation.service.todo <-> com.automation.service.workflow");
 

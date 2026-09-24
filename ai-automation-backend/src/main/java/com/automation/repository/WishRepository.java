@@ -13,6 +13,7 @@ public interface WishRepository extends JpaRepository<Wish, String> {
     List<Wish> findByProjectIdOrderByCreatedAtDesc(String projectId);
     List<Wish> findByStatusOrderByCreatedAtDesc(WishStatus status);
     List<Wish> findAllByOrderByCreatedAtDesc();
+    long countByStatusIn(List<WishStatus> statuses);
     List<Wish> findByStatusInAndUpdatedAtBefore(List<WishStatus> statuses, Instant before);
 
     /** Wuensche, die auf einen Run zeigen — loser Textverweis, beim Loeschen zu nullen. */

@@ -18,6 +18,7 @@ public interface WorkflowMemoryRepository extends JpaRepository<WorkflowMemory, 
     Optional<WorkflowMemory> findByWorkflowIdAndActiveTrue(String workflowId);
 
     List<WorkflowMemory> findByActiveTrueOrderByCreatedAtDesc();
+    long countByActiveTrue();
 
     @Modifying
     @Query("UPDATE WorkflowMemory m SET m.active = false WHERE m.workflowId = :workflowId AND m.active = true")

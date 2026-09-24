@@ -10,7 +10,6 @@ import com.automation.entity.WorkflowRun;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
-import com.automation.service.dlq.DeadLetterService;
 import com.automation.service.todo.GateExpectation;
 import com.automation.service.todo.GateStatusOutputParser;
 import com.automation.service.todo.TodoOutputParser;
@@ -43,7 +42,6 @@ public class RunCompletionHandler {
 
     private final TemplateVerificationService templateVerificationService;
     private final ActivityLogService activityLogService;
-    private final DeadLetterService deadLetterService;
 
     public void complete(WorkflowRun run, ExecutionContext context, String workflowId,
                          String workflowName, String templateId, String projectId,
@@ -183,14 +181,11 @@ public class RunCompletionHandler {
                         "WorkflowExecutor", run.getId(), workflowId);
             }
         } else if (run.getStatus() == RunStatus.FAILED) {
+            // Den DLQ-Eintrag legt DeadLetterService per WorkflowRunCompletedEvent an — so haengt
+            // service.workflow nicht an service.dlq (Paketzyklus, TODO d55c55de).
             activityLogService.error(LogCategory.EXECUTION,
                     "Workflow execution failed: " + run.getId(),
                     "WorkflowExecutor", run.getId(), workflowId);
-            try {
-                deadLetterService.recordFailure(run);
-            } catch (Exception dlqError) {
-                log.warn("Failed to record DLQ entry for run {}: {}", run.getId(), dlqError.getMessage());
-            }
         }
     }
 

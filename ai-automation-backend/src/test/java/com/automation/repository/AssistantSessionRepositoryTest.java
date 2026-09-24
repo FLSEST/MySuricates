@@ -205,4 +205,23 @@ class AssistantSessionRepositoryTest {
         assertThat(found.getPreview()).isEqualTo("Hello");
         assertThat(found.getMessageCount()).isEqualTo(5);
     }
+
+    // ---------- averageMessageCount ----------
+
+    @Test
+    void should_return_null_average_when_no_sessions() {
+        assertThat(repository.averageMessageCount()).isNull();
+    }
+
+    @Test
+    void should_average_message_count_over_all_sessions() {
+        Instant now = Instant.now();
+        for (int count : new int[]{10, 20, 30}) {
+            AssistantSession session = createSession("workflows", now);
+            session.setMessageCount(count);
+            repository.save(session);
+        }
+
+        assertThat(repository.averageMessageCount()).isEqualTo(20.0);
+    }
 }

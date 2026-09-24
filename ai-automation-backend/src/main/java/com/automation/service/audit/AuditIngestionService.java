@@ -25,8 +25,6 @@ public class AuditIngestionService {
     private final AuditReportRepository reportRepository;
     private final AuditFindingRepository findingRepository;
     private final AuditFindingOccurrenceRepository occurrenceRepository;
-    private final AuditFindingTodoRepository findingTodoRepository;
-    private final TodoRepository todoRepository;
     private final AuditResultParser parser;
     private final AuditAcceptancePolicy acceptancePolicy;
     private final AuditRuleKeyCatalog ruleKeyCatalog;

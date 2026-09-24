@@ -1,4 +1,4 @@
-package com.automation.service.scheduler;
+package com.automation.service.workflow;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

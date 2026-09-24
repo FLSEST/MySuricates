@@ -14,6 +14,10 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
     List<Project> findByArchivedAtIsNull();
 
+    long countByArchivedAtIsNull();
+
+    long countByArchivedAtIsNotNull();
+
     /**
      * Die nicht archivierten Projekte samt Container — die Liste hinter
      * {@code GET /api/v1/projects}.

@@ -8,6 +8,7 @@ import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.Workflow;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.workflow.SuspendState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -10,6 +10,7 @@ import java.util.List;
 public interface TodoTriggerRepository extends JpaRepository<TodoTrigger, String> {
 
     List<TodoTrigger> findByEnabledTrue();
+    long countByEnabledTrue();
 
     List<TodoTrigger> findByTargetWorkflowId(String workflowId);
 }

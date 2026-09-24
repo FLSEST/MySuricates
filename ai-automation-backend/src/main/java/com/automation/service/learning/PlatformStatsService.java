@@ -41,8 +41,8 @@ public class PlatformStatsService {
     @Transactional(readOnly = true)
     public PlatformStatsResponse getPlatformStats() {
         // Projects
-        long activeProjects = projectRepository.findByArchivedAtIsNull().size();
-        long archivedProjects = projectRepository.findByArchivedAtIsNotNull().size();
+        long activeProjects = projectRepository.countByArchivedAtIsNull();
+        long archivedProjects = projectRepository.countByArchivedAtIsNotNull();
 
         // Workflows
         long totalWorkflows = workflowRepository.count();
@@ -66,12 +66,12 @@ public class PlatformStatsService {
 
         // Templates
         long totalTemplates = templateRepository.count();
-        long builtinTemplates = templateRepository.findByBuiltInTrue().size();
+        long builtinTemplates = templateRepository.countByBuiltInTrue();
         long customTemplates = totalTemplates - builtinTemplates;
 
         // Schedules
         long totalSchedules = scheduleRepository.count();
-        long activeSchedules = scheduleRepository.findByEnabledTrue().size();
+        long activeSchedules = scheduleRepository.countByEnabledTrue();
 
         // Webhooks
         long totalWebhooks = webhookRepository.count();
@@ -86,11 +86,11 @@ public class PlatformStatsService {
                 totalChains, totalChainRuns, successfulChainRuns, failedChainRuns);
 
         // Triggers
-        long activeTodoTriggers = todoTriggerRepository.findByEnabledTrue().size();
+        long activeTodoTriggers = todoTriggerRepository.countByEnabledTrue();
         long activeCompletionTriggers = completionTriggerRepository.countByEnabledTrue();
 
         // Memory
-        long activeMemoryEntries = memoryRepository.findByActiveTrueOrderByCreatedAtDesc().size();
+        long activeMemoryEntries = memoryRepository.countByActiveTrue();
 
         // Todos
         TodoCountResponse todoCounts = todoRepository.countGroupedByStatus();
@@ -102,26 +102,16 @@ public class PlatformStatsService {
                 fromUser, fromAi, fromWorkflow);
 
         // Wishes
-        List<Wish> allWishes = wishRepository.findAllByOrderByCreatedAtDesc();
-        long wishTotal = allWishes.size();
-        long wishCompleted = allWishes.stream().filter(w -> w.getStatus() == WishStatus.COMPLETED).count();
-        long wishFailed = allWishes.stream().filter(w -> w.getStatus() == WishStatus.FAILED || w.getStatus() == WishStatus.CANCELLED).count();
-        long wishInProgress = allWishes.stream().filter(w -> {
-            WishStatus s = w.getStatus();
-            return s != WishStatus.COMPLETED && s != WishStatus.FAILED && s != WishStatus.CANCELLED;
-        }).count();
+        long wishTotal = wishRepository.count();
+        long wishCompleted = wishRepository.countByStatusIn(List.of(WishStatus.COMPLETED));
+        long wishFailed = wishRepository.countByStatusIn(List.of(WishStatus.FAILED, WishStatus.CANCELLED));
+        long wishInProgress = wishTotal - wishCompleted - wishFailed;
         var wishStats = new PlatformStatsResponse.WishStats(wishTotal, wishCompleted, wishFailed, wishInProgress);
 
         // Assistant
         long totalSessions = assistantSessionRepository.count();
-        double avgMessages = 0;
-        if (totalSessions > 0) {
-            List<AssistantSession> sessions = assistantSessionRepository.findAll();
-            avgMessages = sessions.stream()
-                    .mapToInt(AssistantSession::getMessageCount)
-                    .average()
-                    .orElse(0);
-        }
+        Double avgMessageCount = totalSessions > 0 ? assistantSessionRepository.averageMessageCount() : null;
+        double avgMessages = avgMessageCount != null ? avgMessageCount : 0;
         var assistantStats = new PlatformStatsResponse.AssistantStats(totalSessions, avgMessages);
 
         return new PlatformStatsResponse(

@@ -52,7 +52,7 @@ class AuditIngestionServiceTest {
     @BeforeEach
     void setUp() {
         service = new AuditIngestionService(runRepository, reportRepository, findingRepository, occurrenceRepository,
-                findingTodoRepository, todoRepository, new AuditResultParser(new ObjectMapper()),
+                new AuditResultParser(new ObjectMapper()),
                 new AuditAcceptancePolicy(), new AuditRuleKeyCatalog(new ObjectMapper()), activityLog,
                 new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher));
         when(reportRepository.save(any())).thenAnswer(inv -> {
