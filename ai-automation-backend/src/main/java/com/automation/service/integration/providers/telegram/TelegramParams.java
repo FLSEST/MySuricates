@@ -27,9 +27,20 @@ final class TelegramParams {
         if (val instanceof Number n) return n.longValue();
         String raw = val == null ? "" : val.toString().trim();
         if (raw.isEmpty()) throw new IllegalArgumentException("Required parameter missing: chat_id");
-        if (NUMERIC_CHAT.matcher(raw).matches()) return Long.parseLong(raw);
+        if (NUMERIC_CHAT.matcher(raw).matches()) {
+            try {
+                return Long.parseLong(raw);
+            } catch (NumberFormatException e) {
+                // 19–20 digits pass the pattern but can exceed a long.
+                throw invalidChatId();
+            }
+        }
         if (CHANNEL_USERNAME.matcher(raw).matches()) return raw;
-        throw new IllegalArgumentException("Parameter 'chat_id' must be a numeric chat id or @channelusername");
+        throw invalidChatId();
+    }
+
+    private static IllegalArgumentException invalidChatId() {
+        return new IllegalArgumentException("Parameter 'chat_id' must be a numeric chat id or @channelusername");
     }
 
     /** Message text, 1–4096 characters as documented for sendMessage. */
