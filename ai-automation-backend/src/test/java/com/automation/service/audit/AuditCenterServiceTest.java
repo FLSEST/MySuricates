@@ -1,5 +1,7 @@
 package com.automation.service.audit;
 
+import com.automation.dto.projection.AuditFindingCountRow;
+import com.automation.dto.projection.AuditReportSummaryRow;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditFindingOccurrence;
@@ -31,7 +33,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Duration;
@@ -47,6 +48,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -124,12 +126,11 @@ class AuditCenterServiceTest {
         AuditReport latest = report("r-2", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now.minusSeconds(60));
         AuditReport previous = report("r-1", "p-1", "a.health", GateStatus.YELLOW, AuditIngestionStatus.VALID, now.minusSeconds(120));
         invalidNewest.setIngestionError("kein Envelope");
-        when(reportRepository.findAll(any(Sort.class))).thenReturn(List.of(invalidNewest, latest, previous));
-        AuditFinding open = finding();
-        AuditFinding resolved = finding();
-        resolved.setStatus(AuditFindingStatus.RESOLVED);
-        resolved.setSeverity(AuditSeverity.LOW);
-        when(findingRepository.findByProjectIdAndAuditKey("p-1", "a.health")).thenReturn(List.of(open, resolved));
+        when(reportRepository.findAllSummaryRows()).thenReturn(rows(invalidNewest, latest, previous));
+        when(findingRepository.countByScopeStatusAndSeverity()).thenReturn(List.of(
+                new AuditFindingCountRow("p-1", "a.health", AuditFindingStatus.OPEN, AuditSeverity.HIGH, 1),
+                new AuditFindingCountRow("p-1", "a.health", AuditFindingStatus.RESOLVED, AuditSeverity.LOW, 1),
+                new AuditFindingCountRow("p-2", "a.health", AuditFindingStatus.OPEN, AuditSeverity.LOW, 7)));
 
         List<AuditSummary> result = service.listAudits(null, null, null);
 
@@ -155,9 +156,9 @@ class AuditCenterServiceTest {
         AuditReport green = report("r-g", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now);
         AuditReport otherCategory = report("r-c", "p-1", "a.docs", GateStatus.RED, AuditIngestionStatus.VALID, now);
         otherCategory.setCategory("docs");
-        when(reportRepository.findAll(any(Sort.class)))
-                .thenReturn(List.of(onlyInvalid, otherProject, red, green, otherCategory));
-        when(findingRepository.findByProjectIdAndAuditKey("p-1", "a.security")).thenReturn(List.of());
+        when(reportRepository.findAllSummaryRows())
+                .thenReturn(rows(onlyInvalid, otherProject, red, green, otherCategory));
+        when(findingRepository.countByScopeStatusAndSeverity()).thenReturn(List.of());
 
         List<AuditSummary> result = service.listAudits("p-1", "health", GateStatus.RED);
 
@@ -168,15 +169,32 @@ class AuditCenterServiceTest {
     @Test
     void listAudits_marksAuditsOlderThanThirtyDaysStale_andDetectsRegression() {
         Instant old = Instant.now().minus(Duration.ofDays(31));
-        when(reportRepository.findAll(any(Sort.class))).thenReturn(List.of(
+        when(reportRepository.findAllSummaryRows()).thenReturn(rows(
                 report("r-2", "p-1", "a.health", GateStatus.RED, AuditIngestionStatus.VALID, old),
                 report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, old.minusSeconds(60))));
-        when(findingRepository.findByProjectIdAndAuditKey("p-1", "a.health")).thenReturn(List.of());
+        when(findingRepository.countByScopeStatusAndSeverity()).thenReturn(List.of());
 
         AuditSummary summary = service.listAudits(null, null, null).getFirst();
 
         assertThat(summary.stale()).isTrue();
         assertThat(summary.trend()).isEqualTo("REGRESSED");
+    }
+
+    /** Die Uebersicht laedt weder Report-Markdown noch Findings je Audit (TODO 3d7e3987). */
+    @Test
+    void listAudits_usesOneReportProjectionAndOneFindingCount_forAnyNumberOfAudits() {
+        Instant now = Instant.now();
+        when(reportRepository.findAllSummaryRows()).thenReturn(rows(
+                report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now),
+                report("r-2", "p-1", "a.security", GateStatus.RED, AuditIngestionStatus.VALID, now),
+                report("r-3", "p-2", "a.health", GateStatus.YELLOW, AuditIngestionStatus.VALID, now)));
+        when(findingRepository.countByScopeStatusAndSeverity()).thenReturn(List.of());
+
+        assertThat(service.listAudits(null, null, null)).hasSize(3);
+
+        verify(reportRepository).findAllSummaryRows();
+        verify(findingRepository).countByScopeStatusAndSeverity();
+        verifyNoMoreInteractions(reportRepository, findingRepository);
     }
 
     // --- getAudit ---
@@ -457,6 +475,13 @@ class AuditCenterServiceTest {
         verify(findingRepository).save(open);
         verify(findingRepository, never()).save(resolved);
         verify(findingRepository, never()).findById("f-manual");
+    }
+
+    private static List<AuditReportSummaryRow> rows(AuditReport... reports) {
+        return java.util.Arrays.stream(reports).map(r -> new AuditReportSummaryRow(r.getId(), r.getProjectId(),
+                r.getWorkflowId(), r.getWorkflowRunId(), r.getAuditKey(), r.getCategory(), r.getTitle(),
+                r.getGateStatus(), r.getGateDescription(), r.getIngestionStatus(), r.getIngestionError(),
+                r.getGeneratedAt())).toList();
     }
 
     private static AuditReport report(String id, String projectId, String auditKey, GateStatus gate,

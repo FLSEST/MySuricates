@@ -1,5 +1,7 @@
 package com.automation.service.audit;
 
+import com.automation.dto.projection.AuditFindingCountRow;
+import com.automation.dto.projection.AuditReportSummaryRow;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.*;
 import com.automation.exception.ResourceNotFoundException;
@@ -9,7 +11,6 @@ import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,27 +30,36 @@ public class AuditCenterService {
     private final ManagedTodoReconciler managedTodoReconciler;
     private final AuditFindingTodoLinker todoLinker;
 
+    /**
+     * Eine Report-Projektion ohne Markdown und eine GROUP-BY-Zaehlung der Findings – statt alle
+     * Reports samt Markdown zu laden und je Audit die Findings einzeln abzufragen (TODO 3d7e3987).
+     */
     @Transactional(readOnly = true)
     public List<AuditSummary> listAudits(String projectId, String category, GateStatus gateStatus) {
-        List<AuditReport> all = reportRepository.findAll(Sort.by(Sort.Direction.DESC, "generatedAt"));
-        if (projectId != null) all = all.stream().filter(r -> projectId.equals(r.getProjectId())).toList();
-        if (category != null) all = all.stream().filter(r -> category.equals(r.getCategory())).toList();
+        List<AuditReportSummaryRow> all = reportRepository.findAllSummaryRows();
+        if (projectId != null) all = all.stream().filter(r -> projectId.equals(r.projectId())).toList();
+        if (category != null) all = all.stream().filter(r -> category.equals(r.category())).toList();
 
-        Map<String, List<AuditReport>> grouped = all.stream().collect(Collectors.groupingBy(
-                r -> r.getProjectId() + "\u0000" + r.getAuditKey(), LinkedHashMap::new, Collectors.toList()));
+        Map<Scope, List<AuditReportSummaryRow>> grouped = all.stream().collect(Collectors.groupingBy(
+                r -> new Scope(r.projectId(), r.auditKey()), LinkedHashMap::new, Collectors.toList()));
+        Map<Scope, List<AuditFindingCountRow>> counts = grouped.isEmpty() ? Map.of()
+                : findingRepository.countByScopeStatusAndSeverity().stream().collect(Collectors.groupingBy(
+                        c -> new Scope(c.projectId(), c.auditKey())));
         List<AuditSummary> result = new ArrayList<>();
-        for (List<AuditReport> reports : grouped.values()) {
-            List<AuditReport> valid = reports.stream()
-                    .filter(r -> r.getIngestionStatus() == AuditIngestionStatus.VALID).toList();
+        for (Map.Entry<Scope, List<AuditReportSummaryRow>> entry : grouped.entrySet()) {
+            List<AuditReportSummaryRow> reports = entry.getValue();
+            List<AuditReportSummaryRow> valid = reports.stream()
+                    .filter(r -> r.ingestionStatus() == AuditIngestionStatus.VALID).toList();
             if (valid.isEmpty()) continue;
-            AuditReport latest = valid.getFirst();
-            if (gateStatus != null && latest.getGateStatus() != gateStatus) continue;
-            AuditReport previous = valid.size() > 1 ? valid.get(1) : null;
-            List<AuditFinding> findings = findingRepository.findByProjectIdAndAuditKey(latest.getProjectId(), latest.getAuditKey());
-            result.add(toSummary(latest, previous, reports.getFirst(), findings));
+            AuditReportSummaryRow latest = valid.getFirst();
+            if (gateStatus != null && latest.gateStatus() != gateStatus) continue;
+            AuditReportSummaryRow previous = valid.size() > 1 ? valid.get(1) : null;
+            result.add(toSummary(latest, previous, reports.getFirst(), counts.getOrDefault(entry.getKey(), List.of())));
         }
         return result;
     }
+
+    private record Scope(String projectId, String auditKey) {}
 
     @Transactional(readOnly = true)
     public AuditDetail getAudit(String projectId, String auditKey) {
@@ -66,7 +76,8 @@ public class AuditCenterService {
         AuditReport latestAttempt = reportRepository.findTopByProjectIdAndAuditKeyOrderByGeneratedAtDesc(projectId, auditKey)
                 .orElse(latest);
         List<AuditFinding> findings = findingRepository.findByProjectIdAndAuditKey(projectId, auditKey);
-        return new AuditDetail(toSummary(latest, previous, latestAttempt, findings), toReport(latest));
+        return new AuditDetail(toSummary(summaryRow(latest), previous == null ? null : summaryRow(previous),
+                summaryRow(latestAttempt), countsOf(findings)), toReport(latest));
     }
 
     @Transactional(readOnly = true)
@@ -155,18 +166,30 @@ public class AuditCenterService {
         todoLinker.markAwaitingVerification(todoId);
     }
 
-    private AuditSummary toSummary(AuditReport latest, AuditReport previous, AuditReport latestAttempt,
-                                   List<AuditFinding> findings) {
-        Map<String, Long> byStatus = findings.stream().collect(Collectors.groupingBy(
-                f -> f.getStatus().name(), Collectors.counting()));
-        Map<String, Long> bySeverity = findings.stream()
-                .filter(f -> !f.getStatus().isTerminal())
-                .collect(Collectors.groupingBy(f -> f.getSeverity().name(), Collectors.counting()));
-        return new AuditSummary(latest.getProjectId(), latest.getAuditKey(), latest.getCategory(), latest.getTitle(),
-                latest.getWorkflowId(), latest.getWorkflowRunId(), latest.getId(), latest.getGateStatus(),
-                latest.getGateDescription(), latest.getGeneratedAt(), latestAttempt.getIngestionStatus(),
-                latestAttempt.getIngestionError(), trend(previous != null ? previous.getGateStatus() : null, latest.getGateStatus()),
-                Duration.between(latest.getGeneratedAt(), Instant.now()).toDays() > 30, byStatus, bySeverity);
+    private AuditSummary toSummary(AuditReportSummaryRow latest, AuditReportSummaryRow previous,
+                                   AuditReportSummaryRow latestAttempt, List<AuditFindingCountRow> counts) {
+        Map<String, Long> byStatus = counts.stream().collect(Collectors.groupingBy(
+                c -> c.status().name(), Collectors.summingLong(AuditFindingCountRow::count)));
+        Map<String, Long> bySeverity = counts.stream()
+                .filter(c -> !c.status().isTerminal())
+                .collect(Collectors.groupingBy(c -> c.severity().name(), Collectors.summingLong(AuditFindingCountRow::count)));
+        return new AuditSummary(latest.projectId(), latest.auditKey(), latest.category(), latest.title(),
+                latest.workflowId(), latest.workflowRunId(), latest.id(), latest.gateStatus(),
+                latest.gateDescription(), latest.generatedAt(), latestAttempt.ingestionStatus(),
+                latestAttempt.ingestionError(), trend(previous != null ? previous.gateStatus() : null, latest.gateStatus()),
+                Duration.between(latest.generatedAt(), Instant.now()).toDays() > 30, byStatus, bySeverity);
+    }
+
+    private static AuditReportSummaryRow summaryRow(AuditReport report) {
+        return new AuditReportSummaryRow(report.getId(), report.getProjectId(), report.getWorkflowId(),
+                report.getWorkflowRunId(), report.getAuditKey(), report.getCategory(), report.getTitle(),
+                report.getGateStatus(), report.getGateDescription(), report.getIngestionStatus(),
+                report.getIngestionError(), report.getGeneratedAt());
+    }
+
+    private static List<AuditFindingCountRow> countsOf(List<AuditFinding> findings) {
+        return findings.stream().map(f -> new AuditFindingCountRow(
+                f.getProjectId(), f.getAuditKey(), f.getStatus(), f.getSeverity(), 1L)).toList();
     }
 
     private AuditReportResponse toReport(AuditReport report) {
