@@ -21,7 +21,7 @@ export const LAZY_CHUNKS = [
   'editor.worker', // Monaco-Worker
   'json.worker',
   'TerminalPanel', // @xterm/xterm, lazy in RunContainerPanel
-  'BpmnDiagramView', // lazy in WorkflowDetailPanel
+  'BpmnDiagramView', // lazy in WorkflowBlockList (Panel der Workflow-Liste)
 ];
 
 // Statische Importe/Re-Exporte in minifiziertem ESM: import"x", import{a}from"x",
