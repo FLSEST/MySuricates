@@ -205,6 +205,14 @@
       "The instance fills in its own address and how to read the API key; a foreign AGENTS.md is never overwritten"
     ]
   },
+  "simple-home": {
+    "title": "Simple is for using",
+    "points": [
+      "This is where you start workflows, answer their questions and read what came out of them",
+      "Building and configuring belong in Pro: that is where all the steps, options and tools live that would only get in the way while you just use things",
+      "Whatever leads to Pro is marked, so you never switch surfaces without noticing"
+    ]
+  },
   "simple-result": {
     "title": "The result first, then the way there",
     "points": [

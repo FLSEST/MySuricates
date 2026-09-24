@@ -1,22 +1,25 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Sparkles, ArrowUp } from 'lucide-react';
+import { Sparkles, ArrowUp, GitBranch } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import { useModuleEnabled, useSystemModules } from '../hooks/useModules';
-import { buildHomeTiles, greetingKey } from '../utils/homeTiles';
-import { Spinner } from '../components/ui';
+import { AREA_COLORS, buildHomeTiles, greetingKey } from '../utils/homeTiles';
+import { Button, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
-import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
+import { Hint } from '../components/hints/Hint';
 import { AiProviderStartCard } from '../components/dashboard/AiProviderStartCard';
 import { SimpleOverview } from '../components/simple/SimpleOverview';
 import { FeatureTile } from '../components/simple/FeatureTile';
 import { ProBadge } from '../components/simple/ProHandoff';
 import { simpleRouteKind } from '../utils/simpleRoutes';
-import { StatusDot } from '../components/simple/kit';
+import { RunChip, SimpleCard } from '../components/simple/kit';
+import { WorkflowSearch } from '../components/simple/WorkflowSearch';
+import { FirstProjectActions } from '../components/project/FirstProjectActions';
+import { useProjects } from '../hooks/useProjects';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
 
 export function SimpleHome() {
@@ -24,6 +27,7 @@ export function SimpleHome() {
   const navigate = useNavigate();
   const { pinnedWorkflowIds } = useSettingsStore();
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
+  const { data: projects } = useProjects();
   const simpleRun = useSimpleRun();
   const latestStatus = useLatestRunStatuses();
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
@@ -38,6 +42,7 @@ export function SimpleHome() {
     return buildHomeTiles(workflows ?? [], pinnedWorkflowIds, 4, disabled);
   }, [workflows, pinnedWorkflowIds, systemModules]);
   const greeting = t.simple.home[greetingKey(new Date())];
+  const hasWorkflows = (workflows?.length ?? 0) > 0;
 
   const submitAssistant = () => {
     const text = assistantInput.trim();
@@ -55,7 +60,7 @@ export function SimpleHome() {
 
   return (
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
-      <SimpleOnboarding />
+      <Hint id="simple-home" />
 
       <AiProviderStartCard />
 
@@ -64,6 +69,32 @@ export function SimpleHome() {
         <p className="text-sm text-text-secondary mb-1">{greeting}</p>
         <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.question}</h1>
       </div>
+
+      {/* First start — offers that depend on what exists, not a tour */}
+      {projects?.length === 0 ? (
+        <SimpleCard color={AREA_COLORS.projects} className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-text">{t.projects.firstProject.title}</p>
+            <p className="text-sm text-text-secondary mt-1">{t.projects.firstProject.workflowsHint}</p>
+          </div>
+          <FirstProjectActions />
+        </SimpleCard>
+      ) : projects && projects.length > 0 && !hasWorkflows ? (
+        <SimpleCard color={AREA_COLORS.workflows} className="space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-text">{t.simple.home.firstWorkflowTitle}</p>
+            <p className="text-sm text-text-secondary mt-1">{t.simple.home.firstWorkflowHint}</p>
+          </div>
+          <Button size="sm" icon={<GitBranch className="w-4 h-4" />} onClick={() => navigate('/workflows?new=1')}>
+            {t.simple.home.startFromTemplate}
+          </Button>
+        </SimpleCard>
+      ) : null}
+
+      {/* Without the assistant module the hero is a search over one's own workflows */}
+      {!assistantModule && hasWorkflows && (
+        <WorkflowSearch workflows={workflows ?? []} latestStatus={latestStatus} onRun={simpleRun.run} />
+      )}
 
       {/* Assistant — the hero input */}
       {assistantModule && (
@@ -122,21 +153,9 @@ export function SimpleHome() {
         <div>
           <p className="text-[11px] tracking-widest uppercase text-text-tertiary font-semibold mb-3">{t.simple.home.runTilesTitle}</p>
           <div className="flex flex-wrap gap-2">
-            {runTiles.map((w) => {
-              const status = latestStatus.get(w.id);
-              return (
-                <button
-                  key={w.id}
-                  onClick={() => simpleRun.run(w)}
-                  className="group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 hover:border-accent/40 hover:bg-surface-raised transition-colors"
-                >
-                  <span className="text-lg leading-none">{w.icon || '⚡'}</span>
-                  <span className="text-[13px] font-medium text-text whitespace-nowrap">{w.name}</span>
-                  <StatusDot status={status} />
-                  <Play className="w-3 h-3 text-text-tertiary group-hover:text-accent transition-colors" />
-                </button>
-              );
-            })}
+            {runTiles.map((w) => (
+              <RunChip key={w.id} workflow={w} status={latestStatus.get(w.id)} onRun={() => simpleRun.run(w)} />
+            ))}
             <button
               onClick={() => navigate('/workflows')}
               aria-label={t.simple.home.more}

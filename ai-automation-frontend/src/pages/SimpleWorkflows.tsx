@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GitBranch, Play, Search, Pin, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -35,7 +35,10 @@ export function SimpleWorkflows() {
   const simpleRun = useSimpleRun();
   const deleteWorkflow = useDeleteWorkflow();
 
-  const [createStep, setCreateStep] = useState<CreateStep>('closed');
+  // `?new=1` (the Simple home's "start from a template") opens the create dialog right away
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCreate = searchParams.get('new') === '1';
+  const [createStep, setCreateStep] = useState<CreateStep>(requestedCreate ? 'template' : 'closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
   const [search, setSearch] = useState('');
@@ -66,6 +69,16 @@ export function SimpleWorkflows() {
     setSelectedTemplate(null);
     setForm({ projectId: '', name: '' });
   };
+
+  // The param has done its job once the dialog is open; dropping it keeps back/reload from reopening it
+  useEffect(() => {
+    if (!requestedCreate) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('new');
+      return next;
+    }, { replace: true });
+  }, [requestedCreate, setSearchParams]);
 
   const handleTemplateSelect = (template: WorkflowTemplate | null) => {
     setSelectedTemplate(template);

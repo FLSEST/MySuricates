@@ -205,6 +205,14 @@
       "Adresse und Weg zum API-Key setzt die Instanz selbst ein; eine fremde AGENTS.md wird nie überschrieben"
     ]
   },
+  "simple-home": {
+    "title": "Einfach ist zum Verwenden da",
+    "points": [
+      "Hier startest du Workflows, beantwortest ihre Rückfragen und liest, was dabei herauskam",
+      "Bauen und Einstellen gehört nach Pro: Dort liegen alle Schritte, Optionen und Werkzeuge, die beim bloßen Verwenden nur im Weg stünden",
+      "Wo etwas nach Pro führt, ist es gekennzeichnet, damit du nie unbemerkt die Oberfläche wechselst"
+    ]
+  },
   "simple-result": {
     "title": "Erst das Ergebnis, dann der Weg",
     "points": [
