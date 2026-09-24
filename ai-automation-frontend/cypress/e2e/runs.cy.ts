@@ -96,29 +96,30 @@ describe('Runs', () => {
       });
     });
 
+    // The filters render while the runs are still loading and get their options once the
+    // workflow and project lists arrive — so the assertions retry (`should`) instead of
+    // checking the first render once (`then`).
     it('populates workflow filter with created workflow', () => {
       cy.visit('/runs');
-      cy.get('select').then(($selects) => {
+      cy.get('select').should(($selects) => {
         const wfSelect = [...$selects].find((s) =>
           [...s.options].some((o) => o.text.includes('All Workflows')),
         );
-        if (wfSelect) {
-          const optionTexts = [...wfSelect.options].map((o) => o.text);
-          expect(optionTexts.some((t) => t.includes('Cypress Runs Workflow'))).to.be.true;
-        }
+        expect(wfSelect, 'workflow filter').to.exist;
+        const optionTexts = [...wfSelect!.options].map((o) => o.text);
+        expect(optionTexts).to.include('Cypress Runs Workflow');
       });
     });
 
     it('populates project filter with created project', () => {
       cy.visit('/runs');
-      cy.get('select').then(($selects) => {
+      cy.get('select').should(($selects) => {
         const projSelect = [...$selects].find((s) =>
           [...s.options].some((o) => o.text.includes('All Projects')),
         );
-        if (projSelect) {
-          const optionTexts = [...projSelect.options].map((o) => o.text);
-          expect(optionTexts.some((t) => t.includes('Cypress Runs Project'))).to.be.true;
-        }
+        expect(projSelect, 'project filter').to.exist;
+        const optionTexts = [...projSelect!.options].map((o) => o.text);
+        expect(optionTexts).to.include('Cypress Runs Project');
       });
     });
   });
