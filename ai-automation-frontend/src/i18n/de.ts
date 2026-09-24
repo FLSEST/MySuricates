@@ -1334,6 +1334,14 @@ export const de: TranslationKeys = {
           fetch_feed: 'Einträge eines RSS- oder Atom-Feeds abrufen',
         },
       },
+      'open-meteo': {
+        displayName: 'Open-Meteo',
+        description: 'Wettervorhersage und Ortssuche über Open-Meteo, ohne API-Key',
+        actions: {
+          forecast: 'Wettervorhersage für Koordinaten abrufen',
+          geocode: 'Orte nach Namen suchen (Koordinaten, Land, Zeitzone)',
+        },
+      },
     },
   },
   calendar: {

@@ -1,6 +1,6 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
-import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo, GitMerge, GitPullRequest, CalendarDays, Rss, Bell } from 'lucide-react';
+import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo, GitMerge, GitPullRequest, CalendarDays, Rss, Bell, CloudSun } from 'lucide-react';
 import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -23,6 +23,7 @@ const ICON_MAP: Record<string, typeof Calendar> = {
   GitMerge,
   GitPullRequest,
   Bell,
+  CloudSun,
 };
 
 function ProviderIcon({ icon }: { icon: string }) {

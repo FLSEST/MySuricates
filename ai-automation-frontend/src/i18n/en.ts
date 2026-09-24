@@ -1332,6 +1332,14 @@ export const en = {
           fetch_feed: 'Fetch the entries of an RSS or Atom feed',
         },
       },
+      'open-meteo': {
+        displayName: 'Open-Meteo',
+        description: 'Weather forecast and place search via Open-Meteo, no API key',
+        actions: {
+          forecast: 'Fetch the weather forecast for coordinates',
+          geocode: 'Search places by name (coordinates, country, time zone)',
+        },
+      },
     },
   },
   calendar: {

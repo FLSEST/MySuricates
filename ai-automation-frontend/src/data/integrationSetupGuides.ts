@@ -773,6 +773,35 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'open-meteo': {
+    steps: [
+      {
+        title: {
+          de: 'Keine Zugangsdaten nötig',
+          en: 'No credentials needed',
+        },
+        instructions: {
+          de: [
+            'Open-Meteo ist für nicht-kommerzielle Nutzung frei und braucht keinen API-Key',
+            'Felder leer lassen und "Zugangsdaten speichern" klicken, um die Integration als eingerichtet zu markieren (optional)',
+            'Aktion "geocode" (name, count, language) liefert Koordinaten zu einem Ort',
+            'Aktion "forecast" (latitude, longitude, days 1-16, hourly/daily/current, timezone Standard auto) liefert die Vorhersage',
+          ],
+          en: [
+            'Open-Meteo is free for non-commercial use and needs no API key',
+            'Leave the fields empty and click "Save credentials" to mark the integration as set up (optional)',
+            'Action "geocode" (name, count, language) returns coordinates for a place',
+            'Action "forecast" (latitude, longitude, days 1-16, hourly/daily/current, timezone default auto) returns the forecast',
+          ],
+        },
+        link: {
+          url: 'https://open-meteo.com/en/docs',
+          label: { de: 'Open-Meteo API-Doku (Variablen)', en: 'Open-Meteo API docs (variables)' },
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {

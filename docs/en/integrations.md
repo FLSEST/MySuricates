@@ -116,6 +116,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | iCal feed | `ical-feed` | none (public feed URL as parameter) | `providers/icalfeed/` | `list_events` | verified (public Google holiday feed) |
 | ntfy | `ntfy` | Server URL + optional access token (no OAuth flow, both optional) | `providers/ntfy/` | `publish` | verified |
 | RSS/Atom | `feed` | none (public feeds) | `providers/feed/` | `fetch_feed` | verified |
+| Open-Meteo | `open-meteo` | none (free API without key) | `providers/openmeteo/` | `forecast`, `geocode` | verified |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -235,6 +236,14 @@ Notes:
   too (at most 5), responses of at most 5 MB, timeouts 10 s/20 s. The XML parser rejects any DOCTYPE
   declaration (no XXE, no entity expansion). Internally: `FeedFetcher` (HTTP limits), `FeedParser`,
   `FeedDates`, `FeedText` (HTML → text).
+- **Open-Meteo** (`open-meteo`): `forecast` against `api.open-meteo.com/v1/forecast` (latitude
+  −90…90, longitude −180…180, `days` 1–16 → `forecast_days`, variables for `hourly`/`daily`/`current`
+  with a default selection, an empty value leaves the block out; `timezone` default `auto`; optional
+  `temperature_unit`, `wind_speed_unit`, `precipitation_unit`) and `geocode` against
+  `geocoding-api.open-meteo.com/v1/search` (`name`, `count` 1–100, `language` default `de`; no match
+  gives `results: []`). Parameters are checked before any request, variable names only
+  `[a-z0-9_]`. Responses pass through unchanged; API errors carry the response's `reason`.
+  Internally: `OpenMeteoParams`, `OpenMeteoHttpClient` (base URLs via constructor for tests).
 
 ---
 
@@ -292,6 +301,7 @@ refresh — `getValidAccessToken()` returns the stored credential unchanged.
 For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
 For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy),
 For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom, Open-Meteo),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 
