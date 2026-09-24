@@ -8,15 +8,31 @@ A research project on the question of how far software development can be run in
 way with AI agents — and a working system in which this can be observed.
 
 MySuricates is a local workflow platform: workflows consist of blocks that are either
-deterministic (shell, branch, loop) or call an AI. From this mix, a control loop has emerged
-that produces findings about its own codebase, turns them into TODOs, triggers fix workflows,
-and then verifies the result again. The code was created largely in AI sessions:
-1,641 of 1,825 commits carry at least one AI trailer — 1,354 Claude's, 340 the control loop's
-own (`Generated-By: MySuricates`), 53 both (as of commit `c421f2e3`).
+deterministic (shell, branch, loop) or call an AI. From this mix, a control loop has emerged that
+produces findings about its own codebase, turns them into TODOs, triggers fix workflows, and then
+verifies the result again. The code was created largely in AI sessions: 1,641 of 1,825 commits carry
+at least one AI trailer — 1,354 Claude's, 340 the control loop's own (`Generated-By: MySuricates`),
+53 both (as of commit `c421f2e3`).
 
 **What this is not:** not a product, not a service, no support, no promise of stability. The
 architectural debt is known and is tracked within the system itself as audit findings — see
 [Maturity level](#maturity-level-and-known-debt).
+
+## Quickstart
+
+Just trying it out — all you need is Docker:
+
+```bash
+git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
+scripts/tryout.sh build          # builds the image from the latest release; takes a few minutes the first time
+scripts/tryout.sh start          # http://localhost:9095 — the output shows the API key for login
+scripts/tryout.sh login claude   # optional, for AI blocks; likewise codex or pi
+```
+
+The repository does not publish a ready-made image; `build` builds locally from the repository. The
+container mounts nothing from the machine — no folders, no logins; the AI login stays in a dedicated
+Docker volume. Permanent setup: [Installation](#installation) below or step by step in
+[Getting Started](docs/en/GETTING-STARTED.md).
 
 ## Documentation
 
@@ -55,18 +71,18 @@ It does not mean that the question has been answered.
 
 The most honest answer after seven months: the mechanisms hold up, but they need guardrails,
 and those guardrails are the real outcome. A gate that merely asks a language model whether something
-is good reliably delivers findings — including fabricated ones. Deterministic measurement before
-AI evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram,
-code evidence, and limits: [Concepts](docs/en/konzepte/README.md).
+is good reliably delivers findings — including fabricated ones. Deterministic measurement before AI
+evaluation is the recurring lesson. The mechanisms individually, each with a flow diagram, code
+evidence, and limits: [Concepts](docs/en/konzepte/README.md).
 
 Not all of this is enabled after installation. Peripheral functions are modules that are fixed at
 startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
-`research` adds the mechanisms from this section and their interfaces: chains (several workflows
-as one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
+`research` adds the mechanisms from this section and their interfaces: chains (several workflows as
+one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
 workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
 where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
-everything — including integrations, webhooks, and remote access. The installer asks for this;
-the complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
+everything — including integrations, webhooks, and remote access. The installer asks for this; the
+complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
 
 ## What is in there
 
@@ -98,9 +114,9 @@ from audit workflows are tracked over time — counted **322 findings** for MySu
 2026-09-22 since 2026-07-19: 29 open (including 1 critical, 4 high), 7 waiting for counter-check,
 267 fixed, 18 accepted as risk, 1 discarded. On that day, the open findings mainly concerned three
 areas: structure (an overly large central execution class, tightly coupled services, controllers with
-direct repository access), performance and storage (database size without a vacuum strategy,
-N+1 candidates, bundle size), and readiness for publication. How these findings are created and what
-the statuses mean is described in the [Audit Workflow Protocol](docs/en/audit-workflow-protocol.md).
+direct repository access), performance and storage (database size without a vacuum strategy, N+1
+candidates, bundle size), and readiness for publication. How these findings are created and what the
+statuses mean is described in the [Audit Workflow Protocol](docs/en/audit-workflow-protocol.md).
 
 Known hard limits:
 
@@ -114,9 +130,9 @@ Known hard limits:
 ## Before you start it
 
 Shell blocks and AI calls run **with your privileges** — directly on the machine or, for the
-instance in a container, with your mounted folders and logins — not in a separate sandbox per block;
-the AI CLIs usually do not ask before using tools. When started from source, backend and frontend
-listen on all network interfaces (the instance set up by the installer binds only to `127.0.0.1` by
+instance in a container, with your mounted folders and logins — not in a sandbox per block; the AI
+CLIs by default do not ask before using tools. When started from source, backend and frontend listen
+on all network interfaces (the instance set up by the installer binds only to `127.0.0.1` by
 default), and some endpoints do not need an API key. MySuricates
 is built for local operation by a trusted person — for remote access, put a VPN in front of it,
 not an open port. Full details:
@@ -144,35 +160,27 @@ the container from the machine). A dedicated container per shell block (`contain
 only if the Docker socket is explicitly made available. What gets into the container from the AI
 providers is controlled by a switch: by default, only the programs and, per provider, the login
 (for Claude, a one-time token from `claude setup-token`), not the machine's settings, plugins,
-memory, or histories. If you want to share less or everything, see the variants under
-[AI providers in the container](docs/en/deployment.md#ai-providers-in-the-container).
+memory, or histories. If you want to share less or everything, see the variants under [AI providers in the container](docs/en/deployment.md#ai-providers-in-the-container).
 
-## Quickstart
+## Installation
 
 > New machine (Linux, macOS, Windows via WSL2), possibly without Java/Node/Docker? → **[Getting Started](docs/en/GETTING-STARTED.md)**
-> guides you through the setup step by step. Short version: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
+> guides you through the setup step by step. Short version: `git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates && ./scripts/setup.sh`.
 
 **Requirement for AI blocks:** At least one of the supported command lines must be installed and
 logged in on the machine — `claude` (Anthropic), `codex` (OpenAI), or `pi`. Without one of them,
-only the deterministic blocks run (shell, branch, loop); the installer does not check this, and
-AI blocks then fail only at runtime.
+only the deterministic blocks run (shell, branch, loop). The installer shows which CLIs it found and
+whether they are logged in, but does not require any — without a CLI, AI blocks fail only at runtime.
 
-> **About the name:** The project is called MySuricates; the working directory and some scripts still
-> carry the former name `autotrigger` (for example `scripts/start-autotrigger-dev.sh`). Both mean
-> the same thing; the rename is still pending.
-
-Just trying it out: In the cloned repository, `scripts/tryout.sh build && scripts/tryout.sh start`
-starts a container with all tools at http://localhost:9095 — all it needs is Docker. The container
-mounts no folders and no login from the machine; for AI blocks you log in once **inside the container**
-(`scripts/tryout.sh login claude`, likewise `codex` or `pi`), and the login remains in a dedicated
-Docker volume
-([Getting Started](docs/en/GETTING-STARTED.md#just-trying-it-out--no-installation)).
+> **About the name:** The project is called MySuricates; some scripts still carry the former name
+> `autotrigger` (for example `scripts/start-autotrigger-dev.sh`). Both mean the same thing; the rename
+> is still pending.
 
 Set up permanently:
 
 ```bash
-git clone https://github.com/FLSEST/MySuricates.git autotrigger
-cd autotrigger
+git clone https://github.com/FLSEST/MySuricates.git
+cd MySuricates
 ./scripts/setup.sh              # guided, in English; in German: ./scripts/setup.sh --lang de
 ```
 
