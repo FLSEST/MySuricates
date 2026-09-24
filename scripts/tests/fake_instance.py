@@ -9,7 +9,8 @@
                                        answers 502
 
 With FAKE_INSTANCE_LOG set, the instance writes each request to that file as "GET PATH key=ok|wrong|none"
-— who got the request, and with which key (cf662c01).
+— who got the request, and with which key (cf662c01). FAKE_INSTANCE_HOST is the IPv4 address to listen
+on (default 127.0.0.1), e.g. the SERVER_ADDRESS an instance bound with --bind gets (3d002903).
 
 Both accept every connection — a bare listen() without accept() fills its queue after two probes, and
 the next /dev/tcp probe hangs until the kernel gives up. Each ends by itself after FAKE_INSTANCE_TTL
@@ -95,7 +96,7 @@ def main(argv):
         handler = Proxy
     else:
         sys.exit(__doc__)
-    server = http.server.HTTPServer(("127.0.0.1", int(argv[2])), handler)
+    server = http.server.HTTPServer((os.environ.get("FAKE_INSTANCE_HOST", "127.0.0.1"), int(argv[2])), handler)
     lifetime = threading.Timer(float(os.environ.get("FAKE_INSTANCE_TTL", "600")), os._exit, args=(0,))
     lifetime.daemon = True
     lifetime.start()
