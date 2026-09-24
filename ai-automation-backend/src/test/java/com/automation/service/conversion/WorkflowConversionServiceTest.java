@@ -234,4 +234,26 @@ class WorkflowConversionServiceTest {
         assertThat(request.name()).isEqualTo("My Workflow");
         assertThat(request.blocks()).hasSize(2);
     }
+
+    /**
+     * TODO b07704ca: the prompt describes its block types from BlockSpecs. Its example recommended
+     * retry without execution_mode, so a shell command in it ran as an AI prompt.
+     */
+    @Test
+    void suggestWorkflow_promptCarriesTheBlockSpecificationsAndRetryRunsShellCommandsAsShell() throws Exception {
+        WorkflowRun run = buildCompletedRunWithAgenticSteps();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(run));
+        ArgumentCaptor<AiProvider.ReasoningRequest> request = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+        when(aiProvider.reason(request.capture())).thenThrow(new RuntimeException("no AI"));
+
+        conversionService.suggestWorkflow("run-1");
+
+        String prompt = request.getValue().prompt();
+        assertThat(prompt).contains("Goal: Run project tests", "Step 2: npm test (exit: 0)");
+        for (String type : List.of("simple", "shell", "retry", "conditional")) {
+            assertThat(prompt).contains("**Block type: " + type + "**");
+        }
+        assertThat(prompt.lines().filter(line -> line.contains("\"type\": \"retry\"")).toList())
+                .isNotEmpty().allMatch(line -> line.contains("\"execution_mode\": \"shell\""));
+    }
 }

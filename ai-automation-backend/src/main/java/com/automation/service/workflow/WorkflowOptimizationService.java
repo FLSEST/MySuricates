@@ -35,12 +35,7 @@ public class WorkflowOptimizationService {
             blocksJson = workflow.getBlocks().toString();
         }
 
-        String prompt = buildOptimizationPrompt(
-                workflow.getName(),
-                workflow.getDescription(),
-                workflow.getInstructions(),
-                blocksJson
-        );
+        String prompt = WorkflowOptimizationPrompt.build(workflow, blocksJson);
 
         try {
             AiProvider provider = aiProviderRegistry.resolve(workflow.getProvider());
@@ -53,57 +48,6 @@ public class WorkflowOptimizationService {
                     "message", "Optimization failed: " + e.getMessage()
             );
         }
-    }
-
-    private String buildOptimizationPrompt(String name, String description, String instructions, String blocksJson) {
-        return """
-                Du bist ein Workflow-Optimierer fuer die MySuricates-Plattform.
-
-                ## Plattform-Kontext
-                - Workflows bestehen aus Blocks die in Docker-Containern via Claude CLI ausgefuehrt werden
-                - Verfuegbare Block-Typen: simple, retry, conditional, foreach, while, agentic, approval, sub-workflow
-                - Variablen: {{ variable }} werden vor Ausfuehrung durch Nutzereingaben ersetzt
-                - {{ previous_output }} enthaelt den Output des vorherigen Blocks
-
-                ## Block-Typ Referenz
-                - simple: { "command": "..." } — Einzelner Befehl/Task
-                - retry: { "command": "...", "max_retries": N, "delay": S } — Wiederholung bei Fehler
-                - conditional: { "condition": "...", "then_command": "...", "else_command": "..." }
-                - foreach: { "items_source": "command|list", "items_command": "...", "command": "..." }
-                - while: { "condition_command": "...", "command": "...", "max_iterations": N }
-                - agentic: { "goal": "...", "success_criteria": "...", "max_iterations": N }
-                - approval: { "question": "...", "options": [...] }
-                - sub-workflow: { "workflow_id": "..." }
-
-                ## Dein Auftrag
-                Analysiere den folgenden Workflow und optimiere ihn. Beachte:
-                1. DEFENSIV: Aendere nur was eine klare Verbesserung ist
-                2. VERIFIZIERE: Stelle sicher dass {{ Variablen }} erhalten bleiben
-                3. ERKLAERE: Begruende jede Aenderung
-                4. ERHALTE: Behalte die Kernlogik bei, aendere nicht den Zweck
-
-                ## Aktueller Workflow
-                Name: %s
-                Beschreibung: %s
-                Instructions: %s
-                Blocks: %s
-
-                ## Antwort-Format (NUR valides JSON)
-                {
-                  "suggestedName": "...",
-                  "suggestedDescription": "...",
-                  "suggestedInstructions": "...",
-                  "blocks": [...],
-                  "changes": [
-                    { "type": "modified|added|removed|reordered", "description": "Was und warum" }
-                  ]
-                }
-                """.formatted(
-                name != null ? name : "",
-                description != null ? description : "",
-                instructions != null ? instructions : "",
-                blocksJson
-        );
     }
 
     @SuppressWarnings("unchecked")
