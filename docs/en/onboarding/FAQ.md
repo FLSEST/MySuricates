@@ -88,13 +88,13 @@ Spring automatically detects the new executor via component scan.
 
 ### How does the AI integration work?
 
-All AI calls go through `HostClaudeService`:
+The AI calls of the blocks go to the provider named by the block or the workflow, otherwise to the system default (`AiProviderRegistry`). For Claude they go through `HostClaudeService` (Codex and Pi likewise through `HostCodexService` and `HostPiService`):
 - Starts `claude` as a host process via `ProcessBuilder`
 - Prompt is written via stdin (not as a CLI argument)
 - Removes `CLAUDE_CODE`/`CLAUDECODE` environment variables
 - Supports `--model`, `--max-tokens`, `--append-system-prompt` flags
 
-**Why host instead of Docker?** The Claude CLI detects nested sessions and refuses to run inside containers.
+**Does Claude never run in a container?** It does: ad-hoc commands during a run start `claude` via `docker exec` in the project container, and it can be called from that container's terminal too (what it gets from the host is governed by `ProjectContainerClaudeAccess`). The blocks, by contrast, always call the AI CLIs on the host in the project directory, which needs no Docker.
 
 ---
 

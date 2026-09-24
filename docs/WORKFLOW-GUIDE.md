@@ -1313,7 +1313,7 @@ Für Shell-Blöcke die mehr Tools benötigen, `container_image` setzen:
 - Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools -> `container_image` setzen
 - Container mounten das Projektverzeichnis nach `/workspace`
 - Auch `conditional`, `retry`, `foreach`, `while` und `switch` im Shell-Modus reichen `container_image`, `mount_docker_socket` und `mounts` an ihren Befehl durch. Die Bedingung selbst (`condition` bzw. `condition_command`) läuft auf dem Host
-- Claude CLI läuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
+- `container_image` gilt nur für Shell-Befehle: KI-Aufrufe (Claude, Codex, Pi) laufen immer auf dem Host im Projektverzeichnis
 - Der Server kann `container_image` per Allowlist einschränken (`automation.execution.allowed-container-images` /
   `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Leer (Default) erlaubt jedes Image. Ist ein Image nicht gelistet,
   scheitert der Block sichtbar mit Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt still
