@@ -385,8 +385,10 @@ check "Treffer nennt SlowService mit Zeile" \
 check "FAKT repository_loop_count: 1"          'grep -qx "FAKT repository_loop_count: 1" "$TMP/perf-facts.out"'
 check "Treffer nennt LoopService mit Zeile" \
   'grep -q "^TREFFER repository_in_loop: service/LoopService.java:[0-9]" "$TMP/perf-facts.out"'
-check "FAKT unindexed_findby_columns_count: 2" 'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts.out"'
+# findByThingIdAndStatus traegt der thing_id-Index: status allein ist dort kein Kandidat (59e22c53).
+check "FAKT unindexed_findby_columns_count: 1" 'grep -qx "FAKT unindexed_findby_columns_count: 1" "$TMP/perf-facts.out"'
 check "owner_name als Kandidat gelistet"       'grep -q "^TREFFER unindexed_findby_column: owner_name" "$TMP/perf-facts.out"'
+check "And-Spalte neben Index nicht gemeldet"  '! grep -q "^TREFFER unindexed_findby_column: status" "$TMP/perf-facts.out"'
 check "indizierte Spalte nicht gemeldet"       '! grep -q "^TREFFER unindexed_findby_column: thing_id" "$TMP/perf-facts.out"'
 check "FAKT migration_index_statements: 1"     'grep -qx "FAKT migration_index_statements: 1" "$TMP/perf-facts.out"'
 check "FAKT database_bytes: 2048"              'grep -qx "FAKT database_bytes: 2048" "$TMP/perf-facts.out"'
@@ -465,6 +467,115 @@ run_perf_facts_with '{"status":403,"error":"Forbidden","path":"/api/v1/system/jv
 check "403-Antwort: keine erfundene JVM-Zahl"  '! grep -q "^FAKT jvm_" "$TMP/perf-jvm.out"'
 check "403-Antwort: drei Luecken mit Grund" \
   '[ "$(grep -c "^NICHT GEMESSEN: jvm_.*Backend aus oder aelter als der Endpunkt" "$TMP/perf-jvm.out")" -eq 3 ]'
+
+echo "6c) Performance-Audit: Schleifen- und Index-Scanner ohne Falschtreffer (59e22c53)"
+# Eigenes Fixture, damit die Zaehlungen des Health-Blatts (backend_sources …) unberuehrt bleiben.
+FIX2="$TMP/fixture-perf"
+MAIN2="$FIX2/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN2/service" "$MAIN2/config" "$MAIN2/repository" \
+         "$FIX2/ai-automation-backend/src/main/resources/db/migration" \
+         "$FIX2/ai-automation-backend/data/logs" "$FIX2/ai-automation-frontend/dist/assets"
+cat > "$MAIN2/service/ScanService.java" <<'JAVA'
+package com.automation.service;
+
+class ScanService {
+    void run(java.util.List<String> ids) {
+        ids.forEach(id -> log(id));
+        thingRepository.count();
+        for (String id : ids) thingRepository.save(id);
+        for (String outer : ids) {
+            for (String inner : ids) {
+                thingRepository.findById(inner);
+            }
+        }
+    }
+
+    void waitFor(String id) {
+        java.time.Instant deadline = java.time.Instant.now().plusSeconds(60);
+        while (java.time.Instant.now().isBefore(deadline)) {
+            thingRepository.findById(id);
+            Thread.sleep(1000);
+        }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    void onStart(java.util.List<String> ids) {
+        for (String id : ids) {
+            thingRepository.delete(id);
+        }
+    }
+}
+JAVA
+cat > "$MAIN2/config/ThingSeeder.java" <<'JAVA'
+package com.automation.config;
+
+class ThingSeeder {
+    void seed(java.util.List<String> ids) {
+        for (String id : ids) {
+            thingRepository.save(id);
+        }
+    }
+}
+JAVA
+cat > "$MAIN2/repository/ThingRepository.java" <<'JAVA'
+package com.automation.repository;
+
+interface ThingRepository {
+    /** Nur im Kommentar: findByGhostColumn(x) */
+    java.util.List<Object> findBySlug(String slug);
+    java.util.List<Object> findByProjectOrderByRankDesc(Object project);
+    java.util.List<Object> findByRank(int rank);
+    java.util.List<Object> findByBuiltInTrue();
+    @Query("select t from Thing t join fetch t.parts where t.id = :id")
+    java.util.Optional<Object> findByIdWithParts(String id);
+    java.util.List<Object> findByCreatedAtAfter(Object at);
+}
+JAVA
+cat > "$FIX2/ai-automation-backend/src/main/resources/db/migration/V1__init.sql" <<'SQL'
+CREATE TABLE thing (
+    id TEXT PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    project_id TEXT,
+    rank INTEGER,
+    created_at TEXT,
+    UNIQUE(project_id, rank)
+);
+CREATE INDEX idx_thing_created ON thing(created_at DESC);
+SQL
+head -c 1024 /dev/zero | tr '\0' 'x' > "$FIX2/ai-automation-frontend/dist/assets/index-abc.js"
+head -c 2048 /dev/zero | tr '\0' 'm' > "$FIX2/ai-automation-frontend/dist/assets/monaco-def.js"
+printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
+  '<link rel="modulepreload" crossorigin href="/assets/monaco-def.js">' > "$FIX2/ai-automation-frontend/dist/index.html"
+{ echo "$TODAY 10:00:00 [pool-watchdog] WARN  c.a.s.watchdog.ConnectionPoolWatchdogService - Pool exhaustion detected: active=1"
+  echo "$TODAY 10:00:01 [pool-watchdog] WARN  c.a.s.watchdog.ConnectionPoolWatchdogService - Pool exhaustion detected: active=1"
+  echo "$TODAY 10:00:02 [virtual-3] WARN  c.a.s.project.DockerContainerGateway - docker inspect: Status 404"
+  echo "$TODAY 10:00:03 [virtual-4] WARN  c.a.s.workflow.WorkflowExecutor - slow step"
+} > "$FIX2/ai-automation-backend/data/logs/mysuricates.log"
+printf '%s' "$FIX2" > "$TMP/base2.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base2.txt" request_metrics=)" > "$TMP/perf-facts2.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts2.sh" > "$TMP/perf-facts2.out" 2> "$TMP/perf-facts2.err"
+check "laeuft ohne stderr"                      '[ ! -s "$TMP/perf-facts2.err" ]'
+check "einzeiliges forEach endet in der Zeile"  '! grep -q "^TREFFER repository_in_loop: service/ScanService.java:6 " "$TMP/perf-facts2.out"'
+check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
+check "verschachtelte Schleife: ein Treffer" \
+  '[ "$(grep -c "^TREFFER repository_in_loop: service/ScanService.java:10 " "$TMP/perf-facts2.out")" -eq 1 ]'
+check "FAKT repository_loop_count: 2"           'grep -qx "FAKT repository_loop_count: 2" "$TMP/perf-facts2.out"'
+check "FAKT polling_loop_count: 1"              'grep -qx "FAKT polling_loop_count: 1" "$TMP/perf-facts2.out"'
+check "FAKT startup_repository_loop_count: 2"   'grep -qx "FAKT startup_repository_loop_count: 2" "$TMP/perf-facts2.out"'
+check "Seeder ohne repository_in_loop"          '! grep -q "^TREFFER repository_in_loop: config/ThingSeeder" "$TMP/perf-facts2.out"'
+check "FAKT unindexed_findby_columns_count: 2"  'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts2.out"'
+check "BuiltIn wird built_in"                   'grep -q "^TREFFER unindexed_findby_column: built_in " "$TMP/perf-facts2.out"'
+check "zweite Spalte eines UNIQUE ist Kandidat" 'grep -q "^TREFFER unindexed_findby_column: rank " "$TMP/perf-facts2.out"'
+check "UNIQUE-Spalte, Relation, DESC-Index, OrderBy, @Query und Kommentar nicht gemeldet" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (slug|project|project_id|created_at|rank_desc|id_with_parts|ghost_column) " "$TMP/perf-facts2.out"'
+check "vorgeladener monaco-Chunk gemeldet" \
+  'grep -qx "FAKT frontend_lazy_chunk_preloaded: 1 (/assets/monaco-def.js)" "$TMP/perf-facts2.out"'
+check "WARN je Logger, Rauschen gezaehlt" \
+  'grep -qx "FAKT non_main_runtime_warn_logger_1: ConnectionPoolWatchdogService 2 (50% der WARN-Zeilen, davon bekanntes Rauschen 2)" "$TMP/perf-facts2.out"'
+check "Docker-404 als Rauschen erkannt" \
+  'grep -q "^FAKT non_main_runtime_warn_logger_[0-9]: DockerContainerGateway 1 (.*bekanntes Rauschen 1)" "$TMP/perf-facts2.out"'
+check "Pflicht-Fakten bleiben im Blatt" \
+  '( for F in database_bytes source_files_scanned transactional_slow_call_count repository_loop_count unindexed_findby_columns_count; do grep -q "^FAKT $F: \|^NICHT GEMESSEN: $F (" "$TMP/perf-facts2.out" || exit 1; done )'
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
