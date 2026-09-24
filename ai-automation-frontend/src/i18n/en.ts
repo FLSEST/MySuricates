@@ -1072,6 +1072,7 @@ export const en = {
     maintenanceModeActive: 'Scheduler paused — no schedule starts while the pause is on. On resume, every schedule whose time fell into the pause starts once, right away — all at the same time, not one after another.',
     skipUntilActive: 'Schedules paused until {until} (automation.scheduler.skip-until): occurrences before then are skipped, not caught up, and one-off schedules in that period expire. “Next run” shows the first occurrence after the pause.',
     pausedUntil: 'paused until {until}',
+    maintenanceNothingStarts: 'Maintenance mode – nothing starts',
     nextRunsAfterPause: 'Next runs after the pause (until {until})',
     catchUpQueueTitle: 'Missed runs are being caught up one after another',
     catchUpQueueRunning: 'Running now',

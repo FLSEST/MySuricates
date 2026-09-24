@@ -1068,6 +1068,7 @@ Alle Schedules auflisten.
     "conflictBehavior": "SKIP",
     "catchUpOnResume": false,
     "pausedUntil": null,
+    "maintenance": false,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
@@ -1078,20 +1079,24 @@ in einer aktiven `skip-until`-Pause (`automation.scheduler.skip-until`), steht h
 der Pause — bei einem einmaligen Zeitplan `null`, er verfällt — und `pausedUntil` nennt das Pausenende;
 sonst ist `pausedUntil` `null`. Der Tick spult den Termin erst weiter, wenn er fällig wird; ohne diese
 Umrechnung zeigten Liste, Kalender und Workflow-Seite bis dahin einen Lauf, der nie stattfindet (seit
-2026-09-24, TODO a776fd2a). Dasselbe gilt für alle Routen, die `ScheduledWorkflowResponse` liefern.
+2026-09-24, TODO a776fd2a). Solange der Wartungsmodus an ist, startet der Scheduler nichts, und wann er
+wieder ausgeht, steht nirgends: Dann ist `nextRunAt` `null` und `maintenance` `true` (für jeden Zeitplan
+mit gespeichertem nächsten Termin; der gespeicherte Wert bleibt, TODO 7704b1e9). Dasselbe gilt für alle
+Routen, die `ScheduledWorkflowResponse` liefern.
 
 ### `GET /api/v1/schedules/remaining-today`
 
 Verbleibende geplante Ausführungen für heute.
 
-**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`). Termine in einer aktiven
-`skip-until`-Pause fehlen — der Tick überspringt sie —, `pausedUntil` nennt dann das Pausenende, sonst `null`.
+**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Termine in
+einer aktiven `skip-until`-Pause fehlen — der Tick überspringt sie —, `pausedUntil` nennt dann das Pausenende,
+sonst `null`. Im Wartungsmodus ist die Liste leer und `maintenance` `true`: Solange er an ist, startet nichts.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
 Verbleibende geplante Ausführungen für diese Woche.
 
-**Response:** `UpcomingScheduleResponse` (wie `remaining-today`, einschließlich `pausedUntil`)
+**Response:** `UpcomingScheduleResponse` (wie `remaining-today`, einschließlich `pausedUntil` und `maintenance`)
 
 ### `GET /api/v1/schedules/{id}`
 
@@ -1255,8 +1260,9 @@ sie noch vor uns liegt, sonst `null`.
 
 ### `POST /api/v1/schedules/maintenance`
 
-Wartungsmodus ein-/ausschalten. Im Wartungsmodus startet kein Zeitplan; `nextRunAt` bleibt dabei
-stehen. Beim Ausschalten startet jeder Zeitplan, dessen Termin in die Pause fiel, einmal sofort — alle
+Wartungsmodus ein-/ausschalten. Im Wartungsmodus startet kein Zeitplan; der gespeicherte `nextRunAt`
+bleibt dabei stehen, die Ansichten zeigen solange keinen nächsten Lauf (`maintenance: true`, siehe oben).
+Beim Ausschalten startet jeder Zeitplan, dessen Termin in die Pause fiel, einmal sofort — alle
 gleichzeitig, ohne Catch-up-Warteschlange.
 
 **Request:**

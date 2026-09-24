@@ -51,7 +51,7 @@ class SchedulerTickTest {
         catchUpQueue = new CatchUpQueue(activityLogService);
         tick = new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService, schedulerConfig,
                 maintenanceMode, suspendState,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService),
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode),
                 catchUpQueue, clock);
 
         testWorkflow = Workflow.builder()
@@ -489,6 +489,58 @@ class SchedulerTickTest {
         verify(suspendState).recordResume(eq(FIXED_NOW), anyLong());
         verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
                 contains("System resume detected (paused ~180 min) — 2 missed schedule(s): 0 skipped forward, 2 queued"),
+                eq("SchedulerService"));
+    }
+
+    // ---- One broken schedule must not stop the others of the tick (TODO 68a3d91e) ---------------
+
+    /** A due CRON schedule whose expression no longer parses: skipping it past a pause throws. */
+    private ScheduledWorkflow brokenCron(String id, Instant nextRunAt) {
+        return ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression("not a cron")
+                .scheduleType(ScheduleType.CRON).enabled(true).nextRunAt(nextRunAt).build();
+    }
+
+    @Test
+    void skipUntil_aScheduleThatCannotBeSkipped_doesNotStopTheOthers() {
+        Instant dueAt = FIXED_NOW.minusSeconds(60);
+        Instant skipUntil = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow broken = brokenCron("broken", dueAt);
+        ScheduledWorkflow healthy = cronSchedule("healthy", dueAt, false);
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        // The broken one first: before the fix its exception ended the loop right there.
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(broken, healthy));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tick.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor, never()).executeSingleSchedule(any());
+        assertThat(healthy.getNextRunAt()).isAfterOrEqualTo(skipUntil);
+        assertThat(broken.getNextRunAt()).isEqualTo(dueAt);
+        verify(activityLogService).error(eq(LogCategory.SCHEDULE), startsWith("Schedule skip failed:"),
+                eq("SchedulerService"), eq("broken"));
+    }
+
+    @Test
+    void coldStartDuringSkipUntilPause_aScheduleThatCannotBeSkipped_doesNotStopTheOthers() {
+        ReflectionTestUtils.setField(tick, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        Instant missedAt = FIXED_NOW.minus(1, ChronoUnit.HOURS);
+        Instant skipUntil = FIXED_NOW.plus(2, ChronoUnit.HOURS);
+        ScheduledWorkflow broken = brokenCron("broken", missedAt);
+        ScheduledWorkflow healthy = cronSchedule("healthy", missedAt, false);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(schedulerConfig.getSkipUntil()).thenReturn(skipUntil.toString());
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(broken, healthy));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        tick.checkAndExecuteScheduled();
+
+        assertThat(healthy.getNextRunAt()).isAfterOrEqualTo(skipUntil);
+        verify(activityLogService).error(eq(LogCategory.SCHEDULE), startsWith("Schedule skip failed:"),
+                eq("SchedulerService"), eq("broken"));
+        // The summary adds up: the failed schedule is neither skipped nor queued.
+        verify(activityLogService).warn(eq(LogCategory.SCHEDULE),
+                contains("2 missed schedule(s): 1 skipped forward, 0 queued for sequential catch-up, 1 failed"),
                 eq("SchedulerService"));
     }
 

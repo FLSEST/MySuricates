@@ -6,6 +6,7 @@ import com.automation.entity.Workflow;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.ScheduleSkipPolicy;
+import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class SchedulesContextSectionTest {
 
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SchedulerMaintenanceMode maintenanceMode;
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd.MM. HH:mm").withZone(ZoneId.systemDefault());
@@ -45,7 +47,7 @@ class SchedulesContextSectionTest {
     void setUp() {
         section = new SchedulesContextSection(new UpcomingRunsCalculator(scheduledWorkflowRepository,
                 Clock.systemDefaultZone(),
-                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService)));
+                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService, maintenanceMode)));
     }
 
     private ScheduledWorkflow buildSchedule(String workflowName, Instant nextRun) {

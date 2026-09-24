@@ -27,6 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -492,7 +495,9 @@ class ScheduledWorkflowExecutorTest {
     @Test
     void skipAfterEndDate_disablesTheSchedule_likeAfterARun() {
         ScheduledWorkflow scheduled = dueCron("sched-skip-end");
-        scheduled.setEndDate(Instant.now().minusSeconds(3600));
+        // The skipped occurrence (60 s ago) still lies before the end date, the skip after it. An
+        // occurrence behind the end date never gets this far (TODO 9a3e6c91, tests below).
+        scheduled.setEndDate(scheduled.getNextRunAt().plusSeconds(30));
         stubScheduleLookups(scheduled);
         when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES))).thenReturn(true);
 
@@ -514,6 +519,111 @@ class ScheduledWorkflowExecutorTest {
         verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), eq("sched-overlap"), isNull(),
                 eq(TriggerSource.SCHEDULE));
         assertThat(scheduled.getRunCount()).isEqualTo(1);
+    }
+
+    // --- The end date bounds the occurrences, not only the moment of the check (TODO 9a3e6c91) ---
+
+    /** A full local hour in mid-June (no DST change in any zone): an hourly cron's next run is 11:00. */
+    private static final Instant TEN_O_CLOCK =
+            LocalDateTime.of(2026, 6, 15, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
+
+    private ScheduledWorkflowExecutor executorAt(Instant now) {
+        return new ScheduledWorkflowExecutor(scheduledRepository, workflowRunRepository, chainRunRepository,
+                workflowExecutor, chainExecutor, activityLogService, Clock.fixed(now, ZoneId.systemDefault()), modules);
+    }
+
+    private ScheduledWorkflow hourly(String id, Instant nextRunAt, Instant endDate) {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression("0 0 * * * *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(nextRunAt).endDate(endDate).inputContext(Map.of()).build();
+        stubScheduleLookups(scheduled);
+        return scheduled;
+    }
+
+    private void targetBusy(boolean busy) {
+        when(workflowRunRepository.existsByWorkflowIdAndStatusIn(eq("wf-1"), eq(ScheduledWorkflowExecutor.BUSY_STATES)))
+                .thenReturn(busy);
+    }
+
+    @Test
+    void endDateBetweenTwoOccurrences_theRunBeforeItIsTheLastOne() {
+        // Hourly, due at 10:00, ends at 10:30: 10:00 belongs to the schedule, 11:00 no longer does.
+        ScheduledWorkflow scheduled = hourly("sched-end-run", TEN_O_CLOCK, TEN_O_CLOCK.plus(30, ChronoUnit.MINUTES));
+        targetBusy(false);
+
+        executorAt(TEN_O_CLOCK.plusSeconds(30)).executeSingleSchedule("sched-end-run");
+
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), eq("sched-end-run"), isNull(),
+                eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.getRunCount()).isEqualTo(1);
+        // Not 11:00 — that next run lay behind the end date and still started once.
+        assertThat(scheduled.getNextRunAt()).isNull();
+        assertThat(scheduled.isEnabled()).isFalse();
+    }
+
+    @Test
+    void endDateBetweenTwoOccurrences_aSkippedOccurrenceEndsTheScheduleAsWell() {
+        ScheduledWorkflow scheduled = hourly("sched-end-skip", TEN_O_CLOCK, TEN_O_CLOCK.plus(30, ChronoUnit.MINUTES));
+        targetBusy(true);
+
+        executorAt(TEN_O_CLOCK.plusSeconds(30)).executeSingleSchedule("sched-end-skip");
+
+        verify(workflowExecutor, never()).execute(any(), any(), any(), any(), eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.getRunCount()).isZero();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        assertThat(scheduled.isEnabled()).isFalse();
+    }
+
+    @Test
+    void storedOccurrenceBehindTheEndDate_neverStarts_andEndsTheSchedule() {
+        // Stored before the fix, or the end date was moved forward by an update: due 11:00, ends 10:30.
+        Instant elevenOClock = TEN_O_CLOCK.plus(1, ChronoUnit.HOURS);
+        Instant endDate = TEN_O_CLOCK.plus(30, ChronoUnit.MINUTES);
+        ScheduledWorkflow scheduled = hourly("sched-end-stored", elevenOClock, endDate);
+
+        assertThat(executorAt(elevenOClock.plusSeconds(30)).executeSingleSchedule("sched-end-stored")).isEmpty();
+
+        verifyNoInteractions(workflowExecutor);
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+        assertThat(scheduled.getLastRunAt()).isNull();
+        assertThat(scheduled.getRunCount()).isZero();
+        ArgumentCaptor<Map<String, Object>> meta = ArgumentCaptor.forClass(Map.class);
+        verify(activityLogService).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                eq("Schedule ended (end date reached): Test Workflow"),
+                eq("ScheduledWorkflowExecutor"), eq("sched-end-stored"), meta.capture());
+        assertThat(meta.getValue())
+                .containsEntry("reason", "end-date")
+                .containsEntry("previousNextRunAt", elevenOClock.toString())
+                .containsEntry("endDate", endDate.toString());
+    }
+
+    @Test
+    void occurrenceExactlyAtTheEndDate_doesNotStart() {
+        // "Disabled when now >= endDate": at the end date itself the schedule is over.
+        ScheduledWorkflow scheduled = hourly("sched-end-exact", TEN_O_CLOCK, TEN_O_CLOCK);
+
+        executorAt(TEN_O_CLOCK.plusSeconds(30)).executeSingleSchedule("sched-end-exact");
+
+        verifyNoInteractions(workflowExecutor);
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void lastOccurrenceBeforeTheEndDate_stillRuns_whenTheTickPicksItUpAfterTheEndDate() {
+        // Due 10:00, ends 10:00:10, the 60-s tick comes at 10:00:30. The occurrence belongs to the
+        // schedule; whether it runs must not depend on where the tick happens to fall.
+        ScheduledWorkflow scheduled = hourly("sched-end-late", TEN_O_CLOCK, TEN_O_CLOCK.plusSeconds(10));
+        targetBusy(false);
+
+        executorAt(TEN_O_CLOCK.plusSeconds(30)).executeSingleSchedule("sched-end-late");
+
+        verify(workflowExecutor).execute(eq(testWorkflow), eq(Map.of()), eq("sched-end-late"), isNull(),
+                eq(TriggerSource.SCHEDULE));
+        assertThat(scheduled.isEnabled()).isFalse();
+        assertThat(scheduled.getNextRunAt()).isNull();
     }
 
     @Test

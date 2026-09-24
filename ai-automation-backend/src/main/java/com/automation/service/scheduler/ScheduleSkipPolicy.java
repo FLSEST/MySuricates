@@ -24,7 +24,8 @@ import java.util.Optional;
  * Skip policy of the scheduler tick: the configured manual skip-until window (fail-open on a
  * bad value, warned once per distinct value) and advancing a due schedule past a window without
  * firing it — for the skip-until window and for a detected system suspend/resume. The read views
- * use the same rules to show the next run the scheduler will actually start (TODO a776fd2a).
+ * use the same rules to show the next run the scheduler will actually start (TODO a776fd2a), and
+ * the same place to honour the maintenance switch, under which nothing starts (TODO 7704b1e9).
  *
  * <p>Extracted from {@code SchedulerService} (Audit-TODO 05dbd0e9). Resume detection and the
  * catch-up decision stay in the service; this class only moves schedules and logs the skip.
@@ -37,6 +38,7 @@ public class ScheduleSkipPolicy {
     private final SchedulerConfig schedulerConfig;
     private final ScheduledWorkflowRepository scheduledRepository;
     private final ActivityLogService activityLogService;
+    private final SchedulerMaintenanceMode maintenanceMode;
 
     /** Last unparseable skip-until value we already warned about, to avoid logging every 60s tick. */
     private volatile String lastInvalidSkipUntil = null;
@@ -98,6 +100,14 @@ public class ScheduleSkipPolicy {
         return next != null ? next.atZone(ZoneId.systemDefault()).toInstant() : null;
     }
 
+    /**
+     * Both pauses at {@code now}, for the read views: the maintenance switch and an active skip-until
+     * window. One read per view, then handed along — not one per schedule.
+     */
+    public SchedulerPause activePause(Instant now) {
+        return new SchedulerPause(maintenanceMode.isEnabled(), activeSkipUntil(now));
+    }
+
     /** True when the stored next run lies inside the window: the tick will skip it, not start it. */
     public boolean heldBySkipUntil(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
         return skipUntil.isPresent() && scheduled.getNextRunAt() != null
@@ -105,13 +115,35 @@ public class ScheduleSkipPolicy {
     }
 
     /**
-     * The next run the scheduler will actually start. The tick advances a schedule past the
-     * skip-until window only in the tick in which it becomes due; until then the stored
-     * {@code nextRunAt} may lie inside the window — a run that never happens. For such a schedule
-     * this is {@link #nextRunAfter} (null for a one-off, which expires); otherwise the stored value.
-     * A cron expression that no longer parses keeps the stored value instead of failing the view.
+     * True when the maintenance switch holds the schedule: it has a next run, but the tick starts
+     * nothing while the switch is on — and when it goes off, nobody knows (TODO 7704b1e9).
      */
-    public Instant effectiveNextRun(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
+    public boolean heldByMaintenance(ScheduledWorkflow scheduled, SchedulerPause pause) {
+        return pause.maintenance() && scheduled.getNextRunAt() != null;
+    }
+
+    /**
+     * The next run the scheduler will actually start: none while the maintenance switch holds the
+     * schedule, else the run behind an active skip-until window ({@link #effectiveNextRun(
+     * ScheduledWorkflow, Optional)}). The one rule of every read view — list, calendar, workflow
+     * page, assistant.
+     */
+    public Instant effectiveNextRun(ScheduledWorkflow scheduled, SchedulerPause pause) {
+        if (heldByMaintenance(scheduled, pause)) {
+            return null;
+        }
+        return effectiveNextRun(scheduled, pause.skipUntil());
+    }
+
+    /**
+     * The skip-until part of {@link #effectiveNextRun(ScheduledWorkflow, SchedulerPause)}. The tick
+     * advances a schedule past the skip-until window only in the tick in which it becomes due; until
+     * then the stored {@code nextRunAt} may lie inside the window — a run that never happens. For
+     * such a schedule this is {@link #nextRunAfter} (null for a one-off, which expires); otherwise
+     * the stored value. A cron expression that no longer parses keeps the stored value instead of
+     * failing the view.
+     */
+    Instant effectiveNextRun(ScheduledWorkflow scheduled, Optional<Instant> skipUntil) {
         if (!heldBySkipUntil(scheduled, skipUntil)) {
             return scheduled.getNextRunAt();
         }

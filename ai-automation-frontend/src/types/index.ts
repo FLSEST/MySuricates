@@ -519,6 +519,11 @@ export interface ScheduledWorkflow {
    * run after the pause (null for a one-off, which expires). Null otherwise (a776fd2a).
    */
   pausedUntil?: string | null;
+  /**
+   * The maintenance switch holds the stored next run: nothing starts until it is switched off, so
+   * `nextRunAt` is null (7704b1e9).
+   */
+  maintenance?: boolean;
 }
 
 /** GET/POST /schedules/maintenance: the maintenance switch and an active skip-until pause. */
@@ -582,6 +587,8 @@ export interface UpcomingScheduleData {
   count: number;
   /** End of an active skip-until pause; runs inside it are left out (a776fd2a). */
   pausedUntil?: string | null;
+  /** The maintenance switch is on: nothing starts, so no run is listed (7704b1e9). */
+  maintenance?: boolean;
   schedules: Array<{
     scheduleId: string;
     workflowName: string | null;

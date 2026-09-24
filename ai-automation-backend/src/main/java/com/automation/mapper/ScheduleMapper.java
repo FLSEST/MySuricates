@@ -7,6 +7,7 @@ import com.automation.entity.ScheduledWorkflow.TargetType;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.scheduler.ScheduleSkipPolicy;
+import com.automation.service.scheduler.SchedulerPause;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -14,12 +15,12 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Schedules for the views. {@code nextRunAt} is the run the scheduler will actually start: during
  * an active skip-until pause a stored next run inside the pause is replaced by the first one after
- * it and {@code pausedUntil} is set (TODO a776fd2a) — list, calendar and workflow page read it.
+ * it and {@code pausedUntil} is set (TODO a776fd2a); while the maintenance switch is on there is
+ * none and {@code maintenance} is set (TODO 7704b1e9) — list, calendar and workflow page read it.
  */
 @Component
 public class ScheduleMapper {
@@ -46,22 +47,22 @@ public class ScheduleMapper {
      * Run-Status je Aufruf auf, und das ist in einer Liste ein N+1 (TODO 172a6a67).
      */
     public ScheduledWorkflowResponse toResponse(ScheduledWorkflow s) {
-        return toResponse(s, null, activeSkipUntil());
+        return toResponse(s, null, activePause());
     }
 
-    private Optional<Instant> activeSkipUntil() {
-        return skipPolicy.activeSkipUntil(Instant.now(clock));
+    private SchedulerPause activePause() {
+        return skipPolicy.activePause(Instant.now(clock));
     }
 
     /**
      * @param lastStatusByScheduleId vorab gesammelte Status je Zeitplan-Id, oder {@code null} fuer
      *     die Einzelauflösung. Ein Zeitplan ohne Eintrag hatte keinen Run — das ist kein
      *     fehlender Wert, sondern {@code null} als Status, genau wie vorher.
-     * @param skipUntil Ende einer aktiven skip-until-Pause, einmal je Aufruf ermittelt
+     * @param pause Wartungsmodus und aktive skip-until-Pause, einmal je Aufruf ermittelt
      */
     private ScheduledWorkflowResponse toResponse(ScheduledWorkflow s,
                                                  Map<String, RunStatus> lastStatusByScheduleId,
-                                                 Optional<Instant> skipUntil) {
+                                                 SchedulerPause pause) {
         String workflowId = null;
         String workflowName = null;
         String projectName = null;
@@ -99,7 +100,7 @@ public class ScheduleMapper {
                 s.getDescription(),
                 s.getInputContext(),
                 s.getLastRunAt(),
-                skipPolicy.effectiveNextRun(s, skipUntil),
+                skipPolicy.effectiveNextRun(s, pause),
                 s.getCreatedAt(),
                 lastRunStatus,
                 s.getEndDate(),
@@ -107,7 +108,8 @@ public class ScheduleMapper {
                 s.getRunCount(),
                 s.getConflictBehavior() != null ? s.getConflictBehavior().name() : "SKIP",
                 s.isCatchUpOnResume(),
-                skipPolicy.heldBySkipUntil(s, skipUntil) ? skipUntil.get() : null
+                skipPolicy.heldBySkipUntil(s, pause.skipUntil()) ? pause.skipUntil().get() : null,
+                skipPolicy.heldByMaintenance(s, pause)
         );
     }
 
@@ -133,8 +135,8 @@ public class ScheduleMapper {
         }
         Map<String, RunStatus> lastStatus = lastRunStatusByScheduleId(
                 scheduled.stream().map(ScheduledWorkflow::getId).toList());
-        Optional<Instant> skipUntil = activeSkipUntil();
-        return scheduled.stream().map(s -> toResponse(s, lastStatus, skipUntil)).toList();
+        SchedulerPause pause = activePause();
+        return scheduled.stream().map(s -> toResponse(s, lastStatus, pause)).toList();
     }
 
     /**

@@ -50,5 +50,26 @@ describe('UpcomingSchedulesCard', () => {
 
     expect(await screen.findByText('No scheduled runs')).toBeInTheDocument();
     expect(screen.queryByTestId('upcoming-schedules-paused')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('upcoming-schedules-maintenance')).not.toBeInTheDocument();
+  });
+
+  /** Under the maintenance switch nothing starts: the backend lists no run and says why (7704b1e9). */
+  it.each([
+    ['en', 'Maintenance mode – nothing starts', 'No scheduled runs'],
+    ['de', 'Wartungsmodus – startet nichts', 'Keine geplanten Ausführungen'],
+  ] as const)('says that nothing starts in maintenance mode (%s)', async (locale, note, empty) => {
+    useI18nStore.setState({ locale });
+    server.use(
+      http.get('/api/v1/schedules/remaining-today', () =>
+        HttpResponse.json({ count: 0, schedules: [], pausedUntil: null, maintenance: true })),
+      http.get('/api/v1/schedules/remaining-this-week', () =>
+        HttpResponse.json({ count: 0, schedules: [], pausedUntil: null, maintenance: true })),
+    );
+
+    renderWithProviders(<UpcomingSchedulesCard />);
+
+    expect(await screen.findByTestId('upcoming-schedules-maintenance')).toHaveTextContent(note);
+    expect(screen.getByText(empty)).toBeInTheDocument();
+    expect(screen.queryByTestId('upcoming-schedules-paused')).not.toBeInTheDocument();
   });
 });

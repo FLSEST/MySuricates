@@ -10,6 +10,8 @@ import java.util.Map;
  * start: while an active skip-until pause holds the stored next run, it is the first occurrence
  * after the pause (null for a one-off, which expires), and {@code pausedUntil} names the pause's
  * end; otherwise {@code pausedUntil} is null and {@code nextRunAt} the stored value (TODO a776fd2a).
+ * While the maintenance switch holds the schedule, nothing starts until it is switched off:
+ * {@code nextRunAt} is null and {@code maintenance} true (TODO 7704b1e9).
  */
 public record ScheduledWorkflowResponse(
         String id,
@@ -35,5 +37,6 @@ public record ScheduledWorkflowResponse(
         int runCount,
         String conflictBehavior,
         boolean catchUpOnResume,
-        Instant pausedUntil
+        Instant pausedUntil,
+        boolean maintenance
 ) {}

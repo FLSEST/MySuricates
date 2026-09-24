@@ -538,7 +538,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `input_context` | TEXT | DEFAULT '{}' | JSON: Kontext-Variablen |
 | `last_run_at` | TEXT | | Letzte Ausführung |
 | `next_run_at` | TEXT | | Nächste geplante Ausführung |
-| `end_date` | TEXT | | Optionales Enddatum für CRON-Schedules — Schedule wird deaktiviert wenn `now >= endDate` (V44) |
+| `end_date` | TEXT | | Optionales Enddatum für CRON-Schedules — ein Termin am oder nach `endDate` startet nicht mehr; der Schedule wird nach dem letzten Termin davor deaktiviert (V44) |
 | `max_runs` | INTEGER | DEFAULT 0 | Maximale Anzahl Ausführungen (0 = unbegrenzt) (V44) |
 | `run_count` | INTEGER | DEFAULT 0 | Zähler, wird nach jeder Ausführung inkrementiert (V44) |
 | `conflict_behavior` | TEXT | DEFAULT 'SKIP' | Verhalten bei bereits laufender Ausführung: `SKIP` oder `OVERLAP` (V45) |

@@ -3,6 +3,7 @@ package com.automation.service.assistant;
 import com.automation.config.SchedulerConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.ScheduleSkipPolicy;
+import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.response.BrokenWorkflowResponse;
@@ -65,6 +66,7 @@ class AssistantContextBuilderTest {
     @Mock private WorkflowChainRepository workflowChainRepository;
     @Mock private WorkflowDebugService workflowDebugService;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SchedulerMaintenanceMode maintenanceMode;
 
     private AssistantContextBuilder builder;
 
@@ -75,7 +77,7 @@ class AssistantContextBuilderTest {
         WishesContextSection wishesSection = new WishesContextSection(wishRepository);
         SchedulesContextSection schedulesSection = new SchedulesContextSection(new UpcomingRunsCalculator(
                 scheduledWorkflowRepository, java.time.Clock.systemDefaultZone(),
-                new ScheduleSkipPolicy(new SchedulerConfig(), scheduledWorkflowRepository, activityLogService)));
+                new ScheduleSkipPolicy(new SchedulerConfig(), scheduledWorkflowRepository, activityLogService, maintenanceMode)));
         SkillsIndexSection skillsSection = new SkillsIndexSection(skillRepository);
         IntegrationsIndexSection integrationsSection = new IntegrationsIndexSection(integrationRegistry, integrationConnectionRepository);
         ChainsIndexSection chainsSection = new ChainsIndexSection(workflowChainRepository,

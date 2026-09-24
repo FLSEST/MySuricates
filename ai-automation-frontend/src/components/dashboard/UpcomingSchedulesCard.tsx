@@ -32,6 +32,8 @@ export function UpcomingSchedulesCard() {
 
   // Runs inside a skip-until pause are already left out by the backend (a776fd2a); say why.
   const pausedUntil = today?.pausedUntil ?? week?.pausedUntil ?? null;
+  // Under the maintenance switch the backend lists no run at all — nothing starts (7704b1e9).
+  const maintenance = !!(today?.maintenance || week?.maintenance);
 
   // Combine today + rest-of-week, deduplicate by scheduleId, limit to 5
   const allSchedules = [
@@ -44,6 +46,11 @@ export function UpcomingSchedulesCard() {
   return (
     <Card>
       <CardHeader title={t.dashboard.upcomingSchedules} />
+      {maintenance && (
+        <p className="mb-2 text-[10px] text-info" data-testid="upcoming-schedules-maintenance">
+          {t.schedules.maintenanceNothingStarts}
+        </p>
+      )}
       {pausedUntil && (
         <p className="mb-2 text-[10px] text-info" data-testid="upcoming-schedules-paused">
           {t.dashboard.schedulesPausedUntil.replace('{until}', () => formatDateTime(pausedUntil, locale))}
