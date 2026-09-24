@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Plus, Square, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
 import { useProjects, useCreateProject, useStopContainer } from '../hooks/useProjects';
@@ -10,14 +11,13 @@ import { ProjectFormFields } from '../components/project/ProjectFormFields';
 import { COMPACT_PROJECT_FORM, type ProjectFormValues } from '../components/project/projectForm';
 import { SimplePage, SimplePageHeader, SimpleCard, StatusDot } from '../components/simple/kit';
 import { ProBadge } from '../components/simple/ProHandoff';
-import { useOpenInPro } from '../hooks/useOpenInPro';
 import { AREA_COLORS } from '../utils/homeTiles';
 
 const C = AREA_COLORS.projects;
 
 export function SimpleProjects() {
   const t = useT();
-  const openInPro = useOpenInPro();
+  const navigate = useNavigate();
   const { data: projects, isLoading, error, refetch } = useProjects();
   const create = useCreateProject();
   const stopC = useStopContainer();
@@ -65,8 +65,8 @@ export function SimpleProjects() {
             const starting = p.status === 'STARTING';
             return (
               <SimpleCard key={p.id} color={C}>
-                {/* The project page is a Pro page: the badge says so, the click switches modes openly */}
-                <button onClick={() => openInPro(`/projects/${p.id}`)} className="block text-left w-full">
+                {/* Opens the Pro project page but stays in Simple mode — ProPageNotice offers the way back. */}
+                <button onClick={() => navigate(`/projects/${p.id}`)} className="block text-left w-full">
                   <div className="flex items-start justify-between mb-3">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center"
