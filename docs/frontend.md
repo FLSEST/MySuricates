@@ -803,6 +803,10 @@ Was `UnifiedCalendarGrid` zeigt: Ansicht (Monat, Woche, Tag), Monat mit gewählt
 |---|---|---|
 | `usePaletteHistory(contextId)` | Hook | Recent/Pinned-IDs für die Command-Palette (localStorage-basiert) |
 
+### `usePaletteSelection.ts` (`components/palette/`)
+
+Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
+
 ### `useTodoOverview.ts`
 
 | Hook | Typ | Beschreibung |

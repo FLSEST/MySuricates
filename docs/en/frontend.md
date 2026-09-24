@@ -803,6 +803,10 @@ What `UnifiedCalendarGrid` shows: the view (month, week, day), the month with it
 |---|---|---|
 | `usePaletteHistory(contextId)` | Hook | Recent/pinned IDs for the command palette (localStorage-based) |
 
+### `usePaletteSelection.ts` (`components/palette/`)
+
+Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
+
 ### `useTodoOverview.ts`
 
 | Hook | Type | Description |
