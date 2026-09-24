@@ -11,6 +11,7 @@ import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.metrics.RequestMetricsFactSheet;
+import com.automation.util.UntrustedText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class WorkflowContextDataService {
     private final TodoRepository todoRepository;
     private final RequestMetricsFactSheet requestMetricsFactSheet;
     private final ActivityLogService activityLogService;
-    private final GoalStatusContext goalStatusContext;
+    private final GoalContextSource goalContextSource;
 
     /**
      * What a failed injection writes into the context instead of leaving the variable absent.
@@ -94,11 +95,11 @@ public class WorkflowContextDataService {
         Object locale = context.getVariable("goal_locale");
         Map<String, String> values;
         try {
-            values = goalStatusContext.variables(goalId, locale == null ? null : locale.toString());
+            values = goalContextSource.variables(goalId, locale == null ? null : locale.toString());
         } catch (Exception e) {
             reportGap(context, workflowId, "goal_status", e);
             values = new LinkedHashMap<>();
-            for (String name : GoalStatusContext.VARIABLES) {
+            for (String name : GoalContextSource.VARIABLES) {
                 values.put(name, GAP_FORMAT.formatted(name, e.getClass().getSimpleName()));
             }
         }
@@ -207,20 +208,13 @@ public class WorkflowContextDataService {
         return "(kein vorheriger Report vorhanden)";
     }
 
-    /** Upper bound per injected TODO title — long titles are attacker-controlled prompt real estate. */
-    static final int MAX_TITLE_CHARS = 200;
+    /** Upper bound per injected TODO title – see {@link UntrustedText#MAX_TITLE_CHARS}. */
+    static final int MAX_TITLE_CHARS = UntrustedText.MAX_TITLE_CHARS;
     /** Upper bound for the tag field (raw JSON/CSV from the DB). */
     static final int MAX_TAGS_CHARS = 80;
     /** Upper bound on injected TODOs; the rest is summarised as a count. */
     static final int MAX_TODOS = 150;
 
-    private static final Pattern LINE_BREAKS = Pattern.compile("[\\r\\n\\t\\u2028\\u2029]+");
-    private static final Pattern WHITESPACE = Pattern.compile("\\s{2,}");
-    /** Output markers the platform parses (todo_item, gate_*, dashboard_widget) — defused by removing the colon. */
-    private static final Pattern MARKERS = Pattern.compile(
-            "(?i)(todo[_-]item|gate[_-](?:status|category|description)|dashboard[_-]widget)[*`\\s]*:");
-    /** The delimiter tags themselves ({@code open_todos}, {@code goal_status}) must not be forgeable from inside a title. */
-    private static final Pattern DELIMITER = Pattern.compile("(?i)</?\\s*(open_todos|goal_status)\\s*>");
     private static final Pattern UNSAFE_TAG_CHARS = Pattern.compile("[^A-Za-z0-9_:.,\\- ]");
     private static final Pattern UNSAFE_ID_CHARS = Pattern.compile("[^A-Za-z0-9\\-]");
 
@@ -265,24 +259,15 @@ public class WorkflowContextDataService {
         return "(TODOs nicht verfügbar)";
     }
 
-    /** Flattens untrusted text to a single bounded line without platform markers or delimiter tags. */
+    /** Flattens untrusted text to a single bounded line – {@link UntrustedText#inline}. */
     static String sanitizeInline(String raw, int maxChars) {
-        if (raw == null) return "";
-        String s = LINE_BREAKS.matcher(raw).replaceAll(" ");
-        s = WHITESPACE.matcher(s).replaceAll(" ").trim();
-        s = MARKERS.matcher(s).replaceAll("$1");
-        s = DELIMITER.matcher(s).replaceAll(m -> "[" + m.group(1).toLowerCase(java.util.Locale.ROOT) + "]");
-        if (s.length() > maxChars) {
-            s = s.substring(0, maxChars).trim() + "…";
-        }
-        return s;
+        return UntrustedText.inline(raw, maxChars);
     }
 
     private static String sanitizeTags(String rawTags) {
         if (rawTags == null) return "";
         String s = UNSAFE_TAG_CHARS.matcher(rawTags).replaceAll("");
-        s = MARKERS.matcher(s).replaceAll("$1");
-        s = WHITESPACE.matcher(s).replaceAll(" ").trim();
+        s = UntrustedText.collapseSpaces(UntrustedText.defuseMarkers(s));
         return s.length() > MAX_TAGS_CHARS ? s.substring(0, MAX_TAGS_CHARS).trim() + "…" : s;
     }
 }

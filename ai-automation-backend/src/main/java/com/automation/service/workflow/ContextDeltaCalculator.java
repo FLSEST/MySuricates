@@ -19,7 +19,7 @@ final class ContextDeltaCalculator {
                     "previous_report", "open_todos", "request_metrics",
                     "workflow_version", "workflow_changed_since_last_run", "workflow_definition_hash", "trigger_source"),
             // goal_status + goal_guard_* (TODO 259f4f66): platform data, re-injected on every run
-            GoalStatusContext.VARIABLES.stream())
+            GoalContextSource.VARIABLES.stream())
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     private ContextDeltaCalculator() {}

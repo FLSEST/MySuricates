@@ -1,4 +1,4 @@
-package com.automation.service.workflow;
+package com.automation.service.goal;
 
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.response.GoalMilestoneResponse;
@@ -7,7 +7,6 @@ import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone.State;
 import com.automation.entity.Todo;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
-import com.automation.service.goal.GoalSnapshot;
 import com.automation.service.runoutput.GateStatusOutputParser;
 import com.automation.service.runoutput.TodoOutputParser;
 import org.junit.jupiter.api.Test;
@@ -97,7 +96,7 @@ class GoalStatusContextTest {
     void everyVariableIsAlwaysSet_evenForAnEmptyGoal() {
         Map<String, String> vars = render(snapshot("Leer", null, List.of()), "de");
 
-        assertThat(vars.keySet()).containsExactlyInAnyOrderElementsOf(GoalStatusContext.VARIABLES);
+        assertThat(vars.keySet()).containsExactlyInAnyOrderElementsOf(com.automation.service.workflow.GoalContextSource.VARIABLES);
         assertThat(vars.values()).doesNotContainNull();
         assertThat(vars.get("goal_guard_status")).isEqualTo("GREEN");
     }
@@ -128,7 +127,7 @@ class GoalStatusContextTest {
                 .doesNotContainIgnoringCase("dashboard_widget:");
         assertThat(TodoOutputParser.parse(block)).isEmpty();
         assertThat(GateStatusOutputParser.parse(block)).isEmpty();
-        for (String name : GoalStatusContext.VARIABLES) {
+        for (String name : com.automation.service.workflow.GoalContextSource.VARIABLES) {
             assertThat(vars.get(name)).as(name).doesNotContainIgnoringCase("gate_status:")
                     .doesNotContainIgnoringCase("todo_item:").doesNotContainIgnoringCase("dashboard_widget:");
         }
