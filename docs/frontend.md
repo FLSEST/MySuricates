@@ -226,6 +226,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Floating-Chat-Panel, global über dem Layout eingeblendet
 - Kontext-sensitiver Chat mit Page Suggestions
 - Persistierte Sessions, WebSocket-Integration
+- Größenänderung an linker und oberer Kante (nur Desktop) über `hooks/usePanelResize.ts`: Ziehen vom Anker unten rechts weg vergrößert, je Kante zwischen Mindestmaß und Fenster minus Rand; das Eingabefeld mit Auto-Grow (Enter sendet, Shift+Enter bricht um, höchstens 240 px) ist `assistant/AssistantComposer.tsx`
 - Siehe [Assistant System](assistant-system.md) für Details
 
 ### `src/components/settings/`

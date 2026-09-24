@@ -226,6 +226,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Floating chat panel, globally overlaid on the layout
 - Context-sensitive chat with page suggestions
 - Persisted sessions, WebSocket integration
+- Resizing at the left and top edge (desktop only) via `hooks/usePanelResize.ts`: dragging away from the bottom-right anchor enlarges, each edge between its minimum and the window minus a margin; the auto-growing input (Enter sends, Shift+Enter breaks the line, at most 240 px) is `assistant/AssistantComposer.tsx`
 - See [Assistant System](assistant-system.md) for details
 
 ### `src/components/settings/`
