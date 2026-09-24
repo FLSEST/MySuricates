@@ -1,5 +1,5 @@
 import { useT } from '../../i18n';
-import { CONTENT_LANGUAGES, type ContentLanguage } from './onboardingProfileText';
+import { CONTENT_LANGUAGES, type ContentLanguage } from '../../utils/onboardingProfileText';
 
 /** DE|EN switch for the language of a profile's content (editor and shipped text). */
 export function ContentLanguageToggle({ value, onChange }: {

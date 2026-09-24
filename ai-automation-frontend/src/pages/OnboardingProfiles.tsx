@@ -9,7 +9,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { Plus, BookOpen } from 'lucide-react';
 import { useI18nStore } from '../i18n';
 import { Hint } from '../components/hints/Hint';
-import { resolveProfileName } from '../components/onboarding/onboardingProfileText';
+import { resolveProfileName } from '../utils/onboardingProfileText';
 import { ProfileList } from '../components/onboarding/ProfileList';
 import { ProfileEditor } from '../components/onboarding/ProfileEditor';
 import { CreateProfileModal } from '../components/onboarding/CreateProfileModal';

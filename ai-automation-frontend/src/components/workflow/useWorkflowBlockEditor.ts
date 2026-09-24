@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useUpdateWorkflow } from './useWorkflows';
-import { blockFromDraft, draftFromBlock, emptyDraft, type BlockDraft } from '../components/workflow/blockEdit';
-import type { DiagramSelection } from '../components/workflow/bpmnLayout';
-import type { BlockDefinition, BlockType, Workflow } from '../types';
+import { useUpdateWorkflow } from '../../hooks/useWorkflows';
+import { blockFromDraft, draftFromBlock, emptyDraft, type BlockDraft } from './blockEdit';
+import type { DiagramSelection } from './bpmnLayout';
+import type { BlockDefinition, BlockType, Workflow } from '../../types';
 
 /** Primäres Config-Feld je Block-Typ — die Zeile, auf die ein Top-Level-Klick springt. */
 const PRIMARY_FIELD: Partial<Record<BlockType, string>> = {

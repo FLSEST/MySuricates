@@ -1,4 +1,4 @@
-import type { OnboardingProfile } from '../../hooks/useOnboardingProfiles';
+import type { OnboardingProfile } from '../hooks/useOnboardingProfiles';
 
 export function resolveProfileName(profile: OnboardingProfile, locale: string): string {
   return profile.name[locale] || profile.name['en'] || profile.key;

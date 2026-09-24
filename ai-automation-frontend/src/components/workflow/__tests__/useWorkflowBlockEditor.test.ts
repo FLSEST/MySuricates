@@ -3,9 +3,9 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, createElement } from 'react';
 import { http, HttpResponse } from 'msw';
-import { server } from '../../test/server';
+import { server } from '../../../test/server';
 import { revealTextFor, useWorkflowBlockEditor } from '../useWorkflowBlockEditor';
-import type { BlockDefinition, Workflow } from '../../types';
+import type { BlockDefinition, Workflow } from '../../../types';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());

@@ -3,9 +3,9 @@ import {
   Calendar, CalendarDays, Webhook, Plug, ScrollText, CheckSquare, Link2, BookOpen, BookMarked, BarChart2,
   MessageCircle, ClipboardList, LayoutGrid, Bug, Target,
 } from 'lucide-react';
-import type { SidebarEntry } from '../../utils/sidebarLayout';
-import type { TranslationKeys } from '../../i18n/en';
-import type { FeatureModuleName } from '../../types';
+import type { SidebarEntry } from './sidebarLayout';
+import type { TranslationKeys } from '../i18n/en';
+import type { FeatureModuleName } from '../types';
 
 export interface NavItemDef {
   to: string;

@@ -6,7 +6,7 @@ import {
   useResetOnboardingProfile,
   type OnboardingProfile,
 } from './useOnboardingProfiles';
-import { contentOf, type ContentByLanguage, type ContentLanguage } from '../components/onboarding/onboardingProfileText';
+import { contentOf, type ContentByLanguage, type ContentLanguage } from '../utils/onboardingProfileText';
 
 type Bilingual = { de: string; en: string };
 

@@ -117,7 +117,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Error panel for failed runs
 - Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
 - `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
-- The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `hooks/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
+- The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `components/workflow/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
 
 ### Runs (`/runs`)
 
@@ -202,7 +202,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - **BPMN diagram:** `BpmnDiagramView.tsx` draws the BPMN export as SVG (zoom, click/hover per block, live status during a run). The pure logic — reading the XML, top-to-bottom layout, wrapping labels, element id → block selection — lives in `bpmnLayout.ts` (test `bpmnLayout.test.ts`), the shapes and markers per element type in `BpmnShapes.tsx`.
 - **Dashboard report form:** For blocks of type `dashboard-report`, the block editor (add and edit) shows a form for status, title, summary, KPIs and items in addition to raw JSON editing (`DashboardReportFields.tsx`, model in `dashboardReport.ts`). Bounds and status values come from the single contract mirror `components/dashboard/workflowWidgetContract.ts`; warnings are hints, validation happens in the backend. Values with `{{ … }}` are not length-checked.
 - **AI suggestion:** `DashboardReportAssist.tsx` offers "Suggestion from last run" when the module, setting and provider `CLAUDE` are available (`useDashboardReportAssist.ts`). The suggestion appears as text in a review area and is only written to config after "Apply". Guard: `components/workflow/__tests__/dashboardReportMarkupGuard.test.ts`. The three off-switches have different effects: if the module is off, the block type is not offered in the editor at all. If the setting is off, the block keeps working but the "Suggestion" button does not appear. If this host has no AI, the button is not offered either — that is checked against the provider's model catalog (`useProviderModels('CLAUDE')` → `available`), which for `CLAUDE` looks up whether the `claude` program resolves on the `PATH`; `GET /system/ai-providers` is no use here because it lists registered Spring beans and always contains `CLAUDE`. An installed but unauthenticated CLI cannot be told apart without a real call — that case only fails when the suggestion runs.
-- **Structure:** `hooks/useWorkflowBlockEditor.ts` holds adding, editing (with the jump target from the diagram, `revealTextFor`), saving and removing blocks, `hooks/useWorkflowDetailActions.ts` editing, running, cloning, deleting, optimizing, repairing, instructions and skills including the dialog state. The blocks tab is `components/workflow/WorkflowBlocksTab.tsx` (list and diagram with the hover cross-reference); the page wires tabs, sidebar and `WorkflowDetailModals`
+- **Structure:** `components/workflow/useWorkflowBlockEditor.ts` holds adding, editing (with the jump target from the diagram, `revealTextFor`), saving and removing blocks, `hooks/useWorkflowDetailActions.ts` editing, running, cloning, deleting, optimizing, repairing, instructions and skills including the dialog state. The blocks tab is `components/workflow/WorkflowBlocksTab.tsx` (list and diagram with the hover cross-reference); the page wires tabs, sidebar and `WorkflowDetailModals`
 
 ### Settings (`/settings`)
 
@@ -262,7 +262,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### Sidebar (`src/components/layout/`)
 
-- `Sidebar.tsx` only wires things up: the page list and the indentation rule for sub-entries (`isNestedAt`) live in `navItems.ts`, the logo in `MeerkatIcon.tsx`, the Simple/Pro switch in `SidebarModeToggle.tsx` (a pill, collapsed one icon button)
+- `Sidebar.tsx` only wires things up: the page list and the indentation rule for sub-entries (`isNestedAt`) live in `utils/navItems.ts`, the logo in `MeerkatIcon.tsx`, the Simple/Pro switch in `SidebarModeToggle.tsx` (a pill, collapsed one icon button)
 - `hooks/useSidebarOrder.ts` provides the menu, the edit list and the hidden pages plus moving, adding/removing dividers, hiding/showing and resetting; pages of disabled modules are left out but keep their place in the stored order
 
 ## UI Component Library

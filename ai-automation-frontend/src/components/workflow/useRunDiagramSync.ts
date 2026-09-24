@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { latestStepByBlock } from '../components/workflow/stepMetadata';
-import type { DiagramSelection, RunStatus } from '../components/workflow/bpmnLayout';
-import type { StepResult } from '../types';
+import { latestStepByBlock } from './stepMetadata';
+import type { DiagramSelection, RunStatus } from './bpmnLayout';
+import type { StepResult } from '../../types';
 
 /** How long a step stays highlighted after a click on its box in the diagram. */
 const STEP_HIGHLIGHT_MS = 1800;

@@ -24,7 +24,7 @@ import { RunPendingTodosPanel } from '../components/workflow/RunPendingTodosPane
 import { RunProvenance } from '../components/workflow/RunProvenance';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
 import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
-import { useRunDiagramSync } from '../hooks/useRunDiagramSync';
+import { useRunDiagramSync } from '../components/workflow/useRunDiagramSync';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useT } from '../i18n';

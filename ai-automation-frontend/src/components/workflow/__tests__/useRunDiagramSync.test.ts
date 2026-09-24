@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRunDiagramSync } from '../useRunDiagramSync';
-import type { StepResult } from '../../types';
+import type { StepResult } from '../../../types';
 
 afterEach(() => {
   vi.useRealTimers();

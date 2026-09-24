@@ -4,7 +4,7 @@ import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import { useI18nStore, useT } from '../../i18n';
 import type { OnboardingProfile } from '../../hooks/useOnboardingProfiles';
-import { resolveProfileName } from './onboardingProfileText';
+import { resolveProfileName } from '../../utils/onboardingProfileText';
 
 /** Searchable list of onboarding profiles with type, built-in and update/customized markers. */
 export function ProfileList({ profiles, selectedId, onSelect }: {

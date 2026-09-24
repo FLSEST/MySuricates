@@ -7,7 +7,7 @@ import { server } from '../../test/server';
 import { modulesFixture } from '../../test/modules';
 import { useI18nStore } from '../../i18n';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { isNestedAt } from '../../components/layout/navItems';
+import { isNestedAt } from '../../utils/navItems';
 import { sidebarEntryId, useSidebarOrder } from '../useSidebarOrder';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));

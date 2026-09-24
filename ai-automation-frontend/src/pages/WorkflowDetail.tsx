@@ -11,7 +11,7 @@ import { useWorkflow, useWorkflows as useWorkflowsList, useWorkflowRuns } from '
 import { useSkills } from '../hooks/useSkills';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { useProjects } from '../hooks/useProjects';
-import { useWorkflowBlockEditor } from '../hooks/useWorkflowBlockEditor';
+import { useWorkflowBlockEditor } from '../components/workflow/useWorkflowBlockEditor';
 import { useWorkflowDetailActions } from '../hooks/useWorkflowDetailActions';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
 import { SealBanner } from '../components/workflow/SealBanner';

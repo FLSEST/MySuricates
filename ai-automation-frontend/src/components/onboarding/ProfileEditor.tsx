@@ -6,7 +6,7 @@ import { MonacoEditor } from '../shared/MonacoEditor';
 import { useI18nStore, useT } from '../../i18n';
 import type { OnboardingProfile } from '../../hooks/useOnboardingProfiles';
 import type { OnboardingProfileEditor } from '../../hooks/useOnboardingProfileEditor';
-import { resolveProfileName } from './onboardingProfileText';
+import { resolveProfileName } from '../../utils/onboardingProfileText';
 import { ContentLanguageToggle } from './ContentLanguageToggle';
 
 /**

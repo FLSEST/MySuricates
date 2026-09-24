@@ -21,7 +21,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { sidebarEntryId, useSidebarOrder } from '../../hooks/useSidebarOrder';
 import { useT } from '../../i18n';
-import { isNestedAt } from './navItems';
+import { isNestedAt } from '../../utils/navItems';
 import { MeerkatIcon } from './MeerkatIcon';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';

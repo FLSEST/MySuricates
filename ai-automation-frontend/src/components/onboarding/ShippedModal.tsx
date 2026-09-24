@@ -4,7 +4,7 @@ import { ModalFooter } from '../ui/ModalFooter';
 import { Spinner } from '../ui/Spinner';
 import { useI18nStore, useT } from '../../i18n';
 import { useShippedOnboardingProfile } from '../../hooks/useOnboardingProfiles';
-import type { ContentLanguage } from './onboardingProfileText';
+import type { ContentLanguage } from '../../utils/onboardingProfileText';
 import { ContentLanguageToggle } from './ContentLanguageToggle';
 
 /** Shipped text of a built-in profile with an update, to compare before taking it over. */

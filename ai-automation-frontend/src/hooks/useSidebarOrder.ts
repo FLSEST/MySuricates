@@ -7,7 +7,7 @@ import {
 } from '../utils/sidebarLayout';
 import { SIMPLE_MODE_ROUTES } from '../utils/simpleRoutes';
 import { NAV_TILES } from '../utils/homeTiles';
-import { navItems, type NavItemDef } from '../components/layout/navItems';
+import { navItems, type NavItemDef } from '../utils/navItems';
 
 /** Default order incl. the default dividers — over all pages, so anchors of disabled modules still count. */
 const DEFAULT_ORDER = withDefaultDividers(navItems.map((i) => i.to));
