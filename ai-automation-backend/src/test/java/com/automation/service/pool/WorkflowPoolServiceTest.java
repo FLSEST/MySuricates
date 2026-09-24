@@ -1,5 +1,9 @@
 package com.automation.service.pool;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.config.WorkflowPoolConfig;
 import com.automation.dto.request.ExportToPoolRequest;
 import com.automation.dto.request.InstallPoolWorkflowRequest;
@@ -18,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -140,6 +145,51 @@ class WorkflowPoolServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).id()).isEqualTo("valid");
+    }
+
+    /** A plain workflow export in the pool (string name) is skipped, the rest still lists. */
+    @Test
+    void listAll_skipsFileWithWrongFieldShape_keepsTheOthers() throws Exception {
+        writePoolFile("valid.json", """
+                {"name": {"en": "Valid"}, "blocks": [{"type": "simple", "config": {}}]}
+                """);
+        writePoolFile("export.json", """
+                {"name": "Tech-Radar", "description": "plain", "blocks": [{"type": "shell", "config": {}}]}
+                """);
+
+        assertThat(poolService.listAll()).extracting(PoolWorkflowEntry::id).containsExactly("valid");
+    }
+
+    /** A content error is one WARN line naming file and fields; a stack trace would only bury it. */
+    @Test
+    void listAll_wrongFieldShape_logsOneLineWithFileAndFields_withoutStackTrace() throws Exception {
+        writePoolFile("export.json", """
+                {"name": "Tech-Radar", "description": "plain", "blocks": [{"type": "shell", "config": {}}]}
+                """);
+
+        List<ILoggingEvent> events = captureLogs(() -> poolService.listAll());
+
+        assertThat(events).hasSize(1);
+        ILoggingEvent event = events.get(0);
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(event.getFormattedMessage())
+                .startsWith("Skipping pool workflow file: Pool file export.json: field 'name' must be an object")
+                .contains("field 'description' must be an object")
+                .doesNotContain("\n");
+        assertThat(event.getThrowableProxy()).as("stack trace").isNull();
+    }
+
+    /** Broken JSON is not a known shape problem: it keeps its exception for the reader. */
+    @Test
+    void listAll_brokenJson_logsTheExceptionWithIt() throws Exception {
+        writePoolFile("broken.json", "{\"name\": ");
+
+        List<ILoggingEvent> events = captureLogs(() -> poolService.listAll());
+
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage()).isEqualTo("Failed to parse pool workflow file: broken.json");
+            assertThat(event.getThrowableProxy()).isNotNull();
+        });
     }
 
     @Test
@@ -541,5 +591,26 @@ class WorkflowPoolServiceTest {
 
     private void writePoolFile(String filename, String content) throws Exception {
         Files.writeString(tempDir.resolve(filename), content);
+    }
+
+    /** Runs the action with an appender on the service's logger at WARN; logback-test.xml keeps root at ERROR. */
+    private static List<ILoggingEvent> captureLogs(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(WorkflowPoolService.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        Level previous = logger.getLevel();
+        boolean additive = logger.isAdditive();
+        logger.setLevel(Level.WARN);
+        logger.setAdditive(false); // captured, not also printed to the console
+        logger.addAppender(appender);
+        try {
+            action.run();
+        } finally {
+            logger.detachAppender(appender);
+            logger.setAdditive(additive);
+            logger.setLevel(previous);
+            appender.stop();
+        }
+        return appender.list;
     }
 }

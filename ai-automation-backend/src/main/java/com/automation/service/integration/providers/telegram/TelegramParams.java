@@ -4,7 +4,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** Parameter parsing shared by the Telegram actions — pure functions, no I/O. */
+/**
+ * Parameter parsing shared by the Telegram actions — pure functions, no I/O. A JSON number is read
+ * like its text: {@code 1.5}, {@code 5.0} and values beyond {@code long} fail as the strings do,
+ * instead of being cut off or wrapping around.
+ */
 final class TelegramParams {
 
     static final int MAX_TEXT = 4096;
@@ -24,12 +28,22 @@ final class TelegramParams {
     /** Chat id as the Bot API takes it: a (possibly negative) integer or {@code @channelusername}. */
     static Object chatId(Map<String, Object> params) {
         Object val = params.get("chat_id");
-        if (val instanceof Number n) return n.longValue();
         String raw = val == null ? "" : val.toString().trim();
         if (raw.isEmpty()) throw new IllegalArgumentException("Required parameter missing: chat_id");
-        if (NUMERIC_CHAT.matcher(raw).matches()) return Long.parseLong(raw);
+        if (NUMERIC_CHAT.matcher(raw).matches()) {
+            try {
+                return Long.parseLong(raw);
+            } catch (NumberFormatException e) {
+                // 19–20 digits pass the pattern but can exceed a long.
+                throw invalidChatId();
+            }
+        }
         if (CHANNEL_USERNAME.matcher(raw).matches()) return raw;
-        throw new IllegalArgumentException("Parameter 'chat_id' must be a numeric chat id or @channelusername");
+        throw invalidChatId();
+    }
+
+    private static IllegalArgumentException invalidChatId() {
+        return new IllegalArgumentException("Parameter 'chat_id' must be a numeric chat id or @channelusername");
     }
 
     /** Message text, 1–4096 characters as documented for sendMessage. */
@@ -67,7 +81,6 @@ final class TelegramParams {
     static Long optionalLong(Map<String, Object> params, String key) {
         Object val = params.get(key);
         if (val == null || val.toString().isBlank()) return null;
-        if (val instanceof Number n) return n.longValue();
         try {
             return Long.parseLong(val.toString().trim());
         } catch (NumberFormatException e) {
