@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, X } from 'lucide-react';
 import type { ComponentType } from 'react';
+import { useT } from '../../i18n';
 
 interface NavItemDef {
   to: string;
@@ -16,6 +17,7 @@ interface SortableNavItemProps {
 }
 
 export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
+  const t = useT();
   const {
     attributes,
     listeners,
@@ -41,7 +43,7 @@ export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
         {...attributes}
         {...listeners}
         className="shrink-0 cursor-grab touch-none p-1 text-[var(--color-sidebar-text-muted)] hover:text-[var(--color-sidebar-text)] active:cursor-grabbing"
-        aria-label="Verschieben"
+        aria-label={t.nav.movePage.replace('{name}', item.label)}
       >
         <GripVertical className="w-3.5 h-3.5" />
       </button>
@@ -50,7 +52,7 @@ export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
       <button
         onClick={() => onHide(item.to)}
         className="shrink-0 p-1 text-[var(--color-sidebar-text-muted)] opacity-0 transition-all group-hover:opacity-100 hover:text-danger"
-        aria-label="Ausblenden"
+        aria-label={t.nav.hidePage.replace('{name}', item.label)}
       >
         <X className="w-3.5 h-3.5" />
       </button>

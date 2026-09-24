@@ -91,7 +91,7 @@ describe('Sidebar dividers', () => {
   it('adds, names and removes dividers in edit mode', () => {
     withModules([]);
     renderWithProviders(<Sidebar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Menü bearbeiten' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
 
     expect(screen.getAllByRole('button', { name: 'Remove divider' })).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: 'Add divider' }));
@@ -107,7 +107,7 @@ describe('Sidebar dividers', () => {
     expect(sidebarItemOrder).not.toContain('divider:default-onboarding');
     expect(sidebarDividerLabels).toEqual({ 'divider:default-triggers': 'Planen' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeitung beenden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish editing' }));
     // the new divider sits at the end and separates nothing; the named one is a heading
     expect(screen.getAllByRole('separator')).toHaveLength(3);
     expect(screen.getByRole('separator', { name: 'Planen' })).toHaveTextContent('Planen');
@@ -117,11 +117,40 @@ describe('Sidebar dividers', () => {
     withModules([]);
     useSettingsStore.setState({ sidebarItemOrder: ['/', '/todos'], sidebarDividerLabels: { 'divider:x': 'X' } });
     renderWithProviders(<Sidebar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Menü bearbeiten' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeitung beenden' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Finish editing' }));
 
     expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({});
     expect(screen.getAllByRole('separator')).toHaveLength(4);
+  });
+});
+
+describe('Sidebar edit controls', () => {
+  beforeEach(() => localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', []))));
+
+  it('labels the edit controls in English', () => {
+    renderWithProviders(<Sidebar />);
+    expect(screen.getByRole('button', { name: 'Edit menu' })).toHaveTextContent('Edit menu');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
+    expect(screen.getByRole('button', { name: 'Finish editing' })).toHaveTextContent('Done');
+    expect(screen.getByRole('button', { name: 'Reset menu' }))
+      .toHaveAttribute('title', 'Restore the default order, hidden pages and dividers');
+    expect(screen.getByRole('button', { name: 'Hide Workflows' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move Workflows' })).toBeInTheDocument();
+  });
+
+  it('labels the edit controls in German', () => {
+    useI18nStore.setState({ locale: 'de' });
+    renderWithProviders(<Sidebar />);
+    expect(screen.getByRole('button', { name: 'Menü bearbeiten' })).toHaveTextContent('Menü bearbeiten');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menü bearbeiten' }));
+    expect(screen.getByRole('button', { name: 'Bearbeitung beenden' })).toHaveTextContent('Fertig');
+    expect(screen.getByRole('button', { name: 'Menü zurücksetzen' }))
+      .toHaveAttribute('title', 'Standard-Reihenfolge, ausgeblendete Seiten und Unterteiler wiederherstellen');
+    expect(screen.getByRole('button', { name: 'Workflows ausblenden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Workflows verschieben' })).toBeInTheDocument();
   });
 });

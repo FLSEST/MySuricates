@@ -291,6 +291,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
             onChange={(val) => setEditData({ ...editData, content: val })}
             language="markdown"
             height="300px"
+            prose
           />
         </div>
       </Modal>

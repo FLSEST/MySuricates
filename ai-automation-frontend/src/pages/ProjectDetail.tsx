@@ -349,6 +349,7 @@ export function ProjectDetail() {
             onChange={setEditAiContext}
             language="markdown"
             height="400px"
+            prose
           />
         </div>
       </Modal>

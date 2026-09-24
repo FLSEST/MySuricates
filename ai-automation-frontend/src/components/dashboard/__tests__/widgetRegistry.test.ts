@@ -28,6 +28,14 @@ describe('dashboard widget registry', () => {
     expect(new Set(labels).size).toBe(labels.length);
   });
 
+  it('never puts more than four stat tiles in a row', () => {
+    // At eight per row a tile next to the expanded sidebar was ~130 px wide at 1440 px and cut
+    // its title to „Active P…" (606ec937). Every flex-basis of the stat size stays at 25 % or more.
+    const bases = [...WIDGET_SIZE_CLASSES.stat.matchAll(/basis-\[calc\(([\d.]+)%/g)].map((m) => Number(m[1]));
+    expect(bases.length).toBeGreaterThan(0);
+    for (const basis of bases) expect(basis).toBeGreaterThanOrEqual(25);
+  });
+
   it('references only known modules and sizes', () => {
     const knownModules = new Set<string>(modulesFixture().modules.map((m) => m.name));
     for (const widget of DASHBOARD_WIDGETS) {

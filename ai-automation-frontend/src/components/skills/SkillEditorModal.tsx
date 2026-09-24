@@ -54,9 +54,9 @@ export function SkillEditorModal({
   const createSkill = useCreateSkill();
   const updateSkill = useUpdateSkill();
   const [form, setForm] = useState<SkillInput>(() => (skill ? fromSkill(skill) : initial ?? EMPTY));
-  // The AI context is uncontrolled: @monaco-editor/react replaces the whole model whenever `value`
-  // differs from it, so echoing each keystroke back through state lets a slower re-render write an
-  // older text over newer keystrokes (measured: characters lost at 20–40 ms per key). Read on save.
+  // The AI context is uncontrolled and read on save. It dates from before the MonacoEditor wrapper
+  // ignored echoes of its own onChange (9476d6af): back then a slower re-render wrote an older text
+  // over newer keystrokes (characters lost at 20–40 ms per key). Both ways work now.
   const [initialContext] = useState(() => form.aiContext ?? '');
   const aiContext = useRef(initialContext);
   const pending = createSkill.isPending || updateSkill.isPending;

@@ -116,7 +116,8 @@ describe('Workflows', () => {
       cy.contains('Block Type').should('be.visible');
 
       cy.get('[role="dialog"]').within(() => {
-        cy.get('select').select('simple');
+        // The first select is the block type; AI blocks add a provider select below it.
+        cy.get('select').first().select('simple');
         cy.contains('button', 'Add Block').click();
       });
 

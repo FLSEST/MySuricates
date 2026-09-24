@@ -81,6 +81,13 @@ export const en = {
     dividerNamePlaceholder: 'Name (optional)',
     moveDivider: 'Move divider',
     removeDivider: 'Remove divider',
+    editMenu: 'Edit menu',
+    finishEditing: 'Finish editing',
+    editDone: 'Done',
+    resetMenu: 'Reset menu',
+    resetMenuHint: 'Restore the default order, hidden pages and dividers',
+    movePage: 'Move {name}',
+    hidePage: 'Hide {name}',
   },
   simple: {
     home: {

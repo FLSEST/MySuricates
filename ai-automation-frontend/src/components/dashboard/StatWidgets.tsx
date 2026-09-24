@@ -20,8 +20,9 @@ function StatCard({ icon, label, value, accent }: {
       <div className={`p-2 rounded-lg ${accent ?? 'bg-accent/10'}`}>
         {icon}
       </div>
+      {/* The title wraps instead of being cut off; the tooltip carries it for narrow tiles too. */}
       <div className="min-w-0">
-        <p className="text-xs text-text-secondary truncate">{label}</p>
+        <p className="text-xs text-text-secondary break-words" title={label}>{label}</p>
         <p className="text-lg font-bold text-text">{value}</p>
       </div>
     </Card>
