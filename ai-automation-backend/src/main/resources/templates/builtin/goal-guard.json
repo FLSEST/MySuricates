@@ -1,0 +1,84 @@
+{
+  "id": "goal-guard",
+  "icon": "🎯",
+  "i18n": [
+    "de",
+    "en"
+  ],
+  "name": {
+    "de": "Ziel-Wächter",
+    "en": "Goal guard"
+  },
+  "description": {
+    "de": "Prüft täglich ein Ziel: überfällige und bald fällige TODOs und Meilensteine, Fortschritt, Zieldatum. Meldet eine Ampel mit Kennzahlen und Punkten ans Dashboard (ohne KI, 0 Tokens). Wird über den Schalter „Wächter“ auf der Zielseite je Ziel angelegt; die Daten kommen als Kontextvariablen goal_status und goal_guard_* über goal_id.",
+    "en": "Checks a goal every day: overdue and soon-due TODOs and milestones, progress, target date. Reports a traffic light with key figures and items to the dashboard (no AI, 0 tokens). Created per goal by the “Guard” switch on the goal page; the data arrives as the context variables goal_status and goal_guard_* via goal_id."
+  },
+  "category": "MONITORING",
+  "sortOrder": 54,
+  "version": "1.0.0",
+  "model": null,
+  "instructions": null,
+  "blocks": [
+    {
+      "type": "shell",
+      "name": {
+        "de": "stand_protokollieren",
+        "en": "log_status"
+      },
+      "config": {
+        "command": "set -eu\nprintf '%s\\n' {{ goal_status }}",
+        "shell_escape_variables": true,
+        "description": {
+          "de": "Schreibt den Stand des Ziels ins Protokoll des Laufs – zum Nachlesen, was die Ampel gesehen hat.",
+          "en": "Writes the goal's status into the run log, so you can read what the traffic light saw."
+        }
+      }
+    },
+    {
+      "type": "dashboard-report",
+      "name": {
+        "de": "melden",
+        "en": "report"
+      },
+      "config": {
+        "status": "{{ goal_guard_status }}",
+        "title": "{{ goal_guard_title }}",
+        "summary": "{{ goal_guard_summary }}",
+        "kpis": [
+          {
+            "label": {
+              "de": "Fortschritt",
+              "en": "Progress"
+            },
+            "value": "{{ goal_guard_progress }}"
+          },
+          {
+            "label": {
+              "de": "Überfällig",
+              "en": "Overdue"
+            },
+            "value": "{{ goal_guard_overdue }}"
+          },
+          {
+            "label": {
+              "de": "Bald fällig",
+              "en": "Due soon"
+            },
+            "value": "{{ goal_guard_due_soon }}"
+          }
+        ],
+        "items": [
+          "{{ goal_guard_item_1 }}",
+          "{{ goal_guard_item_2 }}",
+          "{{ goal_guard_item_3 }}",
+          "{{ goal_guard_item_4 }}",
+          "{{ goal_guard_item_5 }}"
+        ],
+        "description": {
+          "de": "Meldet Ampel, Kennzahlen und die dringendsten Punkte des Ziels ans Dashboard. Rot: etwas ist überfällig oder das Zieldatum ist vorbei; Gelb: etwas wird in den nächsten drei Tagen fällig.",
+          "en": "Reports the goal's traffic light, key figures and most urgent items to the dashboard. Red: something is overdue or the target date has passed; yellow: something is due within the next three days."
+        }
+      }
+    }
+  ]
+}

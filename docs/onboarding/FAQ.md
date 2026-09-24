@@ -98,7 +98,7 @@ Die KI-Aufrufe der Bloecke gehen an den Anbieter aus Block oder Workflow, sonst 
 
 ### Wie funktioniert das Template-System?
 
-- 54 Built-in Templates als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`)
+- 55 Built-in Templates als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`)
 - Werden beim Start durch `WorkflowTemplateSeeder` geseedet (idempotent)
 - Name/Description sind i18n JSON-Maps: `{"de":"...", "en":"..."}`
 - Frontend loest Sprache ueber `resolveTemplateName()` in `utils/templateUtils.ts` auf

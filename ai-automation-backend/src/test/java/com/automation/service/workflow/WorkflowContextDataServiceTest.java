@@ -42,6 +42,7 @@ class WorkflowContextDataServiceTest {
     @Mock private TodoRepository todoRepository;
     @Mock private RequestMetricsFactSheet requestMetricsFactSheet;
     @Mock private ActivityLogService activityLogService;
+    @Mock private GoalStatusContext goalStatusContext;
 
     @InjectMocks private WorkflowContextDataService service;
 
@@ -448,5 +449,90 @@ class WorkflowContextDataServiceTest {
         assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS)
                 .as("sonst landet das Faktenblatt im Context-Delta jedes Steps")
                 .contains("request_metrics");
+    }
+
+    // --- injectPlatformData: goal_status + goal_guard_* (TODO 259f4f66) ----------------
+
+    private ExecutionContext goalContext(Object goalId) {
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+        if (goalId != null) {
+            ctx.setVariable("goal_id", goalId);
+        }
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        return ctx;
+    }
+
+    @Test
+    void injectPlatformData_withoutGoalId_setsNoGoalVariables() {
+        ExecutionContext ctx = goalContext(null);
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        for (String name : GoalStatusContext.VARIABLES) {
+            assertThat(ctx.getVariables()).as(name).doesNotContainKey(name);
+        }
+        verify(goalStatusContext, org.mockito.Mockito.never()).variables(anyString(), any());
+    }
+
+    @Test
+    void injectPlatformData_blankGoalId_setsNoGoalVariables() {
+        ExecutionContext ctx = goalContext("  ");
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat(ctx.getVariables()).doesNotContainKey("goal_status");
+        verify(goalStatusContext, org.mockito.Mockito.never()).variables(anyString(), any());
+    }
+
+    @Test
+    void injectPlatformData_withGoalId_setsEveryGoalVariable_asUntrustedPlatformData() {
+        ExecutionContext ctx = goalContext("g-1");
+        ctx.setVariable("goal_locale", "en");
+        java.util.Map<String, String> values = new java.util.LinkedHashMap<>();
+        GoalStatusContext.VARIABLES.forEach(name -> values.put(name, "value of " + name));
+        when(goalStatusContext.variables("g-1", "en")).thenReturn(values);
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        for (String name : GoalStatusContext.VARIABLES) {
+            assertThat(ctx.getVariable(name)).as(name).isEqualTo("value of " + name);
+            assertThat(ctx.isUntrusted(name)).as(name).isTrue();
+        }
+        assertThat(ctx.hasUntrustedInput()).isFalse();
+    }
+
+    @Test
+    void injectPlatformData_goalIdIsReducedToIdCharacters() {
+        ExecutionContext ctx = goalContext("g-1'; rm -rf /");
+        when(goalStatusContext.variables("g-1rm-rf", null)).thenReturn(java.util.Map.of());
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        verify(goalStatusContext).variables("g-1rm-rf", null);
+    }
+
+    @Test
+    void injectPlatformData_unknownGoal_statesTheGapInEveryGoalVariable_andWarns() {
+        ExecutionContext ctx = goalContext("missing");
+        when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 1");
+        when(goalStatusContext.variables("missing", null))
+                .thenThrow(new com.automation.exception.ResourceNotFoundException("Goal", "missing"));
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1");
+
+        for (String name : GoalStatusContext.VARIABLES) {
+            assertThat((String) ctx.getVariable(name)).as(name)
+                    .startsWith("NICHT GEMESSEN: " + name)
+                    .contains("ResourceNotFoundException");
+        }
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), org.mockito.ArgumentMatchers.contains("goal_status"),
+                eq("WorkflowContextDataService"), eq("run-1"), eq("wf-1"));
+        assertUntouched(ctx, "previous_report", "open_todos", "request_metrics");
+    }
+
+    @Test
+    void goalVariables_areSystemVariables_andStayOutOfTheContextDelta() {
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(GoalStatusContext.VARIABLES);
     }
 }

@@ -32,7 +32,7 @@ Interface that every block type must implement. Defines `execute(BlockDefinition
 19 predefined skills that are seeded automatically at startup (e.g. `builtin-code-review`, `builtin-test-generator`). Defined as resources under `src/main/resources/skills/builtin/<id>.json` (metadata incl. `sortOrder`) + `<id>.md` (prompt), loaded by `BuiltInSkillLoader`.
 
 **Built-in Templates**
-54 predefined workflow templates that are seeded at startup. Defined as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`), seeded by `WorkflowTemplateSeeder`. Cannot be deleted.
+55 predefined workflow templates that are seeded at startup. Defined as JSON under `src/main/resources/templates/builtin/`, read by `BuiltInTemplateLoader` (schema: `BuiltInTemplateDefinition`), seeded by `WorkflowTemplateSeeder`. Cannot be deleted.
 
 ## C
 
@@ -58,7 +58,7 @@ Runtime context passed through all block executors of a workflow execution. Cont
 ## F
 
 **Flyway**
-Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 86 migrations (V1-V86).
+Database migration tool. Migrations are located under `src/main/resources/db/migration/` using the schema `V{N}__description.sql`. Currently 88 migrations (V1-V88).
 
 ## G
 

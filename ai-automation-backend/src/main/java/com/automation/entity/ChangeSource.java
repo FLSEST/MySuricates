@@ -18,6 +18,8 @@ public enum ChangeSource {
     POOL_INSTALL("pool-install"),
     /** The bundled example project: its example workflows, created from the shipped templates listed in ExampleProjectService. */
     EXAMPLE_PROJECT("example-project"),
+    /** The goal guard: a workflow from the shipped template goal-guard, created when a goal's guard is switched on. */
+    GOAL_GUARD("goal-guard"),
     IMPORT("import"),
     BPMN_IMPORT("bpmn-import"),
     RESTORE("restore"),

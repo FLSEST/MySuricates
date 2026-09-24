@@ -585,7 +585,7 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-54 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
+55 Built-in-Templates werden durch `WorkflowTemplateSeeder` beim Start angelegt. Template-Definitionen liegen als JSON unter `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -709,10 +709,11 @@ Eine Chain gehört zu keinem Projekt und kann Workflows aus verschiedenen Projek
 | `rated_by` | TEXT | | `USER` oder `AI` – wer zuletzt eingeschätzt hat (V85) |
 | `rated_at` | TEXT | | Zeitpunkt der Einschätzung (V85) |
 | `open_question` | TEXT | | Frage, die vor der Arbeit geklärt sein muss (V85) |
+| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Meilenstein des eigenen Ziels (V88) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87)
+**Indizes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_milestone` (V88)
 
 TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstellt (RED → HIGH, YELLOW → MEDIUM). Bei konfiguriertem `TodoTrigger` werden Fix-Workflows automatisch gestartet (Self-Improvement-Loop).
 
@@ -725,12 +726,29 @@ TODOs werden von `AutoTodoService` automatisch bei RED/YELLOW Gate-Status erstel
 | `description` | TEXT | | Markdown: was „fertig“ heißt |
 | `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
 | `target_date` | TEXT | | Zieldatum |
+| `guard_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Workflow des Ziel-Wächters (Vorlage `goal-guard`); ob er läuft, sagt sein Zeitplan (V88) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
 **Indizes:** `idx_goals_status`
 
-Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang und die Einschätzung stehen am TODO (`todos.goal_id` …), nicht am Ziel; Fortschritt und Reihenfolge rechnet `GoalService` aus schlanken Projektionen zusammen. Beim Löschen eines Ziels bleiben die TODOs erhalten.
+Ein Ziel bündelt TODOs projektübergreifend (V85). Die Zugehörigkeit, der Rang und die Einschätzung stehen am TODO (`todos.goal_id` …), nicht am Ziel; Fortschritt und Reihenfolge rechnet `GoalService` aus schlanken Projektionen zusammen. Beim Löschen eines Ziels bleiben die TODOs erhalten, seine Meilensteine fallen mit, ein Ziel-Wächter pausiert.
+
+### `goal_milestones`
+
+| Spalte | Typ | Constraints | Beschreibung |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Ziel des Meilensteins |
+| `title` | TEXT | NOT NULL | z. B. „Beta fertig“ |
+| `due_date` | TEXT | NOT NULL | Fälligkeit; ein reines Datum gilt bis 23:59:59 UTC |
+| `reached_at` | TEXT | | Erstes Erkennen „alle zugeordneten TODOs erledigt“; bleibt, auch wenn er wieder offen ist |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indizes:** `idx_goal_milestones_goal`
+
+Meilensteine eines Ziels (V88, TODO 259f4f66). TODOs zeigen über `todos.milestone_id` darauf; der Zustand (`OPEN`, `DUE_SOON` ≤ 3 Tage, `OVERDUE`, `REACHED`) wird beim Lesen berechnet, nicht gespeichert. Beim Löschen eines Meilensteins bleiben die TODOs im Ziel.
 
 ### `activity_log`
 
@@ -1094,6 +1112,7 @@ Einzige persistente Systemkonfiguration außerhalb der `application.yml`.
 | `Todo.Complexity` | `S`, `M`, `L`, `XL` | Umfang und Unsicherheit, grob – dieselbe Skala für Mensch und KI |
 | `Todo.RatedBy` | `USER`, `AI` | Wer die Einschätzung zuletzt gesetzt hat; ein Mensch überschreibt die KI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archivierte Ziele erscheinen nur mit ausdrücklichem Filter |
+| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Nicht gespeichert, beim Lesen aus Datum und zugeordneten TODOs berechnet; `DUE_SOON` = höchstens 3 Tage |
 
 ### LogLevel (ActivityLog)
 
@@ -1307,6 +1326,7 @@ Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in 
 | V85 | `V85__goals_and_todo_planning.sql` | neue Tabelle `goals`; `goal_id`, `goal_rank`, `complexity`, `suggested_effort`, `rating_note`, `rated_by`, `rated_at`, `open_question` in todos |
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (Tabellenneubau: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, Bestand wird `default`) |
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | Indizes für Läufe je Schedule (workflow_runs, chain_runs) und TODOs je Lauf (`last_fix_run_id`, `workflow_run_id`) |
+| V88 | `V88__goal_milestones_and_guard.sql` | neue Tabelle `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (Ziel-Wächter) |
 
 ## SQLite-Besonderheiten
 

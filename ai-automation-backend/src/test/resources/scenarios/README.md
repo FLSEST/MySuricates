@@ -55,6 +55,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 16 | Kopierte Marker zählen nur am Originalschritt: `compress` (348b7b3b) und `sub-workflow` (40471709), beides 6e5d6e2c | `compress-copy-counts-markers-once`, `sub-workflow-copy-counts-markers-once` |
 | 17 | `switch`: eine KI-Ausgabe mit Zeilenumbruch am Ende trifft ihren Case, statt still in `default` zu fallen (bf11e6fe) | `switch-ai-output-trailing-newline` |
 | 18 | `skill-capability`: Endet die KI-CLI mit Fehler, scheitert der Schritt; kein Folgeblock und kein Gate nimmt die Fehlermeldung als Antwort (ea0c0b3f) | `skill-capability-cli-error-fails-step` |
+| 19 | Ziel-Wächter: ein Lauf der mitgelieferten Vorlage `goal-guard` mit `goal_id` bekommt `goal_status`/`goal_guard_*` und meldet ohne KI Rot mit dem überfälligen Meilenstein und TODO an die Dashboard-Kachel (259f4f66) | `goal-guard-reports-overdue` |
 
 ### Aus der Historie, noch ohne Szenario
 
@@ -96,6 +97,8 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
                                  "promptContains": ["…"], "promptNotContains": ["{{"] } ] },
     "steps": [ { "index": 0, "status": "COMPLETED", "outputContains": ["…"], "outputNotContains": ["…"] } ],
     "todos": [ { "titleContains": "…", "priority": "MEDIUM", "tags": ["gate:yellow"] } ],
+    "dashboard": { "status": "RED", "title": "…", "summaryContains": ["…"], "kpis": { "Label": "Wert" },
+                   "itemsContain": ["…"] },
     "noTodos": true,
     "markers": { "gates": 1, "todos": 1 },
     "auditReport": "VALID",
@@ -142,6 +145,15 @@ Statt eines Laufs sind auch mehrere Läufe desselben Workflows oder eine Kette m
 - **`auditReport`**, **`auditFindingCount`**, **`auditFindings`:** was die Audit-Auswertung aus dem
   Lauf gemacht hat: den Status des Reports (`VALID`/`INVALID`), die Zahl der Findings im Projekt
   (eines je Identität) und einzelne Findings, gefunden über ihr `subject`.
+- **`goal`:** legt vor dem Lauf ein Ziel im Projekt des Szenarios an – `title`, `targetInDays`,
+  `milestones` (`title`, `dueInDays`) und `todos` (`title`, `status`, `priority`, `dueInDays`,
+  `milestone` als Index). Tage relativ zu jetzt, auch negativ. `"@goal"` in `context` wird zur ID.
+- **`workflow.builtinTemplate`:** statt eigener Blöcke die Blöcke einer mitgelieferten Vorlage, in
+  `locale` aufgelöst (Standard `de`) – das Szenario fährt, was ausgeliefert wird.
+- **`dashboard`:** was der Lauf an seine Dashboard-Kachel gemeldet hat (`dashboard_widget` in den
+  Laufmetadaten): `status`, `title`, Teile von `summary`, `kpis` als Label → Wert, und Teile, die in
+  irgendeinem Punkt von `items` stehen. Jede der drei Prüfarten wurde beim Anlegen einmal mit einer
+  falschen Erwartung gefahren (Status, KPI, Punkt) und wurde rot.
 - **`execute: false`:** Es läuft nur der Analyzer über die Definition, kein Lauf.
 - **`model: null`** in `aiCalls` prüft, dass kein Modell übergeben wurde.
 

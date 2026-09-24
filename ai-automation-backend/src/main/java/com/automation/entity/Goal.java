@@ -46,6 +46,13 @@ public class Goal {
     @Column(name = "target_date")
     private Instant targetDate;
 
+    /**
+     * Workflow des Ziel-Waechters (Vorlage {@code goal-guard}, TODO 259f4f66); null = nie
+     * eingeschaltet. Ob er gerade laeuft, sagt sein Zeitplan, nicht dieses Feld.
+     */
+    @Column(name = "guard_workflow_id")
+    private String guardWorkflowId;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

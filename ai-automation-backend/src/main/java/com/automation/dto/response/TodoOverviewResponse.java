@@ -12,5 +12,13 @@ public record TodoOverviewResponse(
         List<ProjectRollup> projects,
         List<NeedsYouItem> needsYou,
         Instant generatedAt,
-        int staleThresholdDays
-) {}
+        int staleThresholdDays,
+        /** Meilensteine aktiver Ziele, die bald faellig oder ueberfaellig sind (TODO 259f4f66). */
+        List<MilestoneAttentionItem> milestonesDue
+) {
+    /** Form ohne {@code milestonesDue} – fuer Aufrufer und Test-Fixturen von vorher. */
+    public TodoOverviewResponse(List<ProjectRollup> projects, List<NeedsYouItem> needsYou, Instant generatedAt,
+                                int staleThresholdDays) {
+        this(projects, needsYou, generatedAt, staleThresholdDays, List.of());
+    }
+}

@@ -82,6 +82,6 @@ class GoalServiceTest {
                                    String openQuestion) {
         Instant created = Instant.parse("2026-09-01T00:00:00Z").plusSeconds(createdSecond);
         return new GoalTodoRow(id, id, status, priority, null, null, rank, null, null, null, null, null,
-                openQuestion, created, created);
+                openQuestion, created, created, null, null);
     }
 }

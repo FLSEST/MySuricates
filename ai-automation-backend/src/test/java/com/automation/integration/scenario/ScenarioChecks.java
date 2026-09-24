@@ -62,6 +62,39 @@ final class ScenarioChecks {
         checkAudit(projectId, run, expect);
         checkAiCalls(expect);
         checkTodos(projectId, expect);
+        checkDashboard(run, expect.path("dashboard"));
+    }
+
+    /**
+     * {@code dashboard}: what the run reported to its dashboard tile (run metadata
+     * {@code dashboard_widget}, TODO 259f4f66) — status, title, summary parts, KPI values by label and
+     * item parts (each one must appear in some item).
+     */
+    @SuppressWarnings("unchecked")
+    private void checkDashboard(WorkflowRun run, JsonNode want) {
+        if (want.isMissingNode()) {
+            return;
+        }
+        Map<String, Object> metadata = run.getMetadata() == null ? Map.of() : run.getMetadata();
+        assertThat(metadata).as("run metadata — dashboard_widget expected").containsKey("dashboard_widget");
+        Map<String, Object> widget = (Map<String, Object>) metadata.get("dashboard_widget");
+        if (want.has("status")) {
+            assertThat(widget.get("status")).as("dashboard status").isEqualTo(want.path("status").asText());
+        }
+        if (want.has("title")) {
+            assertThat(widget.get("title")).as("dashboard title").isEqualTo(want.path("title").asText());
+        }
+        for (JsonNode part : want.path("summaryContains")) {
+            assertThat(String.valueOf(widget.get("summary"))).as("dashboard summary").contains(part.asText());
+        }
+        List<Map<String, Object>> kpis = widget.get("kpis") == null ? List.of() : (List<Map<String, Object>>) widget.get("kpis");
+        want.path("kpis").fields().forEachRemaining(kpi -> assertThat(kpis.stream()
+                        .filter(entry -> kpi.getKey().equals(entry.get("label"))).map(entry -> entry.get("value")).toList())
+                .as("dashboard KPI " + kpi.getKey()).containsExactly(kpi.getValue().asText()));
+        List<String> items = widget.get("items") == null ? List.of() : (List<String>) widget.get("items");
+        for (JsonNode part : want.path("itemsContain")) {
+            assertThat(items).as("dashboard items").anySatisfy(item -> assertThat(item).contains(part.asText()));
+        }
     }
 
     /** A chain: its status, each entry's run like a single run ({@code entries}), and the AI calls of all. */

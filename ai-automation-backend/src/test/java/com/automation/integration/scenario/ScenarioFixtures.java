@@ -16,6 +16,7 @@ import com.automation.repository.AuditReportRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.util.LocalizedJson;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -94,7 +95,8 @@ final class ScenarioFixtures {
     }
 
     Workflow workflow(Project project, String name, JsonNode spec, Map<String, String> refs) {
-        List<BlockDefinition> blocks = JSON.convertValue(resolveRefs(spec.path("blocks"), refs), new TypeReference<>() { });
+        JsonNode definition = spec.has("builtinTemplate") ? builtinTemplate(spec) : spec;
+        List<BlockDefinition> blocks = JSON.convertValue(resolveRefs(definition.path("blocks"), refs), new TypeReference<>() { });
         Map<String, Object> metadata = spec.has("metadata")
                 ? JSON.convertValue(spec.path("metadata"), new TypeReference<>() { }) : new HashMap<>();
         Workflow saved = workflowRepository.saveAndFlush(Workflow.builder()
@@ -110,6 +112,23 @@ final class ScenarioFixtures {
                 .build());
         entityManager.clear();
         return workflowRepository.findByIdWithSkills(saved.getId()).orElseThrow();
+    }
+
+    /**
+     * {@code "builtinTemplate": "<id>"} (TODO 259f4f66): the blocks of a shipped template exactly as
+     * a workflow created from it gets them — resolved to {@code locale} (default {@code de}) by the
+     * same {@link LocalizedJson} the template install uses. The scenario then runs what ships.
+     */
+    private static JsonNode builtinTemplate(JsonNode spec) {
+        String resource = "templates/builtin/" + spec.path("builtinTemplate").asText() + ".json";
+        try (var in = ScenarioFixtures.class.getClassLoader().getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IllegalArgumentException("no shipped template " + resource);
+            }
+            return LocalizedJson.resolveDefinition(JSON.readTree(in), spec.path("locale").asText("de"));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** {@code chain}: entries reference workflows as {@code "@name"}; {@code stopOnFailure} defaults to true. */

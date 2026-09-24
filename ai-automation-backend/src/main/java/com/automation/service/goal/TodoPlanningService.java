@@ -4,6 +4,8 @@ import com.automation.dto.request.UpdateTodoPlanningRequest;
 import com.automation.dto.response.TodoResponse;
 import com.automation.entity.Todo;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.entity.GoalMilestone;
+import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.ai.ReasoningEffort;
@@ -28,6 +30,7 @@ public class TodoPlanningService {
 
     private final TodoRepository todoRepository;
     private final GoalRepository goalRepository;
+    private final GoalMilestoneRepository milestoneRepository;
     private final TodoResponseAssembler responseAssembler;
 
     @Transactional
@@ -36,6 +39,9 @@ public class TodoPlanningService {
 
         if (request.goalId() != null) {
             applyGoal(todo, request.goalId().trim());
+        }
+        if (request.milestoneId() != null) {
+            applyMilestone(todo, request.milestoneId().trim());
         }
         if (request.goalRank() != null) {
             if (todo.getGoalId() == null && request.goalRank() > 0) {
@@ -71,13 +77,33 @@ public class TodoPlanningService {
         if (goalId.isEmpty()) {
             todo.setGoalId(null);
             todo.setGoalRank(null);
+            todo.setMilestoneId(null);
         } else if (!goalId.equals(todo.getGoalId())) {
             if (!goalRepository.existsById(goalId)) {
                 throw new ResourceNotFoundException("Goal", goalId);
             }
             todo.setGoalId(goalId);
             todo.setGoalRank(null);
+            todo.setMilestoneId(null);
         }
+    }
+
+    /**
+     * Meilenstein zuordnen (TODO 259f4f66): nur einer des eigenen Ziels – sonst 400, damit ein TODO
+     * nie auf einen Meilenstein zeigt, dessen Ziel es nicht zaehlt. {@code ""} loest die Zuordnung.
+     */
+    private void applyMilestone(Todo todo, String milestoneId) {
+        if (milestoneId.isEmpty()) {
+            todo.setMilestoneId(null);
+            return;
+        }
+        GoalMilestone milestone = milestoneRepository.findById(milestoneId)
+                .orElseThrow(() -> new ResourceNotFoundException("GoalMilestone", milestoneId));
+        if (todo.getGoalId() == null || !todo.getGoalId().equals(milestone.getGoalId())) {
+            throw new IllegalArgumentException("Meilenstein " + milestoneId
+                    + " gehoert nicht zum Ziel des TODOs – erst goalId setzen");
+        }
+        todo.setMilestoneId(milestoneId);
     }
 
     static Todo.Complexity parseComplexity(String value) {

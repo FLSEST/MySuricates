@@ -3,6 +3,7 @@ package com.automation.repository;
 import com.automation.dto.projection.GoalRelationRow;
 import com.automation.dto.projection.GoalStatusCounts;
 import com.automation.dto.projection.GoalTodoRow;
+import com.automation.dto.projection.MilestoneTodoCounts;
 import com.automation.dto.projection.NeedsYouRow;
 import com.automation.dto.projection.ProjectCount;
 import com.automation.dto.projection.ProjectStatusCounts;
@@ -196,7 +197,8 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
 
     @Query("SELECT new com.automation.dto.projection.GoalTodoRow("
          + "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.complexity, "
-         + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt"
+         + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt, "
+         + "t.dueDate, t.milestoneId"
          + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
 
@@ -219,9 +221,24 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
     Integer maxGoalRank(@Param("goalId") String goalId);
 
     /** Loest alle TODOs vom Ziel; die TODOs selbst bleiben. Aufrufer muss @Transactional sein. */
-    @Modifying(clearAutomatically = true)
-    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.updatedAt = :now WHERE t.goalId = :goalId")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Todo t SET t.goalId = NULL, t.goalRank = NULL, t.milestoneId = NULL, t.updatedAt = :now "
+         + "WHERE t.goalId = :goalId")
     int detachFromGoal(@Param("goalId") String goalId, @Param("now") Instant now);
+
+    /**
+     * Zugeordnete und erledigte TODOs je Meilenstein (TODO 259f4f66), ohne ARCHIVED – ein
+     * verworfenes TODO haelt keinen Meilenstein auf. Meilensteine ohne TODOs fehlen in der Liste.
+     */
+    @Query("SELECT new com.automation.dto.projection.MilestoneTodoCounts(t.milestoneId, COUNT(t), "
+         + "SUM(CASE WHEN t.status = 'DONE' THEN 1 ELSE 0 END)) FROM Todo t "
+         + "WHERE t.milestoneId IN :milestoneIds AND t.status <> 'ARCHIVED' GROUP BY t.milestoneId")
+    List<MilestoneTodoCounts> countByMilestone(@Param("milestoneIds") Collection<String> milestoneIds);
+
+    /** Loest alle TODOs von einem Meilenstein; sie bleiben im Ziel. Aufrufer muss @Transactional sein. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE Todo t SET t.milestoneId = NULL, t.updatedAt = :now WHERE t.milestoneId = :milestoneId")
+    int detachFromMilestone(@Param("milestoneId") String milestoneId, @Param("now") Instant now);
 
     // ── Hygiene ────────────────────────────────────────────────────────────────
 

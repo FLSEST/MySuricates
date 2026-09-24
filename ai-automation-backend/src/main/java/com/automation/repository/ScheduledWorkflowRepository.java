@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.GuardScheduleRow;
 import com.automation.entity.ScheduledWorkflow;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -7,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,6 +59,15 @@ public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWork
     List<ScheduledWorkflow> findAllWithTargets();
 
     List<ScheduledWorkflow> findByWorkflowId(String workflowId);
+
+    /**
+     * Zeitplaene der Ziel-Waechter (TODO 259f4f66) als schlanke Zeilen – eine Abfrage fuer die ganze
+     * Zielliste, ohne Workflow, Projekt und Container mitzuladen.
+     */
+    @Query("SELECT new com.automation.dto.projection.GuardScheduleRow("
+         + "s.workflow.id, s.id, s.enabled, s.nextRunAt, s.createdAt) "
+         + "FROM ScheduledWorkflow s WHERE s.workflow.id IN :workflowIds")
+    List<GuardScheduleRow> findGuardRows(@Param("workflowIds") Collection<String> workflowIds);
 
     List<ScheduledWorkflow> findByChainId(String chainId);
 

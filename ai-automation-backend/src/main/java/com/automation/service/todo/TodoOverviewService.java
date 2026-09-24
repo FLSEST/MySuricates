@@ -4,9 +4,15 @@ import com.automation.config.TodoHygieneConfig;
 import com.automation.dto.projection.NeedsYouRow;
 import com.automation.dto.projection.ProjectCount;
 import com.automation.dto.projection.ProjectStatusCounts;
+import com.automation.dto.projection.MilestoneTodoCounts;
+import com.automation.dto.response.MilestoneAttentionItem;
 import com.automation.dto.response.NeedsYouItem;
 import com.automation.dto.response.ProjectRollup;
 import com.automation.dto.response.TodoOverviewResponse;
+import com.automation.entity.Goal;
+import com.automation.entity.GoalMilestone;
+import com.automation.repository.GoalMilestoneRepository;
+import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +48,8 @@ public class TodoOverviewService {
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
     private final TodoHygieneConfig hygieneConfig;
+    private final GoalMilestoneRepository milestoneRepository;
+    private final GoalRepository goalRepository;
 
     @Transactional(readOnly = true)
     public TodoOverviewResponse getOverview() {
@@ -97,7 +105,33 @@ public class TodoOverviewService {
                                 (ProjectRollup r) -> r.open() + r.inProgress() + r.backlog()).reversed()))
                 .toList();
 
-        return new TodoOverviewResponse(projects, needsYou, now, staleDays);
+        return new TodoOverviewResponse(projects, needsYou, now, staleDays, milestonesDue(now));
+    }
+
+    /**
+     * Meilensteine aktiver Ziele, die in hoechstens drei Tagen faellig oder schon ueberfaellig sind
+     * (TODO 259f4f66). Erreichte fallen heraus; der Zustand kommt aus derselben Regel wie in der
+     * Zielansicht ({@link GoalMilestone#stateOf}). Ohne Kandidaten bleibt es bei einer Abfrage.
+     */
+    private List<MilestoneAttentionItem> milestonesDue(Instant now) {
+        List<GoalMilestone> due = milestoneRepository.findDueForActiveGoals(
+                now.plus(GoalMilestone.DUE_SOON), PageRequest.of(0, NEEDS_YOU_LIMIT));
+        if (due.isEmpty()) {
+            return List.of();
+        }
+        Map<String, MilestoneTodoCounts> counts = todoRepository.countByMilestone(
+                due.stream().map(GoalMilestone::getId).toList()).stream()
+                .collect(Collectors.toMap(MilestoneTodoCounts::milestoneId, c -> c));
+        Map<String, String> goalTitles = goalRepository.findAllById(
+                due.stream().map(GoalMilestone::getGoalId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(Goal::getId, Goal::getTitle));
+        return due.stream().map(m -> {
+            MilestoneTodoCounts c = counts.getOrDefault(m.getId(), new MilestoneTodoCounts(m.getId(), 0, 0));
+            GoalMilestone.State state = GoalMilestone.stateOf(m.getDueDate(), c.total(), c.done(), now);
+            return new MilestoneAttentionItem(m.getId(), m.getTitle(), m.getGoalId(), goalTitles.get(m.getGoalId()),
+                    m.getDueDate(), state, c.total(), c.done());
+        }).filter(item -> item.state() == GoalMilestone.State.DUE_SOON || item.state() == GoalMilestone.State.OVERDUE)
+                .toList();
     }
 
     private static String key(String projectId) {

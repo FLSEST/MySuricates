@@ -1,0 +1,53 @@
+{
+  "id": "goal-guard-reports-overdue",
+  "title": "Ziel-Wächter: ein Lauf mit goal_id meldet über dashboard-report Rot mit dem überfälligen Meilenstein und TODO, ohne KI",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md → Ziel-Kontext (goal_status, goal_guard_*): nur mit goal_id injiziert, als Daten markiert; Vorlage goal-guard schreibt goal_status ins Protokoll und füllt die Kachel ohne Modell; Rot bei Überfälligem, Gelb bei bald Fälligem",
+    "incidents": [
+      "259f4f66 (Ziele: Meilensteine, Fälligkeit im Ziel, Kontextvariable goal_status, Ziel-Wächter)",
+      "f4231dc9 (dashboard-report: die Kachel aus Block-Config statt aus einem Marker in KI-Ausgabe – der Marker war die Hürde)"
+    ]
+  },
+  "goal": {
+    "title": "Open-Source-Launch",
+    "targetInDays": 20,
+    "milestones": [
+      { "title": "Beta", "dueInDays": -1 },
+      { "title": "Release", "dueInDays": 15 }
+    ],
+    "todos": [
+      { "title": "Privatdaten entfernen", "status": "OPEN", "dueInDays": -2, "milestone": 0 },
+      { "title": "Videos schneiden", "status": "DONE", "milestone": 0 },
+      { "title": "Doku glätten", "status": "OPEN", "dueInDays": 2, "milestone": 1 }
+    ]
+  },
+  "workflow": {
+    "builtinTemplate": "goal-guard",
+    "locale": "de"
+  },
+  "context": {
+    "goal_id": "@goal",
+    "goal_locale": "de"
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": { "SCRIPTED": 0 },
+    "steps": [
+      {
+        "index": 0,
+        "status": "COMPLETED",
+        "outputContains": ["<goal_status>", "Open-Source-Launch", "Beta", "OVERDUE", "Privatdaten entfernen", "</goal_status>"],
+        "outputNotContains": ["{{"]
+      },
+      { "index": 1, "status": "COMPLETED" }
+    ],
+    "dashboard": {
+      "status": "RED",
+      "title": "Ziel: Open-Source-Launch",
+      "summaryContains": ["1/3", "2 überfällig"],
+      "kpis": { "Fortschritt": "1/3 (33 %)", "Überfällig": "2", "Bald fällig": "1" },
+      "itemsContain": ["Beta", "Privatdaten entfernen", "Doku glätten"]
+    },
+    "gate": "none"
+  }
+}

@@ -10,7 +10,7 @@ curl -X POST localhost:9090/api/v1/pool/<id>/install -H "X-API-Key: $KEY"
 
 An installed workflow is a **copy**. It lives on independently — changing the file here does
 not change it, and there is no update mechanism. That is the difference from the
-54 built-in templates under `ai-automation-backend/src/main/resources/templates/builtin/`,
+55 built-in templates under `ai-automation-backend/src/main/resources/templates/builtin/`,
 which every instance gets at startup whether it wants them or not.
 
 ## Read `scope` before you install
