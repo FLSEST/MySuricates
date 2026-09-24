@@ -10,11 +10,11 @@ import org.springframework.context.event.EventListener;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * Feature-flag {@code automation.discovery.semantic-enabled} can disable the service.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SemanticWorkflowSearchService {
 
@@ -58,6 +57,7 @@ public class SemanticWorkflowSearchService {
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRepository workflowRepository;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate readOnlyTransactionTemplate;
 
     @Value("${automation.discovery.semantic-enabled:true}")
     private boolean semanticEnabled;
@@ -72,6 +72,19 @@ public class SemanticWorkflowSearchService {
     }
 
     public record SemanticHit(String workflowId, String reason, double score) {}
+
+    public SemanticWorkflowSearchService(CommandExecutorService commandExecutorService,
+                                         AppSettingsRepository appSettingsRepository,
+                                         WorkflowRepository workflowRepository,
+                                         ObjectMapper objectMapper,
+                                         PlatformTransactionManager transactionManager) {
+        this.commandExecutorService = commandExecutorService;
+        this.appSettingsRepository = appSettingsRepository;
+        this.workflowRepository = workflowRepository;
+        this.objectMapper = objectMapper;
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
 
     @PostConstruct
     public void init() {
@@ -99,14 +112,20 @@ public class SemanticWorkflowSearchService {
         return semanticEnabled;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Deliberately not {@code @Transactional}: the model call takes up to 30 s, and with HikariCP
+     * pool-size 1 an enclosing transaction would hold the only DB connection for all of it. The index
+     * is read in a short read-only burst instead; the prompt only touches plain columns of the
+     * returned workflows, so they need no open session afterwards.
+     */
     public List<SemanticHit> search(String query, int limit) {
         if (!semanticEnabled) return List.of();
         if (query == null || query.isBlank()) return List.of();
         int capped = Math.max(1, Math.min(limit <= 0 ? DEFAULT_LIMIT : limit, MAX_LIMIT));
 
-        List<Workflow> workflows = workflowRepository.findAllWithActiveProject();
-        if (workflows.isEmpty()) return List.of();
+        List<Workflow> workflows = readOnlyTransactionTemplate.execute(
+                status -> workflowRepository.findAllWithActiveProject());
+        if (workflows == null || workflows.isEmpty()) return List.of();
 
         String fingerprint = fingerprint(workflows);
         String cacheKey = capped + ":" + query.trim().toLowerCase() + ":" + fingerprint;

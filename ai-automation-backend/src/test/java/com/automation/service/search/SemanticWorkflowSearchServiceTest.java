@@ -7,6 +7,7 @@ import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.WorkflowContentChangedEvent;
+import com.automation.testsupport.FakeTransactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,9 +19,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +41,7 @@ class SemanticWorkflowSearchServiceTest {
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private WorkflowRepository workflowRepository;
     @Mock private ObjectMapper objectMapper;
+    @Mock private PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private SemanticWorkflowSearchService service;
@@ -240,6 +244,38 @@ class SemanticWorkflowSearchServiceTest {
 
         // both calls must hit the CLI because failures aren't cached
         verify(commandExecutorService, times(2)).executeOnHost(any());
+    }
+
+    // ── search: transaction boundaries (HikariCP pool-size 1) ──────────────
+
+    @Test
+    void should_read_workflows_inside_a_transaction_but_call_the_model_outside_any() {
+        PlatformTransactionManager transactions = FakeTransactions.manager();
+        SemanticWorkflowSearchService target = new SemanticWorkflowSearchService(
+                commandExecutorService, appSettingsRepository, workflowRepository, new ObjectMapper(), transactions);
+        ReflectionTestUtils.setField(target, "semanticEnabled", true);
+        SemanticWorkflowSearchService proxied = FakeTransactions.proxy(target, transactions);
+
+        Workflow wf = mock(Workflow.class);
+        when(wf.getId()).thenReturn("wf-1");
+        when(wf.getName()).thenReturn("Wf");
+        AtomicReference<Boolean> txDuringRead = new AtomicReference<>();
+        AtomicReference<Boolean> txDuringModelCall = new AtomicReference<>();
+        when(workflowRepository.findAllWithActiveProject()).thenAnswer(inv -> {
+            txDuringRead.set(FakeTransactions.active());
+            return List.of(wf);
+        });
+        when(commandExecutorService.executeOnHost(any(HostExecutionRequest.class))).thenAnswer(inv -> {
+            txDuringModelCall.set(FakeTransactions.active());
+            return new CliSession.EnrichedCommandResult(
+                    "[{\"workflowId\":\"wf-1\",\"reason\":\"passt\",\"score\":0.9}]", 0, null);
+        });
+
+        List<SemanticWorkflowSearchService.SemanticHit> hits = proxied.search("query", 5);
+
+        assertThat(txDuringModelCall.get()).as("the model call must not hold the only DB connection").isFalse();
+        assertThat(txDuringRead.get()).as("the workflow index is read in a short transaction").isTrue();
+        assertThat(hits).extracting(SemanticWorkflowSearchService.SemanticHit::workflowId).containsExactly("wf-1");
     }
 
     // ── search: request shape ──────────────────────────────────────────────

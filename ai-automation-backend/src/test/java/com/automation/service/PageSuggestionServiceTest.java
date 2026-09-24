@@ -9,6 +9,7 @@ import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
+import com.automation.testsupport.FakeTransactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -17,10 +18,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,7 +54,7 @@ class PageSuggestionServiceTest {
     void setUp() {
         service = new PageSuggestionService(
                 sessionRepository, suggestionRepository, workflowMemoryRepository,
-                appSettingsRepository, commandExecutorService, objectMapper);
+                appSettingsRepository, commandExecutorService, objectMapper, FakeTransactions.manager());
     }
 
     @Nested
@@ -199,6 +202,42 @@ class PageSuggestionServiceTest {
             List<String> result = service.refreshSuggestions("run");
 
             assertThat(result).contains("Erkläre diesen Run");
+        }
+    }
+
+    @Nested
+    class TransactionBoundaryTests {
+
+        @Test
+        void refreshSuggestions_callsTheModelOutsideAnyTransaction() {
+            PlatformTransactionManager transactions = FakeTransactions.manager();
+            PageSuggestionService proxied = FakeTransactions.proxy(new PageSuggestionService(
+                    sessionRepository, suggestionRepository, workflowMemoryRepository,
+                    appSettingsRepository, commandExecutorService, objectMapper, transactions), transactions);
+            AtomicReference<Boolean> txDuringRead = new AtomicReference<>();
+            AtomicReference<Boolean> txDuringModelCall = new AtomicReference<>();
+            AtomicReference<Boolean> txDuringWrite = new AtomicReference<>();
+            when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run")).thenAnswer(inv -> {
+                txDuringRead.set(FakeTransactions.active());
+                return List.of();
+            });
+            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(commandExecutorService.executeOnHost(any())).thenAnswer(inv -> {
+                txDuringModelCall.set(FakeTransactions.active());
+                return new CliSession.EnrichedCommandResult("[\"Frage A\"]", 0, null);
+            });
+            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.save(any())).thenAnswer(inv -> {
+                txDuringWrite.set(FakeTransactions.active());
+                return inv.getArgument(0);
+            });
+
+            List<String> result = proxied.refreshSuggestions("run");
+
+            assertThat(txDuringModelCall.get()).as("the model call must not hold the only DB connection").isFalse();
+            assertThat(txDuringRead.get()).as("sessions are read in a short transaction").isTrue();
+            assertThat(txDuringWrite.get()).as("suggestions are written in a short transaction").isTrue();
+            assertThat(result).containsExactly("Frage A");
         }
     }
 
