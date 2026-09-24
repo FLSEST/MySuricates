@@ -32,6 +32,7 @@ class PackageCycleRatchetTest {
      * {@code cycle_pairs=13}. 2026-09-24: scheduler and dlq no longer pair with service.workflow
      * (SuspendState moved, DLQ entries via WorkflowRunCompletedEvent) — 11 pairs. Then service.system
      * no longer calls the caches of ai and workflow on a settings change (AppSettingChangedEvent) — 9.
+     * AssistantFormatUtils moved to its own leaf package service.assistant.format — 7.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
             "com.automation.config <-> com.automation.security",
@@ -39,8 +40,6 @@ class PackageCycleRatchetTest {
             "com.automation.dto <-> com.automation.service.assistant",
             "com.automation.executor <-> com.automation.service.cli",
             "com.automation.service.ai <-> com.automation.service.cli",
-            "com.automation.service.assistant <-> com.automation.service.assistant.context",
-            "com.automation.service.assistant <-> com.automation.service.assistant.fetch",
             "com.automation.service.project <-> com.automation.service.workflow",
             "com.automation.service.todo <-> com.automation.service.workflow");
 

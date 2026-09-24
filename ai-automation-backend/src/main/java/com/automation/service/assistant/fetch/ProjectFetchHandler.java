@@ -1,7 +1,7 @@
 package com.automation.service.assistant.fetch;
 
 import com.automation.repository.ProjectRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.automation.service.project.ProjectContextService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

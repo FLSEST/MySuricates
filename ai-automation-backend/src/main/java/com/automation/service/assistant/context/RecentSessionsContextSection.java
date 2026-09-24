@@ -2,7 +2,7 @@ package com.automation.service.assistant.context;
 
 import com.automation.entity.AssistantSession;
 import com.automation.repository.AssistantSessionRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;

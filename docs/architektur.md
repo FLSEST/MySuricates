@@ -236,6 +236,7 @@ com.automation
 │   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
+│   ├── assistant/format/  AssistantFormatUtils (Formatier-Helfer für Prompt-Bausteine; eigenes Blatt-Paket, damit context/ und fetch/ nicht auf assistant/ zurückzeigen)
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
 │   ├── dlq/             DeadLetterService, DeadLetterRetryService
 │   ├── document/        DocumentExtractionService, DocumentExtractionException

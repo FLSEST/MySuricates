@@ -2,7 +2,7 @@ package com.automation.service.assistant.fetch;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

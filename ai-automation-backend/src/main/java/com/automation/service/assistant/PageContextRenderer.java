@@ -18,8 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.automation.service.assistant.AssistantFormatUtils.extractError;
-import static com.automation.service.assistant.AssistantFormatUtils.truncate;
+import static com.automation.service.assistant.format.AssistantFormatUtils.extractError;
+import static com.automation.service.assistant.format.AssistantFormatUtils.truncate;
 
 /**
  * Renders the "Current User Context" block of the assistant system prompt: page header, the

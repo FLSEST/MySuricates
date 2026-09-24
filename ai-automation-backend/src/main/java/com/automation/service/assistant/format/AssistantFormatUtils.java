@@ -1,4 +1,4 @@
-package com.automation.service.assistant;
+package com.automation.service.assistant.format;
 
 import com.automation.entity.WorkflowRun;
 
@@ -10,8 +10,9 @@ import java.util.Set;
 /**
  * Shared formatting helpers for assistant prompt building: run links/labels,
  * timestamp formatting, error extraction and inline truncation.
- * Used by {@link AssistantContextBuilder}, {@link AssistantFetchService} and the
- * context sections — single source of truth so all prompt output stays consistent.
+ * Used by the context builder, the fetch service and their {@code context}/{@code fetch}
+ * sections — single source of truth so all prompt output stays consistent. A leaf package of
+ * its own, so those sections do not depend back on {@code service.assistant}.
  */
 public final class AssistantFormatUtils {
 

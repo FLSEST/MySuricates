@@ -28,6 +28,7 @@ import com.automation.service.assistant.fetch.PoolFetchHandler;
 import com.automation.service.assistant.fetch.ProjectFetchHandler;
 import com.automation.service.assistant.fetch.RunFetchHandler;
 import com.automation.service.assistant.fetch.WorkflowFetchHandler;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;

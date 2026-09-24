@@ -4,7 +4,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.StepStatus;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
