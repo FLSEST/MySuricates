@@ -159,3 +159,67 @@ describe('Todos — search debounce', () => {
     await waitFor(() => expect(queries).toEqual(['log']), { timeout: SEARCH_DEBOUNCE_MS * 10 });
   });
 });
+
+describe('Todos — quick add', () => {
+  function recordCreates(created: unknown[]) {
+    server.use(
+      http.post(`${BASE}/todos`, async ({ request }) => {
+        created.push(await request.json());
+        return HttpResponse.json({ ...deepTodo, id: 't-new' });
+      }),
+    );
+  }
+
+  it("'n' outside of form fields focuses the title, inside a field it types normally", async () => {
+    useTodoEndpoints([]);
+    renderWithProviders(<Todos />, { route: '/todos' });
+    const title = await screen.findByPlaceholderText('New Todo... (n)');
+    const search = screen.getByPlaceholderText('Search...');
+
+    search.focus();
+    expect(fireEvent.keyDown(search, { key: 'n' })).toBe(true);   // not prevented
+    expect(document.activeElement).toBe(search);
+
+    (document.activeElement as HTMLElement).blur();
+    expect(fireEvent.keyDown(document.body, { key: 'n' })).toBe(false);   // prevented
+    expect(document.activeElement).toBe(title);
+
+    title.blur();
+    fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true });
+    expect(document.activeElement).not.toBe(title);
+  });
+
+  it('creates the todo on Enter, then clears the bar and focuses the title again', async () => {
+    const created: unknown[] = [];
+    useTodoEndpoints([]);
+    recordCreates(created);
+    renderWithProviders(<Todos />, { route: '/todos' });
+    const title = await screen.findByPlaceholderText('New Todo... (n)');
+    const description = screen.getByPlaceholderText('Description...');
+
+    fireEvent.change(title, { target: { value: '  Write docs  ' } });
+    fireEvent.change(description, { target: { value: ' Explain the hook ' } });
+    fireEvent.keyDown(description, { key: 'Enter' });
+
+    await waitFor(() => expect(created).toEqual([
+      { title: 'Write docs', description: 'Explain the hook', priority: 'MEDIUM' },
+    ]));
+    await waitFor(() => expect(title).toHaveValue(''));
+    expect(description).toHaveValue('');
+    expect(document.activeElement).toBe(title);
+  });
+
+  it('ignores Enter without a title', async () => {
+    const created: unknown[] = [];
+    useTodoEndpoints([]);
+    recordCreates(created);
+    renderWithProviders(<Todos />, { route: '/todos' });
+    const title = await screen.findByPlaceholderText('New Todo... (n)');
+
+    fireEvent.change(title, { target: { value: '   ' } });
+    fireEvent.keyDown(title, { key: 'Enter' });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(created).toEqual([]);
+  });
+});
