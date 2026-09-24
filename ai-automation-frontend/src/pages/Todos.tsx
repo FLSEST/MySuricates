@@ -1,9 +1,6 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  CheckSquare, Search,
-  X, List, LayoutGrid,
-} from 'lucide-react';
+import { CheckSquare } from 'lucide-react';
 import { Card, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/hints/Hint';
@@ -11,123 +8,48 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { Pagination } from '../components/shared/Pagination';
 import { TodoEditModal } from '../components/todo/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
-import {
-  STATUSES, SOURCES, MAX_VISIBLE_TAGS,
-  ACTIVE_STATUSES, KANBAN_COLUMN_STATUSES, filterShowsStatus,
-} from '../components/todo/todoConstants';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
-import { TodoKanbanView, type TodoKanbanColumn } from '../components/todo/TodoKanbanView';
+import { TodoKanbanView } from '../components/todo/TodoKanbanView';
 import { TodoListItem } from '../components/todo/TodoListView';
 import { TodoQuickAdd } from '../components/todo/TodoQuickAdd';
-import {
-  useTodos, useTodoColumn, useTodo, useTodoCount, useUpdateTodo, useUpdateTodoStatus, useDeleteTodo, useResolveTodo, useExportTodo,
-} from '../hooks/useTodos';
+import { TodoFilterBar } from '../components/todo/TodoFilterBar';
+import { TodoTagChips } from '../components/todo/TodoTagChips';
+import { useTodoCount, useUpdateTodoStatus, useDeleteTodo, useResolveTodo } from '../hooks/useTodos';
 import { useTodoFilters } from '../hooks/useTodoFilters';
 import { useTodoQuickAdd } from '../hooks/useTodoQuickAdd';
+import { useTodoBoard } from '../hooks/useTodoBoard';
+import { useTodoEditor } from '../hooks/useTodoEditor';
 import { useProjects } from '../hooks/useProjects';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { useSettingsStore } from '../stores/settingsStore';
 import { useT } from '../i18n';
-import type { Todo, TodoStatus, TodoSource, UpdateTodoRequest } from '../types';
+import type { Todo, TodoStatus } from '../types';
 
 /* ─── Main Todos Page ───────────────────────────────────── */
 export function Todos() {
   const t = useT();
   const navigate = useNavigate();
-  // Filter state (declared before useTodos so we can pass filters to the API)
-  const {
-    searchParams,
-    statusFilter, setStatusFilter,
-    sourceFilter, setSourceFilter,
-    projectFilter, setProjectFilter,
-    search, setSearch,
-    tagFilter, setTagFilter,
-    viewMode, setViewMode,
-    page, setPage,
-    filterParams, apiParams,
-  } = useTodoFilters();
-
-  // Deep-link to a single todo: ?todoId=… is resolved by id (not by searching the
-  // paginated list), so it works regardless of persisted filters and page.
-  const linkedTodoId = searchParams.get('todoId') ?? '';
-  const { data: linkedTodo } = useTodo(linkedTodoId);
+  // Filter state (declared before the queries so we can pass filters to the API)
+  const filters = useTodoFilters();
+  const { statusFilter, tagFilter, setTagFilter, viewMode, page, setPage } = filters;
   const [showAllTags, setShowAllTags] = useState(false);
 
-  // Pagination — sizes are user settings, not constants (see TodoSettingsCard)
-  const listPageSize = useSettingsStore((s) => s.listPageSize);
-  const kanbanColumnSize = useSettingsStore((s) => s.kanbanColumnSize);
-
-  const isBoard = viewMode === 'board';
-
-  // Which columns the board shows — the status filter narrows them. ARCHIVED has no
-  // permanent column; it only appears when the archive filter is selected explicitly.
-  const boardStatuses = useMemo<TodoStatus[]>(() => {
-    if (statusFilter === 'ALL') return KANBAN_COLUMN_STATUSES;
-    if (statusFilter === 'ACTIVE') return ACTIVE_STATUSES;
-    return [statusFilter];
-  }, [statusFilter]);
-
-  // One query per column — never distribute a mixed page across the columns (b12a1085).
-  const columnEnabled = (status: TodoStatus) => isBoard && boardStatuses.includes(status);
-  const openColumn = useTodoColumn('OPEN', kanbanColumnSize, filterParams, columnEnabled('OPEN'));
-  const inProgressColumn = useTodoColumn('IN_PROGRESS', kanbanColumnSize, filterParams, columnEnabled('IN_PROGRESS'));
-  const doneColumn = useTodoColumn('DONE', kanbanColumnSize, filterParams, columnEnabled('DONE'));
-  const backlogColumn = useTodoColumn('BACKLOG', kanbanColumnSize, filterParams, columnEnabled('BACKLOG'));
-  const archivedColumn = useTodoColumn('ARCHIVED', kanbanColumnSize, filterParams, columnEnabled('ARCHIVED'));
-  const columnQueries = {
-    OPEN: openColumn,
-    IN_PROGRESS: inProgressColumn,
-    DONE: doneColumn,
-    BACKLOG: backlogColumn,
-    ARCHIVED: archivedColumn,
-  } satisfies Record<TodoStatus, ReturnType<typeof useTodoColumn>>;
-
-  const boardColumns: TodoKanbanColumn[] = boardStatuses.map((status) => ({
-    status,
-    todos: columnQueries[status].data?.content ?? [],
-    total: columnQueries[status].data?.totalElements ?? 0,
-    isLoading: columnQueries[status].isLoading,
-  }));
-
-  const listQuery = useTodos(apiParams, page, listPageSize, !isBoard);
-  const todosPage = listQuery.data;
-  const isLoading = isBoard
-    ? boardColumns.length > 0 && boardColumns.every((column) => column.isLoading)
-    : listQuery.isLoading;
-  const error = isBoard
-    ? boardStatuses.map((status) => columnQueries[status].error).find(Boolean) ?? null
-    : listQuery.error;
-  const refetch = () => {
-    if (isBoard) boardStatuses.forEach((status) => columnQueries[status].refetch());
-    else listQuery.refetch();
-  };
-
-  // Todos currently on screen — list rows or the union of all board columns
-  const todos = isBoard ? boardColumns.flatMap((column) => column.todos) : todosPage?.content;
+  const {
+    isBoard, boardColumns, todosPage, todos, isLoading, error, refetch, boardStillLoading,
+  } = useTodoBoard({ viewMode, statusFilter, filterParams: filters.filterParams, apiParams: filters.apiParams, page });
   const { data: counts } = useTodoCount();
   const { data: projects } = useProjects();
   const { data: workflows = [] } = useWorkflows();
-  const updateTodo = useUpdateTodo();
   const updateStatus = useUpdateTodoStatus();
   const deleteTodo = useDeleteTodo();
   const resolveTodo = useResolveTodo();
-  const exportTodo = useExportTodo();
   const { data: integrations } = useIntegrations();
 
   // Quick-add state (lives in the page: survives the loading spinner, 'n' works from mount)
   const { form: quickAdd, inputRef: quickInputRef } = useTodoQuickAdd();
 
-  // Edit modal state
-  const [editTodo, setEditTodo] = useState<Todo | null>(null);
-  const [editForm, setEditForm] = useState<UpdateTodoRequest>({});
-  const [editTagsList, setEditTagsList] = useState<string[]>([]);
-
-  // Deep-link highlight: marks the row the user came from until shortly after the modal closes
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  const handledDeepLink = useRef<string | null>(null);
-  const highlightTimer = useRef<number | null>(null);
-  useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current); }, []);
+  // Edit modal and deep link ?todoId= (opens the todo, highlights its row)
+  const editor = useTodoEditor(filters);
 
   // Server-side filtering — todos already filtered by API params
   const filtered = todos ?? [];
@@ -143,64 +65,10 @@ export function Todos() {
   const backlogCount = counts?.backlog ?? 0;
   /** Distinguishes "nothing matches the filter" from "no todos exist yet". */
   const hasAnyTodos = openCount + inProgressCount + doneCount + backlogCount + (counts?.archived ?? 0) > 0;
-  /** A board column still loading must not flash the empty state. */
-  const boardStillLoading = isBoard && boardColumns.some((column) => column.isLoading);
 
   const handleStatusChange = (todo: Todo, status: TodoStatus) => {
     if (todo.status === status) return;
     updateStatus.mutate({ id: todo.id, status });
-  };
-
-  const openEdit = (todo: Todo) => {
-    setEditTodo(todo);
-    setEditForm({
-      title: todo.title,
-      description: todo.description ?? '',
-      status: todo.status,
-      priority: todo.priority,
-      projectId: todo.projectId ?? '',
-      linkedWorkflowId: todo.linkedWorkflowId ?? '',
-      tags: todo.tags,
-      dueDate: todo.dueDate ?? '',
-    });
-    setEditTagsList([...todo.tags]);
-  };
-
-  const closeEdit = () => {
-    const closedId = editTodo?.id;
-    setEditTodo(null);
-    // Coming back from a deep link: reveal the row the modal was covering
-    if (closedId && closedId === highlightId) {
-      document.getElementById(`todo-${closedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
-      highlightTimer.current = window.setTimeout(() => setHighlightId(null), 2500);
-    }
-  };
-
-  // Open the deep-linked todo as soon as it is loaded. The ref guard keeps the modal
-  // closed once the user dismissed it — the param stays in the URL.
-  useEffect(() => {
-    if (!linkedTodo || handledDeepLink.current === linkedTodo.id) return;
-    handledDeepLink.current = linkedTodo.id;
-    // Preselect the project unless the link already carried it
-    if (!searchParams.get('projectId') && linkedTodo.projectId) setProjectFilter(linkedTodo.projectId);
-    // Release persisted filters that would hide exactly this todo
-    if (!filterShowsStatus(statusFilter, linkedTodo.status)) setStatusFilter('ALL');
-    if (tagFilter && !linkedTodo.tags.includes(tagFilter)) setTagFilter('');
-    openEdit(linkedTodo);
-    setHighlightId(linkedTodo.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkedTodo]);
-
-  const handleEditSave = () => {
-    if (!editTodo) return;
-    const data: UpdateTodoRequest = {
-      ...editForm,
-      tags: editTagsList,
-    };
-    updateTodo.mutate({ id: editTodo.id, data }, {
-      onSuccess: closeEdit,
-    });
   };
 
   const handleResolve = (todo: Todo) => {
@@ -210,7 +78,6 @@ export function Todos() {
       },
     });
   };
-
 
   if (isLoading) {
     return (
@@ -223,9 +90,6 @@ export function Todos() {
   if (error) {
     return <ErrorState message={error.message} onRetry={() => refetch()} />;
   }
-
-  const visibleTags = showAllTags ? allTags : allTags.slice(0, MAX_VISIBLE_TAGS);
-  const hasMoreTags = allTags.length > MAX_VISIBLE_TAGS;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -248,149 +112,16 @@ export function Todos() {
       <TodoQuickAdd form={quickAdd} inputRef={quickInputRef} projects={projects} allTags={allTags} />
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Status tabs */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setStatusFilter('ACTIVE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              statusFilter === 'ACTIVE'
-                ? 'bg-accent text-text-inverse'
-                : 'text-text-secondary hover:text-text hover:bg-surface-raised'
-            }`}
-          >
-            {t.todos.activeStatuses}
-          </button>
-          <button
-            onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              statusFilter === 'ALL'
-                ? 'bg-accent text-text-inverse'
-                : 'text-text-secondary hover:text-text hover:bg-surface-raised'
-            }`}
-          >
-            {t.todos.allStatuses}
-          </button>
-          {STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? 'bg-accent text-text-inverse'
-                  : 'text-text-secondary hover:text-text hover:bg-surface-raised'
-              }`}
-            >
-              {t.todos.statuses[s]}
-            </button>
-          ))}
-          {/* Archive tab — separated; ARCHIVED is hidden from the default views */}
-          <span className="w-px h-4 bg-border mx-1" aria-hidden />
-          <button
-            onClick={() => setStatusFilter('ARCHIVED')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              statusFilter === 'ARCHIVED'
-                ? 'bg-accent text-text-inverse'
-                : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
-            }`}
-          >
-            {t.todos.statuses.ARCHIVED}
-          </button>
-        </div>
-
-        {/* Source filter */}
-        <select
-          className="input-base text-xs py-1.5 w-32"
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value as TodoSource | 'ALL')}
-        >
-          <option value="ALL">{t.todos.allSources}</option>
-          {SOURCES.map((s) => (
-            <option key={s} value={s}>{t.todos.sources[s]}</option>
-          ))}
-        </select>
-
-        {/* Project filter */}
-        <select
-          className="input-base text-xs py-1.5 w-40"
-          value={projectFilter}
-          onChange={(e) => setProjectFilter(e.target.value)}
-        >
-          <option value="">{t.todos.allProjects}</option>
-          {projects?.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-
-        {/* Search */}
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-tertiary pointer-events-none" />
-          <input
-            type="text"
-            className="input-base pl-9 text-xs py-1.5 w-full"
-            placeholder={t.common.search}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        {/* View toggle */}
-        <div className="flex items-center gap-1 ml-auto">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-lg transition-colors ${
-              viewMode === 'list' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
-            }`}
-            title={t.todos.viewList}
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('board')}
-            className={`p-1.5 rounded-lg transition-colors ${
-              viewMode === 'board' ? 'bg-accent text-text-inverse' : 'text-text-tertiary hover:text-text hover:bg-surface-raised'
-            }`}
-            title={t.todos.viewBoard}
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <TodoFilterBar filters={filters} projects={projects} />
 
       {/* Tag chips (collapsible) */}
-      {allTags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {visibleTags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
-                tagFilter === tag
-                  ? 'bg-accent text-text-inverse border-accent'
-                  : 'bg-surface-raised text-text-secondary border-border hover:border-border-strong'
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
-          {hasMoreTags && (
-            <button
-              onClick={() => setShowAllTags(!showAllTags)}
-              className="px-2.5 py-1 rounded-full text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
-            >
-              {showAllTags ? t.todos.showLessTags : `${t.todos.showMoreTags} (+${allTags.length - MAX_VISIBLE_TAGS})`}
-            </button>
-          )}
-          {tagFilter && (
-            <button
-              onClick={() => setTagFilter('')}
-              className="px-2 py-1 rounded-full text-xs text-text-tertiary hover:text-text transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      )}
+      <TodoTagChips
+        tags={allTags}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
+        expanded={showAllTags}
+        onExpandedChange={setShowAllTags}
+      />
 
       {/* Content: List or Board */}
       {filtered.length === 0 && !boardStillLoading ? (
@@ -402,11 +133,11 @@ export function Todos() {
       ) : isBoard ? (
         <TodoKanbanView
           columns={boardColumns}
-          onEdit={openEdit}
+          onEdit={editor.openEdit}
           onStatusChange={handleStatusChange}
           onResolve={handleResolve}
           resolveLoadingId={resolveTodo.variables ?? null}
-          highlightId={highlightId}
+          highlightId={editor.highlightId}
         />
       ) : (
         <>
@@ -416,13 +147,13 @@ export function Todos() {
                 <TodoListItem
                   key={todo.id}
                   todo={todo}
-                  onEdit={openEdit}
+                  onEdit={editor.openEdit}
                   onStatusChange={handleStatusChange}
                   onResolve={handleResolve}
                   resolveLoading={resolveTodo.isPending && resolveTodo.variables === todo.id}
                   exportedIcon={integrations?.find((p) => p.providerId === todo.exportedProvider)?.icon}
                   onDelete={(id) => deleteTodo.mutate(id)}
-                  highlighted={highlightId === todo.id}
+                  highlighted={editor.highlightId === todo.id}
                 />
               ))}
             </div>
@@ -444,20 +175,20 @@ export function Todos() {
       </div>
 
       <TodoEditModal
-        editTodo={editTodo}
-        editForm={editForm}
-        editTagsList={editTagsList}
+        editTodo={editor.editTodo}
+        editForm={editor.editForm}
+        editTagsList={editor.editTagsList}
         projects={projects ?? []}
         workflows={workflows}
         allTags={allTags}
-        isLoading={updateTodo.isPending}
-        onClose={closeEdit}
-        onFormChange={setEditForm}
-        onTagsChange={setEditTagsList}
-        onSave={handleEditSave}
+        isLoading={editor.saving}
+        onClose={editor.closeEdit}
+        onFormChange={editor.setEditForm}
+        onTagsChange={editor.setEditTagsList}
+        onSave={editor.save}
         integrations={integrations ?? []}
-        exportLoading={exportTodo.isPending}
-        onExport={(provider, target) => { if (editTodo) exportTodo.mutate({ id: editTodo.id, provider, target }); }}
+        exportLoading={editor.exporting}
+        onExport={editor.exportTo}
       />
     </div>
   );

@@ -159,6 +159,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
 - Badge display in the sidebar for open TODOs
 - Filter, view and page state (persisted, debounced search, `?projectId=` from the cockpit) comes from `hooks/useTodoFilters.ts`; the quick-add bar is `components/todo/TodoQuickAdd.tsx`, its state and the `n` shortcut (focuses the title outside of form fields) live in `hooks/useTodoQuickAdd.ts` and therefore in the page — input survives the loading spinner when a filter changes
+- `hooks/useTodoBoard.ts` provides the data of the active view: one page in the list, one query per column the status filter shows on the board (never a mixed page spread over the columns); `hooks/useTodoEditor.ts` the edit dialog including the deep link `?todoId=` (opens the todo once, releases filters that would hide it, highlights its row until shortly after closing), saving and export. The filter bar and the tag chips are `components/todo/TodoFilterBar.tsx` and `TodoTagChips.tsx`
 
 ### ActivityLog (`/activity`)
 
