@@ -11,11 +11,13 @@ import type { SetupStep } from '../../data/integrationSetupGuides';
  * Setup guide + credential form for one integration provider. Extracted from
  * pages/Integrations.tsx (audit finding 9c464f6f) — behaviour unchanged.
  */
-export function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, connected = false, onRefresh }: {
+export function SetupGuidePanel({ providerId, displayName, requiresCredentials = true, connected = false, connection, onRefresh }: {
   providerId: string;
   displayName: string;
   requiresCredentials?: boolean;
   connected?: boolean;
+  /** Named connection the credentials belong to; omitted = the provider's default connection. */
+  connection?: string;
   onRefresh: () => void;
 }) {
   const lang = useI18nStore.getState().locale;
@@ -37,7 +39,7 @@ export function SetupGuidePanel({ providerId, displayName, requiresCredentials =
 
   const handleSaveCredentials = () => {
     saveCredentials.mutate(
-      { providerId, clientId, clientSecret },
+      { providerId, clientId, clientSecret, connection },
       { onSuccess: () => onRefresh() }
     );
   };

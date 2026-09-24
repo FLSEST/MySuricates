@@ -165,7 +165,7 @@ Response: 201 Created
 | `sub-workflow` | `description`, `workflow_id` | Verschachtelter Workflow (max 5 Ebenen) |
 | `skill-capability` | `description`, `capability`, `input?`, `params?`, `allow_writes?` | Skill-Ausführung (ohne `allow_writes` nur lesend) |
 | `human-input` | `description`, `prompt`, `input_type`, `variable_name`, `options`, `timeout_minutes` | User-Eingabe |
-| `integration` | `description`, `provider`, `action`, `params?` | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior) |
+| `integration` | `description`, `provider`, `action`, `params?`, `connection?` (benannte Verbindung, default `default`) | Integration-Provider-Aktion (Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior, CalDAV, iCal-Feed, ntfy, RSS/Atom, Open-Meteo, Todoist, Slack, Telegram) |
 | `document` | `description`, `file_path`, `fail_on_empty?`, `min_characters?`, `variable_name?` | Text-Extraktion aus Dokumenten via Tika (PDF mit Text-Layer, DOCX, …) — kein OCR |
 | `compress` | `description`, `source`, `stages`, `max_chars?`, `timeout_seconds?` | Regelbasierte Komprimierung einer Blockausgabe |
 | `compress-ai` | `description`, `source`, `instruction?`, `max_chars?`, `model?`, `effort?`, `provider` (nur `CLAUDE`; setzen, wenn der Workflow einen anderen Provider nutzt), `timeout_seconds?` | KI-Komprimierung einer Blockausgabe (nur CLAUDE, ohne Tools) |
@@ -429,6 +429,7 @@ DELETE /api/v1/assistant/sessions/<session-uuid>
 | Beispielprojekt anlegen (idempotent) | `POST /api/v1/projects/example?locale=de` — 201 beim ersten Aufruf, danach 200 mit demselben Projekt |
 | App-Setting lesen / setzen | `GET`/`PUT /api/v1/system/settings/{key}` — PUT-Body: `{"value": "..."}` |
 | Execution-Config (Timeouts, Concurrency) | `GET`/`PUT /api/v1/system/execution-config` |
+| Integrationen + Verbindungen | `GET /api/v1/integrations` (je Provider `connections[]`), `GET /api/v1/integrations/{providerId}/connections`; `connect`, `credentials`, `connection`, `actions`, `task-targets` nehmen `?connection=<name>` (ohne: `default`) |
 
 Feld-Details zu allen Endpunkten: [docs/api-referenz.md](docs/api-referenz.md).
 

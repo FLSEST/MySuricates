@@ -1550,6 +1550,7 @@ Ruft Actions von verbundenen externen Diensten auf (Google Calendar, Trello, etc
 | `provider` | Ja | Provider-ID: `google-calendar`, `trello`, etc. |
 | `action` | Ja | Action-Name, z.B. `list_events`, `create_card` |
 | `params` | Nein | Parameter als Key-Value, unterstützt `{{ template_vars }}` |
+| `connection` | Nein | Benannte Verbindung des Providers, z.B. `arbeit` — wenn mehrere Konten/Dienste desselben Providers eingerichtet sind (Integrationen-Seite → „Verbindungen“). Default `default`, Platzhalter erlaubt |
 
 ### Beispiel: Nächste Google Calendar Events abrufen
 

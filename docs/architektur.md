@@ -1171,6 +1171,8 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V82 | Siegelstand am Run: `workflow_runs.sealed`, `sealed_skill_pins` |
 | V83 | Bearbeitete Onboarding-Profile: `customized`, `shipped_version` |
 | V84 | Siegel-Signatur und Siegel-Geschichte: `workflows.sealed_signature`, `workflow_seal_events` |
+| V85 | Ziele: Tabelle `goals`, Einordnung und Einschätzung an `todos` |
+| V86 | Mehrere benannte Verbindungen je Integrations-Anbieter: `integration_connections.connection_name` |
 
 ## Architektur-Gates
 
@@ -1214,7 +1216,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 85 Flyway-Migrationen (V1–V85)
+│           └── db/migration/          ← 86 Flyway-Migrationen (V1–V86)
 │
 └── ai-automation-frontend/
     ├── package.json

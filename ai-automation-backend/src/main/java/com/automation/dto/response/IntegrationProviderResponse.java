@@ -20,7 +20,14 @@ public record IntegrationProviderResponse(
         boolean supportsTaskExport,
         /** {@code VERIFIED} or {@code SIMULATED} — see {@code IntegrationVerification}. */
         String verification,
-        String verifiedAgainst
+        String verifiedAgainst,
+        /**
+         * Every stored connection of this provider, {@code default} first (0b3cbcc3). The
+         * top-level status/account fields describe the {@code default} connection.
+         */
+        List<IntegrationConnectionResponse> connections,
+        /** {@code true}: connecting runs the OAuth consent; {@code false}: the credentials are the auth (PAT/API key). */
+        boolean requiresOAuthFlow
 ) {
     public record ScopeOptionResponse(String scope, String label, boolean granted) {}
 }

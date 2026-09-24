@@ -72,9 +72,9 @@ class IntegrationOAuthConnectFlowTest {
     @Test
     void saveCredentials_oauthProvider_storesClientCredentialsOnlyAndNeverCallsProvider() {
         when(provider.requiresOAuthFlow()).thenReturn(true);
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.empty());
 
-        IntegrationConnection saved = flow.saveCredentials("acme", "cid", "secret");
+        IntegrationConnection saved = flow.saveCredentials("acme", "default", "cid", "secret");
 
         assertThat(saved.getProviderId()).isEqualTo("acme");
         assertThat(saved.getClientIdEncrypted()).isEqualTo("enc(cid)");
@@ -90,9 +90,9 @@ class IntegrationOAuthConnectFlowTest {
                 .status(ConnectionStatus.CONNECTED).accountInfo("old").build();
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("key|token")).thenThrow(new IllegalStateException("401"));
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.of(existing));
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.of(existing));
 
-        IntegrationConnection saved = flow.saveCredentials("acme", "key", "token");
+        IntegrationConnection saved = flow.saveCredentials("acme", "default", "key", "token");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(saved.getAccessTokenEncrypted()).isEqualTo("enc(key|token)");
@@ -104,9 +104,9 @@ class IntegrationOAuthConnectFlowTest {
         when(provider.requiresOAuthFlow()).thenReturn(false);
         when(provider.fetchAccountInfo("key|token")).thenReturn("flo");
         when(provider.fetchGrantedScopes("key|token")).thenReturn("repo");
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.empty());
 
-        IntegrationConnection saved = flow.saveCredentials("acme", "key", "token");
+        IntegrationConnection saved = flow.saveCredentials("acme", "default", "key", "token");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         assertThat(saved.getAccountInfo()).isEqualTo("flo");
@@ -120,13 +120,13 @@ class IntegrationOAuthConnectFlowTest {
         IntegrationConnection row = IntegrationConnection.builder().providerId("acme")
                 .clientIdEncrypted("enc(cid)").clientSecretEncrypted("enc(sec)").build();
         when(provider.getOAuthConfig()).thenReturn(CONFIG);
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.of(row));
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.of(row));
         when(tokenClient.exchangeCodeForTokens("acme", CONFIG, "code-1", "cid", "sec", "https://app/cb"))
                 .thenReturn(json("{\"access_token\":\"at\",\"refresh_token\":\"rt\",\"expires_in\":120,\"scope\":\"read write\"}"));
         when(provider.fetchAccountInfo("at")).thenReturn("flo@acme");
 
         Instant before = Instant.now();
-        IntegrationConnection saved = flow.handleCallback("acme", "code-1", "https://app/cb");
+        IntegrationConnection saved = flow.handleCallback("acme", "default", "code-1", "https://app/cb");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         assertThat(saved.getAccessTokenEncrypted()).isEqualTo("enc(at)");
@@ -150,13 +150,13 @@ class IntegrationOAuthConnectFlowTest {
         IntegrationConnection row = IntegrationConnection.builder().providerId("acme")
                 .refreshTokenEncrypted("enc(old-rt)").build();
         when(provider.getOAuthConfig()).thenReturn(CONFIG);
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.of(row));
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.of(row));
         when(tokenClient.exchangeCodeForTokens("acme", CONFIG, "c", null, null, "https://app/cb"))
                 .thenReturn(json("{\"access_token\":\"at\"}"));
         when(provider.fetchAccountInfo("at")).thenThrow(new RuntimeException("profile endpoint down"));
 
         Instant before = Instant.now();
-        IntegrationConnection saved = flow.handleCallback("acme", "c", "https://app/cb");
+        IntegrationConnection saved = flow.handleCallback("acme", "default", "c", "https://app/cb");
 
         assertThat(saved.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
         assertThat(saved.getRefreshTokenEncrypted()).isEqualTo("enc(old-rt)");
@@ -168,11 +168,11 @@ class IntegrationOAuthConnectFlowTest {
     @Test
     void handleCallback_noAccessToken_failsWithoutWriting() throws Exception {
         when(provider.getOAuthConfig()).thenReturn(CONFIG);
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.empty());
         when(tokenClient.exchangeCodeForTokens(any(), any(), any(), any(), any(), any()))
                 .thenReturn(json("{\"error\":\"invalid_grant\"}"));
 
-        assertThatThrownBy(() -> flow.handleCallback("acme", "bad", "https://app/cb"))
+        assertThatThrownBy(() -> flow.handleCallback("acme", "default", "bad", "https://app/cb"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("no access_token");
         verify(connectionRepository, never()).save(any());
@@ -183,10 +183,10 @@ class IntegrationOAuthConnectFlowTest {
     @Test
     void resolveClientCredentials_prefersDb_elseEnvironmentVariable() {
         OAuthConfig envBacked = new OAuthConfig("a", "t", List.of(), "PATH", "MYSURICATES_TEST_UNSET_SECRET");
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.of(
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.of(
                 IntegrationConnection.builder().providerId("acme").clientSecretEncrypted("enc(db-secret)").build()));
 
-        IntegrationOAuthConnectFlow.ClientCredentials credentials = flow.resolveClientCredentials("acme", envBacked);
+        IntegrationOAuthConnectFlow.ClientCredentials credentials = flow.resolveClientCredentials("acme", "default", envBacked);
 
         assertThat(credentials.clientId()).as("no DB value → env var").isEqualTo(System.getenv("PATH"));
         assertThat(credentials.clientSecret()).isEqualTo("db-secret");
@@ -194,8 +194,8 @@ class IntegrationOAuthConnectFlowTest {
 
     @Test
     void resolveClientId_noRowAndNoEnv_isNull() {
-        when(connectionRepository.findByProviderId("acme")).thenReturn(Optional.empty());
+        when(connectionRepository.findByProviderIdAndConnectionName("acme", "default")).thenReturn(Optional.empty());
 
-        assertThat(flow.resolveClientId("acme", CONFIG)).isNull();
+        assertThat(flow.resolveClientId("acme", "default", CONFIG)).isNull();
     }
 }

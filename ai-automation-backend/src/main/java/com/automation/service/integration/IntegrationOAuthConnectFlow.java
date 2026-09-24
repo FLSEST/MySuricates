@@ -8,7 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * The two "connect" paths of an integration: saving credentials (PAT validation) and the
@@ -20,6 +22,9 @@ import java.util.function.Consumer;
  * short read burst ({@link TransactionTemplate}) → provider HTTP outside any transaction →
  * short write burst. Deliberately no {@code @Transactional} anywhere in this class.
  * Extracted from {@link IntegrationOAuthService} to keep that class under its ratchet ceiling.
+ *
+ * <p>Every entry point works on one named connection ({@link IntegrationConnectionNames}); the
+ * callers normalize the name before.
  */
 @Slf4j
 class IntegrationOAuthConnectFlow {
@@ -46,17 +51,18 @@ class IntegrationOAuthConnectFlow {
     record ClientCredentials(String clientId, String clientSecret) {}
 
     /** Save OAuth client credentials (encrypted); PAT connections are validated at the provider first. */
-    IntegrationConnection saveCredentials(String providerId, String clientId, String clientSecret) {
+    IntegrationConnection saveCredentials(String providerId, String connectionName, String clientId, String clientSecret) {
+        String label = IntegrationConnectionNames.label(providerId, connectionName);
         IntegrationProvider provider = registry.getProvider(providerId);
         String clientIdEncrypted = encryptionService.encrypt(clientId);
         String clientSecretEncrypted = encryptionService.encrypt(clientSecret);
 
         if (provider.requiresOAuthFlow()) {
-            IntegrationConnection saved = persist(providerId, connection -> {
+            IntegrationConnection saved = persist(providerId, connectionName, connection -> {
                 connection.setClientIdEncrypted(clientIdEncrypted);
                 connection.setClientSecretEncrypted(clientSecretEncrypted);
             });
-            log.info("Saved client credentials for provider: {}", providerId);
+            log.info("Saved client credentials for provider: {}", label);
             return saved;
         }
 
@@ -64,10 +70,10 @@ class IntegrationOAuthConnectFlow {
         // touching the DB, so the write burst afterwards is a plain save.
         String combinedToken = clientId + "|" + clientSecret;
         String accessTokenEncrypted = encryptionService.encrypt(combinedToken);
-        String accountInfo = validateCredentials(provider, providerId, combinedToken);
+        String accountInfo = validateCredentials(provider, label, combinedToken);
         String scopes = accountInfo != null ? provider.fetchGrantedScopes(combinedToken) : null; // null = unknown
 
-        IntegrationConnection saved = persist(providerId, connection -> {
+        IntegrationConnection saved = persist(providerId, connectionName, connection -> {
             connection.setClientIdEncrypted(clientIdEncrypted);
             connection.setClientSecretEncrypted(clientSecretEncrypted);
             connection.setAccessTokenEncrypted(accessTokenEncrypted);
@@ -79,17 +85,18 @@ class IntegrationOAuthConnectFlow {
                 connection.setStatus(ConnectionStatus.DISCONNECTED);
             }
         });
-        log.info("Saved client credentials for provider: {}", providerId);
+        log.info("Saved client credentials for provider: {}", label);
         return saved;
     }
 
     /** OAuth callback for an already-consumed state: exchange the code, then store the tokens. */
-    IntegrationConnection handleCallback(String providerId, String code, String redirectUri) {
+    IntegrationConnection handleCallback(String providerId, String connectionName, String code, String redirectUri) {
         IntegrationProvider provider = registry.getProvider(providerId);
         OAuthConfig config = provider.getOAuthConfig();
 
         // Burst 1: client credentials (DB read + decrypt)
-        ClientCredentials credentials = transactionTemplate.execute(status -> resolveClientCredentials(providerId, config));
+        ClientCredentials credentials = transactionTemplate.execute(status ->
+                resolveClientCredentials(providerId, connectionName, config));
 
         // Provider HTTP — outside any transaction
         JsonNode tokenResponse = tokenClient.exchangeCodeForTokens(
@@ -103,14 +110,14 @@ class IntegrationOAuthConnectFlow {
         int expiresIn = tokenResponse.has("expires_in") ? tokenResponse.get("expires_in").asInt() : 3600;
         String grantedScopes = tokenResponse.has("scope") ? tokenResponse.get("scope").asText() : String.join(" ", config.defaultScopes());
 
-        String accountInfo = fetchAccountInfo(provider, providerId, accessToken);
+        String accountInfo = fetchAccountInfo(provider, IntegrationConnectionNames.label(providerId, connectionName), accessToken);
 
         String accessTokenEncrypted = encryptionService.encrypt(accessToken);
         String refreshTokenEncrypted = refreshToken != null ? encryptionService.encrypt(refreshToken) : null;
         Instant tokenExpiry = Instant.now().plusSeconds(expiresIn);
 
         // Burst 2: persist the connected row
-        return persist(providerId, connection -> {
+        return persist(providerId, connectionName, connection -> {
             connection.setStatus(ConnectionStatus.CONNECTED);
             connection.setAccessTokenEncrypted(accessTokenEncrypted);
             if (refreshTokenEncrypted != null) {
@@ -122,31 +129,47 @@ class IntegrationOAuthConnectFlow {
         });
     }
 
-    ClientCredentials resolveClientCredentials(String providerId, OAuthConfig config) {
-        return new ClientCredentials(resolveClientId(providerId, config), resolveClientSecret(providerId, config));
+    ClientCredentials resolveClientCredentials(String providerId, String connectionName, OAuthConfig config) {
+        return new ClientCredentials(resolveClientId(providerId, connectionName, config),
+                resolveClientSecret(providerId, connectionName, config));
     }
 
-    /** Resolve client ID: DB first, then env var fallback */
-    String resolveClientId(String providerId, OAuthConfig config) {
-        return connectionRepository.findByProviderId(providerId)
-                .filter(c -> c.getClientIdEncrypted() != null)
-                .map(c -> encryptionService.decrypt(c.getClientIdEncrypted()))
+    /**
+     * Resolve the OAuth app's client ID: the connection's own row first, then — for a named
+     * connection — the {@code default} row (a second account usually signs in through the same
+     * OAuth app), then the env var.
+     */
+    String resolveClientId(String providerId, String connectionName, OAuthConfig config) {
+        return resolveAppCredential(providerId, connectionName, IntegrationConnection::getClientIdEncrypted)
                 .orElseGet(() -> System.getenv(config.clientIdEnvVar()));
     }
 
-    /** Resolve client secret: DB first, then env var fallback */
-    String resolveClientSecret(String providerId, OAuthConfig config) {
-        return connectionRepository.findByProviderId(providerId)
-                .filter(c -> c.getClientSecretEncrypted() != null)
-                .map(c -> encryptionService.decrypt(c.getClientSecretEncrypted()))
+    /** Resolve the OAuth app's client secret — same order as {@link #resolveClientId}. */
+    String resolveClientSecret(String providerId, String connectionName, OAuthConfig config) {
+        return resolveAppCredential(providerId, connectionName, IntegrationConnection::getClientSecretEncrypted)
                 .orElseGet(() -> System.getenv(config.clientSecretEnvVar()));
     }
 
-    /** Load-or-create the provider's row, apply the mutation and save — one short write burst. */
-    private IntegrationConnection persist(String providerId, Consumer<IntegrationConnection> mutation) {
+    private Optional<String> resolveAppCredential(String providerId, String connectionName,
+                                                  Function<IntegrationConnection, String> field) {
+        Optional<String> own = storedField(providerId, connectionName, field);
+        if (own.isPresent() || IntegrationConnectionNames.isDefault(connectionName)) return own;
+        return storedField(providerId, IntegrationConnectionNames.DEFAULT, field);
+    }
+
+    private Optional<String> storedField(String providerId, String connectionName,
+                                         Function<IntegrationConnection, String> field) {
+        return connectionRepository.findByProviderIdAndConnectionName(providerId, connectionName)
+                .map(field)
+                .map(encryptionService::decrypt);
+    }
+
+    /** Load-or-create the connection's row, apply the mutation and save — one short write burst. */
+    private IntegrationConnection persist(String providerId, String connectionName, Consumer<IntegrationConnection> mutation) {
         return transactionTemplate.execute(status -> {
-            IntegrationConnection connection = connectionRepository.findByProviderId(providerId)
-                    .orElse(IntegrationConnection.builder().providerId(providerId).build());
+            IntegrationConnection connection = connectionRepository
+                    .findByProviderIdAndConnectionName(providerId, connectionName)
+                    .orElse(IntegrationConnection.builder().providerId(providerId).connectionName(connectionName).build());
             mutation.accept(connection);
             return connectionRepository.save(connection);
         });

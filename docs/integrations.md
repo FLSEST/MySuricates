@@ -334,6 +334,30 @@ Für einen Provider mit `requiresCredentials() == false` (Taskwarrior, ntfy, RSS
 existiert oder die Entschlüsselung fehlschlägt — Provider ohne Pflicht-Credentials dürfen
 ohne Token laufen.
 
+### Mehrere Verbindungen je Anbieter
+
+Ein Anbieter kann mehrere **benannte Verbindungen** haben (seit V86, TODO 0b3cbcc3) — etwa ein
+privates und ein Arbeitskonto bei Google oder zwei GitHub-Tokens. Jede Verbindung ist eine eigene
+Zeile in `integration_connections`, eindeutig über `(provider_id, connection_name)`.
+
+- **Name:** 1–40 Zeichen aus Kleinbuchstaben, Ziffern und Bindestrich, am Anfang Buchstabe oder
+  Ziffer (`IntegrationConnectionNames`). Ohne Angabe (oder leer) gilt `default` — das ist die
+  Verbindung, die es vor V86 als einzige gab; Bestandszeilen heißen so. Ein ungültiger Name wird
+  mit `400 INVALID_ARGUMENT` abgelehnt, bevor irgendetwas gelesen oder geschrieben wird.
+- **Service:** Jede Methode von `IntegrationOAuthService` gibt es mit und ohne Verbindungsnamen;
+  die Variante ohne Namen delegiert mit `default`. `listConnections(providerId)` liefert alle
+  Verbindungen, `default` zuerst.
+- **OAuth:** Der Name reist im serverseitigen `state` (`OAuthStateRegistry`) mit, nicht in der
+  URL — die Redirect-URI beim Anbieter bleibt für alle Verbindungen dieselbe. Eine benannte
+  Verbindung ohne eigene App-Zugangsdaten meldet sich über die Client-ID/-Secret der
+  `default`-Verbindung (danach Env-Var) an: ein zweites Konto braucht keine zweite OAuth-App.
+- **Direkt-Auth (PAT/API-Key):** Jede Verbindung braucht ihre eigenen Zugangsdaten, es gibt
+  keinen Rückgriff auf `default`.
+- **Trennen/Löschen** wirkt nur auf die genannte Verbindung.
+- **UI:** Auf der Integrationen-Seite listet der Abschnitt „Verbindungen“ alle Verbindungen des
+  gewählten Anbieters; „Weitere Verbindung“ fragt den Namen ab und führt durch denselben
+  Setup-/Zugangsdaten-Weg. `default` bleibt über die Anbieter-Karte verwaltet.
+
 ---
 
 ## Credential-Speicherung & Verschlüsselung
@@ -364,6 +388,8 @@ ohne Token laufen.
 Block-Typ `integration`. Pflichtfelder in `config`: `provider` und `action`. Optionale
 `params` werden vor der Ausführung durch den `ExecutionContext` aufgelöst — String-Werte
 durchlaufen `resolveTemplate(...)`, sodass `{{ variable }}`-Platzhalter funktionieren.
+Optional wählt `connection` eine benannte Verbindung des Anbieters (Platzhalter erlaubt,
+Default `default`, siehe [Mehrere Verbindungen je Anbieter](#mehrere-verbindungen-je-anbieter)).
 
 ```json
 {
@@ -384,7 +410,9 @@ durchlaufen `resolveTemplate(...)`, sodass `{{ variable }}`-Platzhalter funktion
 Verhalten:
 - Das Ergebnis der Action wird als **hübsch formatiertes JSON** in `StepResult.output`
   geschrieben — nachfolgende Blöcke können es als Kontext referenzieren.
-- `StepResult.metadata` enthält `provider`, `action` und `executionMode: "integration"`.
+- `StepResult.metadata` enthält `provider`, `connection`, `action` und `executionMode: "integration"`.
+- Ein ungültiger `connection`-Name (oder kein String) lässt den Step `FAILED` enden, ohne den
+  Anbieter anzusprechen.
 - Fehlt `provider`/`action` oder schlägt der API-Call fehl, endet der Step mit `FAILED` und
   der Fehlermeldung in `output` + `metadata.error` (der Workflow bricht nicht hart ab,
   sondern liefert einen fehlgeschlagenen Step).
@@ -394,9 +422,14 @@ Verhalten:
 
 ## REST-API (`/api/v1/integrations`)
 
+Alle Endpunkte, die eine Verbindung betreffen (`connect`, `credentials`, `connection`,
+`actions`, `task-targets`), nehmen den optionalen Query-Parameter `connection=<name>`; ohne ihn
+ist `default` gemeint.
+
 | Methode | Pfad | Zweck |
 |---|---|---|
-| `GET` | `/` | Alle Provider inkl. Connection-Status auflisten |
+| `GET` | `/` | Alle Provider inkl. Connection-Status auflisten (Status = `default`-Verbindung, zusätzlich `connections[]` und `requiresOAuthFlow`) |
+| `GET` | `/{providerId}/connections` | Alle Verbindungen eines Providers (Name, Status, `configured`, Account, seit, Scopes), `default` zuerst |
 | `GET` | `/{providerId}` | Einen Provider abrufen |
 | `GET` | `/{providerId}/connect` | OAuth2-Authorize-URL erzeugen (Query: `redirectUri`, optionale `scopes`) |
 | `GET` | `/{providerId}/callback` | OAuth2-Callback — **public, kein API-Key nötig** |
@@ -405,6 +438,7 @@ Verhalten:
 | `DELETE` | `/{providerId}/credentials` | Verbindung samt Credentials vollständig löschen |
 | `GET` | `/{providerId}/actions` | Verfügbare Actions inkl. Input-Schema (**Source of Truth**) |
 | `POST` | `/{providerId}/actions/{action}` | Eine Action testweise ausführen |
+| `GET` | `/{providerId}/task-targets` | Export-Ziele eines Task-fähigen Providers (Repos, Projekte, Listen) |
 
 ---
 

@@ -8,6 +8,7 @@ import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.assistant.AssistantFormatUtils;
 import com.automation.service.integration.IntegrationAction;
+import com.automation.service.integration.IntegrationConnectionNames;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
 import com.automation.service.integration.IntegrationVerification;
@@ -93,12 +94,13 @@ public class InventoryFetchHandler {
                 return "Integration '" + providerId + "' not found.\n";
             }
             IntegrationProvider p = integrationRegistry.getProvider(providerId);
-            IntegrationConnection.ConnectionStatus status = integrationConnectionRepository.findByProviderId(providerId)
-                    .map(IntegrationConnection::getStatus)
-                    .orElse(IntegrationConnection.ConnectionStatus.DISCONNECTED);
-            String accountInfo = integrationConnectionRepository.findByProviderId(providerId)
-                    .map(IntegrationConnection::getAccountInfo)
-                    .orElse(null);
+            List<IntegrationConnection> connections = integrationConnectionRepository.findAllByProviderId(providerId);
+            IntegrationConnection defaultConnection = connections.stream()
+                    .filter(c -> IntegrationConnectionNames.isDefault(c.getConnectionName()))
+                    .findFirst().orElse(null);
+            IntegrationConnection.ConnectionStatus status = defaultConnection != null
+                    ? defaultConnection.getStatus() : IntegrationConnection.ConnectionStatus.DISCONNECTED;
+            String accountInfo = defaultConnection != null ? defaultConnection.getAccountInfo() : null;
             var sb = new StringBuilder();
             sb.append("**Integration: ").append(p.getDisplayName()).append("** (id: ").append(p.getProviderId()).append(")\n");
             if (p.getDescription() != null && !p.getDescription().isBlank()) {
@@ -109,6 +111,14 @@ public class InventoryFetchHandler {
                 sb.append(" (").append(AssistantFormatUtils.truncate(accountInfo, 80)).append(")");
             }
             sb.append("\n");
+            List<String> named = connections.stream()
+                    .filter(c -> !IntegrationConnectionNames.isDefault(c.getConnectionName()))
+                    .sorted(java.util.Comparator.comparing(IntegrationConnection::getConnectionName))
+                    .map(c -> c.getConnectionName() + " (" + c.getStatus() + ")")
+                    .toList();
+            if (!named.isEmpty()) {
+                sb.append("Named connections (block config `connection`): ").append(String.join(", ", named)).append("\n");
+            }
             sb.append("OAuth flow required: ").append(p.requiresOAuthFlow() ? "yes" : "no (API key/token)").append("\n");
             sb.append("Verification: ").append(p.getVerification() == IntegrationVerification.VERIFIED
                     ? "checked against the real service (" + p.getVerifiedAgainst() + ")"

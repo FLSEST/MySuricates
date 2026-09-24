@@ -86,13 +86,32 @@ class InventoryFetchHandlerTest {
         when(provider.getAvailableActions()).thenReturn(null);
         when(integrationRegistry.hasProvider("taskwarrior")).thenReturn(true);
         when(integrationRegistry.getProvider("taskwarrior")).thenReturn(provider);
-        when(integrationConnectionRepository.findByProviderId("taskwarrior")).thenReturn(Optional.of(
+        when(integrationConnectionRepository.findAllByProviderId("taskwarrior")).thenReturn(List.of(
                 IntegrationConnection.builder().providerId("taskwarrior")
                         .status(IntegrationConnection.ConnectionStatus.CONNECTED).accountInfo(" ").build()));
 
         assertThat(handler.formatIntegrationDetail("taskwarrior")).isEqualTo(
                 "**Integration: Taskwarrior** (id: taskwarrior)\nStatus: CONNECTED\nOAuth flow required: no (API key/token)\n"
                         + "Verification: checked against the real service (Taskwarrior-CLI auf dem Host)\n");
+    }
+
+    @Test
+    void integration_listsNamedConnectionsBesideTheDefaultStatus() {
+        IntegrationProvider provider = mock(IntegrationProvider.class);
+        when(provider.getDisplayName()).thenReturn("GitHub");
+        when(provider.getProviderId()).thenReturn("github");
+        when(provider.getVerification()).thenReturn(IntegrationVerification.SIMULATED);
+        when(integrationRegistry.hasProvider("github")).thenReturn(true);
+        when(integrationRegistry.getProvider("github")).thenReturn(provider);
+        when(integrationConnectionRepository.findAllByProviderId("github")).thenReturn(List.of(
+                IntegrationConnection.builder().providerId("github").connectionName("work")
+                        .status(IntegrationConnection.ConnectionStatus.CONNECTED).build(),
+                IntegrationConnection.builder().providerId("github")
+                        .status(IntegrationConnection.ConnectionStatus.EXPIRED).build()));
+
+        assertThat(handler.formatIntegrationDetail("github"))
+                .contains("Status: EXPIRED\n")
+                .contains("Named connections (block config `connection`): work (CONNECTED)\n");
     }
 
     @Test
@@ -103,7 +122,7 @@ class InventoryFetchHandlerTest {
         when(provider.getVerification()).thenReturn(IntegrationVerification.SIMULATED);
         when(integrationRegistry.hasProvider("gitea")).thenReturn(true);
         when(integrationRegistry.getProvider("gitea")).thenReturn(provider);
-        when(integrationConnectionRepository.findByProviderId("gitea")).thenReturn(Optional.empty());
+        when(integrationConnectionRepository.findAllByProviderId("gitea")).thenReturn(List.of());
 
         assertThat(handler.formatIntegrationDetail("gitea"))
                 .contains("Verification: simulated only — not yet checked against the real service\n");
@@ -117,7 +136,7 @@ class InventoryFetchHandlerTest {
         when(provider.getAvailableActions()).thenReturn(List.of(new IntegrationAction("ping", null, Map.of())));
         when(integrationRegistry.hasProvider("x")).thenReturn(true);
         when(integrationRegistry.getProvider("x")).thenReturn(provider);
-        when(integrationConnectionRepository.findByProviderId("x")).thenReturn(Optional.empty());
+        when(integrationConnectionRepository.findAllByProviderId("x")).thenReturn(List.of());
 
         assertThat(handler.formatIntegrationDetail("x")).endsWith("Available actions (1):\n  - ping\n");
     }

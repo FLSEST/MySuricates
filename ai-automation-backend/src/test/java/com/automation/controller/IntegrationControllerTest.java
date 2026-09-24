@@ -66,7 +66,7 @@ class IntegrationControllerTest {
                 .build();
 
         when(registry.getAllProviders()).thenReturn(List.of(provider));
-        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.of(connection));
+        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of(connection));
         when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(true);
 
         mockMvc.perform(get("/api/v1/integrations"))
@@ -90,7 +90,7 @@ class IntegrationControllerTest {
         when(provider.getVerification()).thenReturn(IntegrationVerification.VERIFIED);
         when(provider.getVerifiedAgainst()).thenReturn("Google Calendar API");
         when(registry.getAllProviders()).thenReturn(List.of(provider));
-        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.empty());
+        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/integrations"))
                 .andExpect(status().isOk())
@@ -101,7 +101,7 @@ class IntegrationControllerTest {
     @Test
     void getAuthorizationUrl_usesRequestCallbackUrlAndScopes() throws Exception {
         when(oAuthService.getAuthorizationUrl(
-                eq("google-calendar"),
+                eq("google-calendar"), eq("default"),
                 eq("http://localhost/api/v1/integrations/google-calendar/callback"),
                 eq(List.of("calendar.write")), eq("http://localhost")))
                 .thenReturn("https://auth.example/authorize");
@@ -131,13 +131,13 @@ class IntegrationControllerTest {
 
     @Test
     void getAuthorizationUrl_bindsAllowedFrontendOriginToStateAndReportsCallbackOrigin() throws Exception {
-        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), any(), eq(null), eq("http://localhost:3000")))
+        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), eq("default"), any(), eq(null), eq("http://localhost:3000")))
                 .thenReturn("https://auth.example/authorize");
         mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
                         .param("frontendOrigin", "http://localhost:3000"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.callbackOrigin").value("http://localhost"));
-        verify(oAuthService).getAuthorizationUrl("google-calendar",
+        verify(oAuthService).getAuthorizationUrl("google-calendar", "default",
                 "http://localhost/api/v1/integrations/google-calendar/callback", null, "http://localhost:3000");
     }
 
@@ -153,7 +153,7 @@ class IntegrationControllerTest {
     void getAuthorizationUrl_acceptsThisInstancesOwnTailscaleName_butNoForeignTailnet() throws Exception {
         // a8056256: same answer as CORS — the own MagicDNS name yes, a foreign tailnet no
         when(ownTailnet.hosts()).thenReturn(Set.of("mine.tail1234.ts.net"));
-        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), any(), eq(null),
+        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), eq("default"), any(), eq(null),
                 eq("https://mine.tail1234.ts.net:3000"))).thenReturn("https://auth.example/authorize");
 
         mockMvc.perform(get("/api/v1/integrations/google-calendar/connect")
@@ -184,7 +184,7 @@ class IntegrationControllerTest {
         IntegrationProvider provider = provider("taskwarrior");
         when(provider.requiresCredentials()).thenReturn(false);
         when(registry.getProvider("taskwarrior")).thenReturn(provider);
-        when(oAuthService.getConnection("taskwarrior")).thenReturn(Optional.empty());
+        when(oAuthService.listConnections("taskwarrior")).thenReturn(List.of());
         when(oAuthService.isProviderConfigured("taskwarrior")).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/integrations/taskwarrior/credentials")
@@ -194,14 +194,14 @@ class IntegrationControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(oAuthService).saveCredentials("taskwarrior", "", "");
+        verify(oAuthService).saveCredentials("taskwarrior", "default", "", "");
     }
 
     @Test
     void testAction_executesProviderActionWithResolvedAccessToken() throws Exception {
         IntegrationProvider provider = provider("google-calendar");
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar")).thenReturn("access-token");
+        when(oAuthService.getValidAccessToken("google-calendar", "default")).thenReturn("access-token");
         when(provider.executeAction("list_events", Map.of("limit", 3), "access-token"))
                 .thenReturn(Map.of("count", 3));
 
@@ -218,7 +218,7 @@ class IntegrationControllerTest {
     void saveCredentials_withValidBodyDelegatesToOAuthService() throws Exception {
         IntegrationProvider provider = provider("google-calendar");
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.empty());
+        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of());
         when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(false);
 
         mockMvc.perform(post("/api/v1/integrations/google-calendar/credentials")
@@ -229,7 +229,7 @@ class IntegrationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providerId").value("google-calendar"));
 
-        verify(oAuthService).saveCredentials("google-calendar", "client-1", "secret-1");
+        verify(oAuthService).saveCredentials("google-calendar", "default", "client-1", "secret-1");
     }
 
     @Test
@@ -249,7 +249,7 @@ class IntegrationControllerTest {
         mockMvc.perform(delete("/api/v1/integrations/google-calendar/connection"))
                 .andExpect(status().isNoContent());
 
-        verify(oAuthService).disconnect("google-calendar");
+        verify(oAuthService).disconnect("google-calendar", "default");
     }
 
     @Test
@@ -268,7 +268,7 @@ class IntegrationControllerTest {
     void testAction_returns409_whenCredentialsMissing() throws Exception {
         IntegrationProvider provider = provider("google-calendar");
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getValidAccessToken("google-calendar"))
+        when(oAuthService.getValidAccessToken("google-calendar", "default"))
                 .thenThrow(new IllegalStateException("No connection for provider: google-calendar"));
 
         mockMvc.perform(post("/api/v1/integrations/google-calendar/actions/list_events")
@@ -282,12 +282,126 @@ class IntegrationControllerTest {
     void getActions_returnsAvailableActions_forProvider() throws Exception {
         IntegrationProvider provider = provider("google-calendar");
         when(registry.getProvider("google-calendar")).thenReturn(provider);
-        when(oAuthService.getConnection("google-calendar")).thenReturn(Optional.empty());
+        when(oAuthService.getConnection("google-calendar", "default")).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/v1/integrations/google-calendar/actions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("list_events"))
                 .andExpect(jsonPath("$[0].description").value("List events"));
+    }
+
+    // ── Named connections (0b3cbcc3) ─────────────────────────────────────────────
+
+    private static IntegrationConnection named(String name, IntegrationConnection.ConnectionStatus status, String accountInfo) {
+        return IntegrationConnection.builder()
+                .providerId("google-calendar")
+                .connectionName(name)
+                .status(status)
+                .accountInfo(accountInfo)
+                .build();
+    }
+
+    @Test
+    void listProviders_describesDefaultConnectionAtTopLevel_andListsEveryConnection() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(provider.requiresOAuthFlow()).thenReturn(true);
+        when(registry.getAllProviders()).thenReturn(List.of(provider));
+        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of(
+                named("default", IntegrationConnection.ConnectionStatus.DISCONNECTED, null),
+                named("work", IntegrationConnection.ConnectionStatus.CONNECTED, "{\"email\":\"me@work.example\"}")));
+        when(oAuthService.isProviderConfigured("google-calendar")).thenReturn(true);
+
+        mockMvc.perform(get("/api/v1/integrations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("DISCONNECTED"))
+                .andExpect(jsonPath("$[0].accountEmail").doesNotExist())
+                .andExpect(jsonPath("$[0].requiresOAuthFlow").value(true))
+                .andExpect(jsonPath("$[0].connections.length()").value(2))
+                .andExpect(jsonPath("$[0].connections[0].name").value("default"))
+                .andExpect(jsonPath("$[0].connections[1].name").value("work"))
+                .andExpect(jsonPath("$[0].connections[1].status").value("CONNECTED"))
+                .andExpect(jsonPath("$[0].connections[1].accountEmail").value("me@work.example"))
+                // OAuth: a second account signs in through the default connection's app credentials
+                .andExpect(jsonPath("$[0].connections[1].configured").value(true));
+    }
+
+    @Test
+    void listConnections_returnsEveryConnectionOfTheProvider() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.listConnections("google-calendar")).thenReturn(List.of(
+                named("default", IntegrationConnection.ConnectionStatus.CONNECTED, "{\"name\":\"Private\"}"),
+                named("work", IntegrationConnection.ConnectionStatus.EXPIRED, null)));
+
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connections"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("default"))
+                .andExpect(jsonPath("$[0].accountName").value("Private"))
+                .andExpect(jsonPath("$[1].name").value("work"))
+                .andExpect(jsonPath("$[1].status").value("EXPIRED"))
+                // a PAT-style provider (requiresOAuthFlow=false on the mock) needs its own credentials
+                .andExpect(jsonPath("$[1].configured").value(false));
+    }
+
+    @Test
+    void connect_passesTheConnectionNameOn() throws Exception {
+        when(oAuthService.getAuthorizationUrl(eq("google-calendar"), eq("work"), any(), eq(null), any()))
+                .thenReturn("https://auth.example/authorize");
+
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect").param("connection", "work"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authorizationUrl").value("https://auth.example/authorize"));
+    }
+
+    @Test
+    void saveCredentials_forANamedConnection() throws Exception {
+        IntegrationProvider provider = provider("github");
+        when(provider.requiresCredentials()).thenReturn(true);
+        when(registry.getProvider("github")).thenReturn(provider);
+
+        mockMvc.perform(post("/api/v1/integrations/github/credentials").param("connection", "work")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clientId":"user","clientSecret":"pat"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(oAuthService).saveCredentials("github", "work", "user", "pat");
+    }
+
+    @Test
+    void disconnectAndDelete_workOnTheNamedConnectionOnly() throws Exception {
+        mockMvc.perform(delete("/api/v1/integrations/google-calendar/connection").param("connection", "work"))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/integrations/google-calendar/credentials").param("connection", "work"))
+                .andExpect(status().isNoContent());
+
+        verify(oAuthService).disconnect("google-calendar", "work");
+        verify(oAuthService).deleteCredentials("google-calendar", "work");
+    }
+
+    @Test
+    void testAction_usesTheNamedConnectionsToken() throws Exception {
+        IntegrationProvider provider = provider("google-calendar");
+        when(registry.getProvider("google-calendar")).thenReturn(provider);
+        when(oAuthService.getValidAccessToken("google-calendar", "work")).thenReturn("work-token");
+        when(provider.executeAction("list_events", Map.of(), "work-token")).thenReturn(Map.of("count", 1));
+
+        mockMvc.perform(post("/api/v1/integrations/google-calendar/actions/list_events").param("connection", "work")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1));
+    }
+
+    @Test
+    void invalidConnectionName_isRejectedBeforeAnyServiceCall() throws Exception {
+        mockMvc.perform(delete("/api/v1/integrations/google-calendar/connection").param("connection", "../Work"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+        mockMvc.perform(get("/api/v1/integrations/google-calendar/connect").param("connection", "Work Account"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verifyNoInteractions(oAuthService);
     }
 
     private IntegrationProvider provider(String providerId) {

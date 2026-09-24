@@ -69,7 +69,7 @@ class IntegrationOAuthDisconnectIntegrationTest {
 
         doAnswer(invocation -> {
             txDuringRevoke.set(TransactionSynchronizationManager.isActualTransactionActive());
-            statusDuringRevoke.set(connectionRepository.findByProviderId(PROVIDER_ID)
+            statusDuringRevoke.set(connectionRepository.findByProviderIdAndConnectionName(PROVIDER_ID, "default")
                     .map(IntegrationConnection::getStatus).orElse(null));
             return null;
         }).when(tokenClient).revoke(any(), any(), any());
@@ -77,14 +77,19 @@ class IntegrationOAuthDisconnectIntegrationTest {
 
     @AfterEach
     void cleanUp() {
-        connectionRepository.findByProviderId(PROVIDER_ID).ifPresent(connectionRepository::delete);
+        connectionRepository.deleteAll(connectionRepository.findAllByProviderId(PROVIDER_ID));
     }
 
     private void persistConnectedRow() {
+        persistConnectedRow("default", "access-token-1");
+    }
+
+    private void persistConnectedRow(String connectionName, String accessToken) {
         connectionRepository.save(IntegrationConnection.builder()
                 .providerId(PROVIDER_ID)
+                .connectionName(connectionName)
                 .status(ConnectionStatus.CONNECTED)
-                .accessTokenEncrypted(encryptionService.encrypt("access-token-1"))
+                .accessTokenEncrypted(encryptionService.encrypt(accessToken))
                 .refreshTokenEncrypted(encryptionService.encrypt("refresh-token-1"))
                 .clientIdEncrypted(encryptionService.encrypt("client-id"))
                 .clientSecretEncrypted(encryptionService.encrypt("client-secret"))
@@ -104,7 +109,7 @@ class IntegrationOAuthDisconnectIntegrationTest {
         assertThat(statusDuringRevoke.get()).as("row is persisted before the revoke goes out")
                 .isEqualTo(ConnectionStatus.DISCONNECTED);
 
-        IntegrationConnection reloaded = connectionRepository.findByProviderId(PROVIDER_ID).orElseThrow();
+        IntegrationConnection reloaded = connectionRepository.findByProviderIdAndConnectionName(PROVIDER_ID, "default").orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(ConnectionStatus.DISCONNECTED);
         assertThat(reloaded.getAccessTokenEncrypted()).isNull();
         assertThat(reloaded.getRefreshTokenEncrypted()).isNull();
@@ -123,6 +128,21 @@ class IntegrationOAuthDisconnectIntegrationTest {
         verify(tokenClient).revoke(eq(PROVIDER_ID), any(OAuthConfig.class), eq("access-token-1"));
         assertThat(txDuringRevoke.get()).isFalse();
         assertThat(statusDuringRevoke.get()).as("row is gone before the revoke goes out").isNull();
-        assertThat(connectionRepository.findByProviderId(PROVIDER_ID)).isEmpty();
+        assertThat(connectionRepository.findByProviderIdAndConnectionName(PROVIDER_ID, "default")).isEmpty();
+    }
+
+    @Test
+    void disconnectNamedConnection_revokesOnlyItsToken_andLeavesTheDefaultConnected() {
+        persistConnectedRow();
+        persistConnectedRow("work", "work-access-token");
+
+        oAuthService.disconnect(PROVIDER_ID, "work");
+
+        verify(tokenClient).revoke(eq(PROVIDER_ID), any(OAuthConfig.class), eq("work-access-token"));
+        assertThat(connectionRepository.findByProviderIdAndConnectionName(PROVIDER_ID, "work").orElseThrow().getStatus())
+                .isEqualTo(ConnectionStatus.DISCONNECTED);
+        IntegrationConnection standard = connectionRepository.findByProviderIdAndConnectionName(PROVIDER_ID, "default").orElseThrow();
+        assertThat(standard.getStatus()).isEqualTo(ConnectionStatus.CONNECTED);
+        assertThat(encryptionService.decrypt(standard.getAccessTokenEncrypted())).isEqualTo("access-token-1");
     }
 }

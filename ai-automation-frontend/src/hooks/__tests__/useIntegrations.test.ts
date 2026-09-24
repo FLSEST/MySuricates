@@ -10,6 +10,7 @@ import {
   useConnectIntegration,
   useDisconnectIntegration,
   useTestIntegrationAction,
+  connectionParam,
 } from '../useIntegrations';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -238,6 +239,44 @@ describe('useDisconnectIntegration', () => {
       }
     });
     await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+});
+
+describe('named connections (0b3cbcc3)', () => {
+  it('connectionParam omits the default connection and encodes a named one', () => {
+    expect(connectionParam(undefined)).toBe('');
+    expect(connectionParam('default')).toBe('');
+    expect(connectionParam('work')).toBe('connection=work');
+  });
+
+  it('disconnect of a named connection sends ?connection=<name>', async () => {
+    let url = '';
+    server.use(
+      http.delete(`${apiBase}/integrations/github/connection`, ({ request }) => {
+        url = request.url;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const { result } = renderHook(() => useDisconnectIntegration(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.mutateAsync({ providerId: 'github', connection: 'work' });
+    });
+    expect(new URL(url).searchParams.get('connection')).toBe('work');
+  });
+
+  it('test action on a named connection sends ?connection=<name>', async () => {
+    let url = '';
+    server.use(
+      http.post(`${apiBase}/integrations/github/actions/list_repos`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ ok: true });
+      })
+    );
+    const { result } = renderHook(() => useTestIntegrationAction(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.mutateAsync({ providerId: 'github', action: 'list_repos', connection: 'work' });
+    });
+    expect(new URL(url).searchParams.get('connection')).toBe('work');
   });
 });
 

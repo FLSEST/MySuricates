@@ -7,6 +7,7 @@ import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
+import com.automation.service.integration.IntegrationConnectionNames;
 import com.automation.service.integration.IntegrationOAuthService;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.IntegrationRegistry;
@@ -48,14 +49,21 @@ public class IntegrationBlockExecutor implements BlockExecutor {
             return errorResult(context, "Integration block requires 'provider' and 'action' in config");
         }
 
+        String connection;
+        try {
+            connection = connectionName(config.get("connection"), context);
+        } catch (IllegalArgumentException e) {
+            return errorResult(context, "Integration block: " + e.getMessage());
+        }
+
         StepResult step = new StepResult();
         step.setStepIndex(context.nextStepIndex());
         step.setStartedAt(Instant.now());
-        step.setInput("Integration: " + providerId + " → " + action);
+        step.setInput("Integration: " + IntegrationConnectionNames.label(providerId, connection) + " → " + action);
 
         try {
             IntegrationProvider provider = registry.getProvider(providerId);
-            String accessToken = oAuthService.getValidAccessToken(providerId);
+            String accessToken = oAuthService.getValidAccessToken(providerId, connection);
 
             @SuppressWarnings("unchecked")
             Map<String, Object> rawParams = (Map<String, Object>) config.getOrDefault("params", Map.of());
@@ -72,6 +80,7 @@ public class IntegrationBlockExecutor implements BlockExecutor {
             step.setDurationMs(java.time.Duration.between(step.getStartedAt(), step.getCompletedAt()).toMillis());
             step.setMetadata(Map.of(
                     "provider", providerId,
+                    "connection", connection,
                     "action", action,
                     "executionMode", "integration"
             ));
@@ -86,12 +95,25 @@ public class IntegrationBlockExecutor implements BlockExecutor {
             step.setDurationMs(java.time.Duration.between(step.getStartedAt(), step.getCompletedAt()).toMillis());
             step.setMetadata(Map.of(
                     "provider", providerId,
+                    "connection", connection,
                     "action", action,
                     "executionMode", "integration",
-                    "error", e.getMessage()
+                    "error", String.valueOf(e.getMessage())
             ));
             return step;
         }
+    }
+
+    /**
+     * Optional config key {@code connection} (0b3cbcc3): which named connection of the provider the
+     * block uses; placeholders are resolved, missing or blank means {@code default}.
+     */
+    private static String connectionName(Object raw, ExecutionContext context) {
+        if (raw == null) return IntegrationConnectionNames.DEFAULT;
+        if (!(raw instanceof String s)) {
+            throw new IllegalArgumentException("'connection' must be a string");
+        }
+        return IntegrationConnectionNames.normalize(context.resolveTemplate(s));
     }
 
     private Map<String, Object> resolveParams(Map<String, Object> params, ExecutionContext context) {

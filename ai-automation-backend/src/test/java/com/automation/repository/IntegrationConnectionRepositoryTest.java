@@ -9,7 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+import org.springframework.dao.DataAccessException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -24,7 +27,7 @@ class IntegrationConnectionRepositoryTest {
         String providerId = "google-drive-" + System.nanoTime();
         IntegrationConnection saved = persistConnection(providerId);
 
-        Optional<IntegrationConnection> found = repository.findByProviderId(providerId);
+        Optional<IntegrationConnection> found = repository.findByProviderIdAndConnectionName(providerId, "default");
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(saved.getId());
@@ -34,7 +37,7 @@ class IntegrationConnectionRepositoryTest {
 
     @Test
     void findByProviderId_returnsEmpty_whenProviderDoesNotExist() {
-        Optional<IntegrationConnection> found = repository.findByProviderId("non-existent-" + System.nanoTime());
+        Optional<IntegrationConnection> found = repository.findByProviderIdAndConnectionName("non-existent-" + System.nanoTime(), "default");
 
         assertThat(found).isEmpty();
     }
@@ -46,7 +49,7 @@ class IntegrationConnectionRepositoryTest {
         persistConnection(providerA);
         IntegrationConnection savedB = persistConnection(providerB);
 
-        Optional<IntegrationConnection> found = repository.findByProviderId(providerB);
+        Optional<IntegrationConnection> found = repository.findByProviderIdAndConnectionName(providerB, "default");
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(savedB.getId());
@@ -57,12 +60,12 @@ class IntegrationConnectionRepositoryTest {
     void deleteByProviderId_removesConnection_whenProviderExists() {
         String providerId = "jira-" + System.nanoTime();
         persistConnection(providerId);
-        assertThat(repository.findByProviderId(providerId)).isPresent();
+        assertThat(repository.findByProviderIdAndConnectionName(providerId, "default")).isPresent();
 
         repository.deleteByProviderId(providerId);
         repository.flush();
 
-        assertThat(repository.findByProviderId(providerId)).isEmpty();
+        assertThat(repository.findByProviderIdAndConnectionName(providerId, "default")).isEmpty();
     }
 
     @Test
@@ -75,7 +78,7 @@ class IntegrationConnectionRepositoryTest {
         repository.flush();
 
         assertThat(repository.count()).isEqualTo(countBefore);
-        assertThat(repository.findByProviderId(existing)).isPresent();
+        assertThat(repository.findByProviderIdAndConnectionName(existing, "default")).isPresent();
     }
 
     @Test
@@ -88,8 +91,44 @@ class IntegrationConnectionRepositoryTest {
         repository.deleteByProviderId(providerToDelete);
         repository.flush();
 
-        assertThat(repository.findByProviderId(providerToDelete)).isEmpty();
-        assertThat(repository.findByProviderId(providerToKeep)).isPresent();
+        assertThat(repository.findByProviderIdAndConnectionName(providerToDelete, "default")).isEmpty();
+        assertThat(repository.findByProviderIdAndConnectionName(providerToKeep, "default")).isPresent();
+    }
+
+    // ── Named connections (V86, 0b3cbcc3) ─────────────────────────────────────
+
+    @Test
+    void namedConnections_coexistPerProvider_andAreFoundByName() {
+        String providerId = "github-" + System.nanoTime();
+        IntegrationConnection standard = persistConnection(providerId);
+        IntegrationConnection work = persistConnection(providerId, "work");
+
+        assertThat(standard.getConnectionName()).isEqualTo("default");
+        assertThat(repository.findByProviderIdAndConnectionName(providerId, "work"))
+                .get().extracting(IntegrationConnection::getId).isEqualTo(work.getId());
+        assertThat(repository.findByProviderIdAndConnectionName(providerId, "default"))
+                .get().extracting(IntegrationConnection::getId).isEqualTo(standard.getId());
+        assertThat(repository.findAllByProviderId(providerId))
+                .extracting(IntegrationConnection::getConnectionName)
+                .containsExactlyInAnyOrder("default", "work");
+    }
+
+    @Test
+    void connectionName_isUniqueWithinAProvider() {
+        String providerId = "jira-" + System.nanoTime();
+        persistConnection(providerId, "work");
+
+        assertThatThrownBy(() -> persistConnection(providerId, "work"))
+                .isInstanceOf(DataAccessException.class)
+                .hasMessageContaining("UNIQUE");
+    }
+
+    private IntegrationConnection persistConnection(String providerId, String name) {
+        return repository.saveAndFlush(IntegrationConnection.builder()
+                .providerId(providerId)
+                .connectionName(name)
+                .status(IntegrationConnection.ConnectionStatus.DISCONNECTED)
+                .build());
     }
 
     private IntegrationConnection persistConnection(String providerId) {

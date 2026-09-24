@@ -336,6 +336,30 @@ For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Ato
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 
+### Several Connections per Provider
+
+A provider can have several **named connections** (since V86, TODO 0b3cbcc3) — for example a
+private and a work account at Google, or two GitHub tokens. Each connection is its own row in
+`integration_connections`, unique by `(provider_id, connection_name)`.
+
+- **Name:** 1–40 characters of lower-case letters, digits and dashes, starting with a letter or
+  digit (`IntegrationConnectionNames`). Without a name (or blank) `default` applies — the
+  connection that was the only one before V86; existing rows carry that name. An invalid name is
+  rejected with `400 INVALID_ARGUMENT` before anything is read or written.
+- **Service:** Every method of `IntegrationOAuthService` exists with and without a connection
+  name; the variant without a name delegates with `default`. `listConnections(providerId)`
+  returns all connections, `default` first.
+- **OAuth:** The name travels in the server-side `state` (`OAuthStateRegistry`), not in the URL —
+  the redirect URI at the provider stays the same for every connection. A named connection
+  without its own app credentials signs in with the client ID/secret of the `default`
+  connection (then the env var): a second account needs no second OAuth app.
+- **Direct auth (PAT/API key):** Every connection needs its own credentials; there is no fallback
+  to `default`.
+- **Disconnect/delete** affects only the named connection.
+- **UI:** On the Integrations page the "Connections" section lists all connections of the
+  selected provider; "Add connection" asks for the name and leads through the same
+  setup/credentials path. `default` stays managed through the provider card.
+
 ---
 
 ## Credential Storage & Encryption
@@ -365,7 +389,9 @@ decryption fails — providers that need no credentials are allowed to run witho
 
 Block type `integration`. Required fields in `config`: `provider` and `action`. Optional
 `params` are resolved via `ExecutionContext` before execution — string values are passed through
-`resolveTemplate(...)` so that `{{ variable }}` placeholders work.
+`resolveTemplate(...)` so that `{{ variable }}` placeholders work. Optionally `connection`
+selects a named connection of the provider (placeholders allowed, default `default`, see
+[Several Connections per Provider](#several-connections-per-provider)).
 
 ```json
 {
@@ -386,7 +412,9 @@ Block type `integration`. Required fields in `config`: `provider` and `action`. 
 Behavior:
 - The result of the action is written as **nicely formatted JSON** into `StepResult.output`
   — subsequent blocks can reference it as context.
-- `StepResult.metadata` contains `provider`, `action`, and `executionMode: "integration"`.
+- `StepResult.metadata` contains `provider`, `connection`, `action`, and `executionMode: "integration"`.
+- An invalid `connection` name (or a non-string) ends the step `FAILED` without contacting the
+  provider.
 - If `provider`/`action` is missing or the API call fails, the step ends with `FAILED` and
   the error message in `output` + `metadata.error` (the workflow does not hard-abort,
   but delivers a failed step).
@@ -396,9 +424,14 @@ Behavior:
 
 ## REST API (`/api/v1/integrations`)
 
+Every endpoint that concerns one connection (`connect`, `credentials`, `connection`, `actions`,
+`task-targets`) takes the optional query parameter `connection=<name>`; without it `default`
+is meant.
+
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/` | List all providers including connection status |
+| `GET` | `/` | List all providers including connection status (status = `default` connection, plus `connections[]` and `requiresOAuthFlow`) |
+| `GET` | `/{providerId}/connections` | All connections of a provider (name, status, `configured`, account, since, scopes), `default` first |
 | `GET` | `/{providerId}` | Retrieve a single provider |
 | `GET` | `/{providerId}/connect` | Generate OAuth2 authorize URL (query: `redirectUri`, optional `scopes`) |
 | `GET` | `/{providerId}/callback` | OAuth2 callback — **public, no API key required** |
@@ -407,6 +440,7 @@ Behavior:
 | `DELETE` | `/{providerId}/credentials` | Fully delete connection including credentials |
 | `GET` | `/{providerId}/actions` | Available actions including input schema (**source of truth**) |
 | `POST` | `/{providerId}/actions/{action}` | Execute an action for testing purposes |
+| `GET` | `/{providerId}/task-targets` | Export targets of a task-capable provider (repos, projects, lists) |
 
 ---
 

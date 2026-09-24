@@ -132,3 +132,20 @@ describe('Integrations — verification notice', () => {
     expect(screen.queryByText(/Checked against/)).not.toBeInTheDocument();
   });
 });
+
+describe('Integrations — named connections', () => {
+  it('shows the connections of the selected provider from the live list', async () => {
+    useProviders([{
+      ...connectedGithub,
+      connections: [
+        { name: 'default', status: 'CONNECTED', configured: true, accountEmail: null, accountName: 'octocat', connectedSince: null, scopes: null },
+        { name: 'work', status: 'EXPIRED', configured: true, accountEmail: null, accountName: null, connectedSince: null, scopes: null },
+      ],
+    }]);
+    await selectGithub();
+
+    expect(await screen.findByText('Connections')).toBeInTheDocument();
+    expect(screen.getByTestId('connection-work')).toHaveTextContent('Expired');
+    expect(screen.getByText('Add connection')).toBeInTheDocument();
+  });
+});

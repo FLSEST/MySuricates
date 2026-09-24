@@ -35,6 +35,15 @@ class OAuthStateRegistryTest {
     }
 
     @Test
+    void register_bindsTheConnectionName_defaultWhenNoneIsGiven() {
+        assertThat(registry.consume(registry.register("github", null)).orElseThrow().connectionName()).isEqualTo("default");
+        assertThat(registry.consume(registry.register("github", "work", null)).orElseThrow().connectionName()).isEqualTo("work");
+        assertThat(registry.consume(registry.register("github", " ", null)).orElseThrow().connectionName()).isEqualTo("default");
+        assertThatThrownBy(() -> registry.register("github", "Not Valid", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void consume_removesEntryAfterFirstUse() {
         String state = registry.register("jira", null);
 

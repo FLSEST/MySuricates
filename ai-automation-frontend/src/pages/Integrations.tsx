@@ -9,6 +9,7 @@ import { useT } from '../i18n';
 import { useI18nStore } from '../i18n';
 import { formatDateTime } from '../utils/formatTime';
 import { SetupGuidePanel } from '../components/integrations/SetupGuidePanel';
+import { ConnectionsPanel } from '../components/integrations/ConnectionsPanel';
 import { VerificationBadge, VerificationNotice } from '../components/integrations/IntegrationVerification';
 import type { IntegrationProviderInfo, IntegrationActionInfo } from '../types';
 
@@ -394,6 +395,16 @@ export function Integrations() {
             )}
           </div>
         </Card>
+      )}
+
+      {/* Named connections of the selected provider (0b3cbcc3) — from the live list, so a new one shows up after saving */}
+      {selected && (
+        <ConnectionsPanel
+          key={`connections-${selected.providerId}`}
+          provider={providers.find((p) => p.providerId === selected.providerId) ?? selected}
+          displayName={localizedName(selected)}
+          onRefresh={() => refetch()}
+        />
       )}
 
       {/* Disconnect Confirmation */}
