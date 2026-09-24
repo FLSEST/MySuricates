@@ -4,8 +4,7 @@ import { Input } from './Input';
 import { useI18nStore, useT } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
 import { useCronPreview } from '../../hooks/useSchedules';
-
-type Frequency = 'daily' | 'weekly' | 'monthly' | 'advanced';
+import { parseCronToState, stateToCron, type CronFrequency, type CronState } from '../../utils/cronSchedule';
 
 interface CronPickerProps {
   value: string;
@@ -13,66 +12,8 @@ interface CronPickerProps {
   label?: string;
 }
 
-interface CronState {
-  frequency: Frequency;
-  hour: string;
-  minute: string;
-  weekdays: number[];
-  dayOfMonth: string;
-}
-
 const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 const WEEKDAY_CRON_VALUES = [1, 2, 3, 4, 5, 6, 0]; // cron: 0=Sun, 1=Mon, ...
-
-function parseCronToState(cron: string): CronState {
-  const parts = cron.trim().split(/\s+/);
-  // Spring cron uses 6 fields: second minute hour dayOfMonth month weekday
-  // Also accept 5-field (legacy): minute hour dayOfMonth month weekday
-  if (parts.length !== 6 && parts.length !== 5) {
-    return { frequency: 'advanced', hour: '0', minute: '0', weekdays: [], dayOfMonth: '1' };
-  }
-
-  const offset = parts.length === 6 ? 1 : 0; // skip seconds field if 6-field
-  const minute = parts[offset]!;
-  const hour = parts[offset + 1]!;
-  const dayOfMonth = parts[offset + 2]!;
-  const month = parts[offset + 3]!;
-  const weekday = parts[offset + 4]!;
-
-  // Check if it's a simple daily pattern: MM HH * * *
-  if (dayOfMonth === '*' && month === '*' && weekday === '*') {
-    return { frequency: 'daily', hour, minute, weekdays: [], dayOfMonth: '1' };
-  }
-
-  // Check if it's a weekly pattern: MM HH * * 1,3,5
-  if (dayOfMonth === '*' && month === '*' && weekday !== '*') {
-    const days = weekday.split(',').map(Number).filter((n) => !isNaN(n));
-    return { frequency: 'weekly', hour, minute, weekdays: days, dayOfMonth: '1' };
-  }
-
-  // Check if it's a monthly pattern: MM HH DD * *
-  if (dayOfMonth !== '*' && month === '*' && weekday === '*') {
-    return { frequency: 'monthly', hour, minute, weekdays: [], dayOfMonth };
-  }
-
-  return { frequency: 'advanced', hour: '0', minute: '0', weekdays: [], dayOfMonth: '1' };
-}
-
-function stateToCron(state: CronState): string {
-  // Spring cron: 6 fields — second minute hour dayOfMonth month weekday
-  switch (state.frequency) {
-    case 'daily':
-      return `0 ${state.minute} ${state.hour} * * *`;
-    case 'weekly': {
-      const days = state.weekdays.length > 0 ? state.weekdays.sort((a, b) => a - b).join(',') : '*';
-      return `0 ${state.minute} ${state.hour} * * ${days}`;
-    }
-    case 'monthly':
-      return `0 ${state.minute} ${state.hour} ${state.dayOfMonth} * *`;
-    default:
-      return '';
-  }
-}
 
 export function CronPicker({ value, onChange, label }: CronPickerProps) {
   const t = useT();
@@ -107,7 +48,7 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
     updateState({ weekdays: newDays });
   };
 
-  const frequencies: { key: Frequency; label: string }[] = [
+  const frequencies: { key: CronFrequency; label: string }[] = [
     { key: 'daily', label: t.schedules.daily },
     { key: 'weekly', label: t.schedules.weekly },
     { key: 'monthly', label: t.schedules.monthly },

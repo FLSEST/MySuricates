@@ -1,19 +1,14 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
-import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { ProHandoff } from '../components/simple/ProHandoff';
 import { RunReportCard } from '../components/simple/RunResultCard';
 import { SectionLabel } from '../components/simple/kit';
-import {
-  useWorkflow, useWorkflowRuns, useExecuteWorkflow,
-} from '../hooks/useWorkflows';
+import { useSimpleRun } from '../components/simple/useSimpleRun';
+import { useWorkflow, useWorkflowRuns } from '../hooks/useWorkflows';
 import { useT, useI18nStore } from '../i18n';
-import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
-import { readContextSchema } from '../utils/contextSchema';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
 import { readRunReport } from '../utils/runResult';
 
@@ -25,9 +20,7 @@ export function SimpleWorkflowDetail() {
 
   const { data: workflow, isLoading, error, refetch } = useWorkflow(id!);
   const { data: runs } = useWorkflowRuns(id!);
-  const executeWorkflow = useExecuteWorkflow();
-
-  const [showExecuteDialog, setShowExecuteDialog] = useState(false);
+  const simpleRun = useSimpleRun();
 
   if (isLoading) {
     return (
@@ -40,31 +33,6 @@ export function SimpleWorkflowDetail() {
   if (error || !workflow) {
     return <ErrorState message={error?.message} onRetry={() => refetch()} />;
   }
-
-  const workflowVariables = extractWorkflowVariables(workflow.blocks);
-
-  const handleExecute = () => {
-    if (workflowVariables.length > 0) {
-      setShowExecuteDialog(true);
-    } else {
-      executeWorkflow.mutate(
-        { id: workflow.id },
-        { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) },
-      );
-    }
-  };
-
-  const handleExecuteWithContext = (context: Record<string, string>) => {
-    executeWorkflow.mutate(
-      { id: workflow.id, context },
-      {
-        onSuccess: (run) => {
-          setShowExecuteDialog(false);
-          navigate(`/workflows/${workflow.id}/run/${run.id}`);
-        },
-      },
-    );
-  };
 
   const recentRuns = runs?.content?.slice(0, 6) ?? [];
   // The list already carries run metadata, so the latest report costs no extra request.
@@ -97,8 +65,8 @@ export function SimpleWorkflowDetail() {
       <Button
         className="w-full"
         icon={<Play className="w-4 h-4" />}
-        onClick={handleExecute}
-        loading={executeWorkflow.isPending}
+        onClick={() => simpleRun.run(workflow)}
+        loading={simpleRun.isPending}
         size="lg"
       >
         {t.workflows.execute}
@@ -182,17 +150,7 @@ export function SimpleWorkflowDetail() {
         )}
       </Card>
 
-      <ExecuteDialog
-        open={showExecuteDialog}
-        onClose={() => setShowExecuteDialog(false)}
-        onExecute={handleExecuteWithContext}
-        variables={workflowVariables}
-        defaultValues={workflow.defaultContext}
-        optionalVariables={readContextSchema(workflow).optional}
-        descriptions={readContextSchema(workflow).descriptions}
-        placeholders={readContextSchema(workflow).placeholders}
-        loading={executeWorkflow.isPending}
-      />
+      {simpleRun.dialog}
     </div>
   );
 }

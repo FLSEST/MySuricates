@@ -2,15 +2,12 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Sparkles, ArrowUp } from 'lucide-react';
 import { useT } from '../i18n';
-import { useWorkflows, useExecuteWorkflow } from '../hooks/useWorkflows';
+import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import { useModuleEnabled, useSystemModules } from '../hooks/useModules';
 import { buildHomeTiles, greetingKey } from '../utils/homeTiles';
-import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
-import { readContextSchema } from '../utils/contextSchema';
-import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
 import { Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
@@ -20,14 +17,14 @@ import { FeatureTile } from '../components/simple/FeatureTile';
 import { ProBadge } from '../components/simple/ProHandoff';
 import { simpleRouteKind } from '../utils/simpleRoutes';
 import { StatusDot } from '../components/simple/kit';
-import type { Workflow } from '../types';
+import { useSimpleRun } from '../components/simple/useSimpleRun';
 
 export function SimpleHome() {
   const t = useT();
   const navigate = useNavigate();
   const { pinnedWorkflowIds } = useSettingsStore();
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
-  const executeWorkflow = useExecuteWorkflow();
+  const simpleRun = useSimpleRun();
   const latestStatus = useLatestRunStatuses();
   const setPendingInput = useAssistantStore((s) => s.setPendingInput);
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
@@ -35,9 +32,6 @@ export function SimpleHome() {
   const { data: systemModules } = useSystemModules();
 
   const [assistantInput, setAssistantInput] = useState('');
-  const [executeDialog, setExecuteDialog] = useState<{ open: boolean; workflow: Workflow | null; variables: string[] }>(
-    { open: false, workflow: null, variables: [] },
-  );
 
   const { navTiles, runTiles } = useMemo(() => {
     const disabled = new Set((systemModules?.modules ?? []).filter((m) => !m.enabled).map((m) => m.name));
@@ -50,29 +44,6 @@ export function SimpleHome() {
     setPendingInput(text || null);
     setAssistantOpen(true);
     setAssistantInput('');
-  };
-
-  const handleExecute = (workflow: Workflow) => {
-    const variables = extractWorkflowVariables(workflow.blocks);
-    if (variables.length > 0) {
-      setExecuteDialog({ open: true, workflow, variables });
-    } else {
-      executeWorkflow.mutate({ id: workflow.id }, { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) });
-    }
-  };
-
-  const handleExecuteWithContext = (context: Record<string, string>) => {
-    if (!executeDialog.workflow) return;
-    const id = executeDialog.workflow.id;
-    executeWorkflow.mutate(
-      { id, context },
-      {
-        onSuccess: (run) => {
-          setExecuteDialog({ open: false, workflow: null, variables: [] });
-          navigate(`/workflows/${id}/run/${run.id}`);
-        },
-      },
-    );
   };
 
   if (isLoading) {
@@ -156,7 +127,7 @@ export function SimpleHome() {
               return (
                 <button
                   key={w.id}
-                  onClick={() => handleExecute(w)}
+                  onClick={() => simpleRun.run(w)}
                   className="group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 hover:border-accent/40 hover:bg-surface-raised transition-colors"
                 >
                   <span className="text-lg leading-none">{w.icon || '⚡'}</span>
@@ -177,17 +148,7 @@ export function SimpleHome() {
         </div>
       )}
 
-      <ExecuteDialog
-        open={executeDialog.open}
-        onClose={() => setExecuteDialog({ open: false, workflow: null, variables: [] })}
-        onExecute={handleExecuteWithContext}
-        variables={executeDialog.variables}
-        defaultValues={executeDialog.workflow?.defaultContext}
-        optionalVariables={executeDialog.workflow ? readContextSchema(executeDialog.workflow).optional : undefined}
-        descriptions={executeDialog.workflow ? readContextSchema(executeDialog.workflow).descriptions : undefined}
-        placeholders={executeDialog.workflow ? readContextSchema(executeDialog.workflow).placeholders : undefined}
-        loading={executeWorkflow.isPending}
-      />
+      {simpleRun.dialog}
     </div>
   );
 }

@@ -5,25 +5,22 @@ import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleRow, StatusDot } from '../components/simple/kit';
-import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
+import { useSimpleRun } from '../components/simple/useSimpleRun';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import {
   useWorkflows,
   useCreateWorkflow,
-  useExecuteWorkflow,
   useDeleteWorkflow,
 } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
 import { useT, useI18nStore } from '../i18n';
-import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
-import { readContextSchema } from '../utils/contextSchema';
 import { resolveTemplateName } from '../utils/templateUtils';
 import { curateWorkflows } from '../utils/curateWorkflows';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
-import type { CreateWorkflowRequest, Workflow, WorkflowTemplate, PoolWorkflowEntry } from '../types';
+import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 import { useInstallPoolWorkflow } from '../hooks/usePool';
 
 export function SimpleWorkflows() {
@@ -35,17 +32,12 @@ export function SimpleWorkflows() {
   const { data: projects } = useProjects();
   const createWorkflow = useCreateWorkflow();
   const installPoolWorkflow = useInstallPoolWorkflow();
-  const executeWorkflow = useExecuteWorkflow();
+  const simpleRun = useSimpleRun();
   const deleteWorkflow = useDeleteWorkflow();
 
   const [createStep, setCreateStep] = useState<CreateStep>('closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
-  const [executeDialog, setExecuteDialog] = useState<{
-    open: boolean;
-    workflow: Workflow | null;
-    variables: string[];
-  }>({ open: false, workflow: null, variables: [] });
   const [search, setSearch] = useState('');
   const [showAll, setShowAll] = useState(false);
   const { pinnedWorkflowIds, togglePinnedWorkflow } = useSettingsStore();
@@ -137,32 +129,6 @@ export function SimpleWorkflows() {
     });
   };
 
-  const handleExecute = (workflow: Workflow) => {
-    const variables = extractWorkflowVariables(workflow.blocks);
-    if (variables.length > 0) {
-      setExecuteDialog({ open: true, workflow, variables });
-    } else {
-      executeWorkflow.mutate(
-        { id: workflow.id },
-        { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) },
-      );
-    }
-  };
-
-  const handleExecuteWithContext = (context: Record<string, string>) => {
-    if (!executeDialog.workflow) return;
-    const workflowId = executeDialog.workflow.id;
-    executeWorkflow.mutate(
-      { id: workflowId, context },
-      {
-        onSuccess: (run) => {
-          setExecuteDialog({ open: false, workflow: null, variables: [] });
-          navigate(`/workflows/${workflowId}/run/${run.id}`);
-        },
-      },
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -251,8 +217,8 @@ export function SimpleWorkflows() {
                   size="sm"
                   variant="secondary"
                   icon={<Play className="w-3.5 h-3.5" />}
-                  onClick={() => handleExecute(workflow)}
-                  loading={executeWorkflow.isPending}
+                  onClick={() => simpleRun.run(workflow)}
+                  loading={simpleRun.isPending}
                 >
                   {t.workflows.execute}
                 </Button>
@@ -270,17 +236,7 @@ export function SimpleWorkflows() {
         </div>
       )}
 
-      <ExecuteDialog
-        open={executeDialog.open}
-        onClose={() => setExecuteDialog({ open: false, workflow: null, variables: [] })}
-        onExecute={handleExecuteWithContext}
-        variables={executeDialog.variables}
-        defaultValues={executeDialog.workflow?.defaultContext}
-        optionalVariables={readContextSchema(executeDialog.workflow).optional}
-        descriptions={readContextSchema(executeDialog.workflow).descriptions}
-        placeholders={readContextSchema(executeDialog.workflow).placeholders}
-        loading={executeWorkflow.isPending}
-      />
+      {simpleRun.dialog}
 
       <WorkflowCreateFlow
         t={t}
