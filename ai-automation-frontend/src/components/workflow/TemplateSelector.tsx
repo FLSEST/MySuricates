@@ -8,6 +8,8 @@ import { resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
 import { PoolBrowser } from './PoolBrowser';
 import { BlueprintBrowser } from './BlueprintBrowser';
+import { ProHandoff } from '../simple/ProHandoff';
+import { Hint } from '../hints/Hint';
 import type { WorkflowTemplate, PoolWorkflowEntry } from '../../types';
 
 type Tab = 'templates' | 'pool' | 'blueprints';
@@ -15,15 +17,22 @@ type Tab = 'templates' | 'pool' | 'blueprints';
 interface TemplateSelectorProps {
   onSelect: (template: WorkflowTemplate | null) => void;
   onPoolSelect?: (entry: PoolWorkflowEntry) => void;
+  /**
+   * `simple`: only what runs as it is — templates first, the pool next to them. Blueprints and the
+   * blank workflow need the editor, which Simple mode does not have, so a visible hand-off to Pro
+   * takes their place instead of a dead end.
+   */
+  variant?: 'pro' | 'simple';
 }
 
-export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorProps) {
+export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: TemplateSelectorProps) {
+  const simple = variant === 'simple';
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const { data: templates, isLoading } = useTemplates();
   const [search, setSearch] = useState('');
   // Blueprints come first: they show what the building blocks can do (TODO 268ae0db)
-  const [activeTab, setActiveTab] = useState<Tab>('blueprints');
+  const [activeTab, setActiveTab] = useState<Tab>(simple ? 'templates' : 'blueprints');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Blueprints share the endpoint but have their own tab
@@ -45,18 +54,22 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
 
   return (
     <div className="space-y-4">
+      {simple && <Hint id="simple-create" />}
+
       {/* Tabs */}
       <div className="flex border-b border-border">
-        <button
-          onClick={() => setActiveTab('blueprints')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'blueprints'
-              ? 'border-accent text-accent'
-              : 'border-transparent text-text-secondary hover:text-text'
-          }`}
-        >
-          {t.blueprints.tab}
-        </button>
+        {!simple && (
+          <button
+            onClick={() => setActiveTab('blueprints')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'blueprints'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-secondary hover:text-text'
+            }`}
+          >
+            {t.blueprints.tab}
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('templates')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -80,7 +93,7 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
       </div>
 
       {activeTab === 'pool' ? (
-        <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} />
+        <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} variant={variant} />
       ) : activeTab === 'blueprints' ? (
         isLoading ? (
           <div className="flex justify-center py-8">
@@ -93,7 +106,7 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
         <>
           <div>
             <h3 className="text-lg font-semibold text-text">{t.templates.title}</h3>
-            <p className="text-sm text-text-secondary mt-1">{t.templates.subtitle}</p>
+            <p className="text-sm text-text-secondary mt-1">{simple ? t.simple.create.subtitle : t.templates.subtitle}</p>
           </div>
 
           <Input
@@ -138,7 +151,7 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
           ) : (
             <div className="max-h-[60vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Blank option - only when not searching */}
-              {!search.trim() && (
+              {!simple && !search.trim() && (
                 <Card
                   className="cursor-pointer hover:border-border-strong transition-colors"
                   onClick={() => onSelect(null)}
@@ -182,23 +195,28 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-text-tertiary">
-                            {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
-                          </span>
-                          <ExecutionBadges blocks={tmpl.blocks} />
-                        </div>
+                        {/* Step count, execution kinds and export are build details — Pro only */}
+                        {!simple && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-text-tertiary">
+                              {tmpl.blocks.length} {t.workflows.blocks.toLowerCase()}
+                            </span>
+                            <ExecutionBadges blocks={tmpl.blocks} />
+                          </div>
+                        )}
                       </div>
-                      <button
-                        className="p-1 rounded text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors shrink-0"
-                        title={t.templates.exportTemplate}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          exportTemplate(tmpl, locale);
-                        }}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
+                      {!simple && (
+                        <button
+                          className="p-1 rounded text-text-tertiary hover:text-text hover:bg-surface-raised transition-colors shrink-0"
+                          title={t.templates.exportTemplate}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            exportTemplate(tmpl, locale);
+                          }}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-text-secondary">
                       {resolveTemplateName(tmpl.description, locale)}
@@ -210,6 +228,8 @@ export function TemplateSelector({ onSelect, onPoolSelect }: TemplateSelectorPro
           )}
         </>
       )}
+
+      {simple && <ProHandoff reason={t.simple.create.buildInPro} to="/workflows" />}
     </div>
   );
 }

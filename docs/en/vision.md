@@ -146,7 +146,7 @@ Workflows accumulate knowledge across runs:
 | Onboarding Profiles (guided setup for new users) | Done |
 | Workflow Pool & PoolBrowser (template marketplace browsing) | Done |
 | Workflow Versioning (version history + restore) | Done |
-| Simple Mode (simplified UI for beginners) | Done |
+| Simple Mode (operating surface for newcomers who install it themselves; hand-off to Pro visible) | Done |
 | Insights Page (analytics dashboard) | Done |
 | Chain Templates (pre-built chain templates) | Done |
 

@@ -29,14 +29,14 @@ import { useT } from '../../i18n';
 import {
   collapseDividers, effectiveOrder, newDividerId, resolveEntries, withDefaultDividers,
 } from '../../utils/sidebarLayout';
+import { SIMPLE_MODE_ROUTES } from '../../utils/simpleRoutes';
+import { NAV_TILES } from '../../utils/homeTiles';
 import type { TranslationKeys } from '../../i18n/en';
 import type { FeatureModuleName } from '../../types';
 import { HealthIndicator } from './HealthIndicator';
 import { SortableNavItem } from './SortableNavItem';
 import { SidebarDivider, SortableDivider } from './SidebarDivider';
 import { PendingInputNavItem } from './PendingInputNavItem';
-
-const SIMPLE_MODE_ROUTES = new Set(['/', '/workflows', '/runs', '/projects', '/schedules', '/todos', '/activity']);
 
 export function MeerkatIcon({ className, size = 24 }: { className?: string; size?: number }) {
   const bg = 'var(--color-sidebar, #1a1614)';
@@ -147,14 +147,16 @@ const DEFAULT_ORDER = withDefaultDividers(navItems.map((i) => i.to));
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
   const {
-    simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, sidebarDividerLabels,
+    simpleMode, chooseMode, sidebarItemOrder, sidebarHiddenItems, sidebarDividerLabels,
     setSidebarItemOrder, setSidebarHiddenItems, setSidebarDividerLabel, setSidebarDividerLabels,
   } = useSettingsStore();
   const isMobile = useIsMobile();
   const { data: systemInfo } = useSystemInfo();
   const { data: systemModules } = useSystemModules();
   const t = useT();
-  const [editMode, setEditMode] = useState(false);
+  const [editModeState, setEditMode] = useState(false);
+  // Simple mode never edits the menu — also when it was switched on mid-edit.
+  const editMode = editModeState && !simpleMode;
 
   // Pages of disabled modules vanish entirely — also from edit mode and the "add back" list.
   const disabledModules = new Set(
@@ -167,19 +169,17 @@ export function Sidebar() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Build label-enriched nav items once (needed for edit mode display)
-  const SIMPLE_LABEL_KEYS: Record<string, 'simpleHome' | 'myWorkflows' | 'results'> = {
-    '/': 'simpleHome',
-    '/workflows': 'myWorkflows',
-    '/runs': 'results',
+  // Build label-enriched nav items once (needed for edit mode display).
+  // Simple mode names each page like its Simple title (the home tiles), the home itself "Start".
+  const simpleLabel = (to: string): string | undefined => {
+    if (to === '/') return t.nav.simpleHome;
+    const tile = NAV_TILES.find((tl) => tl.to === to);
+    return tile ? t.simple.home.tiles[tile.id].title : undefined;
   };
-  const navItemsWithLabels = availableNavItems.map((item) => {
-    const simpleKey = simpleMode ? SIMPLE_LABEL_KEYS[item.to] : undefined;
-    return {
-      ...item,
-      label: simpleKey ? t.nav[simpleKey] : t.nav[item.labelKey],
-    };
-  });
+  const navItemsWithLabels = availableNavItems.map((item) => ({
+    ...item,
+    label: (simpleMode ? simpleLabel(item.to) : undefined) ?? t.nav[item.labelKey],
+  }));
 
   // Full order (custom or default, dividers included); new pages are appended.
   const fullOrder = effectiveOrder(sidebarItemOrder, DEFAULT_ORDER, navItemsWithLabels.map((i) => i.to));
@@ -269,7 +269,7 @@ export function Sidebar() {
                 }`}
               />
               <button
-                onClick={() => setSimpleMode(true)}
+                onClick={() => chooseMode(true)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
                   simpleMode
                     ? 'text-accent'
@@ -280,7 +280,7 @@ export function Sidebar() {
                 {t.settings.simpleModeShort}
               </button>
               <button
-                onClick={() => setSimpleMode(false)}
+                onClick={() => chooseMode(false)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
                   !simpleMode
                     ? 'text-accent'
@@ -292,10 +292,24 @@ export function Sidebar() {
               </button>
             </div>
           </>
-        ) : systemInfo?.environment && (
-          <span className={`w-2 h-2 rounded-full mt-1 ${
-            systemInfo.environment === 'Produktiv' ? 'bg-emerald-400' : 'bg-amber-400'
-          }`} title={systemInfo.environment} />
+        ) : (
+          <>
+            {systemInfo?.environment && (
+              <span className={`w-2 h-2 rounded-full mt-1 ${
+                systemInfo.environment === 'Produktiv' ? 'bg-emerald-400' : 'bg-amber-400'
+              }`} title={systemInfo.environment} />
+            )}
+            {/* Collapsed: the Einfach|Pro pill has no room — one icon button switches the mode */}
+            <button
+              onClick={() => chooseMode(!simpleMode)}
+              aria-label={simpleMode ? t.simple.handoff.switchToPro : t.simple.handoff.switchToSimple}
+              title={simpleMode ? t.simple.handoff.switchToPro : t.simple.handoff.switchToSimple}
+              className="mt-2 flex h-7 w-7 items-center justify-center rounded-full text-accent transition-colors hover:bg-[var(--color-sidebar-hover)]"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--color-sidebar-text) 10%, transparent)' }}
+            >
+              {simpleMode ? <Zap className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
+            </button>
+          </>
         )}
       </div>
 
@@ -382,8 +396,8 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Edit menu */}
-      {showLabels && (
+      {/* Edit menu — Pro only: Simple shows a fixed, calm set of pages */}
+      {showLabels && !simpleMode && (
         <div className="flex items-center gap-1 px-2 py-1">
           <button
             onClick={() => setEditMode((v) => !v)}

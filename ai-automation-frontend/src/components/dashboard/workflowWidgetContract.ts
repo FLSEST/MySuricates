@@ -46,6 +46,13 @@ export type WorkflowResultStatus = 'GREEN' | 'YELLOW' | 'RED';
 export type WorkflowResultTrend = 'UP' | 'DOWN' | 'FLAT';
 export type WorkflowResultState = 'VALID' | 'INVALID' | 'MISSING';
 
+/** Fixed classes per contract value — Tailwind needs literal class names, and enums are all we allow. */
+export const WORKFLOW_RESULT_STATUS_DOT: Record<WorkflowResultStatus, string> = {
+  GREEN: 'bg-success',
+  YELLOW: 'bg-warning',
+  RED: 'bg-danger',
+};
+
 export interface WorkflowResultKpi { label: string; value: string; trend?: WorkflowResultTrend }
 
 export interface WorkflowResult {

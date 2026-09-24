@@ -9,7 +9,7 @@ import { resolveTemplateName } from '../../utils/templateUtils';
 import { useCreateProject } from '../../hooks/useProjects';
 import { FirstProjectActions } from '../project/FirstProjectActions';
 import { ProjectFormFields } from '../project/ProjectFormFields';
-import { EMPTY_PROJECT_FORM, type ProjectFormValues } from '../project/projectForm';
+import { COMPACT_PROJECT_FORM, EMPTY_PROJECT_FORM, type ProjectFormValues } from '../project/projectForm';
 
 export type CreateStep = 'closed' | 'template' | 'details';
 
@@ -27,6 +27,8 @@ interface WorkflowCreateFlowProps {
   onCreate: () => void;
   onClose: () => void;
   onBackToTemplates: () => void;
+  /** `simple`: templates and pool only, and a new project asks just for a name and a folder. */
+  variant?: 'pro' | 'simple';
 }
 
 export function WorkflowCreateFlow({
@@ -43,7 +45,10 @@ export function WorkflowCreateFlow({
   onCreate,
   onClose,
   onBackToTemplates,
+  variant = 'pro',
 }: WorkflowCreateFlowProps) {
+  const simple = variant === 'simple';
+  const emptyProjectForm = simple ? COMPACT_PROJECT_FORM : EMPTY_PROJECT_FORM;
   // Non-null while the details dialog shows the project form instead (TODO d12c7560): the way from
   // "New workflow" to a project, inside the same dialog because a dialog cannot open a second one on top.
   const [newProject, setNewProject] = useState<ProjectFormValues | null>(null);
@@ -68,7 +73,7 @@ export function WorkflowCreateFlow({
   return (
     <>
       <Modal open={createStep === 'template'} onClose={close} title={t.workflows.create} size="lg">
-        <TemplateSelector onSelect={onTemplateSelect} onPoolSelect={onPoolSelect} />
+        <TemplateSelector onSelect={onTemplateSelect} onPoolSelect={onPoolSelect} variant={variant} />
       </Modal>
 
       <Modal
@@ -90,7 +95,7 @@ export function WorkflowCreateFlow({
           </>
         }
       >
-        {newProject && <ProjectFormFields value={newProject} onChange={setNewProject} placeholders />}
+        {newProject && <ProjectFormFields value={newProject} onChange={setNewProject} placeholders compact={simple} />}
       </Modal>
 
       <Modal
@@ -130,7 +135,7 @@ export function WorkflowCreateFlow({
             <div className="space-y-3 p-3 rounded-lg border border-border bg-surface-raised text-center">
               <p className="text-sm text-text-secondary">{t.workflows.needsProject}</p>
               <FirstProjectActions
-                onCreateOwn={() => setNewProject(EMPTY_PROJECT_FORM)}
+                onCreateOwn={() => setNewProject(emptyProjectForm)}
                 onProjectReady={(project) => onFormChange({ ...form, projectId: project.id })}
               />
             </div>
@@ -147,7 +152,7 @@ export function WorkflowCreateFlow({
               />
               <button
                 type="button"
-                onClick={() => setNewProject(EMPTY_PROJECT_FORM)}
+                onClick={() => setNewProject(emptyProjectForm)}
                 className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-hover transition-colors"
               >
                 <FolderPlus className="w-3.5 h-3.5" />
@@ -159,13 +164,13 @@ export function WorkflowCreateFlow({
             label={t.common.name}
             value={form.name}
             onChange={(e) => onFormChange({ ...form, name: e.target.value })}
-            placeholder="Review Pull Request"
+            placeholder={t.workflows.namePlaceholder}
           />
           <Input
             label={t.common.description}
             value={form.description ?? ''}
             onChange={(e) => onFormChange({ ...form, description: e.target.value })}
-            placeholder="Optional description"
+            placeholder={t.workflows.descriptionPlaceholder}
           />
         </div>
       </Modal>

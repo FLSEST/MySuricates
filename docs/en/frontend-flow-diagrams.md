@@ -6,7 +6,7 @@ Routing, state, data flow, WebSockets and cache invalidation
 
 ## Routing — *App.tsx*
 
-`createBrowserRouter` with one layout (sidebar + header) around all pages. Pages of optional modules sit in `ModuleRoute` and, without their module, explain how to switch it on; several core pages switch to their own, simpler version in Simple Mode (`useSettingsStore`).
+`createBrowserRouter` with one layout (sidebar + header) around all pages. Pages of optional modules sit in `ModuleRoute` and, without their module, explain how to switch it on; several core pages switch to their own, simpler version in Simple Mode (`useSettingsStore`). Every page is `simple` (own version), `shared` (both modes) or `pro` (`utils/simpleRoutes.ts`); when Simple Mode lands on a Pro page, `ProPageNotice` says so below the header and offers the switch.
 
 ```mermaid
 flowchart LR

@@ -7,6 +7,7 @@ import { WidgetCatalogDialog } from '../components/dashboard/WidgetCatalogDialog
 import { DashboardDataProvider } from '../components/dashboard/DashboardDataProvider';
 import { DashboardDataErrorBanner } from '../components/dashboard/DashboardDataErrorBanner';
 import { FirstStepsCard } from '../components/dashboard/FirstStepsCard';
+import { ModeChoiceCard } from '../components/simple/ModeChoiceCard';
 import { AiProviderStartCard } from '../components/dashboard/AiProviderStartCard';
 import { Hint } from '../components/hints/Hint';
 import { WorkflowWidgetProvider } from '../components/dashboard/WorkflowWidgetProvider';
@@ -157,6 +158,8 @@ function DashboardPage() {
       )}
 
       <DashboardDataErrorBanner />
+
+      <ModeChoiceCard />
 
       <FirstStepsCard />
 

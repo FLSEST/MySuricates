@@ -895,7 +895,7 @@ App.tsx (Router)
 │   ├── Runs, ActivityLog, Todos, DeadLetterQueue
 │   ├── Chains, ChainExecution
 │   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
-│   ├── Simple*-Varianten (SimpleDashboard, SimpleWorkflows, etc.)
+│   ├── Simple*-Varianten (SimpleHome, SimpleWorkflows, etc.)
 │
 ├── Hooks (TanStack Query + Custom, 40+)
 │   ├── useProjects, useWorkflows, useSkills, useSchedules, ...

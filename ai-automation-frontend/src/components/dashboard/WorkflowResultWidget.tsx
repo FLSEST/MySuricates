@@ -1,32 +1,20 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, ClipboardList, Minus } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { Card } from '../ui';
 import { useT, useI18nStore } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
 import type { WidgetProps } from './widgetDefinition';
 import { WidgetSkeleton } from './WidgetSkeleton';
-import { isWorkflowId, type WorkflowResultStatus, type WorkflowResultTrend } from './workflowWidgetContract';
+import { isWorkflowId, WORKFLOW_RESULT_STATUS_DOT as STATUS_DOT } from './workflowWidgetContract';
 import { useWorkflowWidgetEntry } from './workflowWidgetContext';
 import { WorkflowWidgetMessage } from './WorkflowWidgetStates';
-
-/** Fixed classes per contract value — Tailwind needs literal class names, and enums are all we allow. */
-const STATUS_DOT: Record<WorkflowResultStatus, string> = {
-  GREEN: 'bg-success',
-  YELLOW: 'bg-warning',
-  RED: 'bg-danger',
-};
-
-const TREND_ICON: Record<WorkflowResultTrend, typeof ArrowUp> = {
-  UP: ArrowUp,
-  DOWN: ArrowDown,
-  FLAT: Minus,
-};
+import { WorkflowResultContent } from './WorkflowResultContent';
 
 /**
  * Widget B (spec E3): what a workflow reported through the dashboard_widget contract. Every value
  * here went through the backend's validation and the client-side contract check, and every one of
  * them is rendered as a React text node — no markup, no markdown, no links, no images. Status and
- * trend are enums, so the only thing they can pick is a class name from the tables above.
+ * trend are enums, so the only thing they can pick is a class name (fixed tables in the contract and in WorkflowResultContent).
  *
  * Without a valid contract the widget says so and offers the run; it never shows raw output and
  * never invents a green result.
@@ -36,9 +24,6 @@ export function WorkflowResultWidget({ config }: WidgetProps) {
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const texts = t.dashboard.workflowWidgets;
-  const trendLabels: Record<WorkflowResultTrend, string> = {
-    UP: texts.trendUp, DOWN: texts.trendDown, FLAT: texts.trendFlat,
-  };
   const workflowId = isWorkflowId(config.workflowId) ? config.workflowId : undefined;
   const { entry, isLoading, error } = useWorkflowWidgetEntry(workflowId);
 
@@ -86,36 +71,7 @@ export function WorkflowResultWidget({ config }: WidgetProps) {
         </span>
       </div>
 
-      {result.kpis.length > 0 && (
-        <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-          {result.kpis.map((kpi, index) => {
-            const TrendIcon = kpi.trend ? TREND_ICON[kpi.trend] : null;
-            return (
-              <div key={`${kpi.label}-${index}`} className="contents">
-                <dt className="min-w-0 break-words text-text-secondary">{kpi.label}</dt>
-                <dd className="flex items-center justify-end gap-1 break-words font-medium text-text">
-                  {kpi.value}
-                  {TrendIcon && kpi.trend && (
-                    <TrendIcon className="h-3 w-3 shrink-0 text-text-tertiary" aria-label={trendLabels[kpi.trend]} />
-                  )}
-                </dd>
-              </div>
-            );
-          })}
-        </dl>
-      )}
-
-      {result.items.length > 0 && (
-        // A CSS list marker, not a literal "• " text node: the latter would merge with the item text
-        // into one DOM text node and break exact text matching (both in tests and for assistive tech).
-        <ul className="list-disc space-y-1 pl-4 text-xs text-text-secondary">
-          {result.items.map((item, index) => (
-            <li key={`${index}-${item}`} className="break-words">{item}</li>
-          ))}
-        </ul>
-      )}
-
-      {result.summary && <p className="text-xs text-text-secondary break-words">{result.summary}</p>}
+      <WorkflowResultContent result={result} />
 
       <div className="flex items-center justify-between gap-2 text-xs text-text-tertiary">
         <span>{run.startedAt ? formatRelativeTime(run.startedAt, locale) : '-'}</span>

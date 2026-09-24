@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSettingsStore, PAGE_SIZE_MIN, PAGE_SIZE_MAX } from '../settingsStore';
+import { HINTS } from '../../data/hints';
 
 describe('settingsStore', () => {
   beforeEach(() => {
@@ -105,5 +106,36 @@ describe('settingsStore sidebar dividers', () => {
     expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({ 'divider:a': 'Bauen' });
     setSidebarDividerLabel('divider:a', '   ');
     expect(useSettingsStore.getState().sidebarDividerLabels).toEqual({});
+  });
+});
+
+describe('settingsStore v2 migration (Simple-mode welcome card → hint)', () => {
+  const migrate = () => useSettingsStore.persist.getOptions().migrate!;
+
+  it('turns a closed welcome card into a dismissed simple-home hint and drops the old flag', () => {
+    const migrated = migrate()({ simpleOnboardingSeen: true, dismissedHints: { 'run-steps': 1 } }, 1) as Record<string, unknown>;
+    expect(migrated.dismissedHints).toEqual({ 'run-steps': 1, 'simple-home': HINTS['simple-home'].version });
+    expect(migrated).not.toHaveProperty('simpleOnboardingSeen');
+  });
+
+  it('leaves the hint alone when the card was never closed', () => {
+    const migrated = migrate()({ simpleOnboardingSeen: false }, 1) as Record<string, unknown>;
+    expect(migrated.dismissedHints).toBeUndefined();
+    expect(migrated).not.toHaveProperty('simpleOnboardingSeen');
+  });
+
+  it('applies on rehydration from a stored v1 state', async () => {
+    // The store's own storage — the test setup's localStorage mock is a different object.
+    const storage = useSettingsStore.persist.getOptions().storage!;
+    useSettingsStore.setState({ dismissedHints: {} });
+    await storage.setItem('app-settings', { state: { simpleOnboardingSeen: true, dismissedHints: {} }, version: 1 });
+
+    await useSettingsStore.persist.rehydrate();
+
+    expect(useSettingsStore.getState().dismissedHints).toEqual({ 'simple-home': HINTS['simple-home'].version });
+    expect(useSettingsStore.getState()).not.toHaveProperty('simpleOnboardingSeen');
+    const stored = await storage.getItem('app-settings');
+    expect(stored?.version).toBe(2);
+    expect(stored?.state).not.toHaveProperty('simpleOnboardingSeen');
   });
 });

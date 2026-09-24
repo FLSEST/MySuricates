@@ -41,6 +41,7 @@ describe('dashboard markup guard', () => {
   // a move can never quietly drop them out of the guard.
   it.each([
     '/WorkflowResultWidget.tsx',
+    '/WorkflowResultContent.tsx',
     '/WorkflowStatusWidget.tsx',
     '/WorkflowWidgetStates.tsx',
     '/WorkflowWidgetProvider.tsx',

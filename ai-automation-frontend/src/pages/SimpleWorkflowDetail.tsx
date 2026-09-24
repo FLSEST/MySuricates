@@ -1,17 +1,16 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
-import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
-import {
-  useWorkflow, useWorkflowRuns, useExecuteWorkflow,
-} from '../hooks/useWorkflows';
+import { ProHandoff } from '../components/simple/ProHandoff';
+import { RunReportCard } from '../components/simple/RunResultCard';
+import { SectionLabel } from '../components/simple/kit';
+import { useSimpleRun } from '../components/simple/useSimpleRun';
+import { useWorkflow, useWorkflowRuns } from '../hooks/useWorkflows';
 import { useT, useI18nStore } from '../i18n';
-import { extractWorkflowVariables } from '../utils/extractWorkflowVariables';
-import { readContextSchema } from '../utils/contextSchema';
 import { formatDuration, formatRelativeTime } from '../utils/formatTime';
+import { readRunReport } from '../utils/runResult';
 
 export function SimpleWorkflowDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,9 +20,7 @@ export function SimpleWorkflowDetail() {
 
   const { data: workflow, isLoading, error, refetch } = useWorkflow(id!);
   const { data: runs } = useWorkflowRuns(id!);
-  const executeWorkflow = useExecuteWorkflow();
-
-  const [showExecuteDialog, setShowExecuteDialog] = useState(false);
+  const simpleRun = useSimpleRun();
 
   if (isLoading) {
     return (
@@ -37,32 +34,10 @@ export function SimpleWorkflowDetail() {
     return <ErrorState message={error?.message} onRetry={() => refetch()} />;
   }
 
-  const workflowVariables = extractWorkflowVariables(workflow.blocks);
-
-  const handleExecute = () => {
-    if (workflowVariables.length > 0) {
-      setShowExecuteDialog(true);
-    } else {
-      executeWorkflow.mutate(
-        { id: workflow.id },
-        { onSuccess: (run) => navigate(`/workflows/${workflow.id}/run/${run.id}`) },
-      );
-    }
-  };
-
-  const handleExecuteWithContext = (context: Record<string, string>) => {
-    executeWorkflow.mutate(
-      { id: workflow.id, context },
-      {
-        onSuccess: (run) => {
-          setShowExecuteDialog(false);
-          navigate(`/workflows/${workflow.id}/run/${run.id}`);
-        },
-      },
-    );
-  };
-
   const recentRuns = runs?.content?.slice(0, 6) ?? [];
+  // The list already carries run metadata, so the latest report costs no extra request.
+  const lastSuccess = runs?.content?.find((run) => run.status === 'COMPLETED' || run.status === 'COMPLETED_WITH_ERRORS');
+  const lastReport = lastSuccess ? readRunReport(lastSuccess) : null;
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -90,12 +65,29 @@ export function SimpleWorkflowDetail() {
       <Button
         className="w-full"
         icon={<Play className="w-4 h-4" />}
-        onClick={handleExecute}
-        loading={executeWorkflow.isPending}
+        onClick={() => simpleRun.run(workflow)}
+        loading={simpleRun.isPending}
         size="lg"
       >
         {t.workflows.execute}
       </Button>
+
+      {/* Latest report, if the newest successful run delivered one */}
+      {lastSuccess && lastReport && (
+        <section aria-label={t.simple.result.lastResult}>
+          <div className="flex items-center justify-between gap-3">
+            <SectionLabel>{t.simple.result.lastResult}</SectionLabel>
+            <button
+              type="button"
+              onClick={() => navigate(`/workflows/${workflow.id}/run/${lastSuccess.id}`)}
+              className="mb-3 text-xs text-accent hover:text-accent-hover"
+            >
+              {t.simple.result.openRun}
+            </button>
+          </div>
+          <RunReportCard report={lastReport} />
+        </section>
+      )}
 
       {/* Info */}
       <Card>
@@ -105,18 +97,17 @@ export function SimpleWorkflowDetail() {
             <dt className="text-text-secondary">{t.common.project}</dt>
             <dd className="text-text font-medium">{workflow.projectName}</dd>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-text-secondary">{t.workflows.blocks}</dt>
-            <dd className="text-text font-medium">{workflow.blocks.length}</dd>
-          </div>
-          {workflow.model && (
+          {recentRuns[0]?.startedAt && (
             <div className="flex justify-between">
-              <dt className="text-text-secondary">{t.workflows.model}</dt>
-              <dd className="text-text font-medium font-mono text-xs">{workflow.model}</dd>
+              <dt className="text-text-secondary">{t.schedules.lastRun}</dt>
+              <dd className="text-text font-medium">{formatRelativeTime(recentRuns[0].startedAt, locale)}</dd>
             </div>
           )}
         </dl>
       </Card>
+
+      {/* Editing the steps is Pro work — say so instead of hiding it */}
+      <ProHandoff reason={t.simple.handoff.changeSteps} to={`/workflows/${workflow.id}`} />
 
       {/* Recent runs */}
       <Card padding={false}>
@@ -155,17 +146,7 @@ export function SimpleWorkflowDetail() {
         )}
       </Card>
 
-      <ExecuteDialog
-        open={showExecuteDialog}
-        onClose={() => setShowExecuteDialog(false)}
-        onExecute={handleExecuteWithContext}
-        variables={workflowVariables}
-        defaultValues={workflow.defaultContext}
-        optionalVariables={readContextSchema(workflow).optional}
-        descriptions={readContextSchema(workflow).descriptions}
-        placeholders={readContextSchema(workflow).placeholders}
-        loading={executeWorkflow.isPending}
-      />
+      {simpleRun.dialog}
     </div>
   );
 }

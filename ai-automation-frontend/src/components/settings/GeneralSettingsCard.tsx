@@ -10,7 +10,7 @@ import { Globe, Bot, Sparkles } from 'lucide-react';
 
 export function GeneralSettingsCard() {
   const t = useT();
-  const { simpleMode, setSimpleMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled, setWalkthroughSeen, hintsEnabled, setHintsEnabled, resetHints } = useSettingsStore();
+  const { simpleMode, chooseMode, advancedMode, setAdvancedMode, autoTodoDefault, setAutoTodoDefault, autoRepairDefault, setAutoRepairDefault, autoRepairMode, setAutoRepairMode, defaultAiProvider, setDefaultAiProvider, assistantModel, setAssistantModel, suggestionsModel, setSuggestionsModel, suggestionsEnabled, setSuggestionsEnabled, setWalkthroughSeen, hintsEnabled, setHintsEnabled, resetHints } = useSettingsStore();
   const toast = useToast();
   const updateSetting = useUpdateSystemSetting();
   const { locale, setLocale } = useI18nStore();
@@ -52,7 +52,7 @@ export function GeneralSettingsCard() {
             <p className="text-sm font-medium text-text">{t.settings.simpleMode}</p>
             <p className="text-xs text-text-tertiary">{t.settings.simpleModeHint}</p>
           </div>
-          <Toggle enabled={simpleMode} onChange={setSimpleMode} />
+          <Toggle enabled={simpleMode} onChange={chooseMode} />
         </div>
 
         <div className="flex items-center justify-between gap-4">

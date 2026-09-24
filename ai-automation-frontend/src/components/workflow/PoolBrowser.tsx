@@ -10,9 +10,12 @@ import type { PoolWorkflowEntry } from '../../types';
 
 interface PoolBrowserProps {
   onSelect: (entry: PoolWorkflowEntry) => void;
+  /** `simple` hides build details (step count, execution kinds). */
+  variant?: 'pro' | 'simple';
 }
 
-export function PoolBrowser({ onSelect }: PoolBrowserProps) {
+export function PoolBrowser({ onSelect, variant = 'pro' }: PoolBrowserProps) {
+  const simple = variant === 'simple';
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const { data: entries, isLoading } = usePoolWorkflows();
@@ -98,10 +101,14 @@ export function PoolBrowser({ onSelect }: PoolBrowserProps) {
                     {resolveTemplateName(entry.name, locale)}
                   </h4>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-text-tertiary">
-                      {entry.blocks.length} {t.workflows.blocks.toLowerCase()}
-                    </span>
-                    <ExecutionBadges blocks={entry.blocks} />
+                    {!simple && (
+                      <>
+                        <span className="text-xs text-text-tertiary">
+                          {entry.blocks.length} {t.workflows.blocks.toLowerCase()}
+                        </span>
+                        <ExecutionBadges blocks={entry.blocks} />
+                      </>
+                    )}
                     {entry.version && (
                       <span className="text-xs text-text-tertiary">v{entry.version}</span>
                     )}

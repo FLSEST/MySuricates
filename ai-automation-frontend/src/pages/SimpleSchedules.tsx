@@ -3,12 +3,26 @@ import { Trash2, Plus } from 'lucide-react';
 import { useT, useI18nStore } from '../i18n';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useCreateSchedule } from '../hooks/useSchedules';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { Spinner, Toggle, Button, Modal, Select, Input } from '../components/ui';
+import { Spinner, Toggle, Button, Modal, Select, CronPicker } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../components/simple/kit';
+import { ProBadge } from '../components/simple/ProHandoff';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime } from '../utils/formatTime';
+import { describeCron } from '../utils/cronSchedule';
+import type { ScheduledWorkflow } from '../types';
+import type { TranslationKeys } from '../i18n/en';
+
+// Spring cron has six fields: second minute hour day month weekday.
+const DEFAULT_CRON = '0 0 9 * * *';
+
+/** How often a schedule runs, in words — null when only Pro can show it (raw cron). */
+function describeSchedule(s: ScheduledWorkflow, t: TranslationKeys): string | null {
+  if (s.scheduleType === 'ONCE') return t.schedules.once;
+  if (s.scheduleType === 'DELAYED') return t.schedules.delayed;
+  return describeCron(s.cronExpression, t);
+}
 
 export function SimpleSchedules() {
   const t = useT();
@@ -21,13 +35,13 @@ export function SimpleSchedules() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [wfId, setWfId] = useState('');
-  const [cron, setCron] = useState('0 9 * * *');
+  const [cron, setCron] = useState(DEFAULT_CRON);
 
   const submitCreate = () => {
     if (!wfId || !cron.trim()) return;
     create.mutate(
       { workflowId: wfId, targetType: 'WORKFLOW', scheduleType: 'CRON', cronExpression: cron.trim() },
-      { onSuccess: () => { setCreateOpen(false); setWfId(''); setCron('0 9 * * *'); } },
+      { onSuccess: () => { setCreateOpen(false); setWfId(''); setCron(DEFAULT_CRON); } },
     );
   };
 
@@ -50,29 +64,35 @@ export function SimpleSchedules() {
         <EmptyState title={t.simple.schedules.empty} description={t.simple.schedules.emptyHint} />
       ) : (
         <div className="space-y-2">
-          {(schedules ?? []).map((s) => (
-            <SimpleRow key={s.id} color={AREA_COLORS.schedules}>
-              <div className="flex items-center gap-3 min-w-0">
-                <StatusDot status={s.lastRunStatus ?? undefined} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-text truncate">{s.workflowName ?? s.chainName ?? '—'}</p>
-                  <p className="text-xs text-text-tertiary truncate">
-                    {s.scheduleType} · {t.simple.schedules.nextRun}: {s.nextRunAt ? formatDateTime(s.nextRunAt, locale) : '—'}
-                  </p>
+          {(schedules ?? []).map((s) => {
+            const when = describeSchedule(s, t);
+            return (
+              <SimpleRow key={s.id} color={AREA_COLORS.schedules}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <StatusDot status={s.lastRunStatus ?? undefined} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{s.workflowName ?? s.chainName ?? '—'}</p>
+                    <p className="flex items-center gap-1.5 text-xs text-text-tertiary min-w-0">
+                      <span className="truncate">
+                        {when ?? t.simple.schedules.customTiming} · {t.simple.schedules.nextRun}: {s.nextRunAt ? formatDateTime(s.nextRunAt, locale) : '—'}
+                      </span>
+                      {when === null && <ProBadge className="shrink-0" />}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Toggle enabled={s.enabled} onChange={(enable) => toggle.mutate({ id: s.id, enable })} />
-                <button
-                  aria-label={t.common.delete}
-                  className="text-text-tertiary hover:text-danger transition-colors"
-                  onClick={() => { if (window.confirm(t.common.deleteConfirm)) del.mutate(s.id); }}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </SimpleRow>
-          ))}
+                <div className="flex items-center gap-2 shrink-0">
+                  <Toggle enabled={s.enabled} onChange={(enable) => toggle.mutate({ id: s.id, enable })} />
+                  <button
+                    aria-label={t.common.delete}
+                    className="text-text-tertiary hover:text-danger transition-colors"
+                    onClick={() => { if (window.confirm(t.common.deleteConfirm)) del.mutate(s.id); }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </SimpleRow>
+            );
+          })}
         </div>
       )}
 
@@ -94,12 +114,7 @@ export function SimpleSchedules() {
             onChange={(e) => setWfId(e.target.value)}
             options={[{ value: '', label: t.common.selectWorkflow }, ...(workflows ?? []).map((w) => ({ value: w.id, label: w.name }))]}
           />
-          <Input
-            label={t.simple.schedules.cron}
-            value={cron}
-            onChange={(e) => setCron(e.target.value)}
-            hint={t.simple.schedules.cronHint}
-          />
+          <CronPicker simple label={t.simple.schedules.when} value={cron} onChange={setCron} />
         </div>
       </Modal>
     </SimplePage>
