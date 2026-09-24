@@ -8,8 +8,8 @@ import com.automation.entity.GoalMilestone.State;
 import com.automation.entity.Todo;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
 import com.automation.service.goal.GoalSnapshot;
-import com.automation.service.todo.GateStatusOutputParser;
-import com.automation.service.todo.TodoOutputParser;
+import com.automation.service.runoutput.GateStatusOutputParser;
+import com.automation.service.runoutput.TodoOutputParser;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
