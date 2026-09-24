@@ -78,6 +78,15 @@ public class ScheduledWorkflowExecutor {
             return Optional.empty();
         }
 
+        // An occurrence at or after the end date no longer belongs to the schedule — stored before
+        // advance() checked the next run against the end date, or the end date was moved forward by
+        // an update. It ends the schedule instead of starting once more (TODO 9a3e6c91).
+        if (scheduled.getScheduleType() == ScheduleType.CRON
+                && reachesEndDate(scheduled, scheduled.getNextRunAt())) {
+            endAtEndDate(scheduled);
+            return Optional.empty();
+        }
+
         // Conflict behaviour SKIP (default; OVERLAP allows parallel runs): while the target still has
         // a run in progress, this occurrence is dropped and the schedule moves on to its next one.
         // Returning without that left nextRunAt in the past, so every tick retried and the occurrence
@@ -175,6 +184,36 @@ public class ScheduledWorkflowExecutor {
                 "ScheduledWorkflowExecutor", scheduled.getId(), metadata);
     }
 
+    /**
+     * Ends a CRON schedule whose due occurrence lies at or after its end date, without starting it:
+     * disabled as after its last run, while {@code lastRunAt} and {@code runCount} stay.
+     */
+    private void endAtEndDate(ScheduledWorkflow scheduled) {
+        Instant occurrence = scheduled.getNextRunAt();
+        advance(scheduled.getId(), scheduled.getScheduleType(), scheduled.getCronExpression(), false);
+        log.info("Schedule {} ended — its occurrence at {} is not before its end date {}",
+                scheduled.getId(), occurrence, scheduled.getEndDate());
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("reason", "end-date");
+        metadata.put("previousNextRunAt", occurrence.toString());
+        metadata.put("endDate", scheduled.getEndDate().toString());
+        activityLogService.log(LogLevel.INFO, LogCategory.SCHEDULE,
+                "Schedule ended (end date reached): " + scheduled.getTargetName(),
+                "ScheduledWorkflowExecutor", scheduled.getId(), metadata);
+    }
+
+    /**
+     * True when the end date lies at or before {@code occurrence}: the schedule is over by then
+     * ("disabled when now >= endDate"), so the occurrence does not run. Measured on the occurrence,
+     * not on the moment the tick picks it up, so the last run before the end date does not depend
+     * on where the 60-s tick falls.
+     */
+    private static boolean reachesEndDate(ScheduledWorkflow scheduled, Instant occurrence) {
+        return scheduled.getEndDate() != null && occurrence != null
+                && !occurrence.isBefore(scheduled.getEndDate());
+    }
+
     @Transactional
     public void updateScheduleAfterRun(String scheduleId, ScheduleType scheduleType,
                                         String cronExpression) {
@@ -207,10 +246,14 @@ public class ScheduledWorkflowExecutor {
                 scheduled.setRunCount(scheduled.getRunCount() + 1);
             }
 
+            Instant now = Instant.now(clock);
             boolean maxRunsReached = scheduled.getMaxRuns() > 0
                     && scheduled.getRunCount() >= scheduled.getMaxRuns();
-            boolean endDateReached = scheduled.getEndDate() != null
-                    && Instant.now(clock).isAfter(scheduled.getEndDate());
+            // The end date bounds the next run, not only this moment: a next run at or after it is no
+            // longer part of the schedule. Setting it anyway started it once after the end date
+            // (TODO 9a3e6c91). Without a next run to check (none left, or not computed), now counts.
+            Instant next = maxRunsReached || reachesEndDate(scheduled, now) ? null : calculateNextRun(cronExpression);
+            boolean endDateReached = reachesEndDate(scheduled, next != null ? next : now);
 
             if (maxRunsReached || endDateReached) {
                 scheduled.setNextRunAt(null);
@@ -218,7 +261,7 @@ public class ScheduledWorkflowExecutor {
                 log.info("Schedule {} disabled — end condition met (maxRuns={}, runCount={}, endDate={})",
                         scheduleId, scheduled.getMaxRuns(), scheduled.getRunCount(), scheduled.getEndDate());
             } else {
-                scheduled.setNextRunAt(calculateNextRun(cronExpression));
+                scheduled.setNextRunAt(next);
                 log.info("Schedule {} {}, next run at: {}",
                         scheduleId, ran ? "executed" : "skipped", scheduled.getNextRunAt());
             }
