@@ -1,6 +1,6 @@
 <!-- Generated from docs/deployment-container-diagrams.md and docs/i18n/deployment-container-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Deployment & Container Lifecycle
+# MySuricates — Deployment & Container Lifecycle
 
 Compose setup, agent images, ContainerService and resource limits
 

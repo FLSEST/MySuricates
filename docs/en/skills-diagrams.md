@@ -1,6 +1,6 @@
 <!-- Generated from docs/skills-diagrams.md and docs/i18n/skills-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Skills & Capabilities
+# MySuricates — Skills & Capabilities
 
 Skill lifecycle, activation per workflow, execution in the skill-capability block
 

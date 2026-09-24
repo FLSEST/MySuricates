@@ -1,4 +1,4 @@
-# AutoPilot — Workflow Memory
+# MySuricates — Workflow Memory
 
 Architektur, Datenfluss & Dateistruktur
 

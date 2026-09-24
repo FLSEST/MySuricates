@@ -1,4 +1,4 @@
-# AutoPilot — Frontend Flow
+# MySuricates — Frontend Flow
 
 Routing, State, Datenfluss, WebSockets und Cache-Invalidierung
 

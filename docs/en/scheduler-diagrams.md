@@ -1,6 +1,6 @@
 <!-- Generated from docs/scheduler-diagrams.md and docs/i18n/scheduler-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Scheduler & Cron
+# MySuricates — Scheduler & Cron
 
 Schedules, InputContext, triggering and execution pipeline
 

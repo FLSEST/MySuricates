@@ -1,4 +1,4 @@
-# AutoPilot — Deployment & Container Lifecycle
+# MySuricates — Deployment & Container Lifecycle
 
 Compose-Setup, Agent-Images, ContainerService und Ressourcenlimits
 

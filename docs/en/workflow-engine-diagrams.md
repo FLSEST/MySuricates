@@ -1,6 +1,6 @@
 <!-- Generated from docs/workflow-engine-diagrams.md and docs/i18n/workflow-engine-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Workflow Engine
+# MySuricates — Workflow Engine
 
 Core logic, execution modes (with/without AI) and control flows
 

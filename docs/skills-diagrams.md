@@ -1,4 +1,4 @@
-# AutoPilot — Skills & Capabilities
+# MySuricates — Skills & Capabilities
 
 Skill-Lebenszyklus, Aktivierung pro Workflow, Ausfuehrung im Skill-Capability Block
 

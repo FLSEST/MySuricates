@@ -1,6 +1,6 @@
 <!-- Generated from docs/workflow-memory-diagrams.md and docs/i18n/workflow-memory-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Workflow Memory
+# MySuricates — Workflow Memory
 
 Architecture, data flow & file structure
 

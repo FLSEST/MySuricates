@@ -1,4 +1,4 @@
-# AutoPilot — Logging & Monitoring
+# MySuricates — Logging & Monitoring
 
 WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header
 

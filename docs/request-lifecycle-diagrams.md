@@ -1,4 +1,4 @@
-# AutoPilot — Request Lifecycle & Security
+# MySuricates — Request Lifecycle & Security
 
 Vom Browser bis zur Datenbank: Filter, Fehlerformat, Auth, Rate Limits
 

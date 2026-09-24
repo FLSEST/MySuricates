@@ -1,4 +1,4 @@
-# AutoPilot — Scheduler & Cron
+# MySuricates — Scheduler & Cron
 
 Schedules, InputContext, Ausloesung und Ausfuehrungspipeline
 

@@ -1,6 +1,6 @@
 <!-- Generated from docs/request-lifecycle-diagrams.md and docs/i18n/request-lifecycle-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Request Lifecycle & Security
+# MySuricates — Request Lifecycle & Security
 
 From the browser to the database: filters, error format, auth, rate limits
 

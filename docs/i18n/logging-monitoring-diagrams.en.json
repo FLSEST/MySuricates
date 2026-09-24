@@ -1,5 +1,5 @@
 {
-  "AutoPilot — Logging & Monitoring": "AutoPilot — Logging & Monitoring",
+  "MySuricates — Logging & Monitoring": "MySuricates — Logging & Monitoring",
   "WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header": "WebSocket logs, ActivityLog, health/info, RateLimit header",
   "WebSocket Log Pipeline": "WebSocket Log Pipeline",
   "/topic/executions/{runId}/logs": "/topic/executions/{runId}/logs",

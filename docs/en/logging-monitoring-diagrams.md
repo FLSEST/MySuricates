@@ -1,6 +1,6 @@
 <!-- Generated from docs/logging-monitoring-diagrams.md and docs/i18n/logging-monitoring-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Logging & Monitoring
+# MySuricates — Logging & Monitoring
 
 WebSocket logs, ActivityLog, health/info, RateLimit header
 

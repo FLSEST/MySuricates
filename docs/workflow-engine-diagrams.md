@@ -1,4 +1,4 @@
-# AutoPilot — Workflow Engine
+# MySuricates — Workflow Engine
 
 Kernlogik, Ausführungsmodi (mit/ohne KI) und Steuerflüsse
 

@@ -1,6 +1,6 @@
 <!-- Generated from docs/workflow-control-diagrams.md and docs/i18n/workflow-control-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Workflow Control & States
+# MySuricates — Workflow Control & States
 
 State machines, pause/resume/cancel, approval & error paths
 

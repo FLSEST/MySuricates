@@ -1,6 +1,6 @@
 <!-- Generated from docs/frontend-flow-diagrams.md and docs/i18n/frontend-flow-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Frontend Flow
+# MySuricates — Frontend Flow
 
 Routing, state, data flow, WebSockets and cache invalidation
 

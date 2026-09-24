@@ -1,4 +1,4 @@
-# AutoPilot — Workflow Control & States
+# MySuricates — Workflow Control & States
 
 Status-Maschinen, Pause/Resume/Cancel, Approval & Fehlerpfade
 
