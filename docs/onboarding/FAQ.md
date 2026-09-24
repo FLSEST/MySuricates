@@ -86,13 +86,13 @@ Spring erkennt den neuen Executor automatisch (Component Scan).
 
 ### Wie funktioniert die KI-Integration?
 
-Alle KI-Aufrufe laufen ueber `HostClaudeService`:
+Die KI-Aufrufe der Bloecke gehen an den Anbieter aus Block oder Workflow, sonst an den Systemstandard (`AiProviderRegistry`). Fuer Claude laeuft das ueber `HostClaudeService` (Codex und Pi analog ueber `HostCodexService` und `HostPiService`):
 - Startet `claude` als Host-Prozess via `ProcessBuilder`
 - Prompt wird ueber stdin geschrieben (nicht als CLI-Argument)
 - Entfernt `CLAUDE_CODE`/`CLAUDECODE` Umgebungsvariablen
 - Unterstuetzt `--model`, `--max-tokens`, `--append-system-prompt` Flags
 
-**Warum Host statt Docker?** Claude CLI erkennt verschachtelte Sessions und verweigert die Ausfuehrung innerhalb von Containern.
+**Laeuft Claude nie im Container?** Doch: Ad-hoc-Befehle waehrend eines Runs starten `claude` per `docker exec` im Projekt-Container, auch im Terminal dieses Containers laesst er sich aufrufen (was er vom Host bekommt, regelt `ProjectContainerClaudeAccess`). Die Bloecke rufen die KI-CLIs dagegen immer auf dem Host im Projektverzeichnis auf, dafuer braucht es kein Docker.
 
 ---
 

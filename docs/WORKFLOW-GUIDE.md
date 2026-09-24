@@ -1313,7 +1313,7 @@ Für Shell-Blöcke die mehr Tools benötigen, `container_image` setzen:
 - Braucht ein Befehl pip, go, docker, gh oder andere spezialisierte Tools -> `container_image` setzen
 - Container mounten das Projektverzeichnis nach `/workspace`
 - Auch `conditional`, `retry`, `foreach`, `while` und `switch` im Shell-Modus reichen `container_image`, `mount_docker_socket` und `mounts` an ihren Befehl durch. Die Bedingung selbst (`condition` bzw. `condition_command`) läuft auf dem Host
-- Claude CLI läuft immer auf dem Host (nicht in Containern), um Nested-Session-Erkennung zu vermeiden
+- `container_image` gilt nur für Shell-Befehle: KI-Aufrufe (Claude, Codex, Pi) laufen immer auf dem Host im Projektverzeichnis
 - Der Server kann `container_image` per Allowlist einschränken (`automation.execution.allowed-container-images` /
   `AUTOMATION_ALLOWED_CONTAINER_IMAGES`). Leer (Default) erlaubt jedes Image. Ist ein Image nicht gelistet,
   scheitert der Block sichtbar mit Exit-Code 125 und einem SECURITY-Eintrag im Activity-Log, statt still
@@ -1354,6 +1354,8 @@ Jede Iteration:
 1. **REASON**: Claude analysiert den aktuellen Stand, Gesprächsverlauf und entscheidet die nächste ACTION (nutzt `--system-prompt`, `--max-turns 3`)
 2. **ACT**: Ein **separater** Claude-CLI-Aufruf führt die ACTION aus (nutzt `--append-system-prompt`, `--model`, Projektverzeichnis)
 3. **OBSERVE**: Das Ergebnis wird aufgezeichnet und in die nächste REASON-Phase zurückgeführt
+
+Endet die KI-CLI in der REASON-Phase mit einem Exit-Code ungleich 0 (Limit, fehlende Anmeldung, Absturz), scheitert der Block sofort: Die Ausgabe zeigt `[iteration N - REASON ERROR]` mit der Meldung der CLI. Als ACTION ausgeführt wird die Meldung nicht.
 
 ### Kritisch: ACT hat keinen Kontext aus REASON
 
@@ -1401,7 +1403,7 @@ Alte Dateien aus vorherigen Runs können den Kontext des Agentic-Blocks verschmu
 
 ### Action-Komprimierung
 
-Wenn eine ACTION 100.000 Zeichen überschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird.
+Wenn eine ACTION 100.000 Zeichen überschreitet, wird sie via separatem Claude-CLI-Aufruf (60s Timeout) komprimiert bevor sie an die ACT-Phase gesendet wird. Scheitert dieser Aufruf (Timeout, Exit-Code ungleich 0), wird die ACTION stattdessen auf 100.000 Zeichen gekürzt.
 
 ### Token-Tracking
 

@@ -585,6 +585,7 @@ Injection paths:
 All Claude CLI calls of the blocks are executed on the host (not in containers; only ad-hoc commands during a run go through `docker exec` into the project container):
 - `HostClaudeService.executeAction()` — ACT phase, uses `--append-system-prompt`, `--model` flag, project working directory
 - `HostClaudeService.reasonStructured()` — REASON phase, uses `--system-prompt`, `--max-turns 3`; `--model` is set when the workflow configures a model (`ReasoningRequest.model`)
+- If the CLI ends a `reasonStructured()` call with a non-zero exit code (limit, missing login, crash), the call throws an `IOException` with exit code and message (`CliExit`, likewise `HostPiService.reason()`; Codex throws on its own). A reasoning result is therefore always an answer; otherwise the summarizer and the context generator would store the error message as memory or project context. `executeAction()` returns the exit code instead, and the block decides.
 - Prompt is written via **stdin** to the process (`writePromptToStdin()`) — avoids Linux ARG_MAX limit
 - `CLAUDE_CODE` and `CLAUDECODE` environment variables are removed from the process environment (prevents nested session errors)
 - `CommandExecutorService` provides `executeOnHost(HostExecutionRequest)` / `executeStepOnHost(HostExecutionRequest)` / `writeSkillContextToProject()` — all overloads use the `HostExecutionRequest` builder API

@@ -896,7 +896,7 @@ siehe [Cypress-Migrationshinweise](https://www.cypress.io/blog/cypress-15-made-s
 - Das Backend bootet auch ohne laufenden Docker-Daemon (der Docker-Client wird lazy aufgebaut).
 - Ohne Docker können keine Container-Execution-Blöcke in Workflows ausgeführt werden.
 - Agent-Images müssen vorher gebaut sein (`docker compose --profile build-only build`).
-- **Claude CLI läuft immer auf dem Host**, nicht in Containern (vermeidet Nested-Session-Erkennung).
+- **KI-CLIs (Claude, Codex, Pi) laufen in Workflow-Blöcken immer auf dem Host**, nicht im Projekt-Container; dafür braucht es kein Docker. Den Projekt-Container nutzen nur Ad-hoc-Befehle während eines Runs (`claude` per `docker exec`) und das Terminal.
 
 ### Sicherheit
 

@@ -8,6 +8,7 @@ import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.ClaudeAiProvider;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
+import com.automation.service.ai.ShellScriptCli;
 import com.automation.service.cli.ClaudeJsonResponse;
 import com.automation.service.cli.CliSession;
 import com.automation.entity.Workflow;
@@ -226,6 +227,24 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("REASON ERROR");
+    }
+
+    /**
+     * The CLI itself fails in the REASON phase (limit, login): it prints its message and ends with exit
+     * code 1. The block stops after that one call with the message in its output — before 9cc6c615 the
+     * message counted as reasoning without an ACTION, and the block reasoned again until max_iterations.
+     */
+    @Test
+    void execute_reasonCliEndsWithNonZeroExitCode_stopsAfterFirstIterationWithItsMessage() throws Exception {
+        when(aiProviderRegistry.resolve(any())).thenReturn(
+                new ClaudeAiProvider(ShellScriptCli.claudeReasoning("Claude AI usage limit reached", 1)));
+        when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
+
+        StepResult result = executor.execute(buildBlock("Test goal", 3), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("REASON ERROR", "exit code 1", "Claude AI usage limit reached");
+        assertThat(result.getMetadata().get("totalIterations")).isEqualTo(1);
     }
 
     @Test

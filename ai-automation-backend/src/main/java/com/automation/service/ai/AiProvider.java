@@ -32,6 +32,9 @@ public interface AiProvider {
     /**
      * Reasoning phase: "think about this prompt and respond".
      * Used by agentic REASON, optimization, conversion, wish analysis, etc.
+     * A returned result is always the model's answer: when the call fails — timeout, or the CLI ends
+     * with an exit code ≠ 0 (limit, login, crash) — every provider throws, because a caller that only
+     * gets text back would take the CLI's error message for the answer (9cc6c615).
      */
     ReasoningResult reason(ReasoningRequest request) throws IOException;
 

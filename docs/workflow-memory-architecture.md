@@ -219,7 +219,7 @@ automation:
 | 400         | Unbekannter Provider                        |
 | 404         | Unbekannte Run-ID in `runIds`               |
 | 422         | Keine Runs / keine Steps gefunden           |
-| 502         | CLI-Aufruf fehlgeschlagen (Timeout, Crash)  |
+| 502         | CLI-Aufruf fehlgeschlagen (Timeout, Crash, Exit-Code ≠ 0 wie Limit oder fehlende Anmeldung) |
 
 ---
 
@@ -266,4 +266,5 @@ das `metadata`-Feld.
 - Läuft asynchron (`@Async @EventListener`) — blockiert den Workflow-Run nicht
 - Nur mit eingeschaltetem Modul `memory`
 - Verwendet immer Provider `CLAUDE`
+- Scheitert der CLI-Aufruf (Timeout, Exit-Code ≠ 0 wie Limit oder fehlende Anmeldung), entsteht keine Memory: Die bisher aktive bleibt aktiv, `project-memory.md` bleibt unverändert, der Fehler steht im Log.
 - Auch `autoMemoryExtraction: true` (boolean statt Map) wird unterstützt (nutzt Default-Interval 5)

@@ -89,8 +89,8 @@ public class HostClaudeService {
     }
 
     /**
-     * Sends a reasoning prompt and returns both text and structured metadata
-     * (tokens, cost, model, tool usage).
+     * Sends a reasoning prompt and returns both text and structured metadata (tokens, cost, model,
+     * tool usage). An exit code ≠ 0 throws: the CLI then printed an error, not an answer ({@link CliExit}).
      */
     public ReasoningResult reasonStructured(String prompt) throws IOException {
         return reasonStructured(prompt, null);
@@ -122,7 +122,7 @@ public class HostClaudeService {
                                              Integer timeoutSeconds, String effort) throws IOException {
         List<String> cmd = buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
-        return new ReasoningResult(result.text, result.parsed);
+        return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text), result.parsed);
     }
 
     /**
