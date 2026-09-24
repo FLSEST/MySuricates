@@ -774,7 +774,7 @@ Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` au
 
 Variablen verwenden doppelte Klammern: `{{ variable_name }}` oder `{{variable_name}}`. Das Leerzeichen muss auf beiden Seiten gleich sein: `{{ variable_name}}` wird **nicht** aufgelöst und bleibt wörtlich stehen.
 
-**Hilfe im Block-Editor:** Nach `{{` schlägt das Konfigurationsfeld genau die Variablen vor, die an dieser Stelle belegt sind: Ausgaben früherer Blöcke, deren `variable_name`, System-Variablen und Startwerte. Hinter jedem Platzhalter steht, woher der Wert kommt (`{{ previous_output }} ← #3 backend_tests`), der Hover erklärt ihn. Gelb markiert werden Verweise auf Blöcke, die es nicht gibt oder die erst später laufen, ungleiche Leerzeichen sowie gequotete Ausgabe-Platzhalter in Shell-Befehlen. Die Logik steht in `ai-automation-frontend/src/components/workflow/placeholderContext.ts` und folgt `BlockStepRunner`/`ExecutionContextFactory`: Wer dort eine Variable ergänzt, ergänzt sie auch hier.
+**Hilfe im Block-Editor:** Nach `{{` schlägt das Konfigurationsfeld genau die Variablen vor, die an dieser Stelle belegt sind: Ausgaben früherer Blöcke, deren `variable_name`, System-Variablen und Startwerte. Hinter jedem Platzhalter steht, woher der Wert kommt (`{{ previous_output }} ← #3 backend_tests`), der Hover erklärt ihn. Gelb markiert werden Verweise auf Blöcke, die es nicht gibt oder die erst später laufen, ungleiche Leerzeichen sowie gequotete Ausgabe-Platzhalter in Shell-Befehlen. Die Logik steht in `ai-automation-frontend/src/utils/placeholderContext.ts` und folgt `BlockStepRunner`/`ExecutionContextFactory`: Wer dort eine Variable ergänzt, ergänzt sie auch hier.
 
 ### Eingebaute Variablen
 
