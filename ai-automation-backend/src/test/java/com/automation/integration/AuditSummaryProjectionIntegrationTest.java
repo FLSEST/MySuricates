@@ -43,11 +43,11 @@ class AuditSummaryProjectionIntegrationTest {
     @Test
     void overviewSummaryMatchesTheSummaryBuiltFromFullEntities() {
         String projectId = UUID.randomUUID().toString();
-        report(projectId, "a.health", GateStatus.YELLOW, AuditIngestionStatus.VALID, NOW.minusSeconds(300), null);
-        AuditReport latestHealth = report(projectId, "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID,
+        report(projectId, "a.health", "health", GateStatus.YELLOW, AuditIngestionStatus.VALID, NOW.minusSeconds(300), null);
+        AuditReport latestHealth = report(projectId, "a.health", "health", GateStatus.GREEN, AuditIngestionStatus.VALID,
                 NOW.minusSeconds(200), null);
-        report(projectId, "a.health", null, AuditIngestionStatus.INVALID, NOW.minusSeconds(100), "kein Envelope");
-        AuditReport security = report(projectId, "a.security", GateStatus.RED, AuditIngestionStatus.VALID, NOW, null);
+        report(projectId, "a.health", "health", null, AuditIngestionStatus.INVALID, NOW.minusSeconds(100), "kein Envelope");
+        AuditReport security = report(projectId, "a.security", "health", GateStatus.RED, AuditIngestionStatus.VALID, NOW, null);
 
         finding(latestHealth, "h1", AuditSeverity.HIGH, AuditFindingStatus.OPEN);
         finding(latestHealth, "h2", AuditSeverity.HIGH, AuditFindingStatus.OPEN);
@@ -58,10 +58,7 @@ class AuditSummaryProjectionIntegrationTest {
         List<AuditSummary> overview = auditCenterService.listAudits(projectId, null, null);
 
         assertThat(overview).extracting(AuditSummary::auditKey).containsExactly("a.security", "a.health");
-        for (AuditSummary summary : overview) {
-            AuditSummary fromEntities = auditCenterService.getAudit(projectId, summary.auditKey()).summary();
-            assertThat(summary).as(summary.auditKey()).isEqualTo(fromEntities);
-        }
+        assertMatchesSummariesFromEntities(overview);
         AuditSummary health = overview.get(1);
         assertThat(health.latestReportId()).isEqualTo(latestHealth.getId());
         assertThat(health.trend()).isEqualTo("IMPROVED");
@@ -73,11 +70,63 @@ class AuditSummaryProjectionIntegrationTest {
         assertThat(overview.get(0).openFindingsBySeverity()).isEmpty();
     }
 
-    private AuditReport report(String projectId, String auditKey, GateStatus gate, AuditIngestionStatus status,
-                               Instant generatedAt, String error) {
+    /**
+     * Derselbe auditKey in zwei Projekten: Gruppierung und Zaehlung halten die Projekte auseinander,
+     * die Findings des einen Projekts landen nicht in der Zusammenfassung des anderen.
+     */
+    @Test
+    void sameAuditKeyInTwoProjectsStaysApart() {
+        String category = "cat-" + UUID.randomUUID(); // nur die Reports dieses Tests
+        String projectA = UUID.randomUUID().toString();
+        String projectB = UUID.randomUUID().toString();
+        AuditReport reportA = report(projectA, "a.shared", category, GateStatus.RED, AuditIngestionStatus.VALID, NOW, null);
+        AuditReport reportB = report(projectB, "a.shared", category, GateStatus.GREEN, AuditIngestionStatus.VALID,
+                NOW.minusSeconds(10), null);
+        finding(reportA, "a1", AuditSeverity.CRITICAL, AuditFindingStatus.OPEN);
+        finding(reportA, "a2", AuditSeverity.HIGH, AuditFindingStatus.OPEN);
+        finding(reportB, "b1", AuditSeverity.LOW, AuditFindingStatus.RESOLVED);
+
+        List<AuditSummary> overview = auditCenterService.listAudits(null, category, null);
+
+        assertThat(overview).extracting(AuditSummary::projectId).containsExactly(projectA, projectB);
+        assertThat(overview).extracting(AuditSummary::latestReportId).containsExactly(reportA.getId(), reportB.getId());
+        assertMatchesSummariesFromEntities(overview);
+        assertThat(overview.get(0).findingsByStatus()).isEqualTo(Map.of("OPEN", 2L));
+        assertThat(overview.get(0).openFindingsBySeverity()).isEqualTo(Map.of("CRITICAL", 1L, "HIGH", 1L));
+        assertThat(overview.get(1).findingsByStatus()).isEqualTo(Map.of("RESOLVED", 1L));
+        assertThat(overview.get(1).openFindingsBySeverity()).isEmpty();
+    }
+
+    /** Ein Audit mit Report, aber ohne Findings: leere Zaehlungen, genau wie aus den Entities. */
+    @Test
+    void auditWithReportButWithoutFindingsHasEmptyCounts() {
+        String projectId = UUID.randomUUID().toString();
+        AuditReport report = report(projectId, "a.clean", "health", GateStatus.GREEN, AuditIngestionStatus.VALID, NOW, null);
+
+        List<AuditSummary> overview = auditCenterService.listAudits(projectId, null, null);
+
+        assertThat(overview).singleElement().satisfies(summary -> {
+            assertThat(summary.latestReportId()).isEqualTo(report.getId());
+            assertThat(summary.trend()).isEqualTo("NEW");
+            assertThat(summary.findingsByStatus()).isEmpty();
+            assertThat(summary.openFindingsBySeverity()).isEmpty();
+        });
+        assertMatchesSummariesFromEntities(overview);
+    }
+
+    /** Jede Zusammenfassung der Uebersicht gleicht der, die {@code getAudit} aus den vollen Entities baut. */
+    private void assertMatchesSummariesFromEntities(List<AuditSummary> overview) {
+        for (AuditSummary summary : overview) {
+            AuditSummary fromEntities = auditCenterService.getAudit(summary.projectId(), summary.auditKey()).summary();
+            assertThat(summary).as(summary.projectId() + "/" + summary.auditKey()).isEqualTo(fromEntities);
+        }
+    }
+
+    private AuditReport report(String projectId, String auditKey, String category, GateStatus gate,
+                               AuditIngestionStatus status, Instant generatedAt, String error) {
         return reportRepository.save(AuditReport.builder()
                 .projectId(projectId).workflowId("wf").workflowRunId(UUID.randomUUID().toString())
-                .auditKey(auditKey).category("health").title("Title " + auditKey)
+                .auditKey(auditKey).category(category).title("Title " + auditKey)
                 .markdownContent("# Report\n" + "x".repeat(2_000)).gateStatus(gate).gateDescription("gate " + gate)
                 .ingestionStatus(status).ingestionError(error).generatedAt(generatedAt).build());
     }
