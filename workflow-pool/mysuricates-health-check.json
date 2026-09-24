@@ -83,15 +83,6 @@
       "name": "report"
     },
     {
-      "type": "simple",
-      "config": {
-        "label": "Ergebnis erklären",
-        "timeout_seconds": 120,
-        "command": "Fasse in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Gesamtscore und Trend\n- Beste und schlechteste Dimension\n- Wichtigste Empfehlung\n\nNur Fliesstext: keine gate_-Zeilen, keinen Envelope und keine Tabelle wiedergeben.",
-        "model": "haiku"
-      }
-    },
-    {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
