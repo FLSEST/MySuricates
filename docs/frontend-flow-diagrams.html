@@ -161,50 +161,61 @@
 
 <section id="routing">
   <h2>Routing <span>App.tsx</span></h2>
-  <p>React Router mit Layout (Sidebar + Header) und 10 Hauptseiten.</p>
+  <p><code>createBrowserRouter</code> mit einem Layout (Sidebar + Header) über allen Seiten. Seiten optionaler Module stehen in <code>ModuleRoute</code> und erklären ohne ihr Modul, wie es sich einschalten lässt; mehrere Kernseiten wechseln im Simple Mode (<code>useSettingsStore</code>) auf eine eigene, einfachere Fassung.</p>
   <pre class="mermaid">
 flowchart LR
-    APP["App.tsx Router"] --&gt; DASH["/ Dashboard"]
-    APP --&gt; PROJ["/projects + /projects/:id"]
-    APP --&gt; WF["/workflows + /workflows/:id"]
-    APP --&gt; RUN["/workflows/:id/run/:runId"]
-    APP --&gt; SK["/skills"]
-    APP --&gt; SCH["/schedules"]
-    APP --&gt; WH["/webhooks"]
-    APP --&gt; ST["/settings"]
+    APP["App.tsx Router + Layout"] --&gt; CORE
+    APP --&gt; MOD
+    subgraph CORE["Kernseiten"]
+        DASH["/ Dashboard<br/>/projects + /projects/:id<br/>/workflows + /workflows/:id"]
+        RUN["/workflows/:id/run/:runId<br/>/runs (/runs/:runId leitet weiter)<br/>/approvals"]
+        SCH["/schedules + /calendar<br/>/todos, /cockpit, /goals/:goalId"]
+        ACT["/activity + /dlq<br/>/docs<br/>/settings"]
+    end
+    subgraph MOD["ModuleRoute (optionale Module)"]
+        SK["/skills, /webhooks, /integrations<br/>/chains + /chains/:id/run/:runId"]
+        MORE["/wishes, /factory, /dialogs<br/>/debug, /reports, /insights<br/>/onboarding-profiles"]
+    end
   </pre>
 </section>
 
 <section id="datenfluss">
   <h2>Datenfluss <span>Client → API</span></h2>
-  <p>Fetches laufen ueber Vite-Proxy <code>/api</code> an das Backend; WebSocket unter <code>/ws</code>.</p>
+  <p>Alle Hooks rufen den <code>api</code>-Client (<code>src/api/client.ts</code>): <code>fetch</code> auf <code>/api/v1/...</code> mit dem <code>X-API-Key</code> aus <code>useSettingsStore</code>. Im Dev-Betrieb leitet der Vite-Proxy <code>/api</code> und <code>/ws</code> an das Backend weiter; sonst liefert das Backend das gebaute Frontend selbst aus (<code>automation.serve-frontend</code>).</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as Component
-    participant HOOK as useXxx (React Query)
-    participant API as fetch /api/v1/...
+    participant HOOK as useXxx (TanStack Query)
+    participant API as api-Client (fetch /api/v1/...)
     participant CACHE as Query Cache
 
     UI-&gt;&gt;HOOK: useQuery/useMutation
     HOOK-&gt;&gt;CACHE: return cached data (if present)
-    HOOK-&gt;&gt;API: HTTP request
-    API--&gt;&gt;HOOK: JSON DTO
-    HOOK--&gt;&gt;CACHE: set + update
-    CACHE--&gt;&gt;UI: re-render with fresh data
+    HOOK-&gt;&gt;API: HTTP request mit X-API-Key
+    alt 429 Too Many Requests
+        API--&gt;&gt;HOOK: Fehler, Pfad bis Retry-After gesperrt
+    else ok
+        API--&gt;&gt;HOOK: JSON DTO
+        HOOK--&gt;&gt;CACHE: set + update
+        CACHE--&gt;&gt;UI: re-render with fresh data
+    end
   </pre>
 </section>
 
 <section id="queries-mutations">
   <h2>Queries &amp; Mutations <span>Invalidierung</span></h2>
+  <p>Ein Schlüssel wie <code>['workflows']</code> trifft als Präfix alle Queries darunter — Detail, Runs, Versionen.</p>
   <table>
     <thead><tr><th>Ressource</th><th>Query Hook</th><th>Mutationen</th><th>Invalidiert</th></tr></thead>
     <tbody>
-      <tr><td>Projects</td><td><code>useProjects</code></td><td>create/update/delete/start/stop</td><td>projects, project detail</td></tr>
-      <tr><td>Workflows</td><td><code>useWorkflows</code></td><td>create/update/delete/execute</td><td>workflows, workflow detail, runs</td></tr>
-      <tr><td>Skills</td><td><code>useSkills</code></td><td>activate/deactivate</td><td>skills, workflow detail</td></tr>
-      <tr><td>Schedules</td><td><code>useSchedules</code></td><td>create/toggle/delete</td><td>schedules list</td></tr>
-      <tr><td>Webhooks</td><td><code>useWebhooks</code></td><td>create/toggle/delete</td><td>webhooks list</td></tr>
-      <tr><td>Settings</td><td><code>useSystemHealth</code></td><td>—</td><td>health</td></tr>
+      <tr><td>Projects</td><td><code>useProjects</code>, <code>useProject</code></td><td>create/update/archive/restore, Container start/stop</td><td><code>projects</code> (Liste, Detail, Archiv)</td></tr>
+      <tr><td>Workflows</td><td><code>useWorkflows</code>, <code>useWorkflow</code></td><td>create/update/delete/import/seal</td><td><code>workflows</code></td></tr>
+      <tr><td>Runs</td><td><code>useWorkflowRuns</code>, <code>useAllRuns</code></td><td>execute/pause/resume/cancel/retry/delete</td><td><code>workflows</code> und <code>learning</code>, je nach Aktion auch <code>runs</code> und <code>dlq</code></td></tr>
+      <tr><td>Skills</td><td><code>useSkills</code></td><td>create/update/delete/import</td><td><code>skills</code>; delete auch <code>workflows</code></td></tr>
+      <tr><td>Skill-Aktivierung</td><td><code>useWorkflow</code></td><td>activate/deactivate</td><td><code>workflows</code></td></tr>
+      <tr><td>Schedules</td><td><code>useSchedules</code></td><td>create/update/toggle/delete</td><td><code>schedules</code> (Liste, Kalender, Vorschau)</td></tr>
+      <tr><td>Webhooks</td><td><code>useWebhooks</code></td><td>create/toggle/delete, Token und Secret</td><td><code>webhooks</code></td></tr>
+      <tr><td>System</td><td><code>useSystemHealth</code>, <code>useSystemInfo</code></td><td>—</td><td>keine; Health fragt alle 30 s neu ab</td></tr>
     </tbody>
   </table>
 </section>
@@ -214,15 +225,18 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>Client State</h3>
-      <p><code>useSidebarStore</code>: Collapse</p>
-      <p><code>useThemeStore</code>: Light/Dark, Overrides</p>
-      <p><code>useSettingsStore</code>: API-Key, Advanced Mode</p>
-      <p><code>useI18nStore</code>: Locale</p>
+      <p><code>useSidebarStore</code>: eingeklappt, mobil geöffnet</p>
+      <p><code>useThemeStore</code>: Theme, zuletzt gewählte helle und dunkle Themes, Overrides</p>
+      <p><code>useSettingsStore</code>: API-Key, Simple und Advanced Mode, Sidebar-Anordnung, Hinweise, Modell-Vorgaben</p>
+      <p><code>useI18nStore</code> (<code>src/i18n</code>): Locale</p>
       <p><code>useToastStore</code>: Toasts</p>
+      <p><code>useAssistantStore</code>: Sitzungen des Assistenten, Panelgröße</p>
+      <p><code>useDashboardLayoutStore</code>, <code>useDashboardSyncStore</code>: Dashboard-Ansichten und ihr Sync-Stand</p>
     </div>
     <div class="card">
       <h3>Persistenz</h3>
-      <p>Sidebar, Theme, Settings, Locale → localStorage</p>
+      <p>Alle Stores außer <code>useToastStore</code> → localStorage (Zustand <code>persist</code>)</p>
+      <p>Die Sidebar speichert nur „eingeklappt“, der Assistent nur Sitzungen und Panelgröße</p>
       <p>Toasts sind flüchtig</p>
     </div>
   </div>
@@ -230,20 +244,26 @@ sequenceDiagram
 
 <section id="live-logs">
   <h2>Live-Logs <span>WebSocket /ws</span></h2>
-  <p>Ausführungs-Logs kommen via STOMP auf <code>/topic/executions/{runId}/logs</code>.</p>
+  <p>Ausführungs-Logs kommen per STOMP auf <code>/topic/executions/{runId}/logs</code>. Den Handshake öffnet ein Einmal-Ticket aus <code>POST /api/v1/ws-ticket</code> — der API-Key steht nie in der URL.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as WorkflowExecution Page
     participant WS as useExecutionWebSocket
+    participant API as REST /api/v1
     participant ST as STOMP Broker (:9090)
-    participant BE as WorkflowExecutor
+    participant BE as ExecutionBroadcaster / Block-Executors
 
-    UI-&gt;&gt;WS: subscribe(runId)
-    WS-&gt;&gt;ST: CONNECT /ws
+    UI-&gt;&gt;WS: useExecutionWebSocket(runId)
+    WS-&gt;&gt;API: POST /ws-ticket (mit X-API-Key)
+    API--&gt;&gt;WS: Einmal-Ticket
+    WS-&gt;&gt;ST: CONNECT /ws?ticket=… (SockJS, nur WebSocket-Transport)
     ST--&gt;&gt;WS: CONNECTED
-    ST--&gt;&gt;WS: messages (step logs, status, approvals)
-    WS--&gt;&gt;UI: append logs, update status
+    WS-&gt;&gt;ST: SUBSCRIBE /topic/executions/{runId}/logs
+    WS-&gt;&gt;API: GET /executions/{runId}/live-log (gepufferte Zeilen nachholen)
     BE-&gt;&gt;ST: convertAndSend("/topic/executions/{runId}/logs", payload)
+    ST--&gt;&gt;WS: messages (Schritte, Status, Approvals, Human Input, Agentic, Foreach, live_output)
+    WS--&gt;&gt;UI: append logs, update status
+    WS-&gt;&gt;WS: bei Schritt- und Endstatus: Runs des Workflows neu laden (invalidate)
   </pre>
 </section>
 
