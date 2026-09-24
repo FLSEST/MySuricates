@@ -31,6 +31,14 @@ describe('useTodoFilters page', () => {
     expect(result.current.page).toBe(1);
   });
 
+  it('does not bring the old page back when a filter returns to its earlier value', () => {
+    const { result } = renderHook(() => useTodoFilters(), { wrapper });
+    act(() => result.current.setPage(2));
+    act(() => result.current.setStatusFilter('ALL'));
+    act(() => result.current.setStatusFilter('ACTIVE'));
+    expect(result.current.page).toBe(0);
+  });
+
   it('starts at page 0 again after a view mode change', () => {
     const { result } = renderHook(() => useTodoFilters(), { wrapper });
     act(() => result.current.setPage(2));

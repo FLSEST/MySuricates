@@ -53,9 +53,11 @@ export function useTodoFilters() {
     return { ...filterParams, status: statusFilter };
   }, [filterParams, statusFilter]);
 
-  // The page belongs to one filter and view combination: a change starts at page 0 again
+  // The page belongs to one filter and view combination: a change starts at page 0 again, and
+  // the reset is stored, so returning to an earlier combination does not bring its old page back
   const pageKey = JSON.stringify([apiParams, viewMode]);
   const [pageState, setPageState] = useState({ key: pageKey, page: 0 });
+  if (pageState.key !== pageKey) setPageState({ key: pageKey, page: 0 });
   const page = pageState.key === pageKey ? pageState.page : 0;
   const setPage = useCallback((next: number | ((p: number) => number)) => {
     setPageState((s) => {
