@@ -1,6 +1,7 @@
 import { Plus, X, ChevronDown } from 'lucide-react';
 import { Modal, Button, Input, Select, CronPicker } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 import { CatchUpOnResumeField } from './CatchUpOnResumeField';
 import type { ScheduledWorkflow, CreateScheduleRequest, Workflow, WorkflowChain } from '../../types';
 
@@ -69,6 +70,7 @@ export function ScheduleFormModal({
   onSubmit,
 }: ScheduleFormModalProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const isDelayValid = !form.delayExpression || DELAY_PATTERN.test(form.delayExpression.trim());
 
@@ -239,7 +241,7 @@ export function ScheduleFormModal({
             {form.delayExpression && isDelayValid && (() => {
               const resolved = resolveDelayExpression(form.delayExpression);
               if (!resolved) return null;
-              const timeStr = resolved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              const timeStr = formatTimeOfDay(resolved, locale, { hour: '2-digit', minute: '2-digit' });
               return (
                 <p className="mt-1 text-xs text-text-secondary">
                   {t.schedules.delayExpressionResolved

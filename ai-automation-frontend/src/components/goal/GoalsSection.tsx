@@ -4,7 +4,8 @@ import { CalendarDays, HelpCircle, Plus, Target } from 'lucide-react';
 import { Button, Card, Input } from '../ui';
 import { TodoProgressBar } from '../todo/TodoProgressBar';
 import { useCreateGoal, useGoals } from '../../hooks/useGoals';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatDate } from '../../utils/localeFormat';
 import type { Goal } from '../../types';
 
 /**
@@ -94,6 +95,7 @@ export function GoalsSection() {
 
 function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { progress } = goal;
   return (
     <button type="button" onClick={onOpen} className="text-left" aria-label={goal.title}>
@@ -110,7 +112,7 @@ function GoalCard({ goal, onOpen }: { goal: Goal; onOpen: () => void }) {
           {goal.targetDate && (
             <span className="flex items-center gap-1">
               <CalendarDays className="w-3 h-3" />
-              {t.goals.targetDate.replace('{date}', new Date(goal.targetDate).toLocaleDateString())}
+              {t.goals.targetDate.replace('{date}', formatDate(goal.targetDate, locale))}
             </span>
           )}
           {progress.openQuestions > 0 && (

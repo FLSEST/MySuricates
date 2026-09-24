@@ -47,6 +47,7 @@ function PaletteTrigger({ compact, label }: { compact: boolean; label: string })
 }
 
 function SuggestionButton() {
+  const t = useT();
   const location = useLocation();
   const { setOpen, setPendingInput } = useAssistantStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -71,8 +72,8 @@ function SuggestionButton() {
         ref={buttonRef}
         onClick={() => setDropdownOpen((v) => !v)}
         className="p-2 rounded-lg text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
-        title="Vorschläge für diese Seite"
-        aria-label="Vorschläge"
+        title={t.assistant.pageSuggestionsHint}
+        aria-label={t.assistant.pageSuggestions}
       >
         <Sparkles className="w-4 h-4" />
       </button>

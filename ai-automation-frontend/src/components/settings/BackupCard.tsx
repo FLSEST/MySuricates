@@ -3,13 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, Button } from '../ui';
 import { downloadFromResponse } from '../../utils/downloadFile';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { useBackupList, useUpdateSystemSetting } from '../../hooks/useSystem';
 import { api } from '../../api/client';
 import { Database, Download, HardDrive, Archive } from 'lucide-react';
 
 export function BackupCard() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: backups } = useBackupList();
   const queryClient = useQueryClient();
   const [backupLoading, setBackupLoading] = useState(false);
@@ -103,7 +105,7 @@ export function BackupCard() {
             <div className="flex items-center gap-2 text-xs">
               <span className="text-text-tertiary">{t.settings.backupLastBackup}:</span>
               <span className="text-text font-mono">
-                {new Date(backups[0]!.createdAt).toLocaleString()}
+                {formatTimestamp(backups[0]!.createdAt, locale)}
               </span>
               <span className="text-text-tertiary">({formatBytes(backups[0]!.sizeBytes)})</span>
             </div>

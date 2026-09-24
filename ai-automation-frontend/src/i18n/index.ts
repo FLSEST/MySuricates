@@ -23,6 +23,18 @@ export const useI18nStore = create<I18nState>()(
 );
 
 /**
+ * Keeps `<html lang>` on the app language (screen readers, hyphenation, spell checking) — index.html
+ * only carries the default until this runs (e86f6544). Returns the unsubscribe function.
+ */
+export function syncDocumentLanguage(): () => void {
+  const apply = (locale: Locale) => {
+    document.documentElement.lang = locale;
+  };
+  apply(useI18nStore.getState().locale);
+  return useI18nStore.subscribe((state) => apply(state.locale));
+}
+
+/**
  * Hook to access translations.
  *
  * Usage:

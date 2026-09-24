@@ -3,7 +3,8 @@ import {
   AlertTriangle, ArrowDown, CheckCircle2, ChevronRight, CornerDownRight, Info, MessageSquare, Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import { useT } from '../../i18n';
+import { useI18nStore, useT, type Locale } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 
 export interface LogEntry {
   /** Stable key; falls back to the index for callers without ids. */
@@ -44,10 +45,11 @@ const kindStyles: Record<string, { icon: LucideIcon; iconClass: string; textClas
 /** Distance from the bottom (px) that still counts as "following the log". */
 const BOTTOM_THRESHOLD_PX = 24;
 
-const LogRow = memo(function LogRow({ log, showStep, skippedText }: {
+const LogRow = memo(function LogRow({ log, showStep, skippedText, locale }: {
   log: LogEntry;
   showStep: boolean;
   skippedText: string | null;
+  locale: Locale;
 }) {
   const style = log.kind ? kindStyles[log.kind] ?? kindStyles.line : null;
   const Icon = style?.icon;
@@ -55,7 +57,7 @@ const LogRow = memo(function LogRow({ log, showStep, skippedText }: {
     <div className="flex gap-3 hover:bg-white/5 rounded-sm px-1 -mx-1" data-kind={log.kind ?? (log.skipped != null ? 'skipped' : 'event')}>
       {log.timestamp && (
         <span className="text-gray-500 shrink-0 select-none">
-          {new Date(log.timestamp).toLocaleTimeString()}
+          {formatTimeOfDay(log.timestamp, locale)}
         </span>
       )}
       {Icon ? (
@@ -79,6 +81,7 @@ const LogRow = memo(function LogRow({ log, showStep, skippedText }: {
 
 export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogViewerProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const containerRef = useRef<HTMLDivElement>(null);
   const followingRef = useRef(true);
   const [scrolledUp, setScrolledUp] = useState(false);
@@ -124,6 +127,7 @@ export function LogViewer({ logs, autoScroll = true, maxHeight = '400px' }: LogV
             <LogRow
               key={log.id ?? i}
               log={log}
+              locale={locale}
               showStep={!!log.kind && log.stepLabel !== logs[i - 1]?.stepLabel}
               skippedText={log.skipped != null
                 ? t.workflows.execution.linesSkipped.replace('{count}', String(log.skipped))

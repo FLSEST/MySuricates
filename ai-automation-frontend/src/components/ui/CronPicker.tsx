@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSyncedState } from '../../hooks/useSyncedState';
 import { Input } from './Input';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { useCronPreview } from '../../hooks/useSchedules';
 
 type Frequency = 'daily' | 'weekly' | 'monthly' | 'advanced';
@@ -75,6 +76,7 @@ function stateToCron(state: CronState): string {
 
 export function CronPicker({ value, onChange, label }: CronPickerProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   // Both follow the external value: re-derived whenever `value` changes, editable in between
   const [state, setState] = useSyncedState(value, parseCronToState);
   const [rawValue, setRawValue] = useSyncedState(value, (v) => v);
@@ -216,12 +218,12 @@ export function CronPicker({ value, onChange, label }: CronPickerProps) {
         <div className="p-2.5 rounded-lg bg-surface-secondary border border-border text-xs space-y-1">
           <span className="text-text-tertiary font-medium">
             {previewData.pausedUntil
-              ? t.schedules.nextRunsAfterPause.replace('{until}', () => new Date(previewData.pausedUntil!).toLocaleString())
+              ? t.schedules.nextRunsAfterPause.replace('{until}', () => formatTimestamp(previewData.pausedUntil!, locale))
               : t.schedules.nextRunsPreview}:
           </span>
           {previewData.runs.map((run) => (
             <div key={run} className="text-text-secondary pl-2">
-              {new Date(run).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {formatTimestamp(run, locale, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </div>
           ))}
         </div>

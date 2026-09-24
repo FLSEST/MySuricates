@@ -11,6 +11,7 @@ import {
 import { api } from '../../api/client';
 import { generateId } from '../../utils/uuid';
 import { useT, useI18nStore } from '../../i18n';
+import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 
 interface MergedSession {
   id: string;
@@ -104,14 +105,13 @@ export function AssistantHistory({
     deleteBackend(id);
   }, [deleteSession, deleteBackend]);
 
-  const formatDate = (ts: number) => {
+  const sessionTime = (ts: number) => {
     const d = new Date(ts);
     const today = new Date();
     const isToday = d.toDateString() === today.toDateString();
-    const intlLocale = locale === 'de' ? 'de-DE' : 'en-US';
-    if (isToday) return d.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' });
-    return d.toLocaleDateString(intlLocale, { day: '2-digit', month: '2-digit' }) +
-      ' ' + d.toLocaleTimeString(intlLocale, { hour: '2-digit', minute: '2-digit' });
+    const time = formatTimeOfDay(d, locale, { hour: '2-digit', minute: '2-digit' });
+    if (isToday) return time;
+    return `${formatDate(d, locale, { day: '2-digit', month: '2-digit' })} ${time}`;
   };
 
   return (
@@ -154,7 +154,7 @@ export function AssistantHistory({
                     sess.preview
                   )}
                 </p>
-                <p className="text-xs text-text-tertiary mt-0.5">{formatDate(sess.startedAt)}</p>
+                <p className="text-xs text-text-tertiary mt-0.5">{sessionTime(sess.startedAt)}</p>
               </div>
               <button
                 onClick={(e) => handleDelete(e, sess.id)}

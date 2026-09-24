@@ -7,7 +7,8 @@ import { priorityColor } from '../components/todo/todoConstants';
 import { ComplexityChip, EffortChip, RatedByMark } from '../components/goal/GoalBadges';
 import { useDeleteGoal, useGoal, useReorderGoal, useUpdateGoal } from '../hooks/useGoals';
 import { todoDeepLink } from '../utils/todoLinks';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
+import { formatDate } from '../utils/localeFormat';
 import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
@@ -22,6 +23,7 @@ const isActive = (todo: GoalTodoItem) =>
 export function GoalDetail() {
   const { goalId } = useParams<{ goalId: string }>();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useGoal(goalId);
   const reorder = useReorderGoal();
@@ -76,7 +78,7 @@ export function GoalDetail() {
           {goal.targetDate && (
             <p className="flex items-center gap-1 text-sm text-text-secondary mt-0.5">
               <CalendarDays className="w-3.5 h-3.5" />
-              {t.goals.targetDate.replace('{date}', new Date(goal.targetDate).toLocaleDateString())}
+              {t.goals.targetDate.replace('{date}', formatDate(goal.targetDate, locale))}
             </p>
           )}
         </div>

@@ -18,6 +18,7 @@ import { ModalFooter } from '../components/ui/ModalFooter';
 import { Spinner } from '../components/ui/Spinner';
 import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield, ArrowUpCircle, PencilLine } from 'lucide-react';
 import { useI18nStore } from '../i18n';
+import { formatTimestamp } from '../utils/localeFormat';
 import { ensureLocalMonaco } from '../components/shared/monacoSetup';
 import { Hint } from '../components/hints/Hint';
 import { useThemeAppearance } from '../stores/themeStore';
@@ -531,6 +532,7 @@ function ShippedModal({ profileId, open, onClose, onTakeOver, takingOver }: {
 
 function HistoryModal({ profileId, open, onClose }: { profileId: string; open: boolean; onClose: () => void }) {
   const t = useT();
+  const locale = useI18nStore(s => s.locale);
   const { data: history, isLoading } = useOnboardingProfileHistory(profileId);
 
   return (
@@ -551,7 +553,7 @@ function HistoryModal({ profileId, open, onClose }: { profileId: string; open: b
                 <span className="text-sm font-medium text-text">v{h.version}</span>
                 <div className="flex items-center gap-2 text-xs text-text-tertiary">
                   <span>{h.changedBy}</span>
-                  <span>{new Date(h.changedAt).toLocaleString()}</span>
+                  <span>{formatTimestamp(h.changedAt, locale)}</span>
                 </div>
               </div>
               {Object.entries(h.content ?? {}).map(([lang, text]) => (

@@ -1,23 +1,22 @@
 import { CalendarClock } from 'lucide-react';
 import { Card, CardHeader } from '../ui';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
-import { useT, useI18nStore } from '../../i18n';
+import { useT, useI18nStore, type Locale } from '../../i18n';
 import { formatDateTime } from '../../utils/formatTime';
+import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
-function formatTime(iso: string): string {
+function scheduleTime(iso: string, locale: Locale): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return formatTimeOfDay(iso, locale, { hour: '2-digit', minute: '2-digit' });
   } catch {
     return '—';
   }
 }
 
-function formatDate(iso: string): string {
+function scheduleDay(iso: string, locale: Locale): string {
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: '2-digit' });
+    return formatDate(iso, locale, { weekday: 'short', day: '2-digit', month: '2-digit' });
   } catch {
     return '—';
   }
@@ -85,8 +84,8 @@ export function UpcomingSchedulesCard() {
               </div>
               <span className="text-[10px] text-text-tertiary shrink-0 tabular-nums">
                 {schedule.isToday
-                  ? formatTime(schedule.scheduledAt)
-                  : formatDate(schedule.scheduledAt)
+                  ? scheduleTime(schedule.scheduledAt, locale)
+                  : scheduleDay(schedule.scheduledAt, locale)
                 }
               </span>
             </div>

@@ -1,10 +1,12 @@
 import { History } from 'lucide-react';
 import { useScheduleRuns } from '../../hooks/useSchedules';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import { statusDot } from './statusDot';
 
 export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data, isLoading } = useScheduleRuns(scheduleId);
 
   if (isLoading) {
@@ -38,7 +40,7 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
             <span className="text-text truncate">{run.workflowName}</span>
             {run.projectName && <span className="text-text-tertiary truncate">({run.projectName})</span>}
             <span className="ml-auto text-text-tertiary shrink-0">
-              {run.startedAt ? new Date(run.startedAt).toLocaleString() : '-'}
+              {run.startedAt ? formatTimestamp(run.startedAt, locale) : '-'}
             </span>
             {run.durationMs != null && (
               <span className="text-text-tertiary shrink-0">{(run.durationMs / 1000).toFixed(1)}s</span>
@@ -51,7 +53,7 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
             <span className="text-text-secondary font-medium">{t.schedules.chainRun}</span>
             <span className="text-text truncate">{run.chainName ?? run.chainId}</span>
             <span className="ml-auto text-text-tertiary shrink-0">
-              {run.startedAt ? new Date(run.startedAt).toLocaleString() : '-'}
+              {run.startedAt ? formatTimestamp(run.startedAt, locale) : '-'}
             </span>
             {run.durationMs != null && (
               <span className="text-text-tertiary shrink-0">{(run.durationMs / 1000).toFixed(1)}s</span>

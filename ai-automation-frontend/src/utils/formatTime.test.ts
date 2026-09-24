@@ -35,8 +35,10 @@ describe('formatDateTime', () => {
     expect(result).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
   });
 
-  it('defaults to English format when no locale is passed', () => {
-    const result = formatDateTime('2026-02-27T14:05:00Z');
-    expect(result).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
+  // The locale is required since e86f6544: the English default hid forgotten call sites, which then
+  // showed English in the German UI. Both formats hold whatever language the machine speaks.
+  it('keeps the 24-hour clock in English as well', () => {
+    expect(formatDateTime(new Date(2026, 1, 27, 14, 5).toISOString(), 'en')).toBe('02/27 14:05');
+    expect(formatDateTime(new Date(2026, 1, 27, 14, 5).toISOString(), 'de')).toBe('27.02. 14:05');
   });
 });

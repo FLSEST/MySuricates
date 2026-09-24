@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCalendarData } from '../../hooks/useSchedules';
 import { useT, useI18nStore } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 import { Spinner } from '../ui';
 import type { CalendarEvent } from '../../types';
 
@@ -21,7 +22,8 @@ const MONTHS_DE = ['Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli',
 
 export function CalendarView() {
   const t = useT();
-  const isGerman = useI18nStore((s) => s.locale) === 'de';
+  const locale = useI18nStore((s) => s.locale);
+  const isGerman = locale === 'de';
   const weekdays = isGerman ? WEEKDAYS_DE : WEEKDAYS_EN;
   const months = isGerman ? MONTHS_DE : MONTHS_EN;
 
@@ -224,7 +226,7 @@ export function CalendarView() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-text truncate">{ev.title}</p>
                     <p className="text-xs text-text-secondary">
-                      {new Date(ev.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatTimeOfDay(ev.date, locale, { hour: '2-digit', minute: '2-digit' })}
                       {' — '}
                       {ev.type === 'scheduled'
                         ? (ev.status === 'ONCE' ? t.schedules.once : t.schedules.recurring)

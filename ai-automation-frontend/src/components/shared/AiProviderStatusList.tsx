@@ -1,7 +1,8 @@
 import { Info, RefreshCw } from 'lucide-react';
 import { Badge } from '../ui';
 import { CopyButton } from './CopyButton';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimeOfDay } from '../../utils/localeFormat';
 import type { AiProviderStatus, AiProviderStatusReport } from '../../hooks/useSystem';
 import { orderProviders } from './aiProviderStatus';
 
@@ -24,7 +25,8 @@ interface AiProviderStatusListProps {
  */
 export function AiProviderStatusList({ report, onRefresh, refreshing }: AiProviderStatusListProps) {
   const t = useT().aiProviderStatus;
-  const checkedAt = new Date(report.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const locale = useI18nStore((s) => s.locale);
+  const checkedAt = formatTimeOfDay(report.checkedAt, locale, { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="space-y-3" data-testid="ai-provider-status">

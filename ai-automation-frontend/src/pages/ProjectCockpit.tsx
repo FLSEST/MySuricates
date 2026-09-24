@@ -7,11 +7,12 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { GoalsSection } from '../components/goal/GoalsSection';
-import { priorityColor, sourceIcon, formatRelative } from '../components/todo/todoConstants';
+import { priorityColor, sourceIcon } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
 import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
 import { todoDeepLink } from '../utils/todoLinks';
-import { useT } from '../i18n';
+import { formatRelativeShort } from '../utils/formatTime';
+import { useI18nStore, useT } from '../i18n';
 import type { NeedsYouItem, ProjectRollup, Todo } from '../types';
 
 export function ProjectCockpit() {
@@ -119,6 +120,7 @@ export function ProjectCockpit() {
 
 /* ─── Needs-You row ─────────────────────────────────────── */
 function NeedsYouRow({ item, onClick, t }: { item: NeedsYouItem; onClick: () => void; t: ReturnType<typeof useT> }) {
+  const locale = useI18nStore((s) => s.locale);
   return (
     <button
       onClick={onClick}
@@ -135,7 +137,7 @@ function NeedsYouRow({ item, onClick, t }: { item: NeedsYouItem; onClick: () => 
       {item.dueDate && (
         <span className={`shrink-0 flex items-center gap-1 text-xs ${item.overdue ? 'text-danger font-medium' : 'text-text-tertiary'}`}>
           <Clock className="w-3 h-3" />
-          {item.overdue ? t.cockpit.overdue : formatRelative(item.dueDate)}
+          {item.overdue ? t.cockpit.overdue : formatRelativeShort(item.dueDate, locale)}
         </span>
       )}
       <ChevronRight className="w-4 h-4 text-text-tertiary shrink-0" />
@@ -265,6 +267,7 @@ function ProjectTodoList({ projectId, onOpen, t }: { projectId: string; onOpen: 
 
 /* ─── Compact read-only todo row ────────────────────────── */
 function TodoMiniRow({ todo, onClick, t }: { todo: Todo; onClick: () => void; t: ReturnType<typeof useT> }) {
+  const locale = useI18nStore((s) => s.locale);
   return (
     <button
       onClick={onClick}
@@ -276,7 +279,7 @@ function TodoMiniRow({ todo, onClick, t }: { todo: Todo; onClick: () => void; t:
       {todo.status === 'IN_PROGRESS' && (
         <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning">{t.todos.statuses.IN_PROGRESS}</span>
       )}
-      <span className="shrink-0 text-[11px] text-text-tertiary">{formatRelative(todo.updatedAt)}</span>
+      <span className="shrink-0 text-[11px] text-text-tertiary">{formatRelativeShort(todo.updatedAt, locale)}</span>
     </button>
   );
 }

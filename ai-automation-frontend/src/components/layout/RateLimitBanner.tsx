@@ -1,9 +1,7 @@
 import { Clock } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
 import { useRateLimitBackoffUntil } from '../../hooks/useRateLimitBackoff';
-
-/** Uhrzeit-Format der App-Sprache, nicht der Browser-Locale. */
-const TIME_LOCALE = { de: 'de-DE', en: 'en-US' } as const;
+import { formatTimeOfDay } from '../../utils/localeFormat';
 
 /**
  * Unaufdringliche Statuszeile, solange ein 429-Backoff läuft (c168293d). `errors.rateLimited`
@@ -17,7 +15,8 @@ export function RateLimitBanner() {
 
   if (until <= 0) return null;
 
-  const time = new Date(until).toLocaleTimeString(TIME_LOCALE[locale]);
+  // Uhrzeit-Format der App-Sprache, nicht der Browser-Locale.
+  const time = formatTimeOfDay(until, locale);
 
   return (
     <div

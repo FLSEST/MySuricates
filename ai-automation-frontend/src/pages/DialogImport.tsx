@@ -12,7 +12,8 @@ import {
   useAnalyzeDialog, useCreateWorkflowFromDialog,
 } from '../hooks/useDialog';
 import { useWorkflows } from '../hooks/useWorkflows';
-import { useT } from '../i18n';
+import { useI18nStore, useT, type Locale } from '../i18n';
+import { formatDate } from '../utils/localeFormat';
 import { useToast } from '../hooks/useToast';
 import { WorkflowIcon } from '../utils/workflowIcon';
 import type { DialogSessionInfo, DialogWorkflowSuggestion, Workflow, BlockDefinition } from '../types';
@@ -39,11 +40,9 @@ function formatDuration(start: string | null, end: string | null): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}min`;
 }
 
-function formatDate(iso: string | null): string {
+function formatSessionStart(iso: string | null, locale: Locale): string {
   if (!iso) return '?';
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  return formatDate(iso, locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function projectShortName(path: string): string {
@@ -115,6 +114,7 @@ function SessionCard({
   selected: boolean;
   onClick: () => void;
 }) {
+  const locale = useI18nStore((s) => s.locale);
   return (
     <button
       onClick={onClick}
@@ -141,7 +141,7 @@ function SessionCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 text-xs text-text-secondary">
-          <span>{formatDate(session.startedAt)}</span>
+          <span>{formatSessionStart(session.startedAt, locale)}</span>
           <span>{formatDuration(session.startedAt, session.endedAt)}</span>
           <ChevronRight className="w-3.5 h-3.5 text-text-secondary/50 mt-0.5" />
         </div>

@@ -3,7 +3,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { ChartCard } from './ChartCard';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatDate } from '../../utils/localeFormat';
 import type { TimeSeriesPoint } from '../../types';
 
 interface RunsChartProps {
@@ -12,14 +13,15 @@ interface RunsChartProps {
 
 export function RunsChart({ data }: RunsChartProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const chartData = useMemo(
     () =>
       data?.map((p) => ({
-        date: new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        date: formatDate(p.date, locale, { month: 'short', day: 'numeric' }),
         count: p.count,
       })) ?? [],
-    [data]
+    [data, locale]
   );
 
   return (

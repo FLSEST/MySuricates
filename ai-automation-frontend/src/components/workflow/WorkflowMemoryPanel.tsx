@@ -6,7 +6,8 @@ import {
   useWorkflowMemories, useExtractMemory, useActivateMemory,
   useUpdateMemory, useDeleteMemory,
 } from '../../hooks/useWorkflowMemory';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatTimestamp } from '../../utils/localeFormat';
 import type { WorkflowRun, WorkflowMemory } from '../../types';
 
 interface Props {
@@ -17,6 +18,7 @@ interface Props {
 
 export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: memories } = useWorkflowMemories(workflowId);
   const extractMemory = useExtractMemory(workflowId);
   const activateMemory = useActivateMemory(workflowId);
@@ -113,7 +115,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                     )}
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary flex-wrap">
-                    <span>{new Date(mem.createdAt).toLocaleString()}</span>
+                    <span>{formatTimestamp(mem.createdAt, locale)}</span>
                     <span>{mem.provider}</span>
                     {mem.sourceRunIds.length > 0 && (() => {
                       const sourceRuns = runs?.filter(r => mem.sourceRunIds.includes(r.id)) ?? [];
@@ -123,7 +125,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                           {sourceRuns.length > 0
                             ? sourceRuns.map(r => (
                                 <span key={r.id} className="px-1.5 py-0.5 rounded-sm bg-surface-raised text-[10px]">
-                                  {new Date(r.startedAt).toLocaleString()}
+                                  {formatTimestamp(r.startedAt, locale)}
                                 </span>
                               ))
                             : <span>{mem.sourceRunIds.length} Runs</span>
@@ -243,7 +245,7 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
                       run.status === 'COMPLETED' ? 'bg-success' :
                       run.status === 'FAILED' ? 'bg-danger' : 'bg-warning'
                     }`} />
-                    <span className="truncate">{new Date(run.startedAt).toLocaleString()}</span>
+                    <span className="truncate">{formatTimestamp(run.startedAt, locale)}</span>
                     <span className="text-xs text-text-tertiary ml-auto">{run.status}</span>
                   </label>
                 ))}

@@ -1,5 +1,6 @@
 import { Shrink } from 'lucide-react';
 import { useI18nStore, useT } from '../../i18n';
+import { formatNumber } from '../../utils/localeFormat';
 import type { StepResult } from '../../types';
 import { compressionFacts } from './stepMetadata';
 import { useStepAnchor } from './stepAnchors';
@@ -7,13 +8,13 @@ import { useStepAnchor } from './stepAnchors';
 /** Makes a compression unmistakable in the run view: size change, source link, capped flag, stage table. */
 export function CompressionPanel({ step }: { step: StepResult }) {
   const t = useT().workflows.compression;
-  const locale = useI18nStore((s) => s.locale) === 'de' ? 'de-DE' : 'en-US';
+  const locale = useI18nStore((s) => s.locale);
   const facts = compressionFacts(step);
   const anchor = useStepAnchor();
   if (!facts) return null;
-  const fmt = (n: number) => n.toLocaleString(locale);
+  const fmt = (n: number) => formatNumber(n, locale);
   const change = facts.inChars > 0 ? Math.round(Math.abs(1 - facts.outChars / facts.inChars) * 1000) / 10 : 0;
-  const percent = `${facts.outChars > facts.inChars ? '+' : '−'}${change.toLocaleString(locale)} %`;
+  const percent = `${facts.outChars > facts.inChars ? '+' : '−'}${formatNumber(change, locale)} %`;
   const src = facts.source;
 
   return (

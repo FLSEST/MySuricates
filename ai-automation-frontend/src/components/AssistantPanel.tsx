@@ -272,7 +272,7 @@ export function AssistantPanel() {
       {/* Floating button */}
       <button
         onClick={toggle}
-        title="MySuricates Assistent"
+        title={t.assistant.toggle}
         className={`fixed bottom-5 right-5 z-50 w-12 h-12 rounded-full shadow-lg
                     flex items-center justify-center transition-all duration-200
                     ${open
@@ -310,7 +310,7 @@ export function AssistantPanel() {
             onPointerUp={onResizePointerUp}
             className={`absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize z-10 transition-colors
                         ${isResizing ? 'bg-accent/60' : 'bg-transparent hover:bg-accent/30'}`}
-            title="Breite anpassen"
+            title={t.assistant.resizeWidth}
           />
         )}
 
@@ -322,7 +322,7 @@ export function AssistantPanel() {
             onPointerUp={onHeightPointerUp}
             className={`absolute left-0 right-0 top-0 h-2 cursor-ns-resize z-10 transition-colors
                         ${isResizing ? 'bg-accent/60' : 'bg-transparent hover:bg-accent/30'}`}
-            title="Höhe anpassen"
+            title={t.assistant.resizeHeight}
           />
         )}
 
@@ -343,7 +343,7 @@ export function AssistantPanel() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowHistory(!showHistory)}
-              title="Gesprächsverlauf"
+              title={t.assistant.historyToggle}
               className={`p-1.5 rounded-lg transition-colors
                           ${showHistory
                             ? 'text-accent bg-accent/10'
@@ -438,7 +438,7 @@ export function AssistantPanel() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Nachricht eingeben… (Enter zum Senden)"
+                  placeholder={t.assistant.inputPlaceholder}
                   rows={1}
                   className="flex-1 resize-none bg-transparent text-sm text-text placeholder-text-tertiary
                              outline-none min-h-[24px] max-h-[240px] leading-6 py-0 overflow-y-auto"

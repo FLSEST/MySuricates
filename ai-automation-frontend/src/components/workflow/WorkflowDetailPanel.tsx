@@ -30,6 +30,7 @@ import { TagEditor } from './TagEditor';
 import { SealBadge } from './SealStateIcon';
 import { useSealStatus } from '../../hooks/useSealStatus';
 import { formatDuration, formatDateTime } from '../../utils/formatTime';
+import { formatTimestamp } from '../../utils/localeFormat';
 import type { useNavigate } from 'react-router-dom';
 import type { Workflow } from '../../types';
 import type { TranslationKeys } from '../../i18n';
@@ -151,13 +152,13 @@ export function WorkflowDetailPanel({
             <h2 className="text-xl font-bold text-text truncate">{workflow.name}</h2>
             <SealBadge sealed={workflow.sealed} status={sealStatus} />
             {workflow.testStatus === 'PASSED' && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-success/10 text-success text-[10px] font-medium" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-success/10 text-success text-[10px] font-medium" title={workflow.lastTestedAt ? formatTimestamp(workflow.lastTestedAt, locale) : undefined}>
                 <FlaskConical className="w-3 h-3" />
                 {t.testBadge.passed}
               </span>
             )}
             {workflow.testStatus === 'FAILED' && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-danger/10 text-danger text-[10px] font-medium" title={workflow.lastTestedAt ? new Date(workflow.lastTestedAt).toLocaleString() : undefined}>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-danger/10 text-danger text-[10px] font-medium" title={workflow.lastTestedAt ? formatTimestamp(workflow.lastTestedAt, locale) : undefined}>
                 <FlaskConical className="w-3 h-3" />
                 {t.testBadge.failed}
               </span>

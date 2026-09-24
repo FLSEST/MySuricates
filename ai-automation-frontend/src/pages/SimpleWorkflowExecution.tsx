@@ -15,7 +15,8 @@ import {
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
+import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
 import { api } from '../api/client';
 import type { StepResult, PendingHumanInput } from '../types';
@@ -76,6 +77,7 @@ export function SimpleWorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const navigate = useNavigate();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
@@ -163,7 +165,7 @@ export function SimpleWorkflowExecution() {
             )}
           </div>
           <p className="text-xs text-text-tertiary mt-0.5">
-            {new Date(run.startedAt).toLocaleString()} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
+            {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
           </p>
         </div>
         <ExecutionRerunButton run={run} />
