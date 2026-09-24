@@ -1055,6 +1055,16 @@ export const de: TranslationKeys = {
         result: 'Ergebnis',
         exitCode: 'Exit-Code',
       },
+      // TODO aus einem fehlgeschlagenen Lauf („Todo erstellen“ auf der Laufseite)
+      failedTodo: {
+        title: '{workflow}: Run fehlgeschlagen',
+        workflow: 'Workflow',
+        run: 'Run',
+        failedStep: 'Fehlgeschlagener Step',
+        error: 'Fehler',
+        stepError: 'Step-Fehler',
+        stepInfo: 'Step {n} ({type})',
+      },
     },
   },
   skills: {

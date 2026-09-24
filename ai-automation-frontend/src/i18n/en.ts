@@ -1053,6 +1053,16 @@ export const en = {
         result: 'Result',
         exitCode: 'Exit Code',
       },
+      // TODO created from a failed run ("Create Todo" on the run page)
+      failedTodo: {
+        title: '{workflow}: Run failed',
+        workflow: 'Workflow',
+        run: 'Run',
+        failedStep: 'Failed step',
+        error: 'Error',
+        stepError: 'Step error',
+        stepInfo: 'Step {n} ({type})',
+      },
     },
   },
   skills: {

@@ -117,6 +117,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Error panel for failed runs
 - Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
 - `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
+- The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `hooks/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
 
 ### Runs (`/runs`)
 

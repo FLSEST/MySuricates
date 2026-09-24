@@ -117,6 +117,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Fehler-Panel bei fehlgeschlagenen Runs
 - Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
 - `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
+- Der Kopf mit Zurück, Status und den Aktionen je Zustand (Pausieren, Fortsetzen, Abbrechen, Löschen, ab letztem Schritt fortsetzen, TODO aus einem fehlgeschlagenen Lauf) ist `RunHeader`, die Notizen sind `RunNotesCard` (der ungespeicherte Text bleibt in der Seite). `hooks/useRunDiagramSync.ts` färbt die Diagramm-Kästen nach Step-Status und hebt beim Klick auf einen Kasten dessen Step hervor; das TODO eines fehlgeschlagenen Laufs baut `utils/failedRunTodo.ts` (`buildFailedRunTodo`) in der App-Sprache
 
 ### Runs (`/runs`)
 
