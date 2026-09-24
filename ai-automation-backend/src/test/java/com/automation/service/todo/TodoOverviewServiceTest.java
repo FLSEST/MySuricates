@@ -29,6 +29,8 @@ class TodoOverviewServiceTest {
     @Mock private TodoRepository todoRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private TodoHygieneConfig hygieneConfig;
+    @Mock private com.automation.repository.GoalMilestoneRepository milestoneRepository;
+    @Mock private com.automation.repository.GoalRepository goalRepository;
 
     @InjectMocks private TodoOverviewService service;
 
@@ -108,5 +110,54 @@ class TodoOverviewServiceTest {
         assertThat(result.projects()).isEmpty();
         assertThat(result.needsYou()).isEmpty();
         assertThat(result.staleThresholdDays()).isEqualTo(30);
+    }
+
+    // --- Meilensteine in „Braucht dich“ (TODO 259f4f66) ---------------------------------
+
+    @Test
+    void getOverview_listsDueSoonAndOverdueMilestones_butNotReachedOnes_withTheirGoal() {
+        Instant now = Instant.now();
+        when(hygieneConfig.getStaleDays()).thenReturn(30);
+        when(todoRepository.aggregateByProject()).thenReturn(List.of());
+        when(todoRepository.staleCountByProject(any())).thenReturn(List.of());
+        when(todoRepository.findNeedsYou(any(), any())).thenReturn(List.of());
+        var overdue = com.automation.entity.GoalMilestone.builder().id("m1").goalId("g1").title("Alpha")
+                .dueDate(now.minus(2, ChronoUnit.DAYS)).build();
+        var soon = com.automation.entity.GoalMilestone.builder().id("m2").goalId("g1").title("Beta")
+                .dueDate(now.plus(2, ChronoUnit.DAYS)).build();
+        var reached = com.automation.entity.GoalMilestone.builder().id("m3").goalId("g1").title("Done")
+                .dueDate(now.minus(1, ChronoUnit.DAYS)).build();
+        when(milestoneRepository.findDueForActiveGoals(any(), any())).thenReturn(List.of(overdue, soon, reached));
+        when(todoRepository.countByMilestone(any())).thenReturn(List.of(
+                new com.automation.dto.projection.MilestoneTodoCounts("m1", 3, 1),
+                new com.automation.dto.projection.MilestoneTodoCounts("m3", 2, 2)));
+        when(goalRepository.findAllById(any())).thenReturn(List.of(
+                com.automation.entity.Goal.builder().id("g1").title("Launch").build()));
+
+        TodoOverviewResponse result = service.getOverview();
+
+        assertThat(result.milestonesDue()).extracting(m -> m.id()).containsExactly("m1", "m2");
+        var first = result.milestonesDue().get(0);
+        assertThat(first.state()).isEqualTo(com.automation.entity.GoalMilestone.State.OVERDUE);
+        assertThat(first.goalId()).isEqualTo("g1");
+        assertThat(first.goalTitle()).isEqualTo("Launch");
+        assertThat(first.total()).isEqualTo(3);
+        assertThat(first.done()).isEqualTo(1);
+        assertThat(result.milestonesDue().get(1).state()).isEqualTo(com.automation.entity.GoalMilestone.State.DUE_SOON);
+    }
+
+    @Test
+    void getOverview_withoutDueMilestones_asksNothingMore() {
+        when(hygieneConfig.getStaleDays()).thenReturn(30);
+        when(todoRepository.aggregateByProject()).thenReturn(List.of());
+        when(todoRepository.staleCountByProject(any())).thenReturn(List.of());
+        when(todoRepository.findNeedsYou(any(), any())).thenReturn(List.of());
+        when(milestoneRepository.findDueForActiveGoals(any(), any())).thenReturn(List.of());
+
+        TodoOverviewResponse result = service.getOverview();
+
+        assertThat(result.milestonesDue()).isEmpty();
+        org.mockito.Mockito.verify(todoRepository, org.mockito.Mockito.never()).countByMilestone(any());
+        org.mockito.Mockito.verifyNoInteractions(goalRepository);
     }
 }

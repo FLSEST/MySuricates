@@ -15,13 +15,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
  * Loads platform data that is injected into the {@link ExecutionContext} as template
- * variables ({@code previous_report}, {@code open_todos}, {@code request_metrics}) so workflows never need direct
+ * variables ({@code previous_report}, {@code open_todos}, {@code request_metrics}, and with
+ * {@code goal_id} also {@code goal_status}/{@code goal_guard_*}) so workflows never need direct
  * DB or API access. Extracted from {@code WorkflowExecutor} (pure data queries).
  */
 @Service
@@ -34,6 +37,7 @@ public class WorkflowContextDataService {
     private final TodoRepository todoRepository;
     private final RequestMetricsFactSheet requestMetricsFactSheet;
     private final ActivityLogService activityLogService;
+    private final GoalStatusContext goalStatusContext;
 
     /**
      * What a failed injection writes into the context instead of leaving the variable absent.
@@ -73,6 +77,38 @@ public class WorkflowContextDataService {
         // Measured request costs in the audit fact format — the only sanctioned way for a
         // shell block to see them, since it must not call the REST API (CLAUDE.md).
         inject(context, workflowId, "request_metrics", this::renderRequestMetrics);
+        injectGoal(context, workflowId);
+    }
+
+    /**
+     * {@code goal_status} and {@code goal_guard_*} (TODO 259f4f66) — only for a run whose merged
+     * context carries {@code goal_id} (the goal guard sets it as default context and schedule input).
+     * An unknown goal states the gap in every one of them and says so, like the other injections.
+     */
+    private void injectGoal(ExecutionContext context, String workflowId) {
+        Object raw = context.getVariable("goal_id");
+        if (raw == null || raw.toString().isBlank()) {
+            return;
+        }
+        String goalId = UNSAFE_ID_CHARS.matcher(raw.toString()).replaceAll("");
+        Object locale = context.getVariable("goal_locale");
+        Map<String, String> values;
+        try {
+            values = goalStatusContext.variables(goalId, locale == null ? null : locale.toString());
+        } catch (Exception e) {
+            reportGap(context, workflowId, "goal_status", e);
+            values = new LinkedHashMap<>();
+            for (String name : GoalStatusContext.VARIABLES) {
+                values.put(name, GAP_FORMAT.formatted(name, e.getClass().getSimpleName()));
+            }
+        }
+        for (Map.Entry<String, String> value : values.entrySet()) {
+            try {
+                context.setUntrustedPlatformVariable(value.getKey(), value.getValue());
+            } catch (Exception e) {
+                reportGap(context, workflowId, value.getKey(), e);
+            }
+        }
     }
 
     /**
@@ -180,11 +216,11 @@ public class WorkflowContextDataService {
 
     private static final Pattern LINE_BREAKS = Pattern.compile("[\\r\\n\\t\\u2028\\u2029]+");
     private static final Pattern WHITESPACE = Pattern.compile("\\s{2,}");
-    /** Output markers the platform parses (todo_item, gate_*) — defused by removing the colon. */
+    /** Output markers the platform parses (todo_item, gate_*, dashboard_widget) — defused by removing the colon. */
     private static final Pattern MARKERS = Pattern.compile(
-            "(?i)(todo[_-]item|gate[_-](?:status|category|description))[*`\\s]*:");
-    /** The delimiter tags themselves must not be forgeable from inside a title. */
-    private static final Pattern DELIMITER = Pattern.compile("(?i)</?\\s*open_todos\\s*>");
+            "(?i)(todo[_-]item|gate[_-](?:status|category|description)|dashboard[_-]widget)[*`\\s]*:");
+    /** The delimiter tags themselves ({@code open_todos}, {@code goal_status}) must not be forgeable from inside a title. */
+    private static final Pattern DELIMITER = Pattern.compile("(?i)</?\\s*(open_todos|goal_status)\\s*>");
     private static final Pattern UNSAFE_TAG_CHARS = Pattern.compile("[^A-Za-z0-9_:.,\\- ]");
     private static final Pattern UNSAFE_ID_CHARS = Pattern.compile("[^A-Za-z0-9\\-]");
 
@@ -235,7 +271,7 @@ public class WorkflowContextDataService {
         String s = LINE_BREAKS.matcher(raw).replaceAll(" ");
         s = WHITESPACE.matcher(s).replaceAll(" ").trim();
         s = MARKERS.matcher(s).replaceAll("$1");
-        s = DELIMITER.matcher(s).replaceAll("[open_todos]");
+        s = DELIMITER.matcher(s).replaceAll(m -> "[" + m.group(1).toLowerCase(java.util.Locale.ROOT) + "]");
         if (s.length() > maxChars) {
             s = s.substring(0, maxChars).trim() + "…";
         }

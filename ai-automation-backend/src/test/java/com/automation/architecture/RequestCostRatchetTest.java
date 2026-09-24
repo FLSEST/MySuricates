@@ -2,6 +2,7 @@ package com.automation.architecture;
 
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.entity.Goal;
+import com.automation.entity.GoalMilestone;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
@@ -14,6 +15,7 @@ import com.automation.entity.TodoTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
+import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
@@ -117,7 +119,7 @@ class RequestCostRatchetTest {
      */
     private static final List<String> SEEDED_TABLES = List.of(
             "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos", "goals",
-            "todo_triggers");
+            "goal_milestones", "todo_triggers");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -200,7 +202,12 @@ class RequestCostRatchetTest {
      *       page in {@code TodoResponseAssembler} — a constant statement, which
      *       {@link #statementCountMustNotGrowWithTheNumberOfRows} keeps constant. 42 → 43 kB with
      *       TODO c6ea8f5c, and only because the seed changed, not the route: every fifth seeded todo
-     *       now carries a {@code workflowRunId} and a {@code lastFixRunId} (measured 42 081 bytes).</li>
+     *       now carries a {@code workflowRunId} and a {@code lastFixRunId} (measured 42 081 bytes).
+     *       43 → 44 kB with TODO 259f4f66: {@code planning} carries {@code milestoneId}, and every tenth
+     *       seeded todo now sits in a milestone (measured 43 201 bytes); the statement count stays 3.</li>
+     *   <li>{@code /goals/{goal}/milestones}: added with TODO 259f4f66. Goal and milestones come from
+     *       one entity join, the counts from the same lean {@code GoalTodoRow} query as the detail –
+     *       2 statements, and the detail itself stays at 2 although it now carries the milestones.</li>
      *   <li>{@code /goals} and {@code /goals/{goal}}: added with TODO dc0566f8. Both read lean
      *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
      *       reaches the goal view. The detail is the goal plus one row query (the project names
@@ -225,7 +232,7 @@ class RequestCostRatchetTest {
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
-            Map.entry("/api/v1/todos", new Cost(3, 43_000)),
+            Map.entry("/api/v1/todos", new Cost(3, 44_000)),
             Map.entry("/api/v1/projects", new Cost(2, 1_200)),
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
@@ -237,6 +244,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals", new Cost(2, 2_000)),
             Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
+            Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
@@ -247,6 +255,7 @@ class RequestCostRatchetTest {
     @Autowired private TodoRepository todoRepository;
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Autowired private GoalRepository goalRepository;
+    @Autowired private GoalMilestoneRepository milestoneRepository;
     @Autowired private TodoTriggerRepository todoTriggerRepository;
     @PersistenceContext private EntityManager entityManager;
 
@@ -383,9 +392,17 @@ class RequestCostRatchetTest {
                 .targetWorkflow(workflows.get(0))
                 .description("Cost Trigger " + batch)
                 .build());
+        // Meilensteine (TODO 259f4f66): jede Charge legt zwei am ersten Ziel an und ordnet jedes zehnte
+        // Todo einem zu – Detail und Meilenstein-Liste muessen sie mit dem Ziel in einer Abfrage holen.
+        List<String> milestoneIds = new ArrayList<>();
+        for (int m = 0; m < 2; m++) {
+            milestoneIds.add(milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId)
+                    .title("Cost Milestone " + batch + m).dueDate(RUN_STARTED.plusSeconds(86_400L * (m + 1))).build()).getId());
+        }
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
             todoRepository.save(Todo.builder()
+                    .milestoneId(t % 10 == 0 ? milestoneIds.get(t / 10 % 2) : null)
                     .goalId(firstGoalId)
                     .goalRank(t % 2 == 0 ? t + 1 : null)
                     .title("Cost Todo " + batch + t)

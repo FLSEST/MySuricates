@@ -111,6 +111,8 @@ class ScenarioIntegrationTest {
     @Autowired private AuditFindingRepository auditFindingRepository;
     @Autowired private AuditFindingOccurrenceRepository auditOccurrenceRepository;
     @Autowired private AuditFindingTodoRepository auditFindingTodoRepository;
+    @Autowired private com.automation.repository.GoalRepository goalRepository;
+    @Autowired private com.automation.repository.GoalMilestoneRepository goalMilestoneRepository;
     @Autowired private EntityManager entityManager;
     @Autowired private List<ScriptedAiProvider> scriptedProviders;
 
@@ -123,6 +125,7 @@ class ScenarioIntegrationTest {
     private ScenarioChecks checks;
     private ScenarioFixtures fixtures;
     private ScenarioApprovals approvals;
+    private ScenarioGoals goals;
 
     @BeforeEach
     void setUp() {
@@ -132,6 +135,7 @@ class ScenarioIntegrationTest {
         fixtures = new ScenarioFixtures(entityManager, projectRepository, workflowRepository, chainRepository,
                 auditReportRepository, auditFindingRepository, auditOccurrenceRepository, auditFindingTodoRepository);
         approvals = new ScenarioApprovals(workflowExecutor, workflowRunRepository, entityManager);
+        goals = new ScenarioGoals(goalRepository, goalMilestoneRepository, todoRepository);
     }
 
     @AfterEach
@@ -141,6 +145,7 @@ class ScenarioIntegrationTest {
             todoRepository.deleteAll(todoRepository.findByProjectIdAndStatusIn(projectId, List.of(Todo.Status.values())));
             fixtures.deleteAuditData(projectId);
         }
+        goals.deleteAll();
         chainRunRepository.deleteAll();
         chainRepository.deleteAll();
         stepResultRepository.deleteAll();
@@ -183,7 +188,10 @@ class ScenarioIntegrationTest {
         String id = scenario.path("id").asText();
         Project project = fixtures.project(tempDir, id);
         projectIds.add(project.getId());
-        Map<String, String> refs = fixtures.namedWorkflows(project, scenario.path("workflows"));
+        Map<String, String> refs = new java.util.LinkedHashMap<>(fixtures.namedWorkflows(project, scenario.path("workflows")));
+        if (scenario.has("goal")) {
+            refs.put("goal", goals.create(project, scenario.path("goal")));
+        }
         if (scenario.has("chain")) {
             runChain(project, id, scenario, refs);
             return;
@@ -202,13 +210,13 @@ class ScenarioIntegrationTest {
         }
 
         if (!scenario.has("runs")) {
-            checks.checkRun(project.getId(), run(workflow, scenario, scenario), expect);
+            checks.checkRun(project.getId(), run(workflow, scenario, scenario, refs), expect);
             return;
         }
         WorkflowRun last = null;
         int index = 0;
         for (JsonNode runSpec : scenario.path("runs")) {
-            last = run(workflow, runSpec, scenario);
+            last = run(workflow, runSpec, scenario, refs);
             try {
                 checks.checkRun(project.getId(), last, runSpec.path("expect"));
             } catch (AssertionError e) {
@@ -220,9 +228,10 @@ class ScenarioIntegrationTest {
     }
 
     /** One run: {@code ai}, {@code context} and {@code answers} from the run, else from the scenario. */
-    private WorkflowRun run(Workflow workflow, JsonNode runSpec, JsonNode scenario) {
+    private WorkflowRun run(Workflow workflow, JsonNode runSpec, JsonNode scenario, Map<String, String> refs) {
         scriptProviders(runSpec.has("ai") ? runSpec.path("ai") : scenario.path("ai"));
-        Map<String, Object> context = contextOf(runSpec.has("context") ? runSpec.path("context") : scenario.path("context"));
+        Map<String, Object> context = contextOf(ScenarioFixtures.resolveRefs(
+                runSpec.has("context") ? runSpec.path("context") : scenario.path("context"), refs));
         WorkflowRun started = workflowExecutor.execute(workflow, context, TriggerSource.MANUAL);
         approvals.answer(started.getId(), runSpec.path("answers"));
         WorkflowRun finished = waitFor("run " + started.getId(), Duration.ofSeconds(30),
