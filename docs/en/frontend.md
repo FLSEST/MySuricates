@@ -729,6 +729,8 @@ The `/integrations` page is built from `components/integrations/ProviderCard` (c
 | `useResetOnboardingProfile()` | Mutation | Reset profile to built-in defaults |
 | `useOnboardingProfileHistory(profileId)` | Query | Version history of a profile |
 
+The editing state of the `/onboarding-profiles` page lives in `hooks/useOnboardingProfileEditor.ts`: selection (from the live list), the draft of name, description and content per language, the content language being edited, `hasChanges`, saving, deleting and resetting to the shipped text (afterwards the editor shows the taken-over text). The building blocks live in `components/onboarding/`: `ProfileList` (search, markers), `ProfileEditor`, `CreateProfileModal`, `ShippedModal`, `HistoryModal` and `ContentLanguageToggle` (DE|EN).
+
 ### `useCalendarAggregated.ts`
 
 Aggregates events from multiple sources (Google Calendar, Trello, Taskwarrior, schedules, runs) via the calendar adapter pattern. Returns `{ events, sources, isLoading, setSourceColor }`.

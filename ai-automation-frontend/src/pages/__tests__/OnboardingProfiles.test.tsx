@@ -104,4 +104,54 @@ describe('OnboardingProfiles', () => {
     expect(screen.getByLabelText('editor')).toHaveValue('## By hand');
     expect(screen.getByLabelText('editor')).toHaveAttribute('data-path', 'onboarding-profile-dev-id-en.md');
   });
+
+  it('creates a profile with a heading per language and starts empty the next time', async () => {
+    const created: unknown[] = [];
+    server.use(
+      http.get('/api/v1/onboarding-profiles', () => HttpResponse.json([profile()])),
+      http.post('/api/v1/onboarding-profiles', async ({ request }) => {
+        created.push(await request.json());
+        return HttpResponse.json(profile({ id: 'new-id', key: 'my-profile', builtIn: false }));
+      }),
+    );
+    renderWithProviders(<OnboardingProfiles />);
+
+    fireEvent.click(await screen.findByRole('button', { name: de.onboardingProfiles.create }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(de.onboardingProfiles.key), { target: { value: 'My-Profile 2!' } });
+    expect(within(dialog).getByLabelText(de.onboardingProfiles.key)).toHaveValue('my-profile2');
+    expect(within(dialog).getByRole('button', { name: de.common.create })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(de.onboardingProfiles.nameEn), { target: { value: 'Tester' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: de.common.create }));
+
+    await waitFor(() => expect(created).toEqual([{
+      key: 'my-profile2', name: { de: '', en: 'Tester' }, description: { de: '', en: '' },
+      content: { de: '## Tester\n\n', en: '## Tester\n\n' }, type: 'PROFILE',
+    }]));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: de.onboardingProfiles.create }));
+    expect(within(await screen.findByRole('dialog')).getByLabelText(de.onboardingProfiles.key)).toHaveValue('');
+  });
+
+  it('deletes an own profile after confirmation and shows the placeholder again', async () => {
+    let deleted = '';
+    server.use(
+      http.get('/api/v1/onboarding-profiles', () => HttpResponse.json([profile({ builtIn: false })])),
+      http.delete('/api/v1/onboarding-profiles/:id', ({ params }) => {
+        deleted = String(params.id);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(<OnboardingProfiles />);
+
+    fireEvent.click(await screen.findByText('Entwickler'));
+    expect(screen.queryByRole('button', { name: de.onboardingProfiles.reset })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: de.common.delete }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(de.onboardingProfiles.deleteConfirm)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: de.common.delete }));
+
+    await waitFor(() => expect(deleted).toBe('dev-id'));
+    expect(await screen.findByText(de.onboardingProfiles.selectProfile)).toBeTruthy();
+  });
 });
