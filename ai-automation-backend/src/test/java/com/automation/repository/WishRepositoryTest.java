@@ -63,6 +63,17 @@ class WishRepositoryTest {
     }
 
     @Test
+    void should_count_wishes_by_status_in() {
+        wish("done", WishStatus.COMPLETED, projectAId);
+        wish("failed", WishStatus.FAILED, projectAId);
+        wish("cancelled", WishStatus.CANCELLED, projectBId);
+        wish("open", WishStatus.RECEIVED, projectBId);
+
+        assertThat(repository.countByStatusIn(List.of(WishStatus.COMPLETED))).isEqualTo(1);
+        assertThat(repository.countByStatusIn(List.of(WishStatus.FAILED, WishStatus.CANCELLED))).isEqualTo(2);
+    }
+
+    @Test
     void should_find_wishes_by_project_id_ordered_by_created_at_desc() {
         wish("first wish", WishStatus.RECEIVED, projectAId);
         wish("second wish", WishStatus.RECEIVED, projectAId);

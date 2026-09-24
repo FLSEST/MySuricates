@@ -14,6 +14,7 @@ import java.util.Optional;
 public interface ScheduledWorkflowRepository extends JpaRepository<ScheduledWorkflow, String> {
 
     List<ScheduledWorkflow> findByEnabledTrue();
+    long countByEnabledTrue();
 
     @Query("SELECT s FROM ScheduledWorkflow s WHERE s.enabled = true AND s.nextRunAt <= :before")
     List<ScheduledWorkflow> findDueSchedules(@Param("before") Instant before);
