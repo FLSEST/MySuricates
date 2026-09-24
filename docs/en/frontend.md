@@ -271,7 +271,7 @@ All components in `src/components/ui/`:
 | `CronPicker` | `value`, `onChange`, `label` | Cron expression editor with preview |
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag input with autocomplete |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardized modal footer |
-| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Confirmation dialog on top of `Modal` (Escape and backdrop close it). Every yes/no dialog uses it instead of assembling `Modal` + `ModalFooter` itself; `isPending` locks the confirm button |
+| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Confirmation dialog on top of `Modal` (Escape and backdrop close it). Every yes/no dialog uses it instead of assembling `Modal` + `ModalFooter` itself; `isPending` locks the confirm button |
 
 ## Design System
 

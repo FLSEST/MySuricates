@@ -271,7 +271,7 @@ Alle Komponenten in `src/components/ui/`:
 | `CronPicker` | `value`, `onChange`, `label` | Cron-Ausdruck-Editor mit Vorschau |
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag-Eingabe mit Autovervollständigung |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardisierter Modal-Footer |
-| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Bestätigungsdialog auf `Modal` (Escape und Backdrop schließen). Jeder Ja/Nein-Dialog nutzt ihn statt `Modal` + `ModalFooter` selbst zusammenzusetzen; `isPending` sperrt den Bestätigen-Button |
+| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Bestätigungsdialog auf `Modal` (Escape und Backdrop schließen). Jeder Ja/Nein-Dialog nutzt ihn statt `Modal` + `ModalFooter` selbst zusammenzusetzen; `isPending` sperrt den Bestätigen-Button |
 
 ## Design-System
 

@@ -59,6 +59,17 @@ describe('ConfirmModal', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
   });
 
+  it('can disable cancel while an action runs that closing cannot stop', () => {
+    const onClose = vi.fn();
+    render(
+      <ConfirmModal open onClose={onClose} onConfirm={vi.fn()} title="T" confirmLabel="Delete" isPending cancelDisabled />,
+    );
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel).toBeDisabled();
+    fireEvent.click(cancel);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('styles the confirm button as danger for destructive actions', () => {
     render(<ConfirmModal open onClose={vi.fn()} onConfirm={vi.fn()} title="T" confirmLabel="Delete" variant="danger" />);
     expect(screen.getByRole('button', { name: 'Delete' }).className).toMatch(/\bbg-danger\b/);

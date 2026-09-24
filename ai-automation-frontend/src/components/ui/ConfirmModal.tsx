@@ -17,6 +17,8 @@ interface ConfirmModalProps {
   variant?: 'primary' | 'danger';
   /** Locks the confirm button with a spinner while the action runs. */
   isPending?: boolean;
+  /** Disables the cancel button, e.g. while an action runs that closing cannot stop (`onClose` should then ignore Escape and backdrop as well). */
+  cancelDisabled?: boolean;
   confirmIcon?: ReactNode;
   cancelVariant?: 'secondary' | 'ghost';
   size?: 'sm' | 'md';
@@ -36,6 +38,7 @@ export function ConfirmModal({
   cancelLabel,
   variant = 'primary',
   isPending = false,
+  cancelDisabled = false,
   confirmIcon,
   cancelVariant = 'secondary',
   size = 'sm',
@@ -51,7 +54,7 @@ export function ConfirmModal({
       footer={
         <>
           {extraAction && <div className="mr-auto">{extraAction}</div>}
-          <Button variant={cancelVariant} onClick={onClose}>
+          <Button variant={cancelVariant} onClick={onClose} disabled={cancelDisabled}>
             {cancelLabel ?? t.common.cancel}
           </Button>
           <Button variant={variant} icon={confirmIcon} onClick={onConfirm} loading={isPending}>
