@@ -1,4 +1,4 @@
-package com.automation.config;
+package com.automation.util;
 
 import org.junit.jupiter.api.Test;
 
