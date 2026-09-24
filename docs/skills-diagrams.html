@@ -146,13 +146,13 @@
 
 <header>
   <h1>MySuricates — Skills &amp; Capabilities</h1>
-  <p>Skill-Lebenszyklus, Aktivierung pro Workflow, Ausfuehrung im Skill-Capability Block</p>
+  <p>Skill-Lebenszyklus, Aktivierung pro Workflow, Ausführung im Skill-Capability-Block</p>
 </header>
 
 <nav>
   <a href="#lifecycle">Lifecycle</a>
   <a href="#aktivierung-pro-workflow">Aktivierung pro Workflow</a>
-  <a href="#ausfuehrung-einer-capability">Ausfuehrung einer Capability</a>
+  <a href="#ausführung-einer-capability">Ausführung einer Capability</a>
   <a href="#datenmodell">Datenmodell</a>
 </nav>
 
@@ -160,20 +160,25 @@
 
 <section id="lifecycle">
   <h2>Lifecycle <span>CRUD</span></h2>
+  <p>Skills sind ein optionales Modul (<code>skills</code>, im Preset <code>full</code>). Jede Änderung läuft über <code>SkillMutationGateway</code>, das eine Versionszeile schreibt.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as Skills Page
     participant CTR as SkillController
     participant SVC as SkillService
-    participant DB as skills/capabilities
+    participant GW as SkillMutationGateway
+    participant DB as skills / skill_versions
 
     UI-&gt;&gt;CTR: POST /api/v1/skills (name, category, aiContext, configSchema)
-    CTR-&gt;&gt;SVC: createSkill()
-    SVC-&gt;&gt;DB: INSERT skill + optional capabilities
-    DB--&gt;&gt;SVC: saved
-    SVC--&gt;&gt;CTR: SkillResponse
-    CTR--&gt;&gt;UI: 201 Created
+    CTR-&gt;&gt;SVC: create(request)
+    SVC-&gt;&gt;GW: save(skill, USER)
+    GW-&gt;&gt;DB: INSERT skill + Versionszeile (Snapshot, Hash)
+    DB--&gt;&gt;GW: saved
+    GW--&gt;&gt;SVC: Skill
+    SVC--&gt;&gt;CTR: Skill
+    CTR--&gt;&gt;UI: 201 Created (SkillResponse)
   </pre>
+  <p>Capabilities entstehen nicht beim Anlegen: Sie kommen aus den Built-in-Skills (<code>skills/builtin/*.json</code>, beim Start eingespielt) oder aus einem Import (<code>POST /api/v1/skills/import</code>). Built-ins sind schreibgeschützt; einen Skill, den ein versiegelter Workflow nutzt, lehnt der Gateway mit 409 ab.</p>
 </section>
 
 <section id="aktivierung-pro-workflow">
@@ -183,36 +188,48 @@ flowchart LR
     SK["Skill"] --&gt; CAP["Capabilities"]
     WF["Workflow"] --&gt; SKW["workflow_skills"]
     SKW --&gt; SK
+    BL["Block (skillIds)"] -.-&gt;|"zusätzlich für diesen Block"| SK
   </pre>
-  <p>Aktivierte Skills werden vor Ausfuehrung in das Projekt injiziert (<code>injectSkillContextOnHost</code>).</p>
+  <p><code>POST /api/v1/workflows/{id}/skills</code> aktiviert, <code>DELETE /api/v1/workflows/{id}/skills/{skillId}</code> deaktiviert.</p>
+  <p>Vor dem ersten Block schreibt der Run den <code>aiContext</code> der aktivierten Skills nach <code>.claude/rules/skills-context.md</code> im Projekt (<code>CommandExecutorService.writeSkillContextToProject</code>); ein Block mit eigenen <code>skillIds</code> ergänzt sie für seine Dauer. Die Claude-CLI liest <code>.claude/rules/</code> selbst, Codex und Pi bekommen die Datei an den System-Prompt gehängt.</p>
 </section>
 
-<section id="ausfuehrung-einer-capability">
-  <h2>Ausfuehrung einer Capability <span>skill-capability Block</span></h2>
+<section id="ausführung-einer-capability">
+  <h2>Ausführung einer Capability <span>skill-capability Block</span></h2>
   <pre class="mermaid">
 sequenceDiagram
     participant BE as SkillCapabilityBlockExecutor
     participant CTX as ExecutionContext
     participant CES as CommandExecutorService
-    participant CLI as claude -p
+    participant CLI as KI-CLI auf dem Host
 
-    BE-&gt;&gt;CTX: resolveTemplate(input, params)
-    BE-&gt;&gt;CES: executeCommandOnHost(projectPath, prompt, model, systemPrompt)
-    CES-&gt;&gt;CLI: run prompt (includes capability + params)
-    CLI--&gt;&gt;CES: output
-    CES--&gt;&gt;BE: result
-    BE--&gt;&gt;CTX: StepResult COMPLETED/FAILED
+    BE-&gt;&gt;CTX: resolvePromptTemplate(input)
+    BE-&gt;&gt;BE: Skill und Capability über die skillIds des Blocks finden
+    alt Capability schreibt, allow_writes fehlt
+        BE--&gt;&gt;CTX: StepResult FAILED
+    else lesend oder allow_writes gesetzt
+        BE-&gt;&gt;CES: executeOnHost(prompt, systemPrompt, model, provider, allowedTools)
+        CES-&gt;&gt;CLI: run prompt (Task, Parameters, Input)
+        CLI--&gt;&gt;CES: output
+        CES--&gt;&gt;BE: result
+        BE--&gt;&gt;CTX: StepResult COMPLETED/FAILED
+    end
   </pre>
   <div class="grid">
     <div class="card">
       <h3>Prompt-Aufbau</h3>
-      <p><code>"Use your '&lt;capability&gt;' capability..."</code> + Params + Input</p>
-      <p>SystemPrompt = Workflow Instruction Prefix</p>
+      <p><code>Task: &lt;description&gt;</code> + <code>Parameters: {…}</code> + <code>Input: …</code> — ohne Beschreibung steht dort der Name der Capability</p>
+      <p>System-Prompt = <code>aiContext</code> des Skills + Workflow-Anweisungen</p>
+    </div>
+    <div class="card">
+      <h3>Rechte</h3>
+      <p>Ohne <code>allow_writes</code> bekommt die CLI nur lesende Werkzeuge: <code>Read</code>, <code>Grep</code>, <code>Glob</code>, <code>WebFetch</code>, <code>WebSearch</code>, <code>Task</code>, <code>TodoWrite</code>.</p>
+      <p>Eine Capability mit <code>writes</code> verlangt <code>allow_writes: true</code>, sonst scheitert der Schritt.</p>
     </div>
     <div class="card">
       <h3>Kontext</h3>
-      <p>Skill-Kontext (aiContext) zuvor injiziert in CLI-Session.</p>
-      <p>Template-Variablen: <code>{{ previous_output }}</code>, <code>{{ vars }}</code></p>
+      <p><code>input</code> wird wie ein Prompt aufgelöst: <code>{{ previous_output }}</code>, <code>{{ block.&lt;name&gt;.output }}</code>, Kontextvariablen.</p>
+      <p><code>params</code> gehen als Parameter in den Prompt.</p>
     </div>
   </div>
 </section>
@@ -222,9 +239,10 @@ sequenceDiagram
   <table>
     <thead><tr><th>Tabelle</th><th>Wichtig</th></tr></thead>
     <tbody>
-      <tr><td><code>skills</code></td><td>name, description, category, ai_context, config_schema, builtin, version</td></tr>
-      <tr><td><code>capabilities</code></td><td>skill_id, name, description, handler_class, input_schema, output_schema, async</td></tr>
+      <tr><td><code>skills</code></td><td>name, description, icon, category, ai_context, config_schema, builtin, version</td></tr>
+      <tr><td><code>capabilities</code></td><td>skill_id, name, description, handler_class, input_schema, output_schema, async, writes</td></tr>
       <tr><td><code>workflow_skills</code></td><td>workflow_id, skill_id (Aktivierung)</td></tr>
+      <tr><td><code>skill_versions</code></td><td>skill_id, version_number, operation, snapshot, content_hash, change_source</td></tr>
     </tbody>
   </table>
 </section>
