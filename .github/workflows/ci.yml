@@ -54,6 +54,18 @@ jobs:
           bash scripts/tests/test-instance.sh
           bash scripts/tests/test-deploy-files.sh
           bash scripts/tests/test-staging-override.sh
+      # Die Python-Skripte fuer Betreiber fragen die eigene Instanz nie ueber einen Proxy aus der Umgebung
+      # (cf662c01): echte Aufrufe gegen fake_instance.py, braucht nur python3.
+      - name: Eigene Instanz ohne Proxy (Python-Skripte)
+        run: python3 -m unittest discover -s scripts/tests -p 'test_local_api_proxy.py'
+      # Liefen bisher nur lokal (cad7d821): Dev-Starter (JAR-Laufzeit, Run-Waechter, Proxy, Container-
+      # Modus mit Stubs), das Integritaets-Gate von cleanup-runs.sh und die Seed-Vorlage gegen einen
+      # curl-Stub. Brauchen python3, curl, git, jq, node und script — kein Backend, kein Docker, keine KI-CLI.
+      - name: Dev-Starter, Run-Aufraeumer und Seed-Vorlage Selbsttest
+        run: |
+          bash scripts/tests/test-start-autotrigger-dev.sh
+          bash scripts/tests/test-cleanup-runs.sh
+          bash scripts/tests/test-seed-workflows-example.sh
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
         run: |
           bash scripts/tests/test-providers.sh

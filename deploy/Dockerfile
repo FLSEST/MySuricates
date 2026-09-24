@@ -81,8 +81,10 @@ ENV AUTOMATION_DB_PATH=/app/data/automation.db \
     AUTOMATION_FRONTENDPATH=/app/frontend \
     AUTOMATION_TRAY_ENABLED=false
 EXPOSE 9090
+# --noproxy '*': Docker reicht Proxy-Variablen in den Container, und curl schickt auch localhost ueber
+# sie — die Pruefung scheiterte am Proxy, der Container wurde nie gesund (cf662c01, wie lib/local-curl.sh)
 HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=3 \
-  CMD curl -fsS http://localhost:9090/api/v1/system/health >/dev/null || exit 1
+  CMD curl --noproxy '*' -fsS http://localhost:9090/api/v1/system/health >/dev/null || exit 1
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["java", "-XX:+UseZGC", "-XX:+ZGenerational", "-Xms256m", "-Xmx1g", "-Djava.awt.headless=true", \
      "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=/app/data/logs/", \

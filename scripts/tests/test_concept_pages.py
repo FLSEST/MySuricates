@@ -123,7 +123,8 @@ class CollectorTest(unittest.TestCase):
         ])
         def response(*args, **kwargs):
             return io.BytesIO(json.dumps(next(responses)).encode())
-        with patch.object(collector.urllib.request, 'urlopen', side_effect=response):
+        # the opener without a proxy (cf662c01); that it asks directly: test_local_api_proxy.py
+        with patch.object(collector.LOCAL, 'open', side_effect=response):
             result = collector.collect('http://localhost/api/v1', 'secret-fixture')
         self.assertEqual(result['metrics']['todos']['value'], 2)
         self.assertEqual(result['metrics']['todos_without_resolution_state']['value'], 1)

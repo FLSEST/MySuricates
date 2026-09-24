@@ -9,6 +9,10 @@ from pathlib import Path
 import urllib.request
 import urllib.error
 
+# Never through a proxy from the environment (cf662c01): urllib sends localhost through http_proxy and
+# all_proxy too — behind a proxy the calls failed, and the proxy got the X-API-Key.
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def normalized_blocks(blocks):
     return [dict(type=b.get("type"), name=b.get("name"), config=b.get("config") or {},
@@ -34,7 +38,7 @@ def main():
             method='PUT' if body is not None else 'GET')
         for attempt in range(7):
             try:
-                with urllib.request.urlopen(request, timeout=30) as response:
+                with LOCAL.open(request, timeout=30) as response:
                     return json.load(response)
             except urllib.error.HTTPError as error:
                 if error.code != 429 or attempt == 6:

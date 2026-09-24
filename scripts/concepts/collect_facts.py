@@ -11,6 +11,10 @@ import os
 from pathlib import Path
 import urllib.request
 
+# Never through a proxy from the environment (cf662c01): urllib sends localhost through http_proxy and
+# all_proxy too — behind a proxy the calls failed, and the proxy got the X-API-Key.
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def collect(base, key):
     started = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -18,7 +22,7 @@ def collect(base, key):
     def get(route):
         request = urllib.request.Request(base.rstrip('/') + route,
                                          headers={'X-API-Key': key})
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with LOCAL.open(request, timeout=60) as response:
             return json.load(response)
 
     workflows = get('/workflows')

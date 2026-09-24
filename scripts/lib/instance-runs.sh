@@ -9,13 +9,25 @@
 # shellcheck source=local-curl.sh
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/local-curl.sh"
 
-# instance_api_base BIND PORT — wie dieser Rechner die Instanz erreicht: lauscht sie auf Loopback oder
-# allen Schnittstellen, ueber 127.0.0.1, sonst unter der gebundenen Adresse
+# instance_connect_addr BIND — wo dieser Rechner die Instanz erreicht: lauscht sie auf 127.0.0.1 oder allen
+# Schnittstellen, dort; sonst unter der gebundenen Adresse, auch einer anderen Loopback-Adresse — auf
+# 127.0.0.1 lauscht sie dann nicht (3d002903). IPv6 ohne Klammern, fuer /dev/tcp.
+instance_connect_addr() {
+  local a="${1:-}"
+  a="${a#\[}"; a="${a%\]}"
+  case "$a" in
+    ""|localhost|127.0.0.1|0.0.0.0|::) printf '127.0.0.1' ;;
+    *) printf '%s' "$a" ;;
+  esac
+}
+
+# instance_api_base BIND PORT — dasselbe als Basis-URL fuer curl
 instance_api_base() {
-  case "${1:-}" in
-    ""|localhost|127.*|0.0.0.0|::|"[::]") printf 'http://127.0.0.1:%s' "$2" ;;
-    *:*) printf 'http://[%s]:%s' "$1" "$2" ;;
-    *) printf 'http://%s:%s' "$1" "$2" ;;
+  local a
+  a="$(instance_connect_addr "${1:-}")"
+  case "$a" in
+    *:*) printf 'http://[%s]:%s' "$a" "$2" ;;
+    *) printf 'http://%s:%s' "$a" "$2" ;;
   esac
 }
 

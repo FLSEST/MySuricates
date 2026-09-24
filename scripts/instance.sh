@@ -110,8 +110,9 @@ say_running() {  # WORT
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
 }
 
-# Ohne Proxy aus der Umgebung (bb4f60a5): ueber ihn scheiterte die Pruefung, up wartete 300 s
-health_ok() { local_curl -fsS --max-time 3 "http://127.0.0.1:$PORT/api/v1/system/health" >/dev/null 2>&1; }
+# Dort, wo die Instanz lauscht — mit --bind auf eine Adresse nur dort, nicht auf 127.0.0.1 (3d002903) —,
+# und ohne Proxy aus der Umgebung (bb4f60a5): an beidem scheiterte die Pruefung, up wartete 300 s
+health_ok() { local_curl -fsS --max-time 3 "$(instance_api_base "$BIND" "$PORT")/api/v1/system/health" >/dev/null 2>&1; }
 # Laufende Workflow-Runs brechen beim Stoppen ab (29820f58): vorher sagen, wie viele. Nur eine Warnung,
 # down ist ein ausdruecklicher Befehl; antwortet die Instanz nicht oder fehlt der Key, still weiter.
 warn_running_runs() {  # KEY
@@ -120,8 +121,8 @@ warn_running_runs() {  # KEY
   [ -n "$n" ] && [ "$n" -gt 0 ] || return 0
   echo "mysuricates-$NAME: $n Workflow-Run(s) laufen noch — sie brechen jetzt ab." >&2
 }
-# Belegt = irgendetwas nimmt Verbindungen an (nicht: antwortet wie MySuricates)
-port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
+# Belegt = irgendetwas nimmt auf der Adresse der Instanz Verbindungen an (nicht: antwortet wie MySuricates)
+port_busy() { (exec 3<>"/dev/tcp/$(instance_connect_addr "$BIND")/$PORT") 2>/dev/null; }
 wait_health() {
   local i=0
   while [ "$i" -lt "${INSTANCE_HEALTH_TIMEOUT:-300}" ]; do

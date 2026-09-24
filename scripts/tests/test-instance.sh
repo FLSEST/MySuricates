@@ -385,5 +385,49 @@ NAKED="$(printf '%s\n' "$CURLS" | grep -vE '^(tests/|lib/local-curl\.sh:|lib/dep
   | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
 check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep -q "^lib/local-curl.sh:" && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'
 
+echo "9) bound to one address: health, port and runs asked there, not on 127.0.0.1 (3d002903)"
+# Mit --bind auf eine Adresse (LAN, Tailscale) lauscht die Instanz nur dort. health_ok fragte 127.0.0.1 —
+# up wartete 300 s und meldete „nicht gesund“ —, port_busy sah einen belegten Port dort nicht, und
+# instance_api_base nahm jede 127.*-Adresse fuer 127.0.0.1. Eine zweite Loopback-Adresse spielt die
+# gebundene; der java-Stub startet die Fake-API wie Spring auf SERVER_ADDRESS. Auf 127.0.0.1 lauscht
+# derweil jemand anderes auf demselben Port und antwortet 502: dort darf nichts als gesund gelten.
+check "address: another loopback address as it is" '[ "$(base 127.0.0.2)" = http://127.0.0.2:19999 ] && [ "$(base localhost)" = http://127.0.0.1:19999 ] && [ "$(base "[::1]")" = "http://[::1]:19999" ] && [ "$(base "[::]")" = http://127.0.0.1:19999 ]'
+BADDR=127.0.0.2
+if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
+   && python3 -c "import socket; socket.socket().bind(('$BADDR', 0))" 2>/dev/null; then
+  # frei auf beiden Adressen
+  bfree() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null || (exec 3<>"/dev/tcp/$BADDR/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
+  listen() {  # HOST MODUS PORT … — fake_instance.py auf HOST, losgeloest; gibt die PID aus, sobald er annimmt
+    local host="$1" pid; shift
+    pid="$( (FAKE_INSTANCE_HOST="$host" python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
+    for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/$host/$2") 2>/dev/null && break; sleep 0.05; done
+    echo "$pid"
+  }
+  gone() { kill "$1" 2>/dev/null; for _ in $(seq 1 100); do kill -0 "$1" 2>/dev/null || break; sleep 0.05; done; }
+  BPORT="$(bfree 19470)"; OTHER=""; FOREIGN=""
+  BSTATE="$TMP/state/mysuricates/bound"; mkdir -p "$BSTATE/frontend" "$BSTATE/home/.autotrigger" "$TMP/bbin"
+  echo jar > "$BSTATE/app.jar"; printf 'bkey\n' > "$BSTATE/home/.autotrigger/api-key"
+  trap 'stopapi; kill $(cat "$BSTATE/instance.pid" 2>/dev/null) $OTHER $FOREIGN 2>/dev/null; rm -rf "$TMP"' EXIT
+  printf '#!/bin/sh\nexec env FAKE_INSTANCE_HOST="$SERVER_ADDRESS" python3 "%s" api "$AUTOMATION_PORT" bkey 1\n' "$FAKE" > "$TMP/bbin/java"
+  chmod +x "$TMP/bbin/java"
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_BIND=%s\n' "$BPORT" "$BADDR" > "$TMP/inst/bound.env"
+  binst() { env PATH="$TMP/bbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" "$@" --name bound 2>&1; }
+  OTHER="$(listen 127.0.0.1 proxy "$BPORT" "$TMP/other.log")"
+  OUT="$(binst up)"; RC=$?
+  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -q "^mysuricates-bound läuft"'
+  check "status: running healthy"                 '[ "$(binst status)" = "running healthy" ]'
+  OUT="$(binst down)"
+  check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -qF "mysuricates-bound: 1 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt'
+  gone "$OTHER"; OTHER=""
+  # Jemand anderes auf der gebundenen Adresse: up lehnt ab, bevor es etwas startet
+  FOREIGN="$(listen "$BADDR" api "$BPORT" x 0)"
+  OUT="$(binst up)"; RC=$?
+  check "up: port taken on the bound address → refused, nothing started" '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep -qF "Port $BPORT ist schon belegt" && [ ! -s "$BSTATE/instance.pid" ]'
+  gone "$FOREIGN"; FOREIGN=""
+  rm -f "$TMP/inst/bound.env"
+else
+  echo "  skip (no python3 or curl, or $BADDR is not a loopback address here — macOS)"
+fi
+
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

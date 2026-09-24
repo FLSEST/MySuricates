@@ -30,8 +30,10 @@ USER appuser
 
 EXPOSE 9090
 
+# --noproxy '*': Docker passes proxy variables into the container, and curl sends localhost through them
+# too — the check failed at the proxy and the container never became healthy (cf662c01)
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost:9090/api/v1/system/health || exit 1
+    CMD curl --noproxy '*' -f http://localhost:9090/api/v1/system/health || exit 1
 
 ENTRYPOINT ["java", \
     "-XX:+UseZGC", \

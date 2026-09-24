@@ -96,7 +96,8 @@ main() {
   local PROJ_DEMO
   PROJ_DEMO=$(create_project "Demo" "CODE" "/path/to/your/project")
 
-  local tmp
+  # Not local: the EXIT trap runs after main has returned — with a local tmp it failed under set -u
+  # ("tmp: unbound variable", exit 1) and the file stayed behind (cad7d821)
   tmp=$(mktemp)
   trap 'rm -f "$tmp"' EXIT
 

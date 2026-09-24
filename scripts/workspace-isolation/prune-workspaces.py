@@ -9,6 +9,10 @@ import shutil
 import subprocess
 import urllib.request
 
+# Never through a proxy from the environment (cf662c01): urllib sends localhost through http_proxy and
+# all_proxy too — behind a proxy the calls failed, and the proxy got the X-API-Key.
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 def eligible(root, manifest_path, execution, cutoff):
     manifest = json.loads(manifest_path.read_text())
@@ -57,7 +61,8 @@ def main():
         try:
             request = urllib.request.Request(args.api_base + '/executions/' + path.parent.name,
                                              headers={'X-API-Key': key})
-            execution = json.load(urllib.request.urlopen(request, timeout=15))
+            with LOCAL.open(request, timeout=15) as response:
+                execution = json.load(response)
             if not eligible(root, path, execution, cutoff):
                 continue
             repo = path.parent / 'repo'

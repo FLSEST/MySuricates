@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Static checks for deploy/ (image for one instance, only Docker needed). The real build runs in
 # the installer probe; this catches the regressions that would make it slow, leaky or root-owned.
+# The health checks of all images also run for real, against a stand-in (python3 and curl, no Docker).
 # Run: bash scripts/tests/test-deploy-files.sh   (exit 0 = all passed)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,5 +64,61 @@ check "pinned binaries stay before it (cached)"   '[ "$(line_of "^ARG GITLEAKS_V
 check "the gh layer uses APT_REFRESH itself"      'grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$ADF"'
 check "compose passes AGENT_APT_REFRESH"          'grep -q "APT_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
 check "pinned checksums are 64 hex chars"         '[ "$(grep -cE "^ARG (GITLEAKS|TRIVY)_LINUX_(X64|ARM64)_SHA256=[0-9a-f]{64}$" "$ADF")" -eq 4 ]'
+
+echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
+# Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt
+# auch localhost ueber sie: die Pruefung scheiterte am Proxy, der Container wurde nie gesund, up wartete
+# 300 s. Jede Health-Pruefung — HEALTHCHECK im Dockerfile, healthcheck.test in einer Compose-Datei, die
+# ihn ersetzt — traegt deshalb --noproxy '*' wie scripts/lib/local-curl.sh. Gesucht in allen getrackten Dateien.
+# hc_lines — je Pruefung DATEI<TAB>BEFEHL: die CMD einer HEALTHCHECK-Anweisung (Shell-Form, Fortsetzungs-
+# zeilen verbunden) oder die test-Liste einer Compose-Datei, wie sie dasteht
+hc_lines() {
+  local files f
+  files="$(git -C "$R" ls-files)"
+  for f in $(printf '%s\n' "$files" | grep -E '(^|/)Dockerfile[^/]*$'); do
+    awk -v f="$f" '/^HEALTHCHECK[[:space:]]/ { on = 1; s = "" }
+      on { l = $0; more = sub(/\\[[:space:]]*$/, "", l); s = s " " l
+           if (!more) { sub(/^.*[[:space:]]CMD[[:space:]]+/, "", s); print f "\t" s; on = 0 } }' "$R/$f"
+  done
+  for f in $(printf '%s\n' "$files" | grep -E '(^|/)(docker-)?compose[^/]*\.ya?ml$'); do
+    awk -v f="$f" '/^[[:space:]]+test:[[:space:]]*\[/ { sub(/^[[:space:]]*test:[[:space:]]*/, ""); print f "\t" $0 }' "$R/$f"
+  done
+}
+HC="$(hc_lines)"; T="$(printf '\t')"
+check "found: HEALTHCHECK and compose healthcheck"   'printf "%s\n" "$HC" | grep -q "^deploy/Dockerfile${T}curl " && printf "%s\n" "$HC" | grep -q "^ai-automation-backend/docker-compose.yml${T}\[\"CMD\", \"curl\""'
+NAKED_HC="$(printf '%s\n' "$HC" | grep curl | grep -vF -e "${T}curl --noproxy '*' " -e '["CMD", "curl", "--noproxy", "*", ')"
+check "every health check curl carries --noproxy '*'" '[ -z "$NAKED_HC" ] || { printf "%s\n" "$NAKED_HC" | sed "s/^/         /"; false; }'
+# Und so, wie Docker sie ausfuehrt — Shell-Form ueber sh -c, im Verzeichnis mit Dateien (ein ungequotetes *
+# wuerde zu ihren Namen), gegen eine Fake-Instanz auf dem Port der Pruefung, den Fake-Proxy in jeder
+# Variablen, die curl liest. Der Proxy schreibt auf, was bei ihm ankommt: er darf nichts bekommen.
+if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+  TMP="$(mktemp -d)"; FAKE="$HERE/fake_instance.py"; PXLOG="$TMP/proxy.log"; : > "$PXLOG"
+  freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
+  serve() {  # MODUS PORT … — fake_instance.py losgeloest starten; gibt die PID aus, sobald der Port antwortet
+    local pid
+    pid="$( (python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
+    for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$2") 2>/dev/null && break; sleep 0.05; done
+    echo "$pid"
+  }
+  APORT="$(freeport 19580)"; API_PID="$(serve api "$APORT" key 0)"
+  PXPORT="$(freeport $((APORT + 1)))"; PX_PID="$(serve proxy "$PXPORT" "$PXLOG")"
+  trap 'kill "$API_PID" "$PX_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
+  mkdir -p "$TMP/app"; touch "$TMP/app/app.jar" "$TMP/app/entrypoint.sh"
+  PX="http://127.0.0.1:$PXPORT"
+  # proxied BEFEHL — sh -c BEFEHL mit dem Fake-Proxy in jeder Variablen; der Proxy-Log beginnt leer
+  proxied() { : > "$PXLOG"; ( cd "$TMP/app" && env -u no_proxy -u NO_PROXY http_proxy="$PX" https_proxy="$PX" all_proxy="$PX" HTTP_PROXY="$PX" HTTPS_PROXY="$PX" ALL_PROXY="$PX" sh -c "$1" ) >/dev/null 2>&1; }
+  untouched() { [ ! -s "$PXLOG" ]; }
+  proxied "curl -fsS http://localhost:$APORT/api/v1/system/health"
+  check "control: a plain curl goes through the fake proxy" '! untouched'
+  while IFS="$T" read -r f cmd; do
+    case "$cmd" in
+      \[*) cmd="$(printf '%s' "$cmd" | python3 -c 'import json, shlex, sys; a = json.load(sys.stdin); print(shlex.join(a[1:]) if a[0] == "CMD" else a[1])')" ;;
+    esac
+    cmd="$(printf '%s' "$cmd" | sed "s#localhost:[0-9][0-9]*#localhost:$APORT#g")"
+    check "$f: healthy although a proxy is set" 'proxied "$cmd" && untouched'
+  done <<< "$HC"
+else
+  echo "  skip (no python3 or curl)"
+fi
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]
