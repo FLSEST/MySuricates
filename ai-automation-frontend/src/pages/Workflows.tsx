@@ -168,40 +168,34 @@ export function Workflows() {
     );
   }, [filtered, t.common.project]);
 
-  useEffect(() => {
-    if (!groupedByProject.length) return;
-    if (collapsedProjects.has('__all__')) {
-      const allIds = new Set(groupedByProject.map((g) => g.projectId));
-      setCollapsedProjects(allIds);
-    }
-  }, [groupedByProject.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const selectedWorkflow = useMemo(() => {
     if (!filtered.length) return null;
     const found = selectedWorkflowId ? filtered.find((w) => w.id === selectedWorkflowId) : null;
     return found ?? filtered[0];
   }, [filtered, selectedWorkflowId]);
 
+  // '__all__' (the default until the first toggle) collapses every project; a toggle expands it
+  // into the ids of the projects shown
   const isProjectCollapsed = useCallback(
-    (projectId: string) => collapsedProjects.has(projectId),
+    (projectId: string) => collapsedProjects.has('__all__') || collapsedProjects.has(projectId),
     [collapsedProjects],
   );
 
   const toggleProject = useCallback((projectId: string) => {
     setCollapsedProjects((prev) => {
-      const next = new Set(prev);
+      const next = prev.has('__all__') ? new Set(groupedByProject.map((g) => g.projectId)) : new Set(prev);
       if (next.has(projectId)) next.delete(projectId);
       else next.add(projectId);
       return next;
     });
-  }, []);
+  }, [groupedByProject]);
 
-  const allCollapsed = groupedByProject.length > 0 && groupedByProject.every((g) => collapsedProjects.has(g.projectId));
+  const allCollapsed = groupedByProject.length > 0 && groupedByProject.every((g) => isProjectCollapsed(g.projectId));
 
   const toggleAll = useCallback(() => {
     setCollapsedProjects((prev) => {
       const allIds = groupedByProject.map((g) => g.projectId);
-      const allAreCollapsed = allIds.every((id) => prev.has(id));
+      const allAreCollapsed = prev.has('__all__') || allIds.every((id) => prev.has(id));
       return allAreCollapsed ? new Set() : new Set(allIds);
     });
   }, [groupedByProject]);

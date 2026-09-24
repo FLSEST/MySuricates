@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, Button } from '../ui';
 import { downloadFromResponse } from '../../utils/downloadFile';
@@ -9,6 +9,8 @@ import { useBackupList, useUpdateSystemSetting } from '../../hooks/useSystem';
 import { api } from '../../api/client';
 import { Database, Download, HardDrive, Archive } from 'lucide-react';
 
+const retainCountKey = ['system', 'settings', 'backup-retain-count'];
+
 export function BackupCard() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -17,22 +19,18 @@ export function BackupCard() {
   const [backupLoading, setBackupLoading] = useState(false);
 
   const { data: retainCountSetting } = useQuery({
-    queryKey: ['system', 'settings', 'backup-retain-count'],
+    queryKey: retainCountKey,
     queryFn: async () => {
       const r = await api.get<{ value: string }>('/system/settings/backup-retain-count');
       return r.value ? parseInt(r.value, 10) : 30;
     },
     staleTime: 5 * 60 * 1000,
   });
-  const [retainCount, setRetainCount] = useState<number>(30);
+  // The field shows the stored value until the user types; the draft only lives while dirty
+  const [retainDraft, setRetainDraft] = useState<number>(30);
   const [retainDirty, setRetainDirty] = useState(false);
+  const retainCount = retainDirty ? retainDraft : (retainCountSetting ?? 30);
   const updateSetting = useUpdateSystemSetting();
-
-  useEffect(() => {
-    if (retainCountSetting != null) {
-      setRetainCount(retainCountSetting);
-    }
-  }, [retainCountSetting]);
 
   const handleBackup = async () => {
     setBackupLoading(true);
@@ -149,7 +147,7 @@ export function BackupCard() {
               max={365}
               value={retainCount}
               onChange={(e) => {
-                setRetainCount(parseInt(e.target.value, 10) || 1);
+                setRetainDraft(parseInt(e.target.value, 10) || 1);
                 setRetainDirty(true);
               }}
               className="w-20 px-2 py-1 text-sm rounded border border-border bg-surface text-text text-right"
@@ -160,7 +158,13 @@ export function BackupCard() {
                 onClick={() => {
                   updateSetting.mutate(
                     { key: 'backup-retain-count', value: String(retainCount) },
-                    { onSuccess: () => setRetainDirty(false) }
+                    {
+                      onSuccess: () => {
+                        // The saved value becomes the stored one, so the field keeps it after the draft ends
+                        queryClient.setQueryData(retainCountKey, retainCount);
+                        setRetainDirty(false);
+                      },
+                    }
                   );
                 }}
                 loading={updateSetting.isPending}

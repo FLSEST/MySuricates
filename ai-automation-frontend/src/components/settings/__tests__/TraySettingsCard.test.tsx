@@ -56,4 +56,24 @@ describe('TraySettingsCard', () => {
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });
+
+  it('follows the stored URL until the user edits it, then keeps the draft', () => {
+    const { rerender } = render(<TraySettingsCard />);
+    expect(screen.getByDisplayValue(settings.publicUrl)).toBeInTheDocument();
+
+    vi.mocked(useTraySettings).mockReturnValue({
+      data: { ...settings, publicUrl: 'https://other.example.com' },
+      isLoading: false,
+    } as never);
+    rerender(<TraySettingsCard />);
+    const field = screen.getByDisplayValue('https://other.example.com');
+
+    fireEvent.change(field, { target: { value: 'https://draft.example.com' } });
+    vi.mocked(useTraySettings).mockReturnValue({
+      data: { ...settings, publicUrl: 'https://third.example.com' },
+      isLoading: false,
+    } as never);
+    rerender(<TraySettingsCard />);
+    expect(screen.getByDisplayValue('https://draft.example.com')).toBeInTheDocument();
+  });
 });
