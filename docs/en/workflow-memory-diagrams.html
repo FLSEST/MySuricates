@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<!-- Generated from docs/workflow-memory-diagrams.md and docs/i18n/workflow-memory-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Workflow Memory</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.8rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    section > ul { color: var(--text); line-height: 1.6; padding-left: 1.2rem; margin-bottom: 1.5rem; }
+    section > p a, .card a { color: var(--accent); }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .card h3 { font-size: 1rem; margin-top: 0; margin-bottom: 0.5rem; }
+    .card p, .card li { font-size: 0.85rem; color: var(--text-muted); }
+    .card ul { padding-left: 1.1rem; }
+    .card code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .tree {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .tree .dir { color: var(--accent); font-weight: 600; }
+    .tree .comment { color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Workflow Memory</h1>
+  <p>Architecture, data flow &amp; file structure</p>
+</header>
+
+<nav>
+  <a href="#system-overview">System Overview</a>
+  <a href="#data-flow-extracting-knowledge">Data Flow: Extracting Knowledge</a>
+  <a href="#summarizer-architecture">Summarizer Architecture</a>
+  <a href="#data-flow-memory-during-workflow-execution">Data Flow: Memory During Workflow Execution</a>
+  <a href="#data-model">Data Model</a>
+  <a href="#file-structure">File Structure</a>
+  <a href="#api-endpoints">API Endpoints</a>
+  <a href="#configuration">Configuration</a>
+</nav>
+
+<main>
+
+<section id="system-overview">
+  <h2>System Overview <span>High-Level Architecture</span></h2>
+  <p>The Workflow Memory feature extracts knowledge from past runs and provides it as context for future executions.</p>
+  <pre class="mermaid">
+graph TB
+    subgraph Browser["Browser (React SPA)"]
+        WMP["WorkflowMemoryPanel.tsx"]
+    end
+
+    subgraph Backend["Backend (Spring Boot :9090)"]
+        CTRL["WorkflowMemoryController"]
+        SVC["WorkflowMemoryService"]
+        PREP["ConversationPreprocessor"]
+        CS["ClaudeSummarizer"]
+        CXS["CodexSummarizer"]
+    end
+
+    subgraph Host["Host (CLI Tools)"]
+        HCLAUDE["HostClaudeService"]
+        HCODEX["HostCodexService"]
+        CLAUDE_CLI["claude -p"]
+        CODEX_CLI["codex exec"]
+    end
+
+    subgraph Storage["Persistence"]
+        DB[("SQLite<br/>workflow_memory<br/>workflow_run")]
+        FS["Filesystem<br/>~/.autotrigger/summarization/"]
+    end
+
+    WMP --&gt;|"POST /extract"| CTRL
+    CTRL --&gt; SVC
+    SVC --&gt; PREP
+    SVC --&gt;|"provider=CLAUDE"| CS
+    SVC --&gt;|"provider=CODEX"| CXS
+    CS --&gt; HCLAUDE
+    CXS --&gt; HCODEX
+    HCLAUDE --&gt; CLAUDE_CLI
+    HCODEX --&gt; CODEX_CLI
+    SVC --&gt;|"load runs / save memory"| DB
+    CLAUDE_CLI --&gt;|"reads CLAUDE.md"| FS
+    CODEX_CLI --&gt;|"reads AGENTS.md"| FS
+
+    style Browser fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Backend fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Host fill:#1a2e1a,stroke:#30363d,color:#e6edf3
+    style Storage fill:#2e1a1a,stroke:#30363d,color:#e6edf3
+  </pre>
+</section>
+
+<section id="data-flow-extracting-knowledge">
+  <h2>Data Flow: Extracting Knowledge <span>POST /api/v1/workflows/{id}/memory/extract</span></h2>
+  <p>Step-by-step flow of extracting knowledge from workflow runs.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant B as Browser
+    participant C as Controller
+    participant S as MemoryService
+    participant P as Preprocessor
+    participant SM as Summarizer<br/>(Claude/Codex)
+    participant CLI as CLI on the host<br/>(claude/codex)
+    participant DB as SQLite
+
+    B-&gt;&gt;C: POST /extract<br/>{provider, runIds?}
+    C-&gt;&gt;S: extractKnowledge()
+    S-&gt;&gt;DB: Load runs<br/>(last 10 or specific IDs)
+    DB--&gt;&gt;S: List&lt;WorkflowRun&gt;
+    S-&gt;&gt;S: Collect StepResults
+    S-&gt;&gt;P: preprocess(steps)
+    Note over P: Compress code blocks<br/>Compress data dumps<br/>Remove meta comments<br/>Merge repeated errors<br/>Reduction: 50-70%
+    P--&gt;&gt;S: preprocessed String
+    S-&gt;&gt;SM: summarize(preprocessed)
+    SM-&gt;&gt;CLI: ProcessBuilder.start()<br/>claude -p / codex exec
+    Note over CLI: The CLI reads instructions<br/>from CLAUDE.md / AGENTS.md<br/>in the working directory
+    CLI--&gt;&gt;SM: TITLE + TAGS + Markdown
+    SM-&gt;&gt;SM: parseResponse()
+    SM--&gt;&gt;S: SummarizationResult
+    S-&gt;&gt;DB: Save WorkflowMemory
+    S--&gt;&gt;C: WorkflowMemory
+    C--&gt;&gt;B: 201 Created + JSON
+
+    Note over C: Error handling:<br/>400 = unknown provider<br/>422 = no runs/steps<br/>502 = CLI error/timeout
+  </pre>
+</section>
+
+<section id="summarizer-architecture">
+  <h2>Summarizer Architecture <span>Provider Abstraction</span></h2>
+  <p>Both providers implement the same interface but use different CLIs following the same pattern.</p>
+  <pre class="mermaid">
+classDiagram
+    class KnowledgeSummarizer {
+        &lt;&lt;interface&gt;&gt;
+        +summarize(preprocessed: String) SummarizationResult
+    }
+    class SummarizationResult {
+        +title: String
+        +content: String
+        +tags: List~String~
+    }
+    class ClaudeSummarizer {
+        -hostClaudeService: HostClaudeService
+        -setupService: SummarizationSetupService
+        +summarize(preprocessed) SummarizationResult
+        +parseResponse(response) SummarizationResult
+    }
+    class CodexSummarizer {
+        -hostCodexService: HostCodexService
+        -setupService: SummarizationSetupService
+        +summarize(preprocessed) SummarizationResult
+        +parseResponse(response) SummarizationResult
+    }
+    class HostClaudeService {
+        +reason(prompt) String
+        +reasonStructured(prompt, systemPrompt, workDir, maxTurns) ReasoningResult
+    }
+    class HostCodexService {
+        +execute(prompt, workDir) String
+        +buildCommand(prompt, workDir, outputFile) List~String~
+    }
+    class SummarizationSetupService {
+        +init() void
+        +getClaudeWorkDir() Path
+        +getCodexWorkDir() Path
+    }
+    class WorkflowMemoryService {
+        +extractKnowledge(workflowId, runIds, provider) WorkflowMemory
+        -getSummarizer(provider) KnowledgeSummarizer
+    }
+
+    KnowledgeSummarizer &lt;|.. ClaudeSummarizer
+    KnowledgeSummarizer &lt;|.. CodexSummarizer
+    KnowledgeSummarizer --o SummarizationResult
+    ClaudeSummarizer --&gt; HostClaudeService
+    ClaudeSummarizer --&gt; SummarizationSetupService
+    CodexSummarizer --&gt; HostCodexService
+    CodexSummarizer --&gt; SummarizationSetupService
+    WorkflowMemoryService --&gt; ClaudeSummarizer
+    WorkflowMemoryService --&gt; CodexSummarizer
+  </pre>
+  <h3>Provider Comparison</h3>
+  <table>
+    <thead><tr><th>Property</th><th>ClaudeSummarizer</th><th>CodexSummarizer</th></tr></thead>
+    <tbody>
+      <tr><td>CLI command</td><td><code>claude -p</code></td><td><code>codex exec</code></td></tr>
+      <tr><td>Max turns</td><td><code>1</code> (no tool use)</td><td>Default (exec mode)</td></tr>
+      <tr><td>Output</td><td>Parse stream JSON</td><td><code>-o result.txt</code></td></tr>
+      <tr><td>Instructions</td><td><code>CLAUDE.md</code></td><td><code>AGENTS.md</code></td></tr>
+      <tr><td>Auth</td><td><code>~/.claude/</code></td><td><code>~/.codex/</code></td></tr>
+      <tr><td>API keys needed?</td><td>No (CLI auth)</td><td>No (CLI auth)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="data-flow-memory-during-workflow-execution">
+  <h2>Data Flow: Memory During Workflow Execution <span>Feedback Loop</span></h2>
+  <p>Activated memories are written into the project directory automatically before a workflow runs.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant WE as WorkflowExecutor
+    participant MS as MemoryService
+    participant DB as SQLite
+    participant FS as Filesystem
+    participant CLI as Claude CLI<br/>(Block Execution)
+
+    WE-&gt;&gt;MS: writeActiveMemoryToProject(wfId, projectPath)
+    MS-&gt;&gt;DB: findByWorkflowIdAndActiveTrue()
+    alt memory exists
+        DB--&gt;&gt;MS: WorkflowMemory
+        MS-&gt;&gt;FS: Write .claude/rules/project-memory.md
+    else no active memory
+        DB--&gt;&gt;MS: empty
+        MS-&gt;&gt;FS: Delete old project-memory.md
+    end
+
+    WE-&gt;&gt;CLI: Start block execution
+    Note over CLI: Claude CLI automatically reads<br/>all .claude/rules/*.md<br/>incl. project-memory.md<br/>as additional context
+
+    CLI--&gt;&gt;WE: Result
+    WE-&gt;&gt;DB: Save WorkflowRun + StepResults
+
+    Note over DB: Stored runs can later<br/>be used for new<br/>memory extraction
+  </pre>
+  <pre class="mermaid">
+graph LR
+    A["Run<br/>workflow"] --&gt; B["Save runs + steps<br/>in the DB"]
+    B --&gt; C["Extract<br/>knowledge"]
+    C --&gt; D["Activate<br/>memory"]
+    D --&gt; E["Provide memory<br/>as context"]
+    E --&gt; A
+
+    style A fill:#1a2e1a,stroke:#3fb950,color:#e6edf3
+    style B fill:#1a1f2e,stroke:#58a6ff,color:#e6edf3
+    style C fill:#2e1a2e,stroke:#bc8cff,color:#e6edf3
+    style D fill:#2e2a1a,stroke:#d29922,color:#e6edf3
+    style E fill:#1a2e1a,stroke:#3fb950,color:#e6edf3
+  </pre>
+</section>
+
+<section id="data-model">
+  <h2>Data Model <span>SQLite Tables</span></h2>
+  <p>Entity-relationship diagram of the tables involved.</p>
+  <pre class="mermaid">
+erDiagram
+    WORKFLOW ||--o{ WORKFLOW_RUN : "has many"
+    WORKFLOW ||--o{ WORKFLOW_MEMORY : "has many"
+    WORKFLOW_RUN ||--o{ STEP_RESULT : "contains"
+    WORKFLOW_MEMORY }o--o{ WORKFLOW_RUN : "extracted from"
+
+    WORKFLOW {
+        text id PK
+        text name
+        text description
+        text instructions
+        text model
+    }
+
+    WORKFLOW_RUN {
+        text id PK
+        text workflow_id FK
+        text status
+        timestamp started_at
+        timestamp finished_at
+    }
+
+    STEP_RESULT {
+        int step_index
+        text input
+        text output
+        text status
+        json metadata
+    }
+
+    WORKFLOW_MEMORY {
+        text id PK
+        text workflow_id FK
+        text title
+        text content
+        json tags
+        json source_run_ids
+        text provider
+        boolean active
+        timestamp created_at
+    }
+  </pre>
+  <div class="grid">
+    <div class="card">
+      <h3>workflow_memory</h3>
+      <p><code>provider</code>: CLAUDE or CODEX</p>
+      <p><code>active</code>: at most 1 active per workflow</p>
+      <p><code>source_run_ids</code>: JSON array of the run IDs used for the extraction</p>
+      <p><code>content</code>: knowledge formatted as Markdown</p>
+    </div>
+    <div class="card">
+      <h3>Relationships</h3>
+      <p>A workflow has many runs and many memories.</p>
+      <p>A memory points via <code>source_run_ids</code> to the runs it was extracted from.</p>
+      <p>Activating a memory sets <code>active=false</code> for all other memories of the same workflow.</p>
+    </div>
+  </div>
+</section>
+
+<section id="file-structure">
+  <h2>File Structure <span>Project + Runtime</span></h2>
+  <p>All files that belong to the Workflow Memory feature. <code>[NEU]</code> (new) = created in this refactoring, <code>[ENTFERNT]</code> (removed) = deleted.</p>
+  <pre class="tree">
+<span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
+├── <span class="dir">config/</span>
+│   ├── SummarizationConfig.java          <span class="comment">← Base-Dir + Timeout Config</span> <span class="badge badge-green">NEU</span>
+│   ├── HostClaudeConfig.java             <span class="comment">← Timeout fuer Claude CLI (besteht)</span>
+│   └── KnowledgeConfig.java              <span class="comment">← OpenAI API-Key Config</span> <span class="badge badge-red">ENTFERNT</span>
+│
+├── <span class="dir">controller/</span>
+│   └── WorkflowMemoryController.java     <span class="comment">← REST API, Error Handling 400/422/502</span>
+│
+├── <span class="dir">dto/</span>
+│   ├── <span class="dir">request/</span>
+│   │   └── ExtractMemoryRequest.java     <span class="comment">← {provider, runIds?}</span>
+│   └── <span class="dir">response/</span>
+│       └── WorkflowMemoryResponse.java   <span class="comment">← DTO fuer Frontend</span>
+│
+├── <span class="dir">entity/</span>
+│   └── WorkflowMemory.java               <span class="comment">← JPA Entity</span>
+│
+├── <span class="dir">mapper/</span>
+│   └── WorkflowMemoryMapper.java         <span class="comment">← MapStruct Entity ↔ DTO</span>
+│
+├── <span class="dir">repository/</span>
+│   └── WorkflowMemoryRepository.java     <span class="comment">← Spring Data JPA</span>
+│
+├── <span class="dir">service/ai/</span>
+│   ├── HostClaudeService.java            <span class="comment">← +reasonStructured(workDir, maxTurns)</span>
+│   └── HostCodexService.java             <span class="comment">← codex exec Wrapper</span> <span class="badge badge-green">NEU</span>
+│
+└── <span class="dir">service/memory/</span>
+    ├── KnowledgeSummarizer.java          <span class="comment">← Interface + SummarizationResult</span>
+    ├── ClaudeSummarizer.java             <span class="comment">← claude -p, --max-turns 1, Work Dir</span>
+    ├── CodexSummarizer.java              <span class="comment">← codex exec, Work Dir</span> <span class="badge badge-green">NEU</span>
+    ├── OpenAiSummarizer.java             <span class="comment">← REST + API-Key</span> <span class="badge badge-red">ENTFERNT</span>
+    ├── ConversationPreprocessor.java     <span class="comment">← Regelbasierte Kompression</span>
+    ├── SummarizationSetupService.java    <span class="comment">← Work Dirs + .md Setup bei Start</span> <span class="badge badge-green">NEU</span>
+    └── WorkflowMemoryService.java        <span class="comment">← Orchestrierung, getSummarizer()</span>
+
+<span class="dir">ai-automation-backend/src/main/resources/</span>
+├── agent-instructions.md                 <span class="comment">← Base Instructions (Block-Execution)</span>
+├── application.yml                       <span class="comment">← +summarization.base-dir/timeout</span>
+├── <span class="dir">db/migration/</span>
+│   └── V16__create_workflow_memory_table.sql
+└── <span class="dir">summarization/</span> <span class="badge badge-green">NEU</span>
+    ├── claude-summarizer.md              <span class="comment">← Template → CLAUDE.md</span>
+    └── codex-summarizer.md               <span class="comment">← Template → AGENTS.md</span>
+
+<span class="dir">ai-automation-backend/src/test/java/com/automation/</span>
+├── <span class="dir">service/ai/</span>
+│   ├── HostClaudeServiceTest.java        <span class="comment">← +customMaxTurns Test</span>
+│   └── HostCodexServiceTest.java <span class="badge badge-green">NEU</span>
+└── <span class="dir">service/memory/</span>
+    ├── ClaudeSummarizerTest.java         <span class="comment">← Angepasst an WorkDir</span>
+    ├── CodexSummarizerTest.java <span class="badge badge-green">NEU</span>
+    ├── ConversationPreprocessorTest.java
+    └── WorkflowMemoryServiceTest.java    <span class="comment">← CodexSummarizer statt OpenAi</span>
+
+<span class="dir">ai-automation-frontend/src/</span>
+├── <span class="dir">components/workflow/</span>
+│   └── WorkflowMemoryPanel.tsx           <span class="comment">← Provider: OPENAI → CODEX</span>
+├── <span class="dir">hooks/</span>
+│   └── useWorkflowMemory.ts              <span class="comment">← TanStack Query Hooks</span>
+└── <span class="dir">types/</span>
+    └── index.ts                          <span class="comment">← WorkflowMemory, ExtractMemoryRequest</span>
+
+<span class="dir">~/.autotrigger/summarization/</span>             <span class="comment">← Runtime (erstellt bei Backend-Start)</span>
+├── <span class="dir">claude/</span>
+│   └── CLAUDE.md                         <span class="comment">← Kopie von claude-summarizer.md</span>
+└── <span class="dir">codex/</span>
+    └── AGENTS.md                         <span class="comment">← Kopie von codex-summarizer.md</span>
+
+<span class="dir">docs/</span>
+└── workflow-memory-architecture.md <span class="badge badge-green">NEU</span>
+  </pre>
+</section>
+
+<section id="api-endpoints">
+  <h2>API Endpoints <span>/api/v1/workflows/{id}/memory</span></h2>
+  <table>
+    <thead><tr><th>Method</th><th>Path</th><th>Description</th><th>Response</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET</code></td><td><code>/memory</code></td><td>All memories of a workflow</td><td><code>200</code> List&lt;WorkflowMemoryResponse&gt;</td></tr>
+      <tr><td><code>POST</code></td><td><code>/memory/extract</code></td><td>Extract knowledge (~30-60s)</td><td><code>201</code> / <code>400</code> / <code>422</code> / <code>502</code></td></tr>
+      <tr><td><code>PUT</code></td><td><code>/memory/{memId}</code></td><td>Update title/content</td><td><code>200</code> WorkflowMemoryResponse</td></tr>
+      <tr><td><code>PUT</code></td><td><code>/memory/{memId}/activate</code></td><td>Activate memory (deactivates the others)</td><td><code>200</code></td></tr>
+      <tr><td><code>DELETE</code></td><td><code>/memory/{memId}</code></td><td>Delete memory</td><td><code>204</code></td></tr>
+    </tbody>
+  </table>
+  <h3>Error Responses (POST /extract)</h3>
+  <table>
+    <thead><tr><th>Status</th><th>Cause</th><th>Body</th></tr></thead>
+    <tbody>
+      <tr><td><code>400</code></td><td>Unknown provider</td><td><code>{"error": "Unknown provider: X"}</code></td></tr>
+      <tr><td><code>422</code></td><td>No runs or steps</td><td><code>{"error": "No runs found..."}</code></td></tr>
+      <tr><td><code>502</code></td><td>CLI timeout / crash</td><td><code>{"error": "Knowledge extraction failed: ..."}</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="configuration">
+  <h2>Configuration <span>application.yml</span></h2>
+  <pre class="mermaid">
+graph LR
+    subgraph YAML["application.yml"]
+        S["automation.summarization"]
+        S --&gt; BD["base-dir<br/><i>~/.autotrigger/summarization</i>"]
+        S --&gt; TO["timeout-seconds<br/><i>120</i>"]
+    end
+    subgraph ENV["Environment Variables"]
+        E1["AUTOMATION_SUMMARIZATION_DIR"]
+        E2["AUTOMATION_SUMMARIZATION_TIMEOUT"]
+    end
+    E1 -.-&gt;|"overrides"| BD
+    E2 -.-&gt;|"overrides"| TO
+
+    style YAML fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style ENV fill:#2e2a1a,stroke:#30363d,color:#e6edf3
+  </pre>
+  <div class="grid">
+    <div class="card">
+      <h3>Prerequisites</h3>
+      <ul>
+        <li><code>claude</code> CLI installed and authenticated (<code>~/.claude/</code>)</li>
+        <li><code>codex</code> CLI installed and authenticated (<code>~/.codex/</code>)</li>
+        <li>No API keys needed in the app configuration</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Startup</h3>
+      <ul>
+        <li><code>SummarizationSetupService.init()</code> runs at backend start</li>
+        <li>Creates the working directories if they do not exist</li>
+        <li>Copies the instruction templates from the resources into the directories</li>
+        <li>Overwrites them on every start (latest bundled version)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>

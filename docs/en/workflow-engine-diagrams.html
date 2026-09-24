@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<!-- Generated from docs/workflow-engine-diagrams.md and docs/i18n/workflow-engine-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoPilot — Workflow Engine</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --red: #f85149;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 600; }
+    header p { color: var(--text-muted); margin-top: 0.3rem; }
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0.8rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav a {
+      color: var(--accent);
+      text-decoration: none;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    nav a:hover { background: rgba(88,166,255,0.1); }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    section h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    section h2 span { font-size: 0.85rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem; }
+    section h3 { font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.8rem; }
+    section > p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    section > ul { color: var(--text); line-height: 1.6; padding-left: 1.2rem; margin-bottom: 1.5rem; }
+    section > p a, .card a { color: var(--accent); }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    td code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1rem 0; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+    }
+    .card h3 { font-size: 1rem; margin-top: 0; margin-bottom: 0.5rem; }
+    .card p, .card li { font-size: 0.85rem; color: var(--text-muted); }
+    .card ul { padding-left: 1.1rem; }
+    .card code {
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .tree {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg);
+      padding: 1.5rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .tree .dir { color: var(--accent); font-weight: 600; }
+    .tree .comment { color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-red { background: rgba(248,81,73,0.15); color: var(--red); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+    .badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AutoPilot — Workflow Engine</h1>
+  <p>Core logic, execution modes (with/without AI) and control flows</p>
+</header>
+
+<nav>
+  <a href="#system-overview">System Overview</a>
+  <a href="#execution-default-ai-assisted">Execution (Default, AI-Assisted)</a>
+  <a href="#execution-without-ai">Execution (Without AI)</a>
+  <a href="#agentic-loop">Agentic Loop</a>
+  <a href="#control-flow">Control Flow</a>
+  <a href="#provider-execution-modes">Provider &amp; Execution Modes</a>
+  <a href="#block-matrix">Block Matrix</a>
+  <a href="#configuration">Configuration</a>
+  <a href="#file-structure">File Structure</a>
+</nav>
+
+<main>
+
+<section id="system-overview">
+  <h2>System Overview <span>High-Level</span></h2>
+  <p>All workflows run through the WorkflowExecutor. It orchestrates BlockExecutors, container start, skill context and WebSocket logs.</p>
+  <pre class="mermaid">
+flowchart LR
+    subgraph Browser["Browser (React SPA)"]
+        UI["Workflow Pages + Live Logs"]
+    end
+
+    subgraph Backend["Backend (Spring Boot)"]
+        WE["WorkflowExecutor"]
+        BE["BlockExecutors"]
+        CES["CommandExecutorService"]
+        SCS["ShellCommandService"]
+        HCL["HostClaudeService"]
+        WS["/topic/executions/{runId}/logs"]
+    end
+
+    subgraph Runtime["Runtime Target"]
+        CON["Docker Container (project)"]
+        HOST["Host (fallback)"]
+    end
+
+    UI --&gt;|"POST /workflows/{id}/execute"| WE
+    WE --&gt;|"blocks"| BE
+    BE --&gt;|"claude"| CES
+    BE --&gt;|"shell"| SCS
+    CES --&gt;|"CLI"| CON
+    SCS --&gt; CON
+    CES -.fallback.-&gt; HOST
+    SCS -.fallback.-&gt; HOST
+    WE --&gt; WS
+    WS --&gt; UI
+
+    style Browser fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Backend fill:#1a1f2e,stroke:#30363d,color:#e6edf3
+    style Runtime fill:#1a2e1a,stroke:#3fb950,color:#e6edf3
+  </pre>
+</section>
+
+<section id="execution-default-ai-assisted">
+  <h2>Execution (Default, AI-Assisted) <span>Reason/Act</span></h2>
+  <p>Default: commands go to the Claude CLI (host/container). Instruction prefix + model come from the workflow.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant UI as Frontend
+    participant WE as WorkflowExecutor
+    participant BE as BlockExecutor
+    participant CES as CommandExecutorService
+    participant CLI as Claude CLI
+    participant WS as WebSocket
+
+    UI-&gt;&gt;WE: POST /workflows/{id}/execute
+    WE-&gt;&gt;WE: create WorkflowRun (RUNNING)
+    WE-&gt;&gt;WE: ensureContainerRunning()
+    WE-&gt;&gt;BE: for block in blocks
+    BE-&gt;&gt;CES: executeStepOnHost/Container(command, model, instructions)
+    CES-&gt;&gt;CLI: claude -p "&lt;command&gt;"
+    CLI--&gt;&gt;CES: output + exitCode + usage
+    CES--&gt;&gt;BE: StepResult (status by exitCode)
+    BE--&gt;&gt;WE: add StepResult, set previous_output
+    WE-&gt;&gt;WS: broadcast step log
+    alt step failed &amp; on_failure=stop
+        WE-&gt;&gt;WE: mark RUN FAILED
+    end
+    WE-&gt;&gt;WE: mark RUN COMPLETED/FAILED
+    WE-&gt;&gt;WS: final status event
+  </pre>
+</section>
+
+<section id="execution-without-ai">
+  <h2>Execution (Without AI) <span>Shell Paths</span></h2>
+  <p>Shell mode uses no models and no instruction prefixes; it only evaluates the exit code.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant BE as BlockExecutor
+    participant SCS as ShellCommandService
+    participant SH as Shell
+    participant WE as WorkflowExecutor
+
+    BE-&gt;&gt;SCS: execute(command, workDir, timeout)
+    SCS-&gt;&gt;SH: run command
+    SH--&gt;&gt;SCS: output + exitCode
+    SCS--&gt;&gt;BE: StepResult (status by exitCode)
+    BE--&gt;&gt;WE: add StepResult
+  </pre>
+  <div class="grid">
+    <div class="card">
+      <h3>When Shell?</h3>
+      <ul>
+        <li>Block type <code>shell</code></li>
+        <li><code>execution_mode=shell</code> for foreach/while/retry</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Differences</h3>
+      <ul>
+        <li>No model / no prompt limit</li>
+        <li>Deterministic through the exit code</li>
+        <li>No token metadata</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="agentic-loop">
+  <h2>Agentic Loop <span>Reason–Act–Observe</span></h2>
+  <p>Multi-step AI planning with token and time budgets, a repetition stop and optional approval.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant AG as AgenticBlockExecutor
+    participant HC as HostClaudeService
+    participant CLI as claude -p (reasonStructured)
+    participant CES as CommandExecutorService (ACT)
+    participant CLI2 as claude -p (action)
+
+    AG-&gt;&gt;HC: buildConversationPrompt + reasonStructured()
+    HC-&gt;&gt;CLI: stream-json
+    CLI--&gt;&gt;HC: structured reasoning
+    HC--&gt;&gt;AG: RATIONALE + ACTION
+    alt ACTION empty
+        AG-&gt;&gt;AG: ask for clearer action
+    else ACTION present
+        AG-&gt;&gt;CES: executeCommandOnHost(action, model, sysPrompt)
+        CES-&gt;&gt;CLI2: run action
+        CLI2--&gt;&gt;CES: output + exitCode + usage
+        CES--&gt;&gt;AG: result
+    end
+    AG-&gt;&gt;AG: record iteration, token budget, repetition check
+    AG-&gt;&gt;AG: stop if goal ACHIEVED/IMPOSSIBLE/timeout/repeat/token
+  </pre>
+</section>
+
+<section id="control-flow">
+  <h2>Control Flow <span>Conditional &amp; Approval</span></h2>
+  <p>Branching and user gates within a run.</p>
+  <pre class="mermaid">
+flowchart LR
+    A["conditional block<br/>condition -&gt; Claude TRUE/FALSE"] --&gt;|then| T["run then_command (simple)"]
+    A --&gt;|else| E["run else_command (simple)"]
+    subgraph Approval
+        Q["approval block<br/>question + options"] --&gt; MEM["remember 'Yes always' per run"]
+        Q --&gt; OUTC["answer stored as variable"]
+        Q --&gt; DEC{"on_no"}
+        DEC --&gt;|fail| FAIL["Step FAILED"]
+        DEC --&gt;|skip| SKIP["Step SKIPPED"]
+        DEC --&gt;|continue| CONT["Step COMPLETED"]
+    end
+  </pre>
+</section>
+
+<section id="provider-execution-modes">
+  <h2>Provider &amp; Execution Modes <span>AI vs. No AI</span></h2>
+  <table>
+    <thead><tr><th>Aspect</th><th>AI (Claude)</th><th>Without AI (Shell)</th></tr></thead>
+    <tbody>
+      <tr><td>CLI</td><td><code>claude -p</code></td><td>System shell</td></tr>
+      <tr><td>Context</td><td>Instruction prefix, skill context, previous_output</td><td>Shell command string only</td></tr>
+      <tr><td>Determinism</td><td>Lower (LLM)</td><td>High (exit code)</td></tr>
+      <tr><td>Telemetry</td><td>Tokens/cost in StepResult.metadata</td><td>exitCode + duration</td></tr>
+      <tr><td>Fallback</td><td>Host, if the container does not start</td><td>Host, same path</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="block-matrix">
+  <h2>Block Matrix <span>Type → Exec Mode</span></h2>
+  <table>
+    <thead><tr><th>Block</th><th>Default</th><th>Options</th><th>Stop on failure</th></tr></thead>
+    <tbody>
+      <tr><td><code>simple</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Yes (default)</td></tr>
+      <tr><td><code>shell</code></td><td>shell</td><td><code>timeout_seconds</code></td><td>Yes</td></tr>
+      <tr><td><code>retry</code></td><td>claude</td><td><code>execution_mode</code>=shell/ai, <code>max_retries</code>, <code>delay</code>, <code>exponential_backoff</code>, <code>timeout_seconds</code></td><td>Yes (when all attempts fail)</td></tr>
+      <tr><td><code>foreach</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>items_source</code>=list/command, <code>timeout_seconds</code></td><td>Aggregated result</td></tr>
+      <tr><td><code>while</code></td><td>claude</td><td><code>execution_mode</code>=shell, <code>condition_command</code>, <code>timeout_seconds</code></td><td>Yes, on an inner failure</td></tr>
+      <tr><td><code>conditional</code></td><td>claude</td><td><code>timeout_seconds</code></td><td>Branch-specific</td></tr>
+      <tr><td><code>approval</code></td><td>-</td><td><code>mode</code>=ask/auto, <code>on_no</code>=fail/skip/continue</td><td>on_no=fail</td></tr>
+      <tr><td><code>skill-capability</code></td><td>claude</td><td><code>params</code>, <code>input</code>, <code>timeout_seconds</code></td><td>Yes</td></tr>
+      <tr><td><code>sub-workflow</code></td><td>depends</td><td>Depth&lt;=5, timeout 30 min</td><td>Yes, on timeout/cycle</td></tr>
+      <tr><td><code>agentic</code></td><td>claude</td><td>Budget, iterations, approval, <code>timeout_seconds</code></td><td>Yes, on stop reasons</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="configuration">
+  <h2>Configuration <span>application.yml (relevant)</span></h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Execution Limits</h3>
+      <p><code>automation.execution.max-concurrent</code>: parallel runs</p>
+      <p><code>automation.host-claude.timeout-seconds</code>: CLI timeout</p>
+      <p><code>docker.container.idle-timeout-minutes</code>: container idle stop</p>
+    </div>
+    <div class="card">
+      <h3>Security</h3>
+      <p><code>automation.security.enabled</code> / <code>api-key</code></p>
+      <p><code>rate-limit</code> defaults disabled</p>
+      <p>CORS: <code>automation.cors.allowed-origins</code></p>
+    </div>
+  </div>
+</section>
+
+<section id="file-structure">
+  <h2>File Structure <span>Core Classes</span></h2>
+  <pre class="tree">
+<span class="dir">ai-automation-backend/src/main/java/com/automation/</span>
+├── <span class="dir">executor/</span>
+│   ├── ExecutionContext.java
+│   ├── BlockExecutor.java
+│   ├── <span class="dir">blocks/</span> (Simple, Shell, Retry, ForEach, While, Conditional, Approval, SkillCapability, SubWorkflow, Agentic)
+├── <span class="dir">service/workflow/</span>
+│   ├── WorkflowExecutor.java
+│   └── AgentInstructionsService.java
+├── <span class="dir">service/cli/</span>
+│   ├── CommandExecutorService.java
+│   ├── ShellCommandService.java
+│   └── CliSessionManager.java
+└── <span class="dir">service/ai/</span>
+    └── HostClaudeService.java
+  </pre>
+</section>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1a2e3e',
+      primaryTextColor: '#e6edf3',
+      primaryBorderColor: '#58a6ff',
+      lineColor: '#8b949e',
+      secondaryColor: '#2e1a2e',
+      tertiaryColor: '#1a2e1a',
+      background: '#0d1117',
+      mainBkg: '#161b22',
+      nodeBorder: '#30363d',
+      clusterBkg: '#161b22',
+      clusterBorder: '#30363d',
+      titleColor: '#e6edf3',
+      edgeLabelBackground: '#161b22'
+    },
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { actorMargin: 50, messageMargin: 40 },
+    er: { layoutDirection: 'LR' }
+  });
+</script>
+
+</body>
+</html>

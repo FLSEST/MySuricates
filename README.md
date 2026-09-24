@@ -26,7 +26,7 @@ architectural debt is known and is tracked within the system itself as audit fin
 | [Concepts](docs/en/konzepte/README.md) | Eight mechanisms to adopt — gates, self-improvement, hardening, and more — each with a flow diagram, code evidence, and dated measurement |
 | [Workflow Guide](docs/en/WORKFLOW-GUIDE.md) | Block types, patterns, timeouts |
 | [Architecture](docs/en/architektur.md) | System overview, layers, data flow, security |
-| [Diagrams](docs/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
+| [Diagrams](docs/en/diagramme.md) | Nine pages of flow and architecture diagrams (engine, control and status, scheduler, skills, memory, request path, frontend, deployment, logging, and monitoring) |
 | [API Reference](docs/en/api-referenz.md) | REST endpoints with request/response |
 | [Data Model](docs/en/datenmodell.md) | Entities, DB schema, migrations |
 | [Frontend](docs/en/frontend.md) | Pages, components, hooks, design system |

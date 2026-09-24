@@ -11,6 +11,9 @@ This page describes its internal structure. For getting started see
 > MySuricates instance. They record when and why something came about — from the
 > outside, only the commit can be looked up.
 
+> The flows on this page also exist as diagrams: [docs/en/diagramme.md](diagramme.md)
+> — engine, scheduler, skills, memory, request path, frontend, deployment.
+
 ## System Overview
 
 ```

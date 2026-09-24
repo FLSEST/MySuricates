@@ -10,12 +10,15 @@ beide zu **Falschbefunden** gefuehrt haetten — der teuersten Sorte Fehler in e
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
 """
+import contextlib
 import importlib.util
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "public-readiness" / "docs_parity_check.py"
@@ -123,11 +126,18 @@ class GateTest(unittest.TestCase):
 
     def test_known_gap_stays_green(self):
         # Eine Luecke, die in KNOWN_GAPS steht, meldet das Gate als bekannt und bleibt gruen.
+        # KNOWN_GAPS ist seit TODO 47bd4d27 leer; geprueft wird der Mechanismus mit einem
+        # Testeintrag — im selben Prozess, weil ein Unterprozess die Ersetzung nicht saehe.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp, extra_de_file="diagramme.md")
-            code, out = run_script(root)
+            argv = ["docs_parity_check.py", "--root", str(root)]
+            with mock.patch.dict(dpc.KNOWN_GAPS, {"docs/diagramme.md": "test"}), \
+                    mock.patch.object(sys, "argv", argv), \
+                    contextlib.redirect_stdout(io.StringIO()) as buffer:
+                code = dpc.main()
+            out = buffer.getvalue()
             self.assertEqual(code, 0, out)
-            self.assertIn("bekannt: kein-en-gegenstueck docs/diagramme.md", out)
+            self.assertIn("bekannt: kein-en-gegenstueck docs/diagramme.md (bekannt, TODO test)", out)
             self.assertIn("gate_status: GREEN", out)
 
     def test_english_link_to_german_page_is_reported_not_failed(self):

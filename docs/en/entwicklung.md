@@ -754,6 +754,51 @@ not reach for it by reflex. A hit on message or address is healed by `git commit
 `--reset-author` after `git config user.email …`), older commits by `git rebase -i`.
 Self-test: `bash scripts/tests/test-pre-push-checks.sh`.
 
+## Diagram pages
+
+The diagram documents under `docs/` exist twice: as Markdown (`<name>-diagrams.md`) and as HTML
+(`<name>-diagrams.html`). **The Markdown file is the source** — GitHub renders ```mermaid fences
+natively but does not render HTML files in the repository at all. The HTML version is meant for
+GitHub Pages and is generated, as is the index [docs/en/diagramme.md](diagramme.md):
+
+```bash
+python3 scripts/docs-diagrams.py                # regenerate HTML, English pages and indexes
+python3 scripts/docs-diagrams.py --check        # reports drift and translation gaps, exit code 1
+python3 scripts/docs-diagrams.py --add-missing  # add missing translation keys with empty values
+python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
+```
+
+Generated means complete, not just the diagrams. The prose, tables, cards and file trees of the HTML
+page come from the same Markdown file; otherwise the rest of the page would be a second,
+hand-maintained version. Editing an HTML file by hand therefore does not last — the next run
+overwrites it, and `--check` reports it in CI first.
+
+The HTML shell (colors, layout, Mermaid integration) is a template in the script, the same for all
+pages. Which Markdown features the template supports is described in the header comment of
+`scripts/docs-diagrams.py`; headings, paragraphs, lists, tables, code fences and the usual inline
+markup are all that is needed.
+
+**English version.** The German page is the source. `docs/en/<name>-diagrams.md` and `.html` as well
+as `docs/en/diagramme.md` are generated from it — there is no second, hand-maintained version.
+Structure, diagram skeletons, code blocks and file trees come from the German page, the text from one
+translation table per page, `docs/i18n/<name>-diagrams.en.json` (the same pattern as the UI's
+`de.ts`/`en.ts`): the key is the German text segment, the value its English translation. Segments are
+titles, subtitles, headings with their tagline, paragraphs, list items, table cells and the Mermaid
+labels — node texts, edge labels, `subgraph` titles, notes, sequence messages, `alt`/`loop` labels;
+the rules per diagram type live in `scripts/lib/mermaid_labels.py`. Node IDs are never translated,
+even where Mermaid displays them (`PENDING --> RUNNING`, `subgraph Compose`): whatever should read
+differently in the two languages needs a label (`ID["Text"]`). A segment without letters outside
+inline code needs no entry; a value equal to its key is fine (class names, labels that are already
+English).
+
+`--check` fails when a segment has no translation (key missing or value empty), when a key is
+orphaned, when a value states inline code or numbers differently from the original, or when the
+translation changes the page structure or a diagram's skeleton. Whoever changes a German diagram page
+therefore updates the table in the same commit: `--add-missing` adds new keys with an empty value in
+reading order; orphaned keys stay until someone deletes them — often their value, slightly adjusted,
+is the translation of the new key. Unknown Mermaid syntax (a new diagram type, a line without a rule)
+aborts with exit code 2 instead of letting German text through silently.
+
 ## Dependency advisories (frontend)
 
 `npm audit` in the frontend reports **0 vulnerabilities** after the updates from 2026-09-12.
