@@ -708,6 +708,8 @@ WebSocket connection for real-time status updates and push events from the assis
 | `useDeleteCredentials()` | Mutation | Delete credentials |
 | `useTestIntegrationAction()` | Mutation | Test provider action |
 
+The `/integrations` page is built from `components/integrations/ProviderCard` (card with status, permissions, connect/disconnect) and `ProviderDetailPanel` (connection, permissions, configuration, action test; fresh per provider, so folded and without an old result). `hooks/useProviderCopy.ts` provides the display texts per provider (name, description, actions; DE/EN, otherwise the backend text), `hooks/useIntegrationActionTest.ts` the test run of an action (running action, result as JSON).
+
 ### `useWorkflowVersions.ts`
 
 | Hook | Type | Description |

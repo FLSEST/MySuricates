@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -172,5 +172,49 @@ describe('Integrations — HTTP API provider', () => {
     expect(await screen.findByPlaceholderText(/Base URL, e\.g\. https:\/\/api\.example\.com\/v1/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Auth header \(optional\)/)).toHaveAttribute('type', 'password');
     expect(screen.getByText('Several services: named connections')).toBeInTheDocument();
+  });
+});
+
+describe('Integrations — cards and action test', () => {
+  const connectedSlack: IntegrationProviderInfo = {
+    ...connectedGithub,
+    providerId: 'example-chat',
+    displayName: 'Example Chat',
+    scopes: null,
+    optionalScopes: [],
+    actions: [{ name: 'post_message', description: 'Post a message', inputSchema: {}, available: false }],
+  };
+
+  it('colours the card icon by status with the theme tokens', async () => {
+    useProviders([connectedGithub, { ...connectedSlack, status: 'DISCONNECTED', configured: false }]);
+    renderWithProviders(<Integrations />);
+
+    const connectedIcon = (await screen.findByText('GitHub')).closest('.flex.items-start')!.firstElementChild!;
+    expect(connectedIcon).toHaveClass('bg-success/10', 'text-success');
+    const setupIcon = screen.getByText('Example Chat').closest('.flex.items-start')!.firstElementChild!;
+    expect(setupIcon).toHaveClass('bg-warning/10', 'text-warning');
+    expect(document.querySelector('[class*="green-500"], [class*="amber-500"]')).toBeNull();
+  });
+
+  it('runs an action, shows the result, and starts fresh for another provider', async () => {
+    const calls: string[] = [];
+    useProviders([connectedGithub, connectedSlack]);
+    server.use(http.post(`${BASE}/integrations/:providerId/actions/:action`, ({ params }) => {
+      calls.push(`${params.providerId}/${params.action}`);
+      return HttpResponse.json({ repos: 2 });
+    }));
+    await selectGithub();
+
+    const row = (await screen.findByText('list_repos')).closest('.justify-between') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Run' }));
+    expect(await screen.findByText('Result')).toBeInTheDocument();
+    expect(screen.getByText(/"repos": 2/)).toBeInTheDocument();
+    expect(calls).toEqual(['github/list_repos']);
+
+    // Another connected provider: no result carried over; its missing scope is a warning
+    fireEvent.click(screen.getByText('Example Chat'));
+    expect(await screen.findByText('post_message')).toBeInTheDocument();
+    expect(screen.queryByText('Result')).not.toBeInTheDocument();
+    expect(screen.getByText('Permission missing — reconnect with the required scope')).toHaveClass('text-warning');
   });
 });

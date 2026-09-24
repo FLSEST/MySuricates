@@ -708,6 +708,8 @@ WebSocket-Verbindung für Echtzeit-Status-Updates und Push-Events des Assistente
 | `useDeleteCredentials()` | Mutation | Credentials löschen |
 | `useTestIntegrationAction()` | Mutation | Provider-Aktion testen |
 
+Die Seite `/integrations` setzt sich aus `components/integrations/ProviderCard` (Karte mit Status, Berechtigungen, Verbinden/Trennen) und `ProviderDetailPanel` (Verbindung, Berechtigungen, Konfiguration, Aktionstest; je Anbieter neu, also eingeklappt und ohne altes Ergebnis) zusammen. `hooks/useProviderCopy.ts` liefert die Anzeigetexte je Anbieter (Name, Beschreibung, Aktionen; DE/EN, sonst der Text des Backends), `hooks/useIntegrationActionTest.ts` den Probelauf einer Aktion (laufende Aktion, Ergebnis als JSON).
+
 ### `useWorkflowVersions.ts`
 
 | Hook | Typ | Beschreibung |
