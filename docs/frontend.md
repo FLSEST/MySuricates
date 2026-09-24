@@ -96,7 +96,8 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Projekt-Cards mit Typ-Icon und Farbcodierung
 - Start/Stop-Buttons für Docker-Container
 - Detail-Seite: Projektinfo, Container-Status, zugehörige Workflows
-- Modals: Erstellen, Bearbeiten, Löschen-Bestätigung
+- Modals: Erstellen, Bearbeiten, Archivieren-Bestätigung (`ConfirmModal`)
+- Bausteine der Detail-Seite in `components/project/`: `ProjectContainerCard` (Image, Status, Start/Stop) und `ProjectAiContextCard` (KI-Kontext samt Editor-Dialog und „Automatisch erzeugen“); der Bearbeiten-Dialog nutzt dieselben `ProjectFormFields` wie das Anlegen
 
 ### Workflows (`/workflows`, `/workflows/:id`)
 

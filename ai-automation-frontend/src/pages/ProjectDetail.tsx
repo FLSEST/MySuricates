@@ -1,27 +1,20 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Archive, ArrowLeft, Play, Square, Pencil, GitBranch, Container as ContainerIcon,
-  Brain, Sparkles,
-} from 'lucide-react';
-import { ModalFooter } from '../components/ui';
-import { Card, CardHeader, Button, Input, Select, Modal, ConfirmModal, Spinner, DirectoryPicker } from '../components/ui';
-import { MonacoEditor } from '../components/shared/MonacoEditor';
+import { Archive, ArrowLeft, Pencil, GitBranch } from 'lucide-react';
+import { Card, CardHeader, Button, Modal, ModalFooter, ConfirmModal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
-import {
-  useProject, useUpdateProject, useArchiveProject,
-  useStartContainer, useStopContainer, useGenerateProjectContext,
-} from '../hooks/useProjects';
+import { useProject, useUpdateProject, useArchiveProject } from '../hooks/useProjects';
 import { OnboardingCard } from '../components/project/OnboardingCard';
+import { ProjectFormFields } from '../components/project/ProjectFormFields';
+import { ProjectAiContextCard } from '../components/project/ProjectAiContextCard';
+import { ProjectContainerCard } from '../components/project/ProjectContainerCard';
+import { EMPTY_PROJECT_FORM, type ProjectFormValues } from '../components/project/projectForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useI18nStore, useT } from '../i18n';
 import { formatDate } from '../utils/localeFormat';
-import type { ProjectType } from '../types';
-
-const PROJECT_TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSONAL'];
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,15 +27,10 @@ export function ProjectDetail() {
   const onboardingModule = useModuleEnabled('onboarding-profiles');
   const updateProject = useUpdateProject();
   const archiveProject = useArchiveProject();
-  const startContainer = useStartContainer();
-  const stopContainer = useStopContainer();
-  const generateContext = useGenerateProjectContext();
 
   const [showEdit, setShowEdit] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const [showAiContext, setShowAiContext] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', subtitle: '', description: '', type: 'CODE' as ProjectType, path: '' });
-  const [editAiContext, setEditAiContext] = useState('');
+  const [editForm, setEditForm] = useState<ProjectFormValues>(EMPTY_PROJECT_FORM);
 
   const projectWorkflows = workflows?.filter((w) => w.projectId === id) ?? [];
 
@@ -63,31 +51,11 @@ export function ProjectDetail() {
     setShowEdit(true);
   };
 
-  const openAiContext = () => {
-    setEditAiContext(project.aiContext ?? '');
-    setShowAiContext(true);
-  };
-
   const handleUpdate = () => {
     updateProject.mutate(
       { id: project.id, data: editForm },
       { onSuccess: () => setShowEdit(false) }
     );
-  };
-
-  const handleSaveAiContext = () => {
-    updateProject.mutate(
-      { id: project.id, data: { aiContext: editAiContext } },
-      { onSuccess: () => setShowAiContext(false) }
-    );
-  };
-
-  const handleGenerate = () => {
-    generateContext.mutate(project.id, {
-      onSuccess: (data) => {
-        setEditAiContext(data.context);
-      },
-    });
   };
 
   const handleArchive = () => {
@@ -149,73 +117,10 @@ export function ProjectDetail() {
           </div>
         </Card>
 
-        {/* Container status */}
-        <Card>
-          <CardHeader
-            title={t.projects.status}
-            subtitle={project.container?.dockerContainerId?.slice(0, 12) ?? '-'}
-          />
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-surface">
-                <ContainerIcon className="w-5 h-5 text-text-secondary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-text">
-                  {project.container?.imageName ?? 'No container'}
-                </p>
-                <StatusBadge status={project.container?.status ?? 'STOPPED'} />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {project.status === 'STOPPED' || project.status === 'ERROR' ? (
-                <Button
-                  size="sm"
-                  icon={<Play className="w-4 h-4" />}
-                  onClick={() => startContainer.mutate(project.id)}
-                  loading={startContainer.isPending}
-                >
-                  {t.projects.startContainer}
-                </Button>
-              ) : project.status === 'RUNNING' ? (
-                <Button
-                  variant="danger"
-                  size="sm"
-                  icon={<Square className="w-4 h-4" />}
-                  onClick={() => stopContainer.mutate(project.id)}
-                  loading={stopContainer.isPending}
-                >
-                  {t.projects.stopContainer}
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </Card>
+        <ProjectContainerCard project={project} />
       </div>
 
-      {/* AI Context */}
-      <Card>
-        <CardHeader
-          title={t.projects.aiContext}
-          action={
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={<Brain className="w-4 h-4" />}
-              onClick={openAiContext}
-            >
-              {t.projects.editAiContext}
-            </Button>
-          }
-        />
-        {project.aiContext ? (
-          <pre className="text-sm text-text-secondary whitespace-pre-wrap font-mono bg-surface rounded-lg p-3 max-h-48 overflow-y-auto">
-            {project.aiContext}
-          </pre>
-        ) : (
-          <p className="text-sm text-text-tertiary">{t.projects.noAiContext}</p>
-        )}
-      </Card>
+      <ProjectAiContextCard project={project} />
 
       {/* MySuricates Integration */}
       {onboardingModule && <OnboardingCard projectId={project.id} />}
@@ -278,82 +183,7 @@ export function ProjectDetail() {
           />
         }
       >
-        <div className="space-y-4">
-          <Input
-            label={t.projects.name}
-            value={editForm.name}
-            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-          />
-          <Input
-            label={t.projects.subtitleField}
-            value={editForm.subtitle}
-            onChange={(e) => setEditForm({ ...editForm, subtitle: e.target.value })}
-            placeholder={t.projects.subtitlePlaceholder}
-          />
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">{t.projects.descriptionField}</label>
-            <textarea
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary focus:outline-hidden focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
-              rows={3}
-              value={editForm.description}
-              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-              placeholder={t.projects.descriptionPlaceholder}
-            />
-          </div>
-          <Select
-            label={t.projects.type}
-            value={editForm.type}
-            onChange={(e) => setEditForm({ ...editForm, type: e.target.value as ProjectType })}
-            options={PROJECT_TYPES.map((type) => ({
-              value: type,
-              label: t.projects.types[type],
-            }))}
-          />
-          <DirectoryPicker
-            label={t.projects.path}
-            value={editForm.path}
-            onChange={(path) => setEditForm({ ...editForm, path })}
-          />
-        </div>
-      </Modal>
-
-      {/* AI Context Modal */}
-      <Modal
-        open={showAiContext}
-        onClose={() => setShowAiContext(false)}
-        title={t.projects.editAiContext}
-        size="lg"
-        footer={
-          <ModalFooter
-            onCancel={() => setShowAiContext(false)}
-            onAction={handleSaveAiContext}
-            cancelLabel={t.common.cancel}
-            actionLabel={t.common.save}
-            actionLoading={updateProject.isPending}
-          />
-        }
-      >
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-text-secondary">{t.projects.aiContextHint}</p>
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={<Sparkles className="w-3.5 h-3.5" />}
-              onClick={handleGenerate}
-              loading={generateContext.isPending}
-            >
-              {generateContext.isPending ? t.projects.generating : t.projects.generateAiContext}
-            </Button>
-          </div>
-          <MonacoEditor
-            value={editAiContext}
-            onChange={setEditAiContext}
-            language="markdown"
-            height="400px"
-            prose
-          />
-        </div>
+        <ProjectFormFields value={editForm} onChange={setEditForm} />
       </Modal>
 
       {/* Archive Confirmation */}
