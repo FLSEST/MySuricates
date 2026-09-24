@@ -17,6 +17,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -77,11 +79,13 @@ class RequestMetricsDriftWatchdogServiceTest {
         IntStream.range(0, calls).forEach(i -> collector.record(route, totalMs, 0, 3, 100));
     }
 
+    private final List<RequestMetricDaily> storedRows = new ArrayList<>();
+
     private void baseline(String route, long p95Ms) {
-        List<RequestMetricDaily> rows = List.of(
-                RequestMetricDaily.builder().route(route).day(TODAY.minusDays(2)).p95Ms(p95Ms).avgSqlStatements(3).build(),
-                RequestMetricDaily.builder().route(route).day(TODAY.minusDays(1)).p95Ms(p95Ms).avgSqlStatements(3).build());
-        when(repository.findByRouteAndDayBetweenOrderByDayAsc(eq(route), any(), any())).thenReturn(rows);
+        storedRows.add(RequestMetricDaily.builder().route(route).day(TODAY.minusDays(2)).p95Ms(p95Ms).avgSqlStatements(3).build());
+        storedRows.add(RequestMetricDaily.builder().route(route).day(TODAY.minusDays(1)).p95Ms(p95Ms).avgSqlStatements(3).build());
+        storedRows.sort(Comparator.comparing(RequestMetricDaily::getDay));
+        when(repository.findByDayBetweenOrderByDayAsc(any(), any())).thenReturn(List.copyOf(storedRows));
     }
 
     @Test
@@ -99,7 +103,35 @@ class RequestMetricsDriftWatchdogServiceTest {
 
         watchdog.detectDrift();
 
-        verify(repository).findByRouteAndDayBetweenOrderByDayAsc(ROUTE, TODAY.minusDays(5), TODAY.minusDays(1));
+        verify(repository).findByDayBetweenOrderByDayAsc(TODAY.minusDays(5), TODAY.minusDays(1));
+    }
+
+    /**
+     * One query for the whole window, however many routes are live — one per route held the
+     * single connection for about 70 s (2026-09-24). Rows of routes without traffic today are
+     * dropped, and each route keeps its rows in day order.
+     */
+    @Test
+    void baselineIsOneQueryForAllRoutesFilteredToTodaysRoutes() {
+        String runs = "GET /api/v1/runs";
+        IntStream.range(0, 20).forEach(i -> recordCalls("GET /api/v1/route-" + i, 1, 10));
+        recordCalls(ROUTE, 30, 300);
+        recordCalls(runs, 30, 300);
+        storedRows.add(RequestMetricDaily.builder().route(ROUTE).day(TODAY.minusDays(3)).p95Ms(100).avgSqlStatements(3).build());
+        storedRows.add(RequestMetricDaily.builder().route("GET /api/v1/gone").day(TODAY.minusDays(3)).p95Ms(1).avgSqlStatements(3).build());
+        storedRows.add(RequestMetricDaily.builder().route(runs).day(TODAY.minusDays(2)).p95Ms(290).avgSqlStatements(3).build());
+        storedRows.add(RequestMetricDaily.builder().route(ROUTE).day(TODAY.minusDays(2)).p95Ms(100).avgSqlStatements(3).build());
+        storedRows.add(RequestMetricDaily.builder().route(ROUTE).day(TODAY.minusDays(1)).p95Ms(120).avgSqlStatements(3).build());
+        when(repository.findByDayBetweenOrderByDayAsc(any(), any())).thenReturn(List.copyOf(storedRows));
+
+        List<RouteDrift> drifting = watchdog.detectDrift();
+
+        verify(repository, times(1)).findByDayBetweenOrderByDayAsc(any(), any());
+        verify(repository, never()).findByRouteAndDayBetweenOrderByDayAsc(any(), any(), any());
+        assertThat(drifting).singleElement().satisfies(drift -> {
+            assertThat(drift.route()).isEqualTo(ROUTE);
+            assertThat(drift.baselineP95Ms()).isEqualTo(100);
+        });
     }
 
     @Test
@@ -180,7 +212,7 @@ class RequestMetricsDriftWatchdogServiceTest {
         config.setEnabled(false);
         watchdog.checkForDrift();
 
-        verify(repository, never()).findByRouteAndDayBetweenOrderByDayAsc(any(), any(), any());
+        verify(repository, never()).findByDayBetweenOrderByDayAsc(any(), any());
         verifyNoInteractions(activityLogService, messagingTemplate);
     }
 }
