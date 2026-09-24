@@ -150,7 +150,7 @@ Workflows sammeln Wissen über Läufe hinweg:
 | Onboarding-Profile (geführter Einstieg für neue Nutzer) | Done |
 | Workflow Pool & PoolBrowser (Template-Marktplatz-Browsing) | Done |
 | Workflow-Versionierung (Versionshistorie + Restore) | Done |
-| Simple Mode (vereinfachte UI für Einsteiger) | Done |
+| Simple Mode (Bedienoberfläche für Einsteiger, die selbst installieren; Übergabe an Pro sichtbar) | Done |
 | Insights-Page (Analyse-Dashboard) | Done |
 | Chain-Templates (vorgefertigte Ketten-Vorlagen) | Done |
 

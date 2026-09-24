@@ -37,9 +37,11 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 
 ### Simple Mode
 
-`useSettingsStore().simpleMode` schaltet neun Seiten zwischen Normal- und Simple-Variante um:
+Simple Mode ist eine Bedienoberfläche für Einsteiger, die MySuricates selbst installiert haben: Workflows starten, ihre Fragen beantworten, Ergebnisse lesen. Gebaut und eingestellt wird in Pro. Wo ein Weg dorthin führt, ist der Übergang sichtbar, nie ein stiller Sprung.
 
-| Route | Normal | Simple |
+`useSettingsStore().simpleMode` schaltet neun Seiten zwischen Pro- und Simple-Variante um:
+
+| Route | Pro | Simple |
 |---|---|---|
 | `/` | `Dashboard` | `SimpleHome` |
 | `/projects` | `Projects` | `SimpleProjects` |
@@ -52,6 +54,16 @@ Alle Routen sind in `src/App.tsx` definiert und von einem `<Layout>`-Wrapper umg
 | `/activity` | `ActivityLog` | `SimpleActivity` |
 
 Die Umschaltung erfolgt über Route-Wrapper-Komponenten (z.B. `DashboardRoute`, `WorkflowsRoute`, `RunsRoute`) in `App.tsx`, die je nach `simpleMode`-Flag die entsprechende Variante rendern.
+
+- **Seitenarten:** `simpleRouteKind(pathname)` (`utils/simpleRoutes.ts`) ordnet jede Seite zu: `simple` hat eine eigene Fassung (die neun oben, dazu `/runs/:runId`), `shared` gilt unverändert in beiden Modi (`/approvals`, `/settings`, `/docs`), alles andere ist `pro`. Landet der Simple Mode auf einer Pro-Seite, sagt `ProPageNotice` das unter dem Header und bietet „Zu Pro wechseln“ oder „Zurück zu Einfach“. Die Simple-Sidebar zeigt nur die `simple`-Seiten unter ihren Simple-Titeln, kein „Menü bearbeiten“ und eingeklappt einen Modus-Umschalter.
+- **Übergabe an Pro:** `ProHandoff` (Begründung und Knopf) und `ProBadge` (Pille „Pro“) in `components/simple/ProHandoff.tsx` markieren, was nach Pro führt: Ablauf ändern, Pro-Kacheln der Startseite, Bauen beim Anlegen, ausgeblendete Einstellungen, Fehleranalyse. Beide wechseln über `useOpenInPro(to?)` den Modus und öffnen optional ein Ziel.
+- **Ergebnis zuerst:** Die Simple-Laufseite zeigt während des Laufs eine Fortschrittsliste, danach `RunResultCard` oder `RunFailureCard`; die Schritte liegen eingeklappt unter „Details“. `utils/runResult.ts` liest alles aus dem Run, ohne weitere Anfrage: den Bericht aus dem `dashboard_widget`-Vertrag (vom `dashboard-report`-Block oder Marker, geprüft wie im Workflow-Ergebnis-Widget; ungültig → Hinweis, nie Rohtext), das Gate als Banner, die letzte lesbare Ausgabe (neuester abgeschlossener Versuch je Block, ohne Freigabe-, Eingabe-, TODO-, Bericht- und Kompressionsblöcke, Markerzeilen entfernt, Markdown ohne Bilder), absolute Dateipfade aus der Ausgabe (höchstens 10) und die Zahl angelegter TODOs. `RunFailureCard` nennt Grund und Schritt im Klartext, hat genau einen Knopf zum erneuten Ausführen und „Im Pro-Modus untersuchen“. `SimpleWorkflowDetail` zeigt das letzte Ergebnis des neuesten erfolgreichen Laufs.
+- **Starten:** `useSimpleRun` (`components/simple`) startet ohne Eingaben sofort, sonst fragt `ExecuteDialog` mit lesbaren Feldnamen nach; danach öffnet sich die Laufseite. „Nochmal versuchen“ in `SimpleRuns` nutzt `/executions/{id}/retry` und behält den Kontext.
+- **Anlegen:** `TemplateSelector variant="simple"` (über `WorkflowCreateFlow`) beginnt bei den Vorlagen, der Pool bleibt; Blaupausen und „Leerer Workflow“ brauchen den Editor und sind durch eine `ProHandoff`-Zeile ersetzt. Projekte entstehen mit dem kompakten Formular (`ProjectFormFields compact`: Name und Ordner, Typ `PERSONAL`). `/workflows?new=1` öffnet den Anlegedialog.
+- **Zeitpläne:** `<CronPicker simple>` ohne „Erweitert“ und Cron-Zeile. Die Liste zeigt `describeCron` (`utils/cronSchedule.ts`: „Täglich um 09:00“, „Mo, Mi um 08:30“ …); nicht Beschreibbares heißt „Eigener Takt“ und trägt das Pro-Abzeichen.
+- **Startseite (`SimpleHome`):** Mit Assistenten-Modul ist das Eingabefeld der Assistent, ohne (Preset `core`) eine Suche in den eigenen Workflows (`WorkflowSearch`, `utils/matchWorkflows.ts`) mit Start-Chips. Beim ersten Start steht ein Angebot am Ort statt einer Tour: ohne Projekt `FirstProjectActions` (Beispielprojekt zuerst), mit Projekt, aber ohne Workflow „Mit einer Vorlage anfangen“. `SimpleOverview` nennt zuerst, wie viele Läufe auf eine Antwort warten (→ `/approvals`).
+- **Hinweise:** `simple-home` (wofür Einfach da ist), `simple-result` (Laufseite), `simple-create` (Vorlagen beim Anlegen).
+- **Moduswahl:** `ModeChoiceCard` steht auf dem Pro-Dashboard neben „Erste Schritte“, solange es kein Projekt gibt und `modeChoiceMade` nicht gesetzt ist: „Einfach verwenden“ und „Pro verwenden“ gleichwertig, je mit einem Satz. Die Karte, die Sidebar-Umschalter und der Schalter in den Einstellungen setzen `modeChoiceMade` (`chooseMode`). Der Standard bleibt Pro; bestehende Installationen haben Projekte und sehen die Karte nie.
 
 ## Seiten
 
@@ -329,7 +341,7 @@ Kein `tailwind.config.js` — die Konfiguration erfolgt über `@theme inline` un
 |---|---|---|
 | `useSidebarStore` | `collapsed`, `mobileOpen`, `toggle()`, `setCollapsed()`, `setMobileOpen()` | `localStorage: sidebar-state` (nur `collapsed`) |
 | `useThemeStore` | `themeId`, `lastLightThemeId`, `lastDarkThemeId`, `overrides` (je Theme-ID), `setTheme()`, `toggleAppearance()`, `setOverride()`, `resetOverrides()`, `apply()` | `localStorage: theme-settings` (Version 1; migriert das alte `mode`-Format) |
-| `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder` (Routen + Unterteiler `divider:<id>`, siehe `utils/sidebarLayout.ts`), `sidebarHiddenItems`, `sidebarDividerLabels`, `pinnedWorkflowIds`, `simpleOnboardingSeen` | `localStorage: app-settings` |
+| `useSettingsStore` | `apiKey`, `advancedMode`, `simpleMode`, `autoTodoDefault`, `autoRepairDefault`, `autoRepairMode`, `defaultAiProvider`, `assistantModel`, `suggestionsModel`, `suggestionsEnabled`, `sidebarItemOrder` (Routen + Unterteiler `divider:<id>`, siehe `utils/sidebarLayout.ts`), `sidebarHiddenItems`, `sidebarDividerLabels`, `pinnedWorkflowIds`, `modeChoiceMade`, `hintsEnabled`, `dismissedHints` (Hinweis-ID → abgewählte Version) | `localStorage: app-settings` (Version 2; v2 macht aus `simpleOnboardingSeen` den abgewählten Hinweis `simple-home`) |
 | `useDashboardLayoutStore` | `activeViewId`, `views[]` (je Ansicht `widgets[]` als `WidgetInstance`, optional `filter { projectId?, days? }`; leere Liste = Standard-Layout), `setActiveViewWidgets()`, `resetActiveView()`, `applyRemoteLayout()` (behält die lokale aktive Ansicht), `upsertView()`, `setActiveView()` (keine lokale Änderung), `addView(name?, widgets?)` (leer oder mit Vorlagen-Widgets), `renameView()`, `duplicateView()`, `removeView()`, `moveView()`, `setViewFilter()` ; Selektor `selectActiveView` | `localStorage: dashboard-layout` (Version 2; migriert v1, beim Laden per `sanitizeLayout` validiert) |
 | `useDashboardSyncStore` | `deviceLabel`, `baseVersionId`, `dirty`, `setDeviceLabel()`, `markDirty()`, `markSynced()` | `localStorage: dashboard-sync` (Version 1) |
 | `useAssistantStore` | `open`, `sessions[]`, `activeSessionId`, `showHistory`, `panelWidth`, `panelHeight`, `pendingInput`, `pendingContext` | `localStorage: assistant-sessions` (Sessions, Panel-Größe) |
@@ -794,7 +806,7 @@ Responsive-Hook, erkennt Mobile-Breakpoint (max-width: 1023px) für adaptive UI-
 ```
 common (~46 Keys) ──── Allgemeine Labels (Erstellen, Löschen, Suchen, ...)
 nav (~27 Keys) ──────── Navigation (Dashboard, Projekte, ...)
-simple (~95 Keys) ───── Simple-Mode-Texte (Home, Workflows, Runs, ...)
+simple (~125 Keys) ──── Simple-Mode-Texte (Home, Workflows, Runs, ...)
 dashboard (~26 Keys) ── Dashboard-Texte
 projects (~52 Keys) ─── Projekte + Onboarding, Typen, Status
 workflows (~155 Keys)   Workflows + Block-Typen, Ausführung, Gate, Agentic

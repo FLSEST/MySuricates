@@ -161,7 +161,7 @@
 
 <section id="routing">
   <h2>Routing <span>App.tsx</span></h2>
-  <p><code>createBrowserRouter</code> mit einem Layout (Sidebar + Header) über allen Seiten. Seiten optionaler Module stehen in <code>ModuleRoute</code> und erklären ohne ihr Modul, wie es sich einschalten lässt; mehrere Kernseiten wechseln im Simple Mode (<code>useSettingsStore</code>) auf eine eigene, einfachere Fassung.</p>
+  <p><code>createBrowserRouter</code> mit einem Layout (Sidebar + Header) über allen Seiten. Seiten optionaler Module stehen in <code>ModuleRoute</code> und erklären ohne ihr Modul, wie es sich einschalten lässt; mehrere Kernseiten wechseln im Simple Mode (<code>useSettingsStore</code>) auf eine eigene, einfachere Fassung. Jede Seite ist <code>simple</code> (eigene Fassung), <code>shared</code> (beide Modi) oder <code>pro</code> (<code>utils/simpleRoutes.ts</code>); landet der Simple Mode auf einer Pro-Seite, sagt <code>ProPageNotice</code> das unter dem Header und bietet den Wechsel an.</p>
   <pre class="mermaid">
 flowchart LR
     APP["App.tsx Router + Layout"] --&gt; CORE
