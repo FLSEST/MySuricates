@@ -9,7 +9,6 @@ import { useI18nStore } from '../../i18n';
 import { en } from '../../i18n/en';
 import hintsEn from '../../data/hints.en.json';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useAssistantStore } from '../../stores/assistantStore';
 import type { ModuleName, Project, Workflow } from '../../types';
 import type { PendingInput } from '../../hooks/usePendingInputs';
 import { SimpleHome } from '../SimpleHome';
@@ -124,19 +123,6 @@ describe('SimpleHome — with the assistant module', () => {
     expect(await screen.findByRole('button', { name: en.simple.home.assistantLabel })).toBeInTheDocument();
     await screen.findByText(en.simple.home.runTilesTitle);
     expect(await searchField()).toBeInTheDocument();
-  });
-
-  it('shows instant hits and hands the text to the assistant on Enter', async () => {
-    useAssistantStore.setState({ open: false, pendingInput: null });
-    serve();
-    renderHome();
-
-    const input = await searchField();
-    fireEvent.change(input, { target: { value: 'digest' } });
-    expect(within(await workflowHits()).getByRole('option', { name: /Morning digest/ })).toBeInTheDocument();
-
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(useAssistantStore.getState()).toMatchObject({ open: true, pendingInput: 'digest' });
   });
 });
 

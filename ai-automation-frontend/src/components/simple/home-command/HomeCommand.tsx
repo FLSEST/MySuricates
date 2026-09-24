@@ -19,10 +19,12 @@ export interface HomeCommandProps {
    */
   onAsk?: (text: string) => void;
   /**
-   * The assistant's answer (Stage B), shown at the top of the result block — above the hits.
-   * The block also opens for an answer alone, without a query.
+   * The assistant's answer, shown at the top of the result block — above the hits for the same
+   * text. The block also opens for an answer alone, without a query.
    */
   answer?: ReactNode;
+  /** Esc: the field is cleared — the answer should go, too. */
+  onClear?: () => void;
 }
 
 /**
@@ -32,7 +34,7 @@ export interface HomeCommandProps {
  * all hits, Enter activates it, Esc clears. Sources and matching: `useHomeCommand`,
  * `utils/homeCommand`.
  */
-export function HomeCommand({ onAsk, answer }: HomeCommandProps) {
+export function HomeCommand({ onAsk, answer, onClear }: HomeCommandProps) {
   const t = useT();
   const c = t.simple.home.command;
   const navigate = useNavigate();
@@ -65,9 +67,12 @@ export function HomeCommand({ onAsk, answer }: HomeCommandProps) {
   const activeIndex = cursor === NO_HIT ? -1 : chosen >= 0 ? chosen : defaultIndex;
   const optionId = (index: number) => `${listId}-option-${index}`;
 
+  // Asking keeps the text: the answer appears above the hits for it
   const ask = () => {
-    onAsk?.(input.trim());
-    reset();
+    const text = input.trim();
+    if (!text || !onAsk) return;
+    onAsk(text);
+    setCursor(null);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -84,9 +89,10 @@ export function HomeCommand({ onAsk, answer }: HomeCommandProps) {
       e.preventDefault();
       if (activeIndex >= 0) actions.execute(items[activeIndex]!.primary.action);
       else if (onAsk) ask();
-    } else if (e.key === 'Escape' && input) {
+    } else if (e.key === 'Escape' && (input || answer)) {
       e.preventDefault();
       reset();
+      onClear?.();
     }
   };
 
@@ -113,7 +119,7 @@ export function HomeCommand({ onAsk, answer }: HomeCommandProps) {
   const indexOf = new Map(items.map((item, i) => [item.id, i]));
   return (
     <div className="space-y-2">
-      <form role="search" onSubmit={(e) => { e.preventDefault(); if (onAsk) ask(); }}>
+      <form role="search" onSubmit={(e) => { e.preventDefault(); ask(); }}>
         {onAsk ? (
           // With the assistant: the gradient frame marks the field as the way to ask, too
           <div
@@ -149,7 +155,7 @@ export function HomeCommand({ onAsk, answer }: HomeCommandProps) {
 
       {open && (
         <div className="rounded-2xl border border-border bg-surface p-2 sm:p-3 space-y-3">
-          {/* Stage B: the assistant's answer comes first, the instant hits follow */}
+          {/* The assistant's answer comes first, the instant hits follow */}
           {answer}
 
           <div role="listbox" id={listId} aria-label={c.resultsLabel} className="space-y-3">

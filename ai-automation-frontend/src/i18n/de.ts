@@ -158,6 +158,14 @@ export const de: TranslationKeys = {
         },
         languages: { de: 'Deutsch', en: 'English' },
         hintsShown: 'Hinweise werden wieder angezeigt',
+        answer: {
+          label: 'Antwort des Assistenten',
+          close: 'Antwort schließen',
+          cancelled: 'Abgebrochen.',
+          error: 'Der Assistent konnte nicht antworten.',
+          retry: 'Erneut versuchen',
+          continueInChat: 'Im Chat weiterführen',
+        },
       },
       tiles: {
         workflows: { title: 'Meine Workflows', desc: 'Automatisierungen ausführen & verwalten' },

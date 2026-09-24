@@ -156,6 +156,14 @@ export const en = {
         },
         languages: { de: 'Deutsch', en: 'English' },
         hintsShown: 'Hints are shown again',
+        answer: {
+          label: 'Answer from the assistant',
+          close: 'Close answer',
+          cancelled: 'Cancelled.',
+          error: 'The assistant could not answer.',
+          retry: 'Try again',
+          continueInChat: 'Continue in chat',
+        },
       },
       tiles: {
         workflows: { title: 'My Workflows', desc: 'Run and manage your automations' },

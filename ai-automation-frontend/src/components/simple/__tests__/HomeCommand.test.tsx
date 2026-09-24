@@ -361,6 +361,17 @@ describe('HomeCommand — keyboard', () => {
     expect(screen.getByText(c.askHint)).toBeInTheDocument();
     fireEvent.keyDown(field(), { key: 'Enter' });
     expect(asked).toEqual(['digest']);
-    expect(field()).toHaveValue('');
+    // The text and its hits stay: the answer shows above them
+    expect(field()).toHaveValue('digest');
+    expect(await group(c.groups.workflows)).toBeInTheDocument();
+  });
+
+  it('does not ask with an empty field', async () => {
+    serve();
+    const asked: string[] = [];
+    renderCommand((text) => asked.push(text));
+
+    fireEvent.submit(screen.getByRole('search'));
+    expect(asked).toEqual([]);
   });
 });

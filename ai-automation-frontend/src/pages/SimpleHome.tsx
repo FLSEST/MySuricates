@@ -4,7 +4,6 @@ import { GitBranch } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
-import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import { useModuleEnabled, useSystemModules } from '../hooks/useModules';
 import { AREA_COLORS, buildHomeTiles, greetingKey } from '../utils/homeTiles';
@@ -18,6 +17,8 @@ import { ProBadge } from '../components/simple/ProHandoff';
 import { simpleRouteKind } from '../utils/simpleRoutes';
 import { RunChip, SimpleCard } from '../components/simple/kit';
 import { HomeCommand } from '../components/simple/home-command/HomeCommand';
+import { HomeAnswer } from '../components/simple/home-command/HomeAnswer';
+import { useHomeAssistant } from '../components/simple/home-command/useHomeAssistant';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { useProjects } from '../hooks/useProjects';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
@@ -30,9 +31,8 @@ export function SimpleHome() {
   const { data: projects } = useProjects();
   const simpleRun = useSimpleRun();
   const latestStatus = useLatestRunStatuses();
-  const setPendingInput = useAssistantStore((s) => s.setPendingInput);
-  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
   const assistantModule = useModuleEnabled('assistant');
+  const homeAssistant = useHomeAssistant();
   const { data: systemModules } = useSystemModules();
 
   const { navTiles, runTiles } = useMemo(() => {
@@ -42,11 +42,23 @@ export function SimpleHome() {
   const greeting = t.simple.home[greetingKey(new Date())];
   const hasWorkflows = (workflows?.length ?? 0) > 0;
 
-  // Until the answer shows up in place (Stage B), asking opens the assistant panel with the text
-  const askAssistant = (text: string) => {
-    setPendingInput(text || null);
-    setAssistantOpen(true);
+  // An answer's "run workflow": the known workflow through the Simple start (inputs dialog), else its page
+  const runFromAnswer = (workflowId: string) => {
+    const workflow = workflows?.find((w) => w.id === workflowId);
+    if (workflow) simpleRun.run(workflow);
+    else navigate(`/workflows/${workflowId}`);
   };
+  const answer = assistantModule && homeAssistant.turn ? (
+    <HomeAnswer
+      turn={homeAssistant.turn}
+      onCancel={homeAssistant.cancel}
+      onRetry={homeAssistant.retry}
+      onClose={homeAssistant.close}
+      onContinueInChat={homeAssistant.continueInChat}
+      onSend={homeAssistant.ask}
+      onRunWorkflow={runFromAnswer}
+    />
+  ) : undefined;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner text={t.common.loading} /></div>;
@@ -88,8 +100,13 @@ export function SimpleHome() {
         </SimpleCard>
       ) : null}
 
-      {/* The hero: instant hits from every source; with the assistant module Enter also asks it */}
-      <HomeCommand onAsk={assistantModule ? askAssistant : undefined} />
+      {/* The hero: instant hits from every source; with the assistant module Enter asks it and the
+          answer appears above the hits */}
+      <HomeCommand
+        onAsk={assistantModule ? homeAssistant.ask : undefined}
+        answer={answer}
+        onClear={homeAssistant.close}
+      />
 
       {/* "How's it looking?" overview */}
       <SimpleOverview />

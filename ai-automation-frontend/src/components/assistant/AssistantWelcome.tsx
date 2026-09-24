@@ -4,20 +4,12 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useAssistantSuggestions } from '../../hooks/useAssistant';
 import { useAssistantThinkingPhrases } from '../../hooks/useSystem';
 import { MeerkatIcon } from '../layout/Sidebar';
+import { assistantPhaseLabel } from '../assistantPanelUtils';
 import type { AssistantStatus } from '../../hooks/useAssistantWebSocket';
 import { useT } from '../../i18n';
 
 export function StatusIndicator({ phase }: { phase: AssistantStatus | null }) {
   const t = useT();
-  const phaseLabels: Record<string, string> = {
-    RECEIVED: t.assistant.phaseReceived,
-    BUILDING_CONTEXT: t.assistant.phaseBuildingContext,
-    THINKING: t.assistant.phaseThinking,
-    FETCHING_DATA: t.assistant.phaseFetchingData,
-    EXECUTING_TOOLS: t.assistant.phaseExecutingTools,
-    COMPLETED: t.assistant.phaseCompleted,
-    ERROR: t.assistant.phaseError,
-  };
   const { data: phrases = t.assistant.defaultPhrases } = useAssistantThinkingPhrases();
   const [idx, setIdx] = useState(() => Math.floor(Math.random() * Math.max(phrases.length, 1)));
 
@@ -28,7 +20,7 @@ export function StatusIndicator({ phase }: { phase: AssistantStatus | null }) {
 
   // Use WebSocket phase if available, otherwise fall back to rotating phrases
   const label = phase
-    ? (phaseLabels[phase.phase] ?? phase.phase)
+    ? assistantPhaseLabel(phase.phase, t)
     : (phrases[idx % phrases.length] ?? '...');
   const detail = phase?.detail;
   const elapsed = phase ? Math.round(phase.elapsedMs / 1000) : null;
