@@ -76,6 +76,25 @@ class TodoServiceTest {
         assertThat(pageable.getValue().getPageSize()).isEqualTo(25);
     }
 
+    /**
+     * TODO 4e7a7401: an unknown filter value used to fail inside the query, where Spring Data wraps
+     * the IllegalArgumentException, and the API answered 500. It is parsed before the query now, and
+     * the message names the allowed values.
+     */
+    @Test
+    void findAll_unknownFilterValue_failsBeforeTheQueryNamingTheAllowedValues() {
+        assertThatThrownBy(() -> todoService.findAll(0, 50, null, List.of("OPEN", "FOO"), null, null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'FOO'");
+        assertThatThrownBy(() -> todoService.findAll(0, 50, null, null, "URGENT", null, null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("priority muss LOW, MEDIUM, HIGH oder CRITICAL sein, nicht 'URGENT'");
+        assertThatThrownBy(() -> todoService.findAll(0, 50, null, null, null, "HUMAN", null, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("source muss USER, AI oder WORKFLOW sein, nicht 'HUMAN'");
+        verify(todoRepository, never()).findAll(ArgumentMatchers.<Specification<Todo>>any(), any(Pageable.class));
+    }
+
     // --- findById ---
 
     @Test
