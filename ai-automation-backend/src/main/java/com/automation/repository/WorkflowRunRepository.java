@@ -111,6 +111,25 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
            "LIMIT 5")
     List<Object[]> findTopWorkflows();
 
+    /** {@link #findTopWorkflows()} restricted to the workflows of one project (dashboard project filter). */
+    @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
+           "FROM WorkflowRun wr " +
+           "WHERE wr.workflow.project.id = :projectId " +
+           "GROUP BY wr.workflow.id, wr.workflow.name " +
+           "ORDER BY COUNT(wr) DESC " +
+           "LIMIT 5")
+    List<Object[]> findTopWorkflowsByProject(@Param("projectId") String projectId);
+
+    /** Runs of one project's workflows — the dashboard overview under a project filter. */
+    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId")
+    long countByProject(@Param("projectId") String projectId);
+
+    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId AND wr.status = :status")
+    long countByProjectAndStatus(@Param("projectId") String projectId, @Param("status") RunStatus status);
+
+    @Query("SELECT COUNT(wr) FROM WorkflowRun wr WHERE wr.workflow.project.id = :projectId AND wr.startedAt > :since")
+    long countByProjectAndStartedAtAfter(@Param("projectId") String projectId, @Param("since") Instant since);
+
     /**
      * Lauf-Id, Workflow-Id und der beim Start festgehaltene Workflow-Name je Lauf — ohne Schritte und
      * ohne Join auf den Workflow, in einer Abfrage. Für die Liste wartender Freigaben, die jede Seite pollt.

@@ -57,18 +57,21 @@ export function useCalendarData(from: string, to: string) {
   });
 }
 
-export function useRemainingToday() {
+const projectQuery = (projectId?: string) => (projectId ? `?projectId=${encodeURIComponent(projectId)}` : '');
+
+/** `projectId`: only the schedules of that project's workflows (the dashboard view's project filter). */
+export function useRemainingToday(projectId?: string) {
   return useQuery({
-    queryKey: ['schedules', 'remaining-today'],
-    queryFn: () => api.get<UpcomingScheduleData>('/schedules/remaining-today'),
+    queryKey: ['schedules', 'remaining-today', projectId ?? null],
+    queryFn: () => api.get<UpcomingScheduleData>(`/schedules/remaining-today${projectQuery(projectId)}`),
     refetchInterval: 60_000,
   });
 }
 
-export function useRemainingThisWeek() {
+export function useRemainingThisWeek(projectId?: string) {
   return useQuery({
-    queryKey: ['schedules', 'remaining-this-week'],
-    queryFn: () => api.get<UpcomingScheduleData>('/schedules/remaining-this-week'),
+    queryKey: ['schedules', 'remaining-this-week', projectId ?? null],
+    queryFn: () => api.get<UpcomingScheduleData>(`/schedules/remaining-this-week${projectQuery(projectId)}`),
     refetchInterval: 60_000,
   });
 }

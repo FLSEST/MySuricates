@@ -41,7 +41,7 @@ describe('DashboardViewFilterBar', () => {
 
   it('says which widgets the filter does not reach', () => {
     renderWithProviders(<DashboardViewFilterBar editMode disabled={false} />);
-    expect(screen.getByText(/Todos, schedules, projects and the overall numbers/)).toBeInTheDocument();
+    expect(screen.getByText(/every tile except Active Projects, Version and API Latency/)).toBeInTheDocument();
   });
 
   it('only shows an active filter outside edit mode, and nothing without one', async () => {

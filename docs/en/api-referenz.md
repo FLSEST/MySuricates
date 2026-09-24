@@ -1084,13 +1084,16 @@ stored value stays, TODO 7704b1e9). The same applies to every route that returns
 
 Remaining scheduled executions for today.
 
+**Query Parameters:** `projectId` (optional) — only schedules of that project's workflows; chains belong to no
+project and drop out (project filter of the dashboard view).
+
 **Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Occurrences
 inside an active `skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the
 pause, else `null`. In maintenance mode the list is empty and `maintenance` is `true`: nothing starts while it is on.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
-Remaining scheduled executions for this week.
+Remaining scheduled executions for this week. `projectId` (optional) as for `remaining-today`.
 
 **Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil` and `maintenance`)
 
@@ -2338,7 +2341,9 @@ Browse directory contents (subdirectories only, no hidden folders).
 
 Dashboard data with statistics.
 
-**Query Parameters:** `days` (default: 30), `projectId` (optional)
+**Query Parameters:** `days` (default: 30), `projectId` (optional). `projectId` restricts every value to that
+project's workflows and runs — including the overall numbers (`totalWorkflows`, `totalRuns`, `runsToday`,
+`successRate`, `topWorkflows`), which count all time regardless of `days`.
 
 **Response:**
 

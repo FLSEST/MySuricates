@@ -272,7 +272,7 @@ class ScheduleControllerTest {
         var run = new UpcomingScheduleResponse.UpcomingRun(
                 "sched-1", "Test Workflow", null, null, null, "WORKFLOW",
                 Instant.parse("2026-02-16T10:00:00Z"));
-        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(new UpcomingScheduleResponse(1, List.of(run), null, false));
+        when(upcomingRunsCalculator.getRemainingToday(null)).thenReturn(new UpcomingScheduleResponse(1, List.of(run), null, false));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-today"))
                 .andExpect(status().isOk())
@@ -283,7 +283,7 @@ class ScheduleControllerTest {
 
     @Test
     void getRemainingThisWeek_returnsCountAndSchedules() throws Exception {
-        when(upcomingRunsCalculator.getRemainingThisWeek()).thenReturn(new UpcomingScheduleResponse(0, List.of(), null, false));
+        when(upcomingRunsCalculator.getRemainingThisWeek(null)).thenReturn(new UpcomingScheduleResponse(0, List.of(), null, false));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-this-week"))
                 .andExpect(status().isOk())
@@ -480,8 +480,21 @@ class ScheduleControllerTest {
     }
 
     @Test
+    void getRemainingToday_andThisWeek_forwardProjectFilter() throws Exception {
+        when(upcomingRunsCalculator.getRemainingToday("p-1")).thenReturn(new UpcomingScheduleResponse(2, List.of(), null, false));
+        when(upcomingRunsCalculator.getRemainingThisWeek("p-1")).thenReturn(new UpcomingScheduleResponse(5, List.of(), null, false));
+
+        mockMvc.perform(get("/api/v1/schedules/remaining-today").param("projectId", "p-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2));
+        mockMvc.perform(get("/api/v1/schedules/remaining-this-week").param("projectId", "p-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(5));
+    }
+
+    @Test
     void getRemainingToday_carriesPausedUntil() throws Exception {
-        when(upcomingRunsCalculator.getRemainingToday()).thenReturn(
+        when(upcomingRunsCalculator.getRemainingToday(null)).thenReturn(
                 new UpcomingScheduleResponse(0, List.of(), Instant.parse("2026-10-01T22:00:00Z"), false));
 
         mockMvc.perform(get("/api/v1/schedules/remaining-today"))

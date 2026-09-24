@@ -10,11 +10,13 @@ import { useI18nStore, useT, type Locale } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
-function StatCard({ icon, label, value, accent }: {
+function StatCard({ icon, label, value, accent, hint }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   accent?: string;
+  /** Small line under the value, e.g. that the tile ignores the view's project filter. */
+  hint?: string;
 }) {
   return (
     <Card className="flex items-center gap-3 py-3! px-4!">
@@ -25,6 +27,7 @@ function StatCard({ icon, label, value, accent }: {
       <div className="min-w-0">
         <p className="text-xs text-text-secondary break-words" title={label}>{label}</p>
         <p className="text-lg font-bold text-text">{value}</p>
+        {hint && <p className="text-[10px] text-text-tertiary">{hint}</p>}
       </div>
     </Card>
   );
@@ -33,6 +36,8 @@ function StatCard({ icon, label, value, accent }: {
 export function ActiveProjectsStat() {
   const t = useT();
   const { data: projects, isLoading } = useProjects();
+  // Counts every project by design; under a project filter the tile says so instead of showing 0/1.
+  const { projectId } = useDashboardData().filter;
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
@@ -40,6 +45,7 @@ export function ActiveProjectsStat() {
       label={t.dashboard.activeProjects}
       value={projects ? projects.filter((p) => p.status === 'RUNNING').length : '-'}
       accent="bg-accent/10"
+      hint={projectId ? t.dashboard.filter.allProjectsHint : undefined}
     />
   );
 }
@@ -106,7 +112,7 @@ export function TotalCostStat() {
 
 export function PlannedTodayStat() {
   const t = useT();
-  const { data: remainingToday, isLoading } = useRemainingToday();
+  const { data: remainingToday, isLoading } = useRemainingToday(useDashboardData().filter.projectId);
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard
@@ -120,7 +126,7 @@ export function PlannedTodayStat() {
 
 export function PlannedThisWeekStat() {
   const t = useT();
-  const { data: remainingThisWeek, isLoading } = useRemainingThisWeek();
+  const { data: remainingThisWeek, isLoading } = useRemainingThisWeek(useDashboardData().filter.projectId);
   if (isLoading) return <WidgetSkeleton size="stat" />;
   return (
     <StatCard

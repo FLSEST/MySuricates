@@ -6,6 +6,16 @@ import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
 import { formatDateTime } from '../../../utils/formatTime';
 import { UpcomingSchedulesCard } from '../UpcomingSchedulesCard';
+import { DashboardDataContext, type DashboardDataValue } from '../dashboardDataContext';
+
+/** The schedule widgets read the view's project filter from the dashboard context. */
+const NO_FILTER: DashboardDataValue = {
+  data: undefined, isLoading: false, error: null, refetch: () => {},
+  filter: {}, days: 30, isPlaceholderData: false, dataDays: 30,
+};
+const inDashboard = (ui: React.ReactElement) => (
+  <DashboardDataContext.Provider value={NO_FILTER}>{ui}</DashboardDataContext.Provider>
+);
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -33,7 +43,7 @@ describe('UpcomingSchedulesCard', () => {
         })),
     );
 
-    renderWithProviders(<UpcomingSchedulesCard />);
+    renderWithProviders(inDashboard(<UpcomingSchedulesCard />));
 
     expect(await screen.findByTestId('upcoming-schedules-paused'))
       .toHaveTextContent(`Schedules paused until ${formatDateTime(PAUSED_UNTIL, 'en')}`);
@@ -46,7 +56,7 @@ describe('UpcomingSchedulesCard', () => {
       http.get('/api/v1/schedules/remaining-this-week', () => HttpResponse.json({ count: 0, schedules: [], pausedUntil: null })),
     );
 
-    renderWithProviders(<UpcomingSchedulesCard />);
+    renderWithProviders(inDashboard(<UpcomingSchedulesCard />));
 
     expect(await screen.findByText('No scheduled runs')).toBeInTheDocument();
     expect(screen.queryByTestId('upcoming-schedules-paused')).not.toBeInTheDocument();
@@ -66,7 +76,7 @@ describe('UpcomingSchedulesCard', () => {
         HttpResponse.json({ count: 0, schedules: [], pausedUntil: null, maintenance: true })),
     );
 
-    renderWithProviders(<UpcomingSchedulesCard />);
+    renderWithProviders(inDashboard(<UpcomingSchedulesCard />));
 
     expect(await screen.findByTestId('upcoming-schedules-maintenance')).toHaveTextContent(note);
     expect(screen.getByText(empty)).toBeInTheDocument();

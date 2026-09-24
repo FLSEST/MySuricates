@@ -1090,13 +1090,16 @@ Routen, die `ScheduledWorkflowResponse` liefern.
 
 Verbleibende geplante Ausführungen für heute.
 
+**Query-Parameter:** `projectId` (optional) — nur Zeitpläne von Workflows dieses Projekts; Ketten gehören zu
+keinem Projekt und fallen dann heraus (Projektfilter der Dashboard-Ansicht).
+
 **Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Termine in
 einer aktiven `skip-until`-Pause fehlen — der Tick überspringt sie —, `pausedUntil` nennt dann das Pausenende,
 sonst `null`. Im Wartungsmodus ist die Liste leer und `maintenance` `true`: Solange er an ist, startet nichts.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
-Verbleibende geplante Ausführungen für diese Woche.
+Verbleibende geplante Ausführungen für diese Woche. `projectId` (optional) wie bei `remaining-today`.
 
 **Response:** `UpcomingScheduleResponse` (wie `remaining-today`, einschließlich `pausedUntil` und `maintenance`)
 
@@ -2366,7 +2369,9 @@ Verzeichnisinhalt durchsuchen (nur Unterverzeichnisse, keine versteckten Ordner)
 
 Dashboard-Daten mit Statistiken.
 
-**Query-Parameter:** `days` (Standard: 30), `projectId` (optional)
+**Query-Parameter:** `days` (Standard: 30), `projectId` (optional). `projectId` schränkt alle Werte auf die
+Workflows und Läufe dieses Projekts ein — auch die Gesamtzahlen (`totalWorkflows`, `totalRuns`, `runsToday`,
+`successRate`, `topWorkflows`), die unabhängig von `days` über die gesamte Laufzeit zählen.
 
 **Response:**
 

@@ -214,4 +214,70 @@ class LearningServiceDashboardIntegrationTest {
                 .extracting(DashboardResponse.ProviderStats::provider)
                 .contains("CLAUDE");
     }
+
+    /**
+     * With a project filter the overview figures (workflow/run counts, success rate, runs today,
+     * top workflows) count only that project — the queries run against real SQLite (TODO 4e1c9ad4).
+     */
+    @Test
+    void getDashboard_withProjectFilter_scopesOverviewToProject() {
+        long nano = System.nanoTime();
+        Project mine = saveProject("dash-scope-a-" + nano);
+        Project other = saveProject("dash-scope-b-" + nano);
+        Workflow mineWf = saveWorkflow("scope-a-wf-" + nano, mine);
+        Workflow otherWf = saveWorkflow("scope-b-wf-" + nano, other);
+
+        Instant now = Instant.now();
+        saveRun(mineWf, RunStatus.COMPLETED, now);
+        saveRun(mineWf, RunStatus.FAILED, now);
+        saveRun(otherWf, RunStatus.COMPLETED, now);
+        saveRun(otherWf, RunStatus.COMPLETED, now);
+        saveRun(otherWf, RunStatus.COMPLETED, now);
+
+        DashboardResponse dashboard = learningService.getDashboard(30, mine.getId());
+
+        assertThat(dashboard.totalWorkflows()).isEqualTo(1);
+        assertThat(dashboard.totalRuns()).isEqualTo(2);
+        assertThat(dashboard.successfulRuns()).isEqualTo(1);
+        assertThat(dashboard.failedRuns()).isEqualTo(1);
+        assertThat(dashboard.successRate()).isEqualTo(0.5);
+        assertThat(dashboard.runsToday()).isEqualTo(2);
+        assertThat(dashboard.topWorkflows())
+                .extracting(DashboardResponse.TopWorkflowEntry::workflowId)
+                .containsExactly(mineWf.getId());
+
+        // Unfiltered, the other project's runs count as well.
+        assertThat(learningService.getDashboard(30, null).totalRuns()).isGreaterThanOrEqualTo(5);
+    }
+
+    private Project saveProject(String name) {
+        Project project = projectRepository.save(Project.builder()
+                .name(name)
+                .description("Dashboard IT")
+                .type(ProjectType.CODE)
+                .path("/tmp/" + name)
+                .status(ProjectStatus.STOPPED)
+                .build());
+        createdProjectIds.add(project.getId());
+        return project;
+    }
+
+    private Workflow saveWorkflow(String name, Project project) {
+        Workflow workflow = workflowRepository.save(Workflow.builder()
+                .name(name)
+                .description("Dashboard IT")
+                .project(project)
+                .build());
+        createdWorkflowIds.add(workflow.getId());
+        return workflow;
+    }
+
+    private void saveRun(Workflow workflow, RunStatus status, Instant startedAt) {
+        createdRunIds.add(runRepository.save(WorkflowRun.builder()
+                .workflow(workflow)
+                .workflowName(workflow.getName())
+                .status(status)
+                .startedAt(startedAt)
+                .build()).getId());
+    }
 }

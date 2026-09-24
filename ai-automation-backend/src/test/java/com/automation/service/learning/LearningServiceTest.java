@@ -431,6 +431,38 @@ class LearningServiceTest {
             assertThat(dashboard.successRate()).isCloseTo(0.667, within(0.01));
         }
 
+        /** Project filter: the overview figures come from the project-scoped queries only (TODO 4e1c9ad4). */
+        @Test
+        void getDashboard_withProject_usesProjectScopedOverview() {
+            LearningService learningService = new LearningService(
+                    runRepository, workflowRepository, workflowMapper,
+                    statsService, similarityService, agenticService, insightsService);
+
+            when(workflowRepository.countByProjectId("p-1")).thenReturn(1L);
+            when(runRepository.countByProject("p-1")).thenReturn(4L);
+            when(runRepository.countByProjectAndStatus("p-1", RunStatus.COMPLETED)).thenReturn(2L);
+            when(runRepository.countByProjectAndStatus("p-1", RunStatus.COMPLETED_WITH_ERRORS)).thenReturn(1L);
+            when(runRepository.countByProjectAndStatus("p-1", RunStatus.FAILED)).thenReturn(1L);
+            when(runRepository.countByProjectAndStartedAtAfter(eq("p-1"), any(Instant.class))).thenReturn(3L);
+            when(runRepository.findDashboardWindow(any(Instant.class))).thenReturn(List.of());
+            when(runRepository.findTopWorkflowsByProject("p-1"))
+                    .thenReturn(objectArrayList(new Object[]{"wf-1", "Mine", 4L}));
+
+            DashboardResponse dashboard = learningService.getDashboard(30, "p-1");
+
+            assertThat(dashboard.totalWorkflows()).isEqualTo(1L);
+            assertThat(dashboard.totalRuns()).isEqualTo(4L);
+            assertThat(dashboard.successfulRuns()).isEqualTo(3L);
+            assertThat(dashboard.failedRuns()).isEqualTo(1L);
+            assertThat(dashboard.successRate()).isCloseTo(0.75, within(0.001));
+            assertThat(dashboard.runsToday()).isEqualTo(3L);
+            assertThat(dashboard.topWorkflows())
+                    .extracting(DashboardResponse.TopWorkflowEntry::workflowId).containsExactly("wf-1");
+            verify(workflowRepository, never()).count();
+            verify(runRepository, never()).count();
+            verify(runRepository, never()).findTopWorkflows();
+        }
+
         @Test
         void getDashboard_integrationProvider_isExcludedFromAiProviderStats() {
             LearningService learningService = new LearningService(

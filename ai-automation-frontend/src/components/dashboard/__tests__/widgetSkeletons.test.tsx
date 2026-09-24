@@ -9,7 +9,7 @@ import { TodosDonutChart } from '../TodosDonutChart';
 import { UpcomingSchedulesCard } from '../UpcomingSchedulesCard';
 import { DashboardDataContext, type DashboardDataValue } from '../dashboardDataContext';
 
-/** The todo widgets read the view's project filter from the dashboard context. */
+/** The todo and schedule widgets read the view's project filter from the dashboard context. */
 const NO_FILTER: DashboardDataValue = {
   data: undefined, isLoading: false, error: null, refetch: () => {},
   filter: {}, days: 30, isPlaceholderData: false, dataDays: 30,
@@ -64,13 +64,13 @@ describe('widget skeletons', () => {
     ['this week', '/api/v1/schedules/remaining-this-week'],
   ])('UpcomingSchedulesCard shows a skeleton while %s loads', async (_what, path) => {
     server.use(hang(path));
-    renderWithProviders(<UpcomingSchedulesCard />);
+    renderWithProviders(inDashboard(<UpcomingSchedulesCard />));
     expect(await screen.findByTestId('widget-skeleton')).toBeInTheDocument();
     expect(screen.queryByText('No scheduled runs')).not.toBeInTheDocument();
   });
 
   it('UpcomingSchedulesCard shows the empty state once loaded', async () => {
-    renderWithProviders(<UpcomingSchedulesCard />);
+    renderWithProviders(inDashboard(<UpcomingSchedulesCard />));
     expect(await screen.findByText('No scheduled runs')).toBeInTheDocument();
     expect(screen.queryByTestId('widget-skeleton')).not.toBeInTheDocument();
   });
