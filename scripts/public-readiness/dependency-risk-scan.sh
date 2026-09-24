@@ -32,7 +32,7 @@ fi
 
 inventory_section "Backend dependency counts (from pom.xml)"
 if [ -f ai-automation-backend/pom.xml ]; then
-  count=$(grep -c '<dependency>' ai-automation-backend/pom.xml 2>/dev/null || echo 0)
+  count=$(grep -c '<dependency>' ai-automation-backend/pom.xml 2>/dev/null); count=${count:-0}
   echo "backend_dependency_entries: $count"
 else
   echo "backend_pom_xml: absent"

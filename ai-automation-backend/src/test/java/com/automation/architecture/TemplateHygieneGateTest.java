@@ -30,6 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     immer untrusted und werden in jedem Run single-quoted.</li>
  * <li>Keine datierten Claude-Modell-IDs: der Modell-Katalog liefert Aliase (opus/sonnet/haiku/fable),
  *     datierte IDs veralten und zeigen im UI "nicht im Katalog" (TODO 5770c88c).</li>
+ * <li>Kein {@code $(grep -c … || echo 0)} in Shell-Feldern: grep schreibt bei null Treffern selbst
+ *     "0" und endet mit 1, das {@code echo} haengt eine zweite Zeile an. Der Wert {@code "0\n0"} laesst
+ *     jeden folgenden {@code [ … -gt … ]} scheitern — im Architektur-Review blieb so die Klassenkopplung
+ *     hundertfach ungemessen (TODO 0c4b4eb5). Korrekt: {@code x=$(grep -c …); x=${x:-0}}.</li>
  * </ol>
  */
 class TemplateHygieneGateTest {
@@ -39,6 +43,8 @@ class TemplateHygieneGateTest {
             "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output"
                     + "|previous_report|open_todos)\\s*}}['\"]");
     private static final Pattern DATED_CLAUDE_MODEL = Pattern.compile("claude-(opus|sonnet|haiku|fable)-\\d");
+    private static final Pattern GREP_COUNT_ECHO_FALLBACK = Pattern.compile(
+            "grep\\s+(?:-[A-Za-z]*c[A-Za-z]*|--count)\\s[^\\n|]*\\|\\|\\s*echo\\b");
 
     @Test
     void should_notQuoteOutputPlaceholders_inShellFields() throws IOException {
@@ -91,6 +97,10 @@ class TemplateHygieneGateTest {
      * the recursion) and records a violation per quoted-output {@link ShippedDefinitions#SHELL_FIELDS} entry that is
      * actually executed as shell for this block. */
     private static void collectQuotedOutputViolations(JsonNode node, String fileLabel, List<String> out) {
+        collectShellViolations(node, fileLabel, QUOTED_OUTPUT, out);
+    }
+
+    private static void collectShellViolations(JsonNode node, String fileLabel, Pattern forbidden, List<String> out) {
         JsonNode config = node.get("config");
         String type = node.path("type").asText(null);
         for (String field : ShippedDefinitions.SHELL_FIELDS) {
@@ -98,7 +108,7 @@ class TemplateHygieneGateTest {
                 continue;
             }
             JsonNode value = config.get(field);
-            if (value != null && value.isTextual() && QUOTED_OUTPUT.matcher(value.asText()).find()) {
+            if (value != null && value.isTextual() && forbidden.matcher(value.asText()).find()) {
                 out.add(fileLabel + " -> " + field);
             }
         }
@@ -127,6 +137,28 @@ class TemplateHygieneGateTest {
         } else if (node.isArray()) {
             node.forEach(child -> collectModelFields(child, label, out));
         }
+    }
+
+    @Test
+    void should_notFallBackToEcho_afterGrepCount_inShellFields() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path file : definitionFiles()) {
+            for (ShippedDefinitions.Variant variant : ShippedDefinitions.variants(file)) {
+                walkBlocks(variant.root(), node -> collectShellViolations(
+                        node, variant.label(), GREP_COUNT_ECHO_FALLBACK, violations));
+            }
+        }
+        assertThat(violations)
+                .as("grep -c … || echo ergibt bei null Treffern \"0\\n0\" (x=$(grep -c …); x=${x:-0} verwenden)")
+                .isEmpty();
+    }
+
+    @Test
+    void should_flagGrepCountEchoFallback_butNotTheSafeForm() {
+        assertThat(GREP_COUNT_ECHO_FALLBACK.matcher("n=$(grep -c 'x' \"$f\" 2>/dev/null || echo 0)").find()).isTrue();
+        assertThat(GREP_COUNT_ECHO_FALLBACK.matcher("n=$(grep -cE '^a:' \"$f\" || echo 0)").find()).isTrue();
+        assertThat(GREP_COUNT_ECHO_FALLBACK.matcher("n=$(grep -c 'x' \"$f\" 2>/dev/null); n=${n:-0}").find()).isFalse();
+        assertThat(GREP_COUNT_ECHO_FALLBACK.matcher("grep -rn 'x' . || echo '(keine)'").find()).isFalse();
     }
 
     /** Ruft {@code visitor} fuer jedes Objekt mit "type" und "config" auf (Bloecke, auch verschachtelt). */

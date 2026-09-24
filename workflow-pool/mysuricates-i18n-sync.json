@@ -24,7 +24,7 @@
       "type": "shell",
       "config": {
         "label": "i18n Keys extrahieren und vergleichen",
-        "command": "DE_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\nEN_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\necho '=== Dateigroessen ==='\nwc -l \"$DE_FILE\" \"$EN_FILE\"\n\necho ''\necho '=== Top-Level Keys DE ==='\ngrep -E '^  [a-zA-Z_]+:' \"$DE_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/de_keys.txt\ncat {{ workspace_logs }}/de_keys.txt\n\necho ''\necho '=== Top-Level Keys EN ==='\ngrep -E '^  [a-zA-Z_]+:' \"$EN_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/en_keys.txt\ncat {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in DE (fehlen in EN) ==='\ncomm -23 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in EN (fehlen in DE) ==='\ncomm -13 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Verschachtelte Key-Anzahl pro Top-Level ==='\nfor key in $(cat {{ workspace_logs }}/de_keys.txt); do\n  DE_COUNT=$(grep -c \"^    \" \"$DE_FILE\" 2>/dev/null | head -1 || echo '?')\n  echo \"$key: DE hat Top-Level-Key\"\ndone\n\necho ''\necho '=== Gesamtstatistik ==='\nDE_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$DE_FILE\" || echo 0)\nEN_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$EN_FILE\" || echo 0)\necho \"DE nested keys: $DE_TOTAL\"\necho \"EN nested keys: $EN_TOTAL\"\necho \"Differenz: $((DE_TOTAL - EN_TOTAL))\"",
+        "command": "DE_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\nEN_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\necho '=== Dateigroessen ==='\nwc -l \"$DE_FILE\" \"$EN_FILE\"\n\necho ''\necho '=== Top-Level Keys DE ==='\ngrep -E '^  [a-zA-Z_]+:' \"$DE_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/de_keys.txt\ncat {{ workspace_logs }}/de_keys.txt\n\necho ''\necho '=== Top-Level Keys EN ==='\ngrep -E '^  [a-zA-Z_]+:' \"$EN_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/en_keys.txt\ncat {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in DE (fehlen in EN) ==='\ncomm -23 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in EN (fehlen in DE) ==='\ncomm -13 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Verschachtelte Key-Anzahl pro Top-Level ==='\nfor key in $(cat {{ workspace_logs }}/de_keys.txt); do\n  DE_COUNT=$(grep -c \"^    \" \"$DE_FILE\" 2>/dev/null | head -1 || echo '?')\n  echo \"$key: DE hat Top-Level-Key\"\ndone\n\necho ''\necho '=== Gesamtstatistik ==='\nDE_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$DE_FILE\"); DE_TOTAL=${DE_TOTAL:-0}\nEN_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$EN_FILE\"); EN_TOTAL=${EN_TOTAL:-0}\necho \"DE nested keys: $DE_TOTAL\"\necho \"EN nested keys: $EN_TOTAL\"\necho \"Differenz: $((DE_TOTAL - EN_TOTAL))\"",
         "timeout_seconds": 30,
         "on_failure": "continue",
         "workspace": {
@@ -78,7 +78,7 @@
       }
     }
   ],
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "MySuricates",
   "metadata": {
     "workspace": {
