@@ -57,12 +57,9 @@ public class WorkflowPoolService {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(poolDir, "*.json")) {
             for (Path file : stream) {
                 try {
-                    PoolWorkflowEntry entry = PoolFileParser.parse(file, objectMapper, locale);
-                    if (entry != null) {
-                        entries.add(entry);
-                    }
+                    entries.add(PoolFileParser.parse(file, objectMapper, locale));
                 } catch (PoolFileParser.PoolFileFormatException e) {
-                    // Content error, not a code error: the message names file and field, a stack trace adds nothing.
+                    // Content error, not a code error: the message names file and fields, a stack trace adds nothing.
                     log.warn("Skipping pool workflow file: {}", e.getMessage());
                 } catch (Exception e) {
                     log.warn("Failed to parse pool workflow file: {}", file.getFileName(), e);

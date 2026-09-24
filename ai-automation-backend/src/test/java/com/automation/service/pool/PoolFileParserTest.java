@@ -139,30 +139,43 @@ class PoolFileParserTest {
     class MissingRequiredFields {
 
         @Test
-        void missingName_returnsNull() throws Exception {
+        void missingName_isReported() throws Exception {
             Path file = write("no-name.json", """
-                    {"blocks": [{"type": "shell", "config": {}}]}
+                    {"scope": "repo", "blocks": [{"type": "shell", "config": {}}]}
                     """);
 
-            assertThat(parse(file, "en")).isNull();
+            assertThatThrownBy(() -> parse(file, "en"))
+                    .isInstanceOf(PoolFileParser.PoolFileFormatException.class)
+                    .hasMessage("Pool file no-name.json: field 'name' is missing");
         }
 
         @Test
-        void emptyName_returnsNull() throws Exception {
+        void nullName_countsAsMissing() throws Exception {
+            Path file = write("null-name.json", """
+                    {"name": null, "scope": "repo", "blocks": []}
+                    """);
+
+            assertThatThrownBy(() -> parse(file, "en")).hasMessageContaining("field 'name' is missing");
+        }
+
+        @Test
+        void emptyName_isReported() throws Exception {
             Path file = write("empty-name.json", """
-                    {"name": {}, "blocks": []}
+                    {"name": {}, "scope": "repo", "blocks": []}
                     """);
 
-            assertThat(parse(file, "en")).isNull();
+            assertThatThrownBy(() -> parse(file, "en"))
+                    .hasMessageContaining("field 'name' is empty, expected an object {\"de\": \"…\", \"en\": \"…\"}");
         }
 
         @Test
-        void missingBlocks_returnsNull() throws Exception {
+        void missingBlocks_isReported() throws Exception {
             Path file = write("no-blocks.json", """
-                    {"name": {"en": "No blocks"}}
+                    {"name": {"en": "No blocks"}, "scope": "repo"}
                     """);
 
-            assertThat(parse(file, "en")).isNull();
+            assertThatThrownBy(() -> parse(file, "en"))
+                    .hasMessage("Pool file no-blocks.json: field 'blocks' is missing");
         }
     }
 
@@ -198,10 +211,11 @@ class PoolFileParserTest {
 
         /**
          * The shape of {@code tech-radar.json} and {@code urlaubs-scout.json}: a plain workflow export
-         * (string name, projectId) copied into the pool. Before, this was a bare ClassCastException.
+         * (string name and description, a projectId, no scope) copied into the pool. Before, this was
+         * a bare ClassCastException; now one message names everything to fix.
          */
         @Test
-        void plainStringName_namesFileFieldAndExpectedShape() throws Exception {
+        void plainWorkflowExport_namesEveryProblemAndThePoolRuleNotesAtOnce() throws Exception {
             Path file = write("tech-radar.json", """
                     {"name": "Tech-Radar", "description": "Weekly digest", "projectId": "p-1",
                      "blocks": [{"type": "shell", "config": {"command": "date"}}]}
@@ -209,18 +223,67 @@ class PoolFileParserTest {
 
             assertThatThrownBy(() -> parse(file, "en"))
                     .isInstanceOf(PoolFileParser.PoolFileFormatException.class)
-                    .hasMessage("Pool file tech-radar.json: field 'name' must be an object "
-                            + "{\"de\": \"…\", \"en\": \"…\"}, found string \"Tech-Radar\"");
+                    .hasMessage("Pool file tech-radar.json: "
+                            + "field 'name' must be an object {\"de\": \"…\", \"en\": \"…\"}, found string \"Tech-Radar\"; "
+                            + "field 'description' must be an object {\"de\": \"…\", \"en\": \"…\"}, found string \"Weekly digest\". "
+                            + "Also against the pool rules (docs/workflow-pool-kuratierung.md): "
+                            + "instance bindings the pool export would remove: projectId; "
+                            + "field 'scope' is missing, expected one of 'repo', 'portable', 'external'");
         }
 
         @Test
-        void plainStringDescription_isNamed() throws Exception {
-            Path file = write("desc.json", """
-                    {"name": {"de": "N", "en": "N"}, "description": "plain", "blocks": []}
+        void everyWrongField_isNamedInOneMessage() throws Exception {
+            Path file = write("many.json", """
+                    {"name": "N", "scope": "repo", "blocks": {"type": "shell"}, "tags": ["ok", 3],
+                     "model": ["opus"], "defaultContext": "x", "metadata": []}
                     """);
 
             assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'description' must be an object");
+                    .hasMessage("Pool file many.json: "
+                            + "field 'name' must be an object {\"de\": \"…\", \"en\": \"…\"}, found string \"N\"; "
+                            + "field 'blocks' must be an array of blocks, found object; "
+                            + "field 'tags' must be an array of strings, found array; "
+                            + "field 'model' must be a string, found array; "
+                            + "field 'defaultContext' must be an object, found string \"x\"; "
+                            + "field 'metadata' must be an object, found array");
+        }
+
+        @Test
+        void poolRuleNotesAloneDoNotReject_theFileStillLoads() throws Exception {
+            Path file = write("bound.json", """
+                    {"name": {"de": "N", "en": "N"}, "projectId": "p-1", "blocks": []}
+                    """);
+
+            PoolWorkflowEntry entry = parse(file, "en");
+
+            assertThat(entry.scope()).isNull();
+            assertThat(entry.name()).containsEntry("en", "N");
+        }
+
+        @Test
+        void poolRuleNotes_followTheRules_placeholderAndDeclaredScopeAreFine() throws Exception {
+            Path file = write("portable.json", """
+                    {"name": "N", "scope": "portable", "projectId": "{{ project_id }}", "blocks": []}
+                    """);
+
+            assertThatThrownBy(() -> parse(file, "en"))
+                    .hasMessageNotContaining("pool rules")
+                    .hasMessageEndingWith("found string \"N\"");
+        }
+
+        @Test
+        void poolRuleNotes_unknownScope_andManyBindingsAreCut() throws Exception {
+            StringBuilder blocks = new StringBuilder();
+            for (int i = 0; i < 7; i++) {
+                blocks.append(i == 0 ? "" : ", ").append("{\"type\": \"sub-workflow\", \"config\": {\"workflow_id\": \"w").append(i).append("\"}}");
+            }
+            Path file = write("bound.json", "{\"name\": \"N\", \"scope\": \"global\", \"blocks\": [" + blocks + "]}");
+
+            assertThatThrownBy(() -> parse(file, "en"))
+                    .hasMessageContaining("instance bindings the pool export would remove: blocks[0].config.workflow_id, "
+                            + "blocks[1].config.workflow_id, blocks[2].config.workflow_id, blocks[3].config.workflow_id, "
+                            + "blocks[4].config.workflow_id and 2 more; ")
+                    .hasMessageEndingWith("field 'scope' must be one of 'repo', 'portable', 'external', found string \"global\"");
         }
 
         @Test
@@ -234,44 +297,25 @@ class PoolFileParserTest {
         }
 
         @Test
-        void blocksAsObject_isNamed() throws Exception {
-            Path file = write("blocks.json", """
-                    {"name": {"en": "N"}, "blocks": {"type": "shell"}}
-                    """);
-
-            assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'blocks' must be an array of blocks, found object");
-        }
-
-        @Test
-        void blockWithUnconvertibleField_namesBlocks() throws Exception {
+        void blockWithUnconvertibleField_namesThePathInTheBlocks() throws Exception {
             Path file = write("bad-block.json", """
-                    {"name": {"en": "N"}, "blocks": [{"type": "shell", "config": "not a map"}]}
+                    {"name": {"en": "N"}, "blocks": [{"type": "shell", "config": {}}, {"type": "shell", "config": "not a map"}]}
                     """);
 
             assertThatThrownBy(() -> parse(file, "en"))
                     .isInstanceOf(PoolFileParser.PoolFileFormatException.class)
-                    .hasMessageContaining("bad-block.json: field 'blocks' is not a valid block list");
+                    .hasMessageContaining("bad-block.json: field 'blocks[1].config' is not valid: ");
         }
 
+        /** The mistake in walkthrough-illustrationen.json: on_failure beside config instead of in it. */
         @Test
-        void tagsWithNonStrings_isNamed() throws Exception {
-            Path file = write("tags.json", """
-                    {"name": {"en": "N"}, "tags": ["ok", 3], "blocks": []}
+        void unknownBlockField_isNamedWithItsPath() throws Exception {
+            Path file = write("beside.json", """
+                    {"name": {"en": "N"}, "blocks": [{"type": "foreach", "config": {}, "on_failure": "continue"}]}
                     """);
 
             assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'tags' must be an array of strings, found array");
-        }
-
-        @Test
-        void wrongTypedStringField_isNamed() throws Exception {
-            Path file = write("model.json", """
-                    {"name": {"en": "N"}, "model": ["opus"], "blocks": []}
-                    """);
-
-            assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'model' must be a string, found array");
+                    .hasMessageContaining("field 'blocks[0].on_failure' is not valid: Unrecognized field \"on_failure\"");
         }
 
         @Test
@@ -285,13 +329,14 @@ class PoolFileParserTest {
         }
 
         @Test
-        void defaultContextAsString_isNamed() throws Exception {
-            Path file = write("ctx.json", """
-                    {"name": {"en": "N"}, "defaultContext": "x", "blocks": []}
+        void messageStaysOneLine_evenWithLineBreaksInTheFoundValue() throws Exception {
+            Path file = write("lines.json", """
+                    {"name": {"en": "N"}, "description": "first line\\nsecond line", "blocks": []}
                     """);
 
             assertThatThrownBy(() -> parse(file, "en"))
-                    .hasMessageContaining("field 'defaultContext' must be an object, found string");
+                    .hasMessageContaining("found string \"first line second line\"")
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("\n"));
         }
     }
 
