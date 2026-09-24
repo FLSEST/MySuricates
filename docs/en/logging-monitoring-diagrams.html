@@ -162,17 +162,18 @@
   <h2>WebSocket Log Pipeline <span>/topic/executions/{runId}/logs</span></h2>
   <pre class="mermaid">
 sequenceDiagram
-    participant BE as WorkflowExecutor/BlockExecutors
+    participant BE as ExecutionBroadcaster / RunLiveLogService / block executors
     participant SMT as SimpMessagingTemplate
     participant ST as STOMP Broker
     participant UI as React (useExecutionWebSocket)
 
     BE-&gt;&gt;SMT: convertAndSend(topic, payload)
     SMT-&gt;&gt;ST: dispatch
-    ST--&gt;&gt;UI: message (step logs, status, approvals, agentic events)
+    ST--&gt;&gt;UI: message (steps, status, approvals, human input, agentic, foreach, live_output)
     UI-&gt;&gt;UI: update LogViewer / Status
   </pre>
-  <p>Payloads: StepResult (input/output/duration/status), status events, approval_required/approval_resolved, agentic_* events.</p>
+  <p>Messages: step result (<code>stepIndex</code>, <code>status</code>, <code>input</code>, <code>output</code>, <code>durationMs</code>, block type and name), <code>status</code>, <code>approval_required</code>/<code>approval_resolved</code>, <code>human_input_required</code>/<code>human_input_resolved</code>, <code>agentic_*</code>, <code>foreach_*</code>, <code>container_*</code>, <code>command</code> and <code>live_output</code>.</p>
+  <p><code>live_output</code> batches the output of running blocks. <code>RunLiveLogService</code> keeps the latest lines in memory only; <code>GET /api/v1/executions/{id}/live-log</code> replays them to a client that reloads the page or opens it later.</p>
 </section>
 
 <section id="activitylogservice">
@@ -180,14 +181,21 @@ sequenceDiagram
   <pre class="mermaid">
 flowchart LR
     SVC["Services"] --&gt; ALS["ActivityLogService"]
+    PLG["Plugins / agents"] --&gt;|"POST /api/v1/activity-log"| ALS
     ALS --&gt; DB["activity_log (SQLite)"]
+    ALS --&gt; TOP["STOMP /topic/activity-log"]
+    UI["Activity page (polls every 10 s)"] --&gt;|"GET /api/v1/activity-log"| ALS
   </pre>
   <table>
     <thead><tr><th>Category</th><th>Examples</th></tr></thead>
     <tbody>
-      <tr><td><code>EXECUTION</code></td><td>Workflow start/complete/fail</td></tr>
-      <tr><td><code>SCHEDULE</code></td><td>Schedule triggered/failed</td></tr>
-      <tr><td><code>SECURITY</code></td><td>auth/rate-limit events</td></tr>
+      <tr><td><code>EXECUTION</code></td><td>Workflow started, completed, failed; cleanup after startup, ghost run watchdog</td></tr>
+      <tr><td><code>SCHEDULE</code></td><td>Schedule triggered, skipped, caught up</td></tr>
+      <tr><td><code>SECURITY</code></td><td>wrong or missing API key, rejected webhook signature, seal set or removed, refused start</td></tr>
+      <tr><td><code>SYSTEM</code></td><td>Workflow created, changed, deleted</td></tr>
+      <tr><td><code>WEBHOOK</code></td><td>Webhook created, triggered, deleted</td></tr>
+      <tr><td><code>CONTAINER</code></td><td>Project container started, stopped, cleaned up when idle</td></tr>
+      <tr><td><code>PLUGIN</code></td><td>Entries from outside via <code>POST /api/v1/activity-log</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -197,24 +205,30 @@ flowchart LR
   <div class="grid">
     <div class="card">
       <h3>Health</h3>
-      <p><code>GET /api/v1/system/health</code>: status OK</p>
+      <p><code>GET /api/v1/system/health</code>: <code>status</code> <code>UP</code>, <code>DEGRADED</code> (Docker set up but not answering) or <code>DOWN</code> (database unreachable), plus <code>components.database</code> and <code>components.docker</code></p>
       <p>Open (no API key)</p>
     </div>
     <div class="card">
       <h3>Info</h3>
-      <p><code>GET /api/v1/system/info</code>: version, build timestamp</p>
+      <p><code>GET /api/v1/system/info</code>: name, version, build type and timestamp, Java version, runtime mode, Tailscale status, environment, rate limit figures</p>
       <p>Open (no API key)</p>
+    </div>
+    <div class="card">
+      <h3>Other Open Probes</h3>
+      <p><code>GET /api/v1/system/auth-status</code>, <code>GET /api/v1/system/jvm-memory</code> (three heap figures) and <code>/actuator/health</code></p>
+      <p>The other <code>/actuator/**</code> endpoints, such as <code>/actuator/metrics</code>, need the API key</p>
     </div>
   </div>
 </section>
 
 <section id="rate-limit-header">
   <h2>Rate Limit Header <span>Filter</span></h2>
-  <p>With the RateLimitFilter active, the remaining requests are reported in a header.</p>
+  <p>The <code>RateLimitFilter</code> is on by default (120 requests per minute and client IP, <code>/api/**</code> only); every response it lets through states the remainder, a 429 the waiting time.</p>
   <table>
     <thead><tr><th>Header</th><th>Meaning</th></tr></thead>
     <tbody>
       <tr><td><code>X-RateLimit-Remaining</code></td><td>Remaining requests in the current 1-minute window</td></tr>
+      <tr><td><code>Retry-After</code></td><td>On 429: seconds until the window frees up again</td></tr>
     </tbody>
   </table>
 </section>
