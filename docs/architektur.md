@@ -232,7 +232,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
+│   ├── integration/providers/ 8 Provider in Unterverzeichnissen (confluence/, gitea/, github/, google/, jira/, taskwarrior/, trello/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
@@ -794,7 +794,7 @@ Plugin-Framework für externe Dienste:
 - `IntegrationEncryptionService` — Verschlüsselung von Credentials (AES-GCM)
 - `IntegrationConnection`-Entity — Verbindungsstatus (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` mit OAuth-Callback, Credentials, Actions
-- 7 Provider in Unterverzeichnissen: Confluence, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
+- 8 Provider in Unterverzeichnissen: Confluence, Gitea, GitHub, GoogleCalendar, GoogleGmail, Jira, Taskwarrior, Trello
 - `IntegrationBlockExecutor` — Führt Provider-Aktionen als Workflow-Block aus
 - `TaskExportCapable` — Interface für Provider, die TODO-Export unterstützen
 

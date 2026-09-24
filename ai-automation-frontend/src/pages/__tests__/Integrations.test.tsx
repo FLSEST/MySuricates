@@ -92,10 +92,11 @@ describe('Integrations — connected state', () => {
 });
 
 describe('Integrations — verification notice', () => {
-  const simulatedGitea: IntegrationProviderInfo = {
+  // A made-up provider id: shipped ids get a localized display name from i18n.
+  const simulatedProvider: IntegrationProviderInfo = {
     ...connectedGithub,
-    providerId: 'gitea',
-    displayName: 'Gitea',
+    providerId: 'example-forge',
+    displayName: 'Example Forge',
     status: 'DISCONNECTED',
     configured: true,
     accountName: null,
@@ -106,11 +107,11 @@ describe('Integrations — verification notice', () => {
   };
 
   it('marks a simulated provider on its card and explains it when selected', async () => {
-    useProviders([simulatedGitea]);
+    useProviders([simulatedProvider]);
     renderWithProviders(<Integrations />);
 
     expect(await screen.findByText('Simulated tests only')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Gitea'));
+    fireEvent.click(screen.getByText('Example Forge'));
     expect(await screen.findByText(/not against the real service/)).toBeInTheDocument();
   });
 

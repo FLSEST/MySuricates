@@ -1,4 +1,4 @@
-import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ListTodo, GitBranch, FileText } from 'lucide-react';
+import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ListTodo, GitBranch, GitMerge, FileText } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 /** Maps a provider's declared Lucide icon name (from getIcon()) to a component. */
@@ -10,6 +10,7 @@ const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   ListTodo,
   // lucide-react 1.x fuehrt keine Markenlogos mehr; der Provider meldet weiter "Github".
   Github: GitBranch,
+  GitMerge,
   FileText,
 };
 

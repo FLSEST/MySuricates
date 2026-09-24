@@ -109,10 +109,12 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | Trello | `trello` | API-Key + Token (kein OAuth-Flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` | geprüft |
 | Taskwarrior | `taskwarrior` | Lokales CLI (kein OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | geprüft |
 | GitHub | `github` | Personal Access Token (kein OAuth-Flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft |
+| Gitea / Forgejo | `gitea` | Server-URL + Zugangstoken (kein OAuth-Flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft (lokaler Container) |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
-**Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Jira (Issue vom
+**Task-Export (TODO → Tracker, `TaskExportCapable`):** GitHub (Issue, Target `owner/repo`), Gitea/Forgejo (Issue,
+Target `owner/repo`; Tags werden als Labels übernommen, soweit es sie im Repository gibt), Jira (Issue vom
 Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den accessible-resources) und Trello
 (Karte, Target = Listen-ID, `listTargets` liefert „Board / Liste"; Tags werden nicht als Labels übertragen, weil
 Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
@@ -152,6 +154,16 @@ Hinweise:
   die benötigten Repositories mit *Issues: Read and write* anlegen statt eines klassischen
   Tokens mit vollem `repo`. Intern aufgeteilt: HTTP über `GitHubHttpClient`, Parameter-Parsing
   in `GitHubParams`.
+- **Gitea / Forgejo** (ein Provider für beide, gleiche API unter `/api/v1`) braucht keinen OAuth-Flow:
+  Feld 1 ist die Server-URL (nur `http`/`https`, ohne Benutzerdaten, Query oder Fragment; ein
+  abschließender Schrägstrich wird entfernt), Feld 2 das Zugangstoken. Beides wird als `url|token`
+  gespeichert (`ServerTokenCredential`) und beim Speichern per `GET /api/v1/user` geprüft; Header
+  `Authorization: token <t>`. Scopes lassen sich mit dem Token allein nicht auslesen (`scopes = null`).
+  Gitea erwartet beim Anlegen und beim Ersetzen von Labels Label-IDs: `GiteaLabels` löst Namen gegen
+  die Labels des Repositories auf (unbekannte Namen: Action schlägt vor dem Schreiben fehl, Task-Export
+  lässt sie weg; Zahlen gelten als IDs, so auch Organisations-Labels). Labels ändert `update_issue`
+  über `PUT …/issues/{n}/labels`, weil der Edit-Endpunkt kein Label-Feld hat. Geprüft gegen Gitea 1.27.3
+  und Forgejo 14.0.5 im lokalen Container.
 
 ---
 

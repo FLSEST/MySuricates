@@ -20,7 +20,8 @@ public final class VerifiedProviders {
             "confluence", "Confluence Cloud (Atlassian 3LO), eigener Account",
             "trello", "Trello REST API, eigener Account",
             "taskwarrior", "Taskwarrior-CLI auf dem Host",
-            "github", "GitHub REST API, eigener Account"
+            "github", "GitHub REST API, eigener Account",
+            "gitea", "Gitea 1.27.3 und Forgejo 14.0.5, lokaler Container"
     );
 
     private VerifiedProviders() {

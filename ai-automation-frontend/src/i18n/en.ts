@@ -1276,6 +1276,18 @@ export const en = {
           add_comment: 'Add a comment to an issue',
         },
       },
+      gitea: {
+        displayName: 'Gitea / Forgejo',
+        description: 'Issues on your own Gitea or Forgejo server: list, create, update and comment',
+        actions: {
+          list_repos: 'List accessible repositories',
+          list_issues: 'List issues of a repository',
+          get_issue: 'Fetch a single issue',
+          create_issue: 'Create a new issue',
+          update_issue: 'Update an issue (incl. open/close)',
+          add_comment: 'Add a comment to an issue',
+        },
+      },
     },
   },
   calendar: {

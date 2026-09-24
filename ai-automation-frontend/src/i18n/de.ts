@@ -1278,6 +1278,18 @@ export const de: TranslationKeys = {
           add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
         },
       },
+      gitea: {
+        displayName: 'Gitea / Forgejo',
+        description: 'Issues auf einem eigenen Gitea- oder Forgejo-Server: auflisten, erstellen, aktualisieren und kommentieren',
+        actions: {
+          list_repos: 'Zugängliche Repositories auflisten',
+          list_issues: 'Issues eines Repositories auflisten',
+          get_issue: 'Ein einzelnes Issue abrufen',
+          create_issue: 'Ein neues Issue erstellen',
+          update_issue: 'Ein Issue aktualisieren (inkl. öffnen/schliessen)',
+          add_comment: 'Einen Kommentar zu einem Issue hinzufügen',
+        },
+      },
     },
   },
   calendar: {

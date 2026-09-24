@@ -110,8 +110,15 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Trello | `trello` | API key + token (no OAuth flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` | verified |
 | Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | verified |
 | GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified |
+| Gitea / Forgejo | `gitea` | Server URL + access token (no OAuth flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified (local container) |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
+
+**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Gitea/Forgejo
+(issue, target `owner/repo`; tags become labels where the repository has them), Jira (issue of type Task,
+target = project key, labels without spaces; browse URL from the accessible resources) and Trello (card,
+target = list ID, `listTargets` returns "board / list"; tags are not transferred as labels because Trello
+expects label IDs). Discovery via `instanceof`, contract test `TaskExportContractTest`.
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 
@@ -147,6 +154,16 @@ Notes:
   execution is not blocked). Least privilege: create a fine-grained PAT limited to the needed
   repositories with *Issues: Read and write* instead of a classic token with full `repo`.
   Split internally: HTTP via `GitHubHttpClient`, parameter parsing in `GitHubParams`.
+- **Gitea / Forgejo** (one provider for both, same API under `/api/v1`) needs no OAuth flow:
+  field 1 is the server URL (`http`/`https` only, no user info, query or fragment; a trailing
+  slash is dropped), field 2 the access token. Both are stored as `url|token`
+  (`ServerTokenCredential`) and checked via `GET /api/v1/user` when saved; header
+  `Authorization: token <t>`. The token alone cannot read its own scopes (`scopes = null`).
+  Gitea expects label IDs when creating an issue or replacing its labels: `GiteaLabels` resolves
+  names against the repository's labels (unknown names: the action fails before writing, the task
+  export drops them; numbers count as IDs, which also covers organisation labels). `update_issue`
+  changes labels via `PUT …/issues/{n}/labels` because the edit endpoint has no labels field.
+  Checked against Gitea 1.27.3 and Forgejo 14.0.5 in a local container.
 
 ---
 

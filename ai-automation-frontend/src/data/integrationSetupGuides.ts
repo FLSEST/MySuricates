@@ -555,6 +555,57 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'gitea': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Server-URL (z. B. https://git.example.org)', en: 'Server URL (e.g. https://git.example.org)' },
+      clientSecretPlaceholder: { de: 'Zugangstoken (Access Token)', en: 'Access token' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Zugangstoken erstellen',
+          en: 'Create an access token',
+        },
+        instructions: {
+          de: [
+            'Auf deinem Gitea- bzw. Forgejo-Server anmelden',
+            'Oben rechts: Profilbild → "Einstellungen" → "Anwendungen"',
+            'Unter "Zugangstoken verwalten" einen Namen eingeben, z. B. "MySuricates"',
+            'Berechtigungen: "issue" auf Lesen und Schreiben, "repository" und "user" auf Lesen',
+            'Token erzeugen und sofort kopieren — er wird nur einmal angezeigt',
+          ],
+          en: [
+            'Sign in to your Gitea or Forgejo server',
+            'Top right: avatar → "Settings" → "Applications"',
+            'Under "Manage access tokens" enter a name, e.g. "MySuricates"',
+            'Permissions: "issue" read and write, "repository" and "user" read',
+            'Generate the token and copy it immediately — it is shown only once',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Server-URL in das erste Feld, nur die Basisadresse ohne /api/v1 (z. B. https://git.example.org oder https://codeberg.org)',
+            'Zugangstoken in das zweite Feld',
+            '"Zugangsdaten speichern" klicken — der Status wird grün, sobald Server und Token passen',
+            'Labels gibst du in Workflows als Namen an; sie müssen im Repository schon existieren',
+          ],
+          en: [
+            'Server URL in the first field, just the base address without /api/v1 (e.g. https://git.example.org or https://codeberg.org)',
+            'Access token in the second field',
+            'Click "Save credentials" — the status turns green once server and token match',
+            'Labels are given by name in workflows; they must already exist in the repository',
+          ],
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {
