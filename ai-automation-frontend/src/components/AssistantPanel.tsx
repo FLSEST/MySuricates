@@ -6,7 +6,7 @@ import { useAssistantConversation } from '../hooks/useAssistantConversation';
 import { useAssistantWebSocket } from '../hooks/useAssistantWebSocket';
 import { useExecuteWorkflow } from '../hooks/useWorkflows';
 import { usePanelResize } from '../hooks/usePanelResize';
-import { MeerkatIcon } from './layout/Sidebar';
+import { MeerkatIcon } from './layout/MeerkatIcon';
 import { parsePageContext } from './assistantPanelUtils';
 import { MessageBubble } from './assistant/AssistantMessage';
 import { AssistantHistory } from './assistant/AssistantHistory';

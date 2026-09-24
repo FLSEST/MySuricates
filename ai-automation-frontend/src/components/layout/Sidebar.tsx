@@ -29,9 +29,6 @@ import { SidebarDivider, SortableDivider } from './SidebarDivider';
 import { PendingInputNavItem } from './PendingInputNavItem';
 import { SidebarModeToggle } from './SidebarModeToggle';
 
-// AssistantPanel still imports the icon from here; the other callers use './MeerkatIcon'.
-export { MeerkatIcon };
-
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
   const { simpleMode } = useSettingsStore();
