@@ -2,7 +2,8 @@ import { openPath } from '../../api/client';
 import { useToast } from '../../hooks/useToast';
 import { useT } from '../../i18n';
 
-const PATH_REGEX = /(\/(?:[\w.-]+\/)+[\w.-]+)/g;
+/** Absolute file paths in step output (global — use with matchAll or reset lastIndex). */
+export const PATH_REGEX = /(\/(?:[\w.-]+\/)+[\w.-]+)/g;
 
 export function PathLinkedOutput({ text }: { text: string }) {
   const toast = useToast();
