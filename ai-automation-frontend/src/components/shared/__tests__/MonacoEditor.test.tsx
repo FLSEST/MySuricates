@@ -243,7 +243,8 @@ describe('Monaco fields', () => {
     const files = markdownEditors.map((e) => e.file);
     expect(files.some((f) => f.endsWith('/InstructionsModal.tsx'))).toBe(true);
     expect(files.some((f) => f.endsWith('/SkillEditorModal.tsx'))).toBe(true);
-    expect(files.some((f) => f.endsWith('/OnboardingProfiles.tsx'))).toBe(true);
+    // The onboarding profile editor (moved out of pages/OnboardingProfiles.tsx)
+    expect(files.some((f) => f.endsWith('/onboarding/ProfileEditor.tsx'))).toBe(true);
   });
 
   it('in Markdown all use prose', () => {
