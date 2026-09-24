@@ -320,17 +320,18 @@ com.automation
 
 ### Workflow-Ausführung
 
-Die Workflow-Engine führt Blöcke sequenziell aus. Claude CLI läuft **immer auf dem Host** (nicht in Containern), um Nested-Session-Erkennung zu vermeiden.
+Die Workflow-Engine führt Blöcke sequenziell aus. Die KI-CLIs (Claude, Codex, Pi) laufen **immer auf dem Host** im Projektverzeichnis, nicht im Projekt-Container; Shell-Blöcke ebenso, außer ein Schritt nennt `container_image`.
 
 **Ablauf:**
-1. `WorkflowExecutor` erstellt einen `WorkflowRun` (Status: PENDING → RUNNING)
-2. Für jeden `BlockDefinition` wird der passende `BlockExecutor` ausgewählt
-3. Claude-CLI-Aufrufe erfolgen auf dem Host via `HostClaudeService` (`ProcessBuilder`)
-4. Shell-Befehle können optional via Docker Exec im Container ausgeführt werden
-5. Ergebnisse werden als `StepResult` gespeichert
-6. Live-Logs gehen über WebSocket (STOMP) an das Frontend
-7. Nach Abschluss wertet `RunCompletionHandler` Gate-Status und TODO-Marker aus (alle Block-Outputs), verbucht Template-Verification, Activity-Log und DLQ
-8. `WorkflowRunCompletedEvent` wird gefeuert → `AutoTodoService` reagiert
+1. `WorkflowExecutor` lässt den Start von `RunAdmission` prüfen (abgewiesen: kein Run), legt den `WorkflowRun` direkt mit Status RUNNING an und antwortet sofort; die Blöcke laufen auf einem virtuellen Thread, sobald ein Slot frei ist (`automation.execution.max-concurrent`)
+2. Vor dem ersten Block sucht oder startet der Run den Projekt-Container, sofern Docker eingerichtet ist und der Run nicht isoliert läuft (scheitert der Start, geht es ohne Container weiter), und schreibt Skills, Projektkontext und aktive Workflow-Memory nach `.claude/rules/`
+3. Für jede `BlockDefinition` wird der passende `BlockExecutor` ausgewählt; `BlockStepRunner` legt den Step an und führt ihn aus
+4. KI-Aufrufe gehen über den `CommandExecutorService` an den Anbieter aus Block oder Workflow, sonst an den Systemstandard (`AiProviderRegistry`), und starten dessen CLI auf dem Host (`claude -p`, `codex exec`, `pi -p`; Prompt über stdin)
+5. Shell-Befehle laufen per `/bin/bash -c` im Projektverzeichnis auf dem Host, mit `container_image` in einem Einmal-Container (`docker run --rm`); den Projekt-Container nutzen nur Ad-hoc-Befehle während eines Runs und das Terminal
+6. Ergebnisse werden als `StepResult` gespeichert
+7. Live-Logs gehen über WebSocket (STOMP, `/topic/executions/{runId}/logs`) an das Frontend
+8. Nach Abschluss wertet `RunCompletionHandler` Gate-Status und TODO-Marker aus allen Block-Ausgaben aus (die Kopien, die `compress`, `compress-ai` und `sub-workflow` weiterreichen, zählen nicht noch einmal), verbucht Template-Verification, Activity-Log und DLQ
+9. Nach dem letzten Speichern feuert `RunFinalizer` das `WorkflowRunCompletedEvent` → u. a. `AutoTodoService` reagiert
 
 **Steuerbarkeit ab Schritt 1:** Noch vor dem Submit registriert der `WorkflowExecutor` einen provisorischen `ExecutionContext` in der `WorkflowExecutionRegistry`. Ein Cancel greift damit auch, solange der Run noch auf einen Semaphore-Slot oder den Container-Start wartet — der Ausführungs-Thread übernimmt beim Tausch gegen den echten Context dessen Cancel-/Pause-Flag. Folge: `getActiveRunCount()` zählt auch wartende Runs, wodurch `GhostRunWatchdogService` den Permit eines startenden Runs nicht mehr als Leak freigibt.
 
@@ -643,7 +644,7 @@ Injektionspfade:
 
 ## Host Claude Service
 
-Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
+Alle Claude-CLI-Aufrufe der Blöcke erfolgen auf dem Host (nicht im Container; nur Ad-hoc-Befehle während eines Runs laufen per `docker exec` im Projekt-Container):
 - `HostClaudeService.executeAction()` — ACT-Phase, nutzt `--append-system-prompt`, `--model`-Flag, Projekt-Arbeitsverzeichnis
 - `HostClaudeService.reasonStructured()` — REASON-Phase, nutzt `--system-prompt`, `--max-turns 3`; `--model` wird gesetzt, wenn der Workflow ein Modell konfiguriert (`ReasoningRequest.model`)
 - Prompt wird via **stdin** an den Prozess geschrieben (`writePromptToStdin()`) — vermeidet Linux ARG_MAX-Limit
@@ -653,7 +654,7 @@ Alle Claude-CLI-Aufrufe erfolgen auf dem Host (nicht im Container):
 
 ## Provider Routing
 
-Alle Block-Executors (simple, retry, conditional, foreach, while, switch, skill-capability, integration) leiten `context.getProvider()` als `providerId` via `HostExecutionRequest.builder()` an den `CommandExecutorService` weiter. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden nicht-Shell-Block-Typ.
+Die KI-fähigen Block-Executors (simple, retry, conditional, foreach, while, switch, skill-capability, compress-ai, agentic) bestimmen den Anbieter mit `context.providerFor(block)`: `provider` am Block vor dem `provider` des Workflows, ohne beide der Systemstandard. Das Setzen von `"provider": "CODEX"` in einem Workflow-JSON gilt damit für jeden KI-Block ohne eigenen `provider`; `compress-ai` läuft nur mit `CLAUDE` (sonst scheitert der Schritt). Beim `integration`-Block bezeichnet `provider` den Integrations-Provider, nicht den KI-Anbieter.
 
 `AiProviderRegistry.resolve()` fällt auf den konfigurierten Standard-Provider zurück (nicht hardcodiertes CLAUDE), wenn eine unbekannte Provider-ID übergeben wird.
 

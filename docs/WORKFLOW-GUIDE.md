@@ -576,6 +576,8 @@ Ruft die Fähigkeit eines registrierten Skills auf.
 
 **Sicherheit**: Capabilities deklarieren über `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, fällt sofort fehl mit klarer Meldung. Für alle anderen Fälle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
 
+**Fehler**: Endet die KI-CLI mit einem Exit-Code ungleich 0 (Limit, fehlende Anmeldung, Absturz), scheitert der Schritt wie ein `simple`-Block, und ihre Meldung steht in der Ausgabe. Weiter läuft der Workflow dann nur mit `"on_failure": "continue"`.
+
 ---
 
 ### `document` — Text aus Dokumenten extrahieren
@@ -1426,7 +1428,7 @@ Workflows können über Runs hinweg Wissen ansammeln. Memory kann **manuell** od
 
 #### Wie es funktioniert
 
-1. **Extrahieren** (manuell oder automatisch): Nach einem oder mehreren Runs, Extraktion über UI ("Memory"-Tab auf der Workflow-Detailseite) oder API auslösen. Runs auswählen und Provider wählen (Claude oder Codex). Der `ConversationPreprocessor` komprimiert die Step-Outputs um ~50-70% bevor sie an die KI gesendet werden, die einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags) erstellt.
+1. **Extrahieren** (manuell oder automatisch): Nach einem oder mehreren Runs, Extraktion über UI ("Memory"-Tab auf der Workflow-Detailseite) oder API auslösen. Runs auswählen und Provider wählen (Claude oder Codex). Der `ConversationPreprocessor` verdichtet die Step-Outputs, bevor sie an die KI gehen; die KI erstellt daraus einen strukturierten Wissenseintrag (Titel, Markdown-Inhalt, Tags).
 2. **Aktivieren** (manuell oder automatisch): Bei manueller Extraktion startet Memory als `active=false`. Bei automatischer Extraktion wird es direkt aktiviert. Nur eine Version kann gleichzeitig aktiv sein.
 3. **Beim nächsten Run verwendet**: Vor jeder Workflow-Ausführung wird das aktive Memory nach `.claude/rules/project-memory.md` im Projektverzeichnis geschrieben. Die Claude CLI greift auf diese Datei automatisch via Rules-System zu; pi und Codex lesen `.claude/rules/` nicht und bekommen Memory, Skills und Projekt-Kontext deshalb als Anhang an den System-Prompt (`RunContextFiles`).
 4. **Versionierung**: Mehrere Memory-Versionen pro Workflow werden aufbewahrt. Aeltere Versionen können durch Aktivierung wiederhergestellt werden.

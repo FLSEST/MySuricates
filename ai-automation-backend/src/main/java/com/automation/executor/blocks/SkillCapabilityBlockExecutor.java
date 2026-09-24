@@ -146,7 +146,10 @@ public class SkillCapabilityBlockExecutor implements BlockExecutor {
 
             var response = commandExecutor.executeOnHost(reqBuilder.build());
             result.setOutput(response.output());
-            result.setStatus(StepStatus.COMPLETED);
+            // Like a simple block: a CLI that ends with an error (limit, login, crash) returns its
+            // message instead of throwing, so the exit code decides — otherwise gates and later
+            // blocks would take that message for the capability's answer (ea0c0b3f).
+            result.setStatus(response.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
             // provider, requestedModel, aiRequest (incl. allowedTools) and response metadata of the host call
             result.setMetadata(new LinkedHashMap<>(response.metadata()));
         } catch (Exception e) {

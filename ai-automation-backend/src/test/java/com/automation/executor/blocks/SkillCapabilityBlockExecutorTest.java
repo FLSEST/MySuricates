@@ -135,6 +135,30 @@ class SkillCapabilityBlockExecutorTest {
         assertThat(result.getOutput()).contains("AI unavailable");
     }
 
+    /**
+     * A CLI that ends with an error (limit, login, crash) does not throw — it returns its message with
+     * a non-zero exit code. The step must fail like a simple block does, not pass the message on as
+     * a successful answer (ea0c0b3f).
+     */
+    @Test
+    void execute_cliEndsWithNonZeroExitCode_returnsFailedResultWithCliMessageAndMetadata() {
+        when(commandExecutor.executeOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(new CliSession.EnrichedCommandResult("Claude AI usage limit reached", 1, null,
+                        Map.of("provider", "CLAUDE", "requestedModel", "opus")));
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("capability", "fact_check");
+        config.put("input", "The earth is round.");
+        BlockDefinition block = BlockDefinition.builder().type("skill-capability").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("usage limit reached");
+        assertThat(result.getMetadata()).containsEntry("provider", "CLAUDE").containsEntry("requestedModel", "opus");
+        assertThat(result.getCompletedAt()).isNotNull();
+    }
+
     @Test
     void execute_nullCapability_throwsException() {
         Map<String, Object> config = new HashMap<>();

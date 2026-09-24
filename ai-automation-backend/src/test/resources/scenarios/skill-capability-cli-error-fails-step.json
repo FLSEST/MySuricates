@@ -1,0 +1,65 @@
+{
+  "id": "skill-capability-cli-error-fails-step",
+  "title": "skill-capability: Endet die KI-CLI mit Fehler, scheitert der Schritt, statt die Fehlermeldung als Antwort weiterzugeben",
+  "derivedFrom": {
+    "spec": "docs/workflow-engine-diagrams.md, Block-Matrix: skill-capability scheitert, wenn der Aufruf scheitert — wie simple, dessen Status der Exit-Code der CLI bestimmt",
+    "incidents": [
+      "ea0c0b3f (SkillCapabilityBlockExecutor meldet COMPLETED unabhängig vom Exit-Code der CLI)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "skill-capability",
+        "name": "fakten_pruefen",
+        "config": {
+          "capability": "fact_check",
+          "input": "Die Erde ist rund."
+        }
+      },
+      {
+        "type": "simple",
+        "name": "bewerten",
+        "config": {
+          "command": "Bewerte das Prüfergebnis und schreibe am Ende gate_status: GREEN|YELLOW|RED.\n{{ previous_output }}"
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "fact_check",
+        "respond": "Claude AI usage limit reached",
+        "exitCode": 1
+      },
+      {
+        "match": "usage limit reached",
+        "respond": "Alles geprüft.\ngate_status: GREEN"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "FAILED",
+    "runError": {
+      "startsWith": "Step 0 (skill-capability) failed",
+      "contains": [
+        "usage limit reached"
+      ]
+    },
+    "steps": [
+      {
+        "index": 0,
+        "status": "FAILED",
+        "outputContains": [
+          "usage limit reached"
+        ]
+      }
+    ],
+    "aiCallCount": {
+      "SCRIPTED": 1
+    },
+    "gate": "none"
+  }
+}

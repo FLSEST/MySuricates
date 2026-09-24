@@ -7,7 +7,8 @@
 
 The Workflow Memory feature extracts reusable knowledge from past workflow runs
 and provides it as context for future executions. It supports two providers:
-**Claude CLI** and **OpenAI Codex CLI**, both running directly on the host.
+**Claude CLI** and **OpenAI Codex CLI**, both running directly on the host. It is an optional
+module (`memory`, in the presets `research` and `full`).
 
 ---
 
@@ -24,7 +25,7 @@ and provides it as context for future executions. It supports two providers:
  Backend (Spring Boot, Port 9090)
  ┌──────────────────────────────────────────────────────────────────┐
  │  WorkflowMemoryController.extract()                             │
- │  ├── Error Handling: 400 / 422 / 502                            │
+ │  ├── Error Handling: 400 / 404 / 422 / 502                       │
  │  └──────────────┬───────────────────────────────────────────────│
  │                 ▼                                                │
  │  WorkflowMemoryService.extractKnowledge()                       │
@@ -36,12 +37,11 @@ and provides it as context for future executions. It supports two providers:
  │  │     └── All steps from all loaded runs                       │
  │  │                                                               │
  │  ├─ 3. Preprocessing ◄── ConversationPreprocessor               │
- │  │     ├── Compress code blocks (>30 lines)                     │
- │  │     ├── Compress data dumps (>20 lines)                      │
- │  │     ├── Remove meta comments                                 │
- │  │     ├── Consolidate repeated errors                          │
- │  │     └── Compress agentic iterations                          │
- │  │     Reduction: typically 50-70%                              │
+ │  │     ├── Replace code blocks over 30 lines                     │
+ │  │     ├── Replace data dumps over 20 lines                      │
+ │  │     ├── Remove meta comments                                  │
+ │  │     ├── Merge repeated lines                                  │
+ │  │     └── Condense agentic iterations                           │
  │  │                                                               │
  │  ├─ 4. getSummarizer(provider)                                  │
  │  │     ├── "CLAUDE" ──► ClaudeSummarizer                        │
@@ -51,6 +51,11 @@ and provides it as context for future executions. It supports two providers:
  │        └── WorkflowMemory { title, content, tags, provider }    │
  └──────────────────────────────────────────────────────────────────┘
 ```
+
+The request is synchronous: the controller answers only after the AI call, with `201` and the new,
+still inactive memory (without `provider` in the body: `CLAUDE`). The AI call itself runs outside
+any transaction, between a short read (steps 1–2) and a short write (step 5), because the database
+has only one connection.
 
 ---
 
@@ -69,7 +74,7 @@ and provides it as context for future executions. It supports two providers:
           ▼                  ▼
   ┌──────────────┐   ┌──────────────┐
   │ claude -p    │   │ codex exec - │
-  │ --max-turns 1│   │ -o result.txt│
+  │ --max-turns 1│   │ -o <tempfile>│
   │ --output-    │   │ --skip-git-  │
   │  format      │   │  repo-check  │
   │  stream-json │   │ -C <workdir> │
@@ -94,14 +99,15 @@ and provides it as context for future executions. It supports two providers:
 | Output method     | Stream-JSON parsing           | `-o` flag (temp file)         |
 | Instructions      | `CLAUDE.md` in working dir    | `AGENTS.md` in working dir    |
 | Auth              | `~/.claude/` (CLI-managed)    | `~/.codex/` (CLI-managed)     |
-| Timeout           | `automation.summarization.timeout-seconds` (default: 120s) |
+| Timeout           | `automation.host-claude.timeout-seconds` (default 300 s) | `automation.summarization.timeout-seconds` (default 120 s) |
 
 ---
 
 ## 3. Data Flow Diagram — Using Memory During Workflow Execution
 
 ```
-  WorkflowExecutor.execute(workflow)
+  WorkflowExecutor, before the first block
+  (ExecutionContextFactory.writeProjectContextFiles)
   │
   ├─ 1. writeActiveMemoryToProject(workflowId, projectPath)
   │     │
@@ -115,8 +121,10 @@ and provides it as context for future executions. It supports two providers:
   │         └── Deletes old project-memory.md (cleanup logic)
   │
   ├─ 2. Block execution starts
-  │     └── Claude CLI reads CLAUDE.md + .claude/rules/*.md automatically
-  │         └── Workflow memory is available as context
+  │     ├── Claude CLI reads CLAUDE.md + .claude/rules/*.md automatically
+  │     ├── Codex and Pi: RunContextFiles appends .claude/rules/*.md
+  │     │   to the system prompt
+  │     └── Workflow memory is thus available as context
   │
   └─ 3. Run result is saved
         └── WorkflowRun + StepResults in SQLite
@@ -187,6 +195,9 @@ automation:
     timeout-seconds: ${AUTOMATION_SUMMARIZATION_TIMEOUT:120}
 ```
 
+`timeout-seconds` limits the Codex call and can be changed at runtime in the settings
+(`summarization-timeout-seconds`); the Claude call follows `automation.host-claude.timeout-seconds`.
+
 ---
 
 ## 7. API Endpoints
@@ -194,7 +205,7 @@ automation:
 | Method   | Path                                              | Description                         |
 |----------|---------------------------------------------------|-------------------------------------|
 | `GET`    | `/api/v1/workflows/{id}/memory`                   | All memories for a workflow         |
-| `POST`   | `/api/v1/workflows/{id}/memory/extract`            | Extract knowledge (async, ~30-60s)  |
+| `POST`   | `/api/v1/workflows/{id}/memory/extract`            | Extract knowledge (synchronous; without `provider`: CLAUDE) |
 | `PUT`    | `/api/v1/workflows/{id}/memory/{memId}`            | Update title/content                |
 | `PUT`    | `/api/v1/workflows/{id}/memory/{memId}/activate`   | Activate a memory                   |
 | `DELETE` | `/api/v1/workflows/{id}/memory/{memId}`            | Delete a memory                     |
@@ -205,6 +216,7 @@ automation:
 |-------------|---------------------------------------------|
 | 201         | Successfully extracted                      |
 | 400         | Unknown provider                            |
+| 404         | Unknown run ID in `runIds`                  |
 | 422         | No runs / no steps found                    |
 | 502         | CLI call failed (timeout, crash)            |
 
@@ -251,5 +263,6 @@ after successful workflow runs. Configuration is done per workflow via the
 ```
 
 - Runs asynchronously (`@Async @EventListener`) — does not block the workflow run
+- Only with the `memory` module switched on
 - Always uses provider `CLAUDE`
 - `autoMemoryExtraction: true` (boolean instead of map) is also supported (uses default interval 5)
