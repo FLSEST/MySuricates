@@ -74,8 +74,8 @@ and so does the start page of the interface — with the command for whatever is
 ## 2. Install
 
 ```bash
-git clone <repository-url> mysuricates
-cd mysuricates
+git clone https://github.com/FLSEST/MySuricates.git
+cd MySuricates
 ./scripts/setup.sh              # English; in German: ./scripts/setup.sh --lang de
 ```
 

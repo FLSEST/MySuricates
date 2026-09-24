@@ -75,8 +75,8 @@ und die Startseite der Oberfläche sagt es ebenso — samt Befehl für das, was 
 ## 2. Installieren
 
 ```bash
-git clone <repository-url> mysuricates
-cd mysuricates
+git clone https://github.com/FLSEST/MySuricates.git
+cd MySuricates
 ./scripts/setup.sh              # Englisch; auf Deutsch: ./scripts/setup.sh --lang de
 ```
 

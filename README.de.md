@@ -18,6 +18,22 @@ entstanden: 1 641 von 1 825 Commits tragen mindestens einen KI-Trailer — 1 354
 Architekturschulden sind bekannt und werden im System selbst als Audit-Befunde gefuehrt — siehe
 [Reifegrad](#reifegrad-und-bekannte-schulden).
 
+## Schnellstart
+
+Nur ausprobieren — dafuer braucht es nur Docker:
+
+```bash
+git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
+scripts/tryout.sh build          # baut das Image aus dem neuesten Release, beim ersten Mal etwa 8 Minuten
+scripts/tryout.sh start          # http://localhost:9095 — die Ausgabe zeigt den API-Key fuer die Anmeldung
+scripts/tryout.sh login claude   # optional, fuer KI-Bloecke; ebenso codex oder pi
+```
+
+Ein fertiges Image in einer Registry gibt es nicht, `build` baut lokal aus dem Repository. Der
+Container bindet nichts vom Rechner ein — keine Ordner, keine Anmeldungen; die KI-Anmeldung bleibt
+in einem eigenen Docker-Volume. Dauerhaft einrichten: [Installation](#installation) weiter unten
+oder Schritt fuer Schritt in [Getting Started](docs/GETTING-STARTED.md).
+
 ## Dokumentation
 
 | Dokument | Inhalt |
@@ -150,32 +166,26 @@ Programme und je Anbieter die Anmeldung (fuer Claude einmal ein Token aus `claud
 die Einstellungen, Plugins, Memory oder Verlaeufe des Rechners. Wer weniger oder alles teilen will,
 findet die Varianten unter [KI-Anbieter im Container](docs/deployment.md#ki-anbieter-im-container).
 
-## Quickstart
+## Installation
 
 > Neuer Rechner (Linux, macOS, Windows ueber WSL2), evtl. ohne Java/Node/Docker? → **[Getting Started](docs/GETTING-STARTED.md)**
-> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git autotrigger && cd autotrigger && ./scripts/setup.sh`.
+> fuehrt Schritt fuer Schritt durch das Setup. Kurzform: `git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates && ./scripts/setup.sh`.
 
 **Voraussetzung fuer KI-Bloecke:** Mindestens eine der unterstuetzten Kommandozeilen muss auf dem
 Rechner installiert und angemeldet sein — `claude` (Anthropic), `codex` (OpenAI) oder `pi`. Ohne
-eine davon laufen nur die deterministischen Bloecke (Shell, Verzweigung, Schleife); der Installer
-prueft das nicht, KI-Bloecke scheitern dann erst zur Laufzeit.
+eine davon laufen nur die deterministischen Bloecke (Shell, Verzweigung, Schleife). Der Installer
+zeigt an, welche CLIs er gefunden hat und ob sie angemeldet sind, verlangt aber keine — ohne CLI
+scheitern KI-Bloecke erst zur Laufzeit.
 
-> **Zum Namen:** Das Projekt heisst MySuricates, das Arbeitsverzeichnis und einige Skripte tragen
-> noch den frueheren Namen `autotrigger` (etwa `scripts/start-autotrigger-dev.sh`). Beides meint
-> dasselbe; die Umbenennung steht aus.
-
-Nur ausprobieren: Im geklonten Repository startet `scripts/tryout.sh build && scripts/tryout.sh start`
-einen Container mit allen Werkzeugen auf http://localhost:9095 — dafuer braucht es nur Docker.
-Der Container bindet keine Ordner und keine Anmeldung vom Rechner ein; fuer KI-Bloecke meldet man
-sich einmal **im Container** an (`scripts/tryout.sh login claude`, ebenso `codex` oder `pi`), die
-Anmeldung bleibt in einem eigenen Docker-Volume
-([Getting Started](docs/GETTING-STARTED.md#nur-ausprobieren--ohne-installation)).
+> **Zum Namen:** Das Projekt heisst MySuricates, einige Skripte tragen noch den frueheren Namen
+> `autotrigger` (etwa `scripts/start-autotrigger-dev.sh`). Beides meint dasselbe; die Umbenennung
+> steht aus.
 
 Dauerhaft einrichten:
 
 ```bash
-git clone https://github.com/FLSEST/MySuricates.git autotrigger
-cd autotrigger
+git clone https://github.com/FLSEST/MySuricates.git
+cd MySuricates
 ./scripts/setup.sh              # gefuehrt, auf Englisch; auf Deutsch: ./scripts/setup.sh --lang de
 ```
 
