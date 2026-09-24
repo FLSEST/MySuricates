@@ -8,42 +8,34 @@ import com.automation.entity.Project;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.workflow.WorkflowExecutionRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Lifecycle of project containers (create/reuse, stop, idle cleanup) and the containers table.
- * Docker calls go through {@link DockerContainerGateway}, orphan reconciliation through
- * {@link DockerOrphanReconciler}; every DB access is a short {@link TransactionTemplate} burst
- * because the slow Docker work must never hold the single SQLite connection.
+ * Lifecycle of project containers (create/reuse, stop) and the containers table.
+ * Docker calls go through {@link DockerContainerGateway}; idle cleanup and orphan reconciliation
+ * run in {@code service.workflow.IdleContainerReaper}; every DB access is a short
+ * {@link TransactionTemplate} burst because the slow Docker work must never hold the single
+ * SQLite connection.
  */
 @Service
 @Slf4j
 public class ContainerService {
 
     private final ContainerRepository containerRepository;
-    private final WorkflowExecutionRegistry executionRegistry;
     private final ActivityLogService activityLogService;
     private final PathValidator pathValidator;
     private final DockerContainerGateway docker;
-    private final DockerOrphanReconciler orphanReconciler;
     private final DockerExpectation dockerExpectation;
     private final TransactionTemplate transactionTemplate;
     private final TransactionTemplate readOnlyTransactionTemplate;
-
-    private final int idleTimeoutMinutes;
     private final String hostHome;
 
     // Per-project lock to serialize concurrent container creation for the same
@@ -60,26 +52,20 @@ public class ContainerService {
 
     public ContainerService(
             ContainerRepository containerRepository,
-            WorkflowExecutionRegistry executionRegistry,
             ActivityLogService activityLogService,
             PathValidator pathValidator,
             PlatformTransactionManager transactionManager,
             DockerContainerGateway docker,
-            DockerOrphanReconciler orphanReconciler,
             DockerExpectation dockerExpectation,
-            @Value("${docker.container.idle-timeout-minutes}") int idleTimeoutMinutes,
             @Value("${automation.cli.host-home:}") String hostHome) {
         this.containerRepository = containerRepository;
-        this.executionRegistry = executionRegistry;
         this.activityLogService = activityLogService;
         this.pathValidator = pathValidator;
         this.docker = docker;
-        this.orphanReconciler = orphanReconciler;
         this.dockerExpectation = dockerExpectation;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
         this.readOnlyTransactionTemplate.setReadOnly(true);
-        this.idleTimeoutMinutes = idleTimeoutMinutes;
         this.hostHome = hostHome != null && !hostHome.isBlank()
                 ? hostHome : System.getProperty("user.home");
     }
@@ -231,52 +217,5 @@ public class ContainerService {
                     }));
         }
         throw new ContainerException("No running container for project: " + project.getId());
-    }
-
-    // NOT @Transactional at the method level: each iteration does a Docker
-    // stop+remove (multi-second). The previous implementation wrapped the
-    // whole loop in a single transaction, so cleaning up N idle containers
-    // held the pool's only connection for N×~5s. We now use short
-    // TransactionTemplate bursts per container.
-    @Scheduled(fixedRate = 300_000)
-    public void cleanupIdleContainers() {
-        if (!dockerExpectation.isConfigured()) return; // ohne Docker nichts aufzuraeumen (a0e85182)
-        List<Container> running = readOnlyTransactionTemplate.execute(status ->
-                containerRepository.findByStatus(ContainerStatus.RUNNING));
-        Set<String> activeContainers = executionRegistry.getActiveContainerIds();
-
-        orphanReconciler.reconcile(running, activeContainers);
-        if (running == null || running.isEmpty()) return;
-
-        Instant threshold = Instant.now().minus(Duration.ofMinutes(idleTimeoutMinutes));
-
-        for (Container container : running) {
-            if (activeContainers.contains(container.getDockerContainerId())) {
-                log.debug("Skipping cleanup for container with active execution: {}",
-                        container.getDockerContainerId());
-                continue;
-            }
-            Instant lastActivity = container.getLastActivityAt() != null
-                    ? container.getLastActivityAt()
-                    : container.getStartedAt();
-            if (lastActivity != null && lastActivity.isBefore(threshold)) {
-                log.info("Stopping idle container: {}", container.getDockerContainerId());
-                docker.remove(container.getDockerContainerId());
-
-                final String entityId = container.getId();
-                transactionTemplate.executeWithoutResult(status ->
-                        containerRepository.findById(entityId).ifPresent(c -> {
-                            c.setStatus(ContainerStatus.STOPPED);
-                            c.setStoppedAt(Instant.now());
-                            containerRepository.save(c);
-                            if (c.getProject() != null) {
-                                c.getProject().setStatus(com.automation.entity.ProjectStatus.STOPPED);
-                            }
-                        }));
-                activityLogService.info(LogCategory.CONTAINER,
-                        "Idle container cleaned up: " + container.getDockerContainerId(),
-                        "ContainerService");
-            }
-        }
     }
 }

@@ -209,7 +209,7 @@ com.automation
 ├── controller/          49 REST Controllers
 ├── service/
 │   ├── project/         ProjectService, ProjectStatusReconciler, ContainerService (+ DockerContainerGateway, DockerOrphanReconciler), ProjectContextService, PathValidator, OnboardingProfileService, ProjectOnboardingService
-│   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
+│   ├── workflow/        WorkflowExecutor (+ ExecutionContextFactory, BlockSkillContext, BlockStepRunner, RunCompletionHandler, RunFinalizer, WorkflowContextDataService), WorkflowService, ExecutionBroadcaster, TemplateVerificationService, WorkflowOptimizationService (+ WorkflowOptimizationPrompt), GhostRunWatchdogService, RunCleanupService, AgentInstructionsService, WorkflowTemplateService, BlockOutputValidator, WorkflowExecutionRegistry, IdleContainerReaper, WorkflowTaggingService, WorkflowVersionService, WorkflowContentChangedEvent
 │   ├── skill/           SkillService, SkillImportExportService, SkillRegistry, CapabilityRegistry
 │   ├── scheduler/       SchedulerService (+ SchedulerTick, SchedulerMaintenanceMode, UpcomingRunsCalculator, ScheduleSkipPolicy, SchedulerPause, ScheduleDefinitionParser, CatchUpQueue), ScheduledWorkflowExecutor, SuspendState
 │   ├── webhook/         WebhookService, GitWebhookPayloadParser

@@ -22,7 +22,7 @@ import java.util.List;
  * the 5–15 s Docker create outside any transaction. If the backend dies inside that window the
  * project keeps STARTING forever: the UI offers no action for STARTING, {@code
  * DockerOrphanReconciler} only touches Docker containers, and {@code
- * ContainerService.cleanupIdleContainers} only flips projects that still have a RUNNING container
+ * IdleContainerReaper.cleanupIdleContainers} only flips projects that still have a RUNNING container
  * row. Same idea as {@code WorkflowExecutor.cleanupZombieRuns} for runs (TODO 3c119d47).
  *
  * <p>Deliberately DB-only: the container row decides the outcome (RUNNING row ⇒ RUNNING, otherwise
