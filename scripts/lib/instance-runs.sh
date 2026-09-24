@@ -4,9 +4,10 @@
 # scripts/instance.sh sie stoppt, fragen beide deshalb nach — nur lesend:
 # GET /api/v1/executions?status=RUNNING, die Zahl steht als totalElements in der Seite.
 #
-# Der Key geht ueber stdin an curl (-H @-), nie in die Argumente: die sieht jeder Benutzer des Rechners
-# in der Prozessliste. --noproxy: ein Proxy aus der Umgebung bekaeme sonst den Key mit.
-# Ohne python und jq, bash 3.2 (macOS).
+# Gefragt wird ueber lib/local-curl.sh: nie ueber einen Proxy aus der Umgebung, der Key ueber stdin statt
+# in den Argumenten (bb4f60a5). Ohne python und jq, bash 3.2 (macOS).
+# shellcheck source=local-curl.sh
+. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/local-curl.sh"
 
 # instance_api_base BIND PORT — wie dieser Rechner die Instanz erreicht: lauscht sie auf Loopback oder
 # allen Schnittstellen, ueber 127.0.0.1, sonst unter der gebundenen Adresse
@@ -25,8 +26,7 @@ instance_running_runs() {
   key="$(printf '%s' "${2:-}" | tr -d '[:space:]')"
   [ -n "$base" ] && [ -n "$key" ] || return 0
   command -v curl >/dev/null 2>&1 || return 0
-  body="$(printf 'X-API-Key: %s\n' "$key" \
-    | curl -fsS --max-time "${INSTANCE_RUNS_TIMEOUT:-5}" --noproxy '*' -H @- \
+  body="$(local_curl_key "$key" -fsS --max-time "${INSTANCE_RUNS_TIMEOUT:-5}" \
         "$base/api/v1/executions?status=RUNNING&size=1" 2>/dev/null)" || return 0
   # Das letzte Vorkommen: die Seite endet mit totalElements und totalPages; ein Name in content, der
   # so aussieht, steht dort mit maskierten Anfuehrungszeichen und passt nicht

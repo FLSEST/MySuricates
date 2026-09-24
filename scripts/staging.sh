@@ -18,6 +18,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/lib/host-mounts.sh"
 # shellcheck source=lib/provider-login.sh
 . "$SCRIPT_DIR/lib/provider-login.sh"
+# shellcheck source=lib/local-curl.sh
+. "$SCRIPT_DIR/lib/local-curl.sh"   # Health ohne Proxy aus der Umgebung (bb4f60a5)
 BACKEND_DIR="$PROJECT_ROOT/ai-automation-backend"
 FRONTEND_DIR="$PROJECT_ROOT/ai-automation-frontend"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.stable.yml"
@@ -82,7 +84,7 @@ wait_healthy() {
     local waited=0
     log "Waiting for health check at $HEALTH_URL ..."
     while [ $waited -lt $max_wait ]; do
-        if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+        if local_curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
             log "Stable environment is healthy!"
             return 0
         fi
@@ -170,7 +172,7 @@ cmd_status() {
     fi
 
     # Health check
-    if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+    if local_curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
         echo -e "  Health:    ${GREEN}OK${NC}"
     else
         echo -e "  Health:    ${RED}Unreachable${NC}"
@@ -275,7 +277,7 @@ test_wait_healthy() {
     local waited=0
     log "Waiting for health check at $TEST_HEALTH_URL ..."
     while [ $waited -lt $max_wait ]; do
-        if curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
+        if local_curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
             log "Test environment is healthy!"
             return 0
         fi
@@ -320,7 +322,7 @@ cmd_test_status() {
         echo -e "  Container: ${RED}Stopped${NC}"
     fi
 
-    if curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
+    if local_curl -sf "$TEST_HEALTH_URL" > /dev/null 2>&1; then
         echo -e "  Health:    ${GREEN}OK${NC}"
     else
         echo -e "  Health:    ${RED}Unreachable${NC}"

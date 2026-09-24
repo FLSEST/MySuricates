@@ -389,6 +389,52 @@ check "... asked with the key from the container"       '[ -s "$RUNS_LOG" ] && g
 check "container running, no runs: up as before"        '[ "$(CONTAINER_UP=1 FAKE_RUNS=0 crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
 rm -f "$SINST/box.env" "$SINST/box.override.yml"
 
+echo "9d) --reconfigure without a terminal and without --port keeps the port of the own running instance (0e5b82b7)"
+# Belegt hiess: etwas nimmt Verbindungen an — die eigene laufende Instanz zaehlte mit. --reconfigure
+# ohne --port schrieb deshalb den naechsten freien Port in die Datei (9090 → 9091) und startete sie dort
+# neu. Hier lauscht der java-Stub wirklich (fake_instance.py), auf dem Port, den setup.sh ohne --port als
+# ersten naehme; die Fake-API spielt nur den Lauscher, Health liefert weiter der curl-Stub.
+listening() { for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0; sleep 0.05; done; return 1; }
+if command -v python3 >/dev/null 2>&1; then
+  PY="$(command -v python3)"
+  # Lauscher, die annehmen (fake_instance.py) — losgeloest gestartet, ihre PIDs raeumt die Trap weg
+  listener() { ( "$PY" "$HERE/fake_instance.py" api "$1" x 0 >/dev/null 2>&1 & echo $! > "$TMP/$2.pid" ); listening "$1"; }
+  trap 'kill $(cat "$TMP/foreign.pid" "$TMP/lp.pid" "$SSTATE/mysuricates/main/instance.pid" 2>/dev/null) 2>/dev/null; rm -rf "$TMP"' EXIT
+  printf '#!/bin/sh\ncase "$1" in -version|--version) echo "openjdk version \\"21.0.8\\" 2025-07-15" >&2 ;; *) exec "%s" "%s" api "$AUTOMATION_PORT" k 0 ;; esac\n' \
+    "$PY" "$HERE/fake_instance.py" > "$B2/java"
+  OWN="$(firstfree 9090)"
+  srun --reconfigure --port "$OWN" >/dev/null; P7="$(spid)"
+  check "the own instance runs and listens on its port"  '[ -n "$P7" ] && kill -0 "$P7" 2>/dev/null && listening "$OWN"'
+  sreconf() { senv bash "$SREPO/scripts/setup.sh" --yes --runtime host --reconfigure "$@" < /dev/null > "$TMP/out" 2>&1; echo $?; }
+  check "--reconfigure without --port: its port stays"   '[ "$(sreconf)" = 0 ] && [ "$(sval MYSURICATES_PORT)" = "$OWN" ] && [ "$(step Ports)" = "$OWN" ]'
+  check "... restarted there, shown there"               '[ "$(spid)" != "$P7" ] && kill -0 "$(spid)" 2>/dev/null && listening "$OWN" && out | grep -qF "http://localhost:$OWN"'
+  sinst down >/dev/null 2>&1
+  # Gegenprobe: laeuft die Instanz nicht, zaehlt ein Lauscher auf dem Port weiter als belegt
+  listener "$OWN" foreign; NEXT="$(firstfree 9090)"
+  check "stopped, someone else on the port: the next free one" '[ "$NEXT" != "$OWN" ] && [ "$(sreconf)" = 0 ] && [ "$(sval MYSURICATES_PORT)" = "$NEXT" ]'
+  sinst down >/dev/null 2>&1; kill "$(cat "$TMP/foreign.pid")" 2>/dev/null; rm -f "$TMP/foreign.pid"
+  # Die Helfer fuer sich — auch fuer Dev · Test · Prod (kept_port): instance.sh ist ein Stub, der main
+  # als laufend meldet, solange die Marke liegt
+  LP="$(firstfree 19750)"; listener "$LP" lp
+  mkdir -p "$TMP/ports/scripts" "$TMP/ports/inst"
+  printf '#!/bin/sh\nif [ "$3" = main ] && [ -e "%s" ]; then echo "running healthy"; else echo "nicht gestartet"; fi\n' "$TMP/ports/up" > "$TMP/ports/scripts/instance.sh"
+  printf 'MYSURICATES_PORT=%s\nMYSURICATES_PORT=%s\n' "$((LP + 7))" "$LP" > "$TMP/ports/inst/main.env"   # doppelt: die letzte Zeile gilt
+  # unset -f cut: 8b hat cut in dieser Shell als Funktion ueberschrieben, die Helfer brauchen das echte
+  lib() { ( unset -f cut; SCRIPT_DIR="$TMP/ports/scripts" INSTANCES_DIR="$TMP/ports/inst" RECONF=1; . "$HERE/../lib/setup-kept.sh"; . "$HERE/../lib/setup-ports.sh"; eval "$1" ); }
+  touch "$TMP/ports/up"
+  check "lib: the running own instance's port counts as free" '[ "$(lib "free_port $LP \"\" main")" = "$LP" ] && [ "$(lib "kept_port main $LP \"\"")" = "$LP" ]'
+  check "lib: not for another name, not when taken in this run" '[ "$(lib "free_port $LP \"\" dev")" != "$LP" ] && [ "$(lib "free_port $LP \"$LP\" main")" != "$LP" ] && [ "$(lib "free_port $LP")" != "$LP" ]'
+  rm -f "$TMP/ports/up"
+  check "lib: own instance stopped → in use as before"   '[ "$(lib "free_port $LP \"\" main")" != "$LP" ]'
+  kill "$(cat "$TMP/lp.pid")" 2>/dev/null; rm -f "$TMP/lp.pid"
+  printf '#!/bin/sh\ncase "$1" in -version|--version) echo "openjdk version \\"21.0.8\\" 2025-07-15" >&2 ;; *) exec sleep 300 ;; esac\n' > "$B2/java"
+else
+  echo "  skip (no python3)"
+fi
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=19761\nMYSURICATES_PORT=19762\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' > "$TMP/dup.env"
+LE="$( unset -f cut; INSTANCES_DIR="$TMP" RECONF=0; RUNTIME="" PORT="" PRESET="" PROVIDER="" PROJECTS=""; . "$HERE/../lib/setup-kept.sh"; load_existing dup; printf '%s|%s|%s|%s|%s' "$RUNTIME" "$PORT" "$PRESET" "$PROVIDER" "$NAME" )"
+check "load_existing: one value per key, the last line wins" '[ "$LE" = "host|19762|full|codex|dup" ]'
+
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'
 

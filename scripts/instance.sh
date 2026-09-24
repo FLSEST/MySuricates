@@ -42,6 +42,8 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 . "${SCRIPT_DIR}/lib/i18n.sh"
 # shellcheck source=lib/netaddr.sh
 . "${SCRIPT_DIR}/lib/netaddr.sh"
+# shellcheck source=lib/local-curl.sh
+. "${SCRIPT_DIR}/lib/local-curl.sh"
 # shellcheck source=lib/instance-runs.sh
 . "${SCRIPT_DIR}/lib/instance-runs.sh"
 INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-${REPO_ROOT}/deploy/instances}"
@@ -108,7 +110,8 @@ say_running() {  # WORT
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
 }
 
-health_ok() { curl -fsS --max-time 3 "http://127.0.0.1:$PORT/api/v1/system/health" >/dev/null 2>&1; }
+# Ohne Proxy aus der Umgebung (bb4f60a5): ueber ihn scheiterte die Pruefung, up wartete 300 s
+health_ok() { local_curl -fsS --max-time 3 "http://127.0.0.1:$PORT/api/v1/system/health" >/dev/null 2>&1; }
 # Laufende Workflow-Runs brechen beim Stoppen ab (29820f58): vorher sagen, wie viele. Nur eine Warnung,
 # down ist ein ausdruecklicher Befehl; antwortet die Instanz nicht oder fehlt der Key, still weiter.
 warn_running_runs() {  # KEY

@@ -43,6 +43,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Das Backend nie ueber einen Proxy aus der Umgebung fragen (bb4f60a5): war er nicht erreichbar, galt ein
+# laufendes Backend als gestoppt — und danach schreibt dieses Skript direkt in die Datenbank.
+# shellcheck source=lib/local-curl.sh
+. "$SCRIPT_DIR/lib/local-curl.sh"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DB_PATH="$PROJECT_ROOT/ai-automation-backend/data/automation.db"
 BASE_URL="http://localhost:9090"
@@ -134,7 +138,7 @@ check_dependencies() {
 check_backend_stopped() {
     # CRITICAL: Writing directly to SQLite while the backend is running causes
     # WAL-mode corruption. The backend MUST be stopped before any direct DB write.
-    if curl -s --connect-timeout 2 "$BASE_URL/api/v1/system/health" &>/dev/null; then
+    if local_curl -s --connect-timeout 2 "$BASE_URL/api/v1/system/health" &>/dev/null; then
         err "Das Backend läuft noch auf $BASE_URL!"
         err ""
         err "Direkter SQLite-Write mit laufendem Backend korumpiert die Datenbank"
@@ -244,8 +248,7 @@ do_backup() {
     log "Triggering backup via API (GET /api/v1/system/backup)..."
 
     local http_code
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "X-API-Key: $api_key" \
+    http_code=$(local_curl_key "$api_key" -s -o /dev/null -w "%{http_code}" \
         "$API_URL/system/backup")
 
     if [[ "$http_code" == "200" ]]; then

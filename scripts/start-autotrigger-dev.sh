@@ -23,6 +23,9 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # Mounts fuer den Dev-Container: nur, was es auf diesem Rechner gibt (gemeinsam mit deploy/).
 # shellcheck source=lib/host-mounts.sh
 . "${SCRIPT_DIR}/lib/host-mounts.sh"
+# Backend und Vite fragen: nie ueber einen Proxy aus der Umgebung, der Key nur ueber stdin (bb4f60a5).
+# shellcheck source=lib/local-curl.sh
+. "${SCRIPT_DIR}/lib/local-curl.sh"
 
 COMMAND="start"
 # Betriebsart des Backends: host (Default, java -jar) oder container (docker compose).
@@ -165,7 +168,7 @@ discard_stale_pid_file() {
 
 endpoint_is_ready() {
   local url="$1"
-  curl -fsSk --max-time 2 "${url}" >/dev/null 2>&1
+  local_curl -fsSk --max-time 2 "${url}" >/dev/null 2>&1
 }
 
 wait_for_endpoint() {
@@ -231,7 +234,7 @@ running_runs_count() {
   local key body
   key="$(api_key)"
   [[ -n "${key}" ]] || return 0
-  body="$(curl -fsS --max-time 5 -H "X-API-Key: ${key}" \
+  body="$(local_curl_key "${key}" -fsS --max-time 5 \
     "${API_BASE}/executions?status=RUNNING&size=1" 2>/dev/null)" || return 0
   python3 -c '
 import sys, json

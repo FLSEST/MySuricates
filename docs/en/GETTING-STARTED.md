@@ -96,7 +96,8 @@ Done. `b` goes one step back, `q` quits.
   `--with-pi`); for claude and codex it names the command. Logging in is up to you.
   In the container the instance uses the CLI **and** your login from the machine — no second login
   (on macOS only the login; the program lives in the image).
-- **Ports:** default 9090, busy ports are skipped. For the container also the projects folder the
+- **Ports:** default 9090, busy ports are skipped — not the one the running instance itself holds
+  when it is set up again. For the container also the projects folder the
   instance sees (default: the folder above the clone, never your whole home).
 
 Without questions, e.g. for scripts: the choices of the steps exist as flags (`--help` lists them);
