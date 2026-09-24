@@ -13,15 +13,16 @@ import java.util.Set;
  */
 public final class VerifiedProviders {
 
-    private static final Map<String, String> CHECKED_AGAINST = Map.of(
-            "google-calendar", "Google Calendar API, eigener Google-Account",
-            "google-gmail", "Gmail API, eigener Google-Account",
-            "jira", "Jira Cloud (Atlassian 3LO), eigener Account",
-            "confluence", "Confluence Cloud (Atlassian 3LO), eigener Account",
-            "trello", "Trello REST API, eigener Account",
-            "taskwarrior", "Taskwarrior-CLI auf dem Host",
-            "github", "GitHub REST API, eigener Account",
-            "gitea", "Gitea 1.27.3 und Forgejo 14.0.5, lokaler Container"
+    private static final Map<String, String> CHECKED_AGAINST = Map.ofEntries(
+            Map.entry("google-calendar", "Google Calendar API, eigener Google-Account"),
+            Map.entry("google-gmail", "Gmail API, eigener Google-Account"),
+            Map.entry("jira", "Jira Cloud (Atlassian 3LO), eigener Account"),
+            Map.entry("confluence", "Confluence Cloud (Atlassian 3LO), eigener Account"),
+            Map.entry("trello", "Trello REST API, eigener Account"),
+            Map.entry("taskwarrior", "Taskwarrior-CLI auf dem Host"),
+            Map.entry("github", "GitHub REST API, eigener Account"),
+            Map.entry("gitea", "Gitea 1.27.3 und Forgejo 14.0.5, lokaler Container"),
+            Map.entry("caldav", "Radicale 3.8.0, lokaler Container")
     );
 
     private VerifiedProviders() {

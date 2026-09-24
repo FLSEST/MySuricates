@@ -111,6 +111,7 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | GitHub | `github` | Personal Access Token (kein OAuth-Flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft |
 | Gitea / Forgejo | `gitea` | Server-URL + Zugangstoken (kein OAuth-Flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | geprüft (lokaler Container) |
 | GitLab | `gitlab` | Server-URL (Standard `https://gitlab.com`) + Access Token (kein OAuth-Flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simuliert |
+| CalDAV | `caldav` | URL + Benutzer:App-Passwort (Basic Auth, kein OAuth-Flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | geprüft (Radicale 3.8.0, lokaler Container) |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
@@ -122,6 +123,36 @@ Typ Task, Target = Project-Key, Labels ohne Leerzeichen; Browse-URL aus den acce
 Trello Label-IDs erwartet). Erkennung per `instanceof`, Contract-Test `TaskExportContractTest`.
 
 > **Taskwarrior ist ein Sonderfall:** kein HTTP-Dienst, sondern das lokale `task`-CLI. `executeAction()` ruft `task` per `ProcessBuilder` (Argument-Array, kein `bash -c`) auf dem Backend-Host auf — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Setzt voraus, dass `task` auf dem Host installiert ist; sonst bleibt die Verbindung „Setup required". Timeout runtime-konfigurierbar über `ExecutionSettingsService` (`task-command-timeout-seconds`). Sicherheit: Filter-Token mit `rc.`-Overrides oder Taskwarrior-Kommandos (z.B. `execute`) werden abgelehnt, IDs validiert, Freitext landet hinter `--`. Intern aufgeteilt: Action-Liste in `TaskwarriorActionCatalog`, Argument-Aufbau und Validierung in `TaskwarriorArgs`.
+
+### CalDAV
+
+CalDAV nutzt einen kleinen iCalendar-Leser/-Schreiber in `providers/ical/` (keine Fremdbibliothek):
+Zeilenfaltung (75 Oktette, UTF-8-sicher), Text-Escapes, `DTSTART`/`DTEND` als UTC, mit `TZID` oder ganztägig
+(`VALUE=DATE`), `DURATION`, `SUMMARY`/`DESCRIPTION`/`LOCATION`/`UID`; `RRULE` wird nur durchgereicht.
+Serien expandiert MySuricates **nicht** selbst. Zeitangaben kommen im Google-Format (`{date}` bzw.
+`{dateTime, timeZone}`), damit Workflows Google Calendar und CalDAV gleich lesen.
+
+- **CalDAV** (`caldav`, RFC 4791): Feld 1 = CalDAV-URL (Nextcloud `https://<server>/remote.php/dav`,
+  Radicale `http://<server>:5232/`), Feld 2 = `benutzer:app-passwort`; gespeichert als `url|benutzer:passwort`,
+  geprüft per PROPFIND (`fetchAccountInfo`). Discovery: `current-user-principal` → `calendar-home-set` →
+  Depth-1-PROPFIND. `list_events` schickt einen `calendar-query`-REPORT mit `time-range` und `<C:expand>` —
+  der Server liefert Serien als Einzeltermine (mit `recurrenceId`); ohne `calendar` werden alle Kalender
+  abgefragt, ein kaputter Kalender landet unter `errors` statt die anderen zu verdecken. `create_event` legt
+  `<uuid>.ics` per PUT mit `If-None-Match: *` an (VTIMEZONE aus den JDK-Regeln für jede verwendete TZID),
+  `update_event` holt das Objekt, ändert nur die übergebenen Eigenschaften des Serien-Masters (Teilnehmer,
+  Alarme, Ausnahmen bleiben), erhöht `SEQUENCE` und schreibt mit `If-Match` (ETag aus dem Parameter oder vom
+  GET) — ein zwischenzeitlich geänderter Termin ergibt 412 statt Überschreiben. `delete_event` löscht bei
+  Serien die ganze Serie. Sicherheit: nur http/https, keine Zugangsdaten in der URL, Weiterleitungen werden
+  nicht verfolgt (sie würden den Basic-Auth-Header mitnehmen), jede angefragte URL muss auf dem Server der
+  eingetragenen URL liegen (auch hrefs aus Server-Antworten), XML-Parser ohne DOCTYPE/externe Entities (XXE),
+  Antworten höchstens 10 MB, Passwort nie in Log oder Fehlermeldung. Intern: `CalDavHttpClient`,
+  `CalDavXml`, `CalDavDiscovery`, `CalDavEvents`, `CalDavActionCatalog`.
+  **Prüfstand:** gegen Radicale 3.8.0 im lokalen Container (alle fünf Actions inkl. Serie mit `RRULE` und
+  `expand`, ETag-Konflikt, fremde Origin). Nextcloud, Posteo und iCloud sind **nicht** live geprüft; iCloud
+  verweist auf einen Partitions-Server (`pNN-caldav.icloud.com`), den der Provider wegen der Origin-Regel nicht
+  selbst ansteuert — dort diese Adresse eintragen.
+
+Die Kalender-Ansicht zeigt CalDAV über `caldavAdapter` (alle Kalender, Serien bereits vom Server expandiert).
 
 ### OAuth-Endpunkte & Scopes je Provider
 
@@ -365,6 +396,7 @@ Hook `useCalendarAggregated`.
 ```ts
 export const CALENDAR_ADAPTERS: CalendarSourceAdapter[] = [
   googleCalendarAdapter,  // Integration: google-calendar
+  caldavAdapter,          // Integration: caldav
   trelloAdapter,          // Integration: trello
   schedulesAdapter,       // System-Quelle: geplante Workflows
   runsAdapter,            // System-Quelle: vergangene Runs

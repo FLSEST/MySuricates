@@ -1266,6 +1266,17 @@ export const de: TranslationKeys = {
     credentialsSaved: 'Zugangsdaten sind gespeichert. Zum Ändern neu eintragen und speichern.',
     updateCredentials: 'Zugangsdaten aktualisieren',
     providers: {
+      caldav: {
+        displayName: 'CalDAV',
+        description: 'Kalender per CalDAV (Nextcloud, Radicale, Posteo, iCloud …): Termine lesen, anlegen, ändern und löschen',
+        actions: {
+          list_calendars: 'Kalender des Kontos auflisten',
+          list_events: 'Termine in einem Zeitraum abrufen — Serien liefert der Server als Einzeltermine',
+          create_event: 'Einen neuen Termin anlegen',
+          update_event: 'Einen Termin ändern — nur übergebene Felder, alles andere bleibt erhalten',
+          delete_event: 'Einen Termin löschen (bei Serien: die ganze Serie)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'GitHub-Issues synchronisieren: auflisten, erstellen, aktualisieren und kommentieren',

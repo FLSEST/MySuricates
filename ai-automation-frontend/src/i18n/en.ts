@@ -1264,6 +1264,17 @@ export const en = {
     credentialsSaved: 'Credentials are saved. Re-enter and save to change them.',
     updateCredentials: 'Update credentials',
     providers: {
+      caldav: {
+        displayName: 'CalDAV',
+        description: 'Calendars via CalDAV (Nextcloud, Radicale, Posteo, iCloud …): read, create, update and delete events',
+        actions: {
+          list_calendars: 'List the calendars of the account',
+          list_events: 'Fetch events in a time range — the server returns series as single occurrences',
+          create_event: 'Create a new event',
+          update_event: 'Update an event — only the fields passed, everything else is kept',
+          delete_event: 'Delete an event (for a series: the whole series)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'Sync GitHub issues: list, create, update and comment',

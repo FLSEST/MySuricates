@@ -755,4 +755,72 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+
+  'caldav': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'CalDAV-URL, z.B. https://cloud.example.org/remote.php/dav', en: 'CalDAV URL, e.g. https://cloud.example.org/remote.php/dav' },
+      clientSecretPlaceholder: { de: 'benutzer:app-passwort', en: 'user:app-password' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'App-Passwort anlegen',
+          en: 'Create an app password',
+        },
+        instructions: {
+          de: [
+            'Nextcloud: Einstellungen → Sicherheit → „Neues App-Passwort erstellen“',
+            'iCloud: account.apple.com → Anmeldung und Sicherheit → App-spezifische Passwörter',
+            'Radicale/Baïkal: Benutzer und Passwort aus der Server-Konfiguration',
+            'Posteo: Posteo-Zugangsdaten, Benutzer ist die E-Mail-Adresse',
+          ],
+          en: [
+            'Nextcloud: Settings → Security → "Create new app password"',
+            'iCloud: account.apple.com → Sign-In and Security → App-Specific Passwords',
+            'Radicale/Baïkal: user and password from the server configuration',
+            'Posteo: your Posteo login, the user is the e-mail address',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'CalDAV-URL eintragen',
+          en: 'Enter the CalDAV URL',
+        },
+        instructions: {
+          de: [
+            'Nextcloud: https://<server>/remote.php/dav',
+            'Radicale: http://<server>:5232/ · Posteo: https://posteo.de:8443/',
+            'iCloud (ungeprüft): https://caldav.icloud.com/ verweist auf einen Partitions-Server (pNN-caldav.icloud.com) — Anfragen an einen anderen Server als den eingetragenen lehnt MySuricates ab, dann diese Adresse eintragen',
+            'Weiterleitungen (z.B. /.well-known/caldav) werden nicht verfolgt: die Fehlermeldung nennt das Ziel',
+          ],
+          en: [
+            'Nextcloud: https://<server>/remote.php/dav',
+            'Radicale: http://<server>:5232/ · Posteo: https://posteo.de:8443/',
+            'iCloud (untested): https://caldav.icloud.com/ points to a partition server (pNN-caldav.icloud.com) — MySuricates refuses requests to a server other than the one entered, so enter that address instead',
+            'Redirects (e.g. /.well-known/caldav) are not followed: the error message names the target',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten speichern',
+          en: 'Save the credentials',
+        },
+        instructions: {
+          de: [
+            'Erstes Feld: CalDAV-URL · zweites Feld: benutzer:app-passwort',
+            '„Zugangsdaten speichern“ — der Status wird grün, sobald der Server die Anmeldung annimmt',
+            'Kalender-hrefs für Workflows liefert die Action list_calendars',
+          ],
+          en: [
+            'First field: CalDAV URL · second field: user:app-password',
+            'Click "Save credentials" — the status turns green once the server accepts the login',
+            'The action list_calendars returns the calendar hrefs for workflows',
+          ],
+        },
+      },
+    ],
+  },
+
 };
