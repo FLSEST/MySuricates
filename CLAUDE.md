@@ -72,7 +72,7 @@ mvn test                   # Run all tests
 
 # Frontend: cd ai-automation-frontend
 npm run dev                # Dev server (port 3000, proxies /api → :9090)
-npm run build              # Production build (tsc + vite)
+npm run build              # Production build (tsc + vite + Lazy-Chunk-Prüfung)
 npm run lint               # ESLint
 ```
 
