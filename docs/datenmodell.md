@@ -1326,6 +1326,7 @@ Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in 
 | V85 | `V85__goals_and_todo_planning.sql` | neue Tabelle `goals`; `goal_id`, `goal_rank`, `complexity`, `suggested_effort`, `rating_note`, `rated_by`, `rated_at`, `open_question` in todos |
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (Tabellenneubau: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, Bestand wird `default`) |
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | Indizes für Läufe je Schedule (workflow_runs, chain_runs) und TODOs je Lauf (`last_fix_run_id`, `workflow_run_id`) |
+| V88 | `V88__goal_milestones_and_guard.sql` | neue Tabelle `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (Ziel-Wächter) |
 
 ## SQLite-Besonderheiten
 

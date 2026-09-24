@@ -1115,6 +1115,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V84 | Seal signature and seal history: `workflows.sealed_signature`, `workflow_seal_events` |
 | V85 | Goals: table `goals`, ranking and rating on `todos` |
 | V86 | Several named connections per integration provider: `integration_connections.connection_name` |
+| V87 | Indexes for runs per schedule (`workflow_runs`, `chain_runs`) and TODOs per run (`todos.last_fix_run_id`, `todos.workflow_run_id`) |
 | V88 | Goals: table `goal_milestones`, `todos.milestone_id`, `goals.guard_workflow_id` (goal guard) |
 
 ## Architecture Gates
@@ -1159,7 +1160,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 87 Flyway migrations (V1–V87)
+│           └── db/migration/          ← 88 Flyway migrations (V1–V88)
 │
 └── ai-automation-frontend/
     ├── package.json
