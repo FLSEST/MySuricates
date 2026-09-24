@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.telegram;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,7 +66,7 @@ class TelegramParamsTest {
         }
 
         @Test
-        void missingOrBlank_isRequired() {
+        void missingOrBlankChatId_isRequired() {
             assertThatThrownBy(() -> TelegramParams.chatId(params()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Required parameter missing: chat_id");
@@ -96,6 +97,24 @@ class TelegramParamsTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Parameter 'chat_id' must be a numeric chat id or @channelusername");
         }
+
+        /** A JSON number beyond long used to wrap around silently to another chat. */
+        @Test
+        void jsonChatIdBeyondLongRange_isRejected_notWrappedAround() {
+            assertThatThrownBy(() -> TelegramParams.chatId(params("chat_id", new BigInteger("99999999999999999999"))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'chat_id' must be a numeric chat id or @channelusername");
+        }
+
+        /** A JSON decimal used to be cut to its integer part; the string "1.5" was already rejected. */
+        @Test
+        void jsonDecimalChatId_isRejectedLikeTheString() {
+            for (Object bad : new Object[] {1.5, "1.5", 5.0}) {
+                assertThatThrownBy(() -> TelegramParams.chatId(params("chat_id", bad)))
+                        .as(String.valueOf(bad))
+                        .hasMessage("Parameter 'chat_id' must be a numeric chat id or @channelusername");
+            }
+        }
     }
 
     @Nested
@@ -112,7 +131,7 @@ class TelegramParamsTest {
         }
 
         @Test
-        void missingOrBlank_isRequired() {
+        void missingOrBlankText_isRequired() {
             assertThatThrownBy(() -> TelegramParams.text(params()))
                     .hasMessage("Required parameter missing: text");
             assertThatThrownBy(() -> TelegramParams.text(params("text", " \n")))
@@ -157,7 +176,7 @@ class TelegramParamsTest {
     class Bool {
 
         @Test
-        void missingOrBlank_isNull() {
+        void missingOrBlankFlag_isNull() {
             assertThat(TelegramParams.bool(params(), "silent")).isNull();
             assertThat(TelegramParams.bool(params("silent", ""), "silent")).isNull();
         }
@@ -187,7 +206,7 @@ class TelegramParamsTest {
     class OptionalLong {
 
         @Test
-        void missingOrBlank_isNull() {
+        void missingOrBlankNumber_isNull() {
             assertThat(TelegramParams.optionalLong(params(), "offset")).isNull();
             assertThat(TelegramParams.optionalLong(params("offset", " "), "offset")).isNull();
         }
@@ -203,6 +222,31 @@ class TelegramParamsTest {
             assertThatThrownBy(() -> TelegramParams.optionalLong(params("offset", "1.5"), "offset"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Parameter 'offset' must be a number");
+        }
+
+        @Test
+        void jsonNumberBeyondLongRange_isRejected_notWrappedAround() {
+            assertThatThrownBy(() -> TelegramParams.optionalLong(
+                    params("offset", new BigInteger("9223372036854775808")), "offset"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'offset' must be a number");
+        }
+
+        /** A number is read like its text: 1.5 and 5.0 fail as "1.5" and "5.0" do, nothing is cut off. */
+        @Test
+        void jsonDecimal_isRejectedLikeTheString() {
+            for (Object bad : new Object[] {1.5, 5.0, "5.0"}) {
+                assertThatThrownBy(() -> TelegramParams.optionalLong(params("offset", bad), "offset"))
+                        .as(String.valueOf(bad))
+                        .hasMessage("Parameter 'offset' must be a number");
+            }
+        }
+
+        @Test
+        void jsonIntegersOfEveryWidth_areAccepted() {
+            assertThat(TelegramParams.optionalLong(params("offset", Long.MAX_VALUE), "offset")).isEqualTo(Long.MAX_VALUE);
+            assertThat(TelegramParams.optionalLong(params("offset", BigInteger.valueOf(Long.MIN_VALUE)), "offset"))
+                    .isEqualTo(Long.MIN_VALUE);
         }
     }
 
@@ -232,6 +276,13 @@ class TelegramParamsTest {
         @Test
         void nonNumeric_isRejectedAsNumber() {
             assertThatThrownBy(() -> TelegramParams.updatesLimit(params("limit", "ten")))
+                    .hasMessage("Parameter 'limit' must be a number");
+        }
+
+        /** {@code limit: 1.5} used to become 1 while {@code "1.5"} was rejected. */
+        @Test
+        void jsonDecimalLimit_isRejected_notCutToOne() {
+            assertThatThrownBy(() -> TelegramParams.updatesLimit(params("limit", 1.5)))
                     .hasMessage("Parameter 'limit' must be a number");
         }
     }
