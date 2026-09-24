@@ -268,7 +268,9 @@ com.automation
 | Controller | Base Path | Description |
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, archiving, container lifecycle, context generation |
-| `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills, optimize, similar, repair, versions |
+| `WorkflowController` | `/api/v1/workflows` | CRUD, execution, runs, export/import, skills |
+| `WorkflowVersionController` | `/api/v1/workflows` | `/{id}/versions` — version list, single version, restore |
+| `WorkflowAssistController` | `/api/v1/workflows` | `/{id}/optimize`, `/{id}/similar`, `/{id}/repair` (repair only with module `factory`) |
 | `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` and `/analyze` — deterministic build-error check of one definition or the whole stock. Reports only, touches no write path (182bd224) |
 | `WorkflowImportController` | `/api/v1/workflows/import` | BPMN import (`POST /bpmn?projectId=…`, body = BPMN XML) → new workflow (201); foreign BPMN/broken XML/too large → 400 |
 | `ExecutionController` | `/api/v1/executions` | List, detail, pause, resume, resume-from-step, cancel, retry, approve, approval-check, todos-approve, notes, command |
