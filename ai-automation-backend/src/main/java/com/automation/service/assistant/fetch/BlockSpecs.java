@@ -109,7 +109,8 @@ public final class BlockSpecs {
                     **Block type: switch** — Multi-way branch: compares `expression` with the `value` of each case and runs \
                     the nested blocks of the first match.
                     Required config: `expression` (string; ${var} and {{ var }} are resolved), `cases` (list of {`value`, \
-                    `blocks`}; `value` must equal the resolved expression, alternatives separated by "|" as in "YELLOW|RED").
+                    `blocks`}; `value` must equal the resolved expression, both trimmed, so an AI answer "GREEN" with a \
+                    trailing line break still hits "GREEN"; alternatives separated by "|" as in "YELLOW|RED").
                     Optional: `default` (list of blocks for no match).
                     Nested blocks: {"type": "shell" or "simple", "name": optional, `config`} — no other types. In `config`: \
                     `command`, `timeout_seconds`, `shell_escape_variables`, `on_failure` ("stop" default ends the case at a \
