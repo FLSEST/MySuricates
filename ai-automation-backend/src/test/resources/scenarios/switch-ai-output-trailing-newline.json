@@ -1,0 +1,86 @@
+{
+  "id": "switch-ai-output-trailing-newline",
+  "title": "switch trifft den Case auch, wenn die KI-Ausgabe mit einem Zeilenumbruch endet",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md — switch: Beispiel mit {{ block.ampel.output }} gegen die Cases GREEN und YELLOW|RED",
+    "incidents": [
+      "bf11e6fe (switch vergleicht den aufgelösten Ausdruck ungetrimmt – KI-Ausgabe mit Zeilenumbruch trifft keinen Case)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "ampel",
+        "config": {
+          "command": "Bewerte den Stand. Antworte nur mit GREEN, YELLOW oder RED."
+        }
+      },
+      {
+        "type": "switch",
+        "name": "verzweigen",
+        "config": {
+          "expression": "{{ block.ampel.output }}",
+          "cases": [
+            {
+              "value": "GREEN",
+              "blocks": [
+                {
+                  "type": "shell",
+                  "config": {
+                    "command": "echo case=green"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "YELLOW|RED",
+              "blocks": [
+                {
+                  "type": "shell",
+                  "config": {
+                    "command": "echo case=warn"
+                  }
+                }
+              ]
+            }
+          ],
+          "default": [
+            {
+              "type": "shell",
+              "config": {
+                "command": "echo case=default"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "respond": "GREEN\n"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 1
+    },
+    "steps": [
+      {
+        "index": 1,
+        "status": "COMPLETED",
+        "outputContains": [
+          "case=green"
+        ],
+        "outputNotContains": [
+          "case=default"
+        ]
+      }
+    ]
+  }
+}

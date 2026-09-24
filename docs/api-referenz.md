@@ -2803,6 +2803,8 @@ TODOs auflisten (paginiert, filterbar).
 | `q` | String | Volltextsuche |
 | `goalId` | String | Nur TODOs dieses Ziels (V85) |
 
+Bei `status`, `priority` und `source` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'BLOCKED'`.
+
 **Response:** `PageResponse<TodoResponse>` – mit `planning` (Ziel, Rang, Einschätzung), sobald davon etwas gesetzt ist
 
 ### `POST /api/v1/todos`

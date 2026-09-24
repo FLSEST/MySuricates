@@ -260,7 +260,7 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 | `skill` | Skill-Detail | Desc: 200, AI-Context: 400, Capability-Desc: 100 |
 | `integration` | Integration-Detail | Desc: 200, Account: 80, Action-Desc: 100 |
 | `chain` | Chain-Detail | Desc: 200 |
-| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig, `BlockSpecConfigKeysGateTest` prüft jeden genannten Config-Schlüssel gegen den Quelltext des Executors; die Prompts von Factory, Wishes und Dialog-Import rendern dieselben Texte mit `BlockSpecs.reference`) | — |
+| `block-spec` | Block-Typ-Spezifikation je Typ (`BlockSpecs`, eine für jeden Typ der Registry; `BlockTypeListsGuardTest` hält sie vollständig, `BlockSpecConfigKeysGateTest` prüft jeden genannten Config-Schlüssel gegen den Quelltext des Executors; die Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung rendern dieselben Texte mit `BlockSpecs.reference`) | — |
 
 Doc-Dateien: `workflow-guide` → `docs/WORKFLOW-GUIDE.md`, `architektur` → `docs/architektur.md`, `vision` → `docs/vision.md`
 

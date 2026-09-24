@@ -105,6 +105,16 @@ class TodoSpecificationsIntegrationTest {
     void blankFilters_areIgnored() {
         assertThat(titles(List.of(), "  ", "", "", " "))
                 .containsExactly("Done thing", "Fix login bug", "Write docs");
+        assertThat(titles(List.of(" "), null, null, null, null))
+                .containsExactly("Done thing", "Fix login bug", "Write docs");
+    }
+
+    /** 4e7a7401: parsed like TodoPlanningService.parseComplexity — trimmed, in any case. */
+    @Test
+    void enumFilters_areTrimmedAndCaseInsensitive() {
+        assertThat(titles(List.of(" open ", "in_progress"), null, null, null, null))
+                .containsExactly("Fix login bug", "Write docs");
+        assertThat(titles(null, "high", " ai", null, null)).containsExactly("Fix login bug");
     }
 
     // --- list order (aa434aee) ---

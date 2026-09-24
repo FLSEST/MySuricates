@@ -1077,4 +1077,38 @@ class SwitchBlockExecutorTest {
         assertThat(context.resolveShellTemplate("echo {{ block.analyse.output }}", false))
                 .isEqualTo("echo 'a | b'");
     }
+
+    /**
+     * TODO bf11e6fe: an AI block typically ends its answer with a newline. The switch compares the
+     * trimmed expression (the case values are trimmed already), so "GREEN\n" hits the case GREEN
+     * instead of silently falling into default — while input and metadata keep the raw value.
+     */
+    @Test
+    void execute_aiOutputWithTrailingNewline_hitsTheCaseAndKeepsTheRawValueVisible() {
+        context.setBlockOutput("ampel", "GREEN\n");
+        when(commandExecutor.executeStepAsShell(any(), any(BlockDefinition.class), anyInt(), anyInt())).thenReturn(
+                StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("gut").build());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "{{ block.ampel.output }}");
+        config.put("cases", List.of(Map.of("value", "GREEN", "blocks",
+                List.of(Map.of("type", "shell", "config", Map.of("command", "echo gut"))))));
+        config.put("default", List.of(Map.of("type", "shell", "config", Map.of("command", "echo unbekannt"))));
+
+        StepResult result = executor.execute(BlockDefinition.builder().type("switch").config(config).build(), context);
+
+        assertThat(result.getMetadata()).containsEntry("matchedCase", "GREEN").containsEntry("expression", "GREEN\n");
+        assertThat(result.getInput()).isEqualTo("switch (GREEN\n)");
+        ArgumentCaptor<BlockDefinition> ran = ArgumentCaptor.forClass(BlockDefinition.class);
+        verify(commandExecutor).executeStepAsShell(any(), ran.capture(), anyInt(), anyInt());
+        assertThat(ran.getValue().getConfig()).containsEntry("command", "echo gut");
+    }
+
+    @Test
+    void matchesValue_ignoresWhitespaceAroundTheExpressionButNotInsideIt() {
+        assertThat(executor.matchesValue("GREEN\n", "GREEN")).isTrue();
+        assertThat(executor.matchesValue("  critical \r\n", "error|critical")).isTrue();
+        assertThat(executor.matchesValue("GREEN\nZwei Befunde", "GREEN")).isFalse();
+        assertThat(executor.matchesValue(null, "GREEN")).isFalse();
+    }
 }

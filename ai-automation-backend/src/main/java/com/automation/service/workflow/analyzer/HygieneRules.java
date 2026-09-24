@@ -54,17 +54,18 @@ final class HygieneRules {
     }
 
     /**
-     * Der Block-Prompt wiederholt wörtlich, was ohnehin über {@code workflow.instructions} in
-     * jeden Aufruf geht: dieselben Regeln zweimal im Kontext, doppelt bezahlt.
+     * Der KI-Auftrag des Blocks ({@link BlockText#instructions}) wiederholt wörtlich, was ohnehin
+     * über {@code workflow.instructions} in jeden Aufruf geht: dieselben Regeln zweimal im Kontext,
+     * doppelt bezahlt.
      */
     private static void duplicatedInstructions(BlockDefinition block, String instructions, int i,
                                                String name, List<AnalyzerFinding> out) {
         if (instructions == null || instructions.isBlank()) return;
-        String prompt = BlockText.instruction(block);
-        if (prompt == null || prompt.isBlank()) return;
+        List<String> prompts = BlockText.instructions(block);
+        if (prompts.isEmpty()) return;
         for (String paragraph : instructions.split("\n\\s*\n")) {
             String trimmed = paragraph.strip();
-            if (trimmed.length() >= 80 && prompt.contains(trimmed)) {
+            if (trimmed.length() >= 80 && prompts.stream().anyMatch(prompt -> prompt.contains(trimmed))) {
                 out.add(AnalyzerFinding.of("duplicated-instructions", Severity.MEDIUM, i, name,
                         "wiederholt wörtlich einen Absatz aus workflow.instructions ("
                                 + trimmed.length() + " Zeichen) — die Regeln gehen zweimal in den Kontext"));

@@ -2,17 +2,21 @@ package com.automation.service.assistant;
 
 import com.automation.config.WishConfig;
 import com.automation.dto.request.WorkflowFactoryRequest;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.Wish;
+import com.automation.entity.Workflow;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowMemoryRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowTemplateRepository;
+import com.automation.service.conversion.WorkflowConversionPrompt;
 import com.automation.service.dialog.DialogConversionPrompt;
 import com.automation.service.factory.FactoryPromptBuilder;
 import com.automation.service.pool.WorkflowPoolService;
 import com.automation.service.wish.WishDecomposePromptBuilder;
 import com.automation.service.wish.WishPromptHelper;
 import com.automation.service.workflow.AgentInstructionsService;
+import com.automation.service.workflow.WorkflowOptimizationPrompt;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -40,7 +44,8 @@ import static org.mockito.Mockito.when;
  * be read where that type runs ({@link ExecutorConfigReads}). The wish, factory and dialog-import
  * prompts described a schema of their own — type {@code forEach} (refused on save),
  * {@code then_blocks}, {@code if_true}, {@code items_expression}, {@code delay_seconds} — and the
- * workflows built from it failed or did nothing.
+ * workflows built from it failed or did nothing. The prompts that convert an agentic run into a
+ * workflow and that optimize a workflow followed (TODO b07704ca).
  *
  * <p><b>Which type a line is about</b>, first match wins: inside a specification section (from a
  * {@code **Block type: X**} headline to the next blank line) that type; a block object on the line
@@ -122,6 +127,12 @@ class PromptBlockSchemaGateTest {
         prompts.put("factory/codex-factory-instructions.md",
                 Files.readString(Path.of("src/main/resources/factory/codex-factory-instructions.md")));
         prompts.put("DialogConversionPrompt.build", DialogConversionPrompt.build("/project", 4, "[ASSISTANT]\n[Bash] mvn test"));
+        prompts.put("WorkflowConversionPrompt.build", WorkflowConversionPrompt.build(
+                "Goal: Make the tests pass\n\nStep 1: npm ci (exit: 0)\nStep 2: npm test (exit: 0)\n"));
+        prompts.put("WorkflowOptimizationPrompt.build", WorkflowOptimizationPrompt.build(Workflow.builder()
+                .name("Nightly build").description("Builds nightly").instructions("Be brief")
+                .blocks(List.of(BlockDefinition.builder().type("simple").config(Map.of("command", "Summarize")).build()))
+                .build(), "[]"));
         return prompts;
     }
 

@@ -1,11 +1,13 @@
 package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.executor.ExecutionMode;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Liest die Texte einer Block-Konfiguration — flach und rekursiv.
@@ -41,12 +43,40 @@ final class BlockText {
     }
 
     /**
-     * Der Auftragstext eines Blocks: {@code prompt} bei KI-Blöcken, {@code command} bei Shell- und
-     * (historisch gewachsen) auch bei simple-Blöcken, die ihren Prompt dort führen.
+     * Wo ein Block seinen Auftrag an die KI führt: je Typ die Schlüssel, die sein Executor liest
+     * (dieselben wie in {@code BlockSpecs}). Nur Aufrufe, die {@code workflow.instructions} als
+     * Systemprompt mitbekommen, also nicht die Bedingung von conditional und nicht compress-ai.
+     * Gelesen wurde früher {@code prompt} vor {@code command} und {@code goal} nie (TODO c52eba8f).
      */
-    static String instruction(BlockDefinition block) {
-        String prompt = directValue(block, "prompt");
-        return prompt != null ? prompt : directValue(block, "command");
+    static final Map<String, List<String>> PROMPT_KEYS = Map.of(
+            "simple", List.of("command"),
+            "agentic", List.of("goal"),
+            "skill-capability", List.of("input"),
+            "retry", List.of("command"),
+            "foreach", List.of("command"),
+            "while", List.of("command"),
+            "conditional", List.of("then_command", "else_command"));
+
+    /** Typen, deren Befehl mit {@code execution_mode: "shell"} als Shell läuft statt als KI-Auftrag. */
+    private static final Set<String> SHELL_SWITCHABLE = Set.of("retry", "foreach", "while", "conditional");
+
+    /**
+     * Die Auftragstexte, die ein Block zusammen mit {@code workflow.instructions} an die KI schickt,
+     * in der Reihenfolge von {@link #PROMPT_KEYS}. Leer für Shell-Befehle, Fragen an Menschen
+     * (approval, human-input) und Blöcke ohne KI-Aufruf.
+     */
+    static List<String> instructions(BlockDefinition block) {
+        if (block == null || block.getType() == null || block.getConfig() == null) return List.of();
+        if (SHELL_SWITCHABLE.contains(block.getType())
+                && ExecutionMode.SHELL.equals(block.getConfig().get(ExecutionMode.KEY))) {
+            return List.of();
+        }
+        List<String> texts = new ArrayList<>();
+        for (String key : PROMPT_KEYS.getOrDefault(block.getType(), List.of())) {
+            String text = directValue(block, key);
+            if (text != null) texts.add(text);
+        }
+        return texts;
     }
 
     private static void collect(Object value, List<String> out, int depth) {

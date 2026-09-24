@@ -2775,6 +2775,8 @@ List TODOs (paginated, filterable).
 | `q` | String | Full-text search |
 | `goalId` | String | Only TODOs of this goal (V85) |
 
+`status`, `priority` and `source` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
+
 **Response:** `PageResponse<TodoResponse>` – with `planning` (goal, rank, assessment) once any of it is set
 
 ### `POST /api/v1/todos`

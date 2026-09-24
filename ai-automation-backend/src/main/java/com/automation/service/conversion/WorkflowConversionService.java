@@ -141,32 +141,7 @@ public class WorkflowConversionService {
             }
         }
 
-        String prompt = """
-                Analyze this successful agentic execution and convert it into optimized workflow blocks.
-
-                %s
-
-                Output ONLY a JSON object with these fields:
-                {
-                  "suggestedName": "short name for the workflow",
-                  "suggestedDescription": "brief description",
-                  "blocks": [
-                    {"type": "simple", "config": {"command": "...", "on_failure": "stop"}},
-                    {"type": "retry", "config": {"command": "...", "max_retries": 3, "on_failure": "stop"}}
-                  ]
-                }
-
-                Rules:
-                - Use "simple" blocks for AI reasoning tasks
-                - Use "shell" blocks for deterministic commands. Config: {"command": "...", "container_image": "image:tag"}
-                - Use "retry" blocks for commands that might fail transiently
-                - Use "conditional" blocks if the sequence has clear if-then logic
-                - Merge related steps when possible
-                - Remove redundant or exploratory steps
-                - Keep only the essential action chain
-                - Follow the "Ausfuehrungsumgebung" rules for shell block container_image
-                - Output ONLY valid JSON, no explanations
-                """.formatted(actionDesc);
+        String prompt = WorkflowConversionPrompt.build(actionDesc.toString());
 
         String systemPrompt = agentInstructionsService.buildInstructionPrefix(null);
         AiProvider.ReasoningResult aiResult = aiProviderRegistry.getDefault().reason(

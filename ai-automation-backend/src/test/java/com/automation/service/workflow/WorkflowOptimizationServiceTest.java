@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -180,5 +181,30 @@ class WorkflowOptimizationServiceTest {
         optimizationService.optimizeWorkflow("wf-1");
 
         // Verified by the argThat matcher - prompt includes workflow name
+    }
+
+    /**
+     * TODO b07704ca: the prompt describes the block types from BlockSpecs — shell included, which the
+     * old list lacked, and every type the workflow uses — and no longer claims that blocks run in
+     * Docker containers via the Claude CLI.
+     */
+    @Test
+    void optimizeWorkflow_promptDescribesTheBlockTypesFromTheirSpecifications() throws IOException {
+        testWorkflow.setBlocks(List.of(
+                BlockDefinition.builder().type("shell").config(Map.of("command", "npm test")).build(),
+                BlockDefinition.builder().type("todo-create").config(Map.of("title", "Tests reparieren")).build()));
+        when(workflowService.findById("wf-1")).thenReturn(testWorkflow);
+        ArgumentCaptor<AiProvider.ReasoningRequest> request = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+        when(aiProvider.reason(request.capture())).thenReturn(reasonResult("{}"));
+
+        optimizationService.optimizeWorkflow("wf-1");
+
+        String prompt = request.getValue().prompt();
+        for (String type : List.of("simple", "shell", "retry", "conditional", "foreach", "while", "agentic",
+                "approval", "sub-workflow", "todo-create")) {
+            assertThat(prompt).contains("**Block type: " + type + "**");
+        }
+        assertThat(prompt).contains("Tests reparieren", "`changes`", "reordered")
+                .doesNotContain("Blocks die in Docker-Containern");
     }
 }

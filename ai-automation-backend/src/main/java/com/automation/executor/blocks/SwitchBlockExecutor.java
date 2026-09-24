@@ -153,12 +153,16 @@ public class SwitchBlockExecutor implements BlockExecutor {
     /**
      * Checks if the expression matches the case value.
      * Supports pipe-separated alternatives (e.g. "error|critical").
+     * Both sides are compared trimmed: an AI block typically ends its answer with a newline, and
+     * "GREEN\n" must hit the case GREEN instead of silently falling into default (bf11e6fe).
+     * Only the comparison trims — input and metadata of the step keep the raw value.
      */
     boolean matchesValue(String expression, String caseValue) {
-        if (caseValue == null) return false;
+        if (caseValue == null || expression == null) return false;
+        String value = expression.trim();
         String[] alternatives = caseValue.split("\\|");
         for (String alt : alternatives) {
-            if (alt.trim().equals(expression)) {
+            if (alt.trim().equals(value)) {
                 return true;
             }
         }

@@ -343,6 +343,8 @@ Jeder Case hat:
 - `value`: String zum Abgleich (Pipe-getrennte Alternativen: `"error|critical"`)
 - `blocks`: Liste von Block-Definitionen bei Treffer
 
+Verglichen wird ohne Leerzeichen und Zeilenumbrüche an Anfang und Ende, beim aufgelösten Ausdruck wie bei jedem `value`. Endet die Antwort eines KI-Blocks mit einem Zeilenumbruch, trifft `GREEN` also trotzdem den Case `GREEN`. Groß- und Kleinschreibung zählen weiter. Eingabe und Metadaten des Schritts (`expression`) zeigen den Rohwert.
+
 Verschachtelte Blöcke in `cases` und `default` sind auf `shell` und `simple` beschränkt — andere Typen (auch `compress`/`compress-ai`) werden mit einer Fehlermeldung abgelehnt.
 
 Ein `name` am verschachtelten Block macht dessen Ausgabe als `{{ block.<name>.output }}` in Folgeschritten verfügbar; ohne Namen bleibt nur `{{ previous_output }}`. Die Ausgabe des switch-Blocks selbst bleibt die Verkettung aller ausgeführten Case-Blöcke.

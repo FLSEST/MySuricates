@@ -53,6 +53,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 14 | Scheitert ein foreach-Item, nennt die Lauf-Fehlermeldung es zuerst, nicht die erfolgreichen davor (4a8cabc4) | `foreach-failed-item-named-first` |
 | 15 | Freigabe: die Frage kommt aufgelöst an (e2efb393), „Nein“ lehnt ab, nicht nur „No“ (50c7b5d5) | `approval-question-resolved-and-german-rejection` |
 | 16 | Kopierte Marker zählen nur am Originalschritt: `compress` (348b7b3b) und `sub-workflow` (40471709), beides 6e5d6e2c | `compress-copy-counts-markers-once`, `sub-workflow-copy-counts-markers-once` |
+| 17 | `switch`: eine KI-Ausgabe mit Zeilenumbruch am Ende trifft ihren Case, statt still in `default` zu fallen (bf11e6fe) | `switch-ai-output-trailing-newline` |
 
 ### Aus der Historie, noch ohne Szenario
 

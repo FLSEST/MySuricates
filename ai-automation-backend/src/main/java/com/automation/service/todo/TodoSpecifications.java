@@ -7,7 +7,9 @@ import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * JPA {@link Specification} for the todo list filters (project, status, priority, source, tag,
@@ -64,31 +66,41 @@ public final class TodoSpecifications {
         };
     }
 
+    /**
+     * The filters of the todo list. The enum values are parsed here, before the query: inside the
+     * specification Spring Data wrapped an unknown value's exception, and the API answered 500
+     * instead of 400 (TODO 4e7a7401).
+     *
+     * @throws IllegalArgumentException for an unknown status, priority or source, naming the allowed values
+     */
     public static Specification<Todo> buildSpec(String projectId, List<String> status, String priority, String source, String tag, String q) {
+        List<Todo.Status> statuses = status == null ? List.of() : status.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(value -> parseFilter(Todo.Status.class, "status", value))
+                .toList();
+        Todo.Priority priorityFilter = priority == null || priority.isBlank()
+                ? null : parseFilter(Todo.Priority.class, "priority", priority);
+        Todo.Source sourceFilter = source == null || source.isBlank()
+                ? null : parseFilter(Todo.Source.class, "source", source);
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (projectId != null && !projectId.isBlank()) {
                 predicates.add(cb.equal(root.get("projectId"), projectId));
             }
-            if (status != null && !status.isEmpty()) {
-                List<Todo.Status> enums = status.stream()
-                        .map(Todo.Status::valueOf)
-                        .toList();
-                if (enums.size() == 1) {
-                    predicates.add(cb.equal(root.get("status"), enums.get(0)));
-                } else {
-                    predicates.add(root.get("status").in(enums));
-                }
+            if (statuses.size() == 1) {
+                predicates.add(cb.equal(root.get("status"), statuses.get(0)));
+            } else if (!statuses.isEmpty()) {
+                predicates.add(root.get("status").in(statuses));
             } else {
                 // ARCHIVED is "out of sight": hidden from the default list unless explicitly requested.
                 predicates.add(cb.notEqual(root.get("status"), Todo.Status.ARCHIVED));
             }
-            if (priority != null && !priority.isBlank()) {
-                predicates.add(cb.equal(root.get("priority"), Todo.Priority.valueOf(priority)));
+            if (priorityFilter != null) {
+                predicates.add(cb.equal(root.get("priority"), priorityFilter));
             }
-            if (source != null && !source.isBlank()) {
-                predicates.add(cb.equal(root.get("source"), Todo.Source.valueOf(source)));
+            if (sourceFilter != null) {
+                predicates.add(cb.equal(root.get("source"), sourceFilter));
             }
             if (tag != null && !tag.isBlank()) {
                 predicates.add(cb.like(root.get("tags"), "%" + escapeLikePattern(tag) + "%", '\\'));
@@ -108,6 +120,18 @@ public final class TodoSpecifications {
     /** Nur TODOs dieses Ziels (TODO dc0566f8); ohne ID keine Einschraenkung. */
     public static Specification<Todo> inGoal(String goalId) {
         return (root, query, cb) -> goalId == null || goalId.isBlank() ? null : cb.equal(root.get("goalId"), goalId);
+    }
+
+    /** A filter value as enum constant, trimmed and in any case — like {@code TodoPlanningService.parseComplexity}. */
+    static <E extends Enum<E>> E parseFilter(Class<E> type, String parameter, String value) {
+        try {
+            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            List<String> allowed = Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
+            throw new IllegalArgumentException(parameter + " muss "
+                    + String.join(", ", allowed.subList(0, allowed.size() - 1)) + " oder " + allowed.getLast()
+                    + " sein, nicht '" + value + "'");
+        }
     }
 
     static String escapeLikePattern(String input) {

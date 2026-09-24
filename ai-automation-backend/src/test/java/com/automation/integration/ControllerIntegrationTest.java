@@ -128,6 +128,31 @@ class ControllerIntegrationTest {
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
     }
 
+    // TODO 4e7a7401: an unknown filter value failed inside the query — Spring Data wrapped the
+    // IllegalArgumentException of the enum parse — and answered 500 INTERNAL_ERROR.
+    @Test
+    void todoList_unknownFilterValue_returns400NamingTheAllowedValues() throws Exception {
+        mockMvc.perform(get("/api/v1/todos").param("status", "OPEN").param("status", "BLOCKED"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.error").value(allOf(
+                        containsString("OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED"), containsString("'BLOCKED'"))));
+        mockMvc.perform(get("/api/v1/todos").param("priority", "URGENT"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("LOW, MEDIUM, HIGH oder CRITICAL")));
+        mockMvc.perform(get("/api/v1/todos").param("source", "HUMAN"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(containsString("USER, AI oder WORKFLOW")));
+    }
+
+    // Spot check from 4e7a7401: the run list parses its status before the query, so it already says 400.
+    @Test
+    void executionList_unknownStatus_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/executions").param("status", "FOO"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
     @Test
     void todoValidation_missingTitle_returns400() throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(

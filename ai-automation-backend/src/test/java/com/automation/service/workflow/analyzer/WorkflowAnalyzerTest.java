@@ -30,7 +30,7 @@ class WorkflowAnalyzerTest {
     void verweisAufUnbekanntenBlockIstEinBefund() {
         var blocks = List.of(
                 block("shell", "messung", Map.of("command", "set -euo pipefail\necho ok")),
-                block("simple", "report", Map.of("prompt", "Lies {{ block.messsung.output }}")));
+                block("simple", "report", Map.of("command", "Lies {{ block.messsung.output }}")));
 
         var findings = analyzer.analyze(blocks, null);
 
@@ -45,7 +45,7 @@ class WorkflowAnalyzerTest {
     void richtigGeschriebenerVerweisIstKeinBefund() {
         var blocks = List.of(
                 block("shell", "messung", Map.of("command", "set -euo pipefail\necho ok")),
-                block("simple", "report", Map.of("prompt", "Lies {{ block.messung.output }}")));
+                block("simple", "report", Map.of("command", "Lies {{ block.messung.output }}")));
 
         assertThat(rules(blocks, null)).doesNotContain("unknown-block-reference", "unwired-output");
     }
@@ -53,7 +53,7 @@ class WorkflowAnalyzerTest {
     @Test
     void chainVariableInEinemEinzelnenWorkflowIstEinBefund() {
         var blocks = List.of(
-                block("simple", "a", Map.of("prompt", "Nimm {{ previous_chain_output }} und fasse zusammen")));
+                block("simple", "a", Map.of("command", "Nimm {{ previous_chain_output }} und fasse zusammen")));
 
         assertThat(rules(blocks, null)).contains("chain-only-placeholder");
     }
@@ -61,8 +61,8 @@ class WorkflowAnalyzerTest {
     @Test
     void ungeleseneKiAusgabeIstEinBefund() {
         var blocks = List.of(
-                block("simple", "analyse", Map.of("prompt", "Analysiere das Projekt ausfuehrlich")),
-                block("simple", "report", Map.of("prompt", "Schreibe einen Bericht ueber das Projekt")));
+                block("simple", "analyse", Map.of("command", "Analysiere das Projekt ausfuehrlich")),
+                block("simple", "report", Map.of("command", "Schreibe einen Bericht ueber das Projekt")));
 
         var findings = analyzer.analyze(blocks, null);
 
@@ -76,9 +76,9 @@ class WorkflowAnalyzerTest {
     @Test
     void ausgabeUeberNullBasiertenStepIndexGiltAlsGelesen() {
         var blocks = List.of(
-                block("simple", "analyse", Map.of("prompt", "Analysiere das Projekt ausfuehrlich")),
+                block("simple", "analyse", Map.of("command", "Analysiere das Projekt ausfuehrlich")),
                 block("shell", "zwischen", Map.of("command", "set -euo pipefail\necho ok")),
-                block("simple", "report", Map.of("prompt", "Schreibe einen Bericht aus {{ step_0_output }}")));
+                block("simple", "report", Map.of("command", "Schreibe einen Bericht aus {{ step_0_output }}")));
 
         assertThat(rules(blocks, null)).doesNotContain("unwired-output");
     }
@@ -86,9 +86,9 @@ class WorkflowAnalyzerTest {
     @Test
     void verweisAufDenFolgendenStepIndexLiestDenBlockNicht() {
         var blocks = List.of(
-                block("simple", "analyse", Map.of("prompt", "Analysiere das Projekt ausfuehrlich")),
+                block("simple", "analyse", Map.of("command", "Analysiere das Projekt ausfuehrlich")),
                 block("shell", "zwischen", Map.of("command", "set -euo pipefail\necho ok")),
-                block("simple", "report", Map.of("prompt", "Schreibe einen Bericht aus {{ step_1_output }}")));
+                block("simple", "report", Map.of("command", "Schreibe einen Bericht aus {{ step_1_output }}")));
 
         assertThat(analyzer.analyze(blocks, null)).anySatisfy(f -> {
             assertThat(f.rule()).isEqualTo("unwired-output");
@@ -113,7 +113,7 @@ class WorkflowAnalyzerTest {
     void letzterBlockUndWrapperLoesenKeineToteAusgabeAus() {
         var blocks = List.of(
                 block("foreach", "je Datei", Map.of("items_command", "ls", "command", "tu etwas")),
-                block("simple", "ende", Map.of("prompt", "Fasse zusammen")));
+                block("simple", "ende", Map.of("command", "Fasse zusammen")));
 
         assertThat(rules(blocks, null)).doesNotContain("unwired-output");
     }
@@ -145,7 +145,7 @@ class WorkflowAnalyzerTest {
     void woertlichWiederholteAnweisungIstEinBefund() {
         String instructions = "Arbeite ausschliesslich mit dem Faktenblatt und zaehle nichts selbst. "
                 + "Jede Zahl im Bericht nennt die FAKT-Zeile, auf der sie beruht, sonst gehoert sie nicht hinein.";
-        var blocks = List.of(block("simple", "report", Map.of("prompt", "Schreibe den Bericht.\n\n" + instructions)));
+        var blocks = List.of(block("simple", "report", Map.of("command", "Schreibe den Bericht.\n\n" + instructions)));
 
         assertThat(rules(blocks, instructions)).contains("duplicated-instructions");
     }
@@ -153,10 +153,10 @@ class WorkflowAnalyzerTest {
     @Test
     void datierteModellIdIstEinBefund() {
         var blocks = List.of(block("simple", "a", Map.of(
-                "prompt", "Fasse zusammen", "model", "claude-opus-4-6")));
+                "command", "Fasse zusammen", "model", "claude-opus-4-6")));
 
         assertThat(rules(blocks, null)).contains("dated-model-id");
-        assertThat(rules(List.of(block("simple", "a", Map.of("prompt", "Fasse zusammen", "model", "opus"))), null))
+        assertThat(rules(List.of(block("simple", "a", Map.of("command", "Fasse zusammen", "model", "opus"))), null))
                 .doesNotContain("dated-model-id");
     }
 
@@ -174,7 +174,7 @@ class WorkflowAnalyzerTest {
         var blocks = List.of(
                 block("shell", "messung", Map.of("command",
                         "set -euo pipefail\ncd {{ project_path }}\nls docs")),
-                block("simple", "report", Map.of("prompt",
+                block("simple", "report", Map.of("command",
                         "Werte {{ block.messung.output }} aus und fasse zusammen.",
                         "model", "opus")));
 
@@ -191,7 +191,7 @@ class WorkflowAnalyzerTest {
     void befundeStehenSchwersteZuerst() {
         var blocks = List.of(
                 block("shell", "a", Map.of("command", "mvn test")),
-                block("simple", "b", Map.of("prompt", "Nimm {{ block.fehlt.output }}")));
+                block("simple", "b", Map.of("command", "Nimm {{ block.fehlt.output }}")));
 
         var findings = analyzer.analyze(blocks, null);
 

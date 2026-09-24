@@ -26,7 +26,8 @@ import java.util.List;
  *   <li>{@code unwired-output} — erzeugte Ausgabe, die kein späterer Block liest</li>
  *   <li>{@code absolute-home-path} — Pfad mit Klarnamen unter {@code /home/…}</li>
  *   <li>{@code missing-strict-mode} — Shell-Block ohne {@code set -euo pipefail}</li>
- *   <li>{@code duplicated-instructions} — Block-Prompt wiederholt {@code workflow.instructions}</li>
+ *   <li>{@code duplicated-instructions} — KI-Auftrag des Blocks ({@code command}, {@code goal},
+ *       {@code input} … je Typ) wiederholt {@code workflow.instructions}</li>
  *   <li>{@code dated-model-id} — datierte Modell-ID statt Alias</li>
  *   <li>{@code on-no-without-reject-option} — Approval mit {@code on_no}, aber ohne Option, die ablehnt</li>
  *   <li>{@code items-command-without-source} — foreach mit {@code items_command}, aber ohne
