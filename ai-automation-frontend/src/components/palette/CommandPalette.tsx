@@ -16,7 +16,7 @@ import { PaletteRow } from './PaletteRow';
 import { Section } from './Section';
 import { AssistantRow } from './AssistantRow';
 import { CollectForm, type CollectingState } from './CollectForm';
-import { useDebounced } from './useDebounced';
+import { useDebounced } from '../../hooks/useDebounced';
 import { useModuleEnabled } from '../../hooks/useModules';
 
 const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
