@@ -262,7 +262,8 @@ export const en = {
       unknownProject: 'Unknown project',
       days: 'Last {days} days',
       active: 'Filtered:',
-      hint: 'Applies to charts, cost and statistics of the selected period. Todos, schedules, projects and the overall numbers (workflows, runs today, success rate, top workflows) stay unfiltered.',
+      hint: 'The project applies to every tile except Active Projects, Version and API Latency. The time range applies to charts, cost and statistics; Total Workflows, Success Rate and Top Workflows count all time.',
+      allProjectsHint: 'all projects',
     },
     views: {
       label: 'Dashboard views',
@@ -333,7 +334,7 @@ export const en = {
         workflows: 'Workflows',
       },
       descriptions: {
-        statActiveProjects: 'Number of projects whose container is running.',
+        statActiveProjects: 'Number of projects whose container is running – regardless of the view\'s project filter.',
         statTotalWorkflows: 'Number of workflows on the platform.',
         statRunsToday: 'Workflow runs started today.',
         statSuccessRate: 'Share of successful runs overall.',

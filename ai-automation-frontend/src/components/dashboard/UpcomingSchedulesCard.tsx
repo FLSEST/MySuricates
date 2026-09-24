@@ -5,6 +5,7 @@ import { useT, useI18nStore, type Locale } from '../../i18n';
 import { formatDateTime } from '../../utils/formatTime';
 import { formatDate, formatTimeOfDay } from '../../utils/localeFormat';
 import { WidgetSkeleton } from './WidgetSkeleton';
+import { useDashboardData } from './dashboardDataContext';
 
 function scheduleTime(iso: string, locale: Locale): string {
   try {
@@ -25,8 +26,9 @@ function scheduleDay(iso: string, locale: Locale): string {
 export function UpcomingSchedulesCard() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
-  const { data: today, isLoading: todayLoading } = useRemainingToday();
-  const { data: week, isLoading: weekLoading } = useRemainingThisWeek();
+  const { projectId } = useDashboardData().filter;
+  const { data: today, isLoading: todayLoading } = useRemainingToday(projectId);
+  const { data: week, isLoading: weekLoading } = useRemainingThisWeek(projectId);
   if (todayLoading || weekLoading) return <WidgetSkeleton size="chart" />;
 
   // Runs inside a skip-until pause are already left out by the backend (a776fd2a); say why.

@@ -127,6 +127,32 @@ class UpcomingRunsCalculatorTest {
         assertThat(result.count()).isZero();
     }
 
+    /** Dashboard project filter: only schedules of that project's workflows; chains have no project (TODO 4e1c9ad4). */
+    @Test
+    void getRemainingToday_withProject_keepsOnlyThatProjectsWorkflows() {
+        Workflow mine = Workflow.builder().id("wf-a").name("Mine")
+                .project(Project.builder().id("p-a").name("A").build()).build();
+        Workflow other = Workflow.builder().id("wf-b").name("Other")
+                .project(Project.builder().id("p-b").name("B").build()).build();
+        Instant soon = FIXED_NOW.plus(1, ChronoUnit.HOURS);
+        ScheduledWorkflow mineOnce = once("s-a", mine, soon);
+        ScheduledWorkflow otherOnce = once("s-b", other, soon);
+        ScheduledWorkflow chainOnce = ScheduledWorkflow.builder().id("s-c").targetType(TargetType.CHAIN)
+                .chain(WorkflowChain.builder().id("c-1").name("Chain").build())
+                .scheduleType(ScheduleType.ONCE).scheduledAt(soon).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(mineOnce, otherOnce, chainOnce));
+
+        assertThat(calculator.getRemainingToday("p-a").schedules())
+                .extracting(UpcomingScheduleResponse.UpcomingRun::scheduleId).containsExactly("s-a");
+        assertThat(calculator.getRemainingThisWeek("p-b").count()).isEqualTo(1);
+        assertThat(calculator.getRemainingToday(null).count()).isEqualTo(3);
+    }
+
+    private static ScheduledWorkflow once(String id, Workflow workflow, Instant at) {
+        return ScheduledWorkflow.builder().id(id).workflow(workflow)
+                .scheduleType(ScheduleType.ONCE).scheduledAt(at).enabled(true).build();
+    }
+
     @Test
     void getRemainingToday_noEnabledSchedules_returnsZero() {
         when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of());

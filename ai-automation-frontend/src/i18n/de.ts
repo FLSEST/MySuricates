@@ -264,7 +264,8 @@ export const de: TranslationKeys = {
       unknownProject: 'Unbekanntes Projekt',
       days: 'Letzte {days} Tage',
       active: 'Gefiltert:',
-      hint: 'Gilt für Diagramme, Kosten und Statistiken im gewählten Zeitraum. Todos, Zeitpläne, Projekte und die Gesamtzahlen (Workflows, Ausführungen heute, Erfolgsrate, Top-Workflows) bleiben ungefiltert.',
+      hint: 'Das Projekt gilt für alle Kacheln außer Aktive Projekte, Version und API-Latenz. Der Zeitraum gilt für Diagramme, Kosten und Statistiken; Workflows gesamt, Erfolgsrate und Top-Workflows zählen die gesamte Laufzeit.',
+      allProjectsHint: 'alle Projekte',
     },
     views: {
       label: 'Dashboard-Ansichten',
@@ -335,7 +336,7 @@ export const de: TranslationKeys = {
         workflows: 'Workflows',
       },
       descriptions: {
-        statActiveProjects: 'Anzahl der Projekte, deren Container läuft.',
+        statActiveProjects: 'Anzahl der Projekte, deren Container läuft – unabhängig vom Projektfilter der Ansicht.',
         statTotalWorkflows: 'Anzahl der Workflows auf der Plattform.',
         statRunsToday: 'Heute gestartete Workflow-Ausführungen.',
         statSuccessRate: 'Anteil erfolgreicher Ausführungen insgesamt.',

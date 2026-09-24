@@ -103,15 +103,8 @@ public class LearningService {
     }
 
     public DashboardResponse getDashboard(int days, String projectId) {
-        long totalWorkflows = workflowRepository.count();
-        long totalRuns = runRepository.count();
-        long successfulRuns = runRepository.countByStatus(RunStatus.COMPLETED)
-                + runRepository.countByStatus(RunStatus.COMPLETED_WITH_ERRORS);
-        long failedRuns = runRepository.countByStatus(RunStatus.FAILED);
-        double successRate = totalRuns > 0 ? (double) successfulRuns / totalRuns : 0;
-
         Instant todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant();
-        long runsToday = runRepository.countByStartedAtAfter(todayStart);
+        DashboardOverview overview = DashboardOverview.load(runRepository, workflowRepository, projectId, todayStart);
 
         Instant windowStart = LocalDate.now().minusDays(days)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
@@ -133,11 +126,6 @@ public class LearningService {
                 .mapToLong(WorkflowRun::getDurationMs)
                 .average()
                 .orElse(0);
-
-        List<DashboardResponse.TopWorkflowEntry> topWorkflows = runRepository.findTopWorkflows().stream()
-                .map(row -> new DashboardResponse.TopWorkflowEntry(
-                        (String) row[0], (String) row[1], (Long) row[2]))
-                .toList();
 
         // recentRuns: the "recent runs" widget needs the full steps (incl. input/output) for at
         // most 10 runs. findDashboardWindow no longer fetches steps (that would drag every step's
@@ -416,18 +404,18 @@ public class LearningService {
         var triggerDistribution = TriggerCategory.distribution(triggerCounts);
 
         return new DashboardResponse(
-                totalWorkflows,
-                totalRuns,
-                runsToday,
-                successfulRuns,
-                failedRuns,
+                overview.totalWorkflows(),
+                overview.totalRuns(),
+                overview.runsToday(),
+                overview.successfulRuns(),
+                overview.failedRuns(),
                 avgDurationMs,
-                successRate,
+                overview.successRate(),
                 totalCostUsd,
                 totalTokens,
                 totalInputTokens,
                 totalOutputTokens,
-                topWorkflows,
+                overview.topWorkflows(),
                 recentRuns,
                 timeSeries,
                 providerStats,

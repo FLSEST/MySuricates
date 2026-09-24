@@ -45,14 +45,15 @@ public class ScheduleController {
         return scheduleMapper.toResponseList(schedulerService.findAll());
     }
 
+    /** {@code projectId} (optional): only the schedules of that project's workflows — the dashboard filter. */
     @GetMapping("/remaining-today")
-    public UpcomingScheduleResponse getRemainingToday() {
-        return upcomingRunsCalculator.getRemainingToday();
+    public UpcomingScheduleResponse getRemainingToday(@RequestParam(required = false) String projectId) {
+        return upcomingRunsCalculator.getRemainingToday(projectId);
     }
 
     @GetMapping("/remaining-this-week")
-    public UpcomingScheduleResponse getRemainingThisWeek() {
-        return upcomingRunsCalculator.getRemainingThisWeek();
+    public UpcomingScheduleResponse getRemainingThisWeek(@RequestParam(required = false) String projectId) {
+        return upcomingRunsCalculator.getRemainingThisWeek(projectId);
     }
 
     @GetMapping("/{id}")

@@ -87,21 +87,43 @@ public class UpcomingRunsCalculator {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true) // own boundary: the self-call below bypasses the proxy
     public UpcomingScheduleResponse getRemainingToday() {
+        return getRemainingToday(null);
+    }
+
+    /**
+     * Runs still due today; with a {@code projectId} only the schedules of that project's workflows
+     * (the dashboard's project filter — chains belong to no project and drop out).
+     */
+    @Transactional(readOnly = true)
+    public UpcomingScheduleResponse getRemainingToday(String projectId) {
         Instant endOfDay = LocalDate.now(clock).plusDays(1)
                 .atStartOfDay(ZoneId.systemDefault()).toInstant();
-        return getUpcomingRuns(endOfDay);
+        return getUpcomingRuns(endOfDay, projectId);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true) // own boundary: the self-call below bypasses the proxy
     public UpcomingScheduleResponse getRemainingThisWeek() {
+        return getRemainingThisWeek(null);
+    }
+
+    /** Runs still due this week, optionally for one project like {@link #getRemainingToday(String)}. */
+    @Transactional(readOnly = true)
+    public UpcomingScheduleResponse getRemainingThisWeek(String projectId) {
         LocalDate nextMonday = LocalDate.now(clock).with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         Instant endOfWeek = nextMonday.atStartOfDay(ZoneId.systemDefault()).toInstant();
-        return getUpcomingRuns(endOfWeek);
+        return getUpcomingRuns(endOfWeek, projectId);
     }
 
-    private UpcomingScheduleResponse getUpcomingRuns(Instant until) {
+    private static boolean inProject(ScheduledWorkflow sw, String projectId) {
+        if (projectId == null || projectId.isBlank()) return true;
+        return sw.getTargetType() != TargetType.CHAIN && sw.getWorkflow() != null
+                && sw.getWorkflow().getProject() != null
+                && projectId.equals(sw.getWorkflow().getProject().getId());
+    }
+
+    private UpcomingScheduleResponse getUpcomingRuns(Instant until, String projectId) {
         Instant now = Instant.now(clock);
         SchedulerPause pause = skipPolicy.activePause(now);
         Optional<Instant> skipUntil = pause.skipUntil();
@@ -109,7 +131,9 @@ public class UpcomingRunsCalculator {
             // Nothing starts while the switch is on, and it has no end: no run is upcoming.
             return new UpcomingScheduleResponse(0, List.of(), skipUntil.orElse(null), true);
         }
-        List<ScheduledWorkflow> enabled = scheduledRepository.findByEnabledTrue();
+        List<ScheduledWorkflow> enabled = scheduledRepository.findByEnabledTrue().stream()
+                .filter(sw -> inProject(sw, projectId))
+                .toList();
         List<UpcomingScheduleResponse.UpcomingRun> upcoming = new ArrayList<>();
 
         for (ScheduledWorkflow sw : enabled) {
