@@ -332,6 +332,8 @@ Each case has:
 - `value`: String to match against (pipe-separated alternatives: `"error|critical"`)
 - `blocks`: List of block definitions to execute on match
 
+The comparison ignores spaces and line breaks at the start and end, both of the resolved expression and of every `value`. If an AI block's answer ends with a line break, `GREEN` still hits the case `GREEN`. Upper and lower case still count. The step's input and metadata (`expression`) show the raw value.
+
 Nested blocks in `cases` and `default` are limited to `shell` and `simple` — other types (including `compress`/`compress-ai`) are rejected with an error message.
 
 A `name` on a nested block makes its output available as `{{ block.<name>.output }}` in later steps; without a name only `{{ previous_output }}` carries it. The switch block's own output stays the concatenation of all executed case blocks.
