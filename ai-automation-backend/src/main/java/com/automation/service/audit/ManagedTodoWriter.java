@@ -55,14 +55,22 @@ class ManagedTodoWriter {
             if (linkedTodo != null) return linkedTodo;
             findingTodoRepository.delete(existing.get());
         }
+        return create(finding, describe(finding, report), report.getWorkflowRunId());
+    }
+
+    /**
+     * Legt ein neues verwaltetes TODO für das Finding an, verknüpft es und meldet es. Ob schon eines
+     * existiert, prüft der Aufrufer ({@link #ensure} beim Ingest, {@link AuditFindingTodoLinker} auf Knopfdruck).
+     */
+    Todo create(AuditFinding finding, String description, String workflowRunId) {
         Todo todo = todoRepository.save(Todo.builder()
                 .title(finding.getTitle())
-                .description(describe(finding, report))
+                .description(description)
                 .status(Todo.Status.OPEN)
                 .priority(Todo.Priority.valueOf(finding.getSeverity().name()))
                 .tags(TodoMapper.listToJson(List.of("audit", "audit:" + finding.getAuditKey(), "auto:workflow")))
                 .projectId(finding.getProjectId()).source(Todo.Source.WORKFLOW).sourceAgent(SOURCE_AGENT)
-                .workflowRunId(report.getWorkflowRunId()).referenceType(REFERENCE_TYPE).referenceId(finding.getId())
+                .workflowRunId(workflowRunId).referenceType(REFERENCE_TYPE).referenceId(finding.getId())
                 .build());
         findingTodoRepository.save(AuditFindingTodo.builder()
                 .findingId(finding.getId()).todoId(todo.getId()).managed(true).build());

@@ -230,7 +230,7 @@ com.automation
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
-│   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService
+│   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
 │   ├── integration/providers/ 7 Provider in Unterverzeichnissen (confluence/, github/, google/, jira/, taskwarrior/, trello/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
