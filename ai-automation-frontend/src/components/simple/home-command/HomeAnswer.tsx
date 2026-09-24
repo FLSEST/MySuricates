@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Loader2, MessageSquare, RefreshCw, Sparkles, Square, X } from 'lucide-react';
 import { useT } from '../../../i18n';
 import { useModuleEnabled } from '../../../hooks/useModules';
@@ -27,6 +28,7 @@ interface HomeAnswerProps {
 export function HomeAnswer({ turn, onCancel, onRetry, onClose, onContinueInChat, onSend, onRunWorkflow }: HomeAnswerProps) {
   const t = useT();
   const a = t.simple.home.command.answer;
+  const navigate = useNavigate();
   const wishesModule = useModuleEnabled('wishes');
   const { currentPhase } = useAssistantWebSocket(turn.requestId, null);
   const { reply } = turn;
@@ -77,7 +79,7 @@ export function HomeAnswer({ turn, onCancel, onRetry, onClose, onContinueInChat,
 
       {turn.state === 'answered' && reply && (
         <>
-          <MarkdownBlock noImages>{reply.content}</MarkdownBlock>
+          <MarkdownBlock noImages onInternalLink={navigate}>{reply.content}</MarkdownBlock>
           {reply.pendingTools && reply.pendingTools.length > 0 && (
             <div className="flex flex-col gap-1.5">
               {reply.pendingTools.map((tool) => (

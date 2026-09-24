@@ -49,13 +49,14 @@ export function RunReportCard({ report }: { report: WorkflowResult }) {
 
 function OutputBlock({ text }: { text: string }) {
   const texts = useT().simple.result;
+  const navigate = useNavigate();
   return (
     <div className="relative rounded-xl border border-border bg-surface">
       <div className="absolute right-2 top-2" title={texts.copy}>
         <CopyButton text={text} />
       </div>
       <div className="max-h-[60vh] overflow-y-auto p-4 pr-10" data-testid="run-result-output">
-        <MarkdownBlock noImages>{text}</MarkdownBlock>
+        <MarkdownBlock noImages onInternalLink={navigate}>{text}</MarkdownBlock>
       </div>
     </div>
   );

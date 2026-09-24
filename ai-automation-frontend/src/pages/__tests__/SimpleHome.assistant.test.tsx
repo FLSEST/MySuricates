@@ -182,6 +182,17 @@ describe('SimpleHome — the assistant answers in place', { timeout: 15_000 }, (
     expect(screen.getByTestId('location')).toHaveTextContent('/runs/r9');
   });
 
+  it('follows an app link in the answer in place, without reloading', async () => {
+    serve({ answers: [reply('Look at [the failed run](/runs/r7).')] });
+    renderHome();
+
+    await askFor('what failed');
+    const link = await within(await answerCard()).findByRole('link', { name: 'the failed run' });
+    // fireEvent returns false when the default (a full page load) was prevented
+    expect(fireEvent.click(link)).toBe(false);
+    expect(screen.getByTestId('location')).toHaveTextContent('/runs/r7');
+  });
+
   it('sends a chosen option as the next message of the same conversation', async () => {
     serve({ answers: [
       reply('Which one?', { actions: [{ type: 'ask_choice', id: null, name: 'pick', label: 'Pick', options: ['Morning digest', 'Backup photos'] }] }),
