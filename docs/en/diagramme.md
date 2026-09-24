@@ -6,7 +6,7 @@ Flow and architecture diagrams as Mermaid fences: GitHub renders them directly i
 
 | Page | Content | Diagrams |
 |---|---|---:|
-| [Deployment & Container Lifecycle](deployment-container-diagrams.md) | Compose setup, agent images, ContainerService and resource limits | 2 |
+| [Deployment & Container Lifecycle](deployment-container-diagrams.md) | Instance in a container, Compose setup, agent images, project containers and resource limits | 2 |
 | [Frontend Flow](frontend-flow-diagrams.md) | Routing, state, data flow, WebSockets and cache invalidation | 3 |
 | [Logging & Monitoring](logging-monitoring-diagrams.md) | WebSocket logs, ActivityLog, health/info, RateLimit header | 2 |
 | [Request Lifecycle & Security](request-lifecycle-diagrams.md) | From the browser to the database: filters, error format, auth, rate limits | 3 |

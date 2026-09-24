@@ -146,22 +146,34 @@
 
 <header>
   <h1>MySuricates — Deployment &amp; Container Lifecycle</h1>
-  <p>Compose-Setup, Agent-Images, ContainerService und Ressourcenlimits</p>
+  <p>Instanz im Container, Compose-Setup, Agent-Images, Projekt-Container und Ressourcenlimits</p>
 </header>
 
 <nav>
+  <a href="#eigene-instanz">Eigene Instanz</a>
   <a href="#docker-compose">Docker Compose</a>
   <a href="#agent-images">Agent-Images</a>
   <a href="#container-lifecycle">Container Lifecycle</a>
   <a href="#mounts-limits">Mounts &amp; Limits</a>
-  <a href="#host-fallback">Host-Fallback</a>
+  <a href="#ausführung-auf-dem-host">Ausführung auf dem Host</a>
 </nav>
 
 <main>
 
+<section id="eigene-instanz">
+  <h2>Eigene Instanz <span>deploy/</span></h2>
+  <p><code>scripts/instance.sh up --name NAME</code> baut mit <code>deploy/Dockerfile</code> Backend und Frontend in ein Image und startet genau einen Container (<code>deploy/compose.yml</code>); das Backend liefert das Frontend selbst aus.</p>
+  <ul>
+    <li>Einstellungen je Instanz: <code>deploy/instances/NAME.env</code> — <code>MYSURICATES_PORT</code> ist Pflicht, <code>MYSURICATES_BIND</code> steht auf <code>127.0.0.1</code>, wenn nichts anderes gesetzt ist</li>
+    <li>Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt <code>scripts/lib/host-mounts.sh</code> in ein Override neben der Compose-Datei</li>
+    <li>Daten liegen in benannten Volumes und bleiben bei <code>scripts/instance.sh down</code> erhalten</li>
+    <li><code>MYSURICATES_RUNTIME=host</code> startet dieselbe Instanz statt im Container direkt auf dem Rechner</li>
+  </ul>
+</section>
+
 <section id="docker-compose">
   <h2>Docker Compose <span>Services</span></h2>
-  <p>Backend und Agenten werden per Compose gebaut/gestartet.</p>
+  <p><code>ai-automation-backend/docker-compose.yml</code> baut und startet das Backend; die Agent-Images baut es nur (Profil <code>build-only</code>). Container aus diesen Images startet das Backend selbst über die Docker-API.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph Compose
@@ -177,13 +189,13 @@ flowchart LR
   <div class="grid">
     <div class="card">
       <h3>Build</h3>
-      <p><code>mvn clean package -DskipTests</code></p>
-      <p><code>docker compose --profile build-only build</code></p>
+      <p><code>mvn clean package -DskipTests</code> (das JAR, das <code>docker/Dockerfile.backend</code> kopiert)</p>
+      <p><code>docker compose --profile build-only build</code> (Agent-Images)</p>
     </div>
     <div class="card">
       <h3>Start</h3>
-      <p><code>docker compose up --build</code></p>
-      <p>Backend Port: 9090</p>
+      <p><code>docker compose up --build</code> im Verzeichnis <code>ai-automation-backend/</code></p>
+      <p>Backend Port: 9090; Daten unter <code>./data</code></p>
     </div>
   </div>
 </section>
@@ -193,36 +205,39 @@ flowchart LR
   <table>
     <thead><tr><th>Image</th><th>Basis</th><th>Pfad</th></tr></thead>
     <tbody>
-      <tr><td>backend</td><td>OpenJDK 21 + Spring Boot Jar</td><td><code>docker/Dockerfile.backend</code></td></tr>
-      <tr><td>agent-node</td><td>Node 22</td><td><code>docker/Dockerfile.agent-node</code></td></tr>
-      <tr><td>agent-python</td><td>Python 3.12</td><td><code>docker/Dockerfile.agent-python</code></td></tr>
-      <tr><td>agent-devops</td><td>Ubuntu 24.04</td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
-      <tr><td>agent-java</td><td>Temurin 21</td><td><code>docker/Dockerfile.agent-java</code></td></tr>
+      <tr><td>backend</td><td><code>eclipse-temurin:21-jre-alpine</code> + Spring-Boot-JAR</td><td><code>docker/Dockerfile.backend</code></td></tr>
+      <tr><td>agent-node</td><td><code>node:22-slim</code></td><td><code>docker/Dockerfile.agent-node</code></td></tr>
+      <tr><td>agent-python</td><td><code>python:3.12-slim</code></td><td><code>docker/Dockerfile.agent-python</code></td></tr>
+      <tr><td>agent-devops</td><td><code>ubuntu:24.04</code></td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
+      <tr><td>agent-java</td><td><code>eclipse-temurin:21-jdk-jammy</code></td><td><code>docker/Dockerfile.agent-java</code></td></tr>
     </tbody>
   </table>
+  <p>Pfade relativ zu <code>ai-automation-backend/</code>. Projekt-Container nehmen je Projekttyp <code>automation-agent-node</code> (<code>CODE</code>, <code>PERSONAL</code>) oder <code>automation-agent-python</code> (<code>RESEARCH</code>, <code>CONTENT</code>, <code>BUSINESS</code>); Shell-Blöcke können über <code>container_image</code> jedes erlaubte Image nutzen (<code>automation.execution.allowed-container-images</code>).</p>
 </section>
 
 <section id="container-lifecycle">
   <h2>Container Lifecycle <span>ContainerService</span></h2>
-  <p>Workflows laufen bevorzugt im Projekt-Container. Falls keiner existiert, wird einer gestartet; bei Problemen fällt die Ausführung auf den Host zurück.</p>
+  <p>Vor dem ersten Block sucht ein Run den laufenden Projekt-Container oder startet einen — sofern Docker eingerichtet ist und der Run nicht isoliert in einem eigenen Workspace-Klon läuft. Scheitert der Start, läuft der Run ohne Container weiter. Die Blöcke selbst laufen auf dem Host (Ausnahme: Shell-Schritte mit <code>container_image</code>); den Projekt-Container nutzen Ad-hoc-Befehle während eines Runs und das Terminal.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant WE as WorkflowExecutor
     participant CS as ContainerService
     participant DO as Docker Engine
 
-    WE-&gt;&gt;CS: getDockerContainerId(project)
-    alt vorhanden
-        CS--&gt;&gt;WE: containerId
-    else nicht vorhanden/stoppt
-        WE-&gt;&gt;CS: createAndStartContainer(project)
-        CS-&gt;&gt;DO: docker create/run (bind mounts, limits)
-        DO--&gt;&gt;CS: containerId
-        CS--&gt;&gt;WE: containerId
+    opt Docker eingerichtet, Run nicht isoliert
+        WE-&gt;&gt;CS: getDockerContainerId(project)
+        alt vorhanden
+            CS--&gt;&gt;WE: containerId
+        else nicht vorhanden/stoppt
+            WE-&gt;&gt;CS: createAndStartContainer(project)
+            CS-&gt;&gt;DO: docker create + start (Image je Projekttyp, bind mount, limits)
+            DO--&gt;&gt;CS: containerId
+            CS--&gt;&gt;WE: containerId (bei Fehler: weiter ohne Container)
+        end
     end
-    WE-&gt;&gt;WE: execute blocks (prefer container)
-    opt idle-timeout
-        CS-&gt;&gt;DO: stop container
+    WE-&gt;&gt;WE: execute blocks (Host), letzte Aktivität des Containers je Schritt
+    opt Leerlauf länger als idle-timeout-minutes (Prüfung alle 5 min)
+        CS-&gt;&gt;DO: stop + remove container
     end
   </pre>
 </section>
@@ -236,23 +251,24 @@ sequenceDiagram
       <p><code>docker.container.memory-limit: 4000000000</code> (~4 GB)</p>
       <p><code>docker.container.pids-limit: 100</code></p>
       <p><code>docker.container.idle-timeout-minutes: 60</code></p>
+      <p>Dazu <code>/tmp</code> als tmpfs, alle Capabilities entfernt, <code>no-new-privileges</code> und die Benutzer-ID des Hosts</p>
     </div>
     <div class="card">
       <h3>Mounts</h3>
-      <p>Projektpfad wird als Bind-Mount in den Container gelegt.</p>
-      <p>Docker-Socket: <code>/var/run/docker.sock</code> (Backend braucht ihn)</p>
-      <p>Backups innerhalb des Projekt-Mounts bleiben isoliert.</p>
+      <p>Projektpfad → <code>/workspace</code> (lesen und schreiben)</p>
+      <p>Claude vom Host nach <code>MYSURICATES_AI_FROM_HOST</code>; Standard <code>login</code>: das Programm schreibgeschützt, die Anmeldung als Token</p>
+      <p>Docker-Socket: nur für das Backend (<code>/var/run/docker.sock</code> in <code>docker-compose.yml</code>), nicht im Projekt-Container</p>
     </div>
   </div>
 </section>
 
-<section id="host-fallback">
-  <h2>Host-Fallback <span>Sicherheit &amp; Reproduzierbarkeit</span></h2>
-  <p>Falls Containerstart fehlschlägt, laufen Kommandos auf dem Host-Projektpfad.</p>
+<section id="ausführung-auf-dem-host">
+  <h2>Ausführung auf dem Host <span>Sicherheit &amp; Reproduzierbarkeit</span></h2>
+  <p>KI-CLIs und Shell-Blöcke laufen auf dem Host im Projektverzeichnis — ob ein Projekt-Container läuft oder nicht.</p>
   <ul>
-    <li>Mehr Rechte, weniger Isolation.</li>
-    <li>Tools/Env stammen vom Host, nicht vom Image.</li>
-    <li>Vermeiden durch: Images vorab bauen, Docker-Daemon verfügbar halten.</li>
+    <li>Werkzeuge und Umgebung stammen vom Host, nicht aus einem Image.</li>
+    <li>Einzelne Shell-Schritte isoliert <code>container_image</code>: ein Einmal-Container (<code>docker run --rm</code>); Docker-Socket und zusätzliche Mounts nur mit <code>automation.execution.allow-docker-socket-mount</code> bzw. <code>allow-extra-mounts</code>.</li>
+    <li>Eine ganze Instanz isoliert <code>scripts/instance.sh</code> im Container (siehe oben).</li>
   </ul>
 </section>
 

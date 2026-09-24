@@ -6,7 +6,7 @@ Ablauf- und Architekturdiagramme als Mermaid-Zaeune: GitHub rendert sie direkt i
 
 | Seite | Inhalt | Diagramme |
 |---|---|---:|
-| [Deployment & Container Lifecycle](deployment-container-diagrams.md) | Compose-Setup, Agent-Images, ContainerService und Ressourcenlimits | 2 |
+| [Deployment & Container Lifecycle](deployment-container-diagrams.md) | Instanz im Container, Compose-Setup, Agent-Images, Projekt-Container und Ressourcenlimits | 2 |
 | [Frontend Flow](frontend-flow-diagrams.md) | Routing, State, Datenfluss, WebSockets und Cache-Invalidierung | 3 |
 | [Logging & Monitoring](logging-monitoring-diagrams.md) | WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header | 2 |
 | [Request Lifecycle & Security](request-lifecycle-diagrams.md) | Vom Browser bis zur Datenbank: Filter, Fehlerformat, Auth, Rate Limits | 3 |
