@@ -1,5 +1,6 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.GoalRelationRow;
 import com.automation.dto.projection.GoalStatusCounts;
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.projection.NeedsYouRow;
@@ -198,6 +199,21 @@ public interface TodoRepository extends JpaRepository<Todo, String>, JpaSpecific
          + "t.suggestedEffort, t.ratingNote, t.ratedBy, t.ratedAt, t.openQuestion, t.createdAt, t.updatedAt"
          + ") FROM Todo t WHERE t.goalId = :goalId")
     List<GoalTodoRow> findGoalRows(@Param("goalId") String goalId);
+
+    /** Spalten von {@link GoalRelationRow} in Konstruktor-Reihenfolge. */
+    String GOAL_RELATION_COLUMNS = "t.id, t.title, t.status, t.priority, t.projectId, t.tags, t.goalRank, t.createdAt, "
+         + "t.source, t.sourceAgent, t.workflowRunId, t.referenceType, t.referenceId, t.linkedWorkflowId, "
+         + "t.lastFixRunId, t.fixAttempts, t.resolutionState";
+
+    /** Relationskarte (TODO c6ea8f5c): Herkunft, Bearbeitung und Ergebnis der TODOs eines Ziels. */
+    @Query("SELECT new com.automation.dto.projection.GoalRelationRow("
+         + GOAL_RELATION_COLUMNS + ") FROM Todo t WHERE t.goalId = :goalId")
+    List<GoalRelationRow> findGoalRelationRows(@Param("goalId") String goalId);
+
+    /** Kandidaten fuer die Relationskarte: nur TODOs, die noch keinem Ziel gehoeren. */
+    @Query("SELECT new com.automation.dto.projection.GoalRelationRow("
+         + GOAL_RELATION_COLUMNS + ") FROM Todo t WHERE t.id IN :ids AND t.goalId IS NULL")
+    List<GoalRelationRow> findUnassignedRelationRows(@Param("ids") Collection<String> ids);
 
     @Query("SELECT MAX(t.goalRank) FROM Todo t WHERE t.goalId = :goalId")
     Integer maxGoalRank(@Param("goalId") String goalId);

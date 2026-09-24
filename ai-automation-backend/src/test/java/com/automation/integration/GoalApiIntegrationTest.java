@@ -3,9 +3,16 @@ package com.automation.integration;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
+import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.TodoTrigger;
+import com.automation.entity.Workflow;
+import com.automation.entity.WorkflowRun;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.TodoTriggerRepository;
+import com.automation.repository.WorkflowRepository;
+import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +48,9 @@ class GoalApiIntegrationTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private TodoRepository todoRepository;
+    @Autowired private WorkflowRepository workflowRepository;
+    @Autowired private WorkflowRunRepository runRepository;
+    @Autowired private TodoTriggerRepository triggerRepository;
 
     private Project projectA;
     private Project projectB;
@@ -163,6 +174,97 @@ class GoalApiIntegrationTest {
         perform(post("/api/v1/goals"), Map.of("title", " ")).andExpect(status().isBadRequest());
         perform(post("/api/v1/goals"), Map.of("title", "Datum kaputt", "targetDate", "morgen"))
                 .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * Relationskarte (TODO c6ea8f5c): Herkunft aus Gate-Lauf, Audit und Mensch, Bearbeitung per
+     * Fix-Workflow und TodoTrigger, Ergebnis des letzten Fix-Laufs, Kandidaten ueber {@code include}
+     * – und {@code goalId=none} als Filter fuer TODOs ohne Ziel.
+     */
+    @Test
+    void relations_showOriginWorkersAndResult_andCandidatesFromUnassignedTodos() throws Exception {
+        String goalId = createGoal("Launch-Karte", null);
+        long nano = System.nanoTime();
+        Workflow gate = workflowRepository.save(Workflow.builder().name("Gate " + nano).project(projectA).build());
+        Workflow fixer = workflowRepository.save(Workflow.builder().name("Fixer " + nano).project(projectA).build());
+        WorkflowRun gateRun = run(gate, RunStatus.FAILED);
+        WorkflowRun fixRun = run(fixer, RunStatus.COMPLETED);
+        String tag = "karte-" + nano;
+        triggerRepository.save(TodoTrigger.builder().tagPattern(tag).targetWorkflow(fixer).description("Karten-Fixer").build());
+
+        Todo fromGate = todoRepository.save(Todo.builder().title("Aus dem Gate").projectId(projectA.getId())
+                .source(Todo.Source.WORKFLOW).workflowRunId(gateRun.getId()).referenceType("workflow_run")
+                .referenceId(gate.getId()).tags("[\"" + tag + "\"]").lastFixRunId(fixRun.getId()).fixAttempts(1)
+                .resolutionState(Todo.ResolutionState.SUCCEEDED).build());
+        Todo fromAudit = todoRepository.save(Todo.builder().title("Aus dem Audit").projectId(projectB.getId())
+                .source(Todo.Source.WORKFLOW).referenceType("audit_finding").referenceId("finding-" + nano).build());
+        Todo mine = todoRepository.save(Todo.builder().title("Von Hand").linkedWorkflowId(fixer.getId()).build());
+        Todo candidate = todoRepository.save(Todo.builder().title("Kandidat " + nano).tags("[\"" + tag + "\"]").build());
+        perform(post("/api/v1/goals/" + goalId + "/todos"),
+                Map.of("todoIds", List.of(fromGate.getId(), fromAudit.getId(), mine.getId()))).andExpect(status().isOk());
+
+        JsonNode relations = json(mockMvc.perform(get("/api/v1/goals/" + goalId + "/relations")
+                .param("include", candidate.getId() + "," + mine.getId())).andExpect(status().isOk()));
+
+        JsonNode gateNode = findTodo(relations, fromGate.getId());
+        assertThat(gateNode.at("/origin/kind").asText()).isEqualTo("WORKFLOW_RUN");
+        assertThat(gateNode.at("/origin/workflowName").asText()).isEqualTo(gate.getName());
+        assertThat(gateNode.at("/origin/runStatus").asText()).isEqualTo("FAILED");
+        // Andere Tests koennen aktive Trigger hinterlassen – gezielt nach dem eigenen suchen.
+        assertThat(workersOf(gateNode, fixer.getId())).containsExactly("TRIGGER:Karten-Fixer");
+        assertThat(gateNode.at("/result/runStatus").asText()).isEqualTo("COMPLETED");
+        assertThat(gateNode.at("/result/resolutionState").asText()).isEqualTo("SUCCEEDED");
+        assertThat(gateNode.at("/projectName").asText()).isEqualTo(projectA.getName());
+        assertThat(gateNode.has("description")).isFalse();
+
+        JsonNode auditNode = findTodo(relations, fromAudit.getId());
+        assertThat(auditNode.at("/origin/kind").asText()).isEqualTo("AUDIT");
+        assertThat(auditNode.at("/origin/findingIds/0").asText()).isEqualTo("finding-" + nano);
+        assertThat(workersOf(auditNode, fixer.getId())).isEmpty();
+        assertThat(auditNode.get("result").isNull()).isTrue();
+
+        JsonNode mineNode = findTodo(relations, mine.getId());
+        assertThat(mineNode.at("/origin/kind").asText()).isEqualTo("USER");
+        assertThat(workersOf(mineNode, fixer.getId())).containsExactly("LINKED:null");
+        assertThat(mineNode.get("candidate").asBoolean()).as("eigenes TODO bleibt Mitglied").isFalse();
+
+        JsonNode candidateNode = findTodo(relations, candidate.getId());
+        assertThat(candidateNode.get("candidate").asBoolean()).isTrue();
+        assertThat(workersOf(candidateNode, fixer.getId())).containsExactly("TRIGGER:Karten-Fixer");
+        assertThat(relations.get("todos")).hasSize(4);
+        assertThat(relations.get("activeTriggers").asInt()).isPositive();
+
+        JsonNode unassigned = json(mockMvc.perform(get("/api/v1/todos").param("goalId", "none").param("tag", tag))
+                .andExpect(status().isOk()));
+        assertThat(unassigned.get("content").findValuesAsText("id")).containsExactly(candidate.getId());
+
+        mockMvc.perform(get("/api/v1/goals/missing/relations")).andExpect(status().isNotFound());
+    }
+
+    private WorkflowRun run(Workflow workflow, RunStatus status) {
+        Instant start = Instant.parse("2026-09-24T08:00:00Z");
+        return runRepository.save(WorkflowRun.builder().workflow(workflow).workflowName(workflow.getName())
+                .status(status).startedAt(start).completedAt(start.plusSeconds(30))
+                .inputContext(Map.of()).metadata(Map.of()).build());
+    }
+
+    private static List<String> workersOf(JsonNode todo, String workflowId) {
+        List<String> found = new java.util.ArrayList<>();
+        for (JsonNode worker : todo.get("workers")) {
+            if (workflowId.equals(worker.get("workflowId").asText())) {
+                found.add(worker.get("kind").asText() + ":" + worker.get("triggerLabel").asText(null));
+            }
+        }
+        return found;
+    }
+
+    private static JsonNode findTodo(JsonNode relations, String id) {
+        for (JsonNode todo : relations.get("todos")) {
+            if (id.equals(todo.get("id").asText())) {
+                return todo;
+            }
+        }
+        throw new AssertionError("TODO " + id + " fehlt in der Relationskarte");
     }
 
     private String createGoal(String title, String targetDate) throws Exception {

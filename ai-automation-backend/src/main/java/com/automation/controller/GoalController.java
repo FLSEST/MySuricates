@@ -4,9 +4,11 @@ import com.automation.dto.request.CreateGoalRequest;
 import com.automation.dto.request.GoalTodoIdsRequest;
 import com.automation.dto.request.UpdateGoalRequest;
 import com.automation.dto.response.GoalDetailResponse;
+import com.automation.dto.response.GoalRelationsResponse;
 import com.automation.dto.response.GoalResponse;
 import com.automation.entity.Goal;
 import com.automation.service.goal.GoalMembershipService;
+import com.automation.service.goal.GoalRelationsService;
 import com.automation.service.goal.GoalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class GoalController {
 
     private final GoalService goalService;
     private final GoalMembershipService membershipService;
+    private final GoalRelationsService relationsService;
 
     /** Ohne {@code status}: aktive und erledigte Ziele, neueste zuerst. */
     @GetMapping
@@ -43,6 +46,17 @@ public class GoalController {
     @GetMapping("/{id}")
     public GoalDetailResponse getGoal(@PathVariable String id) {
         return goalService.detail(id);
+    }
+
+    /**
+     * Relationskarte (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung (Fix-Workflow, passende
+     * TodoTrigger) und Ergebnis. {@code include} holt bis zu 20 noch nicht zugeordnete TODOs als
+     * Kandidaten dazu ({@code candidate: true}).
+     */
+    @GetMapping("/{id}/relations")
+    public GoalRelationsResponse getRelations(@PathVariable String id,
+                                              @RequestParam(required = false) List<String> include) {
+        return relationsService.relations(id, include);
     }
 
     @PutMapping("/{id}")
