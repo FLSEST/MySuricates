@@ -10,6 +10,7 @@ import { useT } from '../../i18n';
 import { apiErrorMessage } from '../../api/client';
 import type { ChatMessage, AssistantAction, PendingTool, ToolExecutionResult } from '../../hooks/useAssistant';
 import { useConfirmPendingTool, useRejectPendingTool } from '../../hooks/useAssistant';
+import { isDestructivePendingTool, pendingToolText } from './pendingToolText';
 
 /** One action of an answer as a button; ask_choice renders one button per option. */
 export function ActionButton({ action, onClose, onSend, onExecute }: {
@@ -98,6 +99,7 @@ export function PendingToolCard({ tool, sessionId, existingResult }: {
     return expiresMs > 0 && expiresMs < Date.now();
   });
   const pending = confirm.isPending || reject.isPending;
+  const destructive = isDestructivePendingTool(tool);
 
   if (localResult) {
     return (
@@ -135,8 +137,8 @@ export function PendingToolCard({ tool, sessionId, existingResult }: {
   return (
     <div className="flex flex-col gap-1.5 text-xs rounded-lg px-2.5 py-1.5 border border-[var(--color-assistant-border)] bg-[var(--color-assistant-raised)]">
       <div className="flex items-start gap-1.5">
-        <ShieldAlert className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent" />
-        <span className="leading-snug text-text">{tool.description}</span>
+        <ShieldAlert className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${destructive ? 'text-danger' : 'text-accent'}`} />
+        <span className="leading-snug text-text">{pendingToolText(tool, t)}</span>
       </div>
       {expired ? (
         <div className="text-text-tertiary italic">{t.assistant.pendingToolExpired}</div>

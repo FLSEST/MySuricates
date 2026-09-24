@@ -29,11 +29,17 @@ public class PendingToolRegistry {
     private final ConcurrentHashMap<String, PendingTool> pending = new ConcurrentHashMap<>();
 
     /** Registers a new pending tool and returns it with a generated ID + expiry. */
-    public PendingTool register(String type, String description, String payloadJson) {
+    public PendingTool register(String type, PendingToolLabel label, String payloadJson) {
         String id = UUID.randomUUID().toString();
-        PendingTool tool = new PendingTool(id, type, description, payloadJson, Instant.now().plus(TTL));
+        PendingTool tool = new PendingTool(id, type, label.description(), label.subject(), label.params(),
+                payloadJson, Instant.now().plus(TTL));
         pending.put(id, tool);
         return tool;
+    }
+
+    /** Registers a pending tool that only carries a fallback description. */
+    public PendingTool register(String type, String description, String payloadJson) {
+        return register(type, PendingToolLabel.of(description), payloadJson);
     }
 
     /**

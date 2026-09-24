@@ -124,6 +124,7 @@ Response (`AssistantChatResponse`):
 - `context.page` steuert, welche Plattform-Daten in den System-Prompt injiziert werden
 - `requestId` wird für WebSocket-Status-Updates verwendet (Topic `/topic/assistant/{requestId}/status`)
 - Response-Felder `provider`, `responseTimeMs` nur bei Wert vorhanden (`@JsonInclude(NON_NULL)`), `pendingTools` nur bei nicht-leer (`@JsonInclude(NON_EMPTY)`)
+- Ein `pendingTools`-Eintrag: `{"id", "type", "description", "subject", "params", "expiresAt"}` — `subject` ist der aufgelöste Name (Workflow-Name, Workflow des Laufs, Aufgaben-Titel, Ketten-Name; unauflösbar: gekürzte ID mit `params.ref = "id"`), `params` kleine Werte wie `priority`/`status`, `description` der englische Ersatzsatz für ältere Clients
 
 ### Page Suggestions
 
@@ -215,8 +216,8 @@ Alle 8 Tool-Typen sind in `MUTATING_TOOL_TYPES` definiert und erfordern User-Bes
 ### PendingTool-Lebenszyklus
 
 1. Claude generiert `<tool type="...">JSON</tool>` in seiner Antwort
-2. `AssistantToolExecutor.extractTools()` parst die Tags, registriert jedes als `PendingTool` (UUID, TTL 30 Min.)
-3. Frontend zeigt `PendingToolCard` mit Confirm/Reject-Buttons
+2. `AssistantToolExecutor.extractTools()` parst die Tags, registriert jedes als `PendingTool` (UUID, TTL 30 Min.); `PendingToolDescriber` löst die IDs per kurzer Lese-Abfrage in Namen auf (`subject`, `params`)
+3. Frontend zeigt `PendingToolCard` mit Confirm/Reject-Buttons; den Satz baut `pendingToolText` aus `type` + `subject` + `params` in der UI-Sprache (Priorität/Status übersetzt, „LÖSCHEN“ hervorgehoben), unbekannter Typ oder fehlendes `subject` → `description`
 4. User bestätigt → `POST /pending-tools/{id}/confirm` → `executeConfirmed()` führt aus
 5. User lehnt ab → `POST /pending-tools/{id}/reject` → markiert als abgelehnt
 6. Ergebnis (`ToolExecutionResult`) wird via `appendToolResult()` in die Session geschrieben

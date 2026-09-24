@@ -112,4 +112,35 @@ class PendingToolTest {
         assertThat(rendered).contains("search");
         assertThat(rendered).contains("Search description");
     }
+
+    @Test
+    void shortConstructor_hasNoSubjectAndEmptyParams() {
+        PendingTool pending = new PendingTool("id", "start_workflow", "desc", "{}", null);
+
+        assertThat(pending.subject()).isNull();
+        assertThat(pending.params()).isEmpty();
+    }
+
+    @Test
+    void json_carriesSubjectAndParams_butNotThePayload() throws Exception {
+        PendingTool pending = new PendingTool("tool-1", "create_todo", "Create TODO: \"Call Anna\" (priority: HIGH)",
+                "Call Anna", java.util.Map.of("priority", "HIGH"), "{\"secret\":\"payload\"}",
+                Instant.parse("2030-01-01T00:00:00Z"));
+
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()
+                .valueToTree(pending);
+
+        assertThat(json.get("type").asText()).isEqualTo("create_todo");
+        assertThat(json.get("subject").asText()).isEqualTo("Call Anna");
+        assertThat(json.get("params").get("priority").asText()).isEqualTo("HIGH");
+        assertThat(json.get("description").asText()).contains("Call Anna");
+        assertThat(json.has("payloadJson")).isFalse();
+    }
+
+    @Test
+    void nullParams_becomeEmptyMap() {
+        PendingTool pending = new PendingTool("id", "t", "d", "s", null, "{}", null);
+
+        assertThat(pending.params()).isEmpty();
+    }
 }

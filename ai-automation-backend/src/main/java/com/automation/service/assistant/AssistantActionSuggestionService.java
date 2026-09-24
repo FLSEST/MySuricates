@@ -124,7 +124,7 @@ public class AssistantActionSuggestionService {
     private final AppSettingsRepository appSettingsRepository;
     private final ObjectMapper objectMapper;
     private final PendingToolRegistry pendingToolRegistry;
-    private final AssistantToolExecutor toolExecutor;
+    private final PendingToolDescriber describer;
     private final WorkflowRepository workflowRepository;
     private final WorkflowRunRepository workflowRunRepository;
 
@@ -281,8 +281,8 @@ public class AssistantActionSuggestionService {
                 }
             }
             String payloadJson = objectMapper.writeValueAsString(payload);
-            String description = toolExecutor.describe(toolType, payloadJson);
-            return pendingToolRegistry.register(toolType, description, payloadJson);
+            PendingToolLabel label = describer.describe(toolType, payloadJson);
+            return pendingToolRegistry.register(toolType, label, payloadJson);
         } catch (Exception e) {
             log.debug("Could not convert propose-action to pending-tool: {}", action, e);
             return null;

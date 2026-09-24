@@ -5,8 +5,6 @@ import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.activitylog.ActivityLogService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,14 +15,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.automation.service.assistant.AssistantToolPayloads.sanitizeJson;
-import static com.automation.service.assistant.AssistantToolPayloads.shorten;
 
 /**
  * Parses and executes tool calls embedded in the assistant's response.
@@ -39,7 +35,8 @@ import static com.automation.service.assistant.AssistantToolPayloads.shorten;
  * without explicit user approval, independent of prompt compliance.
  *
  * <p>The per-tool implementations live in {@link AssistantTodoTools},
- * {@link AssistantWorkflowTools} and {@link AssistantChainTools}; this class owns extraction,
+ * {@link AssistantWorkflowTools} and {@link AssistantChainTools}; the confirmation-card label
+ * (names instead of ids) comes from {@link PendingToolDescriber}. This class owns extraction,
  * guardrails (validation + rate limit), dispatch and the audit trail.
  */
 @Component
@@ -63,12 +60,12 @@ public class AssistantToolExecutor {
     private final AssistantTodoTools todoTools;
     private final AssistantWorkflowTools workflowTools;
     private final AssistantChainTools chainTools;
-    private final ObjectMapper objectMapper;
     private final PendingToolRegistry pendingToolRegistry;
     private final AssistantToolValidator toolValidator;
     private final AssistantGuardrailsConfig guardrailsConfig;
     private final ActivityLogService activityLogService;
     private final ModuleRegistry modules;
+    private final PendingToolDescriber describer;
 
     /** Timestamps of confirmed mutating executions within the rolling rate-limit window. */
     private final Deque<Instant> mutationTimestamps = new ArrayDeque<>();
@@ -106,11 +103,10 @@ public class AssistantToolExecutor {
                 continue;
             }
             String payload = sanitizeJson(m.group(2).trim());
-            String description = describe(type, payload);
-            PendingTool tool = pendingToolRegistry.register(type, description, payload);
+            PendingTool tool = pendingToolRegistry.register(type, describer.describe(type, payload), payload);
             pending.add(tool);
             m.appendReplacement(sb,
-                    Matcher.quoteReplacement("[Action awaiting confirmation: " + description + "]"));
+                    Matcher.quoteReplacement("[Action awaiting confirmation: " + tool.description() + "]"));
         } while (m.find());
         m.appendTail(sb);
         return new ExtractionResult(sb.toString(), pending);
@@ -187,28 +183,6 @@ public class AssistantToolExecutor {
             }
         } catch (Exception e) {
             log.warn("Assistant audit log failed for tool {}: {}", tool.type(), e.getMessage());
-        }
-    }
-
-    /** Builds a short, user-facing description for a tool proposal. */
-    String describe(String type, String payloadJson) {
-        try {
-            Map<String, Object> params = objectMapper.readValue(payloadJson, new TypeReference<>() {});
-            return switch (type) {
-                case "create_todo" -> "Create TODO: \"" + params.getOrDefault("title", "?") + "\""
-                        + " (priority: " + params.getOrDefault("priority", "MEDIUM") + ")";
-                case "update_todo_status" -> "Change TODO status → " + params.getOrDefault("status", "?");
-                case "create_workflow" -> "Create workflow: \"" + params.getOrDefault("name", "?") + "\"";
-                case "update_workflow" -> "Update workflow (ID: " + shorten(params.get("workflowId")) + ")";
-                case "delete_workflow" -> "DELETE workflow (ID: " + shorten(params.get("workflowId")) + ")";
-                case "start_workflow" -> "Start workflow (ID: " + shorten(params.get("workflowId")) + ")";
-                case "cancel_run" -> "Cancel run (ID: " + shorten(params.get("runId")) + ")";
-                case "create_chain" -> "Create chain: \"" + params.getOrDefault("name", "?") + "\"";
-                default -> type;
-            };
-        } catch (Exception e) {
-            log.debug("describe failed for tool type={} — falling back to type label", type, e);
-            return type;
         }
     }
 }

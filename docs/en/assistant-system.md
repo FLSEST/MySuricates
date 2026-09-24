@@ -120,6 +120,7 @@ Response (`AssistantChatResponse`):
 - `context.page` controls which platform data is injected into the system prompt
 - `requestId` is used for WebSocket status updates (topic `/topic/assistant/{requestId}/status`)
 - Response fields `provider`, `responseTimeMs` only present when non-null (`@JsonInclude(NON_NULL)`), `pendingTools` only when non-empty (`@JsonInclude(NON_EMPTY)`)
+- A `pendingTools` entry: `{"id", "type", "description", "subject", "params", "expiresAt"}` — `subject` is the resolved name (workflow name, the run's workflow, task title, chain name; unresolvable: shortened id with `params.ref = "id"`), `params` small values such as `priority`/`status`, `description` the English fallback sentence for older clients
 
 ### Page Suggestions
 
@@ -211,8 +212,8 @@ All 8 tool types are defined in `MUTATING_TOOL_TYPES` and require user confirmat
 ### PendingTool Lifecycle
 
 1. Claude generates `<tool type="...">JSON</tool>` in its response
-2. `AssistantToolExecutor.extractTools()` parses the tags, registers each as a `PendingTool` (UUID, TTL 30 min.)
-3. Frontend displays `PendingToolCard` with Confirm/Reject buttons
+2. `AssistantToolExecutor.extractTools()` parses the tags, registers each as a `PendingTool` (UUID, TTL 30 min.); `PendingToolDescriber` resolves the ids to names with a short read query (`subject`, `params`)
+3. Frontend displays `PendingToolCard` with Confirm/Reject buttons; `pendingToolText` builds the sentence from `type` + `subject` + `params` in the UI language (priority/status translated, "DELETE" emphasised), unknown type or missing `subject` → `description`
 4. User confirms → `POST /pending-tools/{id}/confirm` → `executeConfirmed()` executes
 5. User rejects → `POST /pending-tools/{id}/reject` → marked as rejected
 6. Result (`ToolExecutionResult`) is written to the session via `appendToolResult()`
