@@ -142,6 +142,19 @@ class WorkflowPoolServiceTest {
         assertThat(result.get(0).id()).isEqualTo("valid");
     }
 
+    /** A plain workflow export in the pool (string name) is skipped, the rest still lists. */
+    @Test
+    void listAll_skipsFileWithWrongFieldShape_keepsTheOthers() throws Exception {
+        writePoolFile("valid.json", """
+                {"name": {"en": "Valid"}, "blocks": [{"type": "simple", "config": {}}]}
+                """);
+        writePoolFile("export.json", """
+                {"name": "Tech-Radar", "description": "plain", "blocks": [{"type": "shell", "config": {}}]}
+                """);
+
+        assertThat(poolService.listAll()).extracting(PoolWorkflowEntry::id).containsExactly("valid");
+    }
+
     @Test
     void listAll_ignoresNonJsonFiles() throws Exception {
         writePoolFile("valid.json", """

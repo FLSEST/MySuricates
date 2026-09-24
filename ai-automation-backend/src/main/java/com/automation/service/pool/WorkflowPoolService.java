@@ -61,6 +61,9 @@ public class WorkflowPoolService {
                     if (entry != null) {
                         entries.add(entry);
                     }
+                } catch (PoolFileParser.PoolFileFormatException e) {
+                    // Content error, not a code error: the message names file and field, a stack trace adds nothing.
+                    log.warn("Skipping pool workflow file: {}", e.getMessage());
                 } catch (Exception e) {
                     log.warn("Failed to parse pool workflow file: {}", file.getFileName(), e);
                 }
