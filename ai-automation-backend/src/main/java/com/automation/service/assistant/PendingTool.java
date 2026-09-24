@@ -3,6 +3,7 @@ package com.automation.service.assistant;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.Instant;
+import java.util.Map;
 
 /**
  * A tool call that the assistant has proposed but not yet executed.
@@ -13,15 +14,31 @@ import java.time.Instant;
  * kept as-is so {@link AssistantToolExecutor#executeConfirmed(PendingTool)} can re-parse it
  * with the same sanitization/error handling as inline execution.
  *
- * <p>{@code description} is a human-readable summary rendered in the frontend confirmation card.
+ * <p>The frontend confirmation card formulates its text in the UI language from {@code type},
+ * {@code subject} (the human name the action is about — workflow name, run's workflow name, TODO
+ * title, chain name; the shortened id when it could not be resolved, marked by
+ * {@code params.ref = "id"}) and {@code params} (e.g. {@code priority}, {@code status}).
+ * {@code description} is the English fallback sentence for older clients and unknown types
+ * (TODO 4e152029).
  */
 public record PendingTool(
         String id,
         String type,
         String description,
+        String subject,
+        Map<String, String> params,
         @JsonIgnore String payloadJson,
         Instant expiresAt
 ) {
+    public PendingTool {
+        params = params == null ? Map.of() : Map.copyOf(params);
+    }
+
+    /** Without structured label data — only {@code description} is shown. */
+    public PendingTool(String id, String type, String description, String payloadJson, Instant expiresAt) {
+        this(id, type, description, null, Map.of(), payloadJson, expiresAt);
+    }
+
     public boolean isExpired() {
         return expiresAt != null && Instant.now().isAfter(expiresAt);
     }

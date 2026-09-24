@@ -89,6 +89,8 @@ public class AssistantSessionService {
                 m.put("id", t.id());
                 m.put("type", t.type());
                 m.put("description", t.description());
+                m.put("subject", t.subject());
+                m.put("params", t.params());
                 m.put("expiresAt", t.expiresAt() != null ? t.expiresAt().toString() : null);
                 serialized.add(m);
             }

@@ -27,6 +27,19 @@ class PendingToolRegistryTest {
     }
 
     @Test
+    void register_withLabel_carriesSubjectAndParams() {
+        PendingToolRegistry registry = new PendingToolRegistry();
+
+        PendingTool tool = registry.register("start_workflow",
+                new PendingToolLabel("Start workflow \"Daily\"", "Daily", java.util.Map.of("ref", "id")), "{}");
+
+        assertThat(tool.description()).isEqualTo("Start workflow \"Daily\"");
+        assertThat(tool.subject()).isEqualTo("Daily");
+        assertThat(tool.params()).containsEntry("ref", "id");
+        assertThat(registry.peek(tool.id())).contains(tool);
+    }
+
+    @Test
     void take_returnsAndRemovesEntry() {
         PendingToolRegistry registry = new PendingToolRegistry();
         PendingTool tool = registry.register("create_todo", "x", "{}");

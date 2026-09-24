@@ -32,7 +32,7 @@ class AssistantActionSuggestionServiceTest {
     @Mock private CommandExecutorService commandExecutorService;
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private PendingToolRegistry pendingToolRegistry;
-    @Mock private AssistantToolExecutor toolExecutor;
+    @Mock private PendingToolDescriber describer;
     @Mock private WorkflowRepository workflowRepository;
     @Mock private WorkflowRunRepository workflowRunRepository;
 
@@ -42,7 +42,7 @@ class AssistantActionSuggestionServiceTest {
     void setUp() {
         service = new AssistantActionSuggestionService(
                 commandExecutorService, appSettingsRepository, new ObjectMapper(),
-                pendingToolRegistry, toolExecutor, workflowRepository, workflowRunRepository);
+                pendingToolRegistry, describer, workflowRepository, workflowRunRepository);
         // Default: enabled with Sonnet model
         lenient().when(appSettingsRepository.get("suggestions-model"))
                 .thenReturn(Optional.of("claude-sonnet-4-6"));
@@ -53,13 +53,13 @@ class AssistantActionSuggestionServiceTest {
         Page<com.automation.entity.WorkflowRun> emptyRuns = new PageImpl<>(List.of());
         lenient().when(workflowRunRepository.findAll(any(Pageable.class))).thenReturn(emptyRuns);
         // PendingToolRegistry: register echoes back a synthetic PendingTool.
-        lenient().when(pendingToolRegistry.register(any(), any(), any())).thenAnswer(inv ->
+        lenient().when(pendingToolRegistry.register(any(), any(PendingToolLabel.class), any())).thenAnswer(inv ->
                 new PendingTool("pt-" + inv.<String>getArgument(0),
-                        inv.getArgument(0), inv.getArgument(1), inv.getArgument(2),
+                        inv.getArgument(0), inv.<PendingToolLabel>getArgument(1).description(), inv.getArgument(2),
                         java.time.Instant.now().plusSeconds(60)));
-        // ToolExecutor.describe: simple stringification.
-        lenient().when(toolExecutor.describe(any(), any())).thenAnswer(inv ->
-                inv.<String>getArgument(0) + ": " + inv.<String>getArgument(1));
+        // Describer: simple stringification.
+        lenient().when(describer.describe(any(), any())).thenAnswer(inv ->
+                PendingToolLabel.of(inv.<String>getArgument(0) + ": " + inv.<String>getArgument(1)));
         service.init();
     }
 

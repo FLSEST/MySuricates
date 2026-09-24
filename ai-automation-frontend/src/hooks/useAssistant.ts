@@ -38,7 +38,13 @@ export interface AssistantChatRequest {
 export interface PendingTool {
   id: string;
   type: string;
+  /** English fallback sentence — shown for unknown types or when `subject` is missing. */
   description: string;
+  /** Human name the action is about (workflow name, run's workflow, task title, chain name);
+   *  the shortened id when unresolved, then `params.ref === 'id'`. Absent on older backends. */
+  subject?: string | null;
+  /** Small parameters such as `priority`, `status`, `ref`. */
+  params?: Record<string, string>;
   expiresAt: string;
 }
 
