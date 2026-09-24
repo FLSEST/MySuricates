@@ -4,8 +4,9 @@
 # zeigten die Schritte trotzdem Vorgaben, die nie in die Datei kamen — „Port 9090 belegt, nehme 9091“,
 # weil die eigene laufende Instanz 9090 belegt, oder einen neuen Standard-Anbieter. Jetzt gelten die
 # Werte der Datei, auch gegen Flags, und die Schritte sagen, woher sie kommen; nicht wirkende Flags
-# nennt eine Zeile. Liest und setzt die Variablen des Installers — fuer sich allein nicht nutzbar.
-# bash 3.2 (macOS).
+# nennt eine Zeile. Dazu load_existing: die Werte einer Datei als Vorbelegung, wenn sie neu geschrieben
+# wird („Einstellungen aendern“). Liest und setzt die Variablen des Installers — fuer sich allein nicht
+# nutzbar. bash 3.2 (macOS).
 
 KEPT=0          # 1 = jede Datei dieses Laufs bleibt (die eine Instanz, oder Dev, Test und Prod)
 KEPT_NAMES=""   # die Instanzen, deren Datei bleibt: "main" bzw. "dev, prod"
@@ -83,5 +84,16 @@ kept_mark() {
 }
 
 # kept_port NAME BASIS [VERGEBEN…] — Port im Modus Dev · Test · Prod: aus der Datei, die bleibt, sonst
-# der erste freie ab BASIS, der nicht schon vergeben ist
-kept_port() { if is_kept "$1"; then kept_value "$1" MYSURICATES_PORT; else free_port "$2" "${3:-}"; fi; }
+# der erste freie ab BASIS, der nicht schon vergeben ist; den der laufenden Instanz NAME zaehlt er als frei
+kept_port() { if is_kept "$1"; then kept_value "$1" MYSURICATES_PORT; else free_port "$2" "${3:-}" "$1"; fi; }
+
+# load_existing NAME — die Werte einer vorhandenen Instanz als Vorbelegung fuer „Einstellungen aendern“;
+# Flags gehen vor. Wie kept_value: je Schluessel ein Wert, die letzte Zeile gewinnt (0e5b82b7)
+load_existing() {
+  NAME="$1"; MODE=one
+  RUNTIME="${RUNTIME:-$(kept_or "$1" MYSURICATES_RUNTIME container)}"
+  PORT="${PORT:-$(kept_value "$1" MYSURICATES_PORT)}"
+  PRESET="${PRESET:-$(kept_value "$1" MYSURICATES_PRESET)}"
+  PROVIDER="${PROVIDER:-$(kept_value "$1" AUTOMATION_AI_DEFAULT_PROVIDER | tr 'A-Z' 'a-z')}"
+  PROJECTS="${PROJECTS:-$(kept_value "$1" MYSURICATES_PROJECTS)}"
+}

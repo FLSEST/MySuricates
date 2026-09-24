@@ -29,6 +29,8 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 . "$LIB/instance-runs.sh"
 # shellcheck source=lib/setup-kept.sh
 . "$LIB/setup-kept.sh"    # eine vorhandene Instanz-Datei, die bleibt: ihre Werte gelten (fd4eb89f)
+# shellcheck source=lib/setup-ports.sh
+. "$LIB/setup-ports.sh"   # freie Ports; den der laufenden eigenen Instanz zaehlt er als frei (0e5b82b7)
 # shellcheck source=lib/host-mounts.sh
 . "$LIB/host-mounts.sh"   # claude_token_from_file / claude_token_plausible — dieselbe Regel wie beim Start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
@@ -116,13 +118,6 @@ section() {  # Schrittleiste vor jedem Schritt (nur im Terminal; sonst eine schl
   if [ "$TUI_TTY" = 1 ]; then printf '\n'; tui_rail "$1" "${STEPS[@]}"; printf '\n'
   else printf '\n== %s ==\n' "${STEPS[$1]}"; fi
 }
-port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
-# free_port BASIS [VERGEBEN…] — erster Port ab BASIS, der weder belegt noch schon vergeben ist
-free_port() {
-  local p="$1" i=0 taken=" ${2:-} "
-  while { port_in_use "$p" || [ "${taken#* $p }" != "$taken" ]; } && [ "$i" -lt 50 ]; do p=$((p + 1)); i=$((i + 1)); done
-  echo "$p"
-}
 prop_env() { printf '%s' "$1" | tr 'a-z.' 'A-Z_' | tr -d '-'; }   # automation.modules.remote-access → AUTOMATION_MODULES_REMOTEACCESS
 existing_instances() { local f; for f in "$INSTANCES_DIR"/*.env; do [ -f "$f" ] && basename "$f" .env; done; }
 
@@ -185,17 +180,6 @@ step_mode() {
     staged:*) tui_done "$(msg step_mode)" "$(msg mode_staged)$(kept_mark)" ;;
   esac
   return 0
-}
-
-# Werte einer vorhandenen Instanz als Vorbelegung fuer „Einstellungen aendern“
-load_existing() {
-  local f="$INSTANCES_DIR/$1.env" v
-  NAME="$1"; MODE=one
-  v="$(grep '^MYSURICATES_RUNTIME=' "$f" | cut -d= -f2)"; RUNTIME="${RUNTIME:-${v:-container}}"
-  v="$(grep '^MYSURICATES_PORT=' "$f" | cut -d= -f2)"; PORT="${PORT:-$v}"
-  v="$(grep '^MYSURICATES_PRESET=' "$f" | cut -d= -f2)"; PRESET="${PRESET:-$v}"
-  v="$(grep '^AUTOMATION_AI_DEFAULT_PROVIDER=' "$f" | cut -d= -f2 | tr 'A-Z' 'a-z')"; PROVIDER="${PROVIDER:-$v}"
-  v="$(grep '^MYSURICATES_PROJECTS=' "$f" | cut -d= -f2-)"; PROJECTS="${PROJECTS:-$v}"
 }
 
 # --- Schritt 3: Pruefen und installieren ------------------------------------------------------------
@@ -535,7 +519,7 @@ step_ports() {
     return 0
   fi
   if [ -z "$PORT" ]; then
-    PORT="$(free_port 9090)"
+    PORT="$(free_port 9090 "" "$NAME")"
     [ "$PORT" = 9090 ] || printf '  %s\n' "$(msg ports_busy 9090 "$PORT")"
     [ "$INTERACTIVE" = 1 ] && tui_input PORT "$(msg ports_q "$NAME")" "$PORT"
   fi
@@ -660,9 +644,9 @@ step_done() {
   section 7
   lines=()
   for n in $INSTANCES; do
-    port="$(grep '^MYSURICATES_PORT=' "$INSTANCES_DIR/$n.env" | cut -d= -f2)"
+    port="$(kept_value "$n" MYSURICATES_PORT)"
     # Aus der Datei, nicht aus --bind: eine behaltene Instanz-Datei kann anders binden (b8aa3866)
-    bind="$(grep '^MYSURICATES_BIND=' "$INSTANCES_DIR/$n.env" | tail -n 1 | cut -d= -f2)"
+    bind="$(kept_value "$n" MYSURICATES_BIND)"
     # Nicht neu gestartet (29820f58): sie lauscht noch, wo sie vor dem Schreiben der Datei lauschte
     case "$KEPT_RUNNING" in *" $n "*) l="$(instance_prev_addr "$n")"; [ -z "$l" ] || { port="${l%%,*}"; bind="${l#*,}"; } ;; esac
     if [ "$STARTED" = 1 ] && [ "$DRY" = 0 ]; then

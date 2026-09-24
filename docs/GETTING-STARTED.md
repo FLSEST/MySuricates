@@ -98,7 +98,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
   (unter macOS nur die Anmeldung, das Programm liegt im Image).
-- **Ports:** Default 9090, belegte Ports werden übersprungen. Beim Container zusätzlich der
+- **Ports:** Default 9090, belegte Ports werden übersprungen — nicht der, den die laufende Instanz
+  selbst belegt, wenn sie neu eingerichtet wird. Beim Container zusätzlich der
   Projektordner, den die Instanz sieht (Default: der Ordner über dem Klon, nie das ganze Home).
 
 Ohne Rückfragen, z. B. für Skripte: die Entscheidungen der Schritte gibt es als Flag (`--help` listet
