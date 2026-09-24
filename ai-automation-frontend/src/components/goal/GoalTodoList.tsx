@@ -3,21 +3,30 @@ import { ArrowDown, ArrowUp, HelpCircle } from 'lucide-react';
 import { Card } from '../ui';
 import { priorityColor } from '../todo/todoConstants';
 import { ComplexityChip, EffortChip, RatedByMark } from './GoalBadges';
+import { DueChip, MilestoneChip } from './TodoPlanChips';
 import { useReorderGoal } from '../../hooks/useGoals';
 import { todoDeepLink } from '../../utils/todoLinks';
 import { useT } from '../../i18n';
-import type { GoalTodoItem } from '../../types';
+import type { GoalMilestone, GoalTodoItem } from '../../types';
 
 const isActive = (todo: GoalTodoItem) =>
   todo.status === 'OPEN' || todo.status === 'IN_PROGRESS' || todo.status === 'BACKLOG';
 
 /**
  * Die TODOs eines Ziels als Liste (TODO dc0566f8): was als Nächstes drankommt (verschiebbar),
- * welche Fragen vorher zu klären sind, was schon erledigt ist.
+ * welche Fragen vorher zu klären sind, was schon erledigt ist. Fälligkeit und Meilenstein stehen
+ * als Chips an jedem TODO (TODO e192df18).
  */
-export function GoalTodoList({ goalId, todos }: { goalId: string; todos: GoalTodoItem[] }) {
+export function GoalTodoList({ goalId, todos, milestones, today }: {
+  goalId: string;
+  todos: GoalTodoItem[];
+  milestones: GoalMilestone[];
+  /** Tag (`timelineLayout.dayOf`), gegen den „überfällig“ gilt. */
+  today: number;
+}) {
   const t = useT();
   const reorder = useReorderGoal();
+  const milestoneOf = (todo: GoalTodoItem) => milestones.find((milestone) => milestone.id === todo.milestoneId);
   const next = todos.filter(isActive);
   const questions = next.filter((todo) => todo.openQuestion);
   const done = todos.filter((todo) => todo.status === 'DONE');
@@ -56,6 +65,8 @@ export function GoalTodoList({ goalId, todos }: { goalId: string; todos: GoalTod
                     </Link>
                     {todo.projectName && <span className="text-xs text-text-tertiary">{todo.projectName}</span>}
                   </div>
+                  <DueChip todo={todo} today={today} />
+                  <MilestoneChip milestone={milestoneOf(todo)} />
                   <ComplexityChip value={todo.complexity} />
                   <EffortChip value={todo.suggestedEffort} />
                   <RatedByMark ratedBy={todo.ratedBy} />

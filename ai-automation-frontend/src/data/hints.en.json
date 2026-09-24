@@ -250,5 +250,21 @@
       "Next to it, which workflow works on a TODO: as the fix workflow on the TODO or through a matching TodoTrigger, and what its last run did",
       "A dotted stub shows where no workflow docks on yet; dashed rows are suggestions that might belong to the goal"
     ]
+  },
+  "goal-timeline": {
+    "title": "The goal on a timeline",
+    "points": [
+      "Every row is a milestone, below them the TODOs without a milestone – each on its due day",
+      "A milestone is reached once all TODOs assigned to it are done; its diamond shows where it stands: green reached, yellow due soon, red overdue",
+      "Whatever has no date yet waits under “Unplanned”; overdue TODOs turn red and also show up under “Needs you” in the cockpit"
+    ]
+  },
+  "goal-guard": {
+    "title": "One guard per goal",
+    "points": [
+      "A workflow from the “Goal guard” template checks the goal every day: overdue and soon-due TODOs and milestones, progress and target date",
+      "The result appears as a traffic-light tile on the dashboard; the workflow needs no model and costs no tokens",
+      "Switching it off only pauses the schedule – workflow and tile stay, and switching it on again carries on from there"
+    ]
   }
 }

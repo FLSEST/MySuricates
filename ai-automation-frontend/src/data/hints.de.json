@@ -250,5 +250,21 @@
       "Rechts davon, welcher Workflow ein TODO bearbeitet: als Fix-Workflow am TODO oder über einen passenden TodoTrigger, und was der letzte Lauf ergab",
       "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten"
     ]
+  },
+  "goal-timeline": {
+    "title": "Das Ziel auf dem Zeitstrahl",
+    "points": [
+      "Jede Zeile ist ein Meilenstein, darunter stehen die TODOs ohne Meilenstein – jedes an seinem Fälligkeitstag",
+      "Ein Meilenstein ist erreicht, wenn alle ihm zugeordneten TODOs erledigt sind; seine Raute zeigt den Stand: grün erreicht, gelb bald fällig, rot überfällig",
+      "Was noch kein Datum hat, wartet unter „Ungeplant“; überfällige TODOs werden rot und erscheinen zusätzlich unter „Braucht dich“ im Cockpit"
+    ]
+  },
+  "goal-guard": {
+    "title": "Ein Wächter je Ziel",
+    "points": [
+      "Ein Workflow aus der Vorlage „Ziel-Wächter“ prüft das Ziel jeden Tag: überfällige und bald fällige TODOs und Meilensteine, Fortschritt und Zieldatum",
+      "Das Ergebnis erscheint als Ampel-Kachel auf dem Dashboard; der Workflow braucht kein Modell und kostet keine Tokens",
+      "Ausschalten pausiert nur den Zeitplan – Workflow und Kachel bleiben, beim nächsten Einschalten geht es dort weiter"
+    ]
   }
 }

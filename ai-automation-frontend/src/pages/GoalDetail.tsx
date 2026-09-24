@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, List, Network, Target, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChartGantt, List, Network, Target, Trash2 } from 'lucide-react';
 import { Button, Card, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
@@ -8,6 +8,10 @@ import { GoalTodoList } from '../components/goal/GoalTodoList';
 import { GoalMapOutdatedBackend, GoalRelationMap } from '../components/goal/GoalRelationMap';
 import { GoalCandidates, type CandidateFilter } from '../components/goal/GoalCandidates';
 import { GoalTodoEditor } from '../components/goal/GoalTodoEditor';
+import { GoalTimeline } from '../components/goal/GoalTimeline';
+import { GoalGuardControl } from '../components/goal/GoalGuardControl';
+import { planBadge } from '../components/goal/planDisplay';
+import { dayOf } from '../components/goal/timelineLayout';
 import {
   useAssignGoalTodos, useDeleteGoal, useGoal, useGoalCandidates, useGoalRelations, useUpdateGoal,
 } from '../hooks/useGoals';
@@ -18,14 +22,16 @@ import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
-type GoalView = 'list' | 'map';
+type GoalView = 'list' | 'map' | 'timeline';
 const VIEW_KEY = 'mysuricates-goal-view';
+const VIEWS: readonly GoalView[] = ['list', 'map', 'timeline'];
 /** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
 const DEFAULT_TAG_SUGGESTION = 'release';
 
 function readView(): GoalView {
   try {
-    return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list';
+    const stored = localStorage.getItem(VIEW_KEY);
+    return VIEWS.find((view) => view === stored) ?? 'list';
   } catch {
     return 'list';
   }
@@ -59,8 +65,9 @@ function useDebounced<T>(value: T, ms: number): T {
 
 /**
  * Ein Ziel mit seinen TODOs (TODO dc0566f8): als Liste – was als Nächstes drankommt, offene Fragen,
- * Erledigtes – oder als Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten
- * (TODO c6ea8f5c). Darunter Vorschläge, die zum Ziel passen könnten.
+ * Erledigtes –, als Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten
+ * (TODO c6ea8f5c), oder als Zeitstrahl mit Fälligkeiten und Meilensteinen (TODO e192df18). Im Kopf
+ * der Schalter für den Ziel-Wächter, darunter Vorschläge, die zum Ziel passen könnten.
  */
 export function GoalDetail() {
   const { goalId } = useParams<{ goalId: string }>();
@@ -76,6 +83,15 @@ export function GoalDetail() {
   const candidates = useMemo(() => candidatesPage.data?.content ?? [], [candidatesPage.data]);
   const relations = useGoalRelations(goalId, candidates.map((todo) => todo.id), view === 'map');
   const suggestions = useMemo(() => tagSuggestions(data?.todos ?? []), [data?.todos]);
+  const [today] = useState(() => dayOf(new Date()));
+  const badges = useMemo(() => {
+    const milestones = new Map((data?.milestones ?? []).map((milestone) => [milestone.id, milestone]));
+    const entries = (data?.todos ?? []).flatMap((todo) => {
+      const badge = planBadge(todo, todo.milestoneId ? milestones.get(todo.milestoneId) : undefined, today, locale, t);
+      return badge ? [[todo.id, badge] as const] : [];
+    });
+    return new Map(entries);
+  }, [data?.todos, data?.milestones, today, locale, t]);
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
   const assign = useAssignGoalTodos();
@@ -91,7 +107,7 @@ export function GoalDetail() {
     return <ErrorState message={error?.message ?? t.goals.notFound} onRetry={() => refetch()} />;
   }
 
-  const { goal, todos, byProject } = data;
+  const { goal, todos, byProject, milestones } = data;
   const chooseView = (next: GoalView) => {
     setView(next);
     storeView(next);
@@ -122,6 +138,9 @@ export function GoalDetail() {
               {t.goals.targetDate.replace('{date}', formatDate(goal.targetDate, locale))}
             </p>
           )}
+          <div className="mt-2">
+            <GoalGuardControl goal={goal} byProject={byProject} />
+          </div>
         </div>
         <div className="w-40">
           <Select
@@ -161,7 +180,9 @@ export function GoalDetail() {
       </Card>
 
       <div role="tablist" aria-label={t.goals.views.label} className="inline-flex gap-1 p-1 rounded-lg bg-surface-secondary">
-        {([['list', List, t.goals.views.list], ['map', Network, t.goals.views.map]] as const).map(([key, Icon, label]) => (
+        {([
+          ['list', List, t.goals.views.list], ['map', Network, t.goals.views.map], ['timeline', ChartGantt, t.goals.views.timeline],
+        ] as const).map(([key, Icon, label]) => (
           <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => chooseView(key)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
               view === key ? 'bg-surface text-text shadow-sm font-medium' : 'text-text-secondary hover:text-text'}`}>
@@ -172,7 +193,9 @@ export function GoalDetail() {
       </div>
 
       {view === 'list' ? (
-        <GoalTodoList goalId={goal.id} todos={todos} />
+        <GoalTodoList goalId={goal.id} todos={todos} milestones={milestones} today={today} />
+      ) : view === 'timeline' ? (
+        <GoalTimeline goal={goal} todos={todos} milestones={milestones} onOpenTodo={setEditing} />
       ) : relations.isLoading || !relations.data ? (
         relations.error
           ? apiErrorStatus(relations.error) === 404
@@ -180,7 +203,7 @@ export function GoalDetail() {
             : <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
           : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
       ) : (
-        <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} />
+        <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} badges={badges} />
       )}
 
       <GoalCandidates

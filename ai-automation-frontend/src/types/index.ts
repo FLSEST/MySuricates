@@ -1227,6 +1227,8 @@ export interface TodoPlanning {
   ratedBy: RatedBy | null;
   ratedAt: string | null;
   openQuestion: string | null;
+  /** Meilenstein im Ziel (TODO 259f4f66); null = keiner. Fehlt bei einem älteren Backend. */
+  milestoneId?: string | null;
 }
 
 /** `null`/fehlt = unverändert, leerer Text = leeren (`goalId: ''` löst das TODO vom Ziel). */
@@ -1238,6 +1240,8 @@ export interface UpdateTodoPlanningRequest {
   ratingNote?: string;
   openQuestion?: string;
   ratedBy?: RatedBy;
+  /** Meilenstein desselben Ziels; `''` nimmt ihn weg. */
+  milestoneId?: string;
 }
 
 export interface GoalProgress {
@@ -1250,6 +1254,17 @@ export interface GoalProgress {
   percentDone: number;
 }
 
+/**
+ * Ziel-Wächter (TODO 259f4f66): ein Workflow aus der Vorlage `goal-guard` mit täglichem Zeitplan.
+ * `enabled` = der Zeitplan läuft; ausgeschaltet bleibt der Workflow (`workflowId`), nur pausiert.
+ */
+export interface GoalGuard {
+  enabled: boolean;
+  workflowId: string | null;
+  scheduleId: string | null;
+  nextRunAt: string | null;
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -1259,6 +1274,50 @@ export interface Goal {
   createdAt: string;
   updatedAt: string;
   progress: GoalProgress;
+  /** Nie null; `useGoal` ergänzt ihn für ein älteres Backend. */
+  guard: GoalGuard;
+}
+
+/** Zustand eines Meilensteins, beim Lesen berechnet: bald fällig = in höchstens 3 Tagen. */
+export type MilestoneState = 'OPEN' | 'DUE_SOON' | 'OVERDUE' | 'REACHED';
+
+/** Meilenstein eines Ziels: erreicht, wenn alle zugeordneten TODOs erledigt sind. */
+export interface GoalMilestone {
+  id: string;
+  goalId: string;
+  title: string;
+  dueDate: string;
+  state: MilestoneState;
+  /** Zugeordnete TODOs ohne ARCHIVED. */
+  total: number;
+  done: number;
+  /** Erstes Erreichen; bleibt stehen. */
+  reachedAt: string | null;
+  /** War schon erreicht, ist es wegen eines neuen TODOs nicht mehr („wieder offen“). */
+  reopened: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `dueDate`: ISO-Zeitpunkt oder `YYYY-MM-DD` (= bis 23:59:59 UTC). */
+export interface CreateGoalMilestoneRequest {
+  title: string;
+  dueDate: string;
+}
+
+/** Fehlendes Feld = unverändert. */
+export interface UpdateGoalMilestoneRequest {
+  title?: string;
+  dueDate?: string;
+}
+
+/** `POST /goals/{id}/guard`; Projekt, Zeitplan und Sprache zählen nur beim ersten Einschalten. */
+export interface GoalGuardRequest {
+  enabled: boolean;
+  projectId?: string;
+  /** Spring-CRON mit Sekunden, Vorgabe `0 0 8 * * *`. */
+  cron?: string;
+  locale?: string;
 }
 
 export interface GoalTodoItem {
@@ -1277,13 +1336,26 @@ export interface GoalTodoItem {
   ratedAt: string | null;
   openQuestion: string | null;
   updatedAt: string;
+  /** Fälligkeit (TODO 259f4f66); null = ungeplant. */
+  dueDate: string | null;
+  /** Meilenstein des Ziels; null = keiner. */
+  milestoneId: string | null;
+}
+
+export interface GoalProjectProgress {
+  projectId: string | null;
+  projectName: string | null;
+  total: number;
+  done: number;
 }
 
 export interface GoalDetail {
   goal: Goal;
   /** Arbeitsreihenfolge: Rang, dann Priorität, dann Alter. */
   todos: GoalTodoItem[];
-  byProject: { projectId: string | null; projectName: string | null; total: number; done: number }[];
+  byProject: GoalProjectProgress[];
+  /** Nach Datum sortiert. */
+  milestones: GoalMilestone[];
 }
 
 /** Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODO → Bearbeitung → Ergebnis. */
@@ -1420,11 +1492,25 @@ export interface ProjectRollup {
   needsYouCount: number;
 }
 
+/** Ein Meilenstein in „Braucht dich“: bald fällig oder überfällig, mit dem Ziel für den Link. */
+export interface MilestoneAttentionItem {
+  id: string;
+  title: string;
+  goalId: string;
+  goalTitle: string;
+  dueDate: string;
+  state: MilestoneState;
+  total: number;
+  done: number;
+}
+
 export interface TodoOverviewResponse {
   projects: ProjectRollup[];
   needsYou: NeedsYouItem[];
   generatedAt: string;
   staleThresholdDays: number;
+  /** Meilensteine aktiver Ziele, bald fällig oder überfällig (TODO 259f4f66); fehlt bei einem älteren Backend. */
+  milestonesDue?: MilestoneAttentionItem[];
 }
 
 // ── Workflow Chain ──────────────────────────────────────

@@ -33,6 +33,8 @@ export const HINTS = {
   'cockpit-overview': { version: 1 },
   'goals-overview': { version: 1 },
   'goal-relation-map': { version: 1 },
+  'goal-timeline': { version: 1 },
+  'goal-guard': { version: 1 },
   'activity-events': { version: 1 },
   'dlq-retry': { version: 1 },
   'wishes-loop': { version: 1 },

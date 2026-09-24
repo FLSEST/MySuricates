@@ -20,18 +20,25 @@ function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
   return {
     id: 'x', title: 'X', status: 'OPEN', priority: 'MEDIUM', projectId: 'p1', projectName: 'AutoPilot', tags: [],
     goalRank: null, complexity: null, suggestedEffort: null, ratingNote: null, ratedBy: null, ratedAt: null,
-    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', ...overrides,
+    openQuestion: null, updatedAt: '2026-09-23T00:00:00Z', dueDate: null, milestoneId: null, ...overrides,
   };
 }
+
+/** Ende des lokalen Tages – so speichert der TODO-Dialog eine Fälligkeit. */
+const endOf = (iso: string) => new Date(`${iso}T23:59:59`).toISOString();
 
 const detail: GoalDetailData = {
   goal: {
     id: 'g1', title: 'Open-Source-Launch', description: 'Repo public, README with video', status: 'ACTIVE',
     targetDate: '2026-10-15T00:00:00Z', createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
     progress: { total: 4, open: 2, inProgress: 1, backlog: 0, done: 1, openQuestions: 1, percentDone: 25 },
+    guard: { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null },
   },
   todos: [
-    item({ id: 'a', title: 'Privacy findings', goalRank: 1, complexity: 'M', suggestedEffort: 'medium', ratedBy: 'AI' }),
+    item({
+      id: 'a', title: 'Privacy findings', goalRank: 1, complexity: 'M', suggestedEffort: 'medium', ratedBy: 'AI',
+      dueDate: endOf('2030-10-03'), milestoneId: 'm1',
+    }),
     item({ id: 'b', title: 'Style probe', goalRank: 2, status: 'IN_PROGRESS', openQuestion: 'Which look?' }),
     item({ id: 'c', title: 'Examples page', projectName: 'Site' }),
     item({ id: 'd', title: 'Banner', status: 'DONE' }),
@@ -40,6 +47,10 @@ const detail: GoalDetailData = {
     { projectId: 'p1', projectName: 'AutoPilot', total: 3, done: 1 },
     { projectId: 'p2', projectName: 'Site', total: 1, done: 0 },
   ],
+  milestones: [{
+    id: 'm1', goalId: 'g1', title: 'Beta', dueDate: endOf('2030-10-05'), state: 'OPEN', total: 1, done: 0,
+    reachedAt: null, reopened: false, createdAt: '2026-09-23T00:00:00Z', updatedAt: '2026-09-23T00:00:00Z',
+  }],
 };
 
 function candidate(id: string, title: string, tags: string[] = []): Todo {
@@ -102,6 +113,47 @@ describe('GoalDetail', () => {
     expect(screen.getByRole('img', { name: 'assessed by AI' })).toBeInTheDocument();
   });
 
+  it('shows the due date and the milestone of a TODO as chips in the list', async () => {
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    renderGoal();
+
+    await screen.findByRole('heading', { name: 'Open-Source-Launch' });
+    const [first, second] = screen.getAllByTestId('goal-next-item');
+    expect(within(first!).getByTitle('Due 10/3/2030')).toHaveTextContent('Oct 3');
+    expect(within(first!).getByTitle('Milestone: Beta')).toHaveTextContent('Beta');
+    expect(within(second!).queryByTitle(/^Due/)).not.toBeInTheDocument();
+    expect(within(second!).queryByTitle(/^Milestone/)).not.toBeInTheDocument();
+  });
+
+  it('copes with an older backend without milestones, guard and due dates', async () => {
+    const { guard: _guard, ...goalWithoutGuard } = detail.goal;
+    const { milestones: _milestones, ...older } = detail;
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json({
+      ...older,
+      goal: goalWithoutGuard,
+      todos: detail.todos.map(({ dueDate: _due, milestoneId: _ms, ...rest }) => rest),
+    })));
+    renderGoal();
+
+    await screen.findByRole('heading', { name: 'Open-Source-Launch' });
+    expect(screen.getAllByTestId('goal-next-item')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }));
+    expect(await screen.findByTestId('goal-timeline')).toBeInTheDocument();
+  });
+
+  it('switches to the timeline and remembers the choice', async () => {
+    server.use(http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)));
+    renderGoal();
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Timeline' }));
+
+    const timeline = await screen.findByTestId('goal-timeline');
+    expect(within(timeline).getByTestId('timeline-row-m1')).toBeInTheDocument();
+    expect(within(timeline).getByRole('button', { name: /^Privacy findings/ })).toBeInTheDocument();
+    expect(localStorage.getItem('mysuricates-goal-view')).toBe('timeline');
+    expect(screen.getByRole('tab', { name: 'Timeline' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('moving an item down sends the whole active order to the server', async () => {
     let sent: unknown = null;
     server.use(
@@ -134,6 +186,9 @@ describe('GoalDetail', () => {
     await waitFor(() => expect(asked.include).toContain('c1'));
     // once in the map (dashed), once in the list below
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Add: Release notes' })).toHaveLength(2));
+    // due date and milestone of a TODO also sit on its node
+    const node = document.querySelector('[data-node="todo:a"]')!;
+    expect(node).toHaveTextContent('Oct 3 · Beta');
     const todoQuery = asked.todos[0]!;
     expect(todoQuery.get('goalId')).toBe('none');
     expect(todoQuery.getAll('status')).toEqual(['OPEN', 'IN_PROGRESS', 'BACKLOG']);
