@@ -12,10 +12,19 @@ const STOP_WORDS: ReadonlySet<string> = new Set([
   'und', 'oder', 'ist', 'sind', 'war', 'was', 'wie', 'wo', 'wer', 'mit', 'von', 'zu', 'zum', 'zur',
   'im', 'in', 'am', 'an', 'auf', 'fur', 'mein', 'meine', 'meinen', 'mir', 'mich', 'ich', 'du', 'es',
   'bitte', 'zeig', 'zeige', 'mal', 'gibt', 'hat', 'haben', 'noch', 'schon', 'alle', 'alles', 'nicht',
+  // de verbs and time fillers that say nothing about what to find ("was lief schief", "in letzter Zeit")
+  'lief', 'liefen', 'lauft', 'ging', 'gingen', 'geht', 'gehen', 'kann', 'konnen', 'soll', 'will', 'mochte',
+  'brauche', 'letzte', 'letzten', 'letzter', 'letztes', 'zeit', 'gerade', 'neulich', 'kurzlich', 'zuletzt',
+  'heutigen', 'bei', 'nach', 'uber', 'aus', 'so', 'denn', 'eigentlich', 'irgendwas', 'etwas',
+  // question words and the platform's own generic nouns, which every entry would match
+  'welche', 'welcher', 'welches', 'welchen', 'workflow', 'workflows', 'ablauf', 'ablaufe',
+  'meiner', 'meinem', 'meines', 'dein', 'deine', 'deiner', 'deinen', 'unser', 'unsere', 'uns', 'wir', 'sie', 'ihr',
   // en
   'the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were', 'what', 'how', 'where', 'who', 'with',
   'of', 'to', 'in', 'on', 'at', 'for', 'my', 'me', 'i', 'you', 'it', 'this', 'that', 'please', 'show',
   'all', 'any', 'do', 'does', 'did', 'has', 'have', 'not',
+  'went', 'go', 'goes', 'ran', 'recently', 'lately', 'last', 'can', 'could', 'want', 'need', 'some', 'something',
+  'which',
 ]);
 
 /**

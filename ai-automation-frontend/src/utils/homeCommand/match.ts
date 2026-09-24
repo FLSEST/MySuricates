@@ -101,9 +101,11 @@ function addDays(now: Date, days: number): Date {
 export function pickRuns(query: ParsedQuery, runs: readonly WorkflowRunListItem[], now: Date): WorkflowRunListItem[] {
   const newestFirst = [...runs].sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''));
   if (query.intents.includes('failed')) {
-    return newestFirst.filter((r) => r.status === 'FAILED'
-      && (query.contentTokens.length === 0 || scoreFields(query.contentTokens, [[r.workflowName, 1], [r.error?.message, 1]]) > 0)
-      && (query.dayOffset !== 0 || sameDay(r.startedAt, now)));
+    const failed = newestFirst.filter((r) => r.status === 'FAILED' && (query.dayOffset !== 0 || sameDay(r.startedAt, now)));
+    // Content words narrow the failures — unless nothing is left: the intent itself is the clearer signal
+    const narrowed = query.contentTokens.length === 0 ? failed
+      : failed.filter((r) => scoreFields(query.contentTokens, [[r.workflowName, 1], [r.error?.message, 1]]) > 0);
+    return narrowed.length > 0 ? narrowed : failed;
   }
   if (query.tokens.length === 0) return [];
   const seen = new Set<string>();
@@ -147,7 +149,8 @@ export function pickSchedules(query: ParsedQuery, schedules: readonly ScheduledW
       });
     }
     if (query.contentTokens.length > 0) {
-      hits = hits.filter((s) => scoreFields(query.contentTokens, [[nameOf(s), 1], [s.description, 1]]) > 0);
+      const narrowed = hits.filter((s) => scoreFields(query.contentTokens, [[nameOf(s), 1], [s.description, 1]]) > 0);
+      if (narrowed.length > 0) hits = narrowed;
     }
   } else {
     if (query.tokens.length === 0) return [];

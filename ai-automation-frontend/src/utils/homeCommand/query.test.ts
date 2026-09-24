@@ -122,3 +122,13 @@ describe('serverSearchTerm', () => {
     expect(serverSearchTerm(parse('was ist'))).toBeNull();
   });
 });
+
+describe('parseHomeQuery — filler words', () => {
+  it('drops verbs and time fillers that say nothing about what to find', () => {
+    const q = parseHomeQuery('was lief in letzter Zeit schief', 3);
+    expect(q.tokens).toEqual(['schief']);
+    expect(q.intents).toContain('failed');
+    expect(parseHomeQuery('what went wrong recently', 3).tokens).toEqual(['wrong']);
+    expect(parseHomeQuery('Welche meiner Workflows sind in letzter Zeit fehlgeschlagen?', 3).tokens).toEqual(['fehlgeschlagen']);
+  });
+});

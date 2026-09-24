@@ -92,6 +92,14 @@ describe('pickRuns', () => {
     expect(pickRuns(parse('was ist heute schiefgelaufen'), runs, NOW).map((r) => r.id)).toEqual(['r1']);
   });
 
+  it('keeps all failures when the content words match none of them', () => {
+    // "was lief schief": filler verbs must not narrow the failure list down to nothing
+    expect(pickRuns(parse('was lief schief'), runs, NOW).map((r) => r.id)).toEqual(['r1', 'r2']);
+    expect(pickRuns(parse('Welche meiner Workflows sind in letzter Zeit fehlgeschlagen?'), runs, NOW).map((r) => r.id))
+      .toEqual(['r1', 'r2']);
+    expect(pickRuns(parse('zebra failed'), runs, NOW).map((r) => r.id)).toEqual(['r1', 'r2']);
+  });
+
   it('otherwise shows the newest run per matching workflow', () => {
     expect(pickRuns(parse('backup'), runs, NOW).map((r) => r.id)).toEqual(['r1']);
     expect(pickRuns(parse('xyz'), runs, NOW)).toEqual([]);

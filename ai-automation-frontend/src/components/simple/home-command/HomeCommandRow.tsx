@@ -3,6 +3,7 @@ import {
   LayoutTemplate, Lightbulb, ListPlus, Loader2, MessageSquare, Package, FilePlus, Settings, Sparkles, SquareCheck, SunMoon,
   type LucideIcon,
 } from 'lucide-react';
+import { WorkflowIcon } from '../../../utils/workflowIcon';
 import { Button } from '../../ui';
 import { ProBadge } from '../ProHandoff';
 import { StatusDot } from '../kit';
@@ -33,7 +34,12 @@ const ICONS: Record<Exclude<HomeIcon, { emoji: string }>, LucideIcon> = {
 
 function ItemIcon({ icon, human }: { icon: HomeIcon; human?: boolean }) {
   if (typeof icon === 'object') {
-    return <span className="w-8 h-8 flex items-center justify-center text-lg leading-none shrink-0" aria-hidden>{icon.emoji}</span>;
+    // Workflow icons are an emoji or a lucide name ("Globe") — WorkflowIcon renders both
+    return (
+      <span className="w-8 h-8 flex items-center justify-center text-lg leading-none text-text-secondary shrink-0" aria-hidden>
+        <WorkflowIcon icon={icon.emoji} className="w-4 h-4" />
+      </span>
+    );
   }
   const Icon = ICONS[icon];
   const tone = human ? 'text-human bg-human-subtle' : icon === 'run-failed' ? 'text-danger bg-danger-subtle' : 'text-text-secondary bg-surface-raised';
