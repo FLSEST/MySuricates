@@ -2798,7 +2798,7 @@ List TODOs (paginated, filterable).
 | `source` | String | Filter by source: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter by tag |
 | `q` | String | Full-text search |
-| `goalId` | String | Only TODOs of this goal (V85) |
+| `goalId` | String | Only TODOs of this goal (V85); `none` = only TODOs without a goal (candidates for the relation map) |
 
 `status`, `priority` and `source` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
 
@@ -2994,6 +2994,18 @@ Goals with progress, newest first. **Query:** `status` (repeatable; default `ACT
 The goal with its TODOs in work order (rank, then priority, then age) – without descriptions – and progress per project.
 
 **Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`), `byProject[]` (`projectId`, `projectName`, `total`, `done`)
+
+### `GET /api/v1/goals/{id}/relations`
+
+Relation map: for every TODO of the goal, where it comes from, which workflow works on it and what the last fix run did. A goal is never linked to workflows directly – only through these relations of its TODOs. **Query:** `include` – up to 20 TODO IDs (comma-separated or repeated) that belong to no goal yet; they follow the goal's TODOs as candidates (`candidate: true`). IDs that belong to a goal are skipped.
+
+**Response:** `GoalRelationsResponse` – `goalId`, `activeTriggers` (active TodoTriggers overall), `todos[]` in work order with `id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `candidate` and
+
+- `origin` – `kind` (`AUDIT` | `HEALTH` | `WORKFLOW_RUN` | `AGENT` | `USER`, checked in this order), `workflowId`/`workflowName` of the creating run (or of the `workflow_run` reference), `runId`, `runStatus`, `findingIds` (audit findings from `reference_id` and `audit_finding_todos`), `agent` (`sourceAgent`)
+- `workers[]` – `kind` `LINKED` (fix workflow on the TODO) or `TRIGGER` (every active TodoTrigger whose tags, project, source and minimum priority match), `workflowId`, `workflowName`, `triggerId`, `triggerLabel`; deleted workflows are left out
+- `result` – `runId` (last fix run), `workflowId`, `runStatus`, `at` (end, its start while it runs), `fixAttempts`, `resolutionState`; `null` while no fix run ever ran
+
+Read in batches: one query per kind, independent of the number of TODOs (`RequestCostRatchetTest`). Unknown goal → `404`.
 
 ### `PUT /api/v1/goals/{id}`
 

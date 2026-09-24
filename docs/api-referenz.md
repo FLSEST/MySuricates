@@ -2826,7 +2826,7 @@ TODOs auflisten (paginiert, filterbar).
 | `source` | String | Filter nach Quelle: `USER`, `AI`, `WORKFLOW` |
 | `tag` | String | Filter nach Tag |
 | `q` | String | Volltextsuche |
-| `goalId` | String | Nur TODOs dieses Ziels (V85) |
+| `goalId` | String | Nur TODOs dieses Ziels (V85); `none` = nur TODOs ohne Ziel (Kandidaten der Relationskarte) |
 
 Bei `status`, `priority` und `source` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'BLOCKED'`.
 
@@ -3022,6 +3022,18 @@ Ziele mit Fortschritt, neueste zuerst. **Query:** `status` (mehrfach; ohne Angab
 Ziel mit seinen TODOs in Arbeitsreihenfolge (Rang, dann Priorität, dann Alter) – ohne Beschreibungen – und Fortschritt je Projekt.
 
 **Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`), `byProject[]` (`projectId`, `projectName`, `total`, `done`)
+
+### `GET /api/v1/goals/{id}/relations`
+
+Relationskarte: je TODO des Ziels, woher es kommt, welcher Workflow es bearbeitet und was der letzte Fix-Lauf ergab. Ein Ziel ist mit Workflows nie direkt verknüpft – nur über diese Beziehungen seiner TODOs. **Query:** `include` – bis zu 20 TODO-IDs (kommagetrennt oder mehrfach), die noch keinem Ziel gehören; sie kommen als Kandidaten (`candidate: true`) hinter die TODOs des Ziels. IDs aus einem Ziel werden übergangen.
+
+**Response:** `GoalRelationsResponse` – `goalId`, `activeTriggers` (aktive TodoTrigger insgesamt), `todos[]` in Arbeitsreihenfolge mit `id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `candidate` und
+
+- `origin` – `kind` (`AUDIT` | `HEALTH` | `WORKFLOW_RUN` | `AGENT` | `USER`, in dieser Reihenfolge geprüft), `workflowId`/`workflowName` des erzeugenden Laufs (oder der `workflow_run`-Referenz), `runId`, `runStatus`, `findingIds` (Audit-Befunde aus `reference_id` und `audit_finding_todos`), `agent` (`sourceAgent`)
+- `workers[]` – `kind` `LINKED` (Fix-Workflow am TODO) oder `TRIGGER` (jeder aktive TodoTrigger, dessen Tags, Projekt, Quelle und Mindest-Priorität passen), `workflowId`, `workflowName`, `triggerId`, `triggerLabel`; gelöschte Workflows fallen weg
+- `result` – `runId` (letzter Fix-Lauf), `workflowId`, `runStatus`, `at` (Ende, solange er läuft der Start), `fixAttempts`, `resolutionState`; `null`, solange nie ein Fix-Lauf lief
+
+Gebündelt gelesen: eine Abfrage je Art, unabhängig von der Zahl der TODOs (`RequestCostRatchetTest`). Unbekanntes Ziel → `404`.
 
 ### `PUT /api/v1/goals/{id}`
 
