@@ -1219,7 +1219,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 86 Flyway-Migrationen (V1–V86)
+│           └── db/migration/          ← 87 Flyway-Migrationen (V1–V87)
 │
 └── ai-automation-frontend/
     ├── package.json
