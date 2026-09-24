@@ -136,6 +136,7 @@ describe('SimpleWorkflowExecution', () => {
     expect(screen.getByText('At step ‘Fetch data’')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('"exitCode"');
     expect(screen.getByRole('button', { name: 'Investigate in Pro mode' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Run again' })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Investigate in Pro mode' }));
     expect(useSettingsStore.getState().simpleMode).toBe(false);

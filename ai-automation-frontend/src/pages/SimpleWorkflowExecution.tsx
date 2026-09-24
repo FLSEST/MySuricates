@@ -177,7 +177,8 @@ export function SimpleWorkflowExecution() {
             {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
           </p>
         </div>
-        <ExecutionRerunButton run={run} />
+        {/* A failed run offers its rerun in the failure card below — one button, not two. */}
+        {!FAILURE_STATUSES.has(run.status) && <ExecutionRerunButton run={run} />}
         {isRunning && (
           <div className="flex items-center gap-2 shrink-0">
             {run.status === 'RUNNING' && (
