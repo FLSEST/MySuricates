@@ -62,6 +62,11 @@ file. The model to follow is the ruleKey list in the "Public Readiness" evidence
 (`subject "<value>"` or `subject = Pfad` per entry); `AuditRuleKeyCatalogTest` makes sure no entry
 there leaves it out (TODO `3a9e275b` — evidence prompt: fix the subject per ruleKey).
 
+A colon in the `subject` carries meaning: if a file or class precedes it (`pom.xml:docker-java`,
+`Foo.java:42`), only the part before the `:` counts. If a lower-case kind word precedes it
+(`package:com.example.web`), the whole `<kind>:<value>` counts. Two findings of the same report with
+the same identity are taken over only once; ingestion reports the rest in the activity log.
+
 ### Optional: `expectedFindings`
 
 An audit whose measurement block knows the target count (such as `ERWARTETE FINDINGS` in the test
@@ -179,7 +184,8 @@ it as RESOLVED.
 - A previously open finding that is absent from the next valid snapshot becomes `RESOLVED`.
 - A re-appearing `RESOLVED` finding is reopened as a regression.
 - `CRITICAL` and `HIGH` automatically generate managed TODOs. `MEDIUM` can be confirmed in the Audit
-  Center; `LOW` remains a finding for the time being.
+  Center; `LOW` remains a finding for the time being. If an open finding drops below `HIGH`, its
+  managed TODO is unlinked and archived (unless it is `IN_PROGRESS`).
 - A managed TODO set to `DONE` moves the finding to
   `AWAITING_VERIFICATION`. Only the next valid audit snapshot confirms the fix.
 - Manually linked TODOs are never automatically changed in status.

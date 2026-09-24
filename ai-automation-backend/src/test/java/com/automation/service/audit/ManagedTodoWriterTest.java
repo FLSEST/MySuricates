@@ -197,6 +197,87 @@ class ManagedTodoWriterTest {
         verify(todoRepository, never()).save(any());
     }
 
+    /** ba0dcb3a: ein Finding unter der TODO-Schwelle gibt sein TODO frei — archiviert, nicht DONE. */
+    @Test
+    void reconcile_releasesTheTodo_whenItsOpenFindingFellBelowHigh() {
+        AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        medium.setSeverity(AuditSeverity.MEDIUM);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        todo.setReferenceType(ManagedTodoWriter.REFERENCE_TYPE);
+        todo.setReferenceId(FINDING_ID);
+        AuditFindingTodo managedLink = link("t-1", true);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
+        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
+
+        writer().reconcile(List.of(medium));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        assertThat(todo.getReferenceType()).isNull();
+        assertThat(todo.getReferenceId()).isNull();
+        verify(findingTodoRepository).delete(managedLink);
+        verify(todoRepository).save(todo);
+    }
+
+    @Test
+    void reconcile_archivesInsteadOfReopening_whenAFindingReturnsBelowHigh() {
+        AuditFinding back = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        back.setSeverity(AuditSeverity.LOW);
+        Todo todo = todo("t-1", Todo.Status.DONE);
+        AuditFindingTodo managedLink = link("t-1", true);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
+        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(back));
+
+        writer().reconcile(List.of(back));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        verify(findingTodoRepository).delete(managedLink);
+    }
+
+    /** An einem IN_PROGRESS-TODO arbeitet jemand — das bleibt, wie es ist. */
+    @Test
+    void reconcile_leavesAnInProgressTodoAlone_evenBelowHigh() {
+        AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        medium.setSeverity(AuditSeverity.MEDIUM);
+        Todo todo = todo("t-1", Todo.Status.IN_PROGRESS);
+        AuditFindingTodo managedLink = link("t-1", true);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
+        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
+
+        writer().reconcile(List.of(medium));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.IN_PROGRESS);
+        verify(findingTodoRepository, never()).delete(any());
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void reconcile_keepsTheTodo_whileAnotherLinkedOpenFindingIsStillHigh() {
+        AuditFinding medium = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        medium.setSeverity(AuditSeverity.MEDIUM);
+        AuditFinding high = finding("f-2", AuditFindingStatus.OPEN);
+        high.setSeverity(AuditSeverity.HIGH);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(link("t-1", true)));
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
+        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+                AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-1").managed(true).build(),
+                AuditFindingTodo.builder().findingId("f-2").todoId("t-1").managed(true).build()));
+        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
+        when(findingRepository.findById("f-2")).thenReturn(Optional.of(high));
+
+        writer().reconcile(List.of(medium));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
+        verify(findingTodoRepository, never()).delete(any());
+        verify(todoRepository, never()).save(any());
+    }
+
     private static AuditFindingTodo link(String todoId, boolean managed) {
         return AuditFindingTodo.builder().findingId(FINDING_ID).todoId(todoId).managed(managed).build();
     }

@@ -89,6 +89,47 @@ class AuditIngestionServiceTest {
         when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
     }
 
+    private void stubRunWithSubjects(String runId, String... subjects) {
+        StringBuilder findings = new StringBuilder();
+        for (String subject : subjects) {
+            if (findings.length() > 0) findings.append(',');
+            findings.append("{\"ruleKey\":\"size.class\",\"subject\":\"").append(subject)
+                    .append("\",\"severity\":\"MEDIUM\",\"title\":\"").append(subject)
+                    .append("\",\"evidence\":\"").append(subject).append("\"}");
+        }
+        String envelope = "<!-- mysuricates:audit-result:v1 {\"snapshotComplete\":true,\"findings\":[" + findings
+                + "]} -->\n# Report";
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output(envelope)
+                .metadata(new HashMap<>(Map.of("blockName", "report"))).build();
+        WorkflowRun run = WorkflowRun.builder().id(runId).workflow(Workflow.builder().name("Health Audit").build())
+                .status(RunStatus.COMPLETED).completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build();
+        when(runRepository.findByIdWithSteps(runId)).thenReturn(Optional.of(run));
+    }
+
+    /** 94fda6ef: gleiche Identitaet im selben Report — der zweite Befund faellt weg, aber nicht mehr still. */
+    @Test
+    void findingWithTheSameIdentity_isDroppedAndReported() {
+        stubRunWithSubjects("run-1", "application.yml:key-a", "application.yml:key-b");
+
+        service.ingest(event("run-1"));
+
+        verify(findingRepository, times(1)).save(any(AuditFinding.class));
+        verify(activityLog).warn(eq(ActivityLog.LogCategory.EXECUTION), contains("application.yml:key-b"),
+                eq("AuditIngestionService"), eq("run-1"), eq("wf-1"));
+    }
+
+    @Test
+    void kindPrefixedSubjects_keepSeparateIdentities() {
+        stubRunWithSubjects("run-1", "package:com.automation.controller", "package:com.automation.service.workflow");
+
+        service.ingest(event("run-1"));
+
+        ArgumentCaptor<AuditFinding> saved = ArgumentCaptor.forClass(AuditFinding.class);
+        verify(findingRepository, times(2)).save(saved.capture());
+        assertThat(saved.getAllValues()).extracting(AuditFinding::getFingerprint).doesNotHaveDuplicates();
+        verify(activityLog, never()).warn(any(), contains("gleiche Identitaet"), any(), any(), any());
+    }
+
     /** Ein akzeptiertes Finding; {@code inSnapshot} = der neue Report enthaelt es (gleicher Fingerprint). */
     private AuditFinding acceptedFinding(String snapshotEvidence, Instant acceptedAt, boolean inSnapshot) {
         AuditFinding finding = AuditFinding.builder()

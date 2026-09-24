@@ -60,6 +60,12 @@ Vorbild ist die ruleKey-Liste im Evidenz-Prompt von „Public Readiness“ (`sub
 `subject = Pfad` je Eintrag); `AuditRuleKeyCatalogTest` hält fest, dass dort kein Eintrag die
 Angabe vergisst (TODO `3a9e275b` — Evidenz-Prompt: subject je ruleKey festschreiben).
 
+Ein Doppelpunkt im `subject` hat Bedeutung: Steht davor eine Datei oder Klasse
+(`pom.xml:docker-java`, `Foo.java:42`), zählt nur der Teil vor dem `:`. Steht davor ein klein
+geschriebenes Art-Wort (`package:com.example.web`), zählt `<art>:<wert>` ganz. Zwei Befunde
+desselben Reports mit gleicher Identität übernimmt die Ingestion nur einmal und meldet den Rest
+im Activity-Log.
+
 ### Optional: `expectedFindings`
 
 Ein Audit, dessen Messblock die Soll-Zahl kennt (etwa `ERWARTETE FINDINGS` in der
@@ -179,7 +185,8 @@ Vorlaufs erneut zu melden: sonst schlösse ein bloßer Sinneswandel ihn als RESO
 - Ein zuvor offenes Finding, das im nächsten validen Snapshot fehlt, wird `RESOLVED`.
 - Ein erneut auftretendes `RESOLVED`-Finding wird als Regression wieder geöffnet.
 - `CRITICAL` und `HIGH` erzeugen automatisch verwaltete TODOs. `MEDIUM` kann im Audit
-  Center bestätigt werden; `LOW` bleibt zunächst ein Finding.
+  Center bestätigt werden; `LOW` bleibt zunächst ein Finding. Fällt ein offenes Finding unter
+  `HIGH`, wird sein verwaltetes TODO gelöst und archiviert (außer es steht auf `IN_PROGRESS`).
 - Ein auf `DONE` gesetztes verwaltetes TODO versetzt das Finding in
   `AWAITING_VERIFICATION`. Erst der nächste valide Audit-Snapshot bestätigt die Behebung.
 - Manuell verknüpfte TODOs werden niemals automatisch im Status verändert.

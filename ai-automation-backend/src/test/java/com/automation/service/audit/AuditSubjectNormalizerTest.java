@@ -33,6 +33,16 @@ class AuditSubjectNormalizerTest {
             "ContainerShellService | ContainerShellService",
             // Gross-/Kleinschreibung bleibt unveraendert, ein gross geschriebener Suffix ist keine Methode
             "Application.YML | Application.YML",
+            // Vor dem Doppelpunkt eine Datei oder Klasse: der Rest ist Position/Schluessel und faellt weg
+            "pom.xml:docker-java-core | pom.xml",
+            // (Klasse.java faltet wie Klasse.methode auf den Klassennamen)
+            "RateLimitFilter.java:47 | RateLimitFilter",
+            "ShellBlockExecutor:resolveTemplate | ShellBlockExecutor",
+            // Vor dem Doppelpunkt ein klein geschriebenes Art-Wort: <art>:<wert> ist die Identitaet (94fda6ef)
+            "package:com.automation.controller | package:com.automation.controller",
+            "package:com.automation.service.workflow | package:com.automation.service.workflow",
+            "safe-inventory:git-status | safe-inventory:git-status",
+            "package : com.automation.controller | package:com.automation.controller",
     })
     void normalizesSubject(String input, String expected) {
         assertThat(AuditSubjectNormalizer.normalize(input)).isEqualTo(expected);
@@ -53,7 +63,8 @@ class AuditSubjectNormalizerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"ContainerShellService.execute", "application.yml:key-store-password",
-            "com.automation.service.Foo.bar", "src/main/java/com/automation/Foo.java", "application.yml"})
+            "com.automation.service.Foo.bar", "src/main/java/com/automation/Foo.java", "application.yml",
+            "package : com.automation.controller", "safe-inventory:git-status"})
     void isIdempotent(String input) {
         String once = AuditSubjectNormalizer.normalize(input);
         assertThat(AuditSubjectNormalizer.normalize(once)).isEqualTo(once);

@@ -100,12 +100,16 @@ public class AuditIngestionService {
         Set<String> seenFingerprints = new HashSet<>();
         Set<String> reportedRuleKeys = new HashSet<>();
         List<AuditFinding> touched = new ArrayList<>();
+        List<String> collisions = new ArrayList<>();
 
         for (ParsedFinding item : parsedFindings) {
             AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, item, reportedRuleKeys);
             String ruleKey = resolution.ruleKey();
             String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
-            if (!seenFingerprints.add(fingerprint)) continue;
+            if (!seenFingerprints.add(fingerprint)) {
+                collisions.add(item.subject());
+                continue;
+            }
 
             AuditFinding finding = findingRepository
                     .findByProjectIdAndAuditKeyAndFingerprint(event.getProjectId(), report.getAuditKey(), fingerprint)
@@ -166,12 +170,14 @@ public class AuditIngestionService {
             // Wiedervorlagen (AWAITING_VERIFICATION nach Verfall) loesen keinen Fix-Loop aus.
             // Ein unbelegtes Finding ebenfalls nicht — es bleibt sichtbar, kostet aber keine
             // Arbeitszeit mehr, bis sein Beleg stimmt (TODO a94b56a0).
-            if ((item.severity() == AuditSeverity.CRITICAL || item.severity() == AuditSeverity.HIGH)
+            if (ManagedTodoWriter.needsTodo(item.severity())
                     && finding.getStatus() == AuditFindingStatus.OPEN
                     && !finding.isUnverifiedEvidence()) {
                 managedTodoWriter.ensure(finding, report);
             }
         }
+
+        reportCollisions(event, report, collisions);
 
         for (AuditFinding finding : findingRepository.findByProjectIdAndAuditKey(event.getProjectId(), report.getAuditKey())) {
             if (!seenFingerprints.contains(finding.getFingerprint())
@@ -183,6 +189,21 @@ public class AuditIngestionService {
             }
         }
         managedTodoWriter.reconcile(touched);
+    }
+
+    /**
+     * Zwei Befunde eines Reports mit gleichem ruleKey und gleichem normalisierten subject haben eine
+     * Identitaet; nur der erste wird uebernommen. Das geschah frueher still — beim Architektur-Review
+     * fehlten so drei Findings, ohne dass es jemand merkte (TODO 94fda6ef).
+     */
+    private void reportCollisions(WorkflowRunCompletedEvent event, AuditReport report, List<String> collisions) {
+        if (collisions.isEmpty()) return;
+        String message = "Audit '" + report.getAuditKey() + "': " + collisions.size()
+                + " Finding(s) verworfen, gleiche Identitaet (ruleKey + subject) wie ein frueheres im selben Report: "
+                + collisions;
+        log.warn("{} (run {})", message, event.getRunId());
+        activityLog.warn(ActivityLog.LogCategory.EXECUTION, message, "AuditIngestionService",
+                event.getRunId(), event.getWorkflowId());
     }
 
     /**
