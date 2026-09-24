@@ -200,6 +200,12 @@ another one; `up` does not rebuild a running instance but reports that it still 
 `scripts/instance.sh built --name main` shows which commit the build comes from. Your data stays in
 both cases. Running `./scripts/setup.sh` again also brings the instance to the new state.
 
+A restart aborts the workflow runs that are running at that moment. Before the installer restarts a
+running instance, it therefore asks the instance whether any are running (read-only, with the key from
+`instance.sh key`). If some are, it asks you — default: do not restart; with `--yes` it leaves the
+instance running and names the command for later. If the instance does not answer, it goes ahead as
+before and says so. `scripts/instance.sh down` names how many runs it aborts before it stops.
+
 ---
 
 ## 5. Windows

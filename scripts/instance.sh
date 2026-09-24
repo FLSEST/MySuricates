@@ -3,7 +3,7 @@
 # instance.sh — MySuricates-Instanzen starten, stoppen, ansehen: im Container oder auf diesem Rechner.
 #
 #   scripts/instance.sh up     --name NAME [--no-wait] [--rebuild]   # (bauen und) starten
-#   scripts/instance.sh down   --name NAME                           # stoppen; Daten bleiben
+#   scripts/instance.sh down   --name NAME                           # stoppen; Daten bleiben, laufende Runs brechen ab
 #   scripts/instance.sh status --name NAME
 #   scripts/instance.sh logs   --name NAME
 #   scripts/instance.sh key    --name NAME                           # API-Key fuer den Login
@@ -28,7 +28,8 @@
 # wenn noch kein JAR liegt. Eine laufende Instanz baut `up` nicht um: es sagt, dass sie einen alten
 # Stand zeigt — uebernommen wird er mit down und up (1c016162). Container: `up` baut das Image jedes
 # Mal (unveraenderte Schichten aus dem Cache), und zwar nur aus den getrackten Dateien des Klons
-# (890e8e9c), und ersetzt einen laufenden Container, wenn sich das Image geaendert hat.
+# (890e8e9c), und ersetzt einen laufenden Container, wenn sich das Image geaendert hat. `down` nennt
+# vorher die Workflow-Runs, die dabei abbrechen — gefragt wird die Instanz nur lesend (29820f58).
 # bash-3.2-tauglich (macOS).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,6 +42,8 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 . "${SCRIPT_DIR}/lib/i18n.sh"
 # shellcheck source=lib/netaddr.sh
 . "${SCRIPT_DIR}/lib/netaddr.sh"
+# shellcheck source=lib/instance-runs.sh
+. "${SCRIPT_DIR}/lib/instance-runs.sh"
 INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-${REPO_ROOT}/deploy/instances}"
 COMPOSE_FILE="${REPO_ROOT}/deploy/compose.yml"
 # Werkzeuge aus dem Download des Installers (Java/Node ohne Paketmanager), falls vorhanden
@@ -106,6 +109,14 @@ say_running() {  # WORT
 }
 
 health_ok() { curl -fsS --max-time 3 "http://127.0.0.1:$PORT/api/v1/system/health" >/dev/null 2>&1; }
+# Laufende Workflow-Runs brechen beim Stoppen ab (29820f58): vorher sagen, wie viele. Nur eine Warnung,
+# down ist ein ausdruecklicher Befehl; antwortet die Instanz nicht oder fehlt der Key, still weiter.
+warn_running_runs() {  # KEY
+  local n
+  n="$(instance_running_runs "$(instance_api_base "$BIND" "$PORT")" "${1:-}")"
+  [ -n "$n" ] && [ "$n" -gt 0 ] || return 0
+  echo "mysuricates-$NAME: $n Workflow-Run(s) laufen noch — sie brechen jetzt ab." >&2
+}
 # Belegt = irgendetwas nimmt Verbindungen an (nicht: antwortet wie MySuricates)
 port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
 wait_health() {
@@ -166,7 +177,12 @@ container_cmd() {
       [ "$WAIT" = 1 ] || exit 0
       if wait_health container_healthy; then say_running läuft; exit 0; fi
       echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
-    down)   compose down ;;
+    down)
+      # Key nur aus dem eigenen Container — einen gleichnamigen aus einer anderen Einrichtung fasst down nicht an
+      if [ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "mysuricates-$NAME" 2>/dev/null)" = "mysuricates-$NAME" ]; then
+        warn_running_runs "$(docker exec -u "$HOST_UID" "mysuricates-$NAME" cat "$HOST_HOME/.autotrigger/api-key" 2>/dev/null)"
+      fi
+      compose down ;;
     status) docker inspect -f '{{.State.Status}} {{.State.Health.Status}}' "mysuricates-$NAME" 2>/dev/null || echo "nicht gestartet" ;;
     logs)   compose logs --tail 200 ;;
     key)    docker exec -u "$HOST_UID" "mysuricates-$NAME" cat "$HOST_HOME/.autotrigger/api-key" ;;
@@ -300,6 +316,7 @@ EOF
       echo "mysuricates-$NAME wurde nicht rechtzeitig gesund — scripts/instance.sh logs --name $NAME" >&2; exit 1 ;;
     down)
       if ! host_running; then echo "mysuricates-$NAME läuft nicht"; rm -f "$PID_FILE"; exit 0; fi
+      warn_running_runs "$(cat "$STATE/home/.autotrigger/api-key" 2>/dev/null)"
       pid="$(cat "$PID_FILE")"
       kill "$pid" 2>/dev/null
       i=0; while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 30 ]; do sleep 1; i=$((i + 1)); done

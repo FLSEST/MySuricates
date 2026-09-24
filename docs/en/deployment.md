@@ -11,7 +11,7 @@ printf 'MYSURICATES_PORT=9090\n' > deploy/instances/main.env
 scripts/instance.sh up --name main       # build, start, wait for health
 scripts/instance.sh key --name main      # API key for the login
 scripts/instance.sh list                 # all instances with their port
-scripts/instance.sh down --name main     # stop; data stays in the volumes
+scripts/instance.sh down --name main     # stop; data stays in the volumes, running runs are aborted
 ```
 
 | Value in `deploy/instances/<name>.env` | Meaning |

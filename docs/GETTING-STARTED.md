@@ -204,6 +204,12 @@ Aus welchem Commit der Build stammt, zeigt `scripts/instance.sh built --name mai
 in beiden Fällen erhalten. Ein erneuter Lauf von `./scripts/setup.sh` bringt die Instanz ebenfalls auf
 den neuen Stand.
 
+Ein Neustart bricht Workflow-Runs ab, die gerade laufen. Bevor der Installer eine laufende Instanz neu
+startet, fragt er sie deshalb, ob welche laufen (nur lesend, mit dem Key aus `instance.sh key`). Laufen
+welche, fragt er zurück — Vorgabe: nicht neu starten; mit `--yes` startet er sie dann nicht neu und
+nennt den Befehl für später. Antwortet die Instanz nicht, geht es weiter wie bisher, mit einem Hinweis.
+`scripts/instance.sh down` nennt vor dem Stoppen, wie viele Runs dabei abbrechen.
+
 ---
 
 ## 5. Windows
