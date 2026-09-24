@@ -160,6 +160,10 @@ head -c 2048 /dev/zero | tr '\0' 'y' > "$FIX/ai-automation-backend/data/automati
 TODAY="$(date +%F)"
 { echo "$TODAY 10:00:00 [main] INFO  com.automation.Boot - Starte Kontext"
   echo "$TODAY 10:00:01 [virtual-7] ERROR com.automation.Run - request timed out after 300s"
+  # Kein Timeout, nur das Wort: die DEBUG-Zeile, mit der jeder Shell-Block (auch dieser Messblock)
+  # startet, und ein TODO-Titel im INFO-Log. Beide zaehlten frueher als Laufzeit-Timeout (19a64bbe).
+  echo "$TODAY 10:00:02 [virtual-8] DEBUG c.a.service.cli.ShellCommandService - Shell execute (workDir: /x, timeout: 180s): # Faktenblatt"
+  echo "$TODAY 10:00:03 [virtual-9] INFO  c.a.service.todo.TodoService - Created todo: Runtime-Timeouts: 1/Tag"
 } > "$FIX/ai-automation-backend/data/logs/mysuricates.log"
 echo "# Doku" > "$FIX/docs/x.md"
 git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.invalid add -A \
@@ -388,7 +392,7 @@ check "FAKT migration_index_statements: 1"     'grep -qx "FAKT migration_index_s
 check "FAKT database_bytes: 2048"              'grep -qx "FAKT database_bytes: 2048" "$TMP/perf-facts.out"'
 check "FAKT frontend_bundle_js_bytes: 4096"    'grep -qx "FAKT frontend_bundle_js_bytes: 4096" "$TMP/perf-facts.out"'
 check "FAKT main_thread_log_lines: 1"          'grep -qx "FAKT main_thread_log_lines: 1" "$TMP/perf-facts.out"'
-check "FAKT non_main_runtime_log_lines: 1"     'grep -qx "FAKT non_main_runtime_log_lines: 1" "$TMP/perf-facts.out"'
+check "FAKT non_main_runtime_log_lines: 3"     'grep -qx "FAKT non_main_runtime_log_lines: 3" "$TMP/perf-facts.out"'
 check "FAKT non_main_runtime_timeout_lines: 1" 'grep -qx "FAKT non_main_runtime_timeout_lines: 1" "$TMP/perf-facts.out"'
 check "step_results_bytes als Luecke"          'grep -q "^NICHT GEMESSEN: step_results_bytes (" "$TMP/perf-facts.out"'
 check "JVM entweder gemessen oder Luecke" \
