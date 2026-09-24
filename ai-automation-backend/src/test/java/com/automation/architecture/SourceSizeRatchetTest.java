@@ -44,7 +44,6 @@ class SourceSizeRatchetTest {
             entry("com/automation/service/cli/CommandExecutorService.java", 365),
             entry("com/automation/service/cli/ContainerShellService.java", 350),
             entry("com/automation/service/dialog/DialogSessionScanner.java", 348),
-            entry("com/automation/service/factory/WorkflowFactoryService.java", 317),
             entry("com/automation/service/integration/providers/confluence/ConfluenceProvider.java", 315),
             entry("com/automation/service/integration/providers/google/GoogleCalendarProvider.java", 372),
             entry("com/automation/service/integration/providers/google/GoogleGmailProvider.java", 330),

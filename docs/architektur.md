@@ -224,7 +224,7 @@ com.automation
 │   ├── todo/            TodoService (+ TodoSpecifications, TodoTrackerExportService, TodoResolutionService, TodoResponseAssembler), AutoTodoService (+ AutoTodoTextBuilder, PendingTodoApprovalService, GranularTodoService), GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoGhostWatchdogService, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService (+ WorkflowConversionPrompt), WorkflowSuggestion, DialogWorkflowSuggestion
 │   ├── dialog/          DialogSessionScanner, DialogConversionService (+ DialogConversionPrompt), ClaudeJsonlParser
-│   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog), ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
+│   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog, FactoryGeneratorResolver), FactoryVerificationService, ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
 │   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder (+ WishSystemPrompt), WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
@@ -749,6 +749,7 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Block-Schema in den Prompts von Factory, Wishes, Dialog-Import, Run-Konvertierung und Workflow-Optimierung kommt aus `BlockSpecs` (dieselben Texte wie `fetch block-spec` des Assistenten); `PromptBlockSchemaGateTest` prüft jeden dort genannten Blocktyp und Config-Schlüssel gegen die Executoren — die alten Prompts nannten `forEach`, `then_blocks`, `if_true` und andere Schlüssel, die kein Executor liest. Ein Beispiel für retry, foreach, while oder conditional mit Befehl muss außerdem `execution_mode` nennen: Ohne geht der Befehl als Prompt an die KI, und die KI baut nach, was das Beispiel zeigt (der Konvertierungs-Prompt zeigte so ein retry mit `npm test`).
 - `WorkflowFactoryService` — orchestriert den gesamten Factory-Prozess
+- `FactoryVerificationService` — Verify/Fix-Schleife: auf der Test-Instanz ausführen, bei Fehlschlag Blöcke per KI reparieren, Ergebnis an Dev melden (auch für Auto-Repair und Wishes)
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-basierte Workflow-Generierung
 - `WorkflowTextGenerator` — Textbasierte Workflow-Generierung
 - `FactorySetupService` — Konfiguration und Setup der Factory-Umgebung

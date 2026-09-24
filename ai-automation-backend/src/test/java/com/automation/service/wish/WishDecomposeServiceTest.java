@@ -7,7 +7,8 @@ import com.automation.repository.WishRepository;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.chain.ChainService;
-import com.automation.service.factory.WorkflowFactoryService;
+import com.automation.service.factory.FactoryTestResult;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -33,7 +34,7 @@ class WishDecomposeServiceTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowService workflowService;
     @Mock private ChainService chainService;
-    @Mock private WorkflowFactoryService workflowFactoryService;
+    @Mock private FactoryVerificationService factoryVerificationService;
     @Mock private WishPromptBuilder promptBuilder;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private AiProvider aiProvider;
@@ -46,7 +47,7 @@ class WishDecomposeServiceTest {
         wishConfig = new WishConfig();
         service = new WishDecomposeService(
                 wishConfig, wishRepository, aiProviderRegistry, projectRepository,
-                workflowService, chainService, workflowFactoryService,
+                workflowService, chainService, factoryVerificationService,
                 promptBuilder, messagingTemplate
         );
         lenient().when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
@@ -70,8 +71,8 @@ class WishDecomposeServiceTest {
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             Workflow created = Workflow.builder().id("wf-1").name("My WF").build();
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(created);
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -95,8 +96,8 @@ class WishDecomposeServiceTest {
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf1, wf2);
             WorkflowChain chain = WorkflowChain.builder().id("chain-1").build();
             when(chainService.create(any())).thenReturn(chain);
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -119,8 +120,8 @@ class WishDecomposeServiceTest {
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             Workflow created = Workflow.builder().id("wf-1").name("My WF").build();
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(created);
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -152,8 +153,8 @@ class WishDecomposeServiceTest {
                             "{\"workflows\":[{\"name\":\"WF\",\"blocks\":[]}],\"needsClarification\":false}", null));
             Workflow wf = Workflow.builder().id("wf-1").name("WF").build();
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf);
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -167,8 +168,8 @@ class WishDecomposeServiceTest {
             String json = "{\"workflows\":[{\"name\":\"WF\",\"blocks\":[]}],\"needsClarification\":false}";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -190,8 +191,8 @@ class WishDecomposeServiceTest {
                     .thenReturn("claude-opus-4-6");
             Workflow wf = Workflow.builder().id("wf-1").build();
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(wf);
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -214,8 +215,8 @@ class WishDecomposeServiceTest {
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -235,8 +236,8 @@ class WishDecomposeServiceTest {
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 
@@ -258,8 +259,8 @@ class WishDecomposeServiceTest {
                     ]}],"needsClarification":false}""";
             when(aiProvider.reason(any())).thenReturn(new AiProvider.ReasoningResult(json, null));
             when(workflowService.create(any(), eq(ChangeSource.WISH))).thenReturn(Workflow.builder().id("wf-1").build());
-            lenient().when(workflowFactoryService.verifyAndFix(anyString(), anyInt()))
-                    .thenReturn(new WorkflowFactoryService.FactoryTestResult("OK", null, null));
+            lenient().when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                    .thenReturn(new FactoryTestResult("OK", null, null));
 
             service.decompose(wish);
 

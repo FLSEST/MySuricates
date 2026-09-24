@@ -8,8 +8,8 @@ import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.factory.WorkflowFactoryService;
-import com.automation.service.factory.WorkflowFactoryService.FactoryTestResult;
+import com.automation.service.factory.FactoryTestResult;
+import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.staging.TestingService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AutoRepairServiceTest {
 
-    @Mock private WorkflowFactoryService workflowFactoryService;
+    @Mock private FactoryVerificationService factoryVerificationService;
     @Mock private WorkflowService workflowService;
     @Mock private TestingService testingService;
     @Mock private ActivityLogService activityLogService;
@@ -43,7 +43,7 @@ class AutoRepairServiceTest {
     @BeforeEach
     void setUp() {
         service = new AutoRepairService(
-                workflowFactoryService, workflowService, testingService,
+                factoryVerificationService, workflowService, testingService,
                 activityLogService, appSettingsRepository, workflowRunRepository,
                 workflowExecutor);
     }
@@ -54,14 +54,14 @@ class AutoRepairServiceTest {
     void onWorkflowRunCompleted_skipsNonFailedRuns() {
         var event = createEvent(RunStatus.COMPLETED, Map.of(), Map.of());
         service.onWorkflowRunCompleted(event);
-        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test
     void onWorkflowRunCompleted_skipsRepairAttempts() {
         var event = createEvent(RunStatus.FAILED, Map.of("autoRepairAttempt", true), Map.of());
         service.onWorkflowRunCompleted(event);
-        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test
@@ -69,7 +69,7 @@ class AutoRepairServiceTest {
         var event = createEvent(RunStatus.FAILED, Map.of(),
                 Map.of("autoRepair", Map.of("enabled", false)));
         service.onWorkflowRunCompleted(event);
-        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test
@@ -82,7 +82,7 @@ class AutoRepairServiceTest {
                 Map.of("autoRepair", Map.of("enabled", true, "mode", "test")));
         service.onWorkflowRunCompleted(event);
 
-        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test
@@ -95,7 +95,7 @@ class AutoRepairServiceTest {
                 Map.of("autoRepair", Map.of("enabled", true, "mode", "local")));
         service.onWorkflowRunCompleted(event);
 
-        verifyNoInteractions(workflowFactoryService, workflowExecutor, activityLogService);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor, activityLogService);
     }
 
     @Test
@@ -107,7 +107,7 @@ class AutoRepairServiceTest {
 
         assertThat(service.repairAllFailed(true)).isZero();
 
-        verifyNoInteractions(workflowFactoryService, workflowExecutor);
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test
@@ -115,14 +115,14 @@ class AutoRepairServiceTest {
         var workflow = createWorkflow(Map.of("autoRepair", Map.of("enabled", true)));
         when(workflowService.findById("wf-1")).thenReturn(workflow);
         when(testingService.isHealthy()).thenReturn(true);
-        when(workflowFactoryService.verifyAndFix("wf-1", 2))
+        when(factoryVerificationService.verifyAndFix("wf-1", 2))
                 .thenReturn(new FactoryTestResult("run-1", "PASSED", null));
 
         var event = createEvent(RunStatus.FAILED, Map.of(),
                 Map.of("autoRepair", Map.of("enabled", true)));
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowFactoryService).verifyAndFix("wf-1", 2);
+        verify(factoryVerificationService).verifyAndFix("wf-1", 2);
         verifyNoInteractions(workflowExecutor);
     }
 
@@ -143,7 +143,7 @@ class AutoRepairServiceTest {
                 Map.of("autoRepair", Map.of("enabled", true)));
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowFactoryService).autoFixWorkflow(any(Workflow.class), anyString());
+        verify(factoryVerificationService).autoFixWorkflow(any(Workflow.class), anyString());
         verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR));
     }
 
@@ -161,9 +161,9 @@ class AutoRepairServiceTest {
                 Map.of("autoRepair", Map.of("enabled", true, "mode", "local")));
         service.onWorkflowRunCompleted(event);
 
-        verify(workflowFactoryService).autoFixWorkflow(any(Workflow.class), anyString());
+        verify(factoryVerificationService).autoFixWorkflow(any(Workflow.class), anyString());
         verify(workflowExecutor).execute(any(Workflow.class), anyMap(), isNull(), anyMap(), eq(TriggerSource.AUTO_REPAIR));
-        verify(workflowFactoryService, never()).verifyAndFix(anyString(), anyInt());
+        verify(factoryVerificationService, never()).verifyAndFix(anyString(), anyInt());
     }
 
     // ── resolveRepairMode tests ──────────────────────────────
@@ -307,7 +307,7 @@ class AutoRepairServiceTest {
 
         assertThat(result.status()).isEqualTo("PASSED");
         assertThat(result.runId()).isEqualTo("run-1");
-        verify(workflowFactoryService, times(1)).autoFixWorkflow(any(), anyString());
+        verify(factoryVerificationService, times(1)).autoFixWorkflow(any(), anyString());
     }
 
     @Test
@@ -331,7 +331,7 @@ class AutoRepairServiceTest {
         FactoryTestResult result = service.repairLocally("wf-1", "original error", 2, 600);
 
         assertThat(result.status()).isEqualTo("PASSED");
-        verify(workflowFactoryService, times(2)).autoFixWorkflow(any(), anyString());
+        verify(factoryVerificationService, times(2)).autoFixWorkflow(any(), anyString());
     }
 
     @Test
@@ -350,7 +350,7 @@ class AutoRepairServiceTest {
 
         assertThat(result.status()).isEqualTo("FAILED");
         assertThat(result.error()).isEqualTo("still broken");
-        verify(workflowFactoryService, times(2)).autoFixWorkflow(any(), anyString());
+        verify(factoryVerificationService, times(2)).autoFixWorkflow(any(), anyString());
     }
 
     @Test
