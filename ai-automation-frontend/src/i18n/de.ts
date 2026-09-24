@@ -2329,6 +2329,9 @@ export const de: TranslationKeys = {
       legendAssigned: 'zugeordnet',
       legendCandidate: 'Vorschlag',
       empty: 'Diesem Ziel ist noch kein TODO zugeordnet – unten stehen Vorschläge.',
+      emptyMap: 'Noch keine TODOs – unten unter „Könnte dazugehören“ zuordnen',
+      outdatedBackend: 'Die Karte braucht einen neueren Backend-Stand – Backend neu starten; die Liste funktioniert weiter.',
+      toList: 'Zur Liste',
     },
     candidates: {
       title: 'Könnte dazugehören',

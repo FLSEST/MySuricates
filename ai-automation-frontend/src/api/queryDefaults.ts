@@ -1,6 +1,15 @@
 import type { DefaultOptions, Query, QueryClient } from '@tanstack/react-query';
-import { isRateLimitBackoffActive, subscribeRateLimitBackoff } from './client';
+import { apiErrorStatus, isRateLimitBackoffActive, subscribeRateLimitBackoff } from './client';
 import { isModuleDisabledError } from '../hooks/useModules';
+
+/** Retry rule of the app: once, never for a 429 or a disabled module. Hooks that add a rule build on it. */
+export function defaultQueryRetry(failureCount: number, error: unknown): boolean {
+  // Never retry rate limit errors — retries make the problem worse
+  if (apiErrorStatus(error) === 429) return false;
+  // A disabled module stays disabled until the backend restarts
+  if (isModuleDisabledError(error)) return false;
+  return failureCount < 1;
+}
 
 /**
  * QueryClient-Defaults der App. Als eigenes Modul, damit Tests gegen genau die Defaults
@@ -18,13 +27,7 @@ import { isModuleDisabledError } from '../hooks/useModules';
 export const appQueryDefaults: DefaultOptions = {
   queries: {
     staleTime: 30_000,
-    retry: (failureCount: number, error: unknown) => {
-      // Never retry rate limit errors — retries make the problem worse
-      if (error && typeof error === 'object' && 'status' in error && (error as { status: number }).status === 429) return false;
-      // A disabled module stays disabled until the backend restarts
-      if (isModuleDisabledError(error)) return false;
-      return failureCount < 1;
-    },
+    retry: defaultQueryRetry,
     refetchOnWindowFocus: false,
     refetchOnMount: (query: Query) => !(query.state.status === 'error' && isRateLimitBackoffActive()),
     get retryOnMount() {

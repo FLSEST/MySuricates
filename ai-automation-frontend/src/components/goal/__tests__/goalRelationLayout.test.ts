@@ -98,6 +98,31 @@ describe('layoutRelations', () => {
     expect(layout.hasWorkers).toBe(false);
   });
 
+  it('lays out a goal without any todo as an empty map (no fixed rows, finite size)', () => {
+    const layout = layoutRelations([]);
+    expect(layout.nodes).toEqual([]);
+    expect(layout.edges).toEqual([]);
+    expect(layout.groups).toEqual([]);
+    expect(layout.hasWorkers).toBe(false);
+    expect(Number.isFinite(layout.height)).toBe(true);
+    expect(layout.height).toBeGreaterThan(0);
+  });
+
+  it('lays out a goal with only candidates as the dashed group alone', () => {
+    const layout = layoutRelations([
+      relation('c1', { candidate: true, ...fromGate('c1'), workers: [fixer] }),
+      relation('c2', { candidate: true }),
+    ]);
+
+    expect(layout.groups).toEqual([{ label: null, y: expect.any(Number), candidate: true }]);
+    expect(byKind(layout.nodes, 'todo').map((n) => n.candidate)).toEqual([true, true]);
+    expect(layout.edges.length).toBeGreaterThan(0);
+    expect(layout.edges.filter((e) => e.style !== 'dotted').every((e) => e.style === 'dashed')).toBe(true);
+    expect(layout.hasWorkers).toBe(false);
+    for (const n of layout.nodes) expect(Number.isFinite(n.y)).toBe(true);
+    expect(Number.isFinite(layout.height)).toBe(true);
+  });
+
   it('keeps merged nodes of one column from overlapping', () => {
     const todos = Array.from({ length: 6 }, (_, i) => relation(`t${i}`, {
       origin: { kind: 'AGENT', workflowId: null, workflowName: null, runId: null, runStatus: null, findingIds: [], agent: `agent-${i}` },

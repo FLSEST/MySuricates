@@ -2332,6 +2332,9 @@ export const en = {
       legendAssigned: 'assigned',
       legendCandidate: 'suggestion',
       empty: 'No TODO belongs to this goal yet – suggestions are below.',
+      emptyMap: 'No TODOs yet – add some below under “Might belong here”',
+      outdatedBackend: 'The map needs a newer backend – restart the backend; the list keeps working.',
+      toList: 'To the list',
     },
     candidates: {
       title: 'Might belong here',

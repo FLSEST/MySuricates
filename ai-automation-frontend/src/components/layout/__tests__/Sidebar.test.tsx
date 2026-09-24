@@ -45,7 +45,7 @@ describe('Sidebar modules', () => {
     expect(screen.getByRole('link', { name: 'Workflows' })).toBeInTheDocument();
   });
 
-  it('lists the goals overview right after the cockpit (core page, no module)', async () => {
+  it('lists the goals overview right under the todos, indented as a sub-entry (core page, no module)', async () => {
     const modules = modulesFixture('core', ['chains', 'webhooks', 'audit']);
     server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(modules)));
     renderWithProviders(<Sidebar />);
@@ -53,7 +53,40 @@ describe('Sidebar modules', () => {
     const goals = await screen.findByRole('link', { name: 'Goals' });
     expect(goals).toHaveAttribute('href', '/goals');
     const names = screen.getAllByRole('link').map((link) => link.textContent);
-    expect(names.indexOf('Goals')).toBe(names.indexOf('Cockpit') + 1);
+    expect(names.indexOf('Goals')).toBe(names.indexOf('Todos') + 1);
+    expect(goals).toHaveClass('pl-8');
+    expect(screen.getByRole('link', { name: 'Todos' })).not.toHaveClass('pl-8');
+  });
+
+  it('shows goals as a normal entry once the user moved it away from the todos', () => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', [])));
+    useSettingsStore.setState({ sidebarItemOrder: ['/', '/todos', '/workflows', '/goals', '/cockpit'] });
+    renderWithProviders(<Sidebar />);
+
+    expect(screen.getByRole('link', { name: 'Goals' })).not.toHaveClass('pl-8');
+  });
+
+  it('shows goals as a normal entry when the todos are hidden', () => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', [])));
+    useSettingsStore.setState({ sidebarHiddenItems: ['/todos'] });
+    renderWithProviders(<Sidebar />);
+
+    expect(screen.getByRole('link', { name: 'Goals' })).not.toHaveClass('pl-8');
+  });
+
+  it('indents goals in edit mode too, and not in the collapsed (icons only) sidebar', () => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', [])));
+    const { unmount } = renderWithProviders(<Sidebar />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit menu' }));
+    const row = screen.getByRole('button', { name: 'Move Goals' }).parentElement!;
+    expect(row).toHaveAttribute('data-nested', 'true');
+    expect(screen.getByRole('button', { name: 'Move Todos' }).parentElement).not.toHaveAttribute('data-nested');
+    unmount();
+
+    useSidebarStore.setState({ collapsed: true });
+    renderWithProviders(<Sidebar />);
+    const goalsLink = document.querySelector('a[href="/goals"]')!;
+    expect(goalsLink).not.toHaveClass('pl-8');
   });
 
   it('shows module pages when everything is enabled', async () => {
