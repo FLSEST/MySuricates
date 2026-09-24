@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, Trash2 } from 'lucide-react';
-import { Button, Modal, Spinner } from '../components/ui';
+import { Button, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
@@ -168,13 +168,12 @@ export function Workflows() {
     );
   }, [filtered, t.common.project]);
 
-  useEffect(() => {
-    if (!groupedByProject.length) return;
-    if (collapsedProjects.has('__all__')) {
-      const allIds = new Set(groupedByProject.map((g) => g.projectId));
-      setCollapsedProjects(allIds);
-    }
-  }, [groupedByProject.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Without a stored choice ('__all__') the projects of the first load start collapsed. Resolved
+  // against the unfiltered list, so an active search does not decide it; projects that appear later
+  // (created, imported, installed) are not in the set and show open.
+  if (collapsedProjects.has('__all__') && workflows?.length) {
+    setCollapsedProjects(new Set(workflows.map((w) => w.projectId)));
+  }
 
   const selectedWorkflow = useMemo(() => {
     if (!filtered.length) return null;
@@ -531,30 +530,17 @@ export function Workflows() {
         </div>
       )}
 
-      <Modal
+      <ConfirmModal
         open={deleteConfirm.open}
+        // Closing is blocked while the deletes run (Escape, backdrop and cancel alike)
         onClose={() => !deleting && setDeleteConfirm({ open: false, ids: [], names: [] })}
+        onConfirm={confirmDelete}
         title={deleteConfirm.ids.length === 1 ? t.workflows.deleteWorkflow : t.workflows.deleteWorkflows}
-        size="sm"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setDeleteConfirm({ open: false, ids: [], names: [] })}
-              disabled={deleting}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              variant="danger"
-              icon={<Trash2 className="w-4 h-4" />}
-              onClick={confirmDelete}
-              loading={deleting}
-            >
-              {t.common.delete} ({deleteConfirm.ids.length})
-            </Button>
-          </>
-        }
+        confirmLabel={<>{t.common.delete} ({deleteConfirm.ids.length})</>}
+        confirmIcon={<Trash2 className="w-4 h-4" />}
+        variant="danger"
+        isPending={deleting}
+        cancelDisabled={deleting}
       >
         <div className="space-y-3">
           <p className="text-sm text-text-secondary">{t.workflows.deleteConfirm}</p>
@@ -568,7 +554,7 @@ export function Workflows() {
           </div>
           <p className="text-xs text-danger">{t.common.deleteConfirm}</p>
         </div>
-      </Modal>
+      </ConfirmModal>
 
       <ExecuteDialog
         open={executeDialog.open}

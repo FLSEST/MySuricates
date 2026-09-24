@@ -6,7 +6,7 @@ import { DashboardReportFields } from './DashboardReportFields';
 import { BlockSkillPicker } from './BlockSkillPicker';
 import { IntegrationBlockVerificationNotice } from '../integrations/IntegrationVerification';
 import { BLOCK_DEFAULT_CONFIG, buildBlockConfigSchema } from './blockConfigSchema';
-import { buildPlaceholderContext } from './placeholderContext';
+import { buildPlaceholderContext } from '../../utils/placeholderContext';
 import type { BlockDraft } from './blockEdit';
 import { applyPreset, COMPRESS_PRESETS, type CompressPresetId } from './compression';
 import { useI18nStore, useT } from '../../i18n';

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useDebounced } from '../../palette/useDebounced';
+import { useDebounced } from '../../../hooks/useDebounced';
 import { parseHomeQuery } from '../../../utils/homeCommand/query';
 import { arrangeGroups } from '../../../utils/homeCommand/arrange';
 import {

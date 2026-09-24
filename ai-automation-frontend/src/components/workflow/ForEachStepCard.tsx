@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { CheckCircle2, AlertCircle, ChevronDown, ChevronRight, List } from 'lucide-react';
 import { Badge } from '../ui';
-import { PathLinkedOutput } from './PathLinkedOutput';
+import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import type { StepResult } from '../../types';
 import type { ForEachState, ForEachItemState } from '../../hooks/useWebSocket';
-import { persistedForEachItems, persistedTotalItems, stepMetadataSummary } from '../workflow/stepMetadata';
-import { StepCardFrame, StepCardHeader } from '../workflow/StepCardChrome';
+import { persistedForEachItems, persistedTotalItems, stepMetadataSummary } from './stepMetadata';
+import { StepCardFrame, StepCardHeader } from './StepCardChrome';
 
 interface ForEachItemRowProps {
   item: ForEachItemState;

@@ -223,8 +223,11 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Settings sub-components for the modular settings page
 - Separate components: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation via `SettingsNav`, shared layout via `SettingsSection`
+- `SyncSelectModal`: selection modal for the definition sync (`StagingCard`, `TestingCard`)
 
 ### Shared Components (`src/components/shared/`)
+
+**Rule:** `shared` imports no feature folders (`workflow`, `goal`, `hints`, `todo`, `settings` …) and not `assistantPanelUtils`, only `ui`, `api`, `hooks`, `utils`, `types`, `stores` and `i18n`. A component that needs a feature folder belongs in that folder; feature-free helpers live in `src/utils/` (e.g. `placeholderContext.ts`, `internalAppPath.ts`). That is why `AgenticStepCard`, `ForEachStepCard` and `ApprovalDialog` (approval dialog in a run, uses `Hint`) live in `components/workflow/`, and `TodoEditModal` in `components/todo/`.
 
 | Component | Description |
 |---|---|
@@ -237,9 +240,6 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 | `CopyButton` | Copy button with success feedback |
 | `GateStatusBadge` | Gate status display (RED/YELLOW/GREEN) |
 | `GateStatusBanner` | Gate status banner for run details |
-| `AgenticStepCard` | Display of agentic block steps |
-| `ForEachStepCard` | Display of ForEach block iterations |
-| `ApprovalDialog` | Dialog for approval block interaction |
 | `HumanInputDialog` | Dialog for human input block interaction |
 | `ExecutionBadges` | Status badges for executions |
 | `ConversionSuggestion` | Suggestion for workflow conversion |
@@ -247,9 +247,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 | `PathLinkedOutput` | Output with clickable file paths |
 | `ProviderIcon` | Icon display for AI providers |
 | `RouteErrorFallback` | Error boundary for route errors |
-| `SyncSelectModal` | Selection modal for definition sync |
 | `TerminalPanel` | Interactive xterm.js terminal with WebSocket connection |
-| `TodoEditModal` | Modal for editing TODOs |
 | `ErrorBoundary` | React error boundary with fallback UI |
 
 ## UI Component Library
@@ -273,6 +271,7 @@ All components in `src/components/ui/`:
 | `CronPicker` | `value`, `onChange`, `label` | Cron expression editor with preview |
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag input with autocomplete |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardized modal footer |
+| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Confirmation dialog on top of `Modal` (Escape and backdrop close it). Every yes/no dialog uses it instead of assembling `Modal` + `ModalFooter` itself; `isPending` locks the confirm button |
 
 ## Design System
 

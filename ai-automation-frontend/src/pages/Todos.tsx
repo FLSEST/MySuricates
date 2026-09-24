@@ -9,7 +9,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { Hint } from '../components/hints/Hint';
 import { ErrorState } from '../components/shared/ErrorState';
 import { Pagination } from '../components/shared/Pagination';
-import { TodoEditModal } from '../components/shared/TodoEditModal';
+import { TodoEditModal } from '../components/todo/TodoEditModal';
 import { TodoTriggerSection } from '../components/todo/TodoTriggerSection';
 import {
   STATUSES, SOURCES, MAX_VISIBLE_TAGS,

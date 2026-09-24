@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, ExternalLink, Trash2, Unplug, KeyRound } from 'lucide-react';
-import { Card, Button, Badge, Input, Modal } from '../ui';
+import { Card, Button, Badge, Input, ConfirmModal } from '../ui';
 import {
   CONNECTION_NAME_PATTERN,
   DEFAULT_CONNECTION,
@@ -178,21 +178,21 @@ export function ConnectionsPanel({ provider, displayName, onRefresh }: {
         )}
       </div>
 
-      <Modal
+      <ConfirmModal
         open={!!pending}
         onClose={() => setPending(null)}
+        onConfirm={confirmPending}
         title={pending ? (pending.kind === 'delete' ? tc.deleteConfirm : tc.disconnectConfirm).replace('{name}', pending.name) : ''}
+        confirmLabel={pending?.kind === 'delete' ? tc.delete : t.integrations.disconnect}
+        variant="danger"
+        isPending={disconnect.isPending || deleteCredentials.isPending}
+        cancelVariant="ghost"
+        size="md"
       >
-        <p className="text-text-secondary mb-4">
+        <p className="text-text-secondary">
           {pending?.kind === 'delete' ? tc.deleteWarning : t.integrations.disconnectWarning}
         </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setPending(null)}>{t.common.cancel}</Button>
-          <Button variant="danger" onClick={confirmPending} loading={disconnect.isPending || deleteCredentials.isPending}>
-            {pending?.kind === 'delete' ? tc.delete : t.integrations.disconnect}
-          </Button>
-        </div>
-      </Modal>
+      </ConfirmModal>
     </Card>
   );
 }

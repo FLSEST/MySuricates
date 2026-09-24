@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ExternalLink, PawPrint } from 'lucide-react';
 import { useT } from '../../i18n';
 import { useTraySettings, useUpdateTraySettings, type TraySettings } from '../../hooks/useTraySettings';
@@ -17,12 +17,10 @@ export function TraySettingsCard() {
   const { data, isLoading } = useTraySettings();
   const updateSettings = useUpdateTraySettings();
   const settings = data ?? DEFAULTS;
-  const [publicUrl, setPublicUrl] = useState('');
+  // The field shows the stored URL until the user edits it; the draft only lives while dirty
+  const [urlDraft, setUrlDraft] = useState('');
   const [urlDirty, setUrlDirty] = useState(false);
-
-  useEffect(() => {
-    if (data && !urlDirty) setPublicUrl(data.publicUrl);
-  }, [data, urlDirty]);
+  const publicUrl = urlDirty ? urlDraft : (data?.publicUrl ?? '');
 
   const hasUrlChanges = !!data && publicUrl.trim() !== data.publicUrl;
   const currentOrigin = typeof window === 'undefined' ? '' : window.location.origin;
@@ -96,7 +94,7 @@ export function TraySettingsCard() {
               <Input
                 value={publicUrl}
                 onChange={(event) => {
-                  setPublicUrl(event.target.value);
+                  setUrlDraft(event.target.value);
                   setUrlDirty(true);
                 }}
                 placeholder="https://mysuricates.example.com"
@@ -107,7 +105,7 @@ export function TraySettingsCard() {
               variant="secondary"
               icon={<ExternalLink className="h-4 w-4" />}
               onClick={() => {
-                setPublicUrl(currentOrigin);
+                setUrlDraft(currentOrigin);
                 setUrlDirty(true);
               }}
             >

@@ -52,7 +52,11 @@ export function Settings() {
   const repairAllFailed = useRepairAllFailed();
 
   // Collapsible section state — all start closed except general
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  // A deep link (#section) opens its section from the start; the effect below only scrolls to it
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    const targetId = window.location.hash.slice(1);
+    return targetId ? { [targetId]: true } : {};
+  });
 
   const toggleSection = useCallback((id: string) => {
     setOpenSections(prev => ({ ...prev, [id]: !prev[id] }));
@@ -66,7 +70,6 @@ export function Settings() {
   useEffect(() => {
     const targetId = window.location.hash.slice(1);
     if (!targetId) return;
-    setOpenSections(prev => ({ ...prev, [targetId]: true }));
     window.setTimeout(() => {
       document.getElementById(targetId)?.scrollIntoView({ block: 'start' });
     }, 0);

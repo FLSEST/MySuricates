@@ -1,6 +1,6 @@
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { isInternalAppPath } from '../assistantPanelUtils';
+import { isInternalAppPath } from '../../utils/internalAppPath';
 
 interface MarkdownBlockProps {
   children: string;

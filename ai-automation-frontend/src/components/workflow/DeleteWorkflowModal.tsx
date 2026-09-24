@@ -1,4 +1,4 @@
-import { Modal, ModalFooter } from '../ui';
+import { ConfirmModal } from '../ui';
 import { useT } from '../../i18n';
 
 interface DeleteWorkflowModalProps {
@@ -12,25 +12,15 @@ interface DeleteWorkflowModalProps {
 export function DeleteWorkflowModal({ open, onClose, workflowName, onDelete, deleting }: DeleteWorkflowModalProps) {
   const t = useT();
   return (
-    <Modal
+    <ConfirmModal
       open={open}
       onClose={onClose}
+      onConfirm={onDelete}
       title={`${t.common.delete} "${workflowName}"?`}
-      size="sm"
-      footer={
-        <ModalFooter
-          onCancel={onClose}
-          onAction={onDelete}
-          cancelLabel={t.common.cancel}
-          actionLabel={t.common.delete}
-          actionVariant="danger"
-          actionLoading={deleting}
-        />
-      }
-    >
-      <p className="text-sm text-text-secondary">
-        {t.common.deleteConfirm} {t.workflows.deleteConfirm}
-      </p>
-    </Modal>
+      message={<>{t.common.deleteConfirm} {t.workflows.deleteConfirm}</>}
+      confirmLabel={t.common.delete}
+      variant="danger"
+      isPending={deleting}
+    />
   );
 }

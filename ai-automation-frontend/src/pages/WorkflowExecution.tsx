@@ -7,11 +7,11 @@ import { GateStatusBadge } from '../components/shared/GateStatusBadge';
 import { GateStatusBanner } from '../components/shared/GateStatusBanner';
 import { ErrorState } from '../components/shared/ErrorState';
 import { LogViewer } from '../components/shared/LogViewer';
-import { ApprovalDialog } from '../components/shared/ApprovalDialog';
+import { ApprovalDialog } from '../components/workflow/ApprovalDialog';
 import { Hint } from '../components/hints/Hint';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
-import { AgenticStepCard } from '../components/shared/AgenticStepCard';
-import { ForEachStepCard } from '../components/shared/ForEachStepCard';
+import { AgenticStepCard } from '../components/workflow/AgenticStepCard';
+import { ForEachStepCard } from '../components/workflow/ForEachStepCard';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {

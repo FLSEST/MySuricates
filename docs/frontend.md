@@ -223,8 +223,11 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Settings-Unterkomponenten für die modulare Settings-Seite
 - Separate Komponenten: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation über `SettingsNav`, gemeinsames Layout via `SettingsSection`
+- `SyncSelectModal`: Auswahl-Modal für den Definition-Sync (`StagingCard`, `TestingCard`)
 
 ### Shared-Komponenten (`src/components/shared/`)
+
+**Regel:** `shared` importiert keine Fachordner (`workflow`, `goal`, `hints`, `todo`, `settings` …) und nicht `assistantPanelUtils`, sondern nur `ui`, `api`, `hooks`, `utils`, `types`, `stores` und `i18n`. Eine Komponente, die einen Fachordner braucht, gehört in diesen Ordner; fachfreie Helfer liegen in `src/utils/` (z. B. `placeholderContext.ts`, `internalAppPath.ts`). Deshalb liegen `AgenticStepCard`, `ForEachStepCard` und `ApprovalDialog` (Freigabe-Dialog im Run, nutzt `Hint`) in `components/workflow/`, `TodoEditModal` in `components/todo/`.
 
 | Komponente | Beschreibung |
 |---|---|
@@ -237,9 +240,6 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 | `CopyButton` | Kopier-Button mit Erfolgsfeedback |
 | `GateStatusBadge` | Gate-Status-Anzeige (RED/YELLOW/GREEN) |
 | `GateStatusBanner` | Gate-Status-Banner für Run-Details |
-| `AgenticStepCard` | Darstellung von Agentic-Block-Steps |
-| `ForEachStepCard` | Darstellung von ForEach-Block-Iterationen |
-| `ApprovalDialog` | Dialog für Approval-Block-Interaktion |
 | `HumanInputDialog` | Dialog für Human-Input-Block-Interaktion |
 | `ExecutionBadges` | Status-Badges für Ausführungen |
 | `ConversionSuggestion` | Vorschlag zur Workflow-Konvertierung |
@@ -247,9 +247,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 | `PathLinkedOutput` | Output mit klickbaren Dateipfaden |
 | `ProviderIcon` | Icon-Anzeige für AI-Provider |
 | `RouteErrorFallback` | Error-Boundary für Route-Fehler |
-| `SyncSelectModal` | Auswahl-Modal für Definition-Sync |
 | `TerminalPanel` | Interaktives xterm.js-Terminal mit WebSocket-Anbindung |
-| `TodoEditModal` | Modal zum Bearbeiten von TODOs |
 | `ErrorBoundary` | React Error Boundary mit Fallback-UI |
 
 ## UI-Komponentenbibliothek
@@ -273,6 +271,7 @@ Alle Komponenten in `src/components/ui/`:
 | `CronPicker` | `value`, `onChange`, `label` | Cron-Ausdruck-Editor mit Vorschau |
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag-Eingabe mit Autovervollständigung |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardisierter Modal-Footer |
+| `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Bestätigungsdialog auf `Modal` (Escape und Backdrop schließen). Jeder Ja/Nein-Dialog nutzt ihn statt `Modal` + `ModalFooter` selbst zusammenzusetzen; `isPending` sperrt den Bestätigen-Button |
 
 ## Design-System
 

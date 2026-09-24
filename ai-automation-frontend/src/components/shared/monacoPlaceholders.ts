@@ -1,4 +1,4 @@
-import { checkPlaceholders, type PlaceholderContext, type PlaceholderKind } from '../workflow/placeholderContext';
+import { checkPlaceholders, type PlaceholderContext, type PlaceholderKind } from '../../utils/placeholderContext';
 
 /**
  * Monaco side of the `{{ … }}` help: suggestions after `{{`, a hover with origin and explanation, a

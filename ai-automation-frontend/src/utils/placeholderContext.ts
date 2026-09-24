@@ -1,5 +1,5 @@
-import type { BlockDefinition } from '../../types';
-import type { SchemaLocale } from './blockConfigSchema';
+import type { BlockDefinition } from '../types';
+import type { Locale } from '../i18n';
 
 /**
  * Which `{{ … }}` placeholders are bound at a given position of a block list, and where each value comes
@@ -32,7 +32,7 @@ export interface PlaceholderContext {
   blockIndex: number;
   /** The edited block runs its fields as shell commands. */
   shell: boolean;
-  locale: SchemaLocale;
+  locale: Locale;
 }
 
 type Pick2 = (de: string, en: string) => string;
@@ -130,7 +130,7 @@ export function buildPlaceholderContext(
   blocks: BlockDefinition[],
   blockIndex: number,
   current: { type: string; configJson: string },
-  options: { defaultContext?: Record<string, unknown>; locale: SchemaLocale },
+  options: { defaultContext?: Record<string, unknown>; locale: Locale },
 ): PlaceholderContext {
   const t: Pick2 = (de, en) => (options.locale === 'de' ? de : en);
   const before = blocks.slice(0, blockIndex);

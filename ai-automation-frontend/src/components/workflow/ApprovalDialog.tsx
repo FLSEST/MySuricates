@@ -3,7 +3,7 @@ import { Button } from '../ui';
 import { useT } from '../../i18n';
 import type { PendingApproval } from '../../hooks/useWebSocket';
 import { isRejectOption } from '../../hooks/usePendingInputs';
-import { ApprovalQuestion } from './ApprovalQuestion';
+import { ApprovalQuestion } from '../shared/ApprovalQuestion';
 import { Hint } from '../hints/Hint';
 
 interface ApprovalDialogProps {

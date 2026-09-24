@@ -16,7 +16,7 @@ import { PaletteRow } from './PaletteRow';
 import { Section } from './Section';
 import { AssistantRow } from './AssistantRow';
 import { CollectForm, type CollectingState } from './CollectForm';
-import { useDebounced } from './useDebounced';
+import { useDebounced } from '../../hooks/useDebounced';
 import { useModuleEnabled } from '../../hooks/useModules';
 
 const CONTEXT_ORDER: PaletteContextId[] = ['workflow', 'run', 'project'];
@@ -28,21 +28,22 @@ interface CommandPaletteProps {
 }
 
 /**
- * Outer wrapper: resolves the current context by route and remounts PaletteBody
- * on context change via `key`. Remounting guarantees a stable hook order
- * inside the inner body.
+ * Outer wrapper: keeps the query across openings and mounts OpenPalette only while open.
  */
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
-  const location = useLocation();
-  const routeContextId = resolveContextId(location.pathname);
-  const [contextId, setContextId] = useState<PaletteContextId>(routeContextId);
   const [query, setQuery] = useState('');
+  if (!open) return null;
+  return <OpenPalette onClose={onClose} query={query} setQuery={setQuery} />;
+}
 
-  useEffect(() => {
-    if (open) setContextId(routeContextId);
-    // Only reset to route context when the palette opens; Tab-switch must survive re-renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+/**
+ * Resolves the context by route when the palette opens (it mounts with every opening, so a
+ * Tab switch survives re-renders but not a reopen) and remounts PaletteBody on context change
+ * via `key`. Remounting guarantees a stable hook order inside the inner body.
+ */
+function OpenPalette({ onClose, query, setQuery }: { onClose: () => void; query: string; setQuery: (q: string) => void }) {
+  const location = useLocation();
+  const [contextId, setContextId] = useState<PaletteContextId>(() => resolveContextId(location.pathname));
 
   const cycleContext = (direction: 1 | -1) => {
     setContextId((c) => {
@@ -52,7 +53,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     });
   };
 
-  if (!open) return null;
   return (
     <PaletteBody
       key={contextId}
@@ -145,9 +145,11 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    setSelectedIdx(0);
-  }, [query]);
+  // A new query starts the selection at the top again
+  const changeQuery = (q: string) => {
+    if (q !== query) setSelectedIdx(0);
+    setQuery(q);
+  };
 
   const itemAt = (idx: number): PaletteItem | null => {
     if (isEmptyQuery) {
@@ -338,7 +340,7 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
               {context.id === 'run' && parsed.status && (
                 <button
                   type="button"
-                  onClick={() => setQuery(parsed.query)}
+                  onClick={() => changeQuery(parsed.query)}
                   className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-sm bg-accent/15 text-accent shrink-0"
                   title={t.commandPalette.filterChipRemove}
                 >
@@ -350,7 +352,7 @@ function InnerPalette({ context, onClose, query, setQuery, contextId, cycleConte
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => changeQuery(e.target.value)}
                 placeholder={context.labels.placeholder}
                 className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
               />

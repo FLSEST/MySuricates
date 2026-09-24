@@ -9,7 +9,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
   const t = useT();
   const { apiKey, setApiKey } = useSettingsStore();
   const [securityEnabled, setSecurityEnabled] = useState<boolean | null>(null);
-  // Becomes true once the stored key has been checked (or there is nothing to check).
+  // Becomes true once a key has been checked — the stored one on load, or the one just entered.
   // Deliberately never goes back to false: the children mount once and stay mounted —
   // a guard that re-hides the app makes every child query refetch (d89b2cc1).
   const [storedKeyChecked, setStoredKeyChecked] = useState(false);
@@ -34,11 +34,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
 
   // Validate stored API key on load
   useEffect(() => {
-    if (securityEnabled === null) return;
-    if (!securityEnabled || !apiKey) {
-      setStoredKeyChecked(true);
-      return;
-    }
+    if (!securityEnabled || !apiKey) return;
     let cancelled = false;
     api.get('/projects')
       .catch((err: unknown) => {
@@ -52,8 +48,11 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true; };
   }, [securityEnabled, apiKey, setApiKey]);
 
+  // Without security or without a key there is nothing to check
+  const keyChecked = storedKeyChecked || !securityEnabled || !apiKey;
+
   // Still loading auth status or validating the stored key
-  if (securityEnabled === null || !storedKeyChecked) return null;
+  if (securityEnabled === null || !keyChecked) return null;
 
   // Security disabled or API key already set (and validated) — pass through
   if (!securityEnabled || apiKey) return <>{children}</>;
@@ -68,6 +67,8 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
     try {
       // Über den Client, damit der 429-Backoff auch für die Key-Prüfung gilt (b6feccbc).
       await validateApiKey(inputKey.trim());
+      // Just validated: the app shows at once while the effect checks the key once more
+      setStoredKeyChecked(true);
       setApiKey(inputKey.trim());
     } catch (err: unknown) {
       const status = (err as { status?: number } | null)?.status;

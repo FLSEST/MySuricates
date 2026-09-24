@@ -2,7 +2,7 @@ import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bug, RotateCcw, Stethoscope, ArrowRight, Clock, CalendarClock } from 'lucide-react';
-import { Button, Modal, Spinner } from '../components/ui';
+import { Button, ConfirmModal, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -73,17 +73,18 @@ export function WorkflowDebug() {
         </>
       )}
 
-      <Modal
+      <ConfirmModal
         open={!!restartTarget}
         onClose={() => setRestartTarget(null)}
+        onConfirm={handleRestart}
         title={t.workflowDebug.restartConfirm}
+        confirmLabel={t.workflowDebug.restart}
+        isPending={retry.isPending}
+        cancelVariant="ghost"
+        size="md"
       >
-        <p className="text-text-secondary mb-4">{t.workflowDebug.restartConfirmHint}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setRestartTarget(null)}>{t.common.cancel}</Button>
-          <Button onClick={handleRestart} loading={retry.isPending}>{t.workflowDebug.restart}</Button>
-        </div>
-      </Modal>
+        <p className="text-text-secondary">{t.workflowDebug.restartConfirmHint}</p>
+      </ConfirmModal>
     </div>
   );
 }

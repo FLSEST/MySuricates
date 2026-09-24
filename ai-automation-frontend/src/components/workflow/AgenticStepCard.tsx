@@ -4,10 +4,10 @@ import {
   Target, Loader2, XCircle, ShieldQuestion,
 } from 'lucide-react';
 import { Badge } from '../ui';
-import { PathLinkedOutput } from './PathLinkedOutput';
+import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
 import type { StepResult, AgenticState, AgenticIteration } from '../../types';
-import { StepCardFrame, StepCardHeader } from '../workflow/StepCardChrome';
+import { StepCardFrame, StepCardHeader } from './StepCardChrome';
 
 function IterationCard({ iter }: { iter: AgenticIteration }) {
   const [expanded, setExpanded] = useState(false);

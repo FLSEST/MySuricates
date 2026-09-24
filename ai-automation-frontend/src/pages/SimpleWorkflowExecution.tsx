@@ -5,7 +5,7 @@ import {
 import { Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
-import { ApprovalDialog } from '../components/shared/ApprovalDialog';
+import { ApprovalDialog } from '../components/workflow/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';

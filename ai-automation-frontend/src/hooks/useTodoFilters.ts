@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { usePersistedState } from './usePersistedState';
 import { ACTIVE_STATUSES, SEARCH_DEBOUNCE_MS, type TodoStatusFilter, type ViewMode } from '../components/todo/todoConstants';
@@ -36,8 +36,6 @@ export function useTodoFilters() {
   // View mode
   const [viewMode, setViewMode] = usePersistedState<ViewMode>('todos-view-mode', 'list');
 
-  const [page, setPage] = useState(0);
-
   // Filters without the status — the board adds the status per column
   const filterParams = useMemo(() => {
     const params: Record<string, string> = {};
@@ -55,8 +53,18 @@ export function useTodoFilters() {
     return { ...filterParams, status: statusFilter };
   }, [filterParams, statusFilter]);
 
-  // Reset page on filter or view mode change
-  useEffect(() => { setPage(0); }, [apiParams, viewMode]);
+  // The page belongs to one filter and view combination: a change starts at page 0 again, and
+  // the reset is stored, so returning to an earlier combination does not bring its old page back
+  const pageKey = JSON.stringify([apiParams, viewMode]);
+  const [pageState, setPageState] = useState({ key: pageKey, page: 0 });
+  if (pageState.key !== pageKey) setPageState({ key: pageKey, page: 0 });
+  const page = pageState.key === pageKey ? pageState.page : 0;
+  const setPage = useCallback((next: number | ((p: number) => number)) => {
+    setPageState((s) => {
+      const current = s.key === pageKey ? s.page : 0;
+      return { key: pageKey, page: typeof next === 'function' ? next(current) : next };
+    });
+  }, [pageKey]);
 
   return {
     searchParams,
