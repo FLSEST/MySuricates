@@ -99,7 +99,8 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 ### Workflows (`/workflows`, `/workflows/:id`)
 
 - 2-step creation: template selection → form (project, name, description)
-- 66 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
+- 54 built-in templates (from DB, via `WorkflowTemplateSeeder`) plus custom templates
+- `TemplateSelector`: templates and blueprints whose module is off (`requiredModules` vs. `useSystemModules`) sit behind a counter; once shown, the card names the module and its switch (`TemplateAvailability.tsx`, `templateAvailability.ts`). "Runs without AI" filter via the server's `needsAi`, categories via `t.templates.categories`. With the assistant, the factory and wishes all off (core), the picker shows the hint `build-from-description`
 - Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: add block (type + JSON config via Monaco Editor), activate skill

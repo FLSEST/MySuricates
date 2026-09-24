@@ -631,12 +631,17 @@ List all workflow templates, sorted by kind and `sortOrder`. The field `kind` se
     "verifications": [],
     "version": "1.0.0",
     "createdAt": "2025-01-15T10:00:00Z",
-    "updatedAt": "2025-01-15T10:00:00Z"
+    "updatedAt": "2025-01-15T10:00:00Z",
+    "kind": "TEMPLATE",
+    "requiredModules": [],
+    "needsAi": true
   }
 ]
 ```
 
 `verifications` contains one object per project in which the template was verified, with `projectId`, `projectName`, `lastRunId`, `verifiedAt`.
+
+`requiredModules` names the optional modules its blocks need (such as `skills` for `skill-capability`, `integrations` for `integration`; nested blocks included). While one of them is off, the run refuses the block and the template picker hides the template. `needsAi` tells whether a run can call an AI model: model blocks, `foreach`/`while`/`conditional`/`retry` without `execution_mode: shell`, a `simple` block in a `switch` branch without shell mode, and `sub-workflow`, because the workflow it starts is not part of the definition.
 
 ### `GET /api/v1/workflow-templates/{id}`
 

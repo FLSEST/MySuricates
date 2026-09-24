@@ -627,7 +627,7 @@ Details on the three trust classes and taint propagation:
 | **Types** | Centrally defined in `src/types/index.ts` |
 | **i18n** | Type-safe translation objects (no runtime key lookup) |
 | **Icons** | Lucide React (consistent icon set) |
-| **Hints in place** | `<Hint id="…">` sits in the component it explains, never in a central list — a page that is missing (preset, Simple Mode, module off) takes its hint with it. Registry with version in `src/data/hints.ts` (raise the version only for a change in substance; the hint then shows again), copy in `src/data/hints.<lang>.json`: what and why, never where to click. `i18n/__tests__/hints.test.ts` keeps registry, copy and usage in step |
+| **Hints in place** | `<Hint id="…">` sits in the component it explains, never in a central list — a page that is missing (preset, Simple Mode, module off) takes its hint with it. Registry with version in `src/data/hints.ts` (raise the version only for a change in substance; the hint then shows again), copy in `src/data/hints.<lang>.json`: what and why, never where to click. `i18n/__tests__/hints.test.ts` keeps registry, copy and usage in step. Conversely, a hint may appear precisely because a module is missing: `build-from-description` in the template picker names the assistant, the factory and wishes on core, and how to switch them on |
 | **Forms** | Controlled components with React state |
 
 ### Annotation Processors
@@ -686,7 +686,7 @@ Workflows can accumulate knowledge across runs:
 
 - **SkillSeeder:** Creates 19 built-in skills on startup (idempotent, updates on version bump) and registers them in the `SkillRegistry`
 - Skill definitions as JSON + prompt `.md` under `src/main/resources/skills/builtin/`
-- **WorkflowTemplateSeeder:** Creates 66 built-in templates on startup (idempotent, updates on version bump)
+- **WorkflowTemplateSeeder:** Creates 54 built-in templates on startup (idempotent, updates on version bump) and removes built-in rows whose file no longer ships
 - Template definitions as JSON under `src/main/resources/templates/builtin/`
 
 ### Module Catalog

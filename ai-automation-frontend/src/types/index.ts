@@ -207,6 +207,10 @@ export interface WorkflowTemplate {
   updatedAt: string;
   /** TEMPLATE = finished task; BLUEPRINT = empty scaffold showing how block types connect */
   kind?: 'TEMPLATE' | 'BLUEPRINT';
+  /** Optional modules its blocks need; the picker hides it while one is off. Absent on older backends. */
+  requiredModules?: ModuleName[];
+  /** Whether running it can call an AI model (server-side rule, see `getExecutionModes`). */
+  needsAi?: boolean;
 }
 
 export interface CreateWorkflowTemplateRequest {
@@ -292,7 +296,8 @@ export interface PoolWorkflowEntry {
   category: string | null;
   /**
    * Kategorie des Eintrags: `repo` greift auf die Struktur dieses Repositories zu,
-   * `portable` ist über `project_path` parametrisiert. `null` = nicht deklariert.
+   * `portable` ist über `project_path` parametrisiert, `external` braucht ein Werkzeug außerhalb
+   * von Repo und Projekt (steht in der Beschreibung). `null` = nicht deklariert.
    * Regelwerk: docs/workflow-pool-kuratierung.md
    */
   scope: PoolScope | null;
@@ -306,7 +311,7 @@ export interface PoolWorkflowEntry {
   filename: string;
 }
 
-export type PoolScope = 'repo' | 'portable';
+export type PoolScope = 'repo' | 'portable' | 'external';
 
 // ── Workflow Run ─────────────────────────────────────────
 

@@ -3,7 +3,10 @@ import { FileText, Search } from 'lucide-react';
 import { Card, Input } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { resolveTemplateName } from '../../utils/templateUtils';
+import { useSystemModules } from '../../hooks/useModules';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
+import { NeedsModuleToggle, TemplateModuleNote } from './TemplateAvailability';
+import { missingModules, splitByAvailability } from './templateAvailability';
 import type { WorkflowTemplate } from '../../types';
 
 /** Gallery order of the blueprint groups; a group the backend doesn't know yet goes last. */
@@ -24,11 +27,17 @@ export function BlueprintBrowser({ blueprints, onSelect }: BlueprintBrowserProps
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [search, setSearch] = useState('');
+  const { data: moduleState } = useSystemModules();
+  // Like the templates tab: what needs a switched-off module waits behind a toggle (TODO 560d18dd)
+  const [showNeedsModule, setShowNeedsModule] = useState(false);
 
   const q = search.trim().toLowerCase();
-  const matching = blueprints.filter((bp) => !q
+  const found = blueprints.filter((bp) => !q
     || resolveTemplateName(bp.name, locale).toLowerCase().includes(q)
     || resolveTemplateName(bp.description, locale).toLowerCase().includes(q));
+  const modules = moduleState?.modules;
+  const { runnable, needsModule } = splitByAvailability(found, modules);
+  const matching = showNeedsModule ? [...runnable, ...needsModule] : runnable;
 
   const groupOf = (bp: WorkflowTemplate): string => bp.category ?? '';
   const known = new Set<string>(GROUPS);
@@ -92,12 +101,22 @@ export function BlueprintBrowser({ blueprints, onSelect }: BlueprintBrowserProps
                       </div>
                     </div>
                     <p className="text-xs text-text-secondary">{resolveTemplateName(bp.description, locale)}</p>
+                    <TemplateModuleNote missing={missingModules(bp, modules)} />
                   </Card>
                 ))}
               </div>
             </section>
           );
         })}
+        {needsModule.length > 0 && (
+          <div className="text-center">
+            <NeedsModuleToggle
+              count={needsModule.length}
+              shown={showNeedsModule}
+              onToggle={() => setShowNeedsModule((on) => !on)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -97,7 +97,7 @@ dated in the table:
 | Backend | Java 21 / Spring Boot 3.5, around 73,000 lines, 51 REST controllers, 86 Flyway migrations |
 | Frontend | React 19 / TypeScript, around 77,000 lines |
 | Tests | Backend 10,476, frontend 1,580 (192 files) — 0 failures, 0 skipped, CI run 35777382298 from 2026-09-22 |
-| Building blocks | 20 block types, 66 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
+| Building blocks | 20 block types, 54 workflow templates, 20 blueprints (basic scaffolds to fill in), 19 built-in skills, 18 integration providers |
 
 The test numbers come from the CI run for exactly this commit and are therefore verifiable. The
 CI definition (`.github/workflows/ci.yml`) has run both suites on every push since 2026-09-12,

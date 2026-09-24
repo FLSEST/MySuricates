@@ -1,17 +1,18 @@
 {
-  "id": "saas-marketing-site",
   "icon": "📣",
   "name": {
     "en": "SaaS — Marketing Site",
     "de": "SaaS — Marketing-Webseite"
   },
   "description": {
-    "en": "Generates landing-page copy and renders it as a Next.js (marketing) route group inside the generated app",
-    "de": "Generiert Landing-Page-Copy und rendert sie als Next.js (marketing) Routen-Gruppe in der generierten App"
+    "en": "Generates landing-page copy and renders it as a Next.js (marketing) route group inside the generated app. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de": "Generiert Landing-Page-Copy und rendert sie als Next.js (marketing) Routen-Gruppe in der generierten App. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category": "CONTENT",
-  "sortOrder": 58,
+  "scope": "external",
+  "tags": [ "saas-factory", "content" ],
   "version": "1.0.1",
+  "author": "MySuricates",
   "model": "sonnet",
   "instructions": "Erstellt eine Marketing-Landing-Page für die generierte App. Tonalität und Zielgruppe aus der Spec übernehmen. Anti-AI-Tells beachten (kein 'unleash', 'leverage', 'seamless').\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
   "blocks": [

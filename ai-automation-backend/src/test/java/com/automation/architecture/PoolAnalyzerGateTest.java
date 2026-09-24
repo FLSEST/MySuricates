@@ -39,6 +39,8 @@ class PoolAnalyzerGateTest {
     /**
      * Schwere Befunde an Definitionen, deren Reparatur ein eigenes TODO trägt: {@code "<Datei> <Regel>"}
      * → Grund. Nur zum Abbauen — tritt der Befund an der geprüften Datei nicht mehr auf, bricht der Test.
+     * Der Schlüssel ist der Dateiname: {@code saas-feature-loop.json} liegt seit 7ddacd1d im Pool
+     * (Scope {@code external}) und wird dort weiter geprüft.
      */
     private static final Map<String, String> KNOWN_SEVERE = Map.of(
             "saas-feature-loop.json items-command-without-source",

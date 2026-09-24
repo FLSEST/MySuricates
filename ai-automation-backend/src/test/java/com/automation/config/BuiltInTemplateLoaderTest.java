@@ -5,6 +5,7 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.TemplateKind;
 import com.automation.entity.WorkflowTemplate;
+import com.automation.executor.ModelUse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,17 @@ class BuiltInTemplateLoaderTest {
         assertThat(german.get(1).getConfig().get("options")).isEqualTo(List.of("Ja", "Nein"));
     }
 
+    /**
+     * The picker's AI badge and its "runs without AI" filter read {@link ModelUse} (TODO 560d18dd);
+     * it has to agree with {@code BlueprintGateTest}: only the AI group calls a model.
+     */
+    @Test
+    void blueprints_callAModelOnlyInTheAiGroup_asThePickerShowsIt() {
+        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT))
+                .allSatisfy(bp -> assertThat(ModelUse.needsAi(bp.getBlocks())).as(bp.getId())
+                        .isEqualTo("AI".equals(bp.getCategory())));
+    }
+
     @Test
     void templatesAreSingleLanguage_blueprintsBilingual() {
         assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.TEMPLATE))
@@ -85,6 +97,14 @@ class BuiltInTemplateLoaderTest {
             assertThat(t.getBlocks()).as("blocks for " + t.getId()).isNotEmpty();
             assertThat(t.isBuiltIn()).as("builtIn for " + t.getId()).isTrue();
         }
+    }
+
+    /** The seeder removes built-in rows by file name ({@code shippedIds}), so a file's name is its id. */
+    @Test
+    void shippedIds_areTheFileNames_ofEveryLoadedTemplate() {
+        Set<String> shipped = new BuiltInTemplateLoader(new ObjectMapper()).shippedIds();
+
+        assertThat(shipped).containsExactlyInAnyOrderElementsOf(templates.stream().map(WorkflowTemplate::getId).toList());
     }
 
     @Test

@@ -1,17 +1,18 @@
 {
-  "id" : "saas-scaffold",
   "icon" : "🧱",
   "name" : {
     "en" : "SaaS — Scaffold App",
     "de" : "SaaS — App scaffolden"
   },
   "description" : {
-    "en" : "Picks a recipe (or generator-CLI), reserves a port, scaffolds the project, runs init.sh and a smoke test against the empty skeleton",
-    "de" : "Wählt ein Recipe (oder Generator-CLI), reserviert einen Port, scaffoldet das Projekt, führt init.sh aus und macht einen Smoke-Test gegen das leere Skelett"
+    "en" : "Picks a recipe (or generator-CLI), reserves a port, scaffolds the project, runs init.sh and a smoke test against the empty skeleton. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Wählt ein Recipe (oder Generator-CLI), reserviert einen Port, scaffoldet das Projekt, führt init.sh aus und macht einen Smoke-Test gegen das leere Skelett. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category" : "TRANSFORM",
-  "sortOrder" : 55,
+  "scope" : "external",
+  "tags" : [ "saas-factory", "scaffold" ],
   "version" : "1.0.0",
+  "author" : "MySuricates",
   "model" : null,
   "instructions" : "Initialisiert ein neues App-Verzeichnis basierend auf dem Build-Plan aus saas-spec-to-buildplan. Ruft die deterministische factory-CLI auf — keine LLM-Aktion in diesem Workflow.",
   "blocks" : [ {

@@ -226,5 +226,13 @@
       "Eine Vorlage bringt alle Schritte schon mit: anlegen, einem Projekt zuordnen und starten, ohne etwas zu bauen",
       "Der Pool hält weitere fertige Workflows bereit; manche davon passen nur zu einem bestimmten Projekt"
     ]
+  },
+  "build-from-description": {
+    "title": "Bauen per Beschreibung ist hier aus",
+    "points": [
+      "Assistent und Workflow-Factory bauen einen Workflow aus einer Beschreibung in Worten, Wünsche zerlegen ein Ziel in mehrere Workflows",
+      "Alle drei sind optionale, noch experimentelle Module und gehören nicht zum Standard-Preset core, deshalb fehlen sie auf dieser Instanz",
+      "Zuschalten beim Start: ./scripts/setup.sh --preset research --force bringt den Assistenten, --preset full auch Factory und Wünsche; einzeln geht es mit automation.modules.assistant: true (ebenso factory, wishes). Wo die Instanz es erlaubt, auch in den Einstellungen"
+    ]
   }
 }

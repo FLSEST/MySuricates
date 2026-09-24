@@ -1,5 +1,6 @@
 package com.automation.service.chain;
 
+import com.automation.config.BuiltInTemplateLoader;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.request.CreateWorkflowRequest;
 import com.automation.entity.BlockDefinition;
@@ -9,6 +10,7 @@ import com.automation.entity.WorkflowChain;
 import com.automation.entity.WorkflowTemplate;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.WorkflowTemplateService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,9 +56,22 @@ class ChainTemplateServiceTest {
     class FindTests {
 
         @Test
-        void findAll_returns6BuiltInTemplates() {
+        void findAll_returns5BuiltInTemplates() {
             List<BuiltInChainTemplate> templates = chainTemplateService.findAll();
-            assertThat(templates).hasSize(6);
+            assertThat(templates).hasSize(5);
+        }
+
+        /** An entry whose template no longer ships (moved to the pool) would fail every install. */
+        @Test
+        void everyEntryNamesAShippedBuiltInTemplate() {
+            Set<String> shipped = new BuiltInTemplateLoader(new ObjectMapper()).shippedIds();
+
+            assertThat(shipped).isNotEmpty();
+            for (BuiltInChainTemplate template : chainTemplateService.findAll()) {
+                for (BuiltInChainTemplate.Entry entry : template.entries()) {
+                    assertThat(shipped).as("%s → %s", template.id(), entry.templateId()).contains(entry.templateId());
+                }
+            }
         }
 
         @Test

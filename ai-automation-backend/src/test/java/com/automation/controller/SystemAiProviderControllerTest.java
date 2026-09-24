@@ -181,6 +181,18 @@ class SystemAiProviderControllerTest {
         }
     }
 
+    /**
+     * The integration block refuses to run without its module; preset research leaves integrations
+     * off, so the editor must not be offered the block either (TODO 560d18dd).
+     */
+    @Test
+    void capabilities_doNotOfferTheIntegrationBlockWithoutItsModule() throws Exception {
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blockTypes[*].type", not(hasItem("integration"))))
+                .andExpect(jsonPath("$.blockTypes[*].type", hasItem("todo-create")));
+    }
+
     @Test
     void models_returnsCatalogForProvider() throws Exception {
         when(modelCatalogService.getCatalog("PI", false)).thenReturn(ModelCatalog.available(

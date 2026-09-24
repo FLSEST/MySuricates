@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -129,6 +130,60 @@ class WorkflowTemplateSeederTest {
         seeder.run(null);
 
         verify(templateRepository, never()).save(any());
+    }
+
+    // --- Built-ins that no longer ship (TODO 7ddacd1d) ---
+
+    @Test
+    void run_removesBuiltInsThatNoLongerShip() throws Exception {
+        WorkflowTemplate kept = template("t1", "Template 1", "1.0.0");
+        WorkflowTemplate moved = template("saas-scaffold", "SaaS — Scaffold App", "1.0.0");
+        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(kept, moved));
+        when(templateLoader.shippedIds()).thenReturn(Set.of("t1"));
+        when(templateLoader.loadAll()).thenReturn(List.of(template("t1", "Template 1", "1.0.0")));
+
+        seeder.run(null);
+
+        verify(templateRepository).deleteAll(List.of(moved));
+        verify(templateRepository, never()).save(any());
+    }
+
+    @Test
+    void run_insertsTheShippedTemplateThatALeftOverWithTheSameNameHeldBack() throws Exception {
+        // Rows from before the ids were stable carry a random id and the English name of a shipped template
+        WorkflowTemplate leftOver = template("55c39868-9613-4b05-ae23-5930bc6af862", "Code Quality", "1.0.0");
+        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(leftOver));
+        when(templateLoader.shippedIds()).thenReturn(Set.of("code-quality"));
+        WorkflowTemplate shipped = template("code-quality", "Code Quality", "1.0.1");
+        when(templateLoader.loadAll()).thenReturn(List.of(shipped));
+
+        seeder.run(null);
+
+        verify(templateRepository).deleteAll(List.of(leftOver));
+        verify(templateRepository).save(shipped);
+    }
+
+    @Test
+    void run_removesNothingWhenNoTemplateFileIsFound() throws Exception {
+        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(template("t1", "Template 1", "1.0.0")));
+        when(templateLoader.shippedIds()).thenReturn(Set.of());
+        when(templateLoader.loadAll()).thenReturn(List.of());
+
+        seeder.run(null);
+
+        verify(templateRepository, never()).deleteAll(anyIterable());
+        verify(templateRepository, never()).delete(any());
+    }
+
+    @Test
+    void run_removesNothingWhileEveryBuiltInStillShips() throws Exception {
+        when(templateRepository.findByBuiltInTrue()).thenReturn(List.of(template("t1", "Template 1", "1.0.0")));
+        when(templateLoader.shippedIds()).thenReturn(Set.of("t1", "t2"));
+        when(templateLoader.loadAll()).thenReturn(List.of(template("t1", "Template 1", "1.0.0")));
+
+        seeder.run(null);
+
+        verify(templateRepository, never()).deleteAll(anyIterable());
     }
 
     @Test

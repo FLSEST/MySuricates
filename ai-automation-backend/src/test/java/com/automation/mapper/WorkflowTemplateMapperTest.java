@@ -1,6 +1,7 @@
 package com.automation.mapper;
 
 import com.automation.dto.response.WorkflowTemplateResponse;
+import com.automation.entity.BlockDefinition;
 import com.automation.entity.WorkflowTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -89,6 +90,32 @@ class WorkflowTemplateMapperTest {
             assertThat(response.model()).isNull();
             assertThat(response.createdAt()).isNull();
             assertThat(response.updatedAt()).isNull();
+        }
+
+        /** What the picker needs to hide what this instance cannot run (TODO 560d18dd). */
+        @Test
+        void namesTheModulesItsBlocksNeed_andWhetherItCallsAModel() {
+            WorkflowTemplate skills = WorkflowTemplate.builder().id("tpl-4").name(Map.of("en", "Skills"))
+                    .blocks(List.of(
+                            BlockDefinition.builder().type("shell").config(Map.of("command", "ls")).build(),
+                            BlockDefinition.builder().type("skill-capability").config(Map.of("capability", "x")).build(),
+                            BlockDefinition.builder().type("integration").config(Map.of("provider", "github")).build()))
+                    .build();
+            WorkflowTemplate shellOnly = WorkflowTemplate.builder().id("tpl-5").name(Map.of("en", "Shell"))
+                    .blocks(List.of(
+                            BlockDefinition.builder().type("shell").config(Map.of("command", "ls")).build(),
+                            BlockDefinition.builder().type("foreach")
+                                    .config(Map.of("items", List.of("a"), "command", "echo {{ item }}",
+                                            "execution_mode", "shell")).build()))
+                    .build();
+
+            WorkflowTemplateResponse needsModules = mapper.toResponse(skills);
+            WorkflowTemplateResponse runsAnywhere = mapper.toResponse(shellOnly);
+
+            assertThat(needsModules.requiredModules()).containsExactly("integrations", "skills");
+            assertThat(needsModules.needsAi()).isTrue();
+            assertThat(runsAnywhere.requiredModules()).isEmpty();
+            assertThat(runsAnywhere.needsAi()).isFalse();
         }
     }
 

@@ -114,6 +114,7 @@ zum Katalog passt — wer ein Modul hinzufügt, erfährt es spätestens dort.
 - Hintergrundpfade prüfen `ModuleRegistry` direkt: `integration`-/`skill-capability`-Blöcke schlagen mit klarer Meldung fehl, `/ws/terminal` lehnt den Handshake ab (`ModuleHandshakeGuard`), Auto-Memory, Audit-Ingestion, Staging-Health-Checks und Chain-Schedules laufen nicht, Auto-Repair hängt per `@EventListener(condition = ModuleConditions.FACTORY)` am Modul.
 - Unbekannte Modulnamen, ungültige Werte und unerfüllte Abhängigkeiten (`requires`) **brechen den Start ab** — nichts schaltet sich selbst ein.
 - `ControllerModuleGateTest` erzwingt, dass jeder Controller einem Modul zugeordnet oder bewusst als Kern gelistet ist.
+- Block-Typen eines Moduls stehen in einer Liste, `executor/BlockTypeModules` (`skill-capability` → `skills`, `integration` → `integrations`, `dashboard-report`). `/system/capabilities` bietet einen solchen Typ nur an, wenn sein Modul an ist, und `GET /workflow-templates` nennt je Vorlage `requiredModules`. `BlockTypeModuleGateTest` hält Liste und Executor-Prüfungen in beide Richtungen deckungsgleich: Jeder Eintrag braucht einen Executor, der verweigert, und jeder Executor, der ein Modul prüft, braucht einen Eintrag.
 - `GET /api/v1/system/capabilities` liefert `preset`, `modulesUiEditable` und `modules[]` (mit `configured`/`overridden`); das Frontend blendet damit Navigation, Routen (Seite „Modul deaktiviert“ mit Snippet) und Widgets aus. **Settings → Module & Härtung** zeigt alles mit YAML-/Env-Snippet.
 
 **Schalten in der Oberfläche (optional)** — Mit `automation.modules.ui-editable: true` (Env `AUTOMATION_MODULES_UI_EDITABLE`) bekommt jedes Funktionsmodul in den Settings einen Schalter:
@@ -495,7 +496,7 @@ Chains gruppieren mehrere Workflows für sequenzielle Ausführung:
 
 ### Chain Templates
 
-Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zusammensetzen:
+Vorgefertigte Chain-Definitionen, die sich aus bestehenden Workflow-Templates zusammensetzen. Jeder Eintrag muss ein ausgeliefertes Built-in-Template nennen (`ChainTemplateServiceTest`), eine Kette über Pool-Einträge gibt es nicht:
 - `ChainTemplateService` — verwaltet Built-in Chain Templates (`BuiltInChainTemplate` Records)
 - `ChainTemplateController` — `/api/v1/chain-templates` mit List, Get, Install-Endpunkten
 - Install: Erstellt eine neue Chain (ggf. mit zugehörigen Workflows) in einem Zielprojekt
@@ -713,13 +714,14 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 ## Workflow Templates
 
 - Templates werden in der `workflow_templates`-DB-Tabelle gespeichert (V19-Migration), nicht hardcodiert
-- **66 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump)
+- **54 Built-in Templates** werden beim Start durch `WorkflowTemplateSeeder` eingespielt (idempotent, fügt fehlende ein, aktualisiert bei Version-Bump). Built-in-Zeilen, deren Datei nicht mehr ausgeliefert wird (in den Pool verschoben, umbenannt, Altlasten mit Zufalls-ID), entfernt er vorher; maßgeblich sind die Dateinamen (`BuiltInTemplateLoader.shippedIds`), damit eine Datei, die nicht parst, ihre Zeile nicht verliert. Verifikationen fallen per `ON DELETE CASCADE` mit, Workflows aus solchen Vorlagen bleiben und verlieren nur den Rückverweis (`ON DELETE SET NULL`). Nutzer-Vorlagen bleiben unberührt
 - Template-Definitionen liegen als einzelne JSON-Dateien in `src/main/resources/templates/builtin/` (eine Datei pro Template, geladen durch `BuiltInTemplateLoader`)
 - Name und Beschreibung sind i18n JSON-Maps: `{"de":"...","en":"..."}` — gespeichert via `JsonStringMapConverter`
 - Built-in Templates (`builtIn=true`) können nicht gelöscht werden; nur `sortOrder` und `category` sind aktualisierbar
 - Nutzer können eigene Templates via API oder durch Speichern eines bestehenden Workflows anlegen
 - `workflow.templateId` — optionale Back-Referenz auf das Quell-Template
 - Frontend löst lokalisierte Template-Namen via `resolveTemplateName()` in `utils/templateUtils.ts` auf
+- Jede Antwort trägt `requiredModules` (Module, die ihre Blöcke brauchen, verschachtelte eingeschlossen; `BlockTypeModules.requiredBy`) und `needsAi` (ob ein Lauf ein Modell rufen kann; `executor/ModelUse`, dieselbe Regel wie das KI-Badge im Frontend). Die Vorlagen-Auswahl blendet Vorlagen und Blaupausen mit ausgeschaltetem Modul aus und zeigt stattdessen einen Zähler („N weitere brauchen ein Modul – anzeigen“). Eingeblendet nennt die Karte das Modul und wie man es zuschaltet. Dazu kommen der Filter „Läuft ohne KI“ und übersetzte Kategorien
 - CRUD-API unter `/api/v1/workflow-templates`
 
 ## Built-in Skills

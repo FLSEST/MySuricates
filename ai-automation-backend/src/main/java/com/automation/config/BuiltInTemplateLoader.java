@@ -14,8 +14,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Loads built-in workflow template definitions from JSON files
@@ -54,6 +56,32 @@ public class BuiltInTemplateLoader {
                 .thenComparingInt(WorkflowTemplate::getSortOrder));
         log.debug("Loaded {} built-in templates from JSON files", templates.size());
         return templates;
+    }
+
+    /**
+     * Ids of every template and blueprint file that ships, taken from the file names — a file's
+     * name is its id ({@code BuiltInTemplateLoaderTest}). Read from the names on purpose, not from
+     * the parsed content: a file that fails to parse still counts as shipped, so the seeder never
+     * removes its row because of a typo in a release (TODO 7ddacd1d).
+     *
+     * @return the ids, or an empty set when the classpath cannot be scanned
+     */
+    public Set<String> shippedIds() {
+        Set<String> ids = new LinkedHashSet<>();
+        try {
+            for (String pattern : PATTERNS.values()) {
+                for (Resource resource : new PathMatchingResourcePatternResolver().getResources(pattern)) {
+                    String filename = resource.getFilename();
+                    if (filename != null && filename.endsWith(".json")) {
+                        ids.add(filename.substring(0, filename.length() - ".json".length()));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failed to scan for built-in template files: {}", e.getMessage());
+            return Set.of();
+        }
+        return ids;
     }
 
     private List<WorkflowTemplate> load(TemplateKind kind) {

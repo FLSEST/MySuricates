@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { CheckCircle, Download, FileText, Search } from 'lucide-react';
+import { CheckCircle, Download, FileText, Search, Terminal } from 'lucide-react';
 import { Card, Input, Spinner } from '../ui';
 import { useT } from '../../i18n';
 import { useI18nStore } from '../../i18n';
 import { useTemplates, exportTemplate } from '../../hooks/useTemplates';
-import { resolveTemplateName } from '../../utils/templateUtils';
+import { useModuleEnabled, useSystemModules } from '../../hooks/useModules';
+import { categoryLabel, resolveTemplateName } from '../../utils/templateUtils';
 import { ExecutionBadges } from '../shared/ExecutionBadges';
+import { Hint } from '../hints/Hint';
 import { PoolBrowser } from './PoolBrowser';
 import { BlueprintBrowser } from './BlueprintBrowser';
 import { ProHandoff } from '../simple/ProHandoff';
-import { Hint } from '../hints/Hint';
+import { NeedsModuleToggle, TemplateModuleNote } from './TemplateAvailability';
+import { missingModules, splitByAvailability, templateNeedsAi } from './templateAvailability';
 import type { WorkflowTemplate, PoolWorkflowEntry } from '../../types';
 
 type Tab = 'templates' | 'pool' | 'blueprints';
@@ -30,10 +33,20 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const { data: templates, isLoading } = useTemplates();
+  const { data: moduleState } = useSystemModules();
   const [search, setSearch] = useState('');
   // Blueprints come first: they show what the building blocks can do (TODO 268ae0db)
   const [activeTab, setActiveTab] = useState<Tab>(simple ? 'templates' : 'blueprints');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // "Runs without AI" (TODO 9c4c3b7c): the server's needsAi, the same rule as the AI badge
+  const [withoutAi, setWithoutAi] = useState(false);
+  // Templates whose module is off stay hidden until asked for (TODO 560d18dd)
+  const [showNeedsModule, setShowNeedsModule] = useState(false);
+  // No way to build from a description here (preset core): say that they exist (TODO 3f96f7a0)
+  const assistantOn = useModuleEnabled('assistant');
+  const factoryOn = useModuleEnabled('factory');
+  const wishesOn = useModuleEnabled('wishes');
+  const describingIsOff = !assistantOn && !factoryOn && !wishesOn;
 
   // Blueprints share the endpoint but have their own tab
   const taskTemplates = (templates ?? []).filter((tmpl) => tmpl.kind !== 'BLUEPRINT');
@@ -41,16 +54,20 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
 
   const allCategories = Array.from(
     new Set(taskTemplates.map((tmpl) => tmpl.category).filter(Boolean) as string[]),
-  ).sort();
+  ).sort((a, b) => categoryLabel(t, a).localeCompare(categoryLabel(t, b), locale));
 
   const filtered = taskTemplates.filter((tmpl) => {
     if (selectedCategory && tmpl.category !== selectedCategory) return false;
+    if (withoutAi && templateNeedsAi(tmpl)) return false;
     if (!search.trim()) return true;
     const name = resolveTemplateName(tmpl.name, locale).toLowerCase();
     const desc = resolveTemplateName(tmpl.description, locale).toLowerCase();
     const q = search.toLowerCase();
     return name.includes(q) || desc.includes(q);
   });
+  const modules = moduleState?.modules;
+  const { runnable, needsModule } = splitByAvailability(filtered, modules);
+  const shown = showNeedsModule ? [...runnable, ...needsModule] : runnable;
 
   return (
     <div className="space-y-4">
@@ -92,6 +109,8 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
         </button>
       </div>
 
+      {!simple && describingIsOff && <Hint id="build-from-description" />}
+
       {activeTab === 'pool' ? (
         <PoolBrowser onSelect={(entry) => onPoolSelect?.(entry)} variant={variant} />
       ) : activeTab === 'blueprints' ? (
@@ -116,33 +135,50 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
             icon={<Search className="w-4 h-4 text-text-tertiary" />}
           />
 
-          {allCategories.length > 1 && (
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setSelectedCategory(null)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  !selectedCategory
-                    ? 'bg-accent text-text-inverse'
-                    : 'bg-surface-raised text-text-secondary hover:text-text'
-                }`}
-              >
-                {t.common.all}
-              </button>
-              {allCategories.map((cat) => (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              aria-pressed={withoutAi}
+              title={t.templates.withoutAiHint}
+              onClick={() => setWithoutAi((on) => !on)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                withoutAi
+                  ? 'border-accent bg-accent-subtle text-accent'
+                  : 'border-border text-text-secondary hover:text-text'
+              }`}
+            >
+              <Terminal className="w-3 h-3" aria-hidden="true" />
+              {t.templates.withoutAi}
+            </button>
+            {allCategories.length > 1 && (
+              <>
+                <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-border" />
                 <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                  onClick={() => setSelectedCategory(null)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                    selectedCategory === cat
+                    !selectedCategory
                       ? 'bg-accent text-text-inverse'
                       : 'bg-surface-raised text-text-secondary hover:text-text'
                   }`}
                 >
-                  {cat}
+                  {t.common.all}
                 </button>
-              ))}
-            </div>
-          )}
+                {allCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      selectedCategory === cat
+                        ? 'bg-accent text-text-inverse'
+                        : 'bg-surface-raised text-text-secondary hover:text-text'
+                    }`}
+                  >
+                    {categoryLabel(t, cat)}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
 
           {isLoading ? (
             <div className="flex justify-center py-8">
@@ -167,12 +203,12 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
               )}
 
               {/* Template options */}
-              {filtered.length === 0 ? (
+              {shown.length === 0 ? (
                 <div className="col-span-2 py-8 text-center text-sm text-text-tertiary">
                   {t.common.noResults}
                 </div>
               ) : (
-                filtered.map((tmpl) => (
+                shown.map((tmpl) => (
                   <Card
                     key={tmpl.id}
                     className="cursor-pointer hover:border-border-strong transition-colors"
@@ -221,8 +257,18 @@ export function TemplateSelector({ onSelect, onPoolSelect, variant = 'pro' }: Te
                     <p className="text-xs text-text-secondary">
                       {resolveTemplateName(tmpl.description, locale)}
                     </p>
+                    <TemplateModuleNote missing={missingModules(tmpl, modules)} />
                   </Card>
                 ))
+              )}
+              {needsModule.length > 0 && (
+                <div className="col-span-full pt-1 text-center">
+                  <NeedsModuleToggle
+                    count={needsModule.length}
+                    shown={showNeedsModule}
+                    onToggle={() => setShowNeedsModule((on) => !on)}
+                  />
+                </div>
               )}
             </div>
           )}

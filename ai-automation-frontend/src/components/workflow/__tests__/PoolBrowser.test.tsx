@@ -81,6 +81,35 @@ describe('PoolBrowser scope badge', () => {
     expect(badge).toHaveTextContent('repo');
   });
 
+  it('zeigt external mit dem Hinweis auf das Werkzeug außerhalb von Repo und Projekt (7ddacd1d)', () => {
+    useI18nStore.setState({ locale: 'de' });
+    mockEntries([entry({ id: 'saas-scaffold', scope: 'external' })]);
+
+    render(<PoolBrowser onSelect={() => {}} />);
+
+    const badge = screen.getByTestId('pool-scope-saas-scaffold');
+    expect(badge).toHaveTextContent('external');
+    expect(badge).toHaveAttribute('title', de.pool.scopeExternalHint);
+  });
+
+  it('zeigt einen unbekannten scope so, wie er in der Datei steht', () => {
+    mockEntries([entry({ scope: 'someday' as PoolWorkflowEntry['scope'] })]);
+
+    render(<PoolBrowser onSelect={() => {}} />);
+
+    expect(screen.getByTestId('pool-scope-build-gate')).toHaveTextContent('someday');
+  });
+
+  it('übersetzt die Kategorien', () => {
+    useI18nStore.setState({ locale: 'de' });
+    mockEntries([entry({ category: 'MONITORING' }), entry({ id: 'docs', category: 'DOCUMENTATION' })]);
+
+    render(<PoolBrowser onSelect={() => {}} />);
+
+    expect(screen.getByRole('button', { name: 'Überwachung' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dokumentation' })).toBeInTheDocument();
+  });
+
   it('zeigt kein Badge, wenn der Eintrag keinen scope deklariert', () => {
     mockEntries([entry({ scope: null })]);
 

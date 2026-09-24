@@ -1,17 +1,18 @@
 {
-  "id" : "saas-continuous-improve",
   "icon" : "🌀",
   "name" : {
     "en" : "SaaS — Continuous Improve",
     "de" : "SaaS — Kontinuierliche Verbesserung"
   },
   "description" : {
-    "en" : "Periodic sweep: open TODOs in saas-factory project, dependency updates, container cleanup",
-    "de" : "Regelmäßiger Sweep: offene SaaS-Factory-TODOs, Dependency-Updates, Container-Cleanup"
+    "en" : "Periodic sweep: open TODOs in saas-factory project, dependency updates, container cleanup. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Regelmäßiger Sweep: offene SaaS-Factory-TODOs, Dependency-Updates, Container-Cleanup. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category" : "AUTOMATION",
-  "sortOrder" : 62,
+  "scope" : "external",
+  "tags" : [ "saas-factory", "maintenance" ],
   "version" : "1.0.1",
+  "author" : "MySuricates",
   "model" : null,
   "instructions" : "Wird per Schedule (wöchentlich) ausgeführt. Räumt alte Container auf, listet offene TODOs, triggert Auto-Fix für test-failed-TODOs falls noch nicht gefixt.",
   "blocks" : [ {

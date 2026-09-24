@@ -1,17 +1,18 @@
 {
-  "id" : "saas-spec-to-buildplan",
   "icon" : "🏛️",
   "name" : {
     "en" : "SaaS — Spec to Build-Plan",
     "de" : "SaaS — Spec zu Build-Plan"
   },
   "description" : {
-    "en" : "Reads spec.md, validates frontmatter against schema, drives Spec-Architect to research stack and decompose features, then waits for user approval",
-    "de" : "Liest spec.md, validiert Frontmatter, lässt den Spec-Architect Stack recherchieren und Features zerlegen, wartet dann auf User-Approval"
+    "en" : "Reads spec.md, validates frontmatter against schema, drives Spec-Architect to research stack and decompose features, then waits for user approval. Requires a SaaS factory in the project (directory saas-factory/ or FACTORY_ROOT with the CLI tools/factory); it is not part of this repository.",
+    "de" : "Liest spec.md, validiert Frontmatter, lässt den Spec-Architect Stack recherchieren und Features zerlegen, wartet dann auf User-Approval. Voraussetzung: eine SaaS-Factory im Projekt (Verzeichnis saas-factory/ oder FACTORY_ROOT mit der CLI tools/factory); sie gehört nicht zu diesem Repository."
   },
   "category" : "BUSINESS",
-  "sortOrder" : 54,
+  "scope" : "external",
+  "tags" : [ "saas-factory", "planning" ],
   "version" : "1.0.1",
+  "author" : "MySuricates",
   "model" : "opus",
   "instructions" : "Du bist die erste Stufe der SaaS-Factory-Pipeline. Aus einer spec.md erzeugst du einen strukturierten Build-Plan inklusive Stack-Empfehlung. Sei explizit über Annahmen, formuliere offene Fragen statt schweigend zu raten. Pflicht: respektiere constraints.must_avoid hart.",
   "defaultContext" : {

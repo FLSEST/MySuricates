@@ -16,10 +16,10 @@ Es gibt zwei Mechanismen nebeneinander, und sie beantworten verschiedene Fragen.
 
 | | Built-in-Templates | Workflow-Pool |
 |---|---|---|
-| Ablage | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (66) | `workflow-pool/*.json` |
+| Ablage | `ai-automation-backend/src/main/resources/templates/builtin/*.json` (54) | `workflow-pool/*.json` |
 | Weg in die Instanz | `WorkflowTemplateSeeder` spielt sie beim Start per Semver-Vergleich in die Datenbank | manuell: `GET /api/v1/pool` → `POST /api/v1/pool/{id}/install` |
 | Sichtbar als | Vorlage im Template-Katalog, in jeder Instanz vorhanden | Eintrag im Pool-Browser, erst nach bewusstem Installieren ein Workflow |
-| Aktualisierung | Seeder zieht eine höhere Version nach | keine; ein installierter Workflow ist eine Kopie und lebt weiter für sich |
+| Aktualisierung | Seeder zieht eine höhere Version nach und entfernt, was nicht mehr ausgeliefert wird | keine; ein installierter Workflow ist eine Kopie und lebt weiter für sich |
 | Verzeichnis konfigurierbar | nein | ja, `AUTOMATION_POOL_DIR` (Default `workflow-pool`) |
 
 **Die Abgrenzung in einem Satz:** Ein Built-in-Template ist Teil der Plattform und kommt
@@ -33,23 +33,31 @@ Daraus folgt die Entscheidungsregel für einen neuen Workflow:
 - Er ist auf eine Person, einen Haushalt oder ein fremdes Projekt zugeschnitten → **keins von
   beidem**; er bleibt in der Instanz und wird nicht getrackt.
 
+Die Regeln gegen die eigene REST-API, Zugangsdaten und Home- oder Benutzerpfade (`SELF-API`,
+`CREDENTIAL`, `PATH-HOME`, `PATH-ABS` in §3) gelten für Built-ins genauso. Dort prüft sie
+`BuiltinTemplateGateTest` im Backend-Build — mit den Mustern des Pool-Gates, ergänzt um die
+Key-Datei (`…/api-key`), `$HOME` und die Adresse `localhost:9090`.
+
 ## 2. Welche Kategorien es gibt: `scope`
 
-Jeder Eintrag trägt ein Pflichtfeld `scope` mit genau einem von zwei Werten:
+Jeder Eintrag trägt ein Pflichtfeld `scope` mit genau einem von drei Werten:
 
 | Wert | Bedeutung | Erkennungsmerkmal |
 |---|---|---|
 | `repo` | greift auf die Struktur **dieses** Repositories zu | nennt `ai-automation-backend`, `ai-automation-frontend`, `mvnw`, `scripts/` oder `workflow-pool/` |
 | `portable` | über `project_path` (o. ä. Kontextvariablen) parametrisiert | läuft in jedem Projekt, das der Installierende auswählt |
+| `external` | braucht ein Werkzeug außerhalb dieses Repositories und des gewählten Projekts | die Beschreibung nennt die Voraussetzung, etwa die SaaS-Factory (`saas-factory/` mit der CLI `tools/factory`) |
 
-Beide Arten sind legitim, aber sie sind verschieden nützlich: wer einen `repo`-Eintrag in sein
-eigenes Projekt installiert, bekommt einen Workflow, der ins Leere läuft. Deshalb ist `scope`
-kein Kommentar, sondern ein Feld:
+Alle drei sind legitim, aber sie sind verschieden nützlich: wer einen `repo`-Eintrag in sein
+eigenes Projekt installiert, bekommt einen Workflow, der ins Leere läuft, und ein
+`external`-Eintrag läuft erst, wenn das genannte Werkzeug da ist. Deshalb ist `scope` kein
+Kommentar, sondern ein Feld:
 
 - in der Definition (`"scope": "repo"`),
-- im Pool-Browser als kleines Badge neben der Version (`repo` in Warnfarbe, `portable` in
-  Infofarbe, mit Erklärung im Tooltip),
-- beim Export als Query-Parameter: `POST /api/v1/pool/export/{workflowId}?scope=repo`
+- im Pool-Browser als kleines Badge neben der Version (`repo` und `external` in Warnfarbe,
+  `portable` in Infofarbe, mit Erklärung im Tooltip),
+- beim Export als Query-Parameter: `POST /api/v1/pool/export/{workflowId}?scope=repo` bzw.
+  `?scope=external`
   (ohne Angabe gilt `portable` — die schwächere Zusage muss nicht begründet werden, die
   stärkere Bindung an dieses Repository schon).
 
@@ -81,7 +89,7 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 
 | Kennung | Regel | Prüfung |
 |---|---|---|
-| `SCOPE` | `scope` ist vorhanden und einer von `repo`, `portable` | Feldvergleich |
+| `SCOPE` | `scope` ist vorhanden und einer von `repo`, `portable`, `external` | Feldvergleich |
 | `NAME` | `name` ist ein `{de, en}`-Objekt mit mindestens einem nicht-leeren Text | ohne das lädt der Eintrag gar nicht |
 | `DESCRIPTION` | `description` ist ein `{de, en}`-Objekt mit mindestens einem nicht-leeren Text | Feldvergleich |
 | `TAGS` | `tags` ist eine nicht-leere Liste nicht-leerer Strings | Feldvergleich |
@@ -160,7 +168,7 @@ Zwei Kriterien bleiben eine Lesefrage und gehören in die Freigabe (Abschnitt 4)
 
 ### Export
 
-`POST /api/v1/pool/export/{workflowId}?scope=repo|portable` schreibt den Workflow als
+`POST /api/v1/pool/export/{workflowId}?scope=repo|portable|external` schreibt den Workflow als
 Pool-Definition. Der Export schreibt **keine Instanz-Bindungen** mehr mit
 (`service/pool/PoolExportSanitizer`):
 

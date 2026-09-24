@@ -1523,6 +1523,8 @@ Invokes actions from connected external services (Google Calendar, Trello, etc.)
 
 **Prerequisite:** The provider must be connected on the integrations page (`/integrations`).
 
+**Module:** `integrations` (on only in the `full` preset). While it is off, the block is refused, the editor does not offer the type, and the template picker hides templates with this block.
+
 ### Config
 
 | Field | Required | Description |
@@ -1624,7 +1626,7 @@ If the provider is not connected or the API fails, the block is marked as `FAILE
 
 What belongs in the public workflow pool, how it differs from the built-in templates and which criteria the hygiene gate enforces is described in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
-All 65+ built-in templates with their primary pattern:
+All built-in templates with their primary pattern. The SaaS factory workflows (`saas-*`) live in the pool (scope `external`) because they need a tool from outside the repository:
 
 | Template | Pattern | Category |
 |---|---|---|
@@ -1664,24 +1666,12 @@ All 65+ built-in templates with their primary pattern:
 | `auto-fix-typescript` | Multi-Stage + Approval | CODE |
 | `hunt-quality-pipeline` | Multi-Stage Pipeline | CODE |
 | `folder-backup` | Shell Chain | UTILITY |
-| `github-issues-export` | Shell + Approval (preview, redaction) | TEAM |
-| `github-issues-import` | Shell | TEAM |
-| `github-issues-sync` | Shell Chain | TEAM |
 | `github-project-bootstrap` | Shell Chain | CODE |
 | `dependency-update-check` | Shell + Conditional | CODE |
 | `log-rotate-cleanup` | Shell Collect + AI Analyze | INFRA |
 | `pool-neutrality-audit` | Audit Pipeline | QUALITY |
 | `pr-review-summary` | Shell Collect + AI Analyze | TEAM |
 | `research-enhance` | Sequential Simple Chain | RESEARCH |
-| `saas-auto-fix` | Analyze + Agentic + Verify | CODE |
-| `saas-containerize` | Shell + Approval | DEPLOY |
-| `saas-continuous-improve` | Shell Collect + AI Analyze | AUTOMATION |
-| `saas-doc-update` | Agentic | DOCS |
-| `saas-feature-implement` | Analyze + Agentic + Verify | CODE |
-| `saas-feature-loop` | Shell Scan + ForEach | TRANSFORM |
-| `saas-marketing-site` | Analyze + Agentic | CONTENT |
-| `saas-scaffold` | Shell Chain | TRANSFORM |
-| `saas-spec-to-buildplan` | Document + Analyze + Approval | BUSINESS |
 | `secret-scanner` | Shell + Conditional | CODE |
 | `service-health-monitor` | Shell Scan + ForEach + AI | INFRA |
 | `sprint-retrospective` | Shell Collect + AI Analyze | TEAM |

@@ -48,7 +48,7 @@ class WorkflowTemplateControllerTest {
     private WorkflowTemplateResponse sampleResponse() {
         return new WorkflowTemplateResponse("t-1", Map.of("en", "Test"), Map.of("en", "Desc"),
                 "icon", "devops", List.of(), null, null, false, 0, null,
-                List.of(), null, Instant.now(), Instant.now(), null);
+                List.of(), null, Instant.now(), Instant.now(), null, List.of(), false);
     }
 
     @Test
@@ -86,7 +86,7 @@ class WorkflowTemplateControllerTest {
         var template = WorkflowTemplate.builder().id("t-1").i18nSource(source).build();
         var english = new WorkflowTemplateResponse("t-1", Map.of("en", "Test"), Map.of("en", "Desc"),
                 "icon", "EXAMPLE", List.of(BlockDefinition.builder().type("shell").name("measure").build()),
-                "English", null, true, 0, null, List.of(), "1.0.0", Instant.now(), Instant.now(), null);
+                "English", null, true, 0, null, List.of(), "1.0.0", Instant.now(), Instant.now(), null, List.of(), false);
         when(templateService.findById("t-1")).thenReturn(template);
         when(templateMapper.toResponse(template)).thenReturn(english);
         when(verificationService.enrichWithVerifications(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -115,7 +115,7 @@ class WorkflowTemplateControllerTest {
         var plain = WorkflowTemplate.builder().id("t-2").build();
         var plainResponse = new WorkflowTemplateResponse("t-2", Map.of("en", "Plain"), Map.of(), "icon", "CODE",
                 List.of(BlockDefinition.builder().type("shell").name("build").build()), "Keep", null, true, 1, null,
-                List.of(), "1.0.0", Instant.now(), Instant.now(), null);
+                List.of(), "1.0.0", Instant.now(), Instant.now(), null, List.of(), false);
         when(templateService.findAll()).thenReturn(List.of(bilingual, plain));
         when(templateMapper.toResponseList(any())).thenReturn(List.of(sampleResponse(), plainResponse));
         when(verificationService.enrichAllWithVerifications(any())).thenAnswer(inv -> inv.getArgument(0));
