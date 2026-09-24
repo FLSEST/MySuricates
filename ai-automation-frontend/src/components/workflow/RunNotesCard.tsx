@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Save } from 'lucide-react';
 import { Card, CardHeader, Button } from '../ui';
 import { useUpdateRunNotes } from '../../hooks/useWorkflows';
@@ -16,27 +17,47 @@ interface RunNotesCardProps {
   onDraftChange: (text: string) => void;
 }
 
-/** Notes on a run: saved with the button (with a confirmation) or when the field loses focus. */
+/**
+ * Notes on a run: saved with the button (with a confirmation) or when the focus leaves the notes.
+ * Only typed text that differs from the saved notes is saved, and each text is sent once — a click
+ * on the button does not also save through the field losing its focus.
+ */
 export function RunNotesCard({ runId, savedNotes, draft, onDraftChange }: RunNotesCardProps) {
   const t = useT();
   const toast = useToast();
   const updateNotes = useUpdateRunNotes();
+  // The text of the last request, so the button and leaving the field never send it twice
+  const sent = useRef<string | null>(null);
+  // Nothing typed (draft null) is no change: saving it would write '' over the saved notes
+  const changed = draft !== null && draft !== savedNotes;
+
+  const save = (confirm: boolean) => {
+    if (draft === null || draft === savedNotes || draft === sent.current) return;
+    sent.current = draft;
+    updateNotes.mutate({ runId, notes: draft }, {
+      onSuccess: () => { if (confirm) toast.success(t.workflows.execution.notesSaved); },
+      onError: () => { sent.current = null; },
+    });
+  };
 
   return (
-    <Card>
+    <Card
+      // Leaving the notes saves; moving between the field and the button does not
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) save(false);
+      }}
+    >
       <CardHeader
         title={t.workflows.execution.notes}
         action={
-          (draft ?? '') !== savedNotes ? (
+          changed ? (
             <Button
               size="sm"
               variant="ghost"
               icon={<Save className="w-3.5 h-3.5" />}
-              onClick={() => {
-                updateNotes.mutate({ runId, notes: draft ?? '' }, {
-                  onSuccess: () => toast.success(t.workflows.execution.notesSaved),
-                });
-              }}
+              // A mouse click keeps the focus in the field (some browsers never focus a button)
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => save(true)}
               loading={updateNotes.isPending}
             >
               {t.common.save}
@@ -49,11 +70,6 @@ export function RunNotesCard({ runId, savedNotes, draft, onDraftChange }: RunNot
         placeholder={t.workflows.execution.notesPlaceholder}
         value={draft ?? savedNotes}
         onChange={(e) => onDraftChange(e.target.value)}
-        onBlur={() => {
-          if (draft !== null && draft !== savedNotes) {
-            updateNotes.mutate({ runId, notes: draft });
-          }
-        }}
       />
     </Card>
   );
