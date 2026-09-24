@@ -235,7 +235,7 @@ com.automation
 │   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
 │   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
-│   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
+│   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── assistant/format/  AssistantFormatUtils (Formatier-Helfer für Prompt-Bausteine; eigenes Blatt-Paket, damit context/ und fetch/ nicht auf assistant/ zurückzeigen)
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
@@ -247,7 +247,7 @@ com.automation
 │   ├── repair/          AutoRepairService
 │   ├── tray/            SystemTrayService
 │   ├── activitylog/     ActivityLogService, ActivityLogLifecycleListener
-│   ├── AssistantService.java        Chat-Assistent (Claude CLI)
+│   ├── AssistantService.java        Chat-Assistent (Orchestrierung; CLI-Aufruf in assistant/AssistantChatCaller)
 │   ├── AssistantSessionService.java Session-Persistierung
 │   ├── AssistantSettingsListener.java gecachte Assistenten-Einstellungen nachziehen (nur bei eingeschaltetem Modul)
 │   └── PageSuggestionService.java   Kontext-sensitive UI-Vorschläge
@@ -612,7 +612,7 @@ Benachrichtigungs-Konfigurationen für Workflow-Ereignisse:
 
 Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-system.md](assistant-system.md)
 
-- `AssistantService` — Chat-Logik, Kontext-Aufbereitung, Claude-CLI-Aufruf
+- `AssistantService` — Chat-Logik und Kontext-Aufbereitung; den Claude-CLI-Aufruf samt Chat-Modell und Basisanweisungen übernimmt `AssistantChatCaller`
 - `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`, V58: `preview`-Spalte). Endpunkte: `GET /sessions` (Top 50), `GET /sessions/{id}` (Detail), `DELETE /sessions/{id}`
 - `AssistantContextBuilder` — injiziert letzte 5 Sessions (User-Nachricht + Antwort) und bis zu 8 aktive Workflow Memories in den System-Prompt — auf **allen** Seiten
 - `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite (V42-Migration: `page_suggestions`)

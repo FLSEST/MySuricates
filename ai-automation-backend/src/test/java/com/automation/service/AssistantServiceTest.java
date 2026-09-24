@@ -9,6 +9,7 @@ import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.assistant.AssistantActionSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
+import com.automation.service.assistant.AssistantChatCaller;
 import com.automation.service.assistant.AssistantContextBuilder;
 import com.automation.service.assistant.AssistantErrorClassifier;
 import com.automation.service.assistant.AssistantFetchService;
@@ -60,6 +61,8 @@ class AssistantServiceTest {
     @Mock private AssistantActionSuggestionService actionSuggestionService;
 
     private AssistantService service;
+    /** The real caller on the mocked CLI — the chat tests assert on the request it sends. */
+    private AssistantChatCaller chatCaller;
 
     private HostClaudeConfig hostClaudeConfig;
 
@@ -67,9 +70,10 @@ class AssistantServiceTest {
     void setUp() {
         hostClaudeConfig = new HostClaudeConfig();
         hostClaudeConfig.setAssistantChatTimeoutSeconds(240);
+        chatCaller = new AssistantChatCaller(commandExecutorService, hostClaudeConfig, appSettingsRepository);
         service = new AssistantService(
-                commandExecutorService, aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
-                broadcaster, appSettingsRepository, hostClaudeConfig, actionSuggestionService,
+                aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
+                broadcaster, chatCaller, actionSuggestionService,
                 new AssistantErrorClassifier(hostClaudeConfig), new AssistantResponseParser(new ObjectMapper())
         );
         // Action-suggestion service defaults — disabled unless explicitly stubbed per test
@@ -92,23 +96,21 @@ class AssistantServiceTest {
         lenient().when(toolExecutor.isMutatingToolType(anyString())).thenReturn(true);
         // Fetch strip — pass through
         lenient().when(fetchService.stripFetchTags(any())).thenAnswer(inv -> inv.getArgument(0));
-        // Seed settings as @PostConstruct would in prod — populates cachedBaseInstructions + cachedAssistantModel
+        // Seed settings as @PostConstruct would in prod — populates the caller's base instructions + model
         lenient().when(appSettingsRepository.get(anyString())).thenReturn(Optional.of("claude-sonnet-4-6"));
-        service.seedSettings();
+        chatCaller.seedSettings();
     }
 
-    // ── Base instructions loading ────────────────────────────────────────────
+    // ── Base instructions (seeding itself: AssistantChatCallerTest) ──────────
 
     @Test
-    void seedSettings_loadsBaseInstructionsFromClasspath() {
-        when(appSettingsRepository.get(anyString())).thenReturn(Optional.of("dummy"));
+    void chat_passesTheCallersBaseInstructionsToTheSystemPromptBuilder() {
+        stubClaude("Answer");
 
-        service.seedSettings();
+        chat("Question");
 
-        // After seedSettings, the chat should work with base instructions loaded
-        stubClaude("Test response");
-        var result = chat("Test");
-        assertThat(result.message()).isEqualTo("Test response");
+        assertThat(chatCaller.baseInstructions()).isNotBlank();
+        verify(contextBuilder).buildSystemPrompt(any(), eq(chatCaller.baseInstructions()), any());
     }
 
     // ── Response parsing ──────────────────────────────────────────────────────
@@ -820,7 +822,7 @@ class AssistantServiceTest {
     @Test
     void refreshCachedModel_updatesModelUsedInNextChatCall() {
         when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-opus-4-8"));
-        service.refreshCachedModel();
+        chatCaller.refreshCachedModel();
         stubClaude("ok");
 
         service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
@@ -831,7 +833,7 @@ class AssistantServiceTest {
     @Test
     void refreshCachedModel_withBlankSetting_setsModelToNull() {
         when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("  "));
-        service.refreshCachedModel();
+        chatCaller.refreshCachedModel();
         stubClaude("ok");
 
         service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
@@ -842,7 +844,7 @@ class AssistantServiceTest {
     @Test
     void refreshCachedModel_withEmptySetting_setsModelToNull() {
         when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.empty());
-        service.refreshCachedModel();
+        chatCaller.refreshCachedModel();
         stubClaude("ok");
 
         service.chat(new AssistantChatRequest("Test", List.of(), null, null, null, null));
@@ -873,12 +875,12 @@ class AssistantServiceTest {
         verify(fetchService, times(3)).executeFetch(any());
     }
 
-    // ── Cached model & settings (seedSettings / refreshCachedModel) ─────────
+    // ── Cached model (refreshCachedModel on the caller, read by every chat) ─
 
     @Test
     void refreshCachedModel_updatesModelUsedInChat() {
         when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-opus-4-6"));
-        service.refreshCachedModel();
+        chatCaller.refreshCachedModel();
         stubClaude("Antwort");
 
         var result = chat("Frage");
@@ -891,45 +893,13 @@ class AssistantServiceTest {
     @Test
     void refreshCachedModel_blankSetting_clearsCachedModel() {
         when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("   "));
-        service.refreshCachedModel();
+        chatCaller.refreshCachedModel();
         stubClaude("Antwort");
 
         var result = chat("Frage");
 
         assertThat(result.message()).isEqualTo("Antwort");
         verify(commandExecutorService).executeOnHost(argThat(req -> req.model() == null));
-    }
-
-    @Test
-    void seedSettings_seedsDefaultThinkingPhrases_whenMissing() {
-        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.empty());
-        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-sonnet-4-6"));
-
-        service.seedSettings();
-
-        verify(appSettingsRepository).set(eq("assistant-thinking-phrases"),
-                argThat(v -> v.startsWith("{\"de\"") && v.contains("\"en\"")));
-    }
-
-    @Test
-    void seedSettings_migratesLegacyArrayThinkingPhrases() {
-        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.of("[\"Denke nach…\"]"));
-        when(appSettingsRepository.get("assistant-model")).thenReturn(Optional.of("claude-sonnet-4-6"));
-
-        service.seedSettings();
-
-        verify(appSettingsRepository).set(eq("assistant-thinking-phrases"), argThat(v -> v.startsWith("{")));
-    }
-
-    @Test
-    void seedSettings_seedsDefaultModel_whenBlank() {
-        when(appSettingsRepository.get("assistant-thinking-phrases")).thenReturn(Optional.of("{\"de\":[]}"));
-        when(appSettingsRepository.get("assistant-model"))
-                .thenReturn(Optional.of(" "), Optional.of("sonnet"));
-
-        service.seedSettings();
-
-        verify(appSettingsRepository).set("assistant-model", "sonnet");
     }
 
     // ── Chat context building ────────────────────────────────────────────────

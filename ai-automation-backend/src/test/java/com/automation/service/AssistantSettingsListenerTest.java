@@ -5,6 +5,7 @@ import com.automation.modules.ModuleConditions;
 import com.automation.modules.ModuleRegistry;
 import com.automation.modules.ModuleStateChangedEvent;
 import com.automation.service.assistant.AssistantActionSuggestionService;
+import com.automation.service.assistant.AssistantChatCaller;
 import com.automation.service.system.AppSettingChangedEvent;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -20,18 +21,18 @@ import static org.mockito.Mockito.verifyNoInteractions;
 /** Same key → refresh mapping as the direct calls in SystemSettingsService had, gated by the module. */
 class AssistantSettingsListenerTest {
 
-    private final AssistantService assistantService = mock(AssistantService.class);
+    private final AssistantChatCaller chatCaller = mock(AssistantChatCaller.class);
     private final PageSuggestionService pageSuggestionService = mock(PageSuggestionService.class);
     private final AssistantActionSuggestionService actionSuggestionService = mock(AssistantActionSuggestionService.class);
 
     private final AssistantSettingsListener listener =
-            new AssistantSettingsListener(assistantService, pageSuggestionService, actionSuggestionService);
+            new AssistantSettingsListener(chatCaller, pageSuggestionService, actionSuggestionService);
 
     @Test
     void assistantModel_refreshesTheChatModel() {
         listener.onSettingChanged(new AppSettingChangedEvent("assistant-model"));
 
-        verify(assistantService).refreshCachedModel();
+        verify(chatCaller).refreshCachedModel();
         verifyNoInteractions(pageSuggestionService, actionSuggestionService);
     }
 
@@ -41,7 +42,7 @@ class AssistantSettingsListenerTest {
 
         verify(pageSuggestionService).refreshCachedModel();
         verify(actionSuggestionService).refreshCache();
-        verifyNoInteractions(assistantService);
+        verifyNoInteractions(chatCaller);
     }
 
     @Test
@@ -49,7 +50,7 @@ class AssistantSettingsListenerTest {
         listener.onSettingChanged(new AppSettingChangedEvent("suggestions-enabled"));
 
         verify(actionSuggestionService).refreshCache();
-        verifyNoInteractions(assistantService, pageSuggestionService);
+        verifyNoInteractions(chatCaller, pageSuggestionService);
     }
 
     @Test
@@ -57,14 +58,14 @@ class AssistantSettingsListenerTest {
         listener.onSettingChanged(new AppSettingChangedEvent("default-ai-provider"));
         listener.onSettingChanged(new AppSettingChangedEvent("auto-repair-default"));
 
-        verifyNoInteractions(assistantService, pageSuggestionService, actionSuggestionService);
+        verifyNoInteractions(chatCaller, pageSuggestionService, actionSuggestionService);
     }
 
     @Test
     void switchingTheModuleOn_catchesUpOnEveryCache() {
         listener.onModuleStateChanged(new ModuleStateChangedEvent(this, ModuleCatalog.ASSISTANT, true));
 
-        verify(assistantService).refreshCachedModel();
+        verify(chatCaller).refreshCachedModel();
         verify(pageSuggestionService).refreshCachedModel();
         verify(actionSuggestionService).refreshCache();
     }
@@ -74,7 +75,7 @@ class AssistantSettingsListenerTest {
         listener.onModuleStateChanged(new ModuleStateChangedEvent(this, ModuleCatalog.ASSISTANT, false));
         listener.onModuleStateChanged(new ModuleStateChangedEvent(this, ModuleCatalog.CHAINS, true));
 
-        verifyNoInteractions(assistantService, pageSuggestionService, actionSuggestionService);
+        verifyNoInteractions(chatCaller, pageSuggestionService, actionSuggestionService);
     }
 
     @Test
@@ -98,7 +99,7 @@ class AssistantSettingsListenerTest {
     void publishedChange_isSkippedWhileTheModuleIsOff() {
         publishWith(Map.of(), new AppSettingChangedEvent("suggestions-model"));
 
-        verifyNoInteractions(assistantService, pageSuggestionService, actionSuggestionService);
+        verifyNoInteractions(chatCaller, pageSuggestionService, actionSuggestionService);
     }
 
     /** Real event dispatch, so the SpEL condition on the listener is evaluated against the registry. */

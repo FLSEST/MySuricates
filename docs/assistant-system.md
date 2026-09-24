@@ -19,15 +19,20 @@ Das Assistant-System besteht aus fünf Bereichen:
 
 ### AssistantService
 
-- Hauptklasse für Chat-Logik (`service/AssistantService.java`)
+- Hauptklasse für Chat-Logik (`service/AssistantService.java`) — orchestriert Kontext, Fetch-Runden, Tools und Vorschläge
 - Bereitet den Kontext auf (aktuelle Seite, Workflow-Daten, etc.)
-- Ruft Claude CLI auf dem Host auf (`HostClaudeService`)
-- Standard-Modell: `sonnet` (wird beim Start in `app_settings` geseedet, cached in `cachedAssistantModel`)
-- Erlaubte CLI-Tools: `Read`, `Grep`, `Glob`, `WebFetch` (`CHAT_ALLOWED_TOOLS`)
+- Jeder CLI-Aufruf geht über `AssistantChatCaller` (siehe unten)
 - Auto-Fetch-Loop: bis zu **3 Runden** mit je **3 Fetches** pro Runde (`MAX_FETCH_ROUNDS`, `MAX_FETCHES_PER_ROUND`)
 - Erkennt explizite Mutations-Absicht via Regex (deutsche Verben + Ziel-Nomen) — nur dann werden mutating Actions durchgelassen
 - Action-Suggestions werden parallel via `AssistantActionSuggestionService` geholt (35s Timeout)
 - Gibt `AssistantChatResponse` zurück (Antwort-Text + Aktionen + optional PendingTools)
+
+### AssistantChatCaller
+
+- Die CLI-Seite des Chats (`service/assistant/AssistantChatCaller.java`), aus `AssistantService` herausgelöst
+- Ruft Claude CLI auf dem Host auf (`HostClaudeService`) — interaktiv (`priority`), mit dem Chat-Timeout aus `HostClaudeConfig`; ein Exit-Code ≠ 0 bricht mit Fehler ab, statt den Fehlertext als Antwort auszugeben
+- Standard-Modell: `sonnet` (wird beim Start in `app_settings` geseedet, cached in `cachedAssistantModel`), dazu die Basisanweisungen aus `assistant-system-prompt.md`
+- Erlaubte CLI-Tools: `Read`, `Grep`, `Glob`, `WebFetch` (`CHAT_ALLOWED_TOOLS`)
 
 ### AssistantSessionService
 
@@ -320,7 +325,7 @@ Alle implementieren `AssistantContextSection` mit `append(StringBuilder sb, bool
 
 ## Modell-Auswahl
 
-- **Chat-Modell** (`assistant-model` Setting): Default `sonnet`, cached in `AssistantService.cachedAssistantModel`
+- **Chat-Modell** (`assistant-model` Setting): Default `sonnet`, cached in `AssistantChatCaller.cachedAssistantModel`
 - **Suggestions-Modell** (`suggestions-model` Setting): Default `sonnet`, verwendet von `PageSuggestionService` und `AssistantActionSuggestionService`
 - Beide Modelle werden beim Start in `app_settings` geseedet und können zur Laufzeit via Settings-API geändert werden: `SystemSettingsService` meldet die Änderung als `AppSettingChangedEvent`, `AssistantSettingsListener` ruft `refreshCachedModel()`/`refreshCache()` — nur bei eingeschaltetem Assistenten-Modul; beim Einschalten zur Laufzeit liest er alle drei Werte nach
 - Haiku (`haiku`) ist zu ungenau für Assistent-Aufgaben
