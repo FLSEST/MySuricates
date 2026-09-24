@@ -242,5 +242,13 @@
       "Progress counts the finished TODOs; open questions are listed separately because they have to be settled before the work starts",
       "Reached and archived goals are kept, they just move out of sight"
     ]
+  },
+  "goal-relation-map": {
+    "title": "Where TODOs come from and who works on them",
+    "points": [
+      "On the left is the origin: a workflow run, an audit finding, a health check, an agent or a person",
+      "Next to it, which workflow works on a TODO: as the fix workflow on the TODO or through a matching TodoTrigger, and what its last run did",
+      "A dotted stub shows where no workflow docks on yet; dashed rows are suggestions that might belong to the goal"
+    ]
   }
 }

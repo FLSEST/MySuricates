@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, Trash2, Zap, CheckCircle } from 'lucide-react';
 import { Card, CardHeader, Button, Modal, Select, Input, Toggle, Badge, Spinner } from '../ui';
 import { useT } from '../../i18n';
@@ -30,6 +31,12 @@ export function TodoTriggerSection() {
   const deleteTrigger = useDeleteTodoTrigger();
 
   const [showCreate, setShowCreate] = useState(false);
+  // Sprungziel „TodoTrigger verwalten“ aus der Relationskarte eines Ziels (TODO c6ea8f5c)
+  const location = useLocation();
+  const anchorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (location.hash === '#todo-triggers') anchorRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, [location.hash]);
   const [form, setForm] = useState<CreateTodoTriggerRequest>(defaultForm);
 
   function handleCreate() {
@@ -44,6 +51,7 @@ export function TodoTriggerSection() {
 
   return (
     <>
+      <div id="todo-triggers" ref={anchorRef} className="scroll-mt-4" />
       <Card padding={false}>
         <div className="p-5 pb-0">
           <CardHeader

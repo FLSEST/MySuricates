@@ -242,5 +242,13 @@
       "Der Fortschritt zählt die erledigten TODOs; offene Fragen stehen gesondert, weil sie vor der Arbeit geklärt sein müssen",
       "Erreichte und archivierte Ziele bleiben erhalten, sie treten nur aus dem Blick"
     ]
+  },
+  "goal-relation-map": {
+    "title": "Woher TODOs kommen und wer sie abarbeitet",
+    "points": [
+      "Links steht die Herkunft: ein Workflow-Lauf, ein Audit-Befund, ein Health-Check, ein Agent oder ein Mensch",
+      "Rechts davon, welcher Workflow ein TODO bearbeitet: als Fix-Workflow am TODO oder über einen passenden TodoTrigger, und was der letzte Lauf ergab",
+      "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten"
+    ]
   }
 }

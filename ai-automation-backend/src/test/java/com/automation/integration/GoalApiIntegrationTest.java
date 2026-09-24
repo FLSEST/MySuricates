@@ -213,6 +213,7 @@ class GoalApiIntegrationTest {
         // Andere Tests koennen aktive Trigger hinterlassen – gezielt nach dem eigenen suchen.
         assertThat(workersOf(gateNode, fixer.getId())).containsExactly("TRIGGER:Karten-Fixer");
         assertThat(gateNode.at("/result/runStatus").asText()).isEqualTo("COMPLETED");
+        assertThat(gateNode.at("/result/workflowId").asText()).isEqualTo(fixer.getId());
         assertThat(gateNode.at("/result/resolutionState").asText()).isEqualTo("SUCCEEDED");
         assertThat(gateNode.at("/projectName").asText()).isEqualTo(projectA.getName());
         assertThat(gateNode.has("description")).isFalse();

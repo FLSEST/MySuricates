@@ -67,10 +67,12 @@ public record GoalRelationsResponse(String goalId, int activeTriggers, List<Todo
     /**
      * Ergebnis der Bearbeitung; fehlt ganz, solange nie ein Fix-Lauf gestartet wurde.
      *
-     * @param at Ende des Laufs, solange er laeuft sein Start
+     * @param workflowId Workflow des Fix-Laufs – die Karte zieht die Linie von dessen Bearbeitungs-Knoten
+     * @param at         Ende des Laufs, solange er laeuft sein Start
      */
     public record Result(
             String runId,
+            String workflowId,
             RunStatus runStatus,
             Instant at,
             int fixAttempts,

@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
+import { useTodos } from './useTodos';
 import type {
-  CreateGoalRequest, Goal, GoalDetail, GoalStatus, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
+  CreateGoalRequest, Goal, GoalDetail, GoalRelations, GoalStatus, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
 } from '../types';
 
 /** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
@@ -11,6 +12,7 @@ export const goalKeys = {
   all: ['goals'] as const,
   list: (statuses?: GoalStatus[]) => ['goals', 'list', statuses?.join(',') ?? 'default'] as const,
   detail: (id: string) => ['goals', 'detail', id] as const,
+  relations: (id: string, include: string[]) => ['goals', 'relations', id, include.join(',')] as const,
 };
 
 /** Ohne Filter liefert der Server aktive und erledigte Ziele, neueste zuerst. */
@@ -28,6 +30,53 @@ export function useGoal(id: string | undefined) {
     queryKey: goalKeys.detail(id ?? ''),
     queryFn: () => api.get<GoalDetail>(`/goals/${id}`),
     enabled: !!id,
+  });
+}
+
+/**
+ * Relationskarte (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung und Ergebnis. `include` sind die
+ * gerade gezeigten Kandidaten; sie kommen gestrichelt mit in die Karte. Beim Wechsel der Kandidaten
+ * bleibt die alte Karte stehen, bis die neue da ist.
+ */
+export function useGoalRelations(id: string | undefined, include: string[], enabled = true) {
+  const query = include.length ? `?include=${include.map(encodeURIComponent).join(',')}` : '';
+  return useQuery({
+    queryKey: goalKeys.relations(id ?? '', include),
+    queryFn: () => api.get<GoalRelations>(`/goals/${id}/relations${query}`),
+    enabled: !!id && enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+  });
+}
+
+/** Status, in denen ein TODO noch zu einem Ziel passen kann. */
+const CANDIDATE_STATUSES = ['OPEN', 'IN_PROGRESS', 'BACKLOG'];
+/** Höchstens so viele Kandidaten – genau so viele nimmt die Relationskarte mit. */
+export const CANDIDATE_LIMIT = 20;
+
+/** Kandidaten (TODO c6ea8f5c): offene TODOs ohne Ziel (`goalId=none`), gefiltert nach Tag und Suche. */
+export function useGoalCandidates(filter: { q: string; tag: string }, enabled = true) {
+  return useTodos(
+    { status: CANDIDATE_STATUSES, goalId: 'none', tag: filter.tag.trim(), q: filter.q.trim() },
+    0, CANDIDATE_LIMIT, enabled,
+  );
+}
+
+/** Ordnet TODOs einem Ziel zu – ohne Rang, sie stehen hinter den eingeordneten. */
+export function useAssignGoalTodos() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const t = useT();
+  return useMutation({
+    mutationFn: ({ id, todoIds }: { id: string; todoIds: string[] }) =>
+      api.post<GoalDetail>(`/goals/${id}/todos`, { todoIds }),
+    onSuccess: (detail) => {
+      qc.setQueryData(goalKeys.detail(detail.goal.id), detail);
+      qc.invalidateQueries({ queryKey: goalKeys.all });
+      qc.invalidateQueries({ queryKey: ['todos'] });
+      toast.success(t.goals.assigned);
+    },
+    onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
   });
 }
 

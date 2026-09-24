@@ -120,7 +120,7 @@ final class GoalRelationAssembler {
             return null;
         }
         RunStateRow run = row.lastFixRunId() == null ? null : lookups.runs().get(row.lastFixRunId());
-        return new Result(row.lastFixRunId(), run == null ? null : run.status(),
+        return new Result(row.lastFixRunId(), run == null ? null : run.workflowId(), run == null ? null : run.status(),
                 run == null ? null : (run.completedAt() != null ? run.completedAt() : run.startedAt()),
                 row.fixAttempts(), row.resolutionState());
     }

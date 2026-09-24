@@ -152,6 +152,7 @@ class GoalRelationsServiceTest {
 
         var fixed = byId(response, "fixed").result();
         assertThat(fixed.runStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(fixed.workflowId()).isEqualTo("wf");
         assertThat(fixed.at()).isEqualTo(T0.plusSeconds(90));
         assertThat(fixed.fixAttempts()).isEqualTo(2);
         assertThat(fixed.resolutionState()).isEqualTo(Todo.ResolutionState.SUCCEEDED);
