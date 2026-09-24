@@ -565,6 +565,8 @@ Invokes a capability of a registered skill.
 
 **Security**: Capabilities declare via `Capability.writes` whether they write files. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. A block that invokes a `writes:true` capability without `"allow_writes": true` fails immediately with a clear message. For all other cases, the host CLI is started with a read-only tool whitelist (defense in depth).
 
+**Errors**: If the AI CLI ends with a non-zero exit code (limit, missing login, crash), the step fails like a `simple` block, and the CLI's message is in the output. The workflow then only carries on with `"on_failure": "continue"`.
+
 ---
 
 ### `document` — Extract Text from Documents

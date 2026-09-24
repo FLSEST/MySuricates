@@ -576,6 +576,8 @@ Ruft die Fähigkeit eines registrierten Skills auf.
 
 **Sicherheit**: Capabilities deklarieren über `Capability.writes`, ob sie Dateien schreiben. Built-in `writes:true`: `builtin-test-generator/*`, `builtin-feature-implementer/*`. Ein Block, der eine `writes:true`-Capability aufruft ohne `"allow_writes": true`, fällt sofort fehl mit klarer Meldung. Für alle anderen Fälle wird der Host-CLI mit einer Read-Only-Tool-Whitelist gestartet (Defense-in-Depth).
 
+**Fehler**: Endet die KI-CLI mit einem Exit-Code ungleich 0 (Limit, fehlende Anmeldung, Absturz), scheitert der Schritt wie ein `simple`-Block, und ihre Meldung steht in der Ausgabe. Weiter läuft der Workflow dann nur mit `"on_failure": "continue"`.
+
 ---
 
 ### `document` — Text aus Dokumenten extrahieren
