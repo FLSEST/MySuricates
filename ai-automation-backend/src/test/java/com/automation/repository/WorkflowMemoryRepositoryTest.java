@@ -226,4 +226,21 @@ class WorkflowMemoryRepositoryTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isActive()).isFalse();
     }
+
+    /** Page suggestions read only the five newest active memories, limited in the query (TODO bdd11037). */
+    @Test
+    void findTop5ByActiveTrue_returnsTheFiveNewestActiveMemories() {
+        Instant base = Instant.parse("2999-01-01T00:00:00Z"); // newer than anything other tests leave behind
+        for (int i = 0; i < 7; i++) {
+            repository.save(memoryWithCreatedAt(i % 2 == 0 ? workflowId : otherWorkflowId, true, base.plusSeconds(i)));
+        }
+        repository.save(memoryWithCreatedAt(workflowId, false, base.plusSeconds(100)));
+
+        List<WorkflowMemory> top = repository.findTop5ByActiveTrueOrderByCreatedAtDesc();
+
+        assertThat(top).hasSize(5).allMatch(WorkflowMemory::isActive)
+                .extracting(WorkflowMemory::getCreatedAt)
+                .containsExactly(base.plusSeconds(6), base.plusSeconds(5), base.plusSeconds(4),
+                        base.plusSeconds(3), base.plusSeconds(2));
+    }
 }

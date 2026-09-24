@@ -18,6 +18,9 @@ public interface WorkflowMemoryRepository extends JpaRepository<WorkflowMemory, 
     Optional<WorkflowMemory> findByWorkflowIdAndActiveTrue(String workflowId);
 
     List<WorkflowMemory> findByActiveTrueOrderByCreatedAtDesc();
+
+    /** The five newest active memories — the page suggestions only show that many (TODO bdd11037). */
+    List<WorkflowMemory> findTop5ByActiveTrueOrderByCreatedAtDesc();
     long countByActiveTrue();
 
     @Modifying
