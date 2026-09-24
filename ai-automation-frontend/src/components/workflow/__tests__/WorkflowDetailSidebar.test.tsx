@@ -217,6 +217,30 @@ describe('WorkflowDetailSidebar', () => {
     ).not.toThrow();
   });
 
+  it('shows the effort card unless the active provider declares no effort support', () => {
+    const { unmount } = render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CLAUDE' })} {...defaultProps} />);
+    expect(screen.getByText('Reasoning effort')).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(useAiProviders).mockReturnValue({
+      data: { providers: ['CLAUDE', 'CODEX'], default: 'CLAUDE', capabilities: { CODEX: { supportsEffort: false } } },
+    } as any);
+    render(<WorkflowDetailSidebar workflow={buildWorkflow({ provider: 'CODEX' })} {...defaultProps} />);
+    expect(screen.queryByText('Reasoning effort')).not.toBeInTheDocument();
+  });
+
+  it('switches auto-repair and keeps its mode', () => {
+    render(<WorkflowDetailSidebar {...defaultProps}
+      workflow={buildWorkflow({ metadata: { autoRepair: { enabled: true, mode: 'test' } } })} />);
+    const toggle = screen.getByRole('switch', { name: 'Auto-Repair' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(toggle);
+    expect(mockMutate).toHaveBeenCalledWith({
+      id: 'wf-1', data: { metadata: { autoRepair: { enabled: false, mode: 'test' } } },
+    });
+  });
+
   describe('sealed workflow', () => {
     it('locks the definition editors but keeps recent runs usable', () => {
       render(<WorkflowDetailSidebar {...defaultProps}
@@ -225,6 +249,7 @@ describe('WorkflowDetailSidebar', () => {
       expect(screen.getByRole('button', { name: /edit/i })).toBeDisabled();
       screen.getAllByRole('combobox').forEach((select) => expect(select).toBeDisabled());
       expect(screen.getByRole('button', { name: /deactivate/i })).toBeDisabled();
+      expect(screen.getByRole('switch', { name: 'Auto-Repair' })).toBeDisabled();
     });
 
     it('leaves the editors enabled for unsealed workflows', () => {

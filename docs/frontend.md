@@ -106,6 +106,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Memory, Info)
 - Block-Editor mit `@dnd-kit` für Drag-and-Drop-Sortierung
 - Modals: Block hinzufügen (Typ + JSON-Config via Monaco Editor), Skill aktivieren
+- Panel der Workflow-Liste (`WorkflowDetailPanel`) und Sidebar der Detailseite (`WorkflowDetailSidebar`) teilen `WorkflowRecentRuns` (`list`: neueste Läufe mit Startzeit und Dauer; `card`: Gesamtzahl, Gate, Notizen und Blättern — dieselbe Seite speist das Memory-Panel). Weitere Bausteine in `components/workflow/`: `WorkflowBlockList` (Blockliste mit BPMN-Diagramm, Klick blinkt im jeweils anderen), `WorkflowAutomationSettings` (Auto-Todo, Auto-Repair, Auto-Memory mit `ui/Toggle`), `WorkflowAiSettingsCards` (Anbieter, Modell, Aufwand) und `DefaultContextEditor`
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`)
 
@@ -116,6 +117,13 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Fehler-Panel bei fehlgeschlagenen Runs
 - Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
 - `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
+- Der Kopf mit Zurück, Status und den Aktionen je Zustand (Pausieren, Fortsetzen, Abbrechen, Löschen, ab letztem Schritt fortsetzen, TODO aus einem fehlgeschlagenen Lauf) ist `RunHeader`, die Notizen sind `RunNotesCard` (der ungespeicherte Text bleibt in der Seite). `components/workflow/useRunDiagramSync.ts` färbt die Diagramm-Kästen nach Step-Status und hebt beim Klick auf einen Kasten dessen Step hervor; das TODO eines fehlgeschlagenen Laufs baut `utils/failedRunTodo.ts` (`buildFailedRunTodo`) in der App-Sprache
+
+### Runs (`/runs`)
+
+- Tabs „Workflows“ und „Ketten“ (nur mit Modul `chains`); beide Listen laden unabhängig vom Tab
+- `hooks/useRunsFilters.ts`: gemerkte Filter je Tab; jeder Filterwechsel beginnt wieder bei Seite 0 (die Suche entprellt, erst eine geänderte Suche setzt zurück); Tabwechsel leert die Filter des verlassenen Tabs; Statusoptionen in der App-Sprache (`t.runs.statuses`)
+- Bausteine in `components/runs/`: `WorkflowsTab`, `ChainsTab`, Spalten in `runColumns.tsx` (`useWorkflowRunColumns`, `useChainRunColumns`; die Löschspalte nur, wenn `automation.executions.allow-delete` es erlaubt), `DeleteRunButton`, `RunResultText`, `ChainProgress`
 
 ### Skills (`/skills`)
 
@@ -152,6 +160,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Erkennt automatisch von AI erstellte TODOs (source: AI, sourceAgent: claude-code)
 - Badge-Anzeige in der Sidebar für offene TODOs
 - Filter-, Ansichts- und Seitenzustand (persistiert, Suche entprellt, `?projectId=` aus dem Cockpit) liefert `hooks/useTodoFilters.ts`; die Quick-Add-Leiste ist `components/todo/TodoQuickAdd.tsx`, ihr Zustand und das Kürzel `n` (fokussiert den Titel außerhalb von Eingabefeldern) liegen in `hooks/useTodoQuickAdd.ts` und damit in der Seite — Eingaben überstehen den Lade-Spinner beim Filterwechsel
+- `hooks/useTodoBoard.ts` liefert die Daten der aktiven Ansicht: in der Liste eine Seite, im Board eine Abfrage je Spalte, die der Statusfilter zeigt (nie eine gemischte Seite auf Spalten verteilt); `hooks/useTodoEditor.ts` den Bearbeiten-Dialog samt Deep-Link `?todoId=` (öffnet das TODO einmal, lockert verbergende Filter, hebt die Zeile bis kurz nach dem Schließen hervor), Speichern und Export. Filterleiste und Tag-Chips sind `components/todo/TodoFilterBar.tsx` und `TodoTagChips.tsx`
 
 ### ActivityLog (`/activity`)
 
@@ -193,6 +202,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - **BPMN-Diagramm:** `BpmnDiagramView.tsx` zeichnet den BPMN-Export als SVG (Zoom, Klick/Hover je Block, Live-Status im Run). Die reine Logik — XML lesen, oben→unten-Layout, Beschriftungen umbrechen, Element-ID → Block-Auswahl — liegt in `bpmnLayout.ts` (Test `bpmnLayout.test.ts`), die Formen und Marker je Element-Typ in `BpmnShapes.tsx`.
 - **Dashboard-Bericht-Formular:** Für Blöcke vom Typ `dashboard-report` zeigt der Block-Editor (Hinzufügen und Bearbeiten) zusätzlich zur JSON-Bearbeitung ein Formular für Status, Titel, Zusammenfassung, Kennzahlen und Einträge (`DashboardReportFields.tsx`, Modell in `dashboardReport.ts`). Grenzen und Statuswerte kommen aus dem einen Vertragsspiegel `components/dashboard/workflowWidgetContract.ts`; Warnungen sind Hinweise, geprüft wird im Backend. Werte mit `{{ … }}` werden nicht auf Länge geprüft.
 - **KI-Vorschlag:** `DashboardReportAssist.tsx` bietet „Vorschlag aus dem letzten Run" an, wenn Modul, Einstellung und Anbieter `CLAUDE` vorhanden sind (`useDashboardReportAssist.ts`). Der Vorschlag erscheint als Textknoten in einem Prüf-Bereich und wird erst nach „Übernehmen" in die Config geschrieben. Guard: `components/workflow/__tests__/dashboardReportMarkupGuard.test.ts`. Die drei Abschalter wirken unterschiedlich: Ist das Modul aus, wird der Block-Typ im Editor gar nicht angeboten. Ist die Einstellung aus, bleibt der Block funktionsfähig, nur der Knopf „Vorschlag" erscheint nicht. Fehlt die KI auf diesem Host, wird der Knopf ebenfalls nicht angeboten — geprüft wird dafür der Modellkatalog des Anbieters (`useProviderModels('CLAUDE')` → `available`), der für `CLAUDE` nachsieht, ob das Programm `claude` auf dem `PATH` auflösbar ist; `GET /system/ai-providers` taugt dafür nicht, weil es registrierte Spring-Beans aufzählt und `CLAUDE` immer enthält. Eine installierte, aber nicht angemeldete CLI lässt sich ohne einen echten Aufruf nicht davon unterscheiden — dieser Fall scheitert erst beim Vorschlag selbst.
+- **Aufbau:** `components/workflow/useWorkflowBlockEditor.ts` hält Hinzufügen, Bearbeiten (mit Sprungziel aus dem Diagramm, `revealTextFor`), Speichern und Entfernen von Blöcken, `hooks/useWorkflowDetailActions.ts` Bearbeiten, Ausführen, Klonen, Löschen, Optimieren, Reparieren, Anweisungen und Skills samt Dialogzustand. Der Blöcke-Tab ist `components/workflow/WorkflowBlocksTab.tsx` (Liste und Diagramm mit Hover-Querverweis); die Seite verdrahtet Tabs, Sidebar und `WorkflowDetailModals`
 
 ### Settings (`/settings`)
 
@@ -249,6 +259,11 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 | `RouteErrorFallback` | Error-Boundary für Route-Fehler |
 | `TerminalPanel` | Interaktives xterm.js-Terminal mit WebSocket-Anbindung |
 | `ErrorBoundary` | React Error Boundary mit Fallback-UI |
+
+### Sidebar (`src/components/layout/`)
+
+- `Sidebar.tsx` verdrahtet nur: Seitenliste und Einrückungsregel für Untereinträge (`isNestedAt`) in `utils/navItems.ts`, Logo in `MeerkatIcon.tsx`, Einfach/Pro-Schalter in `SidebarModeToggle.tsx` (Pille, eingeklappt ein Symbolknopf)
+- `hooks/useSidebarOrder.ts` liefert Menü, Bearbeiten-Liste und ausgeblendete Seiten samt Verschieben, Unterteiler anlegen/entfernen, Aus-/Einblenden und Zurücksetzen; Seiten abgeschalteter Module fehlen, behalten aber ihren Platz in der gespeicherten Reihenfolge
 
 ## UI-Komponentenbibliothek
 
@@ -702,6 +717,8 @@ WebSocket-Verbindung für Echtzeit-Status-Updates und Push-Events des Assistente
 | `useDeleteCredentials()` | Mutation | Credentials löschen |
 | `useTestIntegrationAction()` | Mutation | Provider-Aktion testen |
 
+Die Seite `/integrations` setzt sich aus `components/integrations/ProviderCard` (Karte mit Status, Berechtigungen, Verbinden/Trennen) und `ProviderDetailPanel` (Verbindung, Berechtigungen, Konfiguration, Aktionstest; je Anbieter neu, also eingeklappt und ohne altes Ergebnis) zusammen. `hooks/useProviderCopy.ts` liefert die Anzeigetexte je Anbieter (Name, Beschreibung, Aktionen; DE/EN, sonst der Text des Backends), `hooks/useIntegrationActionTest.ts` den Probelauf einer Aktion (laufende Aktion, Ergebnis als JSON).
+
 ### `useWorkflowVersions.ts`
 
 | Hook | Typ | Beschreibung |
@@ -720,6 +737,8 @@ WebSocket-Verbindung für Echtzeit-Status-Updates und Push-Events des Assistente
 | `useDeleteOnboardingProfile()` | Mutation | Profil löschen |
 | `useResetOnboardingProfile()` | Mutation | Profil auf Built-in-Defaults zurücksetzen |
 | `useOnboardingProfileHistory(profileId)` | Query | Versionshistorie eines Profils |
+
+Den Bearbeitungszustand der Seite `/onboarding-profiles` hält `hooks/useOnboardingProfileEditor.ts`: Auswahl (aus der Live-Liste), Entwurf von Name, Beschreibung und Inhalt je Sprache, die bearbeitete Inhaltssprache, `hasChanges`, Speichern, Löschen und das Zurücksetzen auf den ausgelieferten Text (danach zeigt der Editor den übernommenen Text). Die Bausteine liegen in `components/onboarding/`: `ProfileList` (Suche, Markierungen), `ProfileEditor`, `CreateProfileModal`, `ShippedModal`, `HistoryModal` und `ContentLanguageToggle` (DE|EN).
 
 ### `useCalendarAggregated.ts`
 

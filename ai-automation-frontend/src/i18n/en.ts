@@ -1054,6 +1054,16 @@ export const en = {
         result: 'Result',
         exitCode: 'Exit Code',
       },
+      // TODO created from a failed run ("Create Todo" on the run page)
+      failedTodo: {
+        title: '{workflow}: Run failed',
+        workflow: 'Workflow',
+        run: 'Run',
+        failedStep: 'Failed step',
+        error: 'Error',
+        stepError: 'Step error',
+        stepInfo: 'Step {n} ({type})',
+      },
     },
   },
   skills: {
@@ -2066,6 +2076,18 @@ export const en = {
     result: 'Result',
     delete: 'Delete run',
     deleteConfirm: 'Permanently delete this run? Its steps and the matching dead-letter entry go with it. Linked todos are kept, but lose the reference.',
+    // Status filter of the run lists (workflow and chain runs)
+    statuses: {
+      COMPLETED: 'Completed',
+      COMPLETED_WITH_ERRORS: 'Completed (legacy)',
+      FAILED: 'Failed',
+      RUNNING: 'Running',
+      CANCELLED: 'Cancelled',
+      PAUSED: 'Paused',
+      PENDING: 'Pending',
+      INTERRUPTED: 'Interrupted',
+    },
+    chainFailedCount: '({count} failed)',
   },
   activityLog: {
     title: 'Activity Log',

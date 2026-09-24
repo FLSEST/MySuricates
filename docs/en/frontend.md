@@ -106,6 +106,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Detail page: 2/3-column block editor (drag & drop), 1/3 sidebar (skills, runs, memory, info)
 - Block editor with `@dnd-kit` for drag-and-drop sorting
 - Modals: add block (type + JSON config via Monaco Editor), activate skill
+- The panel of the workflow list (`WorkflowDetailPanel`) and the sidebar of the detail page (`WorkflowDetailSidebar`) share `WorkflowRecentRuns` (`list`: newest runs with start time and duration; `card`: total, gate, notes and paging — the same page feeds the memory panel). More building blocks in `components/workflow/`: `WorkflowBlockList` (block list with the BPMN diagram, a click flashes the entry in the other), `WorkflowAutomationSettings` (auto-todo, auto-repair, auto-memory with `ui/Toggle`), `WorkflowAiSettingsCards` (provider, model, effort) and `DefaultContextEditor`
 
 ### WorkflowExecution (`/workflows/:id/run/:runId`)
 
@@ -116,6 +117,13 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Error panel for failed runs
 - Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
 - `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
+- The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `components/workflow/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
+
+### Runs (`/runs`)
+
+- Tabs "Workflows" and "Chains" (only with the `chains` module); both lists load regardless of the tab
+- `hooks/useRunsFilters.ts`: remembered filters per tab; every filter change starts at page 0 again (the search is debounced, only a changed search resets); switching tabs clears the filters of the tab left; status options in the app language (`t.runs.statuses`)
+- Building blocks in `components/runs/`: `WorkflowsTab`, `ChainsTab`, columns in `runColumns.tsx` (`useWorkflowRunColumns`, `useChainRunColumns`; the delete column only when `automation.executions.allow-delete` allows it), `DeleteRunButton`, `RunResultText`, `ChainProgress`
 
 ### Skills (`/skills`)
 
@@ -152,6 +160,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Automatically detects AI-created TODOs (source: AI, sourceAgent: claude-code)
 - Badge display in the sidebar for open TODOs
 - Filter, view and page state (persisted, debounced search, `?projectId=` from the cockpit) comes from `hooks/useTodoFilters.ts`; the quick-add bar is `components/todo/TodoQuickAdd.tsx`, its state and the `n` shortcut (focuses the title outside of form fields) live in `hooks/useTodoQuickAdd.ts` and therefore in the page — input survives the loading spinner when a filter changes
+- `hooks/useTodoBoard.ts` provides the data of the active view: one page in the list, one query per column the status filter shows on the board (never a mixed page spread over the columns); `hooks/useTodoEditor.ts` the edit dialog including the deep link `?todoId=` (opens the todo once, releases filters that would hide it, highlights its row until shortly after closing), saving and export. The filter bar and the tag chips are `components/todo/TodoFilterBar.tsx` and `TodoTagChips.tsx`
 
 ### ActivityLog (`/activity`)
 
@@ -193,6 +202,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - **BPMN diagram:** `BpmnDiagramView.tsx` draws the BPMN export as SVG (zoom, click/hover per block, live status during a run). The pure logic — reading the XML, top-to-bottom layout, wrapping labels, element id → block selection — lives in `bpmnLayout.ts` (test `bpmnLayout.test.ts`), the shapes and markers per element type in `BpmnShapes.tsx`.
 - **Dashboard report form:** For blocks of type `dashboard-report`, the block editor (add and edit) shows a form for status, title, summary, KPIs and items in addition to raw JSON editing (`DashboardReportFields.tsx`, model in `dashboardReport.ts`). Bounds and status values come from the single contract mirror `components/dashboard/workflowWidgetContract.ts`; warnings are hints, validation happens in the backend. Values with `{{ … }}` are not length-checked.
 - **AI suggestion:** `DashboardReportAssist.tsx` offers "Suggestion from last run" when the module, setting and provider `CLAUDE` are available (`useDashboardReportAssist.ts`). The suggestion appears as text in a review area and is only written to config after "Apply". Guard: `components/workflow/__tests__/dashboardReportMarkupGuard.test.ts`. The three off-switches have different effects: if the module is off, the block type is not offered in the editor at all. If the setting is off, the block keeps working but the "Suggestion" button does not appear. If this host has no AI, the button is not offered either — that is checked against the provider's model catalog (`useProviderModels('CLAUDE')` → `available`), which for `CLAUDE` looks up whether the `claude` program resolves on the `PATH`; `GET /system/ai-providers` is no use here because it lists registered Spring beans and always contains `CLAUDE`. An installed but unauthenticated CLI cannot be told apart without a real call — that case only fails when the suggestion runs.
+- **Structure:** `components/workflow/useWorkflowBlockEditor.ts` holds adding, editing (with the jump target from the diagram, `revealTextFor`), saving and removing blocks, `hooks/useWorkflowDetailActions.ts` editing, running, cloning, deleting, optimizing, repairing, instructions and skills including the dialog state. The blocks tab is `components/workflow/WorkflowBlocksTab.tsx` (list and diagram with the hover cross-reference); the page wires tabs, sidebar and `WorkflowDetailModals`
 
 ### Settings (`/settings`)
 
@@ -249,6 +259,11 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 | `RouteErrorFallback` | Error boundary for route errors |
 | `TerminalPanel` | Interactive xterm.js terminal with WebSocket connection |
 | `ErrorBoundary` | React error boundary with fallback UI |
+
+### Sidebar (`src/components/layout/`)
+
+- `Sidebar.tsx` only wires things up: the page list and the indentation rule for sub-entries (`isNestedAt`) live in `utils/navItems.ts`, the logo in `MeerkatIcon.tsx`, the Simple/Pro switch in `SidebarModeToggle.tsx` (a pill, collapsed one icon button)
+- `hooks/useSidebarOrder.ts` provides the menu, the edit list and the hidden pages plus moving, adding/removing dividers, hiding/showing and resetting; pages of disabled modules are left out but keep their place in the stored order
 
 ## UI Component Library
 
@@ -702,6 +717,8 @@ WebSocket connection for real-time status updates and push events from the assis
 | `useDeleteCredentials()` | Mutation | Delete credentials |
 | `useTestIntegrationAction()` | Mutation | Test provider action |
 
+The `/integrations` page is built from `components/integrations/ProviderCard` (card with status, permissions, connect/disconnect) and `ProviderDetailPanel` (connection, permissions, configuration, action test; fresh per provider, so folded and without an old result). `hooks/useProviderCopy.ts` provides the display texts per provider (name, description, actions; DE/EN, otherwise the backend text), `hooks/useIntegrationActionTest.ts` the test run of an action (running action, result as JSON).
+
 ### `useWorkflowVersions.ts`
 
 | Hook | Type | Description |
@@ -720,6 +737,8 @@ WebSocket connection for real-time status updates and push events from the assis
 | `useDeleteOnboardingProfile()` | Mutation | Delete profile |
 | `useResetOnboardingProfile()` | Mutation | Reset profile to built-in defaults |
 | `useOnboardingProfileHistory(profileId)` | Query | Version history of a profile |
+
+The editing state of the `/onboarding-profiles` page lives in `hooks/useOnboardingProfileEditor.ts`: selection (from the live list), the draft of name, description and content per language, the content language being edited, `hasChanges`, saving, deleting and resetting to the shipped text (afterwards the editor shows the taken-over text). The building blocks live in `components/onboarding/`: `ProfileList` (search, markers), `ProfileEditor`, `CreateProfileModal`, `ShippedModal`, `HistoryModal` and `ContentLanguageToggle` (DE|EN).
 
 ### `useCalendarAggregated.ts`
 
