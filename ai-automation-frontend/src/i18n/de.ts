@@ -1074,6 +1074,7 @@ export const de: TranslationKeys = {
     maintenanceModeActive: 'Scheduler pausiert — solange die Pause gilt, startet kein Zeitplan. Beim Fortsetzen startet jeder Zeitplan, dessen Termin in die Pause fiel, einmal sofort – alle gleichzeitig, nicht nacheinander.',
     skipUntilActive: 'Zeitpläne pausiert bis {until} (automation.scheduler.skip-until): Termine davor werden übersprungen, nicht nachgeholt; einmalige Zeitpläne in diesem Zeitraum verfallen. „Nächster Lauf“ zeigt den ersten Termin nach der Pause.',
     pausedUntil: 'pausiert bis {until}',
+    maintenanceNothingStarts: 'Wartungsmodus – startet nichts',
     nextRunsAfterPause: 'Nächste Ausführungen nach der Pause (bis {until})',
     catchUpQueueTitle: 'Verpasste Läufe werden nacheinander nachgeholt',
     catchUpQueueRunning: 'Läuft gerade',

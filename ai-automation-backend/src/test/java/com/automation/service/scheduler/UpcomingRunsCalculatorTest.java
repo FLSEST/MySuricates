@@ -42,6 +42,10 @@ class UpcomingRunsCalculatorTest {
     @Mock
     private ActivityLogService activityLogService;
 
+    /** Off unless a test switches it on (TODO 7704b1e9). */
+    @Mock
+    private SchedulerMaintenanceMode maintenanceMode;
+
     // Fixed at noon UTC so getRemainingToday/Week behave deterministically regardless of wall-clock time.
     private static final Instant FIXED_NOW = Instant.parse("2026-04-26T12:00:00Z");
     private final Clock clock = Clock.fixed(FIXED_NOW, ZoneId.of("UTC"));
@@ -55,7 +59,7 @@ class UpcomingRunsCalculatorTest {
     @BeforeEach
     void setUp() {
         calculator = new UpcomingRunsCalculator(scheduledRepository, clock,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService));
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode));
         testWorkflow = Workflow.builder()
                 .id("wf-1")
                 .name("Test Workflow")
@@ -512,5 +516,67 @@ class UpcomingRunsCalculatorTest {
         assertThat(calculator.nextRun(heldCron)).isAfterOrEqualTo(pauseEnd).isBefore(pauseEnd.plus(1, ChronoUnit.HOURS));
         assertThat(calculator.nextRun(heldOnce)).isNull();
         assertThat(calculator.nextRun(later)).isEqualTo(FIXED_NOW.plus(3, ChronoUnit.DAYS));
+    }
+
+    // --- maintenance switch (TODO 7704b1e9): nothing starts, so nothing is upcoming ---
+
+    @Test
+    void remainingTodayAndWeek_underMaintenance_listNoRun_andSaySo() {
+        when(maintenanceMode.isEnabled()).thenReturn(true);
+
+        UpcomingScheduleResponse today = calculator.getRemainingToday();
+        UpcomingScheduleResponse week = calculator.getRemainingThisWeek();
+
+        for (UpcomingScheduleResponse result : List.of(today, week)) {
+            assertThat(result.maintenance()).isTrue();
+            assertThat(result.count()).isZero();
+            assertThat(result.schedules()).isEmpty();
+            assertThat(result.pausedUntil()).isNull();
+        }
+        // No schedule is even looked at: whatever is stored, the tick starts none of it.
+        verifyNoInteractions(scheduledRepository);
+    }
+
+    @Test
+    void remainingThisWeek_withoutMaintenance_saysNothingAboutIt() {
+        ScheduledWorkflow everyMinute = ScheduledWorkflow.builder().id("s").workflow(testWorkflow)
+                .cronExpression("0 * * * * *").scheduleType(ScheduleType.CRON).enabled(true).build();
+        when(scheduledRepository.findByEnabledTrue()).thenReturn(List.of(everyMinute));
+
+        UpcomingScheduleResponse result = calculator.getRemainingThisWeek();
+
+        assertThat(result.maintenance()).isFalse();
+        assertThat(result.count()).isPositive();
+    }
+
+    @Test
+    void maintenanceAndSkipUntilTogether_nameBoth() {
+        Instant pauseEnd = FIXED_NOW.plus(3, ChronoUnit.HOURS);
+        schedulerConfig.setSkipUntil(pauseEnd.toString());
+        when(maintenanceMode.isEnabled()).thenReturn(true);
+
+        UpcomingScheduleResponse result = calculator.getRemainingThisWeek();
+
+        assertThat(result.maintenance()).isTrue();
+        assertThat(result.pausedUntil()).isEqualTo(pauseEnd);
+        assertThat(result.schedules()).isEmpty();
+    }
+
+    @Test
+    void findWithNextRunBetween_underMaintenance_placesNoSchedule_andNextRunIsNone() {
+        when(maintenanceMode.isEnabled()).thenReturn(true);
+        ScheduledWorkflow cron = ScheduledWorkflow.builder().id("cron").workflow(testWorkflow)
+                .cronExpression("0 0 * * * *").scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(FIXED_NOW.plus(1, ChronoUnit.HOURS)).build();
+        ScheduledWorkflow oneOff = ScheduledWorkflow.builder().id("once").workflow(testWorkflow)
+                .cronExpression("").scheduleType(ScheduleType.ONCE).enabled(true)
+                .scheduledAt(FIXED_NOW.plus(2, ChronoUnit.HOURS)).nextRunAt(FIXED_NOW.plus(2, ChronoUnit.HOURS)).build();
+        when(scheduledRepository.findSchedulesInRange(Instant.EPOCH, FIXED_NOW.plus(1, ChronoUnit.DAYS)))
+                .thenReturn(List.of(cron, oneOff));
+
+        assertThat(calculator.findWithNextRunBetween(FIXED_NOW, FIXED_NOW.plus(1, ChronoUnit.DAYS))).isEmpty();
+        assertThat(calculator.nextRun(cron)).isNull();
+        assertThat(calculator.nextRun(oneOff)).isNull();
+        assertThat(cron.getNextRunAt()).as("a view never writes").isEqualTo(FIXED_NOW.plus(1, ChronoUnit.HOURS));
     }
 }

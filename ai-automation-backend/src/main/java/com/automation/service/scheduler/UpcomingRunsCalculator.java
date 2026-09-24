@@ -26,7 +26,10 @@ import java.util.Optional;
  * which schedules have their next run in a period, and the next occurrences of a cron expression.
  *
  * <p>All of them honour an active skip-until pause ({@code automation.scheduler.skip-until}):
- * occurrences inside it are skipped by the tick, so they are no upcoming runs (TODO a776fd2a).
+ * occurrences inside it are skipped by the tick, so they are no upcoming runs (TODO a776fd2a). The
+ * dates of schedules and the dashboard also honour the maintenance switch, under which nothing
+ * starts: no run is upcoming while it is on (TODO 7704b1e9). Both come from one
+ * {@link SchedulerPause} per call.
  *
  * <p>Extracted from {@code SchedulerService} (Audit-TODO 05dbd0e9). The read-only transactions
  * on the two "remaining" methods are load-bearing: {@link #getUpcomingRuns} navigates the lazy
@@ -45,21 +48,35 @@ public class UpcomingRunsCalculator {
         return skipPolicy.activeSkipUntil(Instant.now(clock));
     }
 
-    /** The next run the scheduler will actually start — behind an active skip-until pause. */
+    /** Both pauses now — the maintenance switch and an active skip-until window. */
+    public SchedulerPause pause() {
+        return skipPolicy.activePause(Instant.now(clock));
+    }
+
+    /**
+     * The next run the scheduler will actually start: none under the maintenance switch, else the
+     * run behind an active skip-until pause.
+     */
     public Instant nextRun(ScheduledWorkflow scheduled) {
-        return skipPolicy.effectiveNextRun(scheduled, pausedUntil());
+        return nextRun(scheduled, pause());
+    }
+
+    /** {@link #nextRun(ScheduledWorkflow)} with a pause read once for many schedules. */
+    public Instant nextRun(ScheduledWorkflow scheduled, SchedulerPause pause) {
+        return skipPolicy.effectiveNextRun(scheduled, pause);
     }
 
     /**
      * Enabled schedules whose next run — as the scheduler will actually start it — lies in
      * [from, to]: the dates of the calendar. With an active skip-until pause a stored next run inside
      * the pause moves behind it and a one-off drops out, so the lookup widens to every schedule
-     * stored up to {@code to} and filters on the run that really comes.
+     * stored up to {@code to} and filters on the run that really comes; under the maintenance switch
+     * none comes.
      */
     @Transactional(readOnly = true)
     public List<ScheduledWorkflow> findWithNextRunBetween(Instant from, Instant to) {
-        Optional<Instant> pause = pausedUntil();
-        if (pause.isEmpty()) {
+        SchedulerPause pause = pause();
+        if (!pause.active()) {
             return scheduledRepository.findSchedulesInRange(from, to);
         }
         return scheduledRepository.findSchedulesInRange(Instant.EPOCH, to).stream()
@@ -86,7 +103,12 @@ public class UpcomingRunsCalculator {
 
     private UpcomingScheduleResponse getUpcomingRuns(Instant until) {
         Instant now = Instant.now(clock);
-        Optional<Instant> pause = skipPolicy.activeSkipUntil(now);
+        SchedulerPause pause = skipPolicy.activePause(now);
+        Optional<Instant> skipUntil = pause.skipUntil();
+        if (pause.maintenance()) {
+            // Nothing starts while the switch is on, and it has no end: no run is upcoming.
+            return new UpcomingScheduleResponse(0, List.of(), skipUntil.orElse(null), true);
+        }
         List<ScheduledWorkflow> enabled = scheduledRepository.findByEnabledTrue();
         List<UpcomingScheduleResponse.UpcomingRun> upcoming = new ArrayList<>();
 
@@ -114,7 +136,7 @@ public class UpcomingRunsCalculator {
                 }
                 Instant effectiveUntil = getEffectiveUntil(until, sw.getEndDate());
                 CronExpression cron = CronExpression.parse(sw.getCronExpression());
-                LocalDateTime next = cron.next(firstCursor(pause));
+                LocalDateTime next = cron.next(firstCursor(skipUntil));
                 int addedForSchedule = 0;
                 while (next != null && addedForSchedule < remainingRuns) {
                     Instant nextInstant = next.atZone(ZoneId.systemDefault()).toInstant();
@@ -131,7 +153,7 @@ public class UpcomingRunsCalculator {
                 if (sw.getScheduledAt() != null
                         && sw.getScheduledAt().isAfter(now)
                         && sw.getScheduledAt().isBefore(until)
-                        && (pause.isEmpty() || !sw.getScheduledAt().isBefore(pause.get()))) {
+                        && (skipUntil.isEmpty() || !sw.getScheduledAt().isBefore(skipUntil.get()))) {
                     upcoming.add(new UpcomingScheduleResponse.UpcomingRun(
                             sw.getId(), workflowName, projectName,
                             chainId, chainName, targetType, sw.getScheduledAt()));
@@ -139,7 +161,7 @@ public class UpcomingRunsCalculator {
             }
         }
 
-        return new UpcomingScheduleResponse(upcoming.size(), upcoming, pause.orElse(null));
+        return new UpcomingScheduleResponse(upcoming.size(), upcoming, skipUntil.orElse(null), false);
     }
 
     /**

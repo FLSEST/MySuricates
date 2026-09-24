@@ -51,7 +51,7 @@ class SchedulerTickTest {
         catchUpQueue = new CatchUpQueue(activityLogService);
         tick = new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService, schedulerConfig,
                 maintenanceMode, suspendState,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService),
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode),
                 catchUpQueue, clock);
 
         testWorkflow = Workflow.builder()

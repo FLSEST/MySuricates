@@ -8,6 +8,7 @@ import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.ScheduleSkipPolicy;
+import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class ScheduleMapperTest {
     @Mock private ChainRunRepository chainRunRepository;
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SchedulerMaintenanceMode maintenanceMode;
 
     private static final Instant NOW = LocalDateTime.of(2026, 9, 24, 10, 0).atZone(ZoneId.systemDefault()).toInstant();
 
@@ -46,7 +48,7 @@ class ScheduleMapperTest {
     @BeforeEach
     void setUp() {
         mapper = new ScheduleMapper(workflowRunRepository, chainRunRepository,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService),
+                new ScheduleSkipPolicy(schedulerConfig, scheduledWorkflowRepository, activityLogService, maintenanceMode),
                 Clock.fixed(NOW, ZoneId.systemDefault()));
     }
 
@@ -114,6 +116,51 @@ class ScheduleMapperTest {
 
             assertThat(response.nextRunAt()).isEqualTo(local(24, 8));
             assertThat(response.pausedUntil()).isNull();
+        }
+    }
+
+    /**
+     * Im Wartungsmodus zeigt kein Zeitplan einen naechsten Lauf (TODO 7704b1e9): Der Tick startet
+     * nichts, solange der Schalter an ist, und wann er ausgeht, weiss niemand.
+     */
+    @Nested
+    class MaintenanceSwitch {
+
+        private ScheduledWorkflow daily(String id, Instant storedNextRun, boolean enabled) {
+            return ScheduledWorkflow.builder().id(id).workflow(Workflow.builder().id("wf-" + id).name("Daily").build())
+                    .targetType(ScheduledWorkflow.TargetType.WORKFLOW).cronExpression("0 0 8 * * *")
+                    .scheduleType(ScheduledWorkflow.ScheduleType.CRON).enabled(enabled).nextRunAt(storedNextRun).build();
+        }
+
+        @Test
+        void heldSchedule_showsNoNextRun_andSaysWhy() {
+            when(maintenanceMode.isEnabled()).thenReturn(true);
+            ScheduledWorkflow held = daily("s-1", local(25, 8), true);
+
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(held)).get(0);
+
+            assertThat(response.nextRunAt()).isNull();
+            assertThat(response.maintenance()).isTrue();
+            assertThat(response.pausedUntil()).isNull();
+            assertThat(held.getNextRunAt()).as("a view never writes").isEqualTo(local(25, 8));
+        }
+
+        @Test
+        void scheduleWithoutNextRun_isNotHeld() {
+            when(maintenanceMode.isEnabled()).thenReturn(true);
+
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(daily("s-2", null, false))).get(0);
+
+            assertThat(response.nextRunAt()).isNull();
+            assertThat(response.maintenance()).isFalse();
+        }
+
+        @Test
+        void switchOff_showsTheStoredNextRun() {
+            ScheduledWorkflowResponse response = mapper.toResponseList(List.of(daily("s-3", local(25, 8), true))).get(0);
+
+            assertThat(response.nextRunAt()).isEqualTo(local(25, 8));
+            assertThat(response.maintenance()).isFalse();
         }
     }
 

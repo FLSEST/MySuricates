@@ -38,12 +38,13 @@ class ScheduleSkipPolicyTest {
     @Mock private SchedulerConfig schedulerConfig;
     @Mock private ScheduledWorkflowRepository scheduledRepository;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SchedulerMaintenanceMode maintenanceMode;
 
     private ScheduleSkipPolicy policy;
 
     @BeforeEach
     void setUp() {
-        policy = new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService);
+        policy = new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode);
     }
 
     private ScheduledWorkflow cron(String expr, Instant nextRunAt) {
@@ -253,6 +254,40 @@ class ScheduleSkipPolicyTest {
         ScheduledWorkflow broken = cron("not a cron", local(27, 8, 0));
 
         assertThat(policy.effectiveNextRun(broken, Optional.of(local(28, 0, 0)))).isEqualTo(local(27, 8, 0));
+    }
+
+    // --- maintenance switch in the same rule (TODO 7704b1e9) ---
+
+    @Test
+    void activePause_readsBothPauses() {
+        Instant until = Instant.parse("2026-05-01T00:00:00Z");
+        when(schedulerConfig.getSkipUntil()).thenReturn(until.toString());
+        when(maintenanceMode.isEnabled()).thenReturn(true);
+
+        SchedulerPause pause = policy.activePause(until.minusSeconds(60));
+
+        assertThat(pause.maintenance()).isTrue();
+        assertThat(pause.skipUntil()).contains(until);
+        assertThat(pause.active()).isTrue();
+        assertThat(new SchedulerPause(false, Optional.empty()).active()).isFalse();
+    }
+
+    @Test
+    void effectiveNextRun_underMaintenance_isNone_forEveryScheduleWithANextRun() {
+        SchedulerPause maintenance = new SchedulerPause(true, Optional.empty());
+        ScheduledWorkflow daily = cron("0 0 8 * * *", local(29, 8, 0));
+        ScheduledWorkflow noNextRun = cron("0 0 8 * * *", null);
+
+        assertThat(policy.heldByMaintenance(daily, maintenance)).isTrue();
+        assertThat(policy.effectiveNextRun(daily, maintenance)).isNull();
+        assertThat(policy.effectiveNextRun(once(local(27, 9, 0)), maintenance)).isNull();
+        assertThat(policy.heldByMaintenance(noNextRun, maintenance)).isFalse();
+        // Maintenance wins over a skip-until window: nothing starts at all while it is on.
+        assertThat(policy.effectiveNextRun(daily, new SchedulerPause(true, Optional.of(local(28, 12, 0))))).isNull();
+        // Switched off, the skip-until part of the rule applies as before.
+        assertThat(policy.effectiveNextRun(cron("0 0 8 * * *", local(27, 8, 0)),
+                new SchedulerPause(false, Optional.of(local(28, 12, 0))))).isEqualTo(local(29, 8, 0));
+        assertThat(daily.getNextRunAt()).as("a view never writes").isEqualTo(local(29, 8, 0));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.automation.service.assistant.context;
 
 import com.automation.entity.ScheduledWorkflow;
+import com.automation.service.scheduler.SchedulerPause;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +14,8 @@ import java.util.List;
 
 /**
  * The schedules of the next 24 hours for the assistant — with the run that really comes: during a
- * skip-until pause the stored next run is skipped, not started (TODO a776fd2a).
+ * skip-until pause the stored next run is skipped, not started (TODO a776fd2a), and under the
+ * maintenance switch nothing is upcoming (TODO 7704b1e9).
  */
 @Component
 @RequiredArgsConstructor
@@ -38,9 +40,11 @@ public class SchedulesContextSection implements AssistantContextSection {
             }
             if (!upcoming.isEmpty()) {
                 sb.append("**Upcoming Schedules (next 24h):**\n");
+                SchedulerPause pause = upcomingRuns.pause();
                 upcoming.forEach(s -> {
                     String name = s.getWorkflow() != null ? s.getWorkflow().getName() : s.getTargetName();
-                    sb.append("  - ").append(name).append(": ").append(fmt(upcomingRuns.nextRun(s))).append("\n");
+                    sb.append("  - ").append(name).append(": ")
+                            .append(fmt(upcomingRuns.nextRun(s, pause))).append("\n");
                 });
                 sb.append("\n");
             }

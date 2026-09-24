@@ -17,7 +17,7 @@ class UpcomingScheduleResponseTest {
         UpcomingRun run = new UpcomingRun("sched-1", "Workflow A", "Project X",
                 "chain-1", "Chain A", "WORKFLOW", Instant.parse("2026-04-25T10:00:00Z"));
 
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(1, List.of(run), null);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(1, List.of(run), null, false);
 
         assertThat(response.count()).isEqualTo(1);
         assertThat(response.schedules()).containsExactly(run);
@@ -25,7 +25,7 @@ class UpcomingScheduleResponseTest {
 
     @Test
     void should_accept_zero_count_and_empty_list() {
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, List.of(), null);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, List.of(), null, false);
 
         assertThat(response.count()).isZero();
         assertThat(response.schedules()).isEmpty();
@@ -33,7 +33,7 @@ class UpcomingScheduleResponseTest {
 
     @Test
     void should_accept_null_schedules_list() {
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, null, null);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, null, null, false);
 
         assertThat(response.count()).isZero();
         assertThat(response.schedules()).isNull();
@@ -41,7 +41,7 @@ class UpcomingScheduleResponseTest {
 
     @Test
     void should_accept_negative_count_value() {
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(-1, List.of(), null);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(-1, List.of(), null, false);
 
         assertThat(response.count()).isEqualTo(-1);
     }
@@ -52,8 +52,8 @@ class UpcomingScheduleResponseTest {
     void should_be_equal_when_fields_match() {
         UpcomingRun run = new UpcomingRun("s1", "wf", "proj", "c1", "chain", "WORKFLOW",
                 Instant.parse("2026-04-25T10:00:00Z"));
-        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(run), null);
-        UpcomingScheduleResponse b = new UpcomingScheduleResponse(1, List.of(run), null);
+        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(run), null, false);
+        UpcomingScheduleResponse b = new UpcomingScheduleResponse(1, List.of(run), null, false);
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -61,8 +61,8 @@ class UpcomingScheduleResponseTest {
 
     @Test
     void should_not_be_equal_when_count_differs() {
-        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(), null);
-        UpcomingScheduleResponse b = new UpcomingScheduleResponse(2, List.of(), null);
+        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(), null, false);
+        UpcomingScheduleResponse b = new UpcomingScheduleResponse(2, List.of(), null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -73,8 +73,8 @@ class UpcomingScheduleResponseTest {
                 Instant.parse("2026-04-25T10:00:00Z"));
         UpcomingRun run2 = new UpcomingRun("s2", "wf", "proj", "c1", "chain", "WORKFLOW",
                 Instant.parse("2026-04-25T10:00:00Z"));
-        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(run1), null);
-        UpcomingScheduleResponse b = new UpcomingScheduleResponse(1, List.of(run2), null);
+        UpcomingScheduleResponse a = new UpcomingScheduleResponse(1, List.of(run1), null, false);
+        UpcomingScheduleResponse b = new UpcomingScheduleResponse(1, List.of(run2), null, false);
 
         assertThat(a).isNotEqualTo(b);
     }
@@ -83,7 +83,7 @@ class UpcomingScheduleResponseTest {
 
     @Test
     void should_contain_field_names_in_toString() {
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(2, List.of(), null);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(2, List.of(), null, false);
 
         assertThat(response.toString())
                 .contains("count")
@@ -173,9 +173,9 @@ class UpcomingScheduleResponseTest {
     void should_carry_the_end_of_an_active_skip_until_pause() {
         Instant pausedUntil = Instant.parse("2026-10-01T22:00:00Z");
 
-        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, List.of(), pausedUntil);
+        UpcomingScheduleResponse response = new UpcomingScheduleResponse(0, List.of(), pausedUntil, false);
 
         assertThat(response.pausedUntil()).isEqualTo(pausedUntil);
-        assertThat(response).isNotEqualTo(new UpcomingScheduleResponse(0, List.of(), null));
+        assertThat(response).isNotEqualTo(new UpcomingScheduleResponse(0, List.of(), null, false));
     }
 }

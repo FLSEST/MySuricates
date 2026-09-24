@@ -1063,6 +1063,7 @@ List all schedules.
     "conflictBehavior": "SKIP",
     "catchUpOnResume": false,
     "pausedUntil": null,
+    "maintenance": false,
     "createdAt": "2025-01-15T10:00:00Z"
   }
 ]
@@ -1073,20 +1074,23 @@ List all schedules.
 `null` for a one-off schedule, which expires — and `pausedUntil` names the end of the pause; otherwise
 `pausedUntil` is `null`. The tick only advances the stored time once it becomes due; without this, list,
 calendar and workflow page showed a run that never happens until then (since 2026-09-24, TODO a776fd2a).
-The same applies to every route that returns `ScheduledWorkflowResponse`.
+While maintenance mode is on, the scheduler starts nothing, and nothing says when it will be switched off:
+`nextRunAt` is then `null` and `maintenance` is `true` (for every schedule with a stored next run; the
+stored value stays, TODO 7704b1e9). The same applies to every route that returns `ScheduledWorkflowResponse`.
 
 ### `GET /api/v1/schedules/remaining-today`
 
 Remaining scheduled executions for today.
 
-**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`). Occurrences inside an active
-`skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the pause, else `null`.
+**Response:** `UpcomingScheduleResponse` (`count`, `schedules[]`, `pausedUntil`, `maintenance`). Occurrences
+inside an active `skip-until` pause are left out — the tick skips them —, and `pausedUntil` names the end of the
+pause, else `null`. In maintenance mode the list is empty and `maintenance` is `true`: nothing starts while it is on.
 
 ### `GET /api/v1/schedules/remaining-this-week`
 
 Remaining scheduled executions for this week.
 
-**Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil`)
+**Response:** `UpcomingScheduleResponse` (like `remaining-today`, including `pausedUntil` and `maintenance`)
 
 ### `GET /api/v1/schedules/{id}`
 
@@ -1250,9 +1254,10 @@ still ahead, else `null`.
 
 ### `POST /api/v1/schedules/maintenance`
 
-Toggle maintenance mode on/off. In maintenance mode no schedule starts; `nextRunAt` stays where it is.
-When it is switched off, every schedule whose time fell into the pause starts once, right away — all at
-the same time, without the catch-up queue.
+Toggle maintenance mode on/off. In maintenance mode no schedule starts; the stored `nextRunAt` stays
+where it is, and the views show no next run meanwhile (`maintenance: true`, see above). When it is
+switched off, every schedule whose time fell into the pause starts once, right away — all at the same
+time, without the catch-up queue.
 
 **Request:**
 

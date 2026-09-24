@@ -33,6 +33,16 @@ describe('schedule list — next run column', () => {
 
     expect(screen.getByTestId('cell')).toHaveTextContent(new Date('2026-10-02T06:00:00Z').toLocaleString());
     expect(screen.queryByTestId('next-run-paused')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('next-run-maintenance')).not.toBeInTheDocument();
+  });
+
+  /** "Next run" says that nothing starts while the maintenance switch holds the schedule (7704b1e9). */
+  it('shows that nothing starts in maintenance mode instead of a date', () => {
+    nextRunCell({ ...base, nextRunAt: null, pausedUntil: null, maintenance: true });
+
+    expect(screen.getByTestId('next-run-maintenance')).toHaveTextContent('Maintenance mode – nothing starts');
+    // No placeholder dash and no date next to it — the note is the whole cell.
+    expect(screen.getByTestId('cell')).toHaveTextContent(/^Maintenance mode – nothing starts$/);
   });
 
   it('shows no date for a one-off the pause lets expire', () => {
