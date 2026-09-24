@@ -28,6 +28,7 @@ describe('simpleRouteKind', () => {
     ['/skills', 'pro'],
     ['/calendar', 'pro'],
     ['/cockpit', 'pro'],
+    ['/goals', 'pro'],
     ['/dlq', 'pro'],
     ['/webhooks', 'pro'],
     ['/debug', 'pro'],

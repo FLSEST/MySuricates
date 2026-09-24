@@ -31,6 +31,8 @@ export const HINTS = {
   'schedules-timing': { version: 2 },
   'calendar-overview': { version: 1 },
   'cockpit-overview': { version: 1 },
+  'goals-overview': { version: 1 },
+  'goal-relation-map': { version: 1 },
   'activity-events': { version: 1 },
   'dlq-retry': { version: 1 },
   'wishes-loop': { version: 1 },

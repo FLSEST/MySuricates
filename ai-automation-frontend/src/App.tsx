@@ -105,6 +105,7 @@ const ChainExecution = lazy(() => import('./pages/ChainExecution').then(m => ({ 
 const Wishes = lazy(() => import('./pages/Wishes').then(m => ({ default: m.Wishes })));
 const Todos = lazy(() => import('./pages/Todos').then(m => ({ default: m.Todos })));
 const ProjectCockpit = lazy(() => import('./pages/ProjectCockpit').then(m => ({ default: m.ProjectCockpit })));
+const Goals = lazy(() => import('./pages/Goals').then(m => ({ default: m.Goals })));
 const GoalDetail = lazy(() => import('./pages/GoalDetail').then(m => ({ default: m.GoalDetail })));
 const ActivityLog = lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLog })));
 const DeadLetterQueue = lazy(() => import('./pages/DeadLetterQueue').then(m => ({ default: m.DeadLetterQueue })));
@@ -143,6 +144,7 @@ const router = createBrowserRouter([
       { path: 'webhooks', element: <ModuleRoute module="webhooks"><Webhooks /></ModuleRoute> },
       { path: 'integrations', element: <ModuleRoute module="integrations"><Integrations /></ModuleRoute> },
       { path: 'cockpit', element: <ProjectCockpit /> },
+      { path: 'goals', element: <Goals /> },
       { path: 'goals/:goalId', element: <GoalDetail /> },
       { path: 'todos', element: <TodosRoute /> },
       { path: 'activity', element: <ActivityRoute /> },

@@ -114,9 +114,20 @@ public final class TodoSpecifications {
         };
     }
 
-    /** Nur TODOs dieses Ziels (TODO dc0566f8); ohne ID keine Einschraenkung. */
+    /** Wert von {@code goalId}, der TODOs ohne Ziel waehlt – die Kandidaten der Relationskarte (TODO c6ea8f5c). */
+    public static final String NO_GOAL = "none";
+
+    /**
+     * Nur TODOs dieses Ziels (TODO dc0566f8); {@value #NO_GOAL} waehlt die TODOs ohne Ziel, ohne ID
+     * gibt es keine Einschraenkung.
+     */
     public static Specification<Todo> inGoal(String goalId) {
-        return (root, query, cb) -> goalId == null || goalId.isBlank() ? null : cb.equal(root.get("goalId"), goalId);
+        return (root, query, cb) -> {
+            if (goalId == null || goalId.isBlank()) {
+                return null;
+            }
+            return NO_GOAL.equals(goalId.trim()) ? cb.isNull(root.get("goalId")) : cb.equal(root.get("goalId"), goalId);
+        };
     }
 
     static String escapeLikePattern(String input) {

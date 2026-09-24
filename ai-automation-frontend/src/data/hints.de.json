@@ -234,5 +234,21 @@
       "Alle drei sind optionale, noch experimentelle Module und gehören nicht zum Standard-Preset core, deshalb fehlen sie auf dieser Instanz",
       "Zuschalten beim Start: ./scripts/setup.sh --preset research --force bringt den Assistenten, --preset full auch Factory und Wünsche; einzeln geht es mit automation.modules.assistant: true (ebenso factory, wishes). Wo die Instanz es erlaubt, auch in den Einstellungen"
     ]
+  },
+  "goals-overview": {
+    "title": "Ziele über Projekte hinweg",
+    "points": [
+      "Ein Ziel sammelt TODOs aus mehreren Projekten, die auf ein Ergebnis einzahlen, etwa einen Release",
+      "Der Fortschritt zählt die erledigten TODOs; offene Fragen stehen gesondert, weil sie vor der Arbeit geklärt sein müssen",
+      "Erreichte und archivierte Ziele bleiben erhalten, sie treten nur aus dem Blick"
+    ]
+  },
+  "goal-relation-map": {
+    "title": "Woher TODOs kommen und wer sie abarbeitet",
+    "points": [
+      "Links steht die Herkunft: ein Workflow-Lauf, ein Audit-Befund, ein Health-Check, ein Agent oder ein Mensch",
+      "Rechts davon, welcher Workflow ein TODO bearbeitet: als Fix-Workflow am TODO oder über einen passenden TodoTrigger, und was der letzte Lauf ergab",
+      "Ein gepunkteter Stummel zeigt, wo noch kein Workflow andockt; gestrichelte Zeilen sind Vorschläge, die zum Ziel passen könnten"
+    ]
   }
 }

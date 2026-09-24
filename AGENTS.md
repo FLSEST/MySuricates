@@ -59,6 +59,15 @@ curl -s -X PUT http://localhost:9090/api/v1/goals/<goal-id>/order \
   -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"todoIds": ["<id-1>", "<id-2>"]}'
 ```
 
+Woher die TODOs eines Ziels kommen und welche Workflows sie abarbeiten (Herkunft, Fix-Workflow und
+passende TodoTrigger, letzter Fix-Lauf), liefert die Relationskarte; passende TODOs ohne Ziel findet
+`goalId=none`:
+
+```bash
+curl -s http://localhost:9090/api/v1/goals/<goal-id>/relations -H "X-API-Key: $DEV_KEY"
+curl -s "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
+```
+
 Referenz: [docs/api-referenz.md](docs/api-referenz.md) → „Ziele“.
 
 ## Cypress E2E gegen Dev oder Test

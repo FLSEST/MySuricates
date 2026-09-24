@@ -1,34 +1,83 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowLeft, ArrowUp, CalendarDays, HelpCircle, Target, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, List, Network, Target, Trash2 } from 'lucide-react';
 import { Button, Card, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
-import { priorityColor } from '../components/todo/todoConstants';
-import { ComplexityChip, EffortChip, RatedByMark } from '../components/goal/GoalBadges';
-import { useDeleteGoal, useGoal, useReorderGoal, useUpdateGoal } from '../hooks/useGoals';
-import { todoDeepLink } from '../utils/todoLinks';
+import { GoalTodoList } from '../components/goal/GoalTodoList';
+import { GoalRelationMap } from '../components/goal/GoalRelationMap';
+import { GoalCandidates, type CandidateFilter } from '../components/goal/GoalCandidates';
+import { GoalTodoEditor } from '../components/goal/GoalTodoEditor';
+import {
+  useAssignGoalTodos, useDeleteGoal, useGoal, useGoalCandidates, useGoalRelations, useUpdateGoal,
+} from '../hooks/useGoals';
 import { useI18nStore, useT } from '../i18n';
 import { formatDate } from '../utils/localeFormat';
 import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
 
-const isActive = (todo: GoalTodoItem) =>
-  todo.status === 'OPEN' || todo.status === 'IN_PROGRESS' || todo.status === 'BACKLOG';
+type GoalView = 'list' | 'map';
+const VIEW_KEY = 'mysuricates-goal-view';
+/** Immer als Tag-Vorschlag dabei: Ziele sind oft Releases. */
+const DEFAULT_TAG_SUGGESTION = 'release';
+
+function readView(): GoalView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'map' ? 'map' : 'list';
+  } catch {
+    return 'list';
+  }
+}
+
+function storeView(view: GoalView) {
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // privates Fenster oder gesperrter Speicher: die Wahl gilt dann nur bis zum Neuladen
+  }
+}
+
+/** `release` und die häufigsten Tags der TODOs des Ziels. */
+function tagSuggestions(todos: GoalTodoItem[]): string[] {
+  const counts = new Map<string, number>();
+  todos.flatMap((todo) => todo.tags).forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
+  const frequent = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
+  return [...new Set([DEFAULT_TAG_SUGGESTION, ...frequent])].slice(0, 5);
+}
+
+/** Filter der Kandidaten, die Suche verzögert – nicht jeder Tastendruck ist eine Abfrage. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), ms);
+    return () => window.clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
+}
 
 /**
- * Ein Ziel mit seinen TODOs (TODO dc0566f8): was als Nächstes drankommt (verschiebbar), welche
- * Fragen vorher zu klären sind, was schon erledigt ist, und wie weit jedes Projekt ist.
+ * Ein Ziel mit seinen TODOs (TODO dc0566f8): als Liste – was als Nächstes drankommt, offene Fragen,
+ * Erledigtes – oder als Relationskarte, woher die TODOs kommen und welche Workflows sie abarbeiten
+ * (TODO c6ea8f5c). Darunter Vorschläge, die zum Ziel passen könnten.
  */
 export function GoalDetail() {
   const { goalId } = useParams<{ goalId: string }>();
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
+  const [view, setView] = useState<GoalView>(readView);
+  const [filter, setFilter] = useState<CandidateFilter>({ q: '', tag: '' });
+  const [editing, setEditing] = useState<string | null>(null);
+  const appliedFilter = useDebounced(filter, 300);
   const { data, isLoading, error, refetch } = useGoal(goalId);
-  const reorder = useReorderGoal();
+  const candidatesPage = useGoalCandidates(appliedFilter, !!data);
+  const candidates = useMemo(() => candidatesPage.data?.content ?? [], [candidatesPage.data]);
+  const relations = useGoalRelations(goalId, candidates.map((todo) => todo.id), view === 'map');
+  const suggestions = useMemo(() => tagSuggestions(data?.todos ?? []), [data?.todos]);
   const updateGoal = useUpdateGoal();
   const deleteGoal = useDeleteGoal();
+  const assign = useAssignGoalTodos();
 
   if (isLoading) {
     return (
@@ -42,29 +91,20 @@ export function GoalDetail() {
   }
 
   const { goal, todos, byProject } = data;
-  const next = todos.filter(isActive);
-  const questions = next.filter((todo) => todo.openQuestion);
-  const done = todos.filter((todo) => todo.status === 'DONE');
-
-  const move = (index: number, delta: -1 | 1) => {
-    const order = next.map((todo) => todo.id);
-    const target = index + delta;
-    const current = order[index];
-    const neighbour = order[target];
-    if (current === undefined || neighbour === undefined) return;
-    order[index] = neighbour;
-    order[target] = current;
-    reorder.mutate({ id: goal.id, todoIds: order });
+  const chooseView = (next: GoalView) => {
+    setView(next);
+    storeView(next);
   };
+  const assignTodo = (todoId: string) => assign.mutate({ id: goal.id, todoIds: [todoId] });
 
   const remove = () => {
     if (!window.confirm(t.goals.removeConfirm)) return;
-    deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/cockpit') });
+    deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/goals') });
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Link to="/cockpit" className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text">
+      <Link to="/goals" className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text">
         <ArrowLeft className="w-3.5 h-3.5" />
         {t.goals.back}
       </Link>
@@ -119,83 +159,41 @@ export function GoalDetail() {
         )}
       </Card>
 
-      <section aria-labelledby="goal-next">
-        <h2 id="goal-next" className="text-sm font-semibold text-text uppercase tracking-wide mb-3">{t.goals.next}</h2>
-        {next.length === 0 ? (
-          <Card><p className="text-sm text-text-secondary">{t.goals.noNext}</p></Card>
-        ) : (
-          <Card padding={false}>
-            <ol className="divide-y divide-border">
-              {next.map((todo, index) => (
-                <li key={todo.id} className="flex items-center gap-3 px-4 py-2.5" data-testid="goal-next-item">
-                  <span className="w-6 text-right text-xs tabular-nums text-text-tertiary"
-                    title={todo.goalRank == null ? t.goals.unranked : undefined}>
-                    {todo.goalRank ?? '·'}
-                  </span>
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColor[todo.priority]}`} />
-                  <div className="flex-1 min-w-0">
-                    <Link to={todoDeepLink(todo)} className="text-sm text-text hover:text-accent truncate block"
-                      title={todo.ratingNote ?? undefined}>
-                      {todo.title}
-                    </Link>
-                    {todo.projectName && <span className="text-xs text-text-tertiary">{todo.projectName}</span>}
-                  </div>
-                  <ComplexityChip value={todo.complexity} />
-                  <EffortChip value={todo.suggestedEffort} />
-                  <RatedByMark ratedBy={todo.ratedBy} />
-                  {todo.openQuestion && <HelpCircle className="w-3.5 h-3.5 text-human" aria-label={t.goals.openQuestion} role="img" />}
-                  <div className="flex gap-1">
-                    <button type="button" className="p-1 rounded hover:bg-surface disabled:opacity-30" disabled={index === 0 || reorder.isPending}
-                      onClick={() => move(index, -1)} aria-label={`${t.goals.moveUp}: ${todo.title}`}>
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" className="p-1 rounded hover:bg-surface disabled:opacity-30"
-                      disabled={index === next.length - 1 || reorder.isPending}
-                      onClick={() => move(index, 1)} aria-label={`${t.goals.moveDown}: ${todo.title}`}>
-                      <ArrowDown className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Card>
-        )}
-      </section>
+      <div role="tablist" aria-label={t.goals.views.label} className="inline-flex gap-1 p-1 rounded-lg bg-surface-secondary">
+        {([['list', List, t.goals.views.list], ['map', Network, t.goals.views.map]] as const).map(([key, Icon, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={view === key} onClick={() => chooseView(key)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              view === key ? 'bg-surface text-text shadow-sm font-medium' : 'text-text-secondary hover:text-text'}`}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <section aria-labelledby="goal-questions">
-        <h2 id="goal-questions" className="text-sm font-semibold text-text uppercase tracking-wide mb-3">{t.goals.questions}</h2>
-        {questions.length === 0 ? (
-          <Card><p className="text-sm text-text-secondary">{t.goals.noQuestions}</p></Card>
-        ) : (
-          <Card padding={false}>
-            <ul className="divide-y divide-border">
-              {questions.map((todo) => (
-                <li key={todo.id} className="px-4 py-2.5" data-testid="goal-question">
-                  <Link to={todoDeepLink(todo)} className="text-sm text-text hover:text-accent">{todo.title}</Link>
-                  <p className="text-sm text-human mt-0.5">{todo.openQuestion}</p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </section>
-
-      {done.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-sm font-semibold text-text uppercase tracking-wide">
-            {t.goals.done} ({done.length})
-          </summary>
-          <Card padding={false} className="mt-3">
-            <ul className="divide-y divide-border">
-              {done.map((todo) => (
-                <li key={todo.id} className="px-4 py-2 text-sm text-text-secondary line-through">
-                  <Link to={todoDeepLink(todo)}>{todo.title}</Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </details>
+      {view === 'list' ? (
+        <GoalTodoList goalId={goal.id} todos={todos} />
+      ) : relations.isLoading || !relations.data ? (
+        relations.error
+          ? <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
+          : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
+      ) : (
+        <>
+          {todos.length === 0 && <Card><p className="text-sm text-text-secondary">{t.goals.map.empty}</p></Card>}
+          <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} />
+        </>
       )}
+
+      <GoalCandidates
+        filter={filter}
+        onFilterChange={setFilter}
+        candidates={candidates}
+        isLoading={candidatesPage.isLoading}
+        suggestions={suggestions}
+        onAssign={assignTodo}
+        assigning={assign.isPending}
+      />
+
+      {editing && <GoalTodoEditor todoId={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }

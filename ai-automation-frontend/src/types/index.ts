@@ -1286,6 +1286,63 @@ export interface GoalDetail {
   byProject: { projectId: string | null; projectName: string | null; total: number; done: number }[];
 }
 
+/** Relationskarte eines Ziels (TODO c6ea8f5c): Herkunft → TODO → Bearbeitung → Ergebnis. */
+export type GoalOriginKind = 'AUDIT' | 'HEALTH' | 'WORKFLOW_RUN' | 'AGENT' | 'USER';
+
+export interface GoalTodoOrigin {
+  kind: GoalOriginKind;
+  workflowId: string | null;
+  workflowName: string | null;
+  runId: string | null;
+  runStatus: RunStatus | null;
+  findingIds: string[];
+  agent: string | null;
+}
+
+export interface GoalTodoWorker {
+  /** `LINKED`: Fix-Workflow am TODO; `TRIGGER`: ein aktiver TodoTrigger passt. */
+  kind: 'LINKED' | 'TRIGGER';
+  workflowId: string;
+  workflowName: string;
+  triggerId: string | null;
+  triggerLabel: string | null;
+}
+
+export interface GoalTodoResult {
+  runId: string | null;
+  workflowId: string | null;
+  runStatus: RunStatus | null;
+  /** Ende des Laufs, solange er läuft sein Start. */
+  at: string | null;
+  fixAttempts: number;
+  resolutionState: TodoResolutionState | null;
+}
+
+export interface GoalTodoRelation {
+  id: string;
+  title: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  projectId: string | null;
+  projectName: string | null;
+  tags: string[];
+  goalRank: number | null;
+  /** Noch keinem Ziel zugeordnet, nur als Vorschlag in der Karte. */
+  candidate: boolean;
+  origin: GoalTodoOrigin;
+  workers: GoalTodoWorker[];
+  /** Fehlt, solange nie ein Fix-Lauf gestartet wurde. */
+  result: GoalTodoResult | null;
+}
+
+export interface GoalRelations {
+  goalId: string;
+  /** Aktive TodoTrigger insgesamt; 0 heißt, kein TODO kann per Trigger andocken. */
+  activeTriggers: number;
+  /** TODOs des Ziels in Arbeitsreihenfolge, danach die Kandidaten. */
+  todos: GoalTodoRelation[];
+}
+
 export interface CreateGoalRequest {
   title: string;
   description?: string;

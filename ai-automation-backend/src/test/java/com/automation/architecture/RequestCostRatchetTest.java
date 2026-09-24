@@ -10,6 +10,7 @@ import com.automation.entity.ScheduledWorkflow;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
+import com.automation.entity.TodoTrigger;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
@@ -18,6 +19,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import jakarta.persistence.EntityManager;
@@ -114,7 +116,8 @@ class RequestCostRatchetTest {
      * {@link #nothingButTheSeedIsMeasured()}.
      */
     private static final List<String> SEEDED_TABLES = List.of(
-            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos", "goals");
+            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos", "goals",
+            "todo_triggers");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -195,11 +198,20 @@ class RequestCostRatchetTest {
      *       every todo into a goal, and each list row carries its {@code planning} (goal title, rank,
      *       rating, open question). The goal titles come from ONE batched {@code findAllById} per
      *       page in {@code TodoResponseAssembler} — a constant statement, which
-     *       {@link #statementCountMustNotGrowWithTheNumberOfRows} keeps constant.</li>
+     *       {@link #statementCountMustNotGrowWithTheNumberOfRows} keeps constant. 42 → 43 kB with
+     *       TODO c6ea8f5c, and only because the seed changed, not the route: every fifth seeded todo
+     *       now carries a {@code workflowRunId} and a {@code lastFixRunId} (measured 42 081 bytes).</li>
      *   <li>{@code /goals} and {@code /goals/{goal}}: added with TODO dc0566f8. Both read lean
      *       projections ({@code GoalStatusCounts}, {@code GoalTodoRow}) — no todo description ever
      *       reaches the goal view. The detail is the goal plus one row query (the project names
      *       are only looked up when a todo has a project; the seeded ones have none).</li>
+     *   <li>{@code /goals/{goal}/relations}: added with TODO c6ea8f5c. Every fifth seeded todo
+     *       points at a run of its batch (origin) and at another one as its last fix run (result),
+     *       and each batch adds one active TodoTrigger that matches every seeded todo (worker). The
+     *       route reads a lean projection and then one query per kind — goal check, rows, active
+     *       triggers, run states, workflow names, audit links (6 statements; no project lookup,
+     *       the seeded todos have none) — so the count stays flat when the second batch doubles
+     *       runs, triggers and todos.</li>
      *   <li>{@code /schedules/{sched}/runs} and the calendar week: added with TODO 168e3d7f, both
      *       answered with every step of every run — 122 651 bytes for the two runs of one schedule,
      *       3 697 137 bytes for the week with 60 runs. They now send the same list rows as
@@ -213,7 +225,7 @@ class RequestCostRatchetTest {
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
-            Map.entry("/api/v1/todos", new Cost(3, 42_000)),
+            Map.entry("/api/v1/todos", new Cost(3, 43_000)),
             Map.entry("/api/v1/projects", new Cost(2, 1_200)),
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
@@ -224,6 +236,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
             Map.entry("/api/v1/goals", new Cost(2, 2_000)),
             Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
+            Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
@@ -234,6 +247,7 @@ class RequestCostRatchetTest {
     @Autowired private TodoRepository todoRepository;
     @Autowired private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Autowired private GoalRepository goalRepository;
+    @Autowired private TodoTriggerRepository todoTriggerRepository;
     @PersistenceContext private EntityManager entityManager;
 
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
@@ -309,6 +323,7 @@ class RequestCostRatchetTest {
         // (EAGER). Faellt der JOIN FETCH aus findAllWithTargets() weg, loest Hibernate die
         // Assoziationen wieder Zeile fuer Zeile auf und die Zahl der Statements springt sichtbar
         // auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
+        List<String> runIds = new ArrayList<>();
         for (Workflow workflow : workflows) {
             ScheduledWorkflow schedule = scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
                     .workflow(workflow)
@@ -335,6 +350,7 @@ class RequestCostRatchetTest {
                         .inputContext(Map.of())
                         .metadata(Map.of())
                         .build());
+                runIds.add(run.getId());
 
                 for (int s = 0; s < STEPS_PER_RUN; s++) {
                     stepResultRepository.save(StepResult.builder()
@@ -359,7 +375,16 @@ class RequestCostRatchetTest {
         if (firstGoalId == null) {
             firstGoalId = goalId;
         }
+        // Relationskarte (TODO c6ea8f5c): jedes fuenfte Todo stammt aus einem Lauf und hat einen
+        // Fix-Lauf, und ein aktiver Trigger je Charge passt auf alle – so muss /relations Laeufe,
+        // Workflow-Namen und Trigger nachschlagen, und ein Nachschlagen je Todo faellt als Wachstum auf.
+        todoTriggerRepository.save(TodoTrigger.builder()
+                .tagPattern("")
+                .targetWorkflow(workflows.get(0))
+                .description("Cost Trigger " + batch)
+                .build());
         for (int t = 0; t < TODOS; t++) {
+            boolean fromRun = t % 5 == 0;
             todoRepository.save(Todo.builder()
                     .goalId(firstGoalId)
                     .goalRank(t % 2 == 0 ? t + 1 : null)
@@ -368,6 +393,9 @@ class RequestCostRatchetTest {
                     .status(Todo.Status.OPEN)
                     .priority(Todo.Priority.MEDIUM)
                     .tags("performance,testing")
+                    .workflowRunId(fromRun ? runIds.get(t % runIds.size()) : null)
+                    .lastFixRunId(fromRun ? runIds.get((t + 1) % runIds.size()) : null)
+                    .fixAttempts(fromRun ? 1 : 0)
                     .build());
         }
     }

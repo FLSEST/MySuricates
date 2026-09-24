@@ -137,6 +137,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     @Query("SELECT wr.id, wr.workflow.id, wr.workflowName FROM WorkflowRun wr WHERE wr.id IN :ids")
     List<Object[]> findWorkflowRefsByRunIds(@Param("ids") Collection<String> ids);
 
+    /** Status, Zeiten und Workflow je Lauf in einer Abfrage, ohne Schritte (TODO c6ea8f5c). */
+    @Query("SELECT new com.automation.dto.projection.RunStateRow(wr.id, wr.workflow.id, wr.workflowName, "
+         + "wr.status, wr.startedAt, wr.completedAt) FROM WorkflowRun wr WHERE wr.id IN :ids")
+    List<com.automation.dto.projection.RunStateRow> findRunStates(@Param("ids") Collection<String> ids);
+
     List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
 
     long countByStatusAndStartedAtAfter(RunStatus status, Instant since);

@@ -9,7 +9,6 @@ import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.mapper.TodoMapper;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WorkflowRepository;
@@ -292,61 +291,9 @@ public class TodoTriggerService {
 
     // ── Matching logic ──────────────────────────────
 
+    /** Abgleich in {@link TodoTriggerMatcher}, den auch die Relationskarte der Ziele nutzt. */
     boolean matches(TodoTrigger trigger, Todo todo) {
-        // Tag matching: all pattern tags must be present in todo tags (AND semantics)
-        if (!matchesTags(trigger.getTagPattern(), todo.getTags())) {
-            return false;
-        }
-
-        // Project filter
-        if (trigger.getProjectId() != null && !trigger.getProjectId().isBlank()) {
-            if (!trigger.getProjectId().equals(todo.getProjectId())) {
-                return false;
-            }
-        }
-
-        // Source filter
-        if (trigger.getSourceFilter() != null && !trigger.getSourceFilter().isBlank()) {
-            if (todo.getSource() == null || !trigger.getSourceFilter().equals(todo.getSource().name())) {
-                return false;
-            }
-        }
-
-        // Priority filter
-        if (trigger.getMinPriority() != null && !trigger.getMinPriority().isBlank()) {
-            try {
-                Todo.Priority minPriority = Todo.Priority.valueOf(trigger.getMinPriority());
-                if (todo.getPriority().ordinal() < minPriority.ordinal()) {
-                    return false;
-                }
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid minPriority '{}' on TodoTrigger {}", trigger.getMinPriority(), trigger.getId());
-            }
-        }
-
-        return true;
-    }
-
-    private boolean matchesTags(String tagPattern, String todoTagsJson) {
-        if (tagPattern == null || tagPattern.isBlank()) {
-            return true; // No tag filter = match all
-        }
-
-        Set<String> requiredTags = new HashSet<>(Arrays.asList(tagPattern.split(",")));
-        requiredTags.removeIf(String::isBlank);
-        requiredTags = new HashSet<>(requiredTags.stream().map(String::trim).toList());
-
-        if (requiredTags.isEmpty()) {
-            return true;
-        }
-
-        List<String> todoTags = TodoMapper.jsonToList(todoTagsJson);
-        if (todoTags == null || todoTags.isEmpty()) {
-            return false;
-        }
-
-        Set<String> todoTagSet = new HashSet<>(todoTags);
-        return todoTagSet.containsAll(requiredTags);
+        return TodoTriggerMatcher.matches(TodoTriggerMatcher.Criteria.of(trigger), TodoTriggerMatcher.Subject.of(todo));
     }
 
     private boolean isFixRunStillRunning(Todo todo) {

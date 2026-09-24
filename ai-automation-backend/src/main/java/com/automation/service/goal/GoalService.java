@@ -50,10 +50,15 @@ public class GoalService {
     private static final List<Todo.Priority> PRIORITY_ORDER = List.of(
             Todo.Priority.CRITICAL, Todo.Priority.HIGH, Todo.Priority.MEDIUM, Todo.Priority.LOW);
 
-    static final Comparator<GoalTodoRow> WORK_ORDER = Comparator
-            .comparing(GoalTodoRow::goalRank, Comparator.nullsLast(Comparator.naturalOrder()))
-            .thenComparing(row -> PRIORITY_ORDER.indexOf(row.priority()))
-            .thenComparing(GoalTodoRow::createdAt, Comparator.nullsLast(Comparator.naturalOrder()));
+    static final Comparator<GoalTodoRow> WORK_ORDER = workOrder(GoalTodoRow::goalRank, GoalTodoRow::priority, GoalTodoRow::createdAt);
+
+    /** Arbeitsreihenfolge fuer jede Zeilenart: Rang (ohne Rang zuletzt), dann Prioritaet, dann Alter. */
+    static <T> Comparator<T> workOrder(Function<T, Integer> rank, Function<T, Todo.Priority> priority,
+                                       Function<T, Instant> createdAt) {
+        return Comparator.comparing(rank, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
+                .thenComparing(row -> PRIORITY_ORDER.indexOf(priority.apply(row)))
+                .thenComparing(createdAt, Comparator.nullsLast(Comparator.<Instant>naturalOrder()));
+    }
 
     private final GoalRepository goalRepository;
     private final TodoRepository todoRepository;

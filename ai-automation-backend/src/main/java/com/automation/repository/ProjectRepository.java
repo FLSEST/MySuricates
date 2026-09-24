@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,6 +34,13 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
     List<Project> findActiveWithContainer();
 
     List<Project> findByArchivedAtIsNotNull();
+
+    /**
+     * Id und Name je Projekt in einer Abfrage, ohne Entity – und damit ohne das
+     * {@code select containers} je Projekt, das {@code findAllById} ausloest (TODO c6ea8f5c).
+     */
+    @Query("SELECT p.id, p.name FROM Project p WHERE p.id IN :ids")
+    List<Object[]> findIdAndNameByIdIn(@org.springframework.data.repository.query.Param("ids") Collection<String> ids);
 
     List<Project> findByStatus(ProjectStatus status);
 
