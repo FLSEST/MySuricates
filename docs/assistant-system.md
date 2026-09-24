@@ -335,8 +335,7 @@ Der Assistent ist als Floating-Panel im Root-Layout (`Layout.tsx`) implementiert
 - Mobile-Responsive: Vollbreite, 85vh Höhe auf Screens < 640px
 - ESC schließt das Panel
 - Header zeigt „MySuricates" + zuletzt verwendetes Modell (ohne `claude-`-Prefix und Datums-Suffix) oder „Online"
-- Nachrichtenqueue: Bei laufender Anfrage werden weitere Nachrichten gequeued und sequentiell abgearbeitet
-- Cancel-Support via `AbortController`
+- Senden, Warteschlange und Abbruch stecken in `hooks/useAssistantConversation.ts`, geteilt mit dem Startfeld der Simple-Startseite: eine Anfrage zur Zeit (`inFlight` im Store), weitere Nachrichten warten und gehen der Reihe nach raus; Abbruch per `AbortController`, eine wartende Nachricht wird herausgenommen. Die Logik liegt außerhalb von React, damit eine Antwort auch im Store landet, wenn die fragende Seite schon weg ist; Antworten tragen `replyTo` (Id der Nutzernachricht)
 - Enter zum Senden, Shift+Enter für Zeilenumbruch, Auto-Growing Textarea (max 240px)
 
 ### Zustand Store (`stores/assistantStore.ts`)
@@ -353,6 +352,8 @@ Persistence-Key: `'assistant-sessions'` (localStorage)
 | `panelHeight` | number | 600 |
 | `pendingInput` | string \| null | null |
 | `pendingContext` | AssistantPageContext \| null | null |
+| `inFlight` | `{ sessionId, requestId, userMsgId }` \| null | null (flüchtig) |
+| `lastModel` | string \| null | null (flüchtig) |
 
 - `startNewSession()` — erzeugt neue Session, Limit **20** Sessions (`MAX_SESSIONS`)
 - `appendMessage()` — Preview aus erster User-Nachricht (60 Zeichen)
@@ -401,6 +402,6 @@ Zwei STOMP-Subscriptions:
 | Quelle | Mechanismus |
 |--------|------------|
 | WorkflowDebug-Seite | Diagnose-Button → `pendingContext` + neue Session + Panel öffnen |
-| SimpleHome | `pendingInput` + Panel öffnen |
+| SimpleHome | fragt selbst (`useHomeAssistant`), Antwort über den Sofort-Treffern; „Im Chat weiterführen“ → `loadSession` + Panel öffnen |
 | CommandPalette | „Ask the assistant" → `pendingInput` + Panel öffnen |
 | Header SuggestionButton | Dropdown-Auswahl → `pendingInput` + Panel öffnen |

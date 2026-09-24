@@ -91,3 +91,13 @@ describe('SimpleProjects', () => {
     await waitFor(() => expect(body).toEqual({ name: 'Mine', type: 'PERSONAL', path: '/home/me/mine' }));
   });
 });
+
+describe('SimpleProjects — ?new=1 (the home field)', () => {
+  it('opens the create dialog right away', async () => {
+    server.use(http.get('/api/v1/projects', () => HttpResponse.json([project('p1', 'Quiet', 'STOPPED')])));
+    renderWithProviders(<SimpleProjects />, { route: '/projects?new=1' });
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(en.simple.projects.createTitle)).toBeInTheDocument();
+  });
+});

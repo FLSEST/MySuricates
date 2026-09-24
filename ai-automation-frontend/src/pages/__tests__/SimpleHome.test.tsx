@@ -67,7 +67,9 @@ function renderHome() {
   );
 }
 
-const searchField = () => screen.findByRole('searchbox', { name: en.simple.home.searchButton });
+const command = en.simple.home.command;
+const searchField = () => screen.findByRole('combobox', { name: command.label });
+const workflowHits = () => screen.findByRole('group', { name: command.groups.workflows });
 
 describe('SimpleHome — without the assistant module', () => {
   it('searches the own workflows instead of offering the assistant', async () => {
@@ -75,12 +77,12 @@ describe('SimpleHome — without the assistant module', () => {
     renderHome();
 
     const input = await searchField();
-    await waitFor(() => expect(screen.queryByPlaceholderText(en.simple.home.assistantPlaceholder)).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('button', { name: en.simple.home.assistantLabel })).toBeNull());
 
     fireEvent.change(input, { target: { value: 'digest' } });
-    const matches = screen.getByText(en.simple.home.matchesTitle).parentElement as HTMLElement;
-    expect(within(matches).getByRole('button', { name: /Morning digest/ })).toBeInTheDocument();
-    expect(within(matches).queryByRole('button', { name: /Backup photos/ })).toBeNull();
+    const matches = await workflowHits();
+    expect(within(matches).getByRole('option', { name: /Morning digest/ })).toBeInTheDocument();
+    expect(within(matches).queryByRole('option', { name: /Backup photos/ })).toBeNull();
   });
 
   it('starts a matching workflow right away', async () => {
@@ -93,8 +95,8 @@ describe('SimpleHome — without the assistant module', () => {
     renderHome();
 
     fireEvent.change(await searchField(), { target: { value: 'backup' } });
-    const matches = screen.getByText(en.simple.home.matchesTitle).parentElement as HTMLElement;
-    fireEvent.click(within(matches).getByRole('button', { name: /Backup photos/ }));
+    const row = within(await workflowHits()).getByRole('option', { name: /Backup photos/ });
+    fireEvent.click(within(row).getByRole('button', { name: command.start }));
 
     await waitFor(() => expect(started).toBe('w2'));
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/w2/run/run-1'));
@@ -105,7 +107,7 @@ describe('SimpleHome — without the assistant module', () => {
     renderHome();
 
     fireEvent.change(await searchField(), { target: { value: 'xyzzy' } });
-    expect(screen.getByText(en.simple.home.noMatch)).toBeInTheDocument();
+    expect(await screen.findByText(en.simple.home.noMatch)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.simple.home.allWorkflows })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: en.simple.home.startFromTemplate }));
@@ -114,13 +116,13 @@ describe('SimpleHome — without the assistant module', () => {
 });
 
 describe('SimpleHome — with the assistant module', () => {
-  it('keeps the assistant as the hero', async () => {
+  it('keeps the assistant in the hero field', async () => {
     serve();
     renderHome();
 
-    expect(await screen.findByPlaceholderText(en.simple.home.assistantPlaceholder)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: en.simple.home.assistantLabel })).toBeInTheDocument();
     await screen.findByText(en.simple.home.runTilesTitle);
-    expect(screen.queryByRole('searchbox', { name: en.simple.home.searchButton })).toBeNull();
+    expect(await searchField()).toBeInTheDocument();
   });
 });
 
@@ -132,8 +134,8 @@ describe('SimpleHome — first start', () => {
     expect(await screen.findByRole('button', { name: en.projects.firstProject.createExample })).toBeInTheDocument();
     expect(screen.getByText(en.projects.firstProject.title)).toBeInTheDocument();
     expect(screen.queryByText(en.simple.home.firstWorkflowTitle)).toBeNull();
-    // Nothing to search yet
-    expect(screen.queryByRole('searchbox', { name: en.simple.home.searchButton })).toBeNull();
+    // The field is there from the start: templates, actions and explanations need no workflow
+    expect(await searchField()).toBeInTheDocument();
   });
 
   it('offers a template once there is a project but no workflow', async () => {

@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, ArrowUp, GitBranch } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
-import { useAssistantStore } from '../stores/assistantStore';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import { useModuleEnabled, useSystemModules } from '../hooks/useModules';
 import { AREA_COLORS, buildHomeTiles, greetingKey } from '../utils/homeTiles';
@@ -17,7 +16,9 @@ import { FeatureTile } from '../components/simple/FeatureTile';
 import { ProBadge } from '../components/simple/ProHandoff';
 import { simpleRouteKind } from '../utils/simpleRoutes';
 import { RunChip, SimpleCard } from '../components/simple/kit';
-import { WorkflowSearch } from '../components/simple/WorkflowSearch';
+import { HomeCommand } from '../components/simple/home-command/HomeCommand';
+import { HomeAnswer } from '../components/simple/home-command/HomeAnswer';
+import { useHomeAssistant } from '../components/simple/home-command/useHomeAssistant';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { useProjects } from '../hooks/useProjects';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
@@ -30,12 +31,9 @@ export function SimpleHome() {
   const { data: projects } = useProjects();
   const simpleRun = useSimpleRun();
   const latestStatus = useLatestRunStatuses();
-  const setPendingInput = useAssistantStore((s) => s.setPendingInput);
-  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
   const assistantModule = useModuleEnabled('assistant');
+  const homeAssistant = useHomeAssistant();
   const { data: systemModules } = useSystemModules();
-
-  const [assistantInput, setAssistantInput] = useState('');
 
   const { navTiles, runTiles } = useMemo(() => {
     const disabled = new Set((systemModules?.modules ?? []).filter((m) => !m.enabled).map((m) => m.name));
@@ -44,12 +42,23 @@ export function SimpleHome() {
   const greeting = t.simple.home[greetingKey(new Date())];
   const hasWorkflows = (workflows?.length ?? 0) > 0;
 
-  const submitAssistant = () => {
-    const text = assistantInput.trim();
-    setPendingInput(text || null);
-    setAssistantOpen(true);
-    setAssistantInput('');
+  // An answer's "run workflow": the known workflow through the Simple start (inputs dialog), else its page
+  const runFromAnswer = (workflowId: string) => {
+    const workflow = workflows?.find((w) => w.id === workflowId);
+    if (workflow) simpleRun.run(workflow);
+    else navigate(`/workflows/${workflowId}`);
   };
+  const answer = assistantModule && homeAssistant.turn ? (
+    <HomeAnswer
+      turn={homeAssistant.turn}
+      onCancel={homeAssistant.cancel}
+      onRetry={homeAssistant.retry}
+      onClose={homeAssistant.close}
+      onContinueInChat={homeAssistant.continueInChat}
+      onSend={homeAssistant.ask}
+      onRunWorkflow={runFromAnswer}
+    />
+  ) : undefined;
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-64"><Spinner text={t.common.loading} /></div>;
@@ -91,41 +100,13 @@ export function SimpleHome() {
         </SimpleCard>
       ) : null}
 
-      {/* Without the assistant module the hero is a search over one's own workflows */}
-      {!assistantModule && hasWorkflows && (
-        <WorkflowSearch workflows={workflows ?? []} latestStatus={latestStatus} onRun={simpleRun.run} />
-      )}
-
-      {/* Assistant — the hero input */}
-      {assistantModule && (
-        <form
-          onSubmit={(e) => { e.preventDefault(); submitAssistant(); }}
-          className="relative rounded-2xl p-[1.5px] shadow-[0_18px_50px_-30px_rgba(129,140,248,0.7)]"
-          style={{ background: 'linear-gradient(120deg, rgba(129,140,248,.55), rgba(56,189,248,.30) 40%, rgba(167,139,250,.45))' }}
-        >
-          <div className="flex items-center gap-3 bg-surface-raised rounded-[14px] px-4 py-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
-            >
-              <Sparkles className="w-[18px] h-[18px]" style={{ color: 'var(--color-ai)' }} />
-            </div>
-            <input
-              value={assistantInput}
-              onChange={(e) => setAssistantInput(e.target.value)}
-              placeholder={t.simple.home.assistantPlaceholder}
-              className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
-            />
-            <button
-              type="submit"
-              aria-label={t.simple.home.assistantLabel}
-              className="w-8 h-8 rounded-lg bg-accent text-text-inverse flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
-            >
-              <ArrowUp className="w-4 h-4" />
-            </button>
-          </div>
-        </form>
-      )}
+      {/* The hero: instant hits from every source; with the assistant module Enter asks it and the
+          answer appears above the hits */}
+      <HomeCommand
+        onAsk={assistantModule ? homeAssistant.ask : undefined}
+        answer={answer}
+        onClear={homeAssistant.close}
+      />
 
       {/* "How's it looking?" overview */}
       <SimpleOverview />

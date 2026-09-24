@@ -1,4 +1,5 @@
-import type { AssistantPageContext } from '../hooks/useAssistant';
+import type { AssistantAction, AssistantPageContext } from '../hooks/useAssistant';
+import type { TranslationKeys } from '../i18n';
 
 export function parsePageContext(pathname: string): AssistantPageContext {
   const segments = pathname.replace(/^\//, '').split('/');
@@ -55,4 +56,23 @@ export function isInternalAppPath(href: string | undefined): href is string {
   if (!href || !href.startsWith('/')) return false;
   const second = href[1];
   return second !== '/' && second !== '\\';
+}
+
+/** The actions worth a button: run/show actions without an id have nowhere to go. */
+export function visibleActions(actions: AssistantAction[] | undefined): AssistantAction[] {
+  return (actions ?? []).filter((a) => a.type === 'ask_choice' || a.type === 'start_wish' || a.id);
+}
+
+/** Text for a status phase pushed while the assistant works (`useAssistantWebSocket`). */
+export function assistantPhaseLabel(phase: string, t: TranslationKeys): string {
+  const labels: Record<string, string> = {
+    RECEIVED: t.assistant.phaseReceived,
+    BUILDING_CONTEXT: t.assistant.phaseBuildingContext,
+    THINKING: t.assistant.phaseThinking,
+    FETCHING_DATA: t.assistant.phaseFetchingData,
+    EXECUTING_TOOLS: t.assistant.phaseExecutingTools,
+    COMPLETED: t.assistant.phaseCompleted,
+    ERROR: t.assistant.phaseError,
+  };
+  return labels[phase] ?? phase;
 }

@@ -10,6 +10,13 @@ export interface ChatSession {
   messages: ChatMessage[];
 }
 
+export interface AssistantInFlight {
+  sessionId: string;
+  requestId: string;
+  /** The user message this request answers. */
+  userMsgId: string;
+}
+
 interface AssistantState {
   open: boolean;
   sessions: ChatSession[];
@@ -19,6 +26,13 @@ interface AssistantState {
   panelHeight: number;
   pendingInput: string | null;
   pendingContext: AssistantPageContext | null;
+  /**
+   * The request on its way to the assistant (transient, not persisted) — one at a time for panel and
+   * Simple home alike; see `useAssistantConversation`.
+   */
+  inFlight: AssistantInFlight | null;
+  /** Model of the latest answer (transient), shown in the panel header. */
+  lastModel: string | null;
 
   toggle: () => void;
   setOpen: (open: boolean) => void;
@@ -27,6 +41,8 @@ interface AssistantState {
   setPanelHeight: (h: number) => void;
   setPendingInput: (text: string | null) => void;
   setPendingContext: (ctx: AssistantPageContext | null) => void;
+  setInFlight: (inFlight: AssistantInFlight | null) => void;
+  setLastModel: (model: string | null) => void;
 
   startNewSession: () => string;
   appendMessage: (sessionId: string, msg: ChatMessage) => void;
@@ -49,6 +65,8 @@ export const useAssistantStore = create<AssistantState>()(
       panelHeight: 600,
       pendingInput: null,
       pendingContext: null,
+      inFlight: null,
+      lastModel: null,
 
       toggle: () => set((s) => ({ open: !s.open })),
       setOpen: (open) => set({ open }),
@@ -57,6 +75,8 @@ export const useAssistantStore = create<AssistantState>()(
       setPanelHeight: (panelHeight) => set({ panelHeight }),
       setPendingInput: (pendingInput) => set({ pendingInput }),
       setPendingContext: (pendingContext) => set({ pendingContext }),
+      setInFlight: (inFlight) => set({ inFlight }),
+      setLastModel: (lastModel) => set({ lastModel }),
 
       startNewSession: () => {
         const id = generateId();

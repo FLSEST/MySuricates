@@ -4,10 +4,11 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { ScheduledWorkflow, CreateScheduleRequest, UpdateScheduleRequest, CalendarDataResponse, UpcomingScheduleData, ScheduleRunsResponse, CatchUpQueueStatus, SchedulerPauseStatus } from '../types';
 
-export function useSchedules() {
+export function useSchedules({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['schedules'],
     queryFn: () => api.get<ScheduledWorkflow[]>('/schedules'),
+    enabled,
   });
 }
 

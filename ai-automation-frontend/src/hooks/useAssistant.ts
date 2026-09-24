@@ -71,12 +71,18 @@ export interface ChatMessage {
   status?: 'sending' | 'sent' | 'error';
   pendingTools?: PendingTool[];
   toolResults?: ToolExecutionResult[];
+  /** On an assistant message: id of the user message it answers. */
+  replyTo?: string;
+}
+
+/** One chat turn: `POST /assistant/chat`. */
+export function postAssistantChat(req: AssistantChatRequest, signal?: AbortSignal) {
+  return api.post<AssistantChatResponse>('/assistant/chat', req, { signal });
 }
 
 export function useAssistantChat() {
   return useMutation({
-    mutationFn: ({ req, signal }: { req: AssistantChatRequest; signal?: AbortSignal }) =>
-      api.post<AssistantChatResponse>('/assistant/chat', req, { signal }),
+    mutationFn: ({ req, signal }: { req: AssistantChatRequest; signal?: AbortSignal }) => postAssistantChat(req, signal),
   });
 }
 

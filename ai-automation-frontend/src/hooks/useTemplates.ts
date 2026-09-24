@@ -10,11 +10,12 @@ import type { WorkflowTemplate, CreateWorkflowTemplateRequest } from '../types';
  * blocks, and the backend resolves them per `locale`. The page copies the blocks unchanged into
  * the new workflow, which is then single-language.
  */
-export function useTemplates() {
+export function useTemplates({ enabled = true }: { enabled?: boolean } = {}) {
   const locale = useI18nStore((s) => s.locale);
   return useQuery({
     queryKey: ['workflow-templates', locale],
     queryFn: () => api.get<WorkflowTemplate[]>(`/workflow-templates?locale=${encodeURIComponent(locale)}`),
+    enabled,
   });
 }
 

@@ -4,10 +4,11 @@ import { useToast } from './useToast';
 import { useI18nStore, useT } from '../i18n';
 import type { PoolWorkflowEntry, ExportToPoolRequest, ExportToPoolResponse, PoolScope } from '../types';
 
-export function usePoolWorkflows() {
+export function usePoolWorkflows({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['pool'],
     queryFn: () => api.get<PoolWorkflowEntry[]>('/pool'),
+    enabled,
   });
 }
 

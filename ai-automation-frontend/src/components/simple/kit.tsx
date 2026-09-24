@@ -1,4 +1,5 @@
 import type { ReactNode, CSSProperties } from 'react';
+import { WorkflowIcon } from '../../utils/workflowIcon';
 import { Play } from 'lucide-react';
 import type { Workflow } from '../../types';
 
@@ -32,8 +33,8 @@ export function SimplePageHeader({
 }
 
 /** Small uppercase section label. */
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="text-[11px] tracking-widest uppercase text-text-tertiary font-semibold mb-3">{children}</p>;
+export function SectionLabel({ children, id, className = 'mb-3' }: { children: ReactNode; id?: string; className?: string }) {
+  return <p id={id} className={`text-[11px] tracking-widest uppercase text-text-tertiary font-semibold ${className}`}>{children}</p>;
 }
 
 /** Color-accented card. Clickable → button with hover lift/glow; static → plain div. */
@@ -99,7 +100,7 @@ export function RunChip({
       onClick={onRun}
       className="group flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2 hover:border-accent/40 hover:bg-surface-raised transition-colors"
     >
-      <span className="text-lg leading-none">{workflow.icon || '⚡'}</span>
+      <span className="text-lg leading-none text-text-secondary">{workflow.icon ? <WorkflowIcon icon={workflow.icon} className="w-4 h-4" /> : '⚡'}</span>
       <span className="text-[13px] font-medium text-text whitespace-nowrap">{workflow.name}</span>
       <StatusDot status={status} />
       <Play className="w-3 h-3 text-text-tertiary group-hover:text-accent transition-colors" />

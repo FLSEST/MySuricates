@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FolderKanban, Plus, Square, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
 import { useProjects, useCreateProject, useStopContainer } from '../hooks/useProjects';
@@ -22,7 +22,19 @@ export function SimpleProjects() {
   const create = useCreateProject();
   const stopC = useStopContainer();
 
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?new=1` (the Simple home's "create a project") opens the create dialog right away
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCreate = searchParams.get('new') === '1';
+  const [createOpen, setCreateOpen] = useState(requestedCreate);
+
+  useEffect(() => {
+    if (!requestedCreate) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('new');
+      return next;
+    }, { replace: true });
+  }, [requestedCreate, setSearchParams]);
   const [newProject, setNewProject] = useState<ProjectFormValues>(COMPACT_PROJECT_FORM);
   const canCreate = newProject.name.trim() !== '' && newProject.path.trim() !== '';
 

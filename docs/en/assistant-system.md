@@ -331,8 +331,7 @@ The assistant is implemented as a floating panel in the root layout (`Layout.tsx
 - Mobile-responsive: full width, 85vh height on screens < 640px
 - ESC closes the panel
 - Header shows "MySuricates" + last used model (without `claude-` prefix and date suffix) or "Online"
-- Message queue: while a request is in progress, additional messages are queued and processed sequentially
-- Cancel support via `AbortController`
+- Sending, queueing and cancelling live in `hooks/useAssistantConversation.ts`, shared with the Simple home's field: one request at a time (`inFlight` in the store), further messages wait and go out in order; cancel via `AbortController`, a waiting message is taken out of the queue. The logic sits outside React so an answer still lands in the store when the asking page is gone; answers carry `replyTo` (id of the user message)
 - Enter to send, Shift+Enter for line break, auto-growing textarea (max 240px)
 
 ### Zustand Store (`stores/assistantStore.ts`)
@@ -349,6 +348,8 @@ Persistence key: `'assistant-sessions'` (localStorage)
 | `panelHeight` | number | 600 |
 | `pendingInput` | string \| null | null |
 | `pendingContext` | AssistantPageContext \| null | null |
+| `inFlight` | `{ sessionId, requestId, userMsgId }` \| null | null (transient) |
+| `lastModel` | string \| null | null (transient) |
 
 - `startNewSession()` — creates a new session, limit **20** sessions (`MAX_SESSIONS`)
 - `appendMessage()` — preview from first user message (60 characters)
@@ -397,6 +398,6 @@ Two STOMP subscriptions:
 | Source | Mechanism |
 |--------|-----------|
 | WorkflowDebug page | Diagnose button → `pendingContext` + new session + open panel |
-| SimpleHome | `pendingInput` + open panel |
+| SimpleHome | asks itself (`useHomeAssistant`), answer above the instant hits; “Continue in chat” → `loadSession` + open panel |
 | CommandPalette | "Ask the assistant" → `pendingInput` + open panel |
 | Header SuggestionButton | Dropdown selection → `pendingInput` + open panel |

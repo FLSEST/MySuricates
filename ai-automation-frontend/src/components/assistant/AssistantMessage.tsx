@@ -5,13 +5,14 @@ import remarkGfm from 'remark-gfm';
 import { Play, Eye, Sparkles, ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle, MessageCircle, Check, X, Loader2, ShieldAlert } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
 import { MeerkatIcon } from '../layout/Sidebar';
-import { formatAssistantTime, formatAssistantResponseTime, isInternalAppPath } from '../assistantPanelUtils';
+import { formatAssistantTime, formatAssistantResponseTime, isInternalAppPath, visibleActions } from '../assistantPanelUtils';
 import { useT } from '../../i18n';
 import { apiErrorMessage } from '../../api/client';
 import type { ChatMessage, AssistantAction, PendingTool, ToolExecutionResult } from '../../hooks/useAssistant';
 import { useConfirmPendingTool, useRejectPendingTool } from '../../hooks/useAssistant';
 
-function ActionButton({ action, onClose, onSend, onExecute }: {
+/** One action of an answer as a button; ask_choice renders one button per option. */
+export function ActionButton({ action, onClose, onSend, onExecute }: {
   action: AssistantAction;
   onClose: () => void;
   onSend?: (text: string) => void;
@@ -80,7 +81,7 @@ function ActionButton({ action, onClose, onSend, onExecute }: {
  * user clicks "Bestätigen" — the assistant has no path to auto-trigger it regardless of the
  * model's prompt compliance.
  */
-function PendingToolCard({ tool, sessionId, existingResult }: {
+export function PendingToolCard({ tool, sessionId, existingResult }: {
   tool: PendingTool;
   sessionId?: string;
   existingResult?: ToolExecutionResult;
@@ -323,9 +324,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
 
         {/* Actions -- filter out run_workflow/show_workflow/show_run with missing id */}
         {msg.actions && msg.actions.length > 0 && (() => {
-          const visible = msg.actions!.filter(a =>
-            a.type === 'ask_choice' || a.type === 'start_wish' || a.id
-          );
+          const visible = visibleActions(msg.actions);
           return visible.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-0.5">
               {visible.map((action, i) => (

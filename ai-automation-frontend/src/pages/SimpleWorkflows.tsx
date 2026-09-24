@@ -21,7 +21,8 @@ import { curateWorkflows } from '../utils/curateWorkflows';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
 import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry } from '../types';
-import { useInstallPoolWorkflow } from '../hooks/usePool';
+import { useInstallPoolWorkflow, usePoolWorkflows } from '../hooks/usePool';
+import { useTemplates } from '../hooks/useTemplates';
 
 export function SimpleWorkflows() {
   const t = useT();
@@ -35,9 +36,13 @@ export function SimpleWorkflows() {
   const simpleRun = useSimpleRun();
   const deleteWorkflow = useDeleteWorkflow();
 
-  // `?new=1` (the Simple home's "start from a template") opens the create dialog right away
+  // `?new=1` (the Simple home's "start from a template") opens the create dialog right away;
+  // `?template=<id>` / `?pool=<id>` (a hit of the home's command field) open it with that entry chosen
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedCreate = searchParams.get('new') === '1';
+  const requestedCreate = ['new', 'template', 'pool'].some((key) => searchParams.has(key));
+  const [pick, setPick] = useState(() => ({ template: searchParams.get('template'), pool: searchParams.get('pool') }));
+  const pickedTemplates = useTemplates({ enabled: !!pick.template });
+  const pickedPool = usePoolWorkflows({ enabled: !!pick.pool });
   const [createStep, setCreateStep] = useState<CreateStep>(requestedCreate ? 'template' : 'closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -70,12 +75,14 @@ export function SimpleWorkflows() {
     setForm({ projectId: '', name: '' });
   };
 
-  // The param has done its job once the dialog is open; dropping it keeps back/reload from reopening it
+  // The params have done their job once the dialog is open; dropping them keeps back/reload from reopening it
   useEffect(() => {
     if (!requestedCreate) return;
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('new');
+      next.delete('template');
+      next.delete('pool');
       return next;
     }, { replace: true });
   }, [requestedCreate, setSearchParams]);
@@ -116,6 +123,18 @@ export function SimpleWorkflows() {
     } as CreateWorkflowRequest);
     setCreateStep('details');
   };
+
+  // Once the requested entry is known, continue with it; unknown or not loadable ⇒ the template list stays open
+  if (pick.template && (pickedTemplates.data || pickedTemplates.isError)) {
+    const template = pickedTemplates.data?.find((tmpl) => tmpl.id === pick.template);
+    setPick((prev) => ({ ...prev, template: null }));
+    if (template) handleTemplateSelect(template);
+  }
+  if (pick.pool && (pickedPool.data || pickedPool.isError)) {
+    const entry = pickedPool.data?.find((e) => e.id === pick.pool);
+    setPick((prev) => ({ ...prev, pool: null }));
+    if (entry) handlePoolSelect(entry);
+  }
 
   const handleCreate = () => {
     const poolId = (form.metadata as Record<string, unknown> | undefined)?.poolSource as string | undefined;
