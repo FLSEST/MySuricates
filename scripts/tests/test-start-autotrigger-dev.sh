@@ -171,17 +171,25 @@ cat > "$TMP/cbin/curl" <<'STUB'
 #!/usr/bin/env bash
 # Antwortet erst, wenn der Container "laeuft" (der docker-Stub legt die Marke an)
 [[ "$*" == *"/system/info"* && -e "$UP_MARKER" ]] && exit 0
+# Vite auf :3000 "laeuft", sobald der npm-Stub die Marke angelegt hat
+[[ "$*" == *":3000"* && -e "$FE_MARKER" ]] && exit 0
 exit 7
 STUB
+# restart startet einen fehlenden Vite mit — nie den echten aus dem Repo (3c75d433)
+cat > "$TMP/cbin/npm" <<'STUB'
+#!/usr/bin/env bash
+echo "npm $*" >> "$CALLS"; touch "$FE_MARKER"
+STUB
+mkdir -p "$TMP/frontend"
 cat > "$TMP/backend/mvnw" <<'STUB'
 #!/usr/bin/env bash
 echo "mvn $*" >> "$CALLS"
 mkdir -p "$(dirname "$0")/target" && echo "fat" > "$(dirname "$0")/target/ai-automation-backend-9.9.9.jar"
 STUB
-chmod +x "$TMP/cbin/docker" "$TMP/cbin/curl" "$TMP/backend/mvnw"
-CTX='export PATH="'"$TMP"'/cbin:$PATH" CALLS="'"$TMP"'/calls.log" UP_MARKER="'"$TMP"'/up.marker" AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/cnm"
-  BACKEND_DIR="'"$TMP"'/backend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMPOSE_OVERRIDE="'"$TMP"'/cov.yml"; RUNTIME_MODE=container'
-fresh() { rm -rf "$TMP/backend/target" "$TMP/up.marker" "$TMP/state/autotrigger-dev/runtime"; : > "$TMP/calls.log"; }
+chmod +x "$TMP/cbin/docker" "$TMP/cbin/curl" "$TMP/cbin/npm" "$TMP/backend/mvnw"
+CTX='export PATH="'"$TMP"'/cbin:$PATH" CALLS="'"$TMP"'/calls.log" UP_MARKER="'"$TMP"'/up.marker" FE_MARKER="'"$TMP"'/fe.marker" AUTOTRIGGER_DEV_NODE_MODULES="'"$TMP"'/cnm"
+  BACKEND_DIR="'"$TMP"'/backend"; FRONTEND_DIR="'"$TMP"'/frontend"; MVN_CMD="$BACKEND_DIR/mvnw"; COMPOSE_OVERRIDE="'"$TMP"'/cov.yml"; RUNTIME_MODE=container'
+fresh() { rm -rf "$TMP/backend/target" "$TMP/up.marker" "$TMP/fe.marker" "$TMP/state/autotrigger-dev/runtime" "$TMP/state/autotrigger-dev/frontend.pid"; : > "$TMP/calls.log"; }
 fresh
 RC="$(run_in_script "$CTX; COMMAND=build; ( main >/dev/null 2>&1 ); echo \$?")"
 check "build --container: exit 0, maven once"            '[ "$RC" = 0 ] && [ "$(grep -c "^mvn .*clean package -DskipTests" "$TMP/calls.log")" = 1 ]'
@@ -190,6 +198,13 @@ fresh
 RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
 check "restart --container: exit 0"                      '[ "$RC" = 0 ]'
 check "restart --container: build, then down, then up"   '[ "$(awk "/^mvn .*clean package/{print \"mvn\"} /^docker compose .* down\$/{print \"down\"} /^docker compose .* up -d --build\$/{print \"up\"}" "$TMP/calls.log" | tr "\n" " ")" = "mvn down up " ]'
+check "restart: a missing Vite is started once, after the backend" '[ "$(grep -c "^npm run dev" "$TMP/calls.log")" = 1 ] && [ "$(tail -1 "$TMP/calls.log")" = "npm run dev" ]'
+fresh; touch "$TMP/fe.marker"
+RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
+check "restart: a running Vite is left alone"            '[ "$RC" = 0 ] && ! grep -q "^npm" "$TMP/calls.log"'
+fresh
+OUT="$(run_in_script "$CTX; wait_for_frontend() { return 1; }; COMMAND=restart; ( main 2>&1 ); echo \"rc=\$?\"")"
+check "restart: Vite not coming up only warns"           'grep -q "^rc=0$" <<<"$OUT" && grep -q "Warnung: Frontend laeuft nicht" <<<"$OUT"'
 fresh; mkdir -p "$TMP/backend/target"; echo alt > "$TMP/backend/target/ai-automation-backend-9.9.9.jar"
 OUT="$(run_in_script "$CTX; start_backend_container missing 2>&1")"
 check "start --container with a JAR: no build, names it" '! grep -q "^mvn" "$TMP/calls.log" && grep -q "Verwende vorhandenes JAR" <<<"$OUT" && grep -q "up -d --build" "$TMP/calls.log"'
@@ -205,7 +220,7 @@ cat > "$TMP/backend/mvnw" <<'STUB'
 echo "mvn $*" >> "$CALLS"; exit 1
 STUB
 RC="$(run_in_script "$CTX; COMMAND=restart; ( main >/dev/null 2>&1 ); echo \$?")"
-check "maven fails: restart stops before touching the container" '[ "$RC" != 0 ] && ! grep -q "^docker" "$TMP/calls.log"'
+check "maven fails: restart stops before touching the container" '[ "$RC" != 0 ] && ! grep -q "^docker" "$TMP/calls.log" && ! grep -q "^npm" "$TMP/calls.log"'
 
 echo "10) --container: the checks follow AUTOTRIGGER_DEV_CONTAINER_PORT (3bfa4e10)"
 URL="$(AUTOTRIGGER_DEV_RUNTIME=container AUTOTRIGGER_DEV_CONTAINER_PORT=9190 run_in_script 'echo "$BACKEND_READY_URL"')"

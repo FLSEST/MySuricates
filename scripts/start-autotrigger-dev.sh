@@ -3,7 +3,8 @@
 #
 #   scripts/start-autotrigger-dev.sh [start] [--rebuild] [--show-key]   # idempotent, Default
 #   scripts/start-autotrigger-dev.sh stop                                # nur Backend
-#   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start
+#   scripts/start-autotrigger-dev.sh restart [--force]                   # Backend: stop -> JAR bauen -> start;
+#                                                                        # Frontend nur, falls es nicht laeuft
 #   scripts/start-autotrigger-dev.sh build                               # nur Runtime-JAR bauen (setup.sh), startet nichts
 #   scripts/start-autotrigger-dev.sh [start|stop|restart|build] --container  # Backend im Docker-Container
 #
@@ -485,6 +486,19 @@ start_frontend() {
   )
 }
 
+# Nach einem restart: Vite nachstarten, falls er fehlt (etwa weil das Terminal abgestuerzt ist und
+# ihn mitgenommen hat). start_frontend laesst einen laufenden Server in Ruhe. Scheitert der Start,
+# bleibt es bei einer Warnung — restart gilt dem Backend, und das laeuft da schon.
+ensure_frontend_after_restart() {
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "Hinweis: npm nicht gefunden, Frontend nicht gestartet." >&2
+    return 0
+  fi
+  start_frontend
+  wait_for_frontend 90 || echo "Warnung: Frontend laeuft nicht, siehe ${FRONTEND_LOG}" >&2
+  return 0
+}
+
 print_logs_hint() {
   echo
   echo "Logs:"
@@ -581,6 +595,7 @@ main() {
       fi
       local ok=0
       if wait_for_endpoint "Backend" "${BACKEND_READY_URL}" 120; then ok=1; fi
+      if [[ "${ok}" -eq 1 ]]; then ensure_frontend_after_restart; fi
       print_logs_hint
       [[ "${ok}" -eq 1 ]] || exit 1
       if [[ "${RUNTIME_MODE}" == "container" ]]; then

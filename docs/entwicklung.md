@@ -31,7 +31,8 @@ neuen Rechner siehe **[GETTING-STARTED.md](GETTING-STARTED.md)** (inkl. `scripts
 # Aus dem Repo-Root — baut ein Fat-JAR, kopiert es nach ~/.local/state/autotrigger-dev/runtime/
 # und startet es von dort (Port 9090). Idempotent; startet auch das Frontend.
 scripts/start-autotrigger-dev.sh            # start
-scripts/start-autotrigger-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start
+scripts/start-autotrigger-dev.sh restart    # Code-Änderungen übernehmen: stop → JAR bauen → start;
+                                            # startet Vite mit, falls er fehlt (etwa nach einem Terminal-Absturz)
 scripts/start-autotrigger-dev.sh stop
 
 # Betriebsart: Host (Default) oder Container — dieselben Kommandos (TODO a1236a64)
