@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /** Jede Regel einmal ausgeloest und einmal bewusst nicht (TODO 182bd224). */
 class WorkflowAnalyzerTest {
@@ -237,5 +238,33 @@ class WorkflowAnalyzerTest {
             assertThat(f.blockIndex()).isZero();
             assertThat(f.blockName()).isEqualTo("dateien › je-datei");
         });
+    }
+
+    // --- TODO 2f01ab01: items_command ohne items_source "command" läuft nie ---
+
+    @Test
+    void itemsCommandOhneItemsSourceIstEinBefund() {
+        var blocks = List.of(
+                block("foreach", "editor-standard", Map.of("items_command", "ls docs", "command", "wc -l {{ item }}")),
+                block("foreach", "mit-liste", Map.of("items_source", "list", "items", List.of("a"),
+                        "items_command", "ls docs", "command", "echo {{ item }}")));
+
+        var findings = analyzer.analyze(blocks, null);
+
+        assertThat(findings).filteredOn(f -> f.rule().equals("items-command-without-source"))
+                .extracting(AnalyzerFinding::blockIndex, AnalyzerFinding::severity)
+                .containsExactly(tuple(0, AnalyzerFinding.Severity.HIGH), tuple(1, AnalyzerFinding.Severity.MEDIUM));
+        assertThat(findings.getFirst().detail()).contains("nicht gesetzt").contains("null Items");
+    }
+
+    @Test
+    void itemsCommandMitItemsSourceCommandOderLeerIstKeinBefund() {
+        var blocks = List.of(
+                block("foreach", "richtig", Map.of("items_source", "command", "items_command", "ls docs",
+                        "command", "echo {{ item }}")),
+                block("foreach", "unausgefuellt", Map.of("items_command", "", "command", "")),
+                block("foreach", "liste", Map.of("items", List.of("a", "b"), "command", "echo {{ item }}")));
+
+        assertThat(rules(blocks, null)).doesNotContain("items-command-without-source");
     }
 }

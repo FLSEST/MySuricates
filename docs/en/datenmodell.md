@@ -1183,24 +1183,32 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 
 **Type-specific config fields:**
 
+The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
 | Type | Key Config Fields |
 |---|---|
-| `simple` | `prompt`, `on_failure`, `timeout_seconds` |
-| `shell` | `command` (shell script), `on_failure`, `timeout_seconds` |
-| `retry` | `prompt`, `maxRetries`, `on_failure`, `timeout_seconds` |
-| `conditional` | `condition`, `thenPrompt`, `elsePrompt` |
-| `foreach` | `items`, `prompt`, `on_failure` |
-| `while` | `condition`, `prompt`, `maxIterations` |
-| `switch` | `expression`, `cases` (list with `value`, `blocks`) |
+| `simple` | `command` (the prompt), `timeout_seconds` |
+| `shell` | `command` (shell script), `timeout_seconds`, `shell_escape_variables`, `container_image` |
+| `retry` | `command`, `max_retries` (3), `delay` (5), `exponential_backoff`, `execution_mode` (`ai`/`shell`) |
+| `conditional` | `condition`, `then_command`, `else_command`, `execution_mode` |
+| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error` |
+| `while` | `command`, `condition_command`, `max_iterations` (100), `execution_mode` |
+| `switch` | `expression`, `cases` (list with `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
-| `approval` | `message`, `timeout_minutes` |
-| `sub-workflow` | `workflowId`, `inputContext` |
-| `skill-capability` | `skillId`, `capabilityName`, `input` |
-| `human-input` | `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout` |
-| `document` | `prompt`, `on_failure`, `timeout_seconds` |
-| `integration` | `provider_id`, `action`, `parameters`, `on_failure`, `timeout_seconds` |
+| `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
+| `sub-workflow` | `workflow_id` |
+| `skill-capability` | `capability`, `input`, `params`, `allow_writes`; the capability's skill goes in `skillIds` on the block |
+| `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
+| `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |
+| `integration` | `provider` (integration provider), `action`, `params` |
+| `todo-create` | `title`, `description`, `priority`, `tags`, `project_id`, `variable_name` (`todo_id`) |
+| `todo-update` | `id`, `title`, `description`, `priority`, `tags` |
+| `todo-close` | `id` |
+| `compress` | `source`, `stages`, `max_chars` |
+| `compress-ai` | `source`, `instruction`, `max_chars` |
+| `dashboard-report` | `status`, `title`, `summary`, `kpis`, `items` |
 
-**Common optional field** `timeout_seconds` overrides the global Claude CLI timeout (`automation.host-claude.timeout-seconds`, default 300s) for all block types.
+**Common optional fields:** `on_failure` (`stop` by default, `continue`) on every block. `timeout_seconds` overrides the global Claude CLI timeout for AI calls (`automation.host-claude.timeout-seconds`, default 300s) and limits shell commands (default 300s).
 
 ## Flyway Migrations
 

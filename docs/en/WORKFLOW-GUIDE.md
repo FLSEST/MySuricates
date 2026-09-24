@@ -310,7 +310,7 @@ Evaluates a condition and executes one of two branches.
 }
 ```
 
-**Condition evaluation**: In `shell` mode, exit code 0 = true, non-zero = false. In `claude` mode, the AI answers the condition with "TRUE" or "FALSE".
+**Condition evaluation**: In `shell` mode, exit code 0 = true, non-zero = false. In `ai` mode (the default), the AI answers the condition with "TRUE" or "FALSE".
 
 **Dual mode**: `execution_mode` controls both condition evaluation and execution of `then_command`/`else_command`. `timeout_seconds` applies to both.
 
@@ -340,11 +340,13 @@ The blocks of a case run in sequence and each one moves `{{ previous_output }}` 
 
 Block names should be unique across the workflow: on a collision the last write wins. A case block overwrites an earlier block of the same name, and after the switch its aggregated output in turn overwrites an equally named child.
 
+In the example, an earlier block named `ampel` prints only `GREEN`, `YELLOW` or `RED`. `gate_status` does not work as an expression: it is no run variable — the run evaluates the `gate_status:` markers only at the end (run metadata), so `${gate_status}` would stay empty and always land in `default`.
+
 ```json
 {
   "type": "switch",
   "config": {
-    "expression": "${gate_status}",
+    "expression": "{{ block.ampel.output }}",
     "cases": [
       {
         "value": "GREEN",
@@ -430,7 +432,7 @@ Repeats a command until a condition is met or the maximum iteration count is rea
 }
 ```
 
-**Condition evaluation**: In `shell` mode, exit code 0 = continue, non-zero = stop. In `claude` mode, "false", "0", or empty response = stop, anything else = continue.
+**Condition evaluation**: In `shell` mode, exit code 0 = continue, non-zero = stop. In `ai` mode (the default), "false", "0", or empty response = stop, anything else = continue.
 
 **Dual mode**: `execution_mode` controls both condition evaluation and command execution. `timeout_seconds` applies to both.
 
@@ -479,12 +481,12 @@ Pauses execution and waits for human approval. Answer it in the dialog on the ru
 
 ### `human-input` — Collect User Input
 
-Pauses execution to collect free-text input from the user.
+Pauses execution until the user enters a value or fills in a form.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
 | `prompt` | string | `"Please provide input:"` | Question for the user (placeholders are resolved) |
-| `input_type` | string | `"text"` | `"text"` or `"select"` |
+| `input_type` | string | `"text"` | Field in the dialog: `"text"` (free text), `"textarea"` (multi-line), `"number"`, `"select"` (choice from `options`), `"checkbox"` (answer `"true"`/`"false"`), `"date"` (`YYYY-MM-DD`). The answer always reaches the variable as text |
 | `variable_name` | string | `"user_input"` | Context variable for the input |
 | `options` | list | `[]` | Selection options (for `select` type) |
 | `default_value` | string | `""` | Default value on timeout |
@@ -537,18 +539,21 @@ Invokes a capability of a registered skill.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
-| `capability` | string | **required** | Capability name (e.g. `"web_search"`, `"analyze"`) |
+| `capability` | string | **required** | Capability name (e.g. `"review_code"` from `builtin-code-review`, `"summarize_text"` from `builtin-smart-summarizer`) |
 | `input` | string | `""` | Input data (optional, default: empty string) |
 | `params` | map | `{}` | Additional parameters |
 | `timeout_seconds` | int | null | Claude CLI timeout |
 | `allow_writes` | bool | `false` | Allows the capability to write to the repo. Required for `writes:true` capabilities (test-generator, feature-implementer). Without `allow_writes`, the block runs read-only (tool whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
 
+**Skill on the block:** The capability is resolved only through the `skillIds` **of the block** (the field next to `config`, see "Per-block skills" above); the workflow's skills do not count here. Without a matching skill on the block, the call runs with just the capability name as its task — without its description and without the skill's AI context, and the `writes` check does not apply (the read-only whitelist stays as long as `allow_writes` is missing).
+
 ```json
 {
   "type": "skill-capability",
+  "skillIds": ["builtin-code-review"],
   "config": {
-    "capability": "analyze",
-    "input": "Analyze: {{ previous_output }}",
+    "capability": "review_code",
+    "input": "Review: {{ previous_output }}",
     "params": { "max_entries": 5 }
   }
 }
@@ -719,9 +724,11 @@ Module: `dashboard-report` (standard on, can be switched off). When off, the blo
 | `kpis` | list of objects | – | ≤ 6 × `{ label (≤ 40), value (≤ 40, string), trend? (UP/DOWN/FLAT) }` |
 | `items` | list of strings | – | ≤ 10 entries, each ≤ 200 characters |
 
+In the example, an earlier block `ampel` prints only `GREEN`, `YELLOW` or `RED` (as in the switch example). There is no `{{ gate_status }}` during the run — the placeholder would stay unresolved and fail the block.
+
 ```json
 { "type": "dashboard-report", "name": "report", "config": {
-  "status": "{{ gate_status }}",
+  "status": "{{ block.ampel.output }}",
   "title": "Nightly QA",
   "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }],
   "items": ["{{ finding_1 }}"],

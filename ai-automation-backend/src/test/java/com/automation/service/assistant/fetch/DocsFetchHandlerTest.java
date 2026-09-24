@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Loads the real bundled docs from the classpath (maven-resources-plugin copies repo docs/
@@ -136,6 +137,23 @@ class DocsFetchHandlerTest {
 
         expected.forEach((type, parts) ->
                 assertThat(handler.formatBlockSpec(type)).as("block-spec %s", type).contains(parts));
+    }
+
+    /** What the workflow-building prompts get (TODO cf8db6f8): the specs, without the AI override line. */
+    @Test
+    void reference_rendersTheSpecsOfTheTypesInOrder_withoutAiOverrides() {
+        String reference = BlockSpecs.reference(List.of("foreach", "shell"));
+
+        assertThat(reference).startsWith("**Block type: foreach**").endsWith("\n\n")
+                .contains("\n\n**Block type: shell**").contains("Example config: {\"items_source\": \"command\"")
+                .doesNotContain("AI overrides:");
+        assertThat(handler.formatBlockSpec("foreach")).contains("AI overrides:");
+    }
+
+    @Test
+    void reference_unknownType_isRefused() {
+        assertThatThrownBy(() -> BlockSpecs.reference(List.of("forEach")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("forEach");
     }
 
     @Test

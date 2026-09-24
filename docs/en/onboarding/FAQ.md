@@ -72,14 +72,15 @@ The complete API reference is at `docs/en/api-referenz.md`.
    @Component
    public class MyBlockExecutor implements BlockExecutor {
        @Override
-       public boolean supports(String type) { return "my-type".equals(type); }
+       public Set<String> supportedTypes() { return Set.of("my-type"); }
 
        @Override
        public StepResult execute(BlockDefinition block, ExecutionContext ctx) { ... }
    }
    ```
+   `supportedTypes()` is the single source of which types exist: `BlockTypeRegistry` collects them from all executors, and saving a workflow with any other type is refused. `supports(String)` is a default method on top of it.
 3. **Keep the lists in sync:** The type must appear in all three lists -- `BLOCK_TYPES` in `ai-automation-frontend/src/types/index.ts`, `BlockTypesIndexSection` (assistant context) and `AssistantToolValidator.KNOWN_BLOCK_TYPES`. `BlockTypeListsGuardTest` (backend) and `types/__tests__/blockTypes.test.ts` (frontend) enforce parity with the executors. The type also needs a specification in `BlockSpecs` (assistant, `fetch block-spec`); `BlockSpecConfigKeysGateTest` checks that the executor reads every config key named there.
-4. **Optional:** Create a configuration dialog
+4. **Editor:** a starting config in `ai-automation-frontend/src/data/blockDefaultConfig.json` and a key schema in `blockConfigSchema.ts` (`blockConfigSchema.test.ts` requires both). Optionally a configuration dialog of its own
 
 Spring automatically detects the new executor via component scan.
 

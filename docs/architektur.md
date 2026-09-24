@@ -223,10 +223,10 @@ com.automation
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
 │   ├── todo/            TodoService (+ TodoSpecifications, TodoTrackerExportService, TodoResolutionService, TodoResponseAssembler), AutoTodoService (+ AutoTodoTextBuilder, PendingTodoApprovalService, GranularTodoService), GateStatusResolver, GateStatusOutputParser, ProjectPathResolver, TodoGhostWatchdogService, TodoHygieneService, TodoOutputParser, TodoOverviewService, TodoResolutionListener, TodoSimilarityService
 │   ├── conversion/      WorkflowConversionService, WorkflowSuggestion, DialogWorkflowSuggestion
-│   ├── dialog/          DialogSessionScanner, DialogConversionService, ClaudeJsonlParser
+│   ├── dialog/          DialogSessionScanner, DialogConversionService (+ DialogConversionPrompt), ClaudeJsonlParser
 │   ├── factory/         WorkflowFactoryService (+ FactoryPromptBuilder, FactoryResponseParser, FactoryTopicCatalog), ClaudeWorkflowGenerator, CodexWorkflowGenerator, WorkflowTextGenerator, FactorySetupService
 │   ├── pool/            WorkflowPoolService
-│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder, WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
+│   ├── wish/            WishService (+ WishFulfillmentLoop, WishEvaluationService), WishWatchdogService, WishDecomposeService, WishDecomposePromptBuilder (+ WishSystemPrompt), WishExecutionService, WishEvaluatePromptBuilder, WishPromptBuilder, WishPromptHelper, WishJsonUtil, WishStatusHelper, WishStringUtil
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
@@ -271,7 +271,7 @@ com.automation
 |---|---|---|
 | `ProjectController` | `/api/v1/projects` | CRUD, Archivierung, Container-Lifecycle, Kontext-Generierung |
 | `WorkflowController` | `/api/v1/workflows` | CRUD, Ausführung, Runs, Export/Import, Skills, Optimize, Similar, Repair, Versions |
-| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` und `/analyze` — deterministische Baufehler-Prüfung einer Definition bzw. des Bestands (sieben Regeln). Meldet nur, greift in keinen Schreibweg ein (182bd224) |
+| `WorkflowAnalyzerController` | `/api/v1/workflows` | `/{id}/analyze` und `/analyze` — deterministische Baufehler-Prüfung einer Definition bzw. des Bestands. Meldet nur, greift in keinen Schreibweg ein (182bd224) |
 | `WorkflowImportController` | `/api/v1/workflows/import` | BPMN-Import (`POST /bpmn?projectId=…`, Body = BPMN-XML) → neuer Workflow (201); BPMN ohne `mysuricates`-Erweiterung/kaputtes XML/zu groß → 400. Der Marker sagt nur, dass sich Blöcke lesen lassen, nicht woher die Datei stammt |
 | `ExecutionController` | `/api/v1/executions` | Liste, Detail, Pause, Resume, Resume-from-Step, Cancel, Retry, Approve, Approval-Check, Todos-Approve, Notes, Command |
 | `SkillController` | `/api/v1/skills` | CRUD, Capabilities, Export/Import |
@@ -698,7 +698,7 @@ Erfolgreiche Agentic-Runs können in deterministische Workflows konvertiert werd
 
 Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 - `DialogSessionScanner` — scannt `~/.claude/projects/` nach JSONL-Session-Dateien
-- `DialogConversionService` — analysiert eine Session mit Claude und generiert eine Workflow-Suggestion
+- `DialogConversionService` — analysiert eine Session mit Claude und generiert eine Workflow-Suggestion; den KI-Auftrag baut `DialogConversionPrompt`
 - `ClaudeJsonlParser` — parst JSONL-Session-Dateien
 - `DialogController` — `/api/v1/dialog` mit Session-List, Analyse und Workflow-Erstellung
 - Pfad-Traversal-Schutz: nur Pfade unter `~/.claude/projects/` mit `.jsonl`-Endung sind erlaubt
@@ -740,11 +740,12 @@ Claude-Code-Sessions können ebenfalls als Vorlage für Workflows dienen:
 
 ## Workflow Factory
 
-Automatisches Generieren und Verifizieren von Workflows aus einem Topic:
+Automatisches Generieren und Verifizieren von Workflows aus einem Topic. Das Block-Schema in den Prompts von Factory, Wishes und Dialog-Import kommt aus `BlockSpecs` (dieselben Texte wie `fetch block-spec` des Assistenten); `PromptBlockSchemaGateTest` prüft jeden dort genannten Blocktyp und Config-Schlüssel gegen die Executoren — die alten Prompts nannten `forEach`, `then_blocks`, `if_true` und andere Schlüssel, die kein Executor liest.
 - `WorkflowFactoryService` — orchestriert den gesamten Factory-Prozess
 - `ClaudeWorkflowGenerator` / `CodexWorkflowGenerator` — AI-basierte Workflow-Generierung
 - `WorkflowTextGenerator` — Textbasierte Workflow-Generierung
 - `FactorySetupService` — Konfiguration und Setup der Factory-Umgebung
+- `FactoryPromptBuilder` — Architekten-, Generator- und Auto-Fix-Prompt; die Codex-`AGENTS.md` verweist für die Blocktypen auf den Prompt
 - `WorkflowFactoryController` — `/api/v1/factory` mit Endpunkten:
   - `POST /generate` — Workflow aus Topic generieren
   - `POST /run` — generierten Workflow auf Test-Instanz ausführen
@@ -772,6 +773,7 @@ Natürlichsprachige Wünsche werden automatisch in Workflows/Chains umgesetzt:
 - `WishFulfillmentLoop` — asynchroner Meta-Loop (decompose → execute → evaluate) inkl. Cancel-Flags und Gesamt-Timeout
 - `WishEvaluationService` — Bewertungsphase (KI-Urteil → AWAITING_APPROVAL / REFINING / FAILED)
 - `WishWatchdogService` — überwacht laufende Wishes auf Stale-/Timeout-Zustände
+- `WishDecomposePromptBuilder` + `WishSystemPrompt` — Zerlegungs-Prompt; die Timeout-Vorgaben darin sind die Werte aus `automation.wish.*`, die `WishDecomposeService` beim Anlegen einsetzt
 - Iterativer Prozess: Decomposition → Workflow-/Chain-Generierung → Ausführung → Feedback
 - Unterstützt bis zu `max_iterations` Iterationen für Verbesserungen
 - `crystallize()` — promotet erfolgreichen Wish als Template

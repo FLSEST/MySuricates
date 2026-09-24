@@ -321,7 +321,7 @@ Wertet eine Bedingung aus und führt einen von zwei Zweigen aus.
 }
 ```
 
-**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = wahr, ungleich 0 = falsch. Im `claude`-Modus beantwortet die KI die Bedingung mit "TRUE" oder "FALSE".
+**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = wahr, ungleich 0 = falsch. Im `ai`-Modus (Standard) beantwortet die KI die Bedingung mit "TRUE" oder "FALSE".
 
 **Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Ausführung von `then_command`/`else_command`. `timeout_seconds` gilt für beide.
 
@@ -351,11 +351,13 @@ Die Blöcke eines Case laufen nacheinander und schieben dabei `{{ previous_outpu
 
 Blocknamen sollten workflowweit eindeutig sein: bei Namensgleichheit gewinnt der zuletzt geschriebene Wert. Ein Case-Kind überschreibt also einen gleichnamigen früheren Block, und nach dem switch überschreibt dessen Gesamtausgabe wiederum ein gleichnamiges Kind.
 
+Im Beispiel gibt ein früherer Block namens `ampel` nur `GREEN`, `YELLOW` oder `RED` aus. `gate_status` taugt als Ausdruck nicht: Es ist keine Laufvariable — der Run wertet die `gate_status:`-Marker erst am Ende aus (Run-Metadaten), `${gate_status}` bliebe leer und landete immer im `default`.
+
 ```json
 {
   "type": "switch",
   "config": {
-    "expression": "${gate_status}",
+    "expression": "{{ block.ampel.output }}",
     "cases": [
       {
         "value": "GREEN",
@@ -441,7 +443,7 @@ Wiederholt einen Befehl bis eine Bedingung erfüllt ist oder die maximale Iterat
 }
 ```
 
-**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = weitermachen, ungleich 0 = stopp. Im `claude`-Modus gilt "false", "0" oder leere Antwort = stopp, alles andere = weitermachen.
+**Bedingungsauswertung**: Im `shell`-Modus gilt Exit-Code 0 = weitermachen, ungleich 0 = stopp. Im `ai`-Modus (Standard) gilt "false", "0" oder leere Antwort = stopp, alles andere = weitermachen.
 
 **Dual-Modus**: `execution_mode` steuert sowohl die Bedingungsauswertung als auch die Befehlsausführung. `timeout_seconds` gilt für beide.
 
@@ -490,12 +492,12 @@ Pausiert die Ausführung und wartet auf menschliche Freigabe. Beantwortet wird i
 
 ### `human-input` — Benutzereingabe sammeln
 
-Pausiert die Ausführung um Freitext-Eingaben vom Benutzer zu sammeln.
+Pausiert die Ausführung, bis der Benutzer einen Wert eingibt oder ein Formular ausfüllt.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `prompt` | string | `"Please provide input:"` | Frage an den Benutzer (Platzhalter werden aufgelöst) |
-| `input_type` | string | `"text"` | `"text"` oder `"select"` |
+| `input_type` | string | `"text"` | Feld im Dialog: `"text"` (Freitext), `"textarea"` (mehrzeilig), `"number"`, `"select"` (Auswahl aus `options`), `"checkbox"` (Antwort `"true"`/`"false"`), `"date"` (`JJJJ-MM-TT`). Die Antwort kommt immer als Text in die Variable |
 | `variable_name` | string | `"user_input"` | Kontext-Variable für die Eingabe |
 | `options` | list | `[]` | Auswahlmöglichkeiten (für `select`-Typ) |
 | `default_value` | string | `""` | Standardwert bei Timeout |
@@ -548,18 +550,21 @@ Ruft die Fähigkeit eines registrierten Skills auf.
 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
-| `capability` | string | **erforderlich** | Fähigkeitsname (z.B. `"web_search"`, `"analyze"`) |
+| `capability` | string | **erforderlich** | Fähigkeitsname (z.B. `"review_code"` aus `builtin-code-review`, `"summarize_text"` aus `builtin-smart-summarizer`) |
 | `input` | string | `""` | Eingabedaten (optional, Default: leerer String) |
 | `params` | map | `{}` | Zusätzliche Parameter |
 | `timeout_seconds` | int | null | Claude-CLI-Timeout |
 | `allow_writes` | bool | `false` | Erlaubt der Capability Schreibzugriff aufs Repo. Erforderlich für `writes:true`-Capabilities (test-generator, feature-implementer). Ohne `allow_writes` läuft der Block read-only (Tool-Whitelist Read/Grep/Glob/WebFetch/WebSearch/Task/TodoWrite). |
 
+**Skill am Block:** Die Capability wird nur über die `skillIds` **des Blocks** aufgelöst (Feld neben `config`, siehe „Per-Block Skills“ oben); die Skills des Workflows zählen hier nicht. Ohne passenden Skill am Block läuft der Aufruf nur mit dem Capability-Namen als Aufgabe — ohne ihre Beschreibung und ohne den KI-Kontext des Skills, und die `writes`-Prüfung greift nicht (es bleibt die Read-Only-Whitelist, solange `allow_writes` fehlt).
+
 ```json
 {
   "type": "skill-capability",
+  "skillIds": ["builtin-code-review"],
   "config": {
-    "capability": "analyze",
-    "input": "Analysiere: {{ previous_output }}",
+    "capability": "review_code",
+    "input": "Prüfe: {{ previous_output }}",
     "params": { "max_entries": 5 }
   }
 }
@@ -731,9 +736,11 @@ Modul: `dashboard-report` (Standard an, abschaltbar). Ist es aus, verweigert der
 | `kpis` | Liste von Objekten | – | ≤ 6 × `{ label (≤ 40), value (≤ 40, String), trend? (UP/DOWN/FLAT) }` |
 | `items` | Liste von Strings | – | ≤ 10 Einträge, je ≤ 200 Zeichen |
 
+Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` aus (wie im switch-Beispiel). `{{ gate_status }}` gibt es während des Laufs nicht — der Platzhalter bliebe unaufgelöst und ließe den Block scheitern.
+
 ```json
 { "type": "dashboard-report", "name": "report", "config": {
-  "status": "{{ gate_status }}",
+  "status": "{{ block.ampel.output }}",
   "title": "Nightly QA",
   "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }],
   "items": ["{{ finding_1 }}"],

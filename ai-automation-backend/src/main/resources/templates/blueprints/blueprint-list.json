@@ -10,12 +10,12 @@
     "en": "Working through a list"
   },
   "description": {
-    "de": "Führt einen Befehl für jedes Element einer Liste aus; ein Element scheitert absichtlich und continue_on_error zeigt, dass der Rest trotzdem läuft. Ersetze die Liste (oder nimm items_command) und den Befehl pro Element.",
-    "en": "Runs a command for every item of a list; one item fails on purpose and continue_on_error shows the rest still runs. Replace the list (or use items_command) and the per-item command."
+    "de": "Führt einen Befehl für jedes Element einer Liste aus; ein Element scheitert absichtlich und continue_on_error zeigt, dass der Rest trotzdem läuft. Ersetze die Liste (oder nimm items_command mit items_source: command) und den Befehl pro Element.",
+    "en": "Runs a command for every item of a list; one item fails on purpose and continue_on_error shows the rest still runs. Replace the list (or use items_command with items_source: command) and the per-item command."
   },
   "category": "BASICS",
   "sortOrder": 5,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "model": null,
   "instructions": null,
   "blocks": [
@@ -37,8 +37,8 @@
         "shell_escape_variables": true,
         "command": "set -eu\n# placeholder - replace with what should happen per item\nif [ {{ item }} = beta ]; then echo 'fails on purpose: beta' >&2; exit 1; fi\nprintf 'done: %s\\n' {{ item }}",
         "description": {
-          "de": "Ein Befehl pro Element; continue_on_error lässt die übrigen weiterlaufen. Ersetze die Liste (oder nimm items_command) und den Befehl.",
-          "en": "One command per item; continue_on_error keeps the others going. Replace the list (or use items_command) and the command."
+          "de": "Ein Befehl pro Element; continue_on_error lässt die übrigen weiterlaufen. Ersetze die Liste (oder nimm items_command mit items_source: command) und den Befehl.",
+          "en": "One command per item; continue_on_error keeps the others going. Replace the list (or use items_command with items_source: command) and the command."
         }
       }
     },

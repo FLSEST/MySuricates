@@ -1,5 +1,6 @@
 package com.automation.service.wish;
 
+import com.automation.config.WishConfig;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.entity.*;
 import com.automation.repository.*;
@@ -31,6 +32,7 @@ class WishDecomposePromptBuilderTest {
     @Mock private com.automation.service.learning.LearningService learningService;
     @Mock private WorkflowRunRepository workflowRunRepository;
 
+    private final WishConfig wishConfig = new WishConfig();
     private WishDecomposePromptBuilder builder;
     private WishPromptHelper helper;
 
@@ -39,7 +41,7 @@ class WishDecomposePromptBuilderTest {
         helper = new WishPromptHelper(workflowRepository, skillRepository, learningService, workflowRunRepository);
         builder = new WishDecomposePromptBuilder(
                 workflowRepository, projectRepository, templateRepository,
-                memoryRepository, workflowPoolService, agentInstructionsService, helper
+                memoryRepository, workflowPoolService, agentInstructionsService, helper, wishConfig
         );
     }
 
@@ -238,21 +240,35 @@ class WishDecomposePromptBuilderTest {
     @Nested
     class BuildSystemPromptTests {
 
+        /** The schema comes from BlockSpecs — the old text named forEach and then_blocks (TODO cf8db6f8). */
         @Test
-        void containsBlockTypes() {
+        void containsTheBlockSpecificationsOfItsTypes() {
             when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("");
 
             String result = builder.buildSystemPrompt(buildWish("test"));
 
-            assertThat(result)
-                    .contains("workflow architect")
-                    .contains("**simple**")
-                    .contains("**shell**")
-                    .contains("**agentic**")
-                    .contains("**conditional**")
-                    .contains("**forEach**")
-                    .contains("**retry**")
-                    .contains("**sub-workflow**");
+            assertThat(result).contains("workflow architect");
+            for (String type : List.of("simple", "shell", "agentic", "conditional", "foreach", "retry", "sub-workflow")) {
+                assertThat(result).contains("**Block type: " + type + "**");
+            }
+            assertThat(result).contains("`then_command`", "`items_source`")
+                    .doesNotContain("forEach", "then_blocks", "AI overrides:");
+        }
+
+        /** The timeouts WishDecomposeService fills in, not numbers of their own. */
+        @Test
+        void timeoutGuidelinesNameTheConfiguredDefaults() {
+            when(agentInstructionsService.buildInstructionPrefix(null)).thenReturn("");
+            wishConfig.setDefaultShellTimeoutSeconds(420);
+            wishConfig.setDefaultAgenticTimeoutSeconds(700);
+            wishConfig.setDefaultAgenticIterationTimeoutSeconds(1500);
+            wishConfig.setDefaultAgenticTotalTimeoutSeconds(4000);
+
+            String result = builder.buildSystemPrompt(buildWish("test"));
+
+            assertThat(result).contains("**simple** blocks: `timeout_seconds` 420.")
+                    .contains("`timeout_seconds` 700 per CLI call, `iteration_timeout_seconds` 1500 per iteration, "
+                            + "`total_timeout_seconds` 4000 overall");
         }
 
         @Test

@@ -1,5 +1,6 @@
 package com.automation.service.wish;
 
+import com.automation.config.WishConfig;
 import com.automation.entity.*;
 import com.automation.dto.response.PoolWorkflowEntry;
 import com.automation.repository.*;
@@ -31,6 +32,7 @@ public class WishDecomposePromptBuilder {
     private final WorkflowPoolService workflowPoolService;
     private final AgentInstructionsService agentInstructionsService;
     private final WishPromptHelper helper;
+    private final WishConfig wishConfig;
 
     public String buildPrompt(Wish wish) {
         StringBuilder sb = new StringBuilder();
@@ -184,85 +186,9 @@ public class WishDecomposePromptBuilder {
     }
 
     public String buildSystemPrompt(Wish wish) {
-        StringBuilder sb = new StringBuilder();
-
-        // Inject base agent instructions for consistent behavior
+        // Base agent instructions first, for consistent behavior
         String agentBase = agentInstructionsService.buildInstructionPrefix(null);
-        if (!agentBase.isBlank()) {
-            sb.append(agentBase).append("\n\n---\n\n");
-        }
-
-        sb.append("""
-                You are a workflow architect. Your job is to decompose a user's wish into executable workflow blocks.
-
-                ## Available Block Types
-
-                - **simple**: Runs a single Claude CLI prompt. Config: `{"command": "prompt text"}`. Use for tasks that need AI reasoning.
-                - **shell**: Runs a shell command. Config: `{"command": "shell command", "container_image": "image:tag"}`. Use for deterministic tasks (file ops, git, API calls, etc.). See "Ausfuehrungsumgebung" section above for available host tools and container images.
-                - **agentic**: Multi-turn AI loop with goal. Config: `{"goal": "description", "max_iterations": 10}`. Use for complex tasks requiring exploration and multi-step work.
-                - **conditional**: Branching logic. Config: `{"condition": "expression", "then_blocks": [...], "else_blocks": [...]}`.
-                - **forEach**: Iterates over items. Config: `{"items": "expression", "variable": "item", "blocks": [...]}`.
-                - **retry**: Retries on failure. Config: `{"command": "...", "max_retries": 3}`.
-                - **sub-workflow**: Runs an existing workflow as a nested block. Config: `{"workflow_id": "id"}`. Use for reuse.
-
-                ## Design Principles
-
-                1. Prefer **shell** blocks for deterministic tasks (faster, reproducible)
-                2. Follow the "Ausfuehrungsumgebung" rules for `container_image` — set it when shell blocks need tools beyond the host environment.
-                3. Use **simple** blocks for single AI reasoning steps
-                4. Use **agentic** blocks only when the task requires multi-step exploration
-                5. Agentic block prompts (goal) must be self-contained — include absolute paths, specific names, and exact instructions
-                6. Keep workflows focused — one workflow per coherent task
-                7. Use a chain when tasks are logically separate but sequential
-                8. Set realistic `max_iterations` for agentic blocks (3-10)
-                9. Add shell cleanup steps before agentic blocks if stale data from previous runs could interfere
-                10. Use `{{ previous_output }}` in block prompts to reference the output of the previous step
-                11. Reference existing workflows via sub-workflow blocks instead of duplicating logic — check "Reusable Components" for workflows from ALL projects, not just the current one
-                12. Workflows from other projects can be reused as sub-workflows — use their ID in the `workflow_id` config field
-                13. User-selected "Referenced Workflows" should be prioritized for reuse when they match the task
-                14. Set `model` for each workflow: Use "opus" (alias for the newest Opus model) for analysis, audits, architecture reviews, security scans, and complex reasoning tasks. Use null for standard automation workflows
-
-                ## Timeout Guidelines
-
-                Timeouts are applied automatically, but you can override them in block config:
-                - **shell** blocks: `timeout_seconds` (default: 600). Increase to 900+ for long builds or large downloads.
-                - **simple** blocks: `timeout_seconds` (default: 600). Usually sufficient.
-                - **agentic** blocks: `timeout_seconds` (default: 900 per CLI call), `iteration_timeout_seconds` (default: 900 per iteration), `total_timeout_seconds` (default: 3600 overall). For complex tasks with Opus model, use 900/900/3600. IMPORTANT: `iteration_timeout_seconds` must be >= `timeout_seconds`.
-
-                ## Output Format
-
-                Respond with ONLY a JSON object:
-                ```json
-                {
-                  "analysis": "Brief analysis of the wish",
-                  "strategy": "Chosen implementation strategy",
-                  "workflows": [
-                    {
-                      "name": "Workflow Name",
-                      "description": "What this workflow does",
-                      "model": "opus | sonnet | null",
-                      "blocks": [
-                        {"type": "shell", "config": {"command": "npm run lint"}},
-                        {"type": "agentic", "config": {"goal": "Fix all lint errors", "max_iterations": 5}}
-                      ]
-                    }
-                  ],
-                  "chain": {
-                    "name": "Chain Name",
-                    "stopOnFailure": true
-                  },
-                  "needsClarification": false,
-                  "clarificationQuestion": null
-                }
-                ```
-
-                If the wish is too vague, set `needsClarification: true` and provide a `clarificationQuestion`.
-                The `chain` field is only needed when generating multiple workflows.
-
-                CRITICAL: Your ENTIRE response must be a single JSON object. No text before or after. No markdown fences. No explanations. Just the raw JSON object starting with { and ending with }.
-                """);
-
-        return sb.toString();
+        return (agentBase.isBlank() ? "" : agentBase + "\n\n---\n\n") + WishSystemPrompt.text(wishConfig);
     }
 
     private void appendMatchingTemplatesAndPool(StringBuilder sb, Set<String> keywords) {

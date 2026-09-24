@@ -40,6 +40,20 @@ class FactoryPromptBuilderTest {
         assertThat(prompt).contains("Available block types:").endsWith("Output ONLY valid JSON (no markdown fences).\n");
     }
 
+    /** The schema comes from BlockSpecs — the old list named forEach, if_true, delay_seconds (TODO cf8db6f8). */
+    @Test
+    void buildSystemPrompt_describesItsBlockTypesWithTheirSpecifications() {
+        when(agentInstructionsService.buildInstructionPrefix(isNull())).thenReturn("");
+
+        String prompt = builder.buildSystemPrompt();
+
+        for (String type : FactoryPromptBuilder.BLOCK_TYPES) {
+            assertThat(prompt).contains("**Block type: " + type + "**");
+        }
+        assertThat(prompt).contains("`delay`", "`then_command`", "`items_command`")
+                .doesNotContain("forEach", "if_true", "items_expression", "delay_seconds");
+    }
+
     @Test
     void buildSystemPrompt_blankAgentBase_noPrefix() {
         when(agentInstructionsService.buildInstructionPrefix(isNull())).thenReturn("  ");
@@ -53,6 +67,8 @@ class FactoryPromptBuilderTest {
 
         assertThat(prompt).startsWith("Create a workflow for the following topic.\n\nTOPIC: Nightly build\nCATEGORY: DEVOPS\nDESCRIPTION: Builds nightly\nTEST INPUTS: {branch=main}\n");
         assertThat(prompt).contains("Output JSON with this structure:").contains("\"defaultContext\": { \"variable\": \"default_value\" }");
+        assertThat(prompt).contains("type is one of simple, shell, retry, conditional, foreach, agentic;")
+                .doesNotContain("forEach");
     }
 
     @Test

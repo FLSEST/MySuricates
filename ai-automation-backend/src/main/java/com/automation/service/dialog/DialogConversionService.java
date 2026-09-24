@@ -102,42 +102,7 @@ public class DialogConversionService {
         String compressed = buildCompressedTranscript(session);
         String systemPrompt = agentInstructionsService.buildInstructionPrefix(null);
 
-        String prompt = """
-                Analysiere diese Claude Code Session und extrahiere einen wiederverwendbaren MySuricates-Workflow.
-
-                SESSION METADATEN:
-                - Projekt: %s
-                - Turns: %d
-
-                SESSION-INHALT:
-                %s
-
-                Identifiziere das KERN-MUSTER — die Abfolge von Befehlen und Entscheidungen, die sich lohnt zu automatisieren.
-
-                Ignoriere: exploratives Lesen von Dateien, fehlgeschlagene Versuche, Debugging-Sackgassen.
-                Behalte: erfolgreiche Befehle, Datei-Änderungen mit Ergebnis, logischer Ablauf.
-
-                Antworte NUR mit einem gültigen JSON-Objekt:
-                {
-                  "suggestedName": "prägnanter Workflow-Name",
-                  "suggestedDescription": "Kurze Beschreibung was dieser Workflow tut",
-                  "confidence": 0.85,
-                  "patternType": "scripting|file_editing|research|mixed",
-                  "blocks": [
-                    {"type": "shell", "config": {"command": "...", "container_image": "debian:bookworm-slim", "on_failure": "stop"}},
-                    {"type": "simple", "config": {"command": "Analysiere die Ausgabe und erstelle einen Report", "on_failure": "stop"}}
-                  ]
-                }
-
-                Block-Regeln:
-                - "shell" für deterministische Bash-Befehle (immer container_image angeben)
-                - "simple" für KI-Reasoning-Aufgaben und Textgenerierung
-                - "retry" für Befehle die transient fehlschlagen können (max_retries: 3)
-                - "forEach" NUR wenn die Session klar über eine Liste iteriert
-                - Verwandte Befehle zusammenfassen wenn sie eine logische Einheit bilden
-                - confidence: 0.9 = klares Scripting-Muster, 0.6 = gemischt, 0.4 = unklar
-                - Nur gültiges JSON, keine Erklärungen
-                """.formatted(session.projectPath(), session.turns().size(), compressed);
+        String prompt = DialogConversionPrompt.build(session.projectPath(), session.turns().size(), compressed);
 
         AiProvider.ReasoningResult aiResult = aiProviderRegistry.getDefault().reason(
                 new AiProvider.ReasoningRequest(prompt, systemPrompt));
