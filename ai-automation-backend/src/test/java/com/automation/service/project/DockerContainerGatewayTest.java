@@ -1,5 +1,9 @@
 package com.automation.service.project;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectType;
 import com.automation.util.HostProcessUtils;
@@ -12,6 +16,7 @@ import com.github.dockerjava.api.command.ListContainersCmd;
 import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
+import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,11 +25,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -90,6 +97,37 @@ class DockerContainerGatewayTest {
 
         verify(stop).withTimeout(10);
         verify(remove).exec();
+    }
+
+    /** c1eda062: a container Docker no longer knows (404) is logged at DEBUG; other failures stay WARN. */
+    @Test
+    void remove_logsAMissingContainerAtDebug_andOtherFailuresAtWarn() {
+        Logger logger = (Logger) LoggerFactory.getLogger(DockerContainerGateway.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try {
+            StopContainerCmd stop = mock(StopContainerCmd.class);
+            when(stop.withTimeout(anyInt())).thenReturn(stop);
+            when(stop.exec()).thenThrow(new NotFoundException("No such container: c1"));
+            when(dockerClient.stopContainerCmd("c1")).thenReturn(stop);
+            RemoveContainerCmd remove = mock(RemoveContainerCmd.class);
+            when(remove.withForce(true)).thenReturn(remove);
+            when(remove.exec()).thenThrow(new RuntimeException("Status 500: driver failed"));
+            when(dockerClient.removeContainerCmd("c1")).thenReturn(remove);
+
+            gateway.remove("c1");
+
+            assertThat(appender.list).extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
+                    .containsExactly(
+                            tuple(Level.DEBUG, "Container c1 already gone on stop: Status 404: No such container: c1"),
+                            tuple(Level.WARN, "Failed to remove container c1: Status 500: driver failed"));
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(appender);
+        }
     }
 
     @Test
