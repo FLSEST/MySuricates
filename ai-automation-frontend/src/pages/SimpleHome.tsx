@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, ArrowUp, GitBranch } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { useT } from '../i18n';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -17,7 +17,7 @@ import { FeatureTile } from '../components/simple/FeatureTile';
 import { ProBadge } from '../components/simple/ProHandoff';
 import { simpleRouteKind } from '../utils/simpleRoutes';
 import { RunChip, SimpleCard } from '../components/simple/kit';
-import { WorkflowSearch } from '../components/simple/WorkflowSearch';
+import { HomeCommand } from '../components/simple/home-command/HomeCommand';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { useProjects } from '../hooks/useProjects';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
@@ -35,8 +35,6 @@ export function SimpleHome() {
   const assistantModule = useModuleEnabled('assistant');
   const { data: systemModules } = useSystemModules();
 
-  const [assistantInput, setAssistantInput] = useState('');
-
   const { navTiles, runTiles } = useMemo(() => {
     const disabled = new Set((systemModules?.modules ?? []).filter((m) => !m.enabled).map((m) => m.name));
     return buildHomeTiles(workflows ?? [], pinnedWorkflowIds, 4, disabled);
@@ -44,11 +42,10 @@ export function SimpleHome() {
   const greeting = t.simple.home[greetingKey(new Date())];
   const hasWorkflows = (workflows?.length ?? 0) > 0;
 
-  const submitAssistant = () => {
-    const text = assistantInput.trim();
+  // Until the answer shows up in place (Stage B), asking opens the assistant panel with the text
+  const askAssistant = (text: string) => {
     setPendingInput(text || null);
     setAssistantOpen(true);
-    setAssistantInput('');
   };
 
   if (isLoading) {
@@ -91,41 +88,8 @@ export function SimpleHome() {
         </SimpleCard>
       ) : null}
 
-      {/* Without the assistant module the hero is a search over one's own workflows */}
-      {!assistantModule && hasWorkflows && (
-        <WorkflowSearch workflows={workflows ?? []} latestStatus={latestStatus} onRun={simpleRun.run} />
-      )}
-
-      {/* Assistant — the hero input */}
-      {assistantModule && (
-        <form
-          onSubmit={(e) => { e.preventDefault(); submitAssistant(); }}
-          className="relative rounded-2xl p-[1.5px] shadow-[0_18px_50px_-30px_rgba(129,140,248,0.7)]"
-          style={{ background: 'linear-gradient(120deg, rgba(129,140,248,.55), rgba(56,189,248,.30) 40%, rgba(167,139,250,.45))' }}
-        >
-          <div className="flex items-center gap-3 bg-surface-raised rounded-[14px] px-4 py-3">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(129,140,248,.25), rgba(56,189,248,.18))' }}
-            >
-              <Sparkles className="w-[18px] h-[18px]" style={{ color: 'var(--color-ai)' }} />
-            </div>
-            <input
-              value={assistantInput}
-              onChange={(e) => setAssistantInput(e.target.value)}
-              placeholder={t.simple.home.assistantPlaceholder}
-              className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
-            />
-            <button
-              type="submit"
-              aria-label={t.simple.home.assistantLabel}
-              className="w-8 h-8 rounded-lg bg-accent text-text-inverse flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity"
-            >
-              <ArrowUp className="w-4 h-4" />
-            </button>
-          </div>
-        </form>
-      )}
+      {/* The hero: instant hits from every source; with the assistant module Enter also asks it */}
+      <HomeCommand onAsk={assistantModule ? askAssistant : undefined} />
 
       {/* "How's it looking?" overview */}
       <SimpleOverview />

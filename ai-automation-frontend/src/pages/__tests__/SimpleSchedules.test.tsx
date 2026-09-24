@@ -3,6 +3,7 @@ import { screen, waitFor, within, fireEvent } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { useI18nStore } from '../../i18n';
 import { de } from '../../i18n/de';
 import { en } from '../../i18n/en';
@@ -111,5 +112,27 @@ describe('SimpleSchedules list', () => {
     expect(screen.getAllByText(de.simple.handoff.badge)).toHaveLength(1);
     expect(screen.queryByText(/CRON/)).not.toBeInTheDocument();
     expect(screen.queryByText(/0 0 12/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SimpleSchedules — ?new=1&workflow= (the home field)', () => {
+  function LocationProbe() {
+    const location = useLocation();
+    return <p data-testid="location">{location.pathname + location.search}</p>;
+  }
+
+  it('opens the create dialog with the workflow chosen and drops the params', async () => {
+    serve([]);
+    renderWithProviders(
+      <>
+        <Routes><Route path="/schedules" element={<SimpleSchedules />} /></Routes>
+        <LocationProbe />
+      </>,
+      { route: '/schedules?new=1&workflow=wf-1' },
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByRole('combobox')).toHaveValue('wf-1'));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/schedules$/));
   });
 });

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Trash2, Plus } from 'lucide-react';
 import { useT, useI18nStore } from '../i18n';
 import { useSchedules, useToggleSchedule, useDeleteSchedule, useCreateSchedule } from '../hooks/useSchedules';
@@ -10,19 +11,10 @@ import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../component
 import { ProBadge } from '../components/simple/ProHandoff';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime } from '../utils/formatTime';
-import { describeCron } from '../utils/cronSchedule';
-import type { ScheduledWorkflow } from '../types';
-import type { TranslationKeys } from '../i18n/en';
+import { describeSchedule } from '../utils/cronSchedule';
 
 // Spring cron has six fields: second minute hour day month weekday.
 const DEFAULT_CRON = '0 0 9 * * *';
-
-/** How often a schedule runs, in words — null when only Pro can show it (raw cron). */
-function describeSchedule(s: ScheduledWorkflow, t: TranslationKeys): string | null {
-  if (s.scheduleType === 'ONCE') return t.schedules.once;
-  if (s.scheduleType === 'DELAYED') return t.schedules.delayed;
-  return describeCron(s.cronExpression, t);
-}
 
 export function SimpleSchedules() {
   const t = useT();
@@ -33,8 +25,21 @@ export function SimpleSchedules() {
   const del = useDeleteSchedule();
   const create = useCreateSchedule();
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [wfId, setWfId] = useState('');
+  // `?new=1[&workflow=<id>]` (the Simple home's "schedule <workflow>") opens the dialog with it chosen
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCreate = searchParams.get('new') === '1';
+  const [createOpen, setCreateOpen] = useState(requestedCreate);
+  const [wfId, setWfId] = useState(() => (requestedCreate ? searchParams.get('workflow') ?? '' : ''));
+
+  useEffect(() => {
+    if (!requestedCreate) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('new');
+      next.delete('workflow');
+      return next;
+    }, { replace: true });
+  }, [requestedCreate, setSearchParams]);
   const [cron, setCron] = useState(DEFAULT_CRON);
 
   const submitCreate = () => {

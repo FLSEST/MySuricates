@@ -32,8 +32,8 @@ export function SimplePageHeader({
 }
 
 /** Small uppercase section label. */
-export function SectionLabel({ children }: { children: ReactNode }) {
-  return <p className="text-[11px] tracking-widest uppercase text-text-tertiary font-semibold mb-3">{children}</p>;
+export function SectionLabel({ children, id, className = 'mb-3' }: { children: ReactNode; id?: string; className?: string }) {
+  return <p id={id} className={`text-[11px] tracking-widest uppercase text-text-tertiary font-semibold ${className}`}>{children}</p>;
 }
 
 /** Color-accented card. Clickable → button with hover lift/glow; static → plain div. */

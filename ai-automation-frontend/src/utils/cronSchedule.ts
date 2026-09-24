@@ -173,3 +173,56 @@ export function describeCron(cron: string | null | undefined, t: CronDescribeTex
 
   return null;
 }
+
+function dayOfMonthList(field: string): number[] | null {
+  const days: number[] = [];
+  for (const part of field.split(',')) {
+    const n = toInt(part, 1, 31);
+    if (n === null) return null;
+    days.push(n);
+  }
+  return days;
+}
+
+/**
+ * Whether a Spring cron expression fires on `date`'s calendar day (any time of day). Month must be
+ * `*`; day of month and weekday are read as lists/ranges and both have to fit. Returns null when the
+ * expression is not one of these shapes — callers then fall back to `nextRunAt`.
+ */
+export function cronRunsOnDay(cron: string | null | undefined, date: Date): boolean | null {
+  if (!cron) return null;
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 6 && parts.length !== 5) return null;
+  const fields = parts.length === 6 ? parts : ['0', ...parts];
+  const [, , , dom, month, dow] = fields as [string, string, string, string, string, string];
+  if (month !== '*' && month !== '?') return null;
+
+  let domOk = true;
+  if (dom !== '*' && dom !== '?') {
+    const days = dayOfMonthList(dom);
+    if (!days) return null;
+    domOk = days.includes(date.getDate());
+  }
+  let dowOk = true;
+  if (dow !== '*' && dow !== '?') {
+    const days = parseWeekdays(dow);
+    if (!days) return null;
+    dowOk = days.includes(date.getDay());
+  }
+  return domOk && dowOk;
+}
+
+/** The strings `describeSchedule` needs besides those of `describeCron`. */
+interface ScheduleDescribeTexts extends CronDescribeTexts {
+  schedules: CronDescribeTexts['schedules'] & { once: string; delayed: string };
+}
+
+/** How often a schedule runs, in words — null when only Pro can show it (raw cron). */
+export function describeSchedule(
+  s: { scheduleType: 'CRON' | 'ONCE' | 'DELAYED'; cronExpression: string },
+  t: ScheduleDescribeTexts,
+): string | null {
+  if (s.scheduleType === 'ONCE') return t.schedules.once;
+  if (s.scheduleType === 'DELAYED') return t.schedules.delayed;
+  return describeCron(s.cronExpression, t);
+}

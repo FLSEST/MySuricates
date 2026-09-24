@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { de } from '../i18n/de';
 import { en } from '../i18n/en';
-import { describeCron, parseCronToState, stateToCron } from './cronSchedule';
+import { cronRunsOnDay, describeCron, describeSchedule, parseCronToState, stateToCron } from './cronSchedule';
 
 describe('parseCronToState / stateToCron', () => {
   it.each([
@@ -72,5 +72,34 @@ describe('describeCron', () => {
     expect(describeCron('@daily', en)).toBeNull();
     expect(describeCron('', en)).toBeNull();
     expect(describeCron(null, en)).toBeNull();
+  });
+});
+
+describe('cronRunsOnDay', () => {
+  // Friday, 2026-09-25
+  const friday = new Date(2026, 8, 25, 12, 0, 0);
+
+  it('reads daily, weekday and day-of-month shapes', () => {
+    expect(cronRunsOnDay('0 0 9 * * *', friday)).toBe(true);
+    expect(cronRunsOnDay('0 0 9 * * MON-FRI', friday)).toBe(true);
+    expect(cronRunsOnDay('0 0 9 * * 1,3', friday)).toBe(false);
+    expect(cronRunsOnDay('0 0 9 25 * *', friday)).toBe(true);
+    expect(cronRunsOnDay('0 0 9 1,15 * *', friday)).toBe(false);
+    expect(cronRunsOnDay('*/15 * * * *', friday)).toBe(true);
+  });
+
+  it('gives up on shapes it cannot read', () => {
+    expect(cronRunsOnDay('0 0 9 * 1 *', friday)).toBeNull();
+    expect(cronRunsOnDay('0 0 9 L * *', friday)).toBeNull();
+    expect(cronRunsOnDay('nonsense', friday)).toBeNull();
+    expect(cronRunsOnDay(null, friday)).toBeNull();
+  });
+});
+
+describe('describeSchedule', () => {
+  it('names one-off and delayed schedules, else describes the cron', () => {
+    expect(describeSchedule({ scheduleType: 'ONCE', cronExpression: '' }, en)).toBe(en.schedules.once);
+    expect(describeSchedule({ scheduleType: 'DELAYED', cronExpression: '' }, en)).toBe(en.schedules.delayed);
+    expect(describeSchedule({ scheduleType: 'CRON', cronExpression: '0 0 9 * * *' }, en)).toBe(describeCron('0 0 9 * * *', en));
   });
 });
