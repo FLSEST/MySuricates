@@ -187,7 +187,9 @@ PY'
 
 echo "5b) Struktur-Scan zaehlt nur Kollaborateure (59e22c53)"
 # Werkzeuge, Konfigurationswerte und Zustand sind keine Abhaengigkeiten: gezaehlt werden nur
-# injizierte "private final <Typ> <name>;"-Felder ausserhalb der Ausschlussliste.
+# injizierte "private final <Typ> <name>;"-Felder ausserhalb der Ausschlussliste. Eine List/Map/Set
+# ohne Initialisierer ist eine injizierte Bean-Sammlung und zaehlt mit; Deque, Atomic* und Locks
+# ohne Initialisierer bleiben Zustand, Felder mit Initialisierer zaehlen nie.
 SCAN_FIX="$TMP/scan-fixture"
 SCAN_MAIN="$SCAN_FIX/ai-automation-backend/src/main/java/com/automation/service"
 mkdir -p "$SCAN_MAIN"
@@ -202,11 +204,12 @@ mkdir -p "$SCAN_MAIN"
   echo "    private final long ttlMs;"
   echo "    private final Clock clock;"
   echo "    private final TrayConfig trayConfig;"
-  echo "    private final List<AiProvider> providers;"
+  echo "    private final List<BlockExecutor> blockExecutors;"
   echo "    private final UnaryOperator<String> env;"
   echo "    private final LongSupplier nanoClock;"
   echo "    private final Map<String, Object> locks = new ConcurrentHashMap<>();"
   echo "    private final AtomicReference<Thread> running;"
+  echo "    private final Deque<String> pending;"
   echo "    private final ReentrantLock lock;"
   echo "    private static final Logger log = LoggerFactory.getLogger(BusyService.class);"
   for i in $(seq 1 200); do echo "    // filler $i"; done
@@ -226,8 +229,9 @@ assert block["config"].get("shell_escape_variables") is True
 print(block["config"]["command"].replace("{{ project_path }}", "'" + sys.argv[2] + "'"))
 PY
 bash "$TMP/delta-scan.sh" > "$TMP/delta-scan.out" 2> /dev/null
-check "God-Class-Liste zaehlt 6 Kollaborateure" 'grep -q "| 6 deps | service/BusyService$" "$TMP/delta-scan.out"'
-check "Kopplungsliste zaehlt 6 Kollaborateure"  'grep -qx "6 deps: BusyService" "$TMP/delta-scan.out"'
+# 6 einzelne Kollaborateure + die injizierte List<BlockExecutor> = 7.
+check "God-Class-Liste zaehlt 7 Kollaborateure" 'grep -q "| 7 deps | service/BusyService$" "$TMP/delta-scan.out"'
+check "Kopplungsliste zaehlt 7 Kollaborateure"  'grep -qx "7 deps: BusyService" "$TMP/delta-scan.out"'
 check "Nicht-Bean ohne deps"                    'grep -q "| - deps | service/PlainEvent$" "$TMP/delta-scan.out"'
 check "Nicht-Bean nicht in der Kopplungsliste"  '! grep -q "deps: PlainEvent" "$TMP/delta-scan.out"'
 check "Report-Prompt: Zahl meint Kollaborateure" \
