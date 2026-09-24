@@ -125,6 +125,9 @@ export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, a
           <title>{node.todo.priority}</title>
         </circle>
       )}
+      {node.kind === 'origin' && node.runStatus === 'FAILED' && (
+        <circle data-testid="origin-run-failed" cx={node.x + node.w - 10} cy={node.y + node.h / 2} r={4} style={{ fill: 'var(--color-danger)' }} />
+      )}
       {nodeIcon(node)}
       <text x={node.x + 28} y={node.y + node.h / 2 + 4}
         className={`text-[12px] ${node.candidate ? 'fill-text-secondary' : 'fill-text'} ${node.todo?.status === 'DONE' ? 'line-through' : ''}`}>

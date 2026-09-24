@@ -78,7 +78,7 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign }: {
           <button type="button" onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} aria-label={t.workflows.zoomIn}
             className="h-6 w-6 rounded text-base leading-none hover:bg-surface-raised hover:text-text disabled:opacity-40">+</button>
         </div>
-        <div ref={scrollRef} className={`p-3 ${fixedSize ? 'overflow-auto max-h-[75vh]' : 'overflow-x-auto'}`}>
+        <div ref={scrollRef} className={`px-3 pb-3 pt-10 ${fixedSize ? 'overflow-auto max-h-[75vh]' : 'overflow-x-auto'}`}>
           <svg
             viewBox={`-8 0 ${layout.width + 16} ${layout.height}`}
             {...(fixedSize ?? {})}

@@ -64,6 +64,9 @@ describe('GoalRelationMap', () => {
     expect(within(map).getAllByText('Done · 2×').length).toBeGreaterThan(0);
     expect(within(map).getByText('Might belong here')).toBeInTheDocument();
     expect(node('todo:cand').querySelector('rect')).toHaveAttribute('stroke-dasharray', '5 4');
+    // the failed gate run is marked on its origin node
+    expect(node('origin:wf:wf-gate').querySelector('[data-testid="origin-run-failed"]')).not.toBeNull();
+    expect(node('origin:user').querySelector('[data-testid="origin-run-failed"]')).toBeNull();
   });
 
   it('highlights the whole path of a todo on hover and dims the rest', () => {
