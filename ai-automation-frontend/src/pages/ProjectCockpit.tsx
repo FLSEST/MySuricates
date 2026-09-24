@@ -7,6 +7,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { GoalsSection } from '../components/goal/GoalsSection';
+import { MilestoneDueRow } from '../components/goal/MilestoneDueRow';
 import { priorityColor, sourceIcon } from '../components/todo/todoConstants';
 import { useTodoOverview } from '../hooks/useTodoOverview';
 import { useArchiveStale, useProjectActiveTodos } from '../hooks/useTodos';
@@ -33,6 +34,9 @@ export function ProjectCockpit() {
   }
 
   const needsYou = data?.needsYou ?? [];
+  // Meilensteine, die bald fällig oder überfällig sind (TODO e192df18); ein älteres Backend liefert sie nicht.
+  const milestonesDue = data?.milestonesDue ?? [];
+  const attention = needsYou.length + milestonesDue.length;
   const projects = data?.projects ?? [];
   const staleThresholdDays = data?.staleThresholdDays ?? 30;
 
@@ -54,24 +58,25 @@ export function ProjectCockpit() {
 
       <Hint id="cockpit-overview" />
 
-      {/* "Braucht dich" focus lane */}
-      <section>
+      {/* "Braucht dich" focus lane: due milestones first, then the TODOs */}
+      <section aria-labelledby="needs-you-heading">
         <div className="flex items-center gap-2 mb-3">
           <AlertTriangle className="w-4 h-4 text-warning" />
-          <h2 className="text-sm font-semibold text-text uppercase tracking-wide">{t.cockpit.needsYou}</h2>
-          {needsYou.length > 0 && (
+          <h2 id="needs-you-heading" className="text-sm font-semibold text-text uppercase tracking-wide">{t.cockpit.needsYou}</h2>
+          {attention > 0 && (
             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warning/15 text-warning">
-              {needsYou.length}
+              {attention}
             </span>
           )}
         </div>
-        {needsYou.length === 0 ? (
+        {attention === 0 ? (
           <Card>
             <p className="text-sm text-text-tertiary text-center py-2">{t.cockpit.needsYouEmpty}</p>
           </Card>
         ) : (
           <Card padding={false}>
             <div className="divide-y divide-border">
+              {milestonesDue.map((item) => <MilestoneDueRow key={item.id} item={item} />)}
               {needsYou.map((item) => (
                 <NeedsYouRow key={item.id} item={item} onClick={() => navigate(todoDeepLink(item))} t={t} />
               ))}

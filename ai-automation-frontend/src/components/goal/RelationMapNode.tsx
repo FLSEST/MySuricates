@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { truncate, useNodeText } from './relationMapText';
 import type { MapNode, Tone } from './goalRelationLayout';
+import type { PlanBadge } from './planDisplay';
 import type { TodoPriority } from '../../types';
 
 /** Farben nur aus Tokens (TODO c6ea8f5c): Status und Rollen, Workflows bleiben neutral. */
@@ -37,6 +38,8 @@ const PRIORITY_FILL: Record<TodoPriority, string> = {
 };
 
 const ICON = 14;
+/** Fälligkeit und Meilenstein im TODO-Knoten: höchstens so viele Zeichen, der Rest steht im Tooltip. */
+const BADGE_CHARS = 18;
 
 /** Symbol eines Knotens – dieselben Zeichen wie in `GoalBadges` und der Legende. */
 function nodeIcon(node: MapNode): ReactNode {
@@ -74,6 +77,8 @@ interface NodeProps {
   onActivate?: () => void;
   onAssign?: () => void;
   assignLabel: string;
+  /** Fälligkeit und Meilenstein eines TODOs (TODO e192df18). */
+  badge?: PlanBadge | null;
 }
 
 const onKey = (action?: () => void) => (e: KeyboardEvent) => {
@@ -83,7 +88,7 @@ const onKey = (action?: () => void) => (e: KeyboardEvent) => {
   }
 };
 
-export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, assignLabel }: NodeProps) {
+export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, assignLabel, badge }: NodeProps) {
   const text = useNodeText()(node);
   const opacity = dimmed ? 0.25 : 1;
 
@@ -97,7 +102,10 @@ export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, a
   }
 
   const assignWidth = onAssign ? 78 : 0;
-  const maxChars = Math.floor((node.w - 34 - assignWidth) / 6.6);
+  const badgeText = badge ? truncate(badge.text, BADGE_CHARS) : null;
+  const badgeWidth = badgeText ? Math.ceil(badgeText.length * 5.8) + 12 : 0;
+  const badgeRight = node.x + node.w - 18 - assignWidth;
+  const maxChars = Math.floor((node.w - 34 - assignWidth - (badgeWidth ? badgeWidth + 8 : 0)) / 6.6);
   return (
     <g
       data-node={node.id}
@@ -133,6 +141,17 @@ export function RelationMapNode({ node, dimmed, onHover, onActivate, onAssign, a
         className={`text-[12px] ${node.candidate ? 'fill-text-secondary' : 'fill-text'} ${node.todo?.status === 'DONE' ? 'line-through' : ''}`}>
         {truncate(text.label, Math.max(8, maxChars))}
       </text>
+      {badge && badgeText && (
+        <g data-testid="todo-plan-badge">
+          <title>{badge.title}</title>
+          <rect x={badgeRight - badgeWidth} y={node.y + 8} width={badgeWidth} height={node.h - 16} rx={5}
+            style={{ fill: badge.overdue ? 'var(--color-danger-subtle)' : 'var(--color-surface-hover)' }} />
+          <text x={badgeRight - badgeWidth / 2} y={node.y + node.h / 2 + 3.5} textAnchor="middle"
+            className={`text-[10px] ${badge.overdue ? 'fill-danger' : 'fill-text-secondary'}`}>
+            {badgeText}
+          </text>
+        </g>
+      )}
       {onAssign && (
         <g
           role="button"

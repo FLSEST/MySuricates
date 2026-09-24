@@ -35,6 +35,18 @@ describe('WorkflowVersionsTab provenance', () => {
     expect(screen.getAllByText('current')).toHaveLength(1);
   });
 
+  it('names the goal guard as the source of the versions it created', async () => {
+    server.use(http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
+      content: [{ ...version('v1', 1, HASH_OLD), changeSource: 'goal-guard' }],
+      page: 0, size: 20, totalElements: 1, totalPages: 1,
+    })));
+
+    renderWithProviders(<WorkflowVersionsTab workflowId="wf-1" />);
+
+    expect(await screen.findByText('Goal guard')).toBeInTheDocument();
+    expect(screen.queryByText('goal-guard')).not.toBeInTheDocument();
+  });
+
   it('marks nothing when the current hash is unknown', async () => {
     server.use(http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
       content: [version('v1', 1, HASH_OLD)], page: 0, size: 20, totalElements: 1, totalPages: 1,

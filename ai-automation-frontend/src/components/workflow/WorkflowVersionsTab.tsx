@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, RotateCcw, ChevronDown, ChevronRight, User, Bot, Download, Globe, Sparkles, Link2, Undo2, AlertTriangle } from 'lucide-react';
+import { History, RotateCcw, ChevronDown, ChevronRight, User, Bot, Download, Globe, Sparkles, Link2, Undo2, AlertTriangle, Target } from 'lucide-react';
 import { useWorkflowVersions, useRestoreWorkflowVersion } from '../../hooks/useWorkflowVersions';
 import { useT, useI18nStore } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
@@ -10,6 +10,7 @@ const SOURCE_ICONS: Record<string, typeof User> = {
   ai: Bot,
   'pool-install': Download,
   'example-project': Download,
+  'goal-guard': Target,
   import: Download,
   api: Globe,
   system: History,
@@ -29,6 +30,7 @@ const SOURCE_COLORS: Record<string, string> = {
   ai: 'bg-ai-subtle text-ai',
   'pool-install': 'bg-amber-500/20 text-amber-400',
   'example-project': 'bg-amber-500/20 text-amber-400',
+  'goal-guard': 'bg-info-subtle text-info',
   import: 'bg-green-500/20 text-green-400',
   api: 'bg-info-subtle text-info',
   system: 'bg-surface-hover text-text-secondary',

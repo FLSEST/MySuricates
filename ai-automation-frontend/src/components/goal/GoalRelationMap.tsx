@@ -8,6 +8,7 @@ import { useT } from '../../i18n';
 import { COLUMNS, highlightFor, layoutRelations, type MapNode, type NodeTarget } from './goalRelationLayout';
 import { RelationMapNode } from './RelationMapNode';
 import { RelationMapLegend } from './RelationMapLegend';
+import type { PlanBadge } from './planDisplay';
 import type { GoalRelations } from '../../types';
 
 /** Wohin ein Klick auf einen Knoten führt; TODOs öffnet die Zielseite selbst. */
@@ -62,10 +63,12 @@ function EmptyGoalMap() {
  * mit Zoom. Hover hebt den ganzen Pfad eines TODOs hervor; Workflows, Läufe und Befunde sind
  * Links, ein TODO öffnet den Bearbeiten-Dialog, ein Kandidat lässt sich zuordnen.
  */
-export function GoalRelationMap({ relations, onOpenTodo, onAssign }: {
+export function GoalRelationMap({ relations, onOpenTodo, onAssign, badges }: {
   relations: GoalRelations;
   onOpenTodo: (todoId: string) => void;
   onAssign: (todoId: string) => void;
+  /** Fälligkeit und Meilenstein je TODO des Ziels (TODO e192df18); Kandidaten haben keine. */
+  badges?: ReadonlyMap<string, PlanBadge>;
 }) {
   const t = useT();
   const m = t.goals.map;
@@ -156,6 +159,7 @@ export function GoalRelationMap({ relations, onOpenTodo, onAssign }: {
                 onActivate={activate(node)}
                 onAssign={node.kind === 'todo' && node.candidate ? () => onAssign(node.todoIds[0]!) : undefined}
                 assignLabel={m.assign}
+                badge={node.kind === 'todo' && !node.candidate ? badges?.get(node.todoIds[0]!) : undefined}
               />
             ))}
           </svg>

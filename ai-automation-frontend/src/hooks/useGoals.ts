@@ -5,7 +5,8 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { useTodos } from './useTodos';
 import type {
-  CreateGoalRequest, Goal, GoalDetail, GoalRelations, GoalStatus, Todo, UpdateGoalRequest, UpdateTodoPlanningRequest,
+  CreateGoalRequest, Goal, GoalDetail, GoalGuard, GoalRelations, GoalStatus, Todo, UpdateGoalRequest,
+  UpdateTodoPlanningRequest,
 } from '../types';
 
 /** Ziele (TODO dc0566f8): TODOs projektübergreifend sammeln, ordnen und einschätzen. */
@@ -26,10 +27,25 @@ export function useGoals(statuses?: GoalStatus[]) {
   });
 }
 
+const NO_GUARD: GoalGuard = { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null };
+
+/**
+ * Ein Backend vor TODO 259f4f66 kennt Wächter, Meilensteine und Fälligkeiten im Ziel noch nicht –
+ * bis zu seinem Neustart zeigt die Zielseite sie dann leer, statt an einem fehlenden Feld zu scheitern.
+ */
+export function normalizeGoalDetail(detail: GoalDetail): GoalDetail {
+  return {
+    ...detail,
+    goal: { ...detail.goal, guard: detail.goal.guard ?? NO_GUARD },
+    milestones: detail.milestones ?? [],
+    todos: detail.todos.map((todo) => ({ ...todo, dueDate: todo.dueDate ?? null, milestoneId: todo.milestoneId ?? null })),
+  };
+}
+
 export function useGoal(id: string | undefined) {
   return useQuery({
     queryKey: goalKeys.detail(id ?? ''),
-    queryFn: () => api.get<GoalDetail>(`/goals/${id}`),
+    queryFn: () => api.get<GoalDetail>(`/goals/${id}`).then(normalizeGoalDetail),
     enabled: !!id,
   });
 }
@@ -81,7 +97,7 @@ export function useAssignGoalTodos() {
     mutationFn: ({ id, todoIds }: { id: string; todoIds: string[] }) =>
       api.post<GoalDetail>(`/goals/${id}/todos`, { todoIds }),
     onSuccess: (detail) => {
-      qc.setQueryData(goalKeys.detail(detail.goal.id), detail);
+      qc.setQueryData(goalKeys.detail(detail.goal.id), normalizeGoalDetail(detail));
       qc.invalidateQueries({ queryKey: goalKeys.all });
       qc.invalidateQueries({ queryKey: ['todos'] });
       toast.success(t.goals.assigned);
@@ -135,7 +151,7 @@ export function useReorderGoal() {
     mutationFn: ({ id, todoIds }: { id: string; todoIds: string[] }) =>
       api.put<GoalDetail>(`/goals/${id}/order`, { todoIds }),
     onSuccess: (detail) => {
-      qc.setQueryData(goalKeys.detail(detail.goal.id), detail);
+      qc.setQueryData(goalKeys.detail(detail.goal.id), normalizeGoalDetail(detail));
       qc.invalidateQueries({ queryKey: ['goals', 'list'] });
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
