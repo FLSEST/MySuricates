@@ -1,38 +1,36 @@
 import { useState } from 'react';
-import { FolderKanban, Plus, Play, Square, Loader2 } from 'lucide-react';
+import { FolderKanban, Plus, Square, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
-import { useProjects, useCreateProject, useStartContainer, useStopContainer } from '../hooks/useProjects';
-import { Spinner, Button, Modal, Select, Input } from '../components/ui';
+import { useProjects, useCreateProject, useStopContainer } from '../hooks/useProjects';
+import { Spinner, Button, Modal } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
+import { ProjectFormFields } from '../components/project/ProjectFormFields';
+import { COMPACT_PROJECT_FORM, type ProjectFormValues } from '../components/project/projectForm';
 import { SimplePage, SimplePageHeader, SimpleCard, StatusDot } from '../components/simple/kit';
 import { ProBadge } from '../components/simple/ProHandoff';
 import { useOpenInPro } from '../hooks/useOpenInPro';
 import { AREA_COLORS } from '../utils/homeTiles';
-import type { ProjectType } from '../types';
 
 const C = AREA_COLORS.projects;
-const TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSONAL'];
 
 export function SimpleProjects() {
   const t = useT();
   const openInPro = useOpenInPro();
   const { data: projects, isLoading, error, refetch } = useProjects();
   const create = useCreateProject();
-  const startC = useStartContainer();
   const stopC = useStopContainer();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [type, setType] = useState<ProjectType>('CODE');
-  const [path, setPath] = useState('');
+  const [newProject, setNewProject] = useState<ProjectFormValues>(COMPACT_PROJECT_FORM);
+  const canCreate = newProject.name.trim() !== '' && newProject.path.trim() !== '';
 
   const submitCreate = () => {
-    if (!name.trim() || !path.trim()) return;
+    if (!canCreate) return;
     create.mutate(
-      { name: name.trim(), type, path: path.trim() },
-      { onSuccess: () => { setCreateOpen(false); setName(''); setPath(''); setType('CODE'); } },
+      { ...newProject, name: newProject.name.trim(), path: newProject.path.trim() },
+      { onSuccess: () => { setCreateOpen(false); setNewProject(COMPACT_PROJECT_FORM); } },
     );
   };
 
@@ -61,8 +59,10 @@ export function SimpleProjects() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {(projects ?? []).map((p) => {
+            // Containers stay out of sight until one is already there: a newcomer never needs to
+            // start one, but a running container can still be stopped from here.
             const running = p.status === 'RUNNING';
-            const busy = p.status === 'STARTING' || startC.isPending || stopC.isPending;
+            const starting = p.status === 'STARTING';
             return (
               <SimpleCard key={p.id} color={C}>
                 {/* The project page is a Pro page: the badge says so, the click switches modes openly */}
@@ -81,19 +81,21 @@ export function SimpleProjects() {
                   </div>
                   <h3 className="text-[15px] font-semibold text-text truncate tracking-tight">{p.name}</h3>
                   <p className="text-xs text-text-secondary mt-0.5 truncate">
-                    {p.type} · {p.workflowCount} {t.simple.projects.workflowsLabel}
+                    {t.projects.types[p.type] ?? p.type} · {p.workflowCount} {t.simple.projects.workflowsLabel}
                   </p>
                 </button>
-                <button
-                  disabled={busy}
-                  onClick={() => (running ? stopC.mutate(p.id) : startC.mutate(p.id))}
-                  className="mt-3 flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors disabled:opacity-50"
-                >
-                  {p.status === 'STARTING'
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : running ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  {running ? t.simple.projects.stop : t.simple.projects.start}
-                </button>
+                {(running || starting) && (
+                  <button
+                    disabled={starting || stopC.isPending}
+                    onClick={() => stopC.mutate(p.id)}
+                    className="mt-3 flex items-center gap-1.5 text-xs font-medium text-text-secondary hover:text-text transition-colors disabled:opacity-50"
+                  >
+                    {starting
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Square className="w-3.5 h-3.5" />}
+                    {starting ? t.simple.projects.containerStarting : t.simple.projects.stopContainer}
+                  </button>
+                )}
               </SimpleCard>
             );
           })}
@@ -107,20 +109,11 @@ export function SimpleProjects() {
         footer={
           <>
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>{t.common.cancel}</Button>
-            <Button onClick={submitCreate} loading={create.isPending} disabled={!name.trim() || !path.trim()}>{t.common.create}</Button>
+            <Button onClick={submitCreate} loading={create.isPending} disabled={!canCreate}>{t.common.create}</Button>
           </>
         }
       >
-        <div className="space-y-4">
-          <Input label={t.common.name} value={name} onChange={(e) => setName(e.target.value)} />
-          <Select
-            label={t.simple.projects.type}
-            value={type}
-            onChange={(e) => setType(e.target.value as ProjectType)}
-            options={TYPES.map((ty) => ({ value: ty, label: ty }))}
-          />
-          <Input label={t.simple.projects.path} value={path} onChange={(e) => setPath(e.target.value)} placeholder="/home/…" />
-        </div>
+        <ProjectFormFields value={newProject} onChange={setNewProject} compact />
       </Modal>
     </SimplePage>
   );

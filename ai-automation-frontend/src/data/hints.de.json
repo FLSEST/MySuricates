@@ -211,5 +211,12 @@
       "Oben steht, was der Lauf ergeben hat: sein Bericht, seine letzte Ausgabe oder der Grund, warum er scheiterte",
       "Wie er dahin kam, steht Schritt für Schritt in den Details, die zugeklappt bleiben, bis du sie brauchst"
     ]
+  },
+  "simple-create": {
+    "title": "Vorlagen sind fertige Abläufe",
+    "points": [
+      "Eine Vorlage bringt alle Schritte schon mit: anlegen, einem Projekt zuordnen und starten, ohne etwas zu bauen",
+      "Der Pool hält weitere fertige Workflows bereit; manche davon passen nur zu einem bestimmten Projekt"
+    ]
   }
 }

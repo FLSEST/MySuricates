@@ -211,5 +211,12 @@
       "The top shows what the run came to: its report, its last output or the reason it failed",
       "How it got there is in the details, step by step, kept closed until you need them"
     ]
+  },
+  "simple-create": {
+    "title": "Templates are ready-made workflows",
+    "points": [
+      "A template already brings all its steps: create it, give it a project and start it, without building anything",
+      "The pool holds more finished workflows; some of them only fit one particular project"
+    ]
   }
 }

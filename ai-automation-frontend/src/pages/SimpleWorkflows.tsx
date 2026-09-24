@@ -296,6 +296,7 @@ export function SimpleWorkflows() {
         onCreate={handleCreate}
         onClose={() => { setCreateStep('closed'); setSelectedTemplate(null); setForm({ projectId: '', name: '' }); }}
         onBackToTemplates={() => setCreateStep('template')}
+        variant="simple"
       />
     </div>
   );

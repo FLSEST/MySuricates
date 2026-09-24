@@ -3,18 +3,41 @@ import { useT } from '../../i18n';
 import type { ProjectType } from '../../types';
 import { PROJECT_TYPES, type ProjectFormValues } from './projectForm';
 
-/** The fields of a project, shared by creating and editing one. */
+/**
+ * The fields of a project, shared by creating and editing one.
+ *
+ * `compact` (Simple mode): only a name and the folder, chosen with the picker. The type stays what
+ * the caller passes (`COMPACT_PROJECT_FORM` fixes it to PERSONAL); it only labels the project.
+ */
 export function ProjectFormFields<T extends ProjectFormValues>({
   value,
   onChange,
   placeholders = false,
+  compact = false,
 }: {
   value: T;
   onChange: (value: T) => void;
   /** Example values for an empty form; editing an existing project shows none. */
   placeholders?: boolean;
+  compact?: boolean;
 }) {
   const t = useT();
+  if (compact) {
+    return (
+      <div className="space-y-4">
+        <Input
+          label={t.projects.name}
+          value={value.name}
+          onChange={(e) => onChange({ ...value, name: e.target.value })}
+        />
+        <DirectoryPicker
+          label={t.projects.folder}
+          value={value.path}
+          onChange={(path) => onChange({ ...value, path })}
+        />
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <Input
