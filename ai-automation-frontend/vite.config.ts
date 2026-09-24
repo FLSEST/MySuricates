@@ -58,11 +58,9 @@ export default defineConfig(() => {
         workbox: {
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api/, /^\/ws/],
-          // Monaco (editor core > 2 MiB, language workers) loads on first use, not at PWA install
-          // Rollup may name Monaco's transitive core chunk after its first export
-          // instead of the manual chunk (currently `toggleHighContrast`). Keep both
-          // names out of the precache; the editor loads them on demand.
-          globIgnores: ['**/monaco-*.js', '**/toggleHighContrast-*.js', '**/*.worker-*.js'],
+          // Monaco (editor core > 2 MiB, language workers) loads on first use, not at PWA install.
+          // The codeSplitting group below keeps all of monaco-editor in the `monaco` chunk.
+          globIgnores: ['**/monaco-*.js', '**/*.worker-*.js'],
         },
         manifest: {
           name: 'MySuricates',
