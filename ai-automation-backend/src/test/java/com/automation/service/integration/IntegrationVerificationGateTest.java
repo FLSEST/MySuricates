@@ -49,7 +49,7 @@ class IntegrationVerificationGateTest {
     @Test
     void scanFindsTheShippedProviders() throws Exception {
         assertThat(shippedProviders()).extracting(IntegrationProvider::getProviderId)
-                .contains("github", "jira", "trello", "google-calendar", "todoist");
+                .contains("github", "jira", "trello", "google-calendar", "todoist", "slack");
     }
 
     @Test

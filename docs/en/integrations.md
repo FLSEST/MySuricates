@@ -117,6 +117,8 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | ntfy | `ntfy` | Server URL + optional access token (no OAuth flow, both optional) | `providers/ntfy/` | `publish` | verified |
 | RSS/Atom | `feed` | none (public feeds) | `providers/feed/` | `fetch_feed` | verified |
 | Open-Meteo | `open-meteo` | none (free API without key) | `providers/openmeteo/` | `forecast`, `geocode` | verified |
+| Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
+| Slack | `slack` | Bot token `xoxb-…` (no OAuth flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | simulated only |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -259,6 +261,13 @@ Notes:
   Todoist filter (`GET /tasks/filter?query=…`). Since v1 errors are JSON (`error`, `error_tag`,
   `error_extra.retry_after`); only `error` and `error_tag` reach the message. Todoist tokens have no scopes
   (`scopes = null`). Split into `TodoistHttpClient`, `TodoistParams`, `TodoistActionCatalog`.
+- **Slack (bot token)** calls the Web API (`https://slack.com/api/<method>`) with the bot token of an app
+  installed in the workspace: `chat.postMessage` (JSON), `conversations.list` and `conversations.history` (cursor
+  via `response_metadata.next_cursor`). Slack reports most errors with HTTP 200 and `{"ok":false,"error":…}` —
+  the client treats that as a failure (`invalid_auth` and friends → token hint, `missing_scope` names the
+  missing scope, 429 with `Retry-After`). Validation uses `auth.test`, the scopes come from its `x-oauth-scopes`
+  header; `post_message` needs `chat:write`, `list_channels` `channels:read`, `get_channel_history`
+  `channels:history`. Split into `SlackHttpClient`, `SlackParams`, `SlackActionCatalog`.
 
 ---
 

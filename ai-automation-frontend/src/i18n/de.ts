@@ -1355,6 +1355,15 @@ export const de: TranslationKeys = {
           add_comment: 'Einen Kommentar zu einer Aufgabe hinzufügen',
         },
       },
+      slack: {
+        displayName: 'Slack',
+        description: 'Nachrichten in Slack-Kanäle senden, Kanäle auflisten und Verläufe lesen',
+        actions: {
+          post_message: 'Nachricht in einen Kanal senden',
+          list_channels: 'Kanäle auflisten',
+          get_channel_history: 'Nachrichten eines Kanals lesen',
+        },
+      },
     },
   },
   calendar: {

@@ -1061,4 +1061,73 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+
+  'slack': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Workspace-Name (optional)', en: 'Workspace name (optional)' },
+      clientSecretPlaceholder: { de: 'Bot-Token (xoxb-…)', en: 'Bot token (xoxb-…)' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Slack-App anlegen',
+          en: 'Create a Slack app',
+        },
+        instructions: {
+          de: [
+            'Die Slack-App-Verwaltung öffnen (Link unten) → "Create New App" → "From scratch"',
+            'Namen vergeben (z.B. "MySuricates") und den Workspace wählen',
+          ],
+          en: [
+            'Open the Slack app management (link below) → "Create New App" → "From scratch"',
+            'Pick a name (e.g. "MySuricates") and the workspace',
+          ],
+        },
+        link: {
+          url: 'https://api.slack.com/apps',
+          label: { de: 'Slack-Apps verwalten', en: 'Manage Slack apps' },
+        },
+      },
+      {
+        title: {
+          de: 'Bot-Scopes setzen und installieren',
+          en: 'Set bot scopes and install',
+        },
+        instructions: {
+          de: [
+            '"OAuth & Permissions" → "Bot Token Scopes": chat:write, channels:read und channels:history hinzufügen',
+            '(für private Kanäle zusätzlich groups:read und groups:history)',
+            'Oben "Install to Workspace" klicken und zustimmen',
+            'Den "Bot User OAuth Token" kopieren (beginnt mit xoxb-)',
+            'Die App in jeden Zielkanal einladen: im Kanal /invite @App-Name eingeben',
+          ],
+          en: [
+            '"OAuth & Permissions" → "Bot Token Scopes": add chat:write, channels:read and channels:history',
+            '(for private channels also groups:read and groups:history)',
+            'Click "Install to Workspace" at the top and allow',
+            'Copy the "Bot User OAuth Token" (starts with xoxb-)',
+            'Invite the app to every target channel: type /invite @app-name in the channel',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Erstes Feld: Workspace-Name zur Anzeige (optional)',
+            'Zweites Feld: den Bot-Token einfügen',
+            '"Zugangsdaten speichern" klicken — die erteilten Scopes übernimmt MySuricates aus der Antwort von auth.test',
+          ],
+          en: [
+            'First field: workspace name for display (optional)',
+            'Second field: paste the bot token',
+            'Click "Save credentials" — MySuricates takes the granted scopes from the auth.test answer',
+          ],
+        },
+      },
+    ],
+  },
 };

@@ -230,7 +230,7 @@ com.automation
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 15 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, taskwarrior/, todoist/, trello/; shared: ical/)
+│   ├── integration/providers/ 16 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, todoist/, trello/; shared: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (reads + DTO mapping), ExecutionCommandService (retry, resume, notes), WorkflowDebugService
@@ -732,7 +732,7 @@ Plugin framework for external services:
 - `IntegrationEncryptionService` — credential encryption (AES-GCM)
 - `IntegrationConnection` entity — connection status (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` with OAuth callback, credentials, actions
-- 15 providers in subdirectories: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Taskwarrior, Todoist, Trello
+- 16 providers in subdirectories: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Todoist, Trello
 - `IntegrationBlockExecutor` — executes provider actions as workflow blocks
 - `TaskExportCapable` — interface for providers that support TODO export
 

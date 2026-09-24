@@ -1353,6 +1353,15 @@ export const en = {
           add_comment: 'Add a comment to a task',
         },
       },
+      slack: {
+        displayName: 'Slack',
+        description: 'Post messages to Slack channels, list channels and read their history',
+        actions: {
+          post_message: 'Post a message to a channel',
+          list_channels: 'List channels',
+          get_channel_history: 'Read the messages of a channel',
+        },
+      },
     },
   },
   calendar: {

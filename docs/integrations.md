@@ -117,6 +117,7 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | RSS/Atom | `feed` | keine (öffentliche Feeds) | `providers/feed/` | `fetch_feed` | geprüft |
 | Open-Meteo | `open-meteo` | keine (freie API ohne Key) | `providers/openmeteo/` | `forecast`, `geocode` | geprüft |
 | Todoist | `todoist` | API-Token (kein OAuth-Flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | nur simuliert |
+| Slack | `slack` | Bot-Token `xoxb-…` (kein OAuth-Flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | nur simuliert |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
@@ -255,6 +256,14 @@ Hinweise:
   JSON (`error`, `error_tag`, `error_extra.retry_after`); in die Meldung gehen nur `error` und `error_tag`.
   Todoist-Tokens haben keine Scopes (`scopes = null`). Aufgeteilt in `TodoistHttpClient`, `TodoistParams`,
   `TodoistActionCatalog`.
+- **Slack (Bot-Token)** spricht die Web API (`https://slack.com/api/<methode>`) mit dem Bot-Token einer im
+  Workspace installierten App an: `chat.postMessage` (JSON), `conversations.list` und `conversations.history`
+  (Cursor über `response_metadata.next_cursor`). Slack meldet die meisten Fehler mit HTTP 200 und
+  `{"ok":false,"error":…}` — der Client wertet das als Fehler (`invalid_auth` & Co. → Token-Hinweis,
+  `missing_scope` nennt den fehlenden Scope, 429 mit `Retry-After`). Geprüft wird per `auth.test`, die Scopes
+  kommen aus dessen Header `x-oauth-scopes`; `post_message` braucht `chat:write`, `list_channels`
+  `channels:read`, `get_channel_history` `channels:history`. Aufgeteilt in `SlackHttpClient`, `SlackParams`,
+  `SlackActionCatalog`.
 
 ---
 
