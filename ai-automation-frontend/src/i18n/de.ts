@@ -1327,6 +1327,13 @@ export const de: TranslationKeys = {
           publish: 'Eine Push-Benachrichtigung an ein Topic senden',
         },
       },
+      feed: {
+        displayName: 'RSS/Atom',
+        description: 'RSS- und Atom-Feeds lesen: neue Einträge mit Titel, Link, Datum und Zusammenfassung',
+        actions: {
+          fetch_feed: 'Einträge eines RSS- oder Atom-Feeds abrufen',
+        },
+      },
     },
   },
   calendar: {

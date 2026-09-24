@@ -1325,6 +1325,13 @@ export const en = {
           publish: 'Send a push notification to a topic',
         },
       },
+      feed: {
+        displayName: 'RSS/Atom',
+        description: 'Read RSS and Atom feeds: new entries with title, link, date and summary',
+        actions: {
+          fetch_feed: 'Fetch the entries of an RSS or Atom feed',
+        },
+      },
     },
   },
   calendar: {

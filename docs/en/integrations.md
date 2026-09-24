@@ -115,6 +115,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | CalDAV | `caldav` | URL + user:app-password (Basic auth, no OAuth flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | verified (Radicale 3.8.0, local container) |
 | iCal feed | `ical-feed` | none (public feed URL as parameter) | `providers/icalfeed/` | `list_events` | verified (public Google holiday feed) |
 | ntfy | `ntfy` | Server URL + optional access token (no OAuth flow, both optional) | `providers/ntfy/` | `publish` | verified |
+| RSS/Atom | `feed` | none (public feeds) | `providers/feed/` | `fetch_feed` | verified |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -227,6 +228,13 @@ Notes:
   `_`, at most 64 characters; `priority` 1–5 or `min`/`low`/`default`/`high`/`max`. Note: topics on
   ntfy.sh can be read by anyone who knows the name. Internally: `NtfyParams` (parsing, validation),
   `NtfyHttpClient` (HTTP, 401/403 → token hint).
+- **RSS/Atom** (`feed`) reads RSS 2.0, Atom 1.0 and RSS 1.0 (RDF). `fetch_feed` returns per entry
+  title, link, date (ISO 8601, UTC; RFC 822 and ISO values are normalised), summary (HTML removed,
+  cut to 500 characters), author and id/guid — newest first, `limit` default 20 (at most 200); with
+  `since`, older and undated entries are dropped. Fetching uses http/https only, on every redirect
+  too (at most 5), responses of at most 5 MB, timeouts 10 s/20 s. The XML parser rejects any DOCTYPE
+  declaration (no XXE, no entity expansion). Internally: `FeedFetcher` (HTTP limits), `FeedParser`,
+  `FeedDates`, `FeedText` (HTML → text).
 
 ---
 
@@ -283,6 +291,7 @@ validation, and on success sets the status directly to `CONNECTED`. There is no 
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
 For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
 For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy),
+For a provider with `requiresCredentials() == false` (Taskwarrior, ntfy, RSS/Atom),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 

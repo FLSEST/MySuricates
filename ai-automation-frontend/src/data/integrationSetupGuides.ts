@@ -748,6 +748,31 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'feed': {
+    steps: [
+      {
+        title: {
+          de: 'Keine Zugangsdaten nötig',
+          en: 'No credentials needed',
+        },
+        instructions: {
+          de: [
+            'Liest öffentliche RSS-2.0-, Atom- und RSS-1.0-Feeds — ohne Konto und ohne Schlüssel',
+            'Felder leer lassen und "Zugangsdaten speichern" klicken, um die Integration als eingerichtet zu markieren (optional)',
+            'Im Workflow: Block "integration" mit Aktion "fetch_feed" (url, optional since als ISO-Datum, limit Standard 20)',
+            'Nur http/https, höchstens 5 MB und 5 Weiterleitungen je Abruf',
+          ],
+          en: [
+            'Reads public RSS 2.0, Atom and RSS 1.0 feeds — no account, no key',
+            'Leave the fields empty and click "Save credentials" to mark the integration as set up (optional)',
+            'In a workflow: block "integration" with action "fetch_feed" (url, optional since as ISO date, limit default 20)',
+            'http/https only, at most 5 MB and 5 redirects per fetch',
+          ],
+        },
+      },
+    ],
+  },
+
   'confluence': {
     steps: [
       {

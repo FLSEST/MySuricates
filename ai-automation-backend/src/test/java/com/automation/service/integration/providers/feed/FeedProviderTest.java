@@ -1,0 +1,169 @@
+package com.automation.service.integration.providers.feed;
+
+import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/** Provider + fetcher against a local HTTP server. */
+class FeedProviderTest {
+
+    private HttpServer server;
+    private String base;
+    private final FeedProvider provider = new FeedProvider(new FeedFetcher());
+
+    @BeforeEach
+    void start() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.start();
+        base = "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    @AfterEach
+    void stop() {
+        server.stop(0);
+    }
+
+    private void serve(String path, int status, String body, String location) {
+        server.createContext(path, ex -> {
+            if (location != null) ex.getResponseHeaders().add("Location", location);
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
+            if (bytes.length > 0) ex.getResponseBody().write(bytes);
+            ex.close();
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> fetch(Map<String, Object> params) {
+        return (Map<String, Object>) provider.executeAction("fetch_feed", params, null);
+    }
+
+    @Test
+    void fetchFeed_returnsNewestFirstWithIsoDates() {
+        serve("/rss", 200, FeedParserTest.RSS, null);
+
+        Map<String, Object> result = fetch(Map.of("url", base + "/rss"));
+
+        assertThat(result.get("count")).isEqualTo(3);
+        assertThat(result.get("totalInFeed")).isEqualTo(3);
+        assertThat((Map<String, Object>) result.get("feed")).containsEntry("format", "rss").containsEntry("title", "Beispiel-Blog");
+        List<Map<String, Object>> items = items(result);
+        assertThat(items).extracting(i -> i.get("title"))
+                .containsExactly("Neuer Beitrag", "Erster & alter Beitrag", "Ohne Datum");
+        assertThat(items.get(0).get("published")).isEqualTo("2026-09-20T10:00:00Z");
+        assertThat(items.get(2).get("published")).isNull();
+    }
+
+    @Test
+    void fetchFeed_sinceDropsOlderAndUndatedEntries() {
+        serve("/rss", 200, FeedParserTest.RSS, null);
+
+        Map<String, Object> result = fetch(Map.of("url", base + "/rss", "since", "2026-09-10"));
+
+        assertThat(items(result)).extracting(i -> i.get("title")).containsExactly("Neuer Beitrag");
+        assertThat(result.get("totalInFeed")).isEqualTo(3);
+    }
+
+    @Test
+    void fetchFeed_limitCutsAfterSorting() {
+        serve("/atom", 200, FeedParserTest.ATOM, null);
+
+        Map<String, Object> result = fetch(Map.of("url", base + "/atom", "limit", "1"));
+
+        assertThat(items(result)).extracting(i -> i.get("title")).containsExactly("v1.1 beta");
+    }
+
+    @Test
+    void fetchFeed_followsRelativeRedirect() {
+        serve("/old", 301, "", "/new");
+        serve("/new", 200, FeedParserTest.RDF, null);
+
+        assertThat(fetch(Map.of("url", base + "/old")).get("count")).isEqualTo(1);
+    }
+
+    @Test
+    void fetchFeed_stopsRedirectLoops() {
+        AtomicInteger hits = new AtomicInteger();
+        server.createContext("/loop", ex -> {
+            hits.incrementAndGet();
+            ex.getResponseHeaders().add("Location", "/loop");
+            ex.sendResponseHeaders(302, -1);
+            ex.close();
+        });
+
+        assertThatThrownBy(() -> fetch(Map.of("url", base + "/loop")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("redirects");
+        assertThat(hits.get()).isEqualTo(FeedFetcher.MAX_REDIRECTS + 1);
+    }
+
+    @Test
+    void fetchFeed_rejectsRedirectToFileScheme() {
+        serve("/evil", 302, "", "file:///etc/passwd");
+
+        assertThatThrownBy(() -> fetch(Map.of("url", base + "/evil")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("http or https");
+    }
+
+    @Test
+    void fetchFeed_httpErrorCarriesStatus() {
+        serve("/gone", 404, "not here", null);
+
+        assertThatThrownBy(() -> fetch(Map.of("url", base + "/gone")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("HTTP 404");
+    }
+
+    @Test
+    void fetcher_enforcesSizeLimit() {
+        serve("/big", 200, FeedParserTest.RSS, null);
+        FeedFetcher small = new FeedFetcher(100);
+
+        assertThatThrownBy(() -> small.fetch(base + "/big"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("larger than");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"file:///etc/passwd", "ftp://example.org/feed", "jar:file:/x.jar!/a", "/relative", "http://"})
+    void fetchFeed_rejectsNonHttpUrls(String url) {
+        assertThatThrownBy(() -> fetch(Map.of("url", url))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void params_validation() {
+        assertThatThrownBy(() -> fetch(Map.of())).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("url");
+        assertThatThrownBy(() -> FeedProvider.since("letzte Woche")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FeedProvider.limit(0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> FeedProvider.limit("viele")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(FeedProvider.limit(null)).isEqualTo(FeedProvider.DEFAULT_LIMIT);
+        assertThat(FeedProvider.limit(10_000)).isEqualTo(FeedProvider.MAX_LIMIT);
+        assertThatThrownBy(() -> provider.executeAction("other", Map.of(), null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void metadata() {
+        assertThat(provider.getProviderId()).isEqualTo("feed");
+        assertThat(provider.requiresCredentials()).isFalse();
+        assertThat(provider.requiresOAuthFlow()).isFalse();
+        assertThat(provider.fetchAccountInfo("|")).contains("\"name\"");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> items(Map<String, Object> result) {
+        return (List<Map<String, Object>>) result.get("items");
+    }
+}
