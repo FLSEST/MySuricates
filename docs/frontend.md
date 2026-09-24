@@ -135,6 +135,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - „Neuer Skill“ und „Bearbeiten“ öffnen `SkillEditorModal` (Name, Kategorie, Icon über `EmojiPicker` — kuratiertes Raster, „Keine“, eigene Eingabe —, Beschreibung, AI-Context im Monaco-Markdown-Editor); „Importieren“ liest eine Export-Datei, „Exportieren“ lädt sie herunter
 - Built-in-Skills sind schreibgeschützt und lassen sich als eigener Skill kopieren (ohne Capabilities)
 - Nutzt ein versiegelter Workflow den Skill, sind Bearbeiten und Löschen gesperrt — unabhängig vom Modul `sealing`; der Hinweis nennt den Ausweg (entsiegeln, Entsiegeln abgeschaltet oder `seal-immutable`)
+- Bausteine in `components/skills/`: `SkillCard` (Karte im Raster), `SkillDetail` (Slide-Over mit Aktionen, Capabilities, AI-Context), `SkillHistory` (Verlauf) und `SkillIcon`; die Seite hält Suche, Kategorie-Filter, Import und den Editor-Zustand
 
 ### Schedules (`/schedules`)
 

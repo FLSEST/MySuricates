@@ -135,6 +135,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - "New skill" and "Edit" open `SkillEditorModal` (name, category, icon via `EmojiPicker` — curated grid, "None", own input —, description, AI context in the Monaco Markdown editor); "Import" reads an export file, "Export" downloads it
 - Built-in skills are read-only and can be copied as a custom skill (without capabilities)
 - If a sealed workflow uses the skill, editing and deleting are locked — regardless of the `sealing` module; the hint names the way out (unseal, unsealing switched off, or `seal-immutable`)
+- Building blocks in `components/skills/`: `SkillCard` (card in the grid), `SkillDetail` (slide-over with actions, capabilities, AI context), `SkillHistory` (history) and `SkillIcon`; the page keeps search, category filter, import and the editor state
 
 ### Schedules (`/schedules`)
 
