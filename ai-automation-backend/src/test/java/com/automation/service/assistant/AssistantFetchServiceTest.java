@@ -652,9 +652,9 @@ class AssistantFetchServiceTest {
                 .entries(new ArrayList<>(List.of(e1, e2)))
                 .build();
         when(workflowChainRepository.findById("c1")).thenReturn(Optional.of(chain));
-        when(workflowRepository.findById("wf-a")).thenReturn(Optional.of(
-                Workflow.builder().id("wf-a").name("Build Workflow").build()));
-        when(workflowRepository.findById("wf-b")).thenReturn(Optional.empty());
+        List<Object[]> names = new ArrayList<>();
+        names.add(new Object[]{"wf-a", "Build Workflow"});
+        when(workflowRepository.findIdAndNameByIdIn(List.of("wf-a", "wf-b"))).thenReturn(names);
 
         String result = service.executeFetch(new AssistantFetchService.FetchRequest("chain", "c1"));
 

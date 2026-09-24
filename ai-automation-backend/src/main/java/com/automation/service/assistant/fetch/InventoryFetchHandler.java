@@ -16,7 +16,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Fetch handler for the platform inventory (repertoire) details: wishes, skills,
@@ -159,11 +162,11 @@ public class InventoryFetchHandler {
                 var entries = c.getEntries();
                 if (entries != null && !entries.isEmpty()) {
                     sb.append("\nWorkflows in Chain (").append(entries.size()).append("):\n");
+                    Map<String, String> names = workflowNames(entries.stream()
+                            .map(e -> e.getWorkflowId()).filter(Objects::nonNull).distinct().toList());
                     for (int i = 0; i < entries.size(); i++) {
                         var entry = entries.get(i);
-                        String wfName = workflowRepository.findById(entry.getWorkflowId())
-                                .map(w -> w.getName())
-                                .orElse(entry.getWorkflowId());
+                        String wfName = names.getOrDefault(entry.getWorkflowId(), entry.getWorkflowId());
                         sb.append("  ").append(i + 1).append(". ").append(wfName)
                           .append(" (id: ").append(entry.getWorkflowId()).append(")");
                         if (entry.getLabel() != null && !entry.getLabel().isBlank()) {
@@ -181,5 +184,15 @@ public class InventoryFetchHandler {
             log.debug("Could not fetch chain detail for {}", chainId, e);
             return "";
         }
+    }
+
+    /** Names of the chain's workflows in one query instead of one lookup per entry (TODO ad130b6f). */
+    private Map<String, String> workflowNames(List<String> workflowIds) {
+        if (workflowIds.isEmpty()) return Map.of();
+        Map<String, String> names = new HashMap<>();
+        for (Object[] row : workflowRepository.findIdAndNameByIdIn(workflowIds)) {
+            if (row[1] != null) names.put((String) row[0], (String) row[1]);
+        }
+        return names;
     }
 }
