@@ -147,6 +147,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Tabelle: Workflow, URL (kopierbar), Token (maskiert + kopierbar), Trigger-Count, Status
 - CopyButton-Komponente mit Erfolgsfeedback
 - Erstellen-Modal: Workflow-Auswahl + Beschreibung
+- Bausteine in `components/webhooks/`: die Tabellenspalten `webhookColumns.tsx` (neues Token, Secret rotieren/entfernen und Löschen fragen über das `ConfirmModal` der Seite), `WebhookCreateModal` und `SecretRevealModal`, das URL und Token nach Anlegen/Neu-Erzeugen bzw. das Signatur-Secret nach dem Setzen genau einmal zeigt, je Wert mit Kopierknopf
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 

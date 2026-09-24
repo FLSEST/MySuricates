@@ -147,6 +147,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Table: workflow, URL (copyable), token (masked + copyable), trigger count, status
 - CopyButton component with success feedback
 - Create modal: workflow selection + description
+- Building blocks in `components/webhooks/`: the table columns `webhookColumns.tsx` (new token, rotating/removing the secret and deleting ask through the page's `ConfirmModal`), `WebhookCreateModal` and `SecretRevealModal`, which shows URL and token after creating/regenerating, or the signing secret after setting it, exactly once, each value with a copy button
 
 ### Chains (`/chains`, `/chains/:id/run/:runId`)
 
