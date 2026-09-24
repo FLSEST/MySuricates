@@ -234,5 +234,13 @@
       "All three are optional, still experimental modules and not part of the default preset core, which is why this instance has none of them",
       "To switch them on at startup: ./scripts/setup.sh --preset research --force brings the assistant, --preset full also the factory and wishes; one at a time with automation.modules.assistant: true (likewise factory, wishes). Where the instance allows it, also in the settings"
     ]
+  },
+  "goals-overview": {
+    "title": "Goals across projects",
+    "points": [
+      "A goal collects TODOs from several projects that work towards one outcome, such as a release",
+      "Progress counts the finished TODOs; open questions are listed separately because they have to be settled before the work starts",
+      "Reached and archived goals are kept, they just move out of sight"
+    ]
   }
 }

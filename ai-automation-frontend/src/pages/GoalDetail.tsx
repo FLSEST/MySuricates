@@ -59,12 +59,12 @@ export function GoalDetail() {
 
   const remove = () => {
     if (!window.confirm(t.goals.removeConfirm)) return;
-    deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/cockpit') });
+    deleteGoal.mutate(goal.id, { onSuccess: () => navigate('/goals') });
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Link to="/cockpit" className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text">
+      <Link to="/goals" className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text">
         <ArrowLeft className="w-3.5 h-3.5" />
         {t.goals.back}
       </Link>

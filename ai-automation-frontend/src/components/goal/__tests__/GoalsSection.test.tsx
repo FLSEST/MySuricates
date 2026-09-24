@@ -47,4 +47,15 @@ describe('GoalsSection', () => {
 
     await waitFor(() => expect(body).toEqual({ title: 'Launch', targetDate: '2026-10-15' }));
   });
+
+  it('stays compact: only active goals, at most four, and a link to all goals', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ ...goal, id: `g${i}`, title: `Goal ${i}` }));
+    server.use(http.get('/api/v1/goals', () => HttpResponse.json([...many, { ...goal, id: 'done', title: 'Reached one', status: 'DONE' }])));
+    renderWithProviders(<GoalsSection />);
+
+    expect(await screen.findByRole('button', { name: 'Goal 0' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Goal \d$/ })).toHaveLength(4);
+    expect(screen.queryByRole('button', { name: 'Reached one' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /All goals/ })).toHaveAttribute('href', '/goals');
+  });
 });

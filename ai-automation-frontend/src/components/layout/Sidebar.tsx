@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, GitBranch, History, Zap, Sparkles, Factory,
   Calendar, CalendarDays, Webhook, Plug, ScrollText, CheckSquare, Settings, ChevronLeft, ChevronRight, Link2, BookOpen, BookMarked, BarChart2,
-  Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList, LayoutGrid, Bug,
+  Pencil, Check, RotateCcw, Plus, MessageCircle, ClipboardList, LayoutGrid, Bug, Target,
 } from 'lucide-react';
 import {
   DndContext,
@@ -126,6 +126,7 @@ const navItems: NavItemDef[] = [
   { to: '/debug', icon: Bug, labelKey: 'debug', module: 'debug' },
   { to: '/chains', icon: Link2, labelKey: 'chains', module: 'chains' },
   { to: '/cockpit', icon: LayoutGrid, labelKey: 'cockpit' },
+  { to: '/goals', icon: Target, labelKey: 'goals' },
   { to: '/calendar', icon: CalendarDays, labelKey: 'calendar' },
   { to: '/schedules', icon: Calendar, labelKey: 'schedules' },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks', module: 'webhooks' },

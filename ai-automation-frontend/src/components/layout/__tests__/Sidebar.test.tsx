@@ -45,6 +45,17 @@ describe('Sidebar modules', () => {
     expect(screen.getByRole('link', { name: 'Workflows' })).toBeInTheDocument();
   });
 
+  it('lists the goals overview right after the cockpit (core page, no module)', async () => {
+    const modules = modulesFixture('core', ['chains', 'webhooks', 'audit']);
+    server.use(http.get('/api/v1/system/capabilities', () => HttpResponse.json(modules)));
+    renderWithProviders(<Sidebar />);
+
+    const goals = await screen.findByRole('link', { name: 'Goals' });
+    expect(goals).toHaveAttribute('href', '/goals');
+    const names = screen.getAllByRole('link').map((link) => link.textContent);
+    expect(names.indexOf('Goals')).toBe(names.indexOf('Cockpit') + 1);
+  });
+
   it('shows module pages when everything is enabled', async () => {
     renderWithProviders(<Sidebar />);
 
