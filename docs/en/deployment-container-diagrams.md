@@ -1,12 +1,21 @@
 <!-- Generated from docs/deployment-container-diagrams.md and docs/i18n/deployment-container-diagrams.en.json by scripts/docs-diagrams.py — do not edit by hand. -->
 
-# AutoPilot — Deployment & Container Lifecycle
+# MySuricates — Deployment & Container Lifecycle
 
-Compose setup, agent images, ContainerService and resource limits
+Instance in a container, Compose setup, agent images, project containers and resource limits
+
+## Your Own Instance — *deploy/*
+
+`scripts/instance.sh up --name NAME` builds backend and frontend into one image with `deploy/Dockerfile` and starts exactly one container (`deploy/compose.yml`); the backend serves the frontend itself.
+
+- Settings per instance: `deploy/instances/NAME.env` — `MYSURICATES_PORT` is required, `MYSURICATES_BIND` is `127.0.0.1` unless set otherwise
+- Mounts for projects, AI providers and the Docker socket are written by `scripts/lib/host-mounts.sh` into an override (`deploy/instances/NAME.override.yml`)
+- Data lives in named volumes and survives `scripts/instance.sh down`
+- `MYSURICATES_RUNTIME=host` starts the same instance directly on the machine instead of in a container
 
 ## Docker Compose — *Services*
 
-Backend and agents are built and started with Compose.
+`ai-automation-backend/docker-compose.yml` builds and starts the backend; it only builds the agent images (profile `build-only`). The backend itself starts containers from these images through the Docker API.
 
 ```mermaid
 flowchart LR
@@ -23,29 +32,31 @@ flowchart LR
 
 ### Build
 
-`mvn clean package -DskipTests`
+`mvn clean package -DskipTests` (the JAR that `docker/Dockerfile.backend` copies)
 
-`docker compose --profile build-only build`
+`docker compose --profile build-only build` (agent images)
 
 ### Start
 
-`docker compose up --build`
+`docker compose up --build` in the directory `ai-automation-backend/`
 
-Backend port: 9090
+Backend port: 9090; data under `./data`
 
 ## Agent Images — *Dockerfiles*
 
 | Image | Base | Path |
 |---|---|---|
-| backend | OpenJDK 21 + Spring Boot jar | `docker/Dockerfile.backend` |
-| agent-node | Node 22 | `docker/Dockerfile.agent-node` |
-| agent-python | Python 3.12 | `docker/Dockerfile.agent-python` |
-| agent-devops | Ubuntu 24.04 | `docker/Dockerfile.agent-devops` |
-| agent-java | Temurin 21 | `docker/Dockerfile.agent-java` |
+| backend | `eclipse-temurin:21-jre-alpine` + Spring Boot JAR | `docker/Dockerfile.backend` |
+| agent-node | `node:22-slim` | `docker/Dockerfile.agent-node` |
+| agent-python | `python:3.12-slim` | `docker/Dockerfile.agent-python` |
+| agent-devops | `ubuntu:24.04` | `docker/Dockerfile.agent-devops` |
+| agent-java | `eclipse-temurin:21-jdk-jammy` | `docker/Dockerfile.agent-java` |
+
+Paths relative to `ai-automation-backend/`. Project containers use `automation-agent-node` (`CODE`, `PERSONAL`) or `automation-agent-python` (`RESEARCH`, `CONTENT`, `BUSINESS`) depending on the project type; shell blocks can use any allowed image via `container_image` (`automation.execution.allowed-container-images`).
 
 ## Container Lifecycle — *ContainerService*
 
-Workflows preferably run in the project container. If none exists, one is started; if there are problems, execution falls back to the host.
+Before the first block, a run looks up the running project container or starts one — provided Docker is set up and the run does not run isolated in its own workspace clone. If the start fails, the run continues without a container. The blocks themselves run on the host (exception: shell steps with `container_image`); the project container is used by ad-hoc commands during a run and by the terminal.
 
 ```mermaid
 sequenceDiagram
@@ -53,18 +64,20 @@ sequenceDiagram
     participant CS as ContainerService
     participant DO as Docker Engine
 
-    WE->>CS: getDockerContainerId(project)
-    alt exists
-        CS-->>WE: containerId
-    else missing/stopped
-        WE->>CS: createAndStartContainer(project)
-        CS->>DO: docker create/run (bind mounts, limits)
-        DO-->>CS: containerId
-        CS-->>WE: containerId
+    opt Docker set up, run not isolated
+        WE->>CS: getDockerContainerId(project)
+        alt exists
+            CS-->>WE: containerId
+        else missing/stopped
+            WE->>CS: createAndStartContainer(project)
+            CS->>DO: docker create + start (image per project type, bind mount, limits)
+            DO-->>CS: containerId
+            CS-->>WE: containerId (on failure: continue without a container)
+        end
     end
-    WE->>WE: execute blocks (prefer container)
-    opt idle-timeout
-        CS->>DO: stop container
+    WE->>WE: execute blocks (host), container's last activity per step
+    opt idle longer than idle-timeout-minutes (checked every 5 min)
+        CS->>DO: stop + remove container
     end
 ```
 
@@ -80,18 +93,20 @@ sequenceDiagram
 
 `docker.container.idle-timeout-minutes: 60`
 
+Plus `/tmp` as tmpfs, all capabilities dropped, `no-new-privileges` and the host's user ID
+
 ### Mounts
 
-The project path is bind-mounted into the container.
+Project path → `/workspace` (read and write)
 
-Docker socket: `/var/run/docker.sock` (the backend needs it)
+Claude from the host according to `MYSURICATES_AI_FROM_HOST`; default `login`: the program read-only, the login as a token
 
-Backups inside the project mount stay isolated.
+Docker socket: only for the backend (`/var/run/docker.sock` in `docker-compose.yml`), not in the project container
 
-## Host Fallback — *Security & Reproducibility*
+## Execution on the Host — *Security & Reproducibility*
 
-If the container fails to start, commands run in the project path on the host.
+AI CLIs and shell blocks run on the host in the project directory — whether a project container is running or not.
 
-- More privileges, less isolation.
-- Tools and environment come from the host, not from the image.
-- Avoid it by building the images in advance and keeping the Docker daemon available.
+- Tools and environment come from the host, not from an image.
+- `container_image` isolates single shell steps: a one-off container (`docker run --rm`); Docker socket and extra mounts only with `automation.execution.allow-docker-socket-mount` or `allow-extra-mounts`.
+- `scripts/instance.sh` isolates a whole instance in a container (see above).

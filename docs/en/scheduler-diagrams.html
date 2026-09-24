@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Scheduler &amp; Cron</title>
+  <title>MySuricates — Scheduler &amp; Cron</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Scheduler &amp; Cron</h1>
+  <h1>MySuricates — Scheduler &amp; Cron</h1>
   <p>Schedules, InputContext, triggering and execution pipeline</p>
 </header>
 
@@ -160,22 +160,27 @@
 <main>
 
 <section id="system-overview">
-  <h2>System Overview <span>Scheduler Loop</span></h2>
-  <p>A one-minute tick checks for due schedules and starts workflows with their stored <code>inputContext</code>.</p>
+  <h2>System Overview <span>Scheduler Tick</span></h2>
+  <p>Every 60 seconds <code>SchedulerTick</code> checks the due schedules and starts their target — a workflow or a chain — with the stored <code>inputContext</code>. Occurrences that fell due during a gap (standby, cold start) are caught up one after another by the <code>CatchUpQueue</code> — or they move on to their next occurrence.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph DB["SQLite"]
         SW["scheduled_workflows"]
     end
     subgraph Backend["Backend"]
-        SCH["SchedulerService @Scheduled 60s"]
+        SCH["SchedulerTick @Scheduled 60s"]
+        CQ["CatchUpQueue"]
         EXE["ScheduledWorkflowExecutor"]
         WE["WorkflowExecutor"]
+        CE["ChainExecutor"]
     end
     SCH --&gt;|findDueSchedules| SW
     SCH --&gt; EXE
+    SCH --&gt;|"missed occurrences"| CQ
+    CQ --&gt;|"one after another"| EXE
     EXE --&gt; WE
-    WE --&gt; SW
+    EXE --&gt; CE
+    EXE --&gt;|"lastRunAt, runCount, nextRunAt"| SW
 
     style DB fill:#2e1a1a,stroke:#30363d,color:#e6edf3
   </pre>
@@ -190,23 +195,25 @@ sequenceDiagram
     participant SVC as SchedulerService
     participant DB as scheduled_workflows
 
-    UI-&gt;&gt;CTR: POST /api/v1/schedules {workflowId, cronExpression|scheduledAt, inputContext}
+    UI-&gt;&gt;CTR: POST /api/v1/schedules {targetType, workflowId|chainId, scheduleType, cronExpression|scheduledAt|delayExpression, inputContext}
     CTR-&gt;&gt;SVC: create(...)
+    SVC-&gt;&gt;SVC: check target, compute first occurrence (nextRunAt)
     SVC-&gt;&gt;DB: INSERT scheduled_workflows (input_context JSON)
     DB--&gt;&gt;SVC: saved schedule
-    SVC--&gt;&gt;CTR: ScheduledWorkflowResponse
-    CTR--&gt;&gt;UI: 201 Created
+    SVC--&gt;&gt;CTR: ScheduledWorkflow
+    CTR--&gt;&gt;UI: 201 Created (ScheduledWorkflowResponse)
   </pre>
   <div class="grid">
     <div class="card">
       <h3>Types</h3>
-      <p><code>scheduleType</code>: <code>CRON</code> (default) or <code>ONCE</code></p>
-      <p>CRON needs <code>cronExpression</code>; ONCE needs <code>scheduledAt</code></p>
+      <p><code>scheduleType</code>: <code>CRON</code> (default), <code>ONCE</code> or <code>DELAYED</code></p>
+      <p>CRON needs <code>cronExpression</code>, ONCE <code>scheduledAt</code>, DELAYED a <code>delayExpression</code> such as <code>30s</code>, <code>10m</code>, <code>2h</code> or <code>1d</code></p>
+      <p>Target: <code>targetType</code> <code>WORKFLOW</code> (default, with <code>workflowId</code>) or <code>CHAIN</code> (with <code>chainId</code>)</p>
     </div>
     <div class="card">
       <h3>InputContext</h3>
-      <p>Any JSON; passed on 1:1 to <code>workflowExecutor.execute(..., context)</code>.</p>
-      <p>This way, schedules run deterministically with the stored variables.</p>
+      <p>Any JSON object; <code>ScheduledWorkflowExecutor</code> passes it to <code>WorkflowExecutor.execute(…)</code> or <code>ChainExecutor.execute(…)</code>.</p>
+      <p>For a workflow, its values override entries of the same name in the <code>defaultContext</code> — so schedules run with the stored variables.</p>
     </div>
   </div>
 </section>
@@ -215,18 +222,34 @@ sequenceDiagram
   <h2>Execution <span>Due Schedules</span></h2>
   <pre class="mermaid">
 sequenceDiagram
-    participant CRON as @Scheduled (60s)
+    participant CRON as SchedulerTick (@Scheduled 60s)
     participant DB as scheduled_workflows
     participant EX as ScheduledWorkflowExecutor
-    participant WE as WorkflowExecutor
+    participant WE as WorkflowExecutor / ChainExecutor
 
-    CRON-&gt;&gt;DB: findDueSchedules(now)
-    DB--&gt;&gt;CRON: List&lt;ScheduledWorkflow&gt;
-    loop for each due
-        CRON-&gt;&gt;EX: executeSingleSchedule(id)
-        EX-&gt;&gt;WE: execute(workflow, inputContext)
-        WE--&gt;&gt;EX: WorkflowRun (async)
-        EX-&gt;&gt;DB: update lastRunAt, nextRunAt / disable if ONCE
+    alt maintenance mode on
+        CRON-&gt;&gt;CRON: start nothing, nextRunAt stays put
+    else tick runs
+        CRON-&gt;&gt;DB: findDueSchedules(now)
+        DB--&gt;&gt;CRON: List&lt;ScheduledWorkflow&gt;
+        opt standby or cold start detected
+            CRON-&gt;&gt;CRON: move missed occurrences forward or put them into the CatchUpQueue
+        end
+        alt skip-until active
+            CRON-&gt;&gt;DB: move occurrences past the window, ONCE and DELAYED expire
+        else
+            loop for each remaining due schedule
+                CRON-&gt;&gt;EX: executeSingleSchedule(id)
+                alt conflict SKIP and the target still has a run (RUNNING or PAUSED)
+                    EX-&gt;&gt;DB: occurrence dropped, nextRunAt moves on
+                else
+                    EX-&gt;&gt;WE: execute(target, inputContext, scheduleId)
+                    WE--&gt;&gt;EX: run (continues asynchronously)
+                    EX-&gt;&gt;DB: lastRunAt, runCount, nextRunAt or disable
+                end
+            end
+        end
+        CRON-&gt;&gt;EX: CatchUpQueue.drain(): start the next catch-up once the previous one has finished
     end
   </pre>
 </section>
@@ -236,13 +259,18 @@ sequenceDiagram
   <table>
     <thead><tr><th>Column</th><th>Description</th></tr></thead>
     <tbody>
-      <tr><td><code>workflow_id</code></td><td>FK → workflow</td></tr>
-      <tr><td><code>cron_expression</code></td><td>CRON string (empty for ONCE)</td></tr>
-      <tr><td><code>schedule_type</code></td><td><code>CRON</code> | <code>ONCE</code></td></tr>
-      <tr><td><code>scheduled_at</code></td><td>Execution timestamp for ONCE</td></tr>
+      <tr><td><code>target_type</code></td><td><code>WORKFLOW</code> | <code>CHAIN</code></td></tr>
+      <tr><td><code>workflow_id</code>, <code>chain_id</code></td><td>Target (FK → <code>workflows</code> or <code>workflow_chains</code>)</td></tr>
+      <tr><td><code>schedule_type</code></td><td><code>CRON</code> | <code>ONCE</code> | <code>DELAYED</code></td></tr>
+      <tr><td><code>cron_expression</code></td><td>CRON string (empty for ONCE and DELAYED)</td></tr>
+      <tr><td><code>scheduled_at</code></td><td>Execution time for ONCE and DELAYED</td></tr>
+      <tr><td><code>delay_expression</code></td><td>Delay for DELAYED, e.g. <code>2h</code></td></tr>
       <tr><td><code>input_context</code></td><td>JSON map (parameters for the run)</td></tr>
-      <tr><td><code>enabled</code></td><td>Toggle</td></tr>
-      <tr><td><code>last_run_at</code>, <code>next_run_at</code></td><td>Tracking</td></tr>
+      <tr><td><code>enabled</code></td><td>On/off</td></tr>
+      <tr><td><code>last_run_at</code>, <code>next_run_at</code></td><td>Last start, next occurrence</td></tr>
+      <tr><td><code>end_date</code>, <code>max_runs</code>, <code>run_count</code></td><td>End conditions for CRON (<code>max_runs</code> = <code>0</code>: unlimited)</td></tr>
+      <tr><td><code>conflict_behavior</code></td><td><code>SKIP</code> (default) or <code>OVERLAP</code></td></tr>
+      <tr><td><code>catch_up_on_resume</code></td><td>Catch up this schedule's missed occurrences</td></tr>
     </tbody>
   </table>
 </section>
@@ -253,12 +281,27 @@ sequenceDiagram
     <div class="card">
       <h3>Validation</h3>
       <p>CRON is validated with <code>CronExpression.isValidExpression</code>.</p>
-      <p>ONCE requires <code>scheduledAt</code>.</p>
+      <p>ONCE requires <code>scheduledAt</code>, DELAYED a <code>delayExpression</code>.</p>
     </div>
     <div class="card">
-      <h3>Tick &amp; NextRun</h3>
-      <p>Check: every minute (<code>@Scheduled(fixedRate=60_000)</code>).</p>
-      <p>After execution: CRON → nextRun recalculated, ONCE → disabled.</p>
+      <h3>Tick &amp; nextRunAt</h3>
+      <p>Tick: <code>@Scheduled(fixedRate = 60_000)</code> in <code>SchedulerTick</code>.</p>
+      <p>After a start: CRON → next occurrence (disabled once <code>maxRuns</code> or <code>endDate</code> is reached); ONCE and DELAYED → disabled.</p>
+    </div>
+    <div class="card">
+      <h3>Conflict</h3>
+      <p><code>SKIP</code> (default): if the target still has a run in <code>RUNNING</code> or <code>PAUSED</code>, the occurrence is dropped — CRON moves on to the next one, ONCE and DELAYED expire; <code>lastRunAt</code> and <code>runCount</code> stay unchanged.</p>
+      <p><code>OVERLAP</code> starts a second run alongside.</p>
+    </div>
+    <div class="card">
+      <h3>Missed Occurrences</h3>
+      <p>Detected as a tick gap above <code>automation.scheduler.resume-grace-minutes</code> (default 5 minutes) or as the first tick after startup.</p>
+      <p>Catch-up runs one at a time through the <code>CatchUpQueue</code> — for all schedules while <code>scheduler-catch-up-on-resume</code> is on (default), otherwise only with <code>catchUpOnResume</code>. All others jump to their next occurrence.</p>
+    </div>
+    <div class="card">
+      <h3>Pauses</h3>
+      <p>Maintenance mode (<code>POST /api/v1/schedules/maintenance</code>): the tick starts nothing, <code>nextRunAt</code> stays put.</p>
+      <p><code>automation.scheduler.skip-until</code> (ISO instant): due occurrences jump past the window; it also wins over catching up.</p>
     </div>
   </div>
 </section>

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Request Lifecycle &amp; Security</title>
+  <title>MySuricates — Request Lifecycle &amp; Security</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Request Lifecycle &amp; Security</h1>
+  <h1>MySuricates — Request Lifecycle &amp; Security</h1>
   <p>From the browser to the database: filters, error format, auth, rate limits</p>
 </header>
 
@@ -162,17 +162,17 @@
 
 <section id="system-overview">
   <h2>System Overview <span>Request Path</span></h2>
-  <p>HTTP requests go through the Vite proxy (dev) or straight to the Spring Boot backend, pass the security filters and end up in the REST controllers.</p>
+  <p>HTTP requests go through the Vite proxy (dev) or straight to the Spring Boot backend, pass Spring Security with the <code>ApiKeyAuthFilter</code> and the <code>RateLimitFilter</code>, and end up in the REST controllers. Services send live messages via STOMP.</p>
   <pre class="mermaid">
 flowchart LR
     B["Browser"] --&gt; P["Vite Proxy /api -&gt; :9090"]
-    P --&gt; F["ApiKeyAuthFilter"]
+    P --&gt; F["ApiKeyAuthFilter (Spring Security)"]
     F --&gt; RLF["RateLimitFilter"]
     RLF --&gt; C["REST Controller"]
     C --&gt; S["Service"]
     S --&gt; REPO["Repository (JPA)"]
     REPO --&gt; DB["SQLite (WAL)"]
-    C --&gt; WS["STOMP /topic/**"]
+    S --&gt; WS["STOMP /topic/**"]
 
     style DB fill:#2e1a1a,stroke:#30363d,color:#e6edf3
   </pre>
@@ -180,27 +180,27 @@ flowchart LR
 
 <section id="filter-chain">
   <h2>Filter Chain <span>Before the Controllers</span></h2>
-  <p>Order: ApiKeyAuth → RateLimit → Controller. With a misconfiguration or a missing key, the request is rejected before any business logic runs.</p>
+  <p>Order: Spring Security with <code>ApiKeyAuthFilter</code> → <code>RateLimitFilter</code> → controller. Without a valid key, Spring Security rejects protected paths with 403 before any business logic runs; the rate limit only counts <code>/api/**</code>.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant Client
     participant Proxy as Vite Proxy
     participant API as Spring Boot
-    participant AK as ApiKeyAuthFilter
+    participant AK as ApiKeyAuthFilter + Spring Security
     participant RL as RateLimitFilter
     participant CTR as Controller
 
     Client-&gt;&gt;Proxy: HTTP /api/v1/...
     Proxy-&gt;&gt;API: forwarded request
     API-&gt;&gt;AK: doFilter
-    alt API key missing/invalid (if enabled)
-        AK--&gt;&gt;Client: 401 Unauthorized
-    else ok
+    alt API key missing/invalid on a protected path
+        AK--&gt;&gt;Client: 403 Forbidden (SECURITY entry in the activity log)
+    else ok or open path
         AK-&gt;&gt;RL: proceed
         alt limit exceeded
-            RL--&gt;&gt;Client: 429 Too Many Requests
+            RL--&gt;&gt;Client: 429 Too Many Requests + Retry-After
         else ok
-            RL-&gt;&gt;CTR: proceed
+            RL-&gt;&gt;CTR: proceed (X-RateLimit-Remaining)
             CTR--&gt;&gt;Client: Response / Error
         end
     end
@@ -209,7 +209,7 @@ sequenceDiagram
 
 <section id="controller-service-repository">
   <h2>Controller → Service → Repository <span>Example: /projects</span></h2>
-  <p>Controllers are thin; services encapsulate the logic, repositories talk to SQLite.</p>
+  <p>Controllers are thin; services encapsulate logic and transactions, repositories talk to SQLite over a single connection (HikariCP <code>maximum-pool-size: 1</code>). Open Session in View is off: lazy loading belongs in the service, the controller maps to DTOs with MapStruct.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant Client
@@ -220,9 +220,12 @@ sequenceDiagram
 
     Client-&gt;&gt;CTR: GET /api/v1/projects
     CTR-&gt;&gt;SVC: findAll()
-    SVC-&gt;&gt;REP: findAll()
+    SVC-&gt;&gt;REP: findActiveWithContainer() (read-only transaction)
+    REP-&gt;&gt;DB: SELECT projects without archived_at, container via join
+    DB--&gt;&gt;REP: rows
     REP--&gt;&gt;SVC: List&lt;Project&gt;
-    SVC--&gt;&gt;CTR: DTOs via mapper
+    SVC--&gt;&gt;CTR: List&lt;Project&gt;
+    CTR-&gt;&gt;CTR: ProjectMapper.toResponseList()
     CTR--&gt;&gt;Client: 200 JSON
   </pre>
 </section>
@@ -232,10 +235,12 @@ sequenceDiagram
   <table>
     <thead><tr><th>Case</th><th>Status</th><th>Body</th></tr></thead>
     <tbody>
-      <tr><td>Validation</td><td>400</td><td><code>{"error":"Validation failed","fieldErrors":{...}}</code></td></tr>
-      <tr><td>Not Found</td><td>404</td><td><code>{"error":"Resource not found"}</code></td></tr>
-      <tr><td>Rate Limit</td><td>429</td><td><code>{"error":"Too many requests"}</code></td></tr>
-      <tr><td>Server</td><td>500</td><td><code>{"error":"Internal server error"}</code></td></tr>
+      <tr><td>Validation</td><td>400</td><td><code>{"code":"VALIDATION_FAILED","error":"Validation failed","timestamp":"…","fieldErrors":{...}}</code></td></tr>
+      <tr><td>Invalid argument</td><td>400</td><td><code>{"code":"INVALID_ARGUMENT","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>Not found</td><td>404</td><td><code>{"code":"RESOURCE_NOT_FOUND","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>State conflict</td><td>409</td><td><code>{"code":"STATE_CONFLICT","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>Rate limit (filter, not handler)</td><td>429</td><td><code>{"error": "Rate limit exceeded", "retryAfterSeconds": N}</code></td></tr>
+      <tr><td>Server</td><td>500</td><td><code>{"code":"INTERNAL_ERROR","error":"Internal server error","timestamp":"…"}</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -245,15 +250,15 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>API Key</h3>
-      <p><code>automation.security.enabled=true</code></p>
-      <p>Header: <code>X-API-Key</code></p>
+      <p><code>automation.security.enabled=true</code> (default)</p>
+      <p>Header: <code>X-API-Key</code>; without <code>automation.security.api-key</code> the backend generates a key on first start and stores it in <code>app_settings</code></p>
       <p>Constant-time comparison (<code>MessageDigest.isEqual</code>)</p>
     </div>
     <div class="card">
       <h3>Rate Limit</h3>
-      <p><code>automation.security.rate-limit.enabled</code> (default false)</p>
-      <p>Sliding window, 120 req/min per client IP</p>
-      <p>Header: <code>X-RateLimit-Remaining</code></p>
+      <p><code>automation.security.rate-limit.enabled</code> (default <code>true</code>), <code>requests-per-minute</code> (default <code>120</code>)</p>
+      <p>Fixed 1-minute window per client IP; <code>X-Forwarded-For</code> only counts behind <code>trusted-proxies</code></p>
+      <p>Header: <code>X-RateLimit-Remaining</code>, on 429 <code>Retry-After</code></p>
     </div>
   </div>
 </section>
@@ -261,11 +266,11 @@ sequenceDiagram
 <section id="open-endpoints">
   <h2>Open Endpoints <span>Without API Key</span></h2>
   <ul>
-    <li><code>GET /api/v1/system/health</code></li>
-    <li><code>GET /api/v1/system/info</code></li>
-    <li><code>POST /api/v1/webhook/trigger/{token}</code></li>
-    <li><code>/ws/**</code> (SockJS/STOMP)</li>
-    <li><code>/actuator/**</code></li>
+    <li><code>GET /api/v1/system/health</code>, <code>/info</code>, <code>/auth-status</code>, <code>/jvm-memory</code></li>
+    <li><code>POST /api/v1/webhook/trigger/{token}</code> — with a signing secret set, only with a valid HMAC signature (<code>X-Signature</code>)</li>
+    <li><code>GET /api/v1/integrations/{providerId}/callback</code> (OAuth callback)</li>
+    <li><code>/ws/**</code> (SockJS/STOMP) — no key header, but the handshake requires a single-use ticket from <code>POST /api/v1/ws-ticket</code></li>
+    <li><code>/actuator/health</code>; the other <code>/actuator/**</code> only with the key</li>
   </ul>
 </section>
 

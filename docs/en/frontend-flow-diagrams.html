@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Frontend Flow</title>
+  <title>MySuricates — Frontend Flow</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Frontend Flow</h1>
+  <h1>MySuricates — Frontend Flow</h1>
   <p>Routing, state, data flow, WebSockets and cache invalidation</p>
 </header>
 
@@ -161,50 +161,61 @@
 
 <section id="routing">
   <h2>Routing <span>App.tsx</span></h2>
-  <p>React Router with a layout (sidebar + header) and 10 main pages.</p>
+  <p><code>createBrowserRouter</code> with one layout (sidebar + header) around all pages. Pages of optional modules sit in <code>ModuleRoute</code> and, without their module, explain how to switch it on; several core pages switch to their own, simpler version in Simple Mode (<code>useSettingsStore</code>).</p>
   <pre class="mermaid">
 flowchart LR
-    APP["App.tsx Router"] --&gt; DASH["/ Dashboard"]
-    APP --&gt; PROJ["/projects + /projects/:id"]
-    APP --&gt; WF["/workflows + /workflows/:id"]
-    APP --&gt; RUN["/workflows/:id/run/:runId"]
-    APP --&gt; SK["/skills"]
-    APP --&gt; SCH["/schedules"]
-    APP --&gt; WH["/webhooks"]
-    APP --&gt; ST["/settings"]
+    APP["App.tsx Router + Layout"] --&gt; CORE
+    APP --&gt; MOD
+    subgraph CORE["Core pages"]
+        DASH["/ Dashboard<br/>/projects + /projects/:id<br/>/workflows + /workflows/:id"]
+        RUN["/workflows/:id/run/:runId<br/>/runs (/runs/:runId redirects)<br/>/approvals"]
+        SCH["/schedules + /calendar<br/>/todos, /cockpit, /goals/:goalId"]
+        ACT["/activity + /dlq<br/>/docs<br/>/settings"]
+    end
+    subgraph MOD["ModuleRoute (optional modules)"]
+        SK["/skills, /webhooks, /integrations<br/>/chains + /chains/:id/run/:runId"]
+        MORE["/wishes, /factory, /dialogs<br/>/debug, /reports, /insights<br/>/onboarding-profiles"]
+    end
   </pre>
 </section>
 
 <section id="data-flow">
   <h2>Data Flow <span>Client → API</span></h2>
-  <p>Fetches go through the Vite proxy <code>/api</code> to the backend; the WebSocket lives at <code>/ws</code>.</p>
+  <p>All hooks call the <code>api</code> client (<code>src/api/client.ts</code>): <code>fetch</code> on <code>/api/v1/...</code> with the <code>X-API-Key</code> from <code>useSettingsStore</code>. In development the Vite proxy forwards <code>/api</code> and <code>/ws</code> to the backend; otherwise the backend serves the built frontend itself (<code>automation.serve-frontend</code>).</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as Component
-    participant HOOK as useXxx (React Query)
-    participant API as fetch /api/v1/...
+    participant HOOK as useXxx (TanStack Query)
+    participant API as api client (fetch /api/v1/...)
     participant CACHE as Query Cache
 
     UI-&gt;&gt;HOOK: useQuery/useMutation
     HOOK-&gt;&gt;CACHE: return cached data (if present)
-    HOOK-&gt;&gt;API: HTTP request
-    API--&gt;&gt;HOOK: JSON DTO
-    HOOK--&gt;&gt;CACHE: set + update
-    CACHE--&gt;&gt;UI: re-render with fresh data
+    HOOK-&gt;&gt;API: HTTP request with X-API-Key
+    alt 429 Too Many Requests
+        API--&gt;&gt;HOOK: error, path locked until Retry-After
+    else ok
+        API--&gt;&gt;HOOK: JSON DTO
+        HOOK--&gt;&gt;CACHE: set + update
+        CACHE--&gt;&gt;UI: re-render with fresh data
+    end
   </pre>
 </section>
 
 <section id="queries-mutations">
   <h2>Queries &amp; Mutations <span>Invalidation</span></h2>
+  <p>A key such as <code>['workflows']</code> matches all queries below it as a prefix — detail, runs, versions.</p>
   <table>
     <thead><tr><th>Resource</th><th>Query Hook</th><th>Mutations</th><th>Invalidates</th></tr></thead>
     <tbody>
-      <tr><td>Projects</td><td><code>useProjects</code></td><td>create/update/delete/start/stop</td><td>projects, project detail</td></tr>
-      <tr><td>Workflows</td><td><code>useWorkflows</code></td><td>create/update/delete/execute</td><td>workflows, workflow detail, runs</td></tr>
-      <tr><td>Skills</td><td><code>useSkills</code></td><td>activate/deactivate</td><td>skills, workflow detail</td></tr>
-      <tr><td>Schedules</td><td><code>useSchedules</code></td><td>create/toggle/delete</td><td>schedules list</td></tr>
-      <tr><td>Webhooks</td><td><code>useWebhooks</code></td><td>create/toggle/delete</td><td>webhooks list</td></tr>
-      <tr><td>Settings</td><td><code>useSystemHealth</code></td><td>—</td><td>health</td></tr>
+      <tr><td>Projects</td><td><code>useProjects</code>, <code>useProject</code></td><td>create/update/archive/restore, container start/stop</td><td><code>projects</code> (list, detail, archive)</td></tr>
+      <tr><td>Workflows</td><td><code>useWorkflows</code>, <code>useWorkflow</code></td><td>create/update/delete/import/seal</td><td><code>workflows</code></td></tr>
+      <tr><td>Runs</td><td><code>useWorkflowRuns</code>, <code>useAllRuns</code></td><td>execute/pause/resume/cancel/retry/delete</td><td><code>workflows</code> and <code>learning</code>, depending on the action also <code>runs</code> and <code>dlq</code></td></tr>
+      <tr><td>Skills</td><td><code>useSkills</code></td><td>create/update/delete/import</td><td><code>skills</code>; delete also <code>workflows</code></td></tr>
+      <tr><td>Skill activation</td><td><code>useWorkflow</code></td><td>activate/deactivate</td><td><code>workflows</code></td></tr>
+      <tr><td>Schedules</td><td><code>useSchedules</code></td><td>create/update/toggle/delete</td><td><code>schedules</code> (list, calendar, preview)</td></tr>
+      <tr><td>Webhooks</td><td><code>useWebhooks</code></td><td>create/toggle/delete, token and secret</td><td><code>webhooks</code></td></tr>
+      <tr><td>System</td><td><code>useSystemHealth</code>, <code>useSystemInfo</code></td><td>—</td><td>none; health refetches every 30 s</td></tr>
     </tbody>
   </table>
 </section>
@@ -214,15 +225,18 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>Client State</h3>
-      <p><code>useSidebarStore</code>: collapse</p>
-      <p><code>useThemeStore</code>: light/dark, overrides</p>
-      <p><code>useSettingsStore</code>: API key, advanced mode</p>
-      <p><code>useI18nStore</code>: locale</p>
+      <p><code>useSidebarStore</code>: collapsed, open on mobile</p>
+      <p><code>useThemeStore</code>: theme, last chosen light and dark themes, overrides</p>
+      <p><code>useSettingsStore</code>: API key, Simple and Advanced Mode, sidebar order, hints, model defaults</p>
+      <p><code>useI18nStore</code> (<code>src/i18n</code>): locale</p>
       <p><code>useToastStore</code>: toasts</p>
+      <p><code>useAssistantStore</code>: assistant sessions, panel size</p>
+      <p><code>useDashboardLayoutStore</code>, <code>useDashboardSyncStore</code>: dashboard views and their sync state</p>
     </div>
     <div class="card">
       <h3>Persistence</h3>
-      <p>Sidebar, theme, settings, locale → localStorage</p>
+      <p>All stores except <code>useToastStore</code> → localStorage (Zustand <code>persist</code>)</p>
+      <p>The sidebar only stores "collapsed", the assistant only sessions and panel size</p>
       <p>Toasts are transient</p>
     </div>
   </div>
@@ -230,20 +244,26 @@ sequenceDiagram
 
 <section id="live-logs">
   <h2>Live Logs <span>WebSocket /ws</span></h2>
-  <p>Execution logs arrive via STOMP on <code>/topic/executions/{runId}/logs</code>.</p>
+  <p>Execution logs arrive via STOMP on <code>/topic/executions/{runId}/logs</code>. A single-use ticket from <code>POST /api/v1/ws-ticket</code> opens the handshake — the API key never appears in the URL.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as WorkflowExecution Page
     participant WS as useExecutionWebSocket
+    participant API as REST /api/v1
     participant ST as STOMP Broker (:9090)
-    participant BE as WorkflowExecutor
+    participant BE as ExecutionBroadcaster / block executors
 
-    UI-&gt;&gt;WS: subscribe(runId)
-    WS-&gt;&gt;ST: CONNECT /ws
+    UI-&gt;&gt;WS: useExecutionWebSocket(runId)
+    WS-&gt;&gt;API: POST /ws-ticket (with X-API-Key)
+    API--&gt;&gt;WS: single-use ticket
+    WS-&gt;&gt;ST: CONNECT /ws?ticket=… (SockJS, WebSocket transport only)
     ST--&gt;&gt;WS: CONNECTED
-    ST--&gt;&gt;WS: messages (step logs, status, approvals)
-    WS--&gt;&gt;UI: append logs, update status
+    WS-&gt;&gt;ST: SUBSCRIBE /topic/executions/{runId}/logs
+    WS-&gt;&gt;API: GET /executions/{runId}/live-log (replay buffered lines)
     BE-&gt;&gt;ST: convertAndSend("/topic/executions/{runId}/logs", payload)
+    ST--&gt;&gt;WS: messages (steps, status, approvals, human input, agentic, foreach, live_output)
+    WS--&gt;&gt;UI: append logs, update status
+    WS-&gt;&gt;WS: on step and final status: reload the workflow's runs (invalidate)
   </pre>
 </section>
 

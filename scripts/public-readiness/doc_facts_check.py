@@ -256,6 +256,12 @@ FORBIDDEN_PATTERNS = [
     # docs/architektur.md nennt sie genau so als Beispiel.
     (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d+-\d"),
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
+    # Das Produkt heisst MySuricates. "AutoPilot" ist nur der Name des Projekts, unter dem
+    # MySuricates seine eigenen TODOs fuehrt (docs/onboarding/README.md) — bis e3101cd6
+    # stand er trotzdem als "AutoPilot — …" im Titel aller Diagramm-Seiten. Geprueft wird
+    # nur die Ueberschrift mit Gedankenstrich; der Projektname im Fliesstext bleibt frei.
+    (re.compile(r"^#{1,6}\s+AutoPilot\s+[—–-]\s"),
+     "alter Produktname im Seitentitel — das Produkt heisst MySuricates, AutoPilot nur das Projekt"),
 ]
 
 # ---------------------------------------------------------------------------

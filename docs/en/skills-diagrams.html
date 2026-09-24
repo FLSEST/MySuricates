@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Skills &amp; Capabilities</title>
+  <title>MySuricates — Skills &amp; Capabilities</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Skills &amp; Capabilities</h1>
+  <h1>MySuricates — Skills &amp; Capabilities</h1>
   <p>Skill lifecycle, activation per workflow, execution in the skill-capability block</p>
 </header>
 
@@ -160,20 +160,25 @@
 
 <section id="lifecycle">
   <h2>Lifecycle <span>CRUD</span></h2>
+  <p>Skills are an optional module (<code>skills</code>, in the preset <code>full</code>). Every change goes through <code>SkillMutationGateway</code>, which writes a version row.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant UI as Skills Page
     participant CTR as SkillController
     participant SVC as SkillService
-    participant DB as skills/capabilities
+    participant GW as SkillMutationGateway
+    participant DB as skills / skill_versions
 
     UI-&gt;&gt;CTR: POST /api/v1/skills (name, category, aiContext, configSchema)
-    CTR-&gt;&gt;SVC: createSkill()
-    SVC-&gt;&gt;DB: INSERT skill + optional capabilities
-    DB--&gt;&gt;SVC: saved
-    SVC--&gt;&gt;CTR: SkillResponse
-    CTR--&gt;&gt;UI: 201 Created
+    CTR-&gt;&gt;SVC: create(request)
+    SVC-&gt;&gt;GW: save(skill, USER)
+    GW-&gt;&gt;DB: INSERT skill + version row (snapshot, hash)
+    DB--&gt;&gt;GW: saved
+    GW--&gt;&gt;SVC: Skill
+    SVC--&gt;&gt;CTR: Skill
+    CTR--&gt;&gt;UI: 201 Created (SkillResponse)
   </pre>
+  <p>Capabilities are not created along with a skill: they come from the built-in skills (<code>skills/builtin/*.json</code>, loaded at startup) or from an import (<code>POST /api/v1/skills/import</code>). Built-ins are read-only; the gateway refuses changes to a skill that a sealed workflow uses with 409.</p>
 </section>
 
 <section id="activation-per-workflow">
@@ -183,8 +188,10 @@ flowchart LR
     SK["Skill"] --&gt; CAP["Capabilities"]
     WF["Workflow"] --&gt; SKW["workflow_skills"]
     SKW --&gt; SK
+    BL["Block (skillIds)"] -.-&gt;|"additionally for this block"| SK
   </pre>
-  <p>Activated skills are injected into the project before execution (<code>injectSkillContextOnHost</code>).</p>
+  <p><code>POST /api/v1/workflows/{id}/skills</code> activates, <code>DELETE /api/v1/workflows/{id}/skills/{skillId}</code> deactivates.</p>
+  <p>Before the first block, the run writes the <code>aiContext</code> of the activated skills to <code>.claude/rules/skills-context.md</code> in the project (<code>CommandExecutorService.writeSkillContextToProject</code>); a block with its own <code>skillIds</code> adds them for its duration. The Claude CLI reads <code>.claude/rules/</code> by itself, Codex and Pi get the file appended to the system prompt.</p>
 </section>
 
 <section id="executing-a-capability">
@@ -194,25 +201,35 @@ sequenceDiagram
     participant BE as SkillCapabilityBlockExecutor
     participant CTX as ExecutionContext
     participant CES as CommandExecutorService
-    participant CLI as claude -p
+    participant CLI as AI CLI on the host
 
-    BE-&gt;&gt;CTX: resolveTemplate(input, params)
-    BE-&gt;&gt;CES: executeCommandOnHost(projectPath, prompt, model, systemPrompt)
-    CES-&gt;&gt;CLI: run prompt (includes capability + params)
-    CLI--&gt;&gt;CES: output
-    CES--&gt;&gt;BE: result
-    BE--&gt;&gt;CTX: StepResult COMPLETED/FAILED
+    BE-&gt;&gt;CTX: resolvePromptTemplate(input)
+    BE-&gt;&gt;BE: find skill and capability via the block's skillIds
+    alt capability writes, allow_writes missing
+        BE--&gt;&gt;CTX: StepResult FAILED
+    else read-only or allow_writes set
+        BE-&gt;&gt;CES: executeOnHost(prompt, systemPrompt, model, provider, allowedTools)
+        CES-&gt;&gt;CLI: run prompt (Task, Parameters, Input)
+        CLI--&gt;&gt;CES: output
+        CES--&gt;&gt;BE: result
+        BE--&gt;&gt;CTX: StepResult COMPLETED/FAILED
+    end
   </pre>
   <div class="grid">
     <div class="card">
       <h3>Prompt Structure</h3>
-      <p><code>"Use your '&lt;capability&gt;' capability..."</code> + params + input</p>
-      <p>SystemPrompt = workflow instruction prefix</p>
+      <p><code>Task: &lt;description&gt;</code> + <code>Parameters: {…}</code> + <code>Input: …</code> — without a description, the capability's name stands there</p>
+      <p>System prompt = the skill's <code>aiContext</code> + workflow instructions</p>
+    </div>
+    <div class="card">
+      <h3>Permissions</h3>
+      <p>Without <code>allow_writes</code> the CLI only gets read-only tools: <code>Read</code>, <code>Grep</code>, <code>Glob</code>, <code>WebFetch</code>, <code>WebSearch</code>, <code>Task</code>, <code>TodoWrite</code>.</p>
+      <p>A capability with <code>writes</code> requires <code>allow_writes: true</code>, otherwise the step fails.</p>
     </div>
     <div class="card">
       <h3>Context</h3>
-      <p>Skill context (aiContext) injected into the CLI session beforehand.</p>
-      <p>Template variables: <code>{{ previous_output }}</code>, <code>{{ vars }}</code></p>
+      <p><code>input</code> is resolved like a prompt: <code>{{ previous_output }}</code>, <code>{{ block.&lt;name&gt;.output }}</code>, context variables.</p>
+      <p><code>params</code> go into the prompt as parameters.</p>
     </div>
   </div>
 </section>
@@ -222,9 +239,10 @@ sequenceDiagram
   <table>
     <thead><tr><th>Table</th><th>Key columns</th></tr></thead>
     <tbody>
-      <tr><td><code>skills</code></td><td>name, description, category, ai_context, config_schema, builtin, version</td></tr>
-      <tr><td><code>capabilities</code></td><td>skill_id, name, description, handler_class, input_schema, output_schema, async</td></tr>
+      <tr><td><code>skills</code></td><td>name, description, icon, category, ai_context, config_schema, builtin, version</td></tr>
+      <tr><td><code>capabilities</code></td><td>skill_id, name, description, handler_class, input_schema, output_schema, async, writes</td></tr>
       <tr><td><code>workflow_skills</code></td><td>workflow_id, skill_id (activation)</td></tr>
+      <tr><td><code>skill_versions</code></td><td>skill_id, version_number, operation, snapshot, content_hash, change_source</td></tr>
     </tbody>
   </table>
 </section>

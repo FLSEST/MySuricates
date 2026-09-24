@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Deployment &amp; Container Lifecycle</title>
+  <title>MySuricates — Deployment &amp; Container Lifecycle</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,23 +145,35 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Deployment &amp; Container Lifecycle</h1>
-  <p>Compose setup, agent images, ContainerService and resource limits</p>
+  <h1>MySuricates — Deployment &amp; Container Lifecycle</h1>
+  <p>Instance in a container, Compose setup, agent images, project containers and resource limits</p>
 </header>
 
 <nav>
+  <a href="#your-own-instance">Your Own Instance</a>
   <a href="#docker-compose">Docker Compose</a>
   <a href="#agent-images">Agent Images</a>
   <a href="#container-lifecycle">Container Lifecycle</a>
   <a href="#mounts-limits">Mounts &amp; Limits</a>
-  <a href="#host-fallback">Host Fallback</a>
+  <a href="#execution-on-the-host">Execution on the Host</a>
 </nav>
 
 <main>
 
+<section id="your-own-instance">
+  <h2>Your Own Instance <span>deploy/</span></h2>
+  <p><code>scripts/instance.sh up --name NAME</code> builds backend and frontend into one image with <code>deploy/Dockerfile</code> and starts exactly one container (<code>deploy/compose.yml</code>); the backend serves the frontend itself.</p>
+  <ul>
+    <li>Settings per instance: <code>deploy/instances/NAME.env</code> — <code>MYSURICATES_PORT</code> is required, <code>MYSURICATES_BIND</code> is <code>127.0.0.1</code> unless set otherwise</li>
+    <li>Mounts for projects, AI providers and the Docker socket are written by <code>scripts/lib/host-mounts.sh</code> into an override (<code>deploy/instances/NAME.override.yml</code>)</li>
+    <li>Data lives in named volumes and survives <code>scripts/instance.sh down</code></li>
+    <li><code>MYSURICATES_RUNTIME=host</code> starts the same instance directly on the machine instead of in a container</li>
+  </ul>
+</section>
+
 <section id="docker-compose">
   <h2>Docker Compose <span>Services</span></h2>
-  <p>Backend and agents are built and started with Compose.</p>
+  <p><code>ai-automation-backend/docker-compose.yml</code> builds and starts the backend; it only builds the agent images (profile <code>build-only</code>). The backend itself starts containers from these images through the Docker API.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph Compose
@@ -177,13 +189,13 @@ flowchart LR
   <div class="grid">
     <div class="card">
       <h3>Build</h3>
-      <p><code>mvn clean package -DskipTests</code></p>
-      <p><code>docker compose --profile build-only build</code></p>
+      <p><code>mvn clean package -DskipTests</code> (the JAR that <code>docker/Dockerfile.backend</code> copies)</p>
+      <p><code>docker compose --profile build-only build</code> (agent images)</p>
     </div>
     <div class="card">
       <h3>Start</h3>
-      <p><code>docker compose up --build</code></p>
-      <p>Backend port: 9090</p>
+      <p><code>docker compose up --build</code> in the directory <code>ai-automation-backend/</code></p>
+      <p>Backend port: 9090; data under <code>./data</code></p>
     </div>
   </div>
 </section>
@@ -193,36 +205,39 @@ flowchart LR
   <table>
     <thead><tr><th>Image</th><th>Base</th><th>Path</th></tr></thead>
     <tbody>
-      <tr><td>backend</td><td>OpenJDK 21 + Spring Boot jar</td><td><code>docker/Dockerfile.backend</code></td></tr>
-      <tr><td>agent-node</td><td>Node 22</td><td><code>docker/Dockerfile.agent-node</code></td></tr>
-      <tr><td>agent-python</td><td>Python 3.12</td><td><code>docker/Dockerfile.agent-python</code></td></tr>
-      <tr><td>agent-devops</td><td>Ubuntu 24.04</td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
-      <tr><td>agent-java</td><td>Temurin 21</td><td><code>docker/Dockerfile.agent-java</code></td></tr>
+      <tr><td>backend</td><td><code>eclipse-temurin:21-jre-alpine</code> + Spring Boot JAR</td><td><code>docker/Dockerfile.backend</code></td></tr>
+      <tr><td>agent-node</td><td><code>node:22-slim</code></td><td><code>docker/Dockerfile.agent-node</code></td></tr>
+      <tr><td>agent-python</td><td><code>python:3.12-slim</code></td><td><code>docker/Dockerfile.agent-python</code></td></tr>
+      <tr><td>agent-devops</td><td><code>ubuntu:24.04</code></td><td><code>docker/Dockerfile.agent-devops</code></td></tr>
+      <tr><td>agent-java</td><td><code>eclipse-temurin:21-jdk-jammy</code></td><td><code>docker/Dockerfile.agent-java</code></td></tr>
     </tbody>
   </table>
+  <p>Paths relative to <code>ai-automation-backend/</code>. Project containers use <code>automation-agent-node</code> (<code>CODE</code>, <code>PERSONAL</code>) or <code>automation-agent-python</code> (<code>RESEARCH</code>, <code>CONTENT</code>, <code>BUSINESS</code>) depending on the project type; shell blocks can use any allowed image via <code>container_image</code> (<code>automation.execution.allowed-container-images</code>).</p>
 </section>
 
 <section id="container-lifecycle">
   <h2>Container Lifecycle <span>ContainerService</span></h2>
-  <p>Workflows preferably run in the project container. If none exists, one is started; if there are problems, execution falls back to the host.</p>
+  <p>Before the first block, a run looks up the running project container or starts one — provided Docker is set up and the run does not run isolated in its own workspace clone. If the start fails, the run continues without a container. The blocks themselves run on the host (exception: shell steps with <code>container_image</code>); the project container is used by ad-hoc commands during a run and by the terminal.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant WE as WorkflowExecutor
     participant CS as ContainerService
     participant DO as Docker Engine
 
-    WE-&gt;&gt;CS: getDockerContainerId(project)
-    alt exists
-        CS--&gt;&gt;WE: containerId
-    else missing/stopped
-        WE-&gt;&gt;CS: createAndStartContainer(project)
-        CS-&gt;&gt;DO: docker create/run (bind mounts, limits)
-        DO--&gt;&gt;CS: containerId
-        CS--&gt;&gt;WE: containerId
+    opt Docker set up, run not isolated
+        WE-&gt;&gt;CS: getDockerContainerId(project)
+        alt exists
+            CS--&gt;&gt;WE: containerId
+        else missing/stopped
+            WE-&gt;&gt;CS: createAndStartContainer(project)
+            CS-&gt;&gt;DO: docker create + start (image per project type, bind mount, limits)
+            DO--&gt;&gt;CS: containerId
+            CS--&gt;&gt;WE: containerId (on failure: continue without a container)
+        end
     end
-    WE-&gt;&gt;WE: execute blocks (prefer container)
-    opt idle-timeout
-        CS-&gt;&gt;DO: stop container
+    WE-&gt;&gt;WE: execute blocks (host), container's last activity per step
+    opt idle longer than idle-timeout-minutes (checked every 5 min)
+        CS-&gt;&gt;DO: stop + remove container
     end
   </pre>
 </section>
@@ -236,23 +251,24 @@ sequenceDiagram
       <p><code>docker.container.memory-limit: 4000000000</code> (~4 GB)</p>
       <p><code>docker.container.pids-limit: 100</code></p>
       <p><code>docker.container.idle-timeout-minutes: 60</code></p>
+      <p>Plus <code>/tmp</code> as tmpfs, all capabilities dropped, <code>no-new-privileges</code> and the host's user ID</p>
     </div>
     <div class="card">
       <h3>Mounts</h3>
-      <p>The project path is bind-mounted into the container.</p>
-      <p>Docker socket: <code>/var/run/docker.sock</code> (the backend needs it)</p>
-      <p>Backups inside the project mount stay isolated.</p>
+      <p>Project path → <code>/workspace</code> (read and write)</p>
+      <p>Claude from the host according to <code>MYSURICATES_AI_FROM_HOST</code>; default <code>login</code>: the program read-only, the login as a token</p>
+      <p>Docker socket: only for the backend (<code>/var/run/docker.sock</code> in <code>docker-compose.yml</code>), not in the project container</p>
     </div>
   </div>
 </section>
 
-<section id="host-fallback">
-  <h2>Host Fallback <span>Security &amp; Reproducibility</span></h2>
-  <p>If the container fails to start, commands run in the project path on the host.</p>
+<section id="execution-on-the-host">
+  <h2>Execution on the Host <span>Security &amp; Reproducibility</span></h2>
+  <p>AI CLIs and shell blocks run on the host in the project directory — whether a project container is running or not.</p>
   <ul>
-    <li>More privileges, less isolation.</li>
-    <li>Tools and environment come from the host, not from the image.</li>
-    <li>Avoid it by building the images in advance and keeping the Docker daemon available.</li>
+    <li>Tools and environment come from the host, not from an image.</li>
+    <li><code>container_image</code> isolates single shell steps: a one-off container (<code>docker run --rm</code>); Docker socket and extra mounts only with <code>automation.execution.allow-docker-socket-mount</code> or <code>allow-extra-mounts</code>.</li>
+    <li><code>scripts/instance.sh</code> isolates a whole instance in a container (see above).</li>
   </ul>
 </section>
 

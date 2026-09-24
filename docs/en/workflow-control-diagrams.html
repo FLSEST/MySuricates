@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Workflow Control &amp; States</title>
+  <title>MySuricates — Workflow Control &amp; States</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Workflow Control &amp; States</h1>
+  <h1>MySuricates — Workflow Control &amp; States</h1>
   <p>State machines, pause/resume/cancel, approval &amp; error paths</p>
 </header>
 
@@ -161,6 +161,7 @@
 
 <section id="workflowrun-state-machine">
   <h2>WorkflowRun State Machine <span>RunStatus</span></h2>
+  <p>A workflow run is created directly as <code>RUNNING</code> (<code>PENDING</code> is only the entity's default). If <code>RunAdmission</code> refuses the start — a sealed workflow no longer matches its seal, or an unattended start meets an unsealed workflow with <code>require-sealed-for-unattended</code> —, no run is created at all.</p>
   <pre class="mermaid">
 stateDiagram-v2
     [*] --&gt; RUNNING : execute()
@@ -169,11 +170,17 @@ stateDiagram-v2
     RUNNING --&gt; FAILED : step failed + on_failure=stop / exception
     RUNNING --&gt; CANCELLED : cancelExecution(runId)
     RUNNING --&gt; COMPLETED : all steps ok
+    RUNNING --&gt; COMPLETED_WITH_ERRORS : a checked_command step failed, the run went on
     PAUSED --&gt; CANCELLED : cancelExecution(runId)
+    RUNNING --&gt; INTERRUPTED : backend restart or standby
+    PAUSED --&gt; INTERRUPTED : backend restart
+    INTERRUPTED --&gt; RUNNING : resume-from-step
     FAILED --&gt; [*]
     CANCELLED --&gt; [*]
     COMPLETED --&gt; [*]
+    COMPLETED_WITH_ERRORS --&gt; [*]
   </pre>
+  <p>At startup the backend cleans up runs still stored as <code>RUNNING</code> or <code>PAUSED</code> and sets them to <code>INTERRUPTED</code>. The watchdog sets a run without an execution thread to <code>FAILED</code> after <code>automation.execution.ghost-watchdog-stale-minutes</code> — or to <code>INTERRUPTED</code> if a standby was detected shortly before. <code>resume-from-step</code> continues after the last completed step; without a completed step a new run starts.</p>
 </section>
 
 <section id="stepresult-status">
@@ -185,7 +192,7 @@ flowchart LR
     RUNNING --&gt; FAILED
     RUNNING --&gt; SKIPPED
   </pre>
-  <p>Set by the BlockExecutor: shell/Claude exit code -&gt; COMPLETED/FAILED; conditional without a branch -&gt; SKIPPED.</p>
+  <p><code>BlockStepRunner</code> creates every step directly as <code>RUNNING</code> (<code>PENDING</code> is the entity's default) and then sets the BlockExecutor's result: exit code of the shell or the AI CLI → COMPLETED/FAILED; a conditional without a command for the chosen branch and a rejected approval with <code>on_no: skip</code> → SKIPPED.</p>
 </section>
 
 <section id="pause-cancel">
@@ -193,17 +200,24 @@ flowchart LR
   <pre class="mermaid">
 sequenceDiagram
     participant UI
-    participant CTRL as ExecutionController (n/a)
-    participant WE as WorkflowExecutor
+    participant CTRL as ExecutionController
+    participant WE as WorkflowExecutor / WorkflowExecutionRegistry
     participant CTX as ExecutionContext
 
-    UI-&gt;&gt;WE: pauseExecution(runId)
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/pause
+    CTRL-&gt;&gt;WE: pauseExecution(runId)
     WE-&gt;&gt;CTX: paused=true
-    Note over CTX: Block loop polls paused<br/>and waits 500ms
-    UI-&gt;&gt;WE: resumeExecution(runId)
+    Note over CTX: Before the next block the loop sets<br/>the run to PAUSED and checks every 500 ms
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/resume
+    CTRL-&gt;&gt;WE: resumeExecution(runId)
     WE-&gt;&gt;CTX: paused=false
-    UI-&gt;&gt;WE: cancelExecution(runId)
-    WE-&gt;&gt;CTX: cancelled=true + cancel pending approvals
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/cancel
+    CTRL-&gt;&gt;WE: cancelExecution(runId)
+    alt run has a context (running or waiting for a slot)
+        WE-&gt;&gt;CTX: cancelled=true, kill the running process, cancel a pending approval
+    else ghost run without a thread
+        WE-&gt;&gt;WE: set the run to CANCELLED directly
+    end
   </pre>
 </section>
 
@@ -213,19 +227,26 @@ sequenceDiagram
 sequenceDiagram
     participant BE as ApprovalBlockExecutor
     participant CTX as ExecutionContext
-    participant WS as WebSocket /topic/...
+    participant WS as WebSocket /topic/executions/{runId}/logs
     participant USER as User
+    participant API as ExecutionController
 
     BE-&gt;&gt;CTX: requestApproval(question, options)
     BE-&gt;&gt;WS: broadcast approval_required
-    USER--&gt;&gt;WS: answer via UI
-    WE-&gt;&gt;CTX: resolveApproval(answer)
+    USER-&gt;&gt;API: POST /api/v1/executions/{id}/approve (field answer)
+    API-&gt;&gt;CTX: resolveApproval(answer), offered options only, else 400
     CTX--&gt;&gt;BE: future completes
+    BE-&gt;&gt;WS: broadcast approval_resolved
     alt answer == "Yes always"
-        CTX-&gt;&gt;CTX: rememberApproval(question, answer)
+        BE-&gt;&gt;CTX: rememberApproval(question, answer)
     end
-    BE--&gt;&gt;WE: StepResult (COMPLETED/FAILED/SKIPPED depending on on_no)
+    alt rejection (reject_options, default No/Nein)
+        BE--&gt;&gt;BE: on_no: continue → COMPLETED, skip → SKIPPED, fail → FAILED
+    else approval
+        BE--&gt;&gt;BE: COMPLETED, answer in approval_answer
+    end
   </pre>
+  <p>Without an answer after <code>timeout_minutes</code> (default 30) or when the run is cancelled, the step ends <code>FAILED</code>. <code>GET /api/v1/executions/pending-input</code> lists waiting approvals (page <code>/approvals</code>). The agentic block asks through the same mechanism with <code>require_approval</code> (<code>agentic_approval_required</code>); there, "No" repeats the iteration with a new proposal.</p>
 </section>
 
 <section id="error-paths-stop-on-failure">
@@ -233,13 +254,13 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>Default Behavior</h3>
-      <p><code>on_failure</code> missing → the run stops at a FAILED step.</p>
-      <p>Can be set to <code>"continue"</code> if the following steps should run anyway.</p>
+      <p><code>on_failure</code> missing or set to <code>"stop"</code> → a FAILED step ends the run with <code>FAILED</code>.</p>
+      <p>With <code>"continue"</code> the following steps run anyway; if a step with <code>checked_command</code> fails along the way, the run ends as <code>COMPLETED_WITH_ERRORS</code>.</p>
     </div>
     <div class="card">
       <h3>Agentic Specifics</h3>
-      <p>Stop reasons: ITERATION_TIMEOUT, TOTAL_TIMEOUT, TOKEN_BUDGET_EXCEEDED, REPEATED_ACTIONS, GOAL_STATUS=IMPOSSIBLE.</p>
-      <p>Status: FAILED if the goal is not reached.</p>
+      <p>Stop reasons: TOTAL_TIMEOUT, ITERATION_TIMEOUT, TOKEN_BUDGET_EXCEEDED, REPEATED_ACTIONS, TOKEN_TRACKING_FAILED; also GOAL_STATUS=IMPOSSIBLE and reaching <code>max_iterations</code>.</p>
+      <p>Status: COMPLETED only with GOAL_STATUS=ACHIEVED, otherwise FAILED.</p>
     </div>
   </div>
 </section>

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AutoPilot — Logging &amp; Monitoring</title>
+  <title>MySuricates — Logging &amp; Monitoring</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
@@ -145,7 +145,7 @@
 <body>
 
 <header>
-  <h1>AutoPilot — Logging &amp; Monitoring</h1>
+  <h1>MySuricates — Logging &amp; Monitoring</h1>
   <p>WebSocket-Logs, ActivityLog, Health/Info, RateLimit Header</p>
 </header>
 
@@ -162,17 +162,18 @@
   <h2>WebSocket Log Pipeline <span>/topic/executions/{runId}/logs</span></h2>
   <pre class="mermaid">
 sequenceDiagram
-    participant BE as WorkflowExecutor/BlockExecutors
+    participant BE as ExecutionBroadcaster / RunLiveLogService / Block-Executors
     participant SMT as SimpMessagingTemplate
     participant ST as STOMP Broker
     participant UI as React (useExecutionWebSocket)
 
     BE-&gt;&gt;SMT: convertAndSend(topic, payload)
     SMT-&gt;&gt;ST: dispatch
-    ST--&gt;&gt;UI: message (step logs, status, approvals, agentic events)
+    ST--&gt;&gt;UI: message (Schritte, Status, Approvals, Human Input, Agentic, Foreach, live_output)
     UI-&gt;&gt;UI: update LogViewer / Status
   </pre>
-  <p>Payloads: StepResult (input/output/duration/status), Status-Events, approval_required/approval_resolved, agentic_* Events.</p>
+  <p>Nachrichten: Schritt-Ergebnis (<code>stepIndex</code>, <code>status</code>, <code>input</code>, <code>output</code>, <code>durationMs</code>, Blocktyp und -name), <code>status</code>, <code>approval_required</code>/<code>approval_resolved</code>, <code>human_input_required</code>/<code>human_input_resolved</code>, <code>agentic_*</code>, <code>foreach_*</code>, <code>container_*</code>, <code>command</code> und <code>live_output</code>.</p>
+  <p><code>live_output</code> bündelt die Ausgabe laufender Blöcke. <code>RunLiveLogService</code> hält die letzten Zeilen nur im Speicher; <code>GET /api/v1/executions/{id}/live-log</code> liefert sie einem Client nach, der die Seite neu lädt oder später öffnet.</p>
 </section>
 
 <section id="activitylogservice">
@@ -180,14 +181,21 @@ sequenceDiagram
   <pre class="mermaid">
 flowchart LR
     SVC["Services"] --&gt; ALS["ActivityLogService"]
+    PLG["Plugins / Agents"] --&gt;|"POST /api/v1/activity-log"| ALS
     ALS --&gt; DB["activity_log (SQLite)"]
+    ALS --&gt; TOP["STOMP /topic/activity-log"]
+    UI["Activity-Seite (fragt alle 10 s ab)"] --&gt;|"GET /api/v1/activity-log"| ALS
   </pre>
   <table>
     <thead><tr><th>Kategorie</th><th>Beispiele</th></tr></thead>
     <tbody>
-      <tr><td><code>EXECUTION</code></td><td>Workflow start/complete/fail</td></tr>
-      <tr><td><code>SCHEDULE</code></td><td>Schedule triggered/failed</td></tr>
-      <tr><td><code>SECURITY</code></td><td>auth/rate-limit events</td></tr>
+      <tr><td><code>EXECUTION</code></td><td>Workflow gestartet, abgeschlossen, fehlgeschlagen; Aufräumen nach dem Start, Ghost-Run-Watchdog</td></tr>
+      <tr><td><code>SCHEDULE</code></td><td>Zeitplan ausgelöst, übersprungen, nachgeholt</td></tr>
+      <tr><td><code>SECURITY</code></td><td>falscher oder fehlender API-Key, abgelehnte Webhook-Signatur, Siegel gesetzt oder entfernt, abgewiesener Start</td></tr>
+      <tr><td><code>SYSTEM</code></td><td>Workflow angelegt, geändert, gelöscht</td></tr>
+      <tr><td><code>WEBHOOK</code></td><td>Webhook angelegt, ausgelöst, gelöscht</td></tr>
+      <tr><td><code>CONTAINER</code></td><td>Projekt-Container gestartet, gestoppt, im Leerlauf aufgeräumt</td></tr>
+      <tr><td><code>PLUGIN</code></td><td>Einträge von außen über <code>POST /api/v1/activity-log</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -197,24 +205,30 @@ flowchart LR
   <div class="grid">
     <div class="card">
       <h3>Health</h3>
-      <p><code>GET /api/v1/system/health</code>: Status OK</p>
+      <p><code>GET /api/v1/system/health</code>: <code>status</code> <code>UP</code>, <code>DEGRADED</code> (Docker eingerichtet, antwortet aber nicht) oder <code>DOWN</code> (Datenbank nicht erreichbar), dazu <code>components.database</code> und <code>components.docker</code></p>
       <p>Offen (kein API-Key)</p>
     </div>
     <div class="card">
       <h3>Info</h3>
-      <p><code>GET /api/v1/system/info</code>: Version, Build Timestamp</p>
+      <p><code>GET /api/v1/system/info</code>: Name, Version, Build-Typ und -Zeitpunkt, Java-Version, Laufzeitmodus, Tailscale-Status, Umgebung, Rate-Limit-Kennzahlen</p>
       <p>Offen (kein API-Key)</p>
+    </div>
+    <div class="card">
+      <h3>Weitere offene Sonden</h3>
+      <p><code>GET /api/v1/system/auth-status</code>, <code>GET /api/v1/system/jvm-memory</code> (drei Heap-Zahlen) und <code>/actuator/health</code></p>
+      <p>Die übrigen <code>/actuator/**</code>-Endpunkte, etwa <code>/actuator/metrics</code>, brauchen den API-Key</p>
     </div>
   </div>
 </section>
 
 <section id="rate-limit-header">
   <h2>Rate Limit Header <span>Filter</span></h2>
-  <p>Bei aktivem RateLimitFilter werden verbleibende Requests im Header geliefert.</p>
+  <p>Der <code>RateLimitFilter</code> ist standardmäßig an (120 Anfragen pro Minute und Client-IP, nur <code>/api/**</code>); jede durchgelassene Antwort nennt den Rest, ein 429 die Wartezeit.</p>
   <table>
     <thead><tr><th>Header</th><th>Bedeutung</th></tr></thead>
     <tbody>
-      <tr><td><code>X-RateLimit-Remaining</code></td><td>Requests im aktuellen 1-Minuten-Fenster</td></tr>
+      <tr><td><code>X-RateLimit-Remaining</code></td><td>Verbleibende Anfragen im aktuellen 1-Minuten-Fenster</td></tr>
+      <tr><td><code>Retry-After</code></td><td>Bei 429: Sekunden, bis das Fenster wieder frei ist</td></tr>
     </tbody>
   </table>
 </section>
