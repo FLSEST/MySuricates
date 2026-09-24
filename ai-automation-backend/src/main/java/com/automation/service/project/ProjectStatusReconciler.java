@@ -23,7 +23,7 @@ import java.util.List;
  * project keeps STARTING forever: the UI offers no action for STARTING, {@code
  * DockerOrphanReconciler} only touches Docker containers, and {@code
  * IdleContainerReaper.cleanupIdleContainers} only flips projects that still have a RUNNING container
- * row. Same idea as {@code WorkflowExecutor.cleanupZombieRuns} for runs (TODO 3c119d47).
+ * row. Same idea as {@code RunControlService.cleanupZombieRuns} for runs (TODO 3c119d47).
  *
  * <p>Deliberately DB-only: the container row decides the outcome (RUNNING row ⇒ RUNNING, otherwise
  * STOPPED) and no Docker call is made inside the transaction — with HikariCP pool-size 1 a Docker

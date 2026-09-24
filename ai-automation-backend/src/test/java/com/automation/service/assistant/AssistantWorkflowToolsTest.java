@@ -6,6 +6,7 @@ import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,11 +32,12 @@ class AssistantWorkflowToolsTest {
 
     @Mock private WorkflowService workflowService;
     @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private RunControlService runControlService;
     private AssistantWorkflowTools tools;
 
     @BeforeEach
     void setUp() {
-        tools = new AssistantWorkflowTools(workflowService, workflowExecutor, new ObjectMapper());
+        tools = new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, new ObjectMapper());
     }
 
     @Test
@@ -143,13 +145,13 @@ class AssistantWorkflowToolsTest {
     @Test
     void cancelRun_exactSuccessLine() {
         assertThat(tools.cancelRun("{\"runId\":\"run-123456789\"}")).isEqualTo("✓ Run cancelled (ID: run-1234…)");
-        verify(workflowExecutor).cancelExecution("run-123456789");
+        verify(runControlService).cancelExecution("run-123456789");
     }
 
     @Test
     void cancelRun_missingOrFailing_errorLines() {
         assertThat(tools.cancelRun("{}")).isEqualTo("⚠ cancel_run: runId is a required field.");
-        doThrow(new RuntimeException("gone")).when(workflowExecutor).cancelExecution("r");
+        doThrow(new RuntimeException("gone")).when(runControlService).cancelExecution("r");
         assertThat(tools.cancelRun("{\"runId\":\"r\"}")).isEqualTo("⚠ Could not cancel run: gone");
     }
 }

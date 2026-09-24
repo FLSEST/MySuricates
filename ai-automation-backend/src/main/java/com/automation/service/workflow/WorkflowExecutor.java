@@ -4,7 +4,6 @@ import com.automation.entity.*;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.exception.WorkflowExecutionException;
-import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.StepFailureSummary;
@@ -12,12 +11,9 @@ import com.automation.repository.SkillRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.project.ContainerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -38,7 +34,6 @@ public class WorkflowExecutor {
 
     private final List<BlockExecutor> blockExecutors;
     private final ContainerService containerService;
-    private final CommandExecutorService commandExecutorService;
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
     private final SkillRepository skillRepository;
@@ -55,7 +50,8 @@ public class WorkflowExecutor {
     private final RunWorkspaceService workspaces;
     private final RunAdmission admission;
 
-    // Active execution tracking is delegated to WorkflowExecutionRegistry
+    // Active execution tracking is delegated to WorkflowExecutionRegistry; controlling a run that
+    // already exists (pause/resume/cancel/approval, ad-hoc commands) to RunControlService.
 
     /** Detached copy of everything the async loop needs — taken while the JPA session is open. */
     private record WorkflowSnapshot(Project project, List<BlockDefinition> blocks, List<Skill> skills,
@@ -362,28 +358,6 @@ public class WorkflowExecutor {
         }
     }
 
-    /** Cleans up runs stuck in RUNNING/PAUSED from a previous application lifecycle. */
-    @EventListener(ApplicationReadyEvent.class)
-    public void cleanupZombieRuns() {
-        // Collect all runs that were in-flight when the application was last shut down
-        List<WorkflowRun> zombies = new java.util.ArrayList<>();
-        zombies.addAll(runRepository.findByStatus(RunStatus.RUNNING));
-        zombies.addAll(runRepository.findByStatus(RunStatus.PAUSED));
-        if (zombies.isEmpty()) return;
-        log.warn("Found {} run(s) stuck in RUNNING/PAUSED status — marking as INTERRUPTED", zombies.size());
-        for (WorkflowRun zombie : zombies) {
-            zombie.setStatus(RunStatus.INTERRUPTED);
-            zombie.setCompletedAt(Instant.now());
-            zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
-            zombie.setError(Map.of("message", "Workflow was interrupted by an application restart"));
-            runRepository.save(zombie);
-            log.info("Marked interrupted run: {}", zombie.getId());
-        }
-        activityLogService.warn(LogCategory.EXECUTION,
-                "Startup cleanup: marked " + zombies.size() + " run(s) as INTERRUPTED",
-                "WorkflowExecutor");
-    }
-
     /** Resumes an INTERRUPTED run after its last completed step; no completed step ⇒ full retry. */
     public WorkflowRun resumeFromStep(String runId) {
         WorkflowRun run = runRepository.findById(runId)
@@ -454,68 +428,6 @@ public class WorkflowExecutor {
         }
 
         return run;
-    }
-
-    // ── Run control (pause/resume/cancel/approval) — status queries such as active run count,
-    // container ids or pending approvals go straight to WorkflowExecutionRegistry.
-
-    public void pauseExecution(String runId) {
-        executionRegistry.pauseExecution(runId);
-    }
-
-    public void resumeExecution(String runId) {
-        executionRegistry.resumeExecution(runId);
-    }
-
-    public void cancelExecution(String runId) {
-        // Covers the running and the still-queued case; only a run with no context is a ghost.
-        if (executionRegistry.cancel(runId)) {
-            log.info("Cancelled execution: {}", runId);
-        } else {
-            // Ghost run: no active thread, but possibly still RUNNING in the DB
-            try {
-                runRepository.findById(runId).ifPresent(run -> {
-                    if (run.getStatus() == RunStatus.RUNNING) {
-                        log.warn("Force-cancelling ghost run {} — not in activeExecutions but status=RUNNING", runId);
-                        run.setStatus(RunStatus.CANCELLED);
-                        run.setCompletedAt(Instant.now());
-                        run.setDurationMs(run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli());
-                        run.setError(Map.of("message", "Force-cancelled: no active execution thread found (ghost run)"));
-                        runRepository.save(run);
-                        broadcaster.broadcastRunStatus(runId, RunStatus.CANCELLED);
-                        activityLogService.warn(LogCategory.EXECUTION,
-                                "Ghost run force-cancelled: " + runId, "WorkflowExecutor", runId, null);
-                    }
-                });
-            } catch (Exception e) {
-                log.error("Failed to force-cancel ghost run {}: {}", runId, e.getMessage());
-            }
-        }
-    }
-
-    public void resolveApproval(String runId, String answer) {
-        executionRegistry.resolveApproval(runId, answer);
-    }
-
-    public ApprovalRequest getPendingApproval(String runId) {
-        return executionRegistry.getPendingApproval(runId);
-    }
-
-    public String executeAdHocCommand(String runId, String command) {
-        ExecutionContext context = executionRegistry.getStartedContext(runId); // null while queued
-        if (context == null) {
-            throw new WorkflowExecutionException("No active execution found for run: " + runId);
-        }
-        log.info("Executing ad-hoc command in run {}: {}", runId, command);
-        var result = commandExecutorService.executeCommand(context.getContainerId(), "claude", command);
-
-        // Broadcast as a log message
-        broadcaster.broadcastLogMessage(runId, "command", Map.of(
-                "input", command,
-                "output", result.output() != null ? result.output() : ""
-        ));
-
-        return result.output() != null ? result.output() : "";
     }
 
     private BlockExecutor findExecutor(String blockType) {

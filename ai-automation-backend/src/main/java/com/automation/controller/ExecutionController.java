@@ -12,10 +12,10 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.executor.ApprovalRequest;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.RunLiveLogService;
-import com.automation.service.workflow.WorkflowExecutor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ExecutionController {
 
-    private final WorkflowExecutor workflowExecutor;
+    private final RunControlService runControlService;
     private final ExecutionQueryService executionQueryService;
     private final ExecutionCommandService executionCommandService;
     private final PendingTodoApprovalService pendingTodoApprovalService;
@@ -88,19 +88,19 @@ public class ExecutionController {
 
     @PostMapping("/{id}/pause")
     public ResponseEntity<Void> pauseExecution(@PathVariable String id) {
-        workflowExecutor.pauseExecution(id);
+        runControlService.pauseExecution(id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/resume")
     public ResponseEntity<Void> resumeExecution(@PathVariable String id) {
-        workflowExecutor.resumeExecution(id);
+        runControlService.resumeExecution(id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/cancel")
     public ResponseEntity<Void> cancelExecution(@PathVariable String id) {
-        workflowExecutor.cancelExecution(id);
+        runControlService.cancelExecution(id);
         return ResponseEntity.ok().build();
     }
 
@@ -119,13 +119,13 @@ public class ExecutionController {
     public ResponseEntity<Void> approveExecution(
             @PathVariable String id,
             @Valid @RequestBody ApproveExecutionRequest request) {
-        workflowExecutor.resolveApproval(id, request.answer());
+        runControlService.resolveApproval(id, request.answer());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{id}/approval")
     public ResponseEntity<Map<String, Object>> getPendingApproval(@PathVariable String id) {
-        ApprovalRequest request = workflowExecutor.getPendingApproval(id);
+        ApprovalRequest request = runControlService.getPendingApproval(id);
         if (request == null) {
             return ResponseEntity.ok(Map.of("pending", false));
         }
@@ -167,7 +167,7 @@ public class ExecutionController {
     public ResponseEntity<Map<String, String>> executeCommand(
             @PathVariable String id,
             @Valid @RequestBody ExecuteCommandRequest request) {
-        String output = workflowExecutor.executeAdHocCommand(id, request.command());
+        String output = runControlService.executeAdHocCommand(id, request.command());
         return ResponseEntity.ok(Map.of("output", output));
     }
 }

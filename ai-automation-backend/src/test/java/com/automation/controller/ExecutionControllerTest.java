@@ -14,10 +14,10 @@ import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.execution.PendingInputService;
 import com.automation.dto.response.PendingInputResponse;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.RunDeletionPolicy;
 import com.automation.service.workflow.RunDeletionService;
 import com.automation.service.workflow.RunLiveLogService;
-import com.automation.service.workflow.WorkflowExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -55,7 +55,7 @@ class ExecutionControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private WorkflowExecutor workflowExecutor;
+    private RunControlService runControlService;
     @MockitoBean
     private ActivityLogService activityLogService;
     @MockitoBean
@@ -188,7 +188,7 @@ class ExecutionControllerTest {
         mockMvc.perform(post("/api/v1/executions/run-1/pause"))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).pauseExecution("run-1");
+        verify(runControlService).pauseExecution("run-1");
     }
 
     @Test
@@ -196,7 +196,7 @@ class ExecutionControllerTest {
         mockMvc.perform(post("/api/v1/executions/run-1/resume"))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).resumeExecution("run-1");
+        verify(runControlService).resumeExecution("run-1");
     }
 
     @Test
@@ -204,7 +204,7 @@ class ExecutionControllerTest {
         mockMvc.perform(post("/api/v1/executions/run-1/cancel"))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).cancelExecution("run-1");
+        verify(runControlService).cancelExecution("run-1");
     }
 
     // --- New tests for missing endpoints ---
@@ -274,7 +274,7 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).resolveApproval("run-1", "Yes");
+        verify(runControlService).resolveApproval("run-1", "Yes");
     }
 
     @Test
@@ -286,7 +286,7 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).resolveApproval("run-1", "No");
+        verify(runControlService).resolveApproval("run-1", "No");
     }
 
     @Test
@@ -298,7 +298,7 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).resolveApproval("run-1", "Deploy to staging instead");
+        verify(runControlService).resolveApproval("run-1", "Deploy to staging instead");
     }
 
     @Test
@@ -331,7 +331,7 @@ class ExecutionControllerTest {
     @Test
     void approveExecution_unknownExecution_returns404() throws Exception {
         org.mockito.Mockito.doThrow(new ResourceNotFoundException("Execution", "unknown"))
-                .when(workflowExecutor).resolveApproval("unknown", "Yes");
+                .when(runControlService).resolveApproval("unknown", "Yes");
 
         mockMvc.perform(post("/api/v1/executions/unknown/approve")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -350,12 +350,12 @@ class ExecutionControllerTest {
                                 """))
                 .andExpect(status().isOk());
 
-        verify(workflowExecutor).resolveApproval("exec-42", "Approved");
+        verify(runControlService).resolveApproval("exec-42", "Approved");
     }
 
     @Test
     void getPendingApproval_noPending_returnsPendingFalse() throws Exception {
-        when(workflowExecutor.getPendingApproval("run-1")).thenReturn(null);
+        when(runControlService.getPendingApproval("run-1")).thenReturn(null);
 
         mockMvc.perform(get("/api/v1/executions/run-1/approval"))
                 .andExpect(status().isOk())
@@ -367,7 +367,7 @@ class ExecutionControllerTest {
         var approval = ApprovalRequest.builder()
                 .blockId("block-1").question("Approve?")
                 .options(List.of("Yes", "No")).stepIndex(2).build();
-        when(workflowExecutor.getPendingApproval("run-1")).thenReturn(approval);
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
 
         mockMvc.perform(get("/api/v1/executions/run-1/approval"))
                 .andExpect(status().isOk())
@@ -381,7 +381,7 @@ class ExecutionControllerTest {
         var approval = ApprovalRequest.builder()
                 .blockId("approval-30").question("Satz uebernehmen?")
                 .options(List.of("Ja", "Nein")).rejectOptions(List.of("Nein")).stepIndex(30).build();
-        when(workflowExecutor.getPendingApproval("run-1")).thenReturn(approval);
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
 
         mockMvc.perform(get("/api/v1/executions/run-1/approval"))
                 .andExpect(status().isOk())
@@ -391,7 +391,7 @@ class ExecutionControllerTest {
     @Test
     void approveExecution_answerNotOffered_returns400() throws Exception {
         doThrow(new IllegalArgumentException("Answer 'No' is not one of the offered options [Ja, Nein]"))
-                .when(workflowExecutor).resolveApproval("run-1", "No");
+                .when(runControlService).resolveApproval("run-1", "No");
 
         mockMvc.perform(post("/api/v1/executions/run-1/approve")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -437,7 +437,7 @@ class ExecutionControllerTest {
                 .type("human-input").inputType("text")
                 .defaultValue("default").variableName("name")
                 .required(true).validationPattern("\\w+").build();
-        when(workflowExecutor.getPendingApproval("run-1")).thenReturn(approval);
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
 
         mockMvc.perform(get("/api/v1/executions/run-1/approval"))
                 .andExpect(status().isOk())
@@ -461,7 +461,7 @@ class ExecutionControllerTest {
 
     @Test
     void executeCommand_validCommand_returnsOutput() throws Exception {
-        when(workflowExecutor.executeAdHocCommand("run-1", "ls -la")).thenReturn("file1.txt\nfile2.txt");
+        when(runControlService.executeAdHocCommand("run-1", "ls -la")).thenReturn("file1.txt\nfile2.txt");
 
         mockMvc.perform(post("/api/v1/executions/run-1/command")
                         .contentType(MediaType.APPLICATION_JSON)
