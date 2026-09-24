@@ -523,6 +523,21 @@ class ScanService {
             thingRepository.delete(id);
         }
     }
+
+    void purgeExpired(java.util.List<Session> sessions) {
+        for (Session s : sessions) {
+            if (Instant.now().isAfter(s.getExpiresAt())) {
+                sessionRepository.delete(s);
+            }
+        }
+    }
+
+    @EventListener({ApplicationReadyEvent.class})
+    void onReady(java.util.List<String> ids) {
+        for (String id : ids) {
+            readyRepository.save(id);
+        }
+    }
 }
 JAVA
 cat > "$MAIN2/config/ThingSeeder.java" <<'JAVA'
@@ -568,6 +583,8 @@ printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></sc
 { echo "$TODAY 10:00:00 [pool-watchdog] WARN  c.a.s.watchdog.ConnectionPoolWatchdogService - Pool exhaustion detected: active=1"
   echo "$TODAY 10:00:01 [pool-watchdog] WARN  c.a.s.watchdog.ConnectionPoolWatchdogService - Pool exhaustion detected: active=1"
   echo "$TODAY 10:00:02 [virtual-3] WARN  c.a.s.project.DockerContainerGateway - docker inspect: Status 404"
+  # 404 nur im Zeitstempel und in einer ID: kein Docker-404.
+  echo "$TODAY 10:04:04.404 [virtual-5] WARN  c.a.s.project.DockerContainerGateway - docker restart of container run-404-a failed"
   echo "$TODAY 10:00:03 [virtual-4] WARN  c.a.s.workflow.WorkflowExecutor - slow step"
 } > "$FIX2/ai-automation-backend/data/logs/mysuricates.log"
 printf '%s' "$FIX2" > "$TMP/base2.txt"
@@ -578,9 +595,14 @@ check "einzeiliges forEach endet in der Zeile"  '! grep -q "^TREFFER repository_
 check "einzeiliges for mit Aufruf ist Treffer"  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:7 " "$TMP/perf-facts2.out"'
 check "verschachtelte Schleife: ein Treffer" \
   '[ "$(grep -c "^TREFFER repository_in_loop: service/ScanService.java:10 " "$TMP/perf-facts2.out")" -eq 1 ]'
-check "FAKT repository_loop_count: 2"           'grep -qx "FAKT repository_loop_count: 2" "$TMP/perf-facts2.out"'
+# Warten kann nur eine while-Schleife: das for-each mit Fristpruefung je Element ist ein N+1.
+check "for-each mit Fristpruefung bleibt N+1" \
+  'grep -q "^TREFFER repository_in_loop: service/ScanService.java:[0-9]* sessionRepository.delete " "$TMP/perf-facts2.out"'
+check "FAKT repository_loop_count: 3"           'grep -qx "FAKT repository_loop_count: 3" "$TMP/perf-facts2.out"'
 check "FAKT polling_loop_count: 1"              'grep -qx "FAKT polling_loop_count: 1" "$TMP/perf-facts2.out"'
-check "FAKT startup_repository_loop_count: 2"   'grep -qx "FAKT startup_repository_loop_count: 2" "$TMP/perf-facts2.out"'
+# onStart, onReady (@EventListener({ApplicationReadyEvent.class})) und der Seeder.
+check "FAKT startup_repository_loop_count: 3"   'grep -qx "FAKT startup_repository_loop_count: 3" "$TMP/perf-facts2.out"'
+check "Listener in Array-Schreibweise ist Startlauf" '! grep -q "readyRepository" "$TMP/perf-facts2.out"'
 check "Seeder ohne repository_in_loop"          '! grep -q "^TREFFER repository_in_loop: config/ThingSeeder" "$TMP/perf-facts2.out"'
 check "FAKT unindexed_findby_columns_count: 2"  'grep -qx "FAKT unindexed_findby_columns_count: 2" "$TMP/perf-facts2.out"'
 check "BuiltIn wird built_in"                   'grep -q "^TREFFER unindexed_findby_column: built_in " "$TMP/perf-facts2.out"'
@@ -590,9 +612,9 @@ check "UNIQUE-Spalte, Relation, DESC-Index, OrderBy, @Query und Kommentar nicht 
 check "vorgeladener monaco-Chunk gemeldet" \
   'grep -qx "FAKT frontend_lazy_chunk_preloaded: 1 (/assets/monaco-def.js)" "$TMP/perf-facts2.out"'
 check "WARN je Logger, Rauschen gezaehlt" \
-  'grep -qx "FAKT non_main_runtime_warn_logger_1: ConnectionPoolWatchdogService 2 (50% der WARN-Zeilen, davon bekanntes Rauschen 2)" "$TMP/perf-facts2.out"'
-check "Docker-404 als Rauschen erkannt" \
-  'grep -q "^FAKT non_main_runtime_warn_logger_[0-9]: DockerContainerGateway 1 (.*bekanntes Rauschen 1)" "$TMP/perf-facts2.out"'
+  'grep -qx "FAKT non_main_runtime_warn_logger_1: ConnectionPoolWatchdogService 2 (40% der WARN-Zeilen, davon bekanntes Rauschen 2)" "$TMP/perf-facts2.out"'
+check "Docker-404 nur in der Nachricht, nicht in Zeitstempel oder ID" \
+  'grep -qx "FAKT non_main_runtime_warn_logger_2: DockerContainerGateway 2 (40% der WARN-Zeilen, davon bekanntes Rauschen 1)" "$TMP/perf-facts2.out"'
 check "Pflicht-Fakten bleiben im Blatt" \
   '( for F in database_bytes source_files_scanned transactional_slow_call_count repository_loop_count unindexed_findby_columns_count; do grep -q "^FAKT $F: \|^NICHT GEMESSEN: $F (" "$TMP/perf-facts2.out" || exit 1; done )'
 
