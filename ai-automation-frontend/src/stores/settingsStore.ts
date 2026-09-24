@@ -15,6 +15,11 @@ export function clampPageSize(value: number): number {
 interface SettingsState {
   apiKey: string;
   simpleMode: boolean;
+  /**
+   * The user picked a mode on purpose (start-page card or the mode switch). Until then a fresh
+   * installation without projects offers the choice; the default stays Pro.
+   */
+  modeChoiceMade: boolean;
   advancedMode: boolean;
   autoTodoDefault: boolean;
   autoRepairDefault: boolean;
@@ -46,6 +51,8 @@ interface SettingsState {
   kanbanColumnSize: number;
   setApiKey: (key: string) => void;
   setSimpleMode: (enabled: boolean) => void;
+  /** An explicit mode choice: sets the mode and marks the choice as made. */
+  chooseMode: (simple: boolean) => void;
   setAdvancedMode: (enabled: boolean) => void;
   setAutoTodoDefault: (enabled: boolean) => void;
   setAutoRepairDefault: (enabled: boolean) => void;
@@ -76,6 +83,7 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       apiKey: '',
       simpleMode: false,
+      modeChoiceMade: false,
       advancedMode: false,
       autoTodoDefault: false,
       autoRepairDefault: false,
@@ -97,6 +105,7 @@ export const useSettingsStore = create<SettingsState>()(
       kanbanColumnSize: 50,
       setApiKey: (apiKey) => set({ apiKey }),
       setSimpleMode: (simpleMode) => set({ simpleMode }),
+      chooseMode: (simpleMode) => set({ simpleMode, modeChoiceMade: true }),
       setAdvancedMode: (advancedMode) => set({ advancedMode }),
       setAutoTodoDefault: (autoTodoDefault) => set({ autoTodoDefault }),
       setAutoRepairDefault: (autoRepairDefault) => set({ autoRepairDefault }),

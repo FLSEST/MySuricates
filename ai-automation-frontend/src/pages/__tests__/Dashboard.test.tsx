@@ -9,6 +9,7 @@ import { DASHBOARD_FIXTURE, setupDashboardPageTests, slot, widgetOrder } from '.
 import { useDashboardLayoutStore } from '../../stores/dashboardLayoutStore';
 import { useDashboardSyncStore } from '../../stores/dashboardSyncStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { DEFAULT_WIDGET_IDS } from '../../components/dashboard/widgetRegistry';
 import { Dashboard } from '../Dashboard';
 
@@ -413,5 +414,27 @@ describe('Dashboard layout', { timeout: 20_000 }, () => {
     releaseDetail();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit dashboard' })).toBeEnabled());
     expect(screen.queryByTestId('layout-sync-conflict')).not.toBeInTheDocument();
+  });
+});
+
+describe('Dashboard on a fresh installation', { timeout: 20_000 }, () => {
+  it('offers the mode choice next to the first steps while there is no project', async () => {
+    useSettingsStore.setState({ simpleMode: false, modeChoiceMade: false });
+    server.use(http.get('/api/v1/projects', () => HttpResponse.json([])));
+    await renderDashboard();
+
+    expect(await screen.findByTestId('mode-choice')).toBeInTheDocument();
+    expect(screen.getByTestId('first-steps')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Simple' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Pro' })).toBeInTheDocument();
+  });
+
+  it('shows no mode choice once projects exist', async () => {
+    useSettingsStore.setState({ simpleMode: false, modeChoiceMade: false });
+    const { queryClient } = renderWithProviders(<Dashboard />);
+
+    await waitFor(() => expect(queryClient.getQueryData(['projects'])).toBeDefined());
+    expect(screen.queryByTestId('mode-choice')).toBeNull();
+    expect(screen.queryByTestId('first-steps')).toBeNull();
   });
 });

@@ -205,6 +205,14 @@ export const de: TranslationKeys = {
     run: {
       inputsTitle: 'Angaben für diesen Lauf',
     },
+    modeChoice: {
+      title: 'Wie möchtest du MySuricates verwenden?',
+      subtitle: 'Du kannst jederzeit in der Seitenleiste wechseln.',
+      useSimple: 'Einfach verwenden',
+      simpleDesc: 'Workflows starten, ihre Fragen beantworten und die Ergebnisse lesen, ohne selbst etwas zu bauen.',
+      usePro: 'Pro verwenden',
+      proDesc: 'Workflows bauen und einstellen, Projekte und Einstellungen verwalten.',
+    },
     handoff: {
       badge: 'Pro',
       badgeHint: 'Gehört zum Pro-Modus',

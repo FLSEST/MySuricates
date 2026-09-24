@@ -203,6 +203,14 @@ export const en = {
     run: {
       inputsTitle: 'Details for this run',
     },
+    modeChoice: {
+      title: 'How do you want to use MySuricates?',
+      subtitle: 'You can switch at any time in the sidebar.',
+      useSimple: 'Use Simple',
+      simpleDesc: 'Start workflows, answer their questions and read the results, without building anything.',
+      usePro: 'Use Pro',
+      proDesc: 'Build and configure workflows, manage projects and settings.',
+    },
     handoff: {
       badge: 'Pro',
       badgeHint: 'Part of Pro mode',

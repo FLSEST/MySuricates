@@ -147,7 +147,7 @@ const DEFAULT_ORDER = withDefaultDividers(navItems.map((i) => i.to));
 export function Sidebar() {
   const { collapsed, toggle, mobileOpen, setMobileOpen } = useSidebarStore();
   const {
-    simpleMode, setSimpleMode, sidebarItemOrder, sidebarHiddenItems, sidebarDividerLabels,
+    simpleMode, chooseMode, sidebarItemOrder, sidebarHiddenItems, sidebarDividerLabels,
     setSidebarItemOrder, setSidebarHiddenItems, setSidebarDividerLabel, setSidebarDividerLabels,
   } = useSettingsStore();
   const isMobile = useIsMobile();
@@ -269,7 +269,7 @@ export function Sidebar() {
                 }`}
               />
               <button
-                onClick={() => setSimpleMode(true)}
+                onClick={() => chooseMode(true)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
                   simpleMode
                     ? 'text-accent'
@@ -280,7 +280,7 @@ export function Sidebar() {
                 {t.settings.simpleModeShort}
               </button>
               <button
-                onClick={() => setSimpleMode(false)}
+                onClick={() => chooseMode(false)}
                 className={`relative z-10 flex items-center gap-1 px-3 py-1 rounded-full font-medium transition-colors ${
                   !simpleMode
                     ? 'text-accent'
@@ -301,7 +301,7 @@ export function Sidebar() {
             )}
             {/* Collapsed: the Einfach|Pro pill has no room — one icon button switches the mode */}
             <button
-              onClick={() => setSimpleMode(!simpleMode)}
+              onClick={() => chooseMode(!simpleMode)}
               aria-label={simpleMode ? t.simple.handoff.switchToPro : t.simple.handoff.switchToSimple}
               title={simpleMode ? t.simple.handoff.switchToPro : t.simple.handoff.switchToSimple}
               className="mt-2 flex h-7 w-7 items-center justify-center rounded-full text-accent transition-colors hover:bg-[var(--color-sidebar-hover)]"

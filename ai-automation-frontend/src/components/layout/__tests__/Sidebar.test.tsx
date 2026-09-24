@@ -15,7 +15,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   localStorage.clear();
   useI18nStore.setState({ locale: 'en' });
-  useSettingsStore.setState({ simpleMode: false, sidebarItemOrder: [], sidebarHiddenItems: [], sidebarDividerLabels: {} });
+  useSettingsStore.setState({ simpleMode: false, modeChoiceMade: false, sidebarItemOrder: [], sidebarHiddenItems: [], sidebarDividerLabels: {} });
   useSidebarStore.setState({ collapsed: false });
 });
 
@@ -193,7 +193,14 @@ describe('Sidebar in simple mode', () => {
     const toggle = screen.getByRole('button', { name: 'Switch to Pro' });
     expect(toggle).toHaveAttribute('title', 'Switch to Pro');
     fireEvent.click(toggle);
-    expect(useSettingsStore.getState().simpleMode).toBe(false);
+    expect(useSettingsStore.getState()).toMatchObject({ simpleMode: false, modeChoiceMade: true });
     expect(screen.getByRole('button', { name: 'Switch to Simple' })).toBeInTheDocument();
+  });
+
+  it('counts the Einfach|Pro pill as a mode choice', () => {
+    renderWithProviders(<Sidebar />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pro' }));
+    expect(useSettingsStore.getState()).toMatchObject({ simpleMode: false, modeChoiceMade: true });
   });
 });
