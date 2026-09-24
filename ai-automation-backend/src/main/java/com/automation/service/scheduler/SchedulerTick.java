@@ -88,12 +88,13 @@ public class SchedulerTick {
     }
 
     private void fireOrSkipUntil(List<ScheduledWorkflow> due, Instant now, Optional<Instant> skipUntil) {
-        if (skipUntil.isPresent()) {
-            due.forEach(scheduled -> skipPolicy.skipScheduleUntil(scheduled, skipUntil.get()));
-            return;
+        for (ScheduledWorkflow scheduled : due) {
+            if (skipUntil.isPresent()) {
+                runIsolated(scheduled, "skip", () -> skipPolicy.skipScheduleUntil(scheduled, skipUntil.get()));
+            } else {
+                runIsolated(scheduled, "execution", () -> scheduledExecutor.executeSingleSchedule(scheduled.getId()));
+            }
         }
-        due.forEach(scheduled -> execute(scheduled,
-                "Failed to execute scheduled workflow: {}", "Schedule execution failed: "));
     }
 
     /** A tick that fired far later than the fixed 60s rate means the JVM was frozen (e.g. suspend). */
@@ -152,31 +153,34 @@ public class SchedulerTick {
         Optional<Instant> skipUntil = activeSkipUntil(now);
         int queued = 0;
         int skipped = 0;
+        int failed = 0;
         for (ScheduledWorkflow scheduled : missed) {
-            if (skipUntil.isPresent()) {
-                skipPolicy.skipScheduleUntil(scheduled, skipUntil.get());
-                skipped++;
-            } else if (scheduled.isCatchUpOnResume() || schedulerConfig.isCatchUpOnResume()) {
-                catchUpQueue.enqueue(scheduled, scheduled.getNextRunAt(), reason);
+            boolean catchUp = skipUntil.isEmpty()
+                    && (scheduled.isCatchUpOnResume() || schedulerConfig.isCatchUpOnResume());
+            boolean done = runIsolated(scheduled, catchUp ? "catch-up queueing" : "skip", () -> {
+                if (catchUp) {
+                    catchUpQueue.enqueue(scheduled, scheduled.getNextRunAt(), reason);
+                } else if (skipUntil.isPresent()) {
+                    skipPolicy.skipScheduleUntil(scheduled, skipUntil.get());
+                } else {
+                    skip.accept(scheduled);
+                }
+            });
+            if (!done) {
+                failed++;
+            } else if (catchUp) {
                 queued++;
             } else {
-                try {
-                    skip.accept(scheduled);
-                    skipped++;
-                } catch (Exception e) {
-                    log.error("Failed to skip schedule {}: {}", scheduled.getId(), e.getMessage(), e);
-                    activityLogService.error(LogCategory.SCHEDULE, "Schedule skip failed: " + e.getMessage(),
-                            "SchedulerService", scheduled.getId());
-                }
+                skipped++;
             }
         }
-        return new MissedSummary(missed.size(), skipped, queued);
+        return new MissedSummary(missed.size(), skipped, queued, failed);
     }
 
-    private record MissedSummary(int missed, int skipped, int queued) {
+    private record MissedSummary(int missed, int skipped, int queued, int failed) {
         String describe() {
             return missed + " missed schedule(s): " + skipped + " skipped forward, "
-                    + queued + " queued for sequential catch-up";
+                    + queued + " queued for sequential catch-up" + (failed > 0 ? ", " + failed + " failed" : "");
         }
     }
 
@@ -187,13 +191,23 @@ public class SchedulerTick {
         return due.stream().filter(s -> !catchUpQueue.contains(s.getId())).toList();
     }
 
-    private void execute(ScheduledWorkflow scheduled, String logMessage, String activityPrefix) {
+    /**
+     * One schedule's step of this tick, isolated from the others: a failure — a cron expression that
+     * no longer parses, a failed write — is logged and recorded in the activity log, and the tick
+     * goes on with the next schedule. Before, it ended the loop, and the schedules after it were
+     * neither started nor skipped (TODO 68a3d91e).
+     *
+     * @return true when the step went through
+     */
+    private boolean runIsolated(ScheduledWorkflow scheduled, String action, Runnable step) {
         try {
-            scheduledExecutor.executeSingleSchedule(scheduled.getId());
+            step.run();
+            return true;
         } catch (Exception e) {
-            log.error(logMessage, scheduled.getId(), e);
-            activityLogService.error(LogCategory.SCHEDULE, activityPrefix + e.getMessage(),
+            log.error("Schedule {} {} failed: {}", scheduled.getId(), action, e.getMessage(), e);
+            activityLogService.error(LogCategory.SCHEDULE, "Schedule " + action + " failed: " + e.getMessage(),
                     "SchedulerService", scheduled.getId());
+            return false;
         }
     }
 }
