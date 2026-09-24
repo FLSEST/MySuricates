@@ -37,9 +37,9 @@ class PackageCycleRatchetTest {
      * PendingTool moved to com.automation.dto, next to the chat response that carries it — 5.
      * RateLimitConfig moved to com.automation.security, next to the RateLimitFilter that reads it — 4.
      * OnboardingProfileSeeder moved to service.project, next to the services it seeds for — 3.
+     * The HostExecutionRequest overload of StepAiMetadata.aiRequest moved to service.cli — 2.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
-            "com.automation.executor <-> com.automation.service.cli",
             "com.automation.service.ai <-> com.automation.service.cli",
             "com.automation.service.project <-> com.automation.service.workflow");
 
