@@ -9,7 +9,7 @@
 // nicht — ueber die sollen diese Chunks kommen.
 //
 // Aufruf: node scripts/check-lazy-chunks.mjs [distDir]   (laeuft am Ende von `npm run build`)
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,7 +120,17 @@ export function checkLazyChunks(distDir, lazyChunks = LAZY_CHUNKS) {
   return { violations, entries, preloads };
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// Direkt aufgerufen? Beide Seiten real aufloesen: Node setzt import.meta.url auf den echten Pfad,
+// process.argv[1] behaelt einen Symlink-Pfad. Ohne realpath endete ein Aufruf ueber einen
+// Symlink still mit Exit 0 — auch bei kaputtem Build.
+function realPath(file) {
+  try {
+    return realpathSync(file);
+  } catch {
+    return path.resolve(file);
+  }
+}
+const isMain = Boolean(process.argv[1]) && realPath(process.argv[1]) === realPath(fileURLToPath(import.meta.url));
 if (isMain) {
   const distDir = path.resolve(process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '../dist'));
   const { violations, entries, preloads } = checkLazyChunks(distDir);
