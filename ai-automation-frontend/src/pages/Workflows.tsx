@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, Trash2 } from 'lucide-react';
-import { Button, Modal, Spinner } from '../components/ui';
+import { Button, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
@@ -531,30 +531,16 @@ export function Workflows() {
         </div>
       )}
 
-      <Modal
+      <ConfirmModal
         open={deleteConfirm.open}
+        // Closing is blocked while the deletes run (Escape, backdrop and cancel alike)
         onClose={() => !deleting && setDeleteConfirm({ open: false, ids: [], names: [] })}
+        onConfirm={confirmDelete}
         title={deleteConfirm.ids.length === 1 ? t.workflows.deleteWorkflow : t.workflows.deleteWorkflows}
-        size="sm"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setDeleteConfirm({ open: false, ids: [], names: [] })}
-              disabled={deleting}
-            >
-              {t.common.cancel}
-            </Button>
-            <Button
-              variant="danger"
-              icon={<Trash2 className="w-4 h-4" />}
-              onClick={confirmDelete}
-              loading={deleting}
-            >
-              {t.common.delete} ({deleteConfirm.ids.length})
-            </Button>
-          </>
-        }
+        confirmLabel={<>{t.common.delete} ({deleteConfirm.ids.length})</>}
+        confirmIcon={<Trash2 className="w-4 h-4" />}
+        variant="danger"
+        isPending={deleting}
       >
         <div className="space-y-3">
           <p className="text-sm text-text-secondary">{t.workflows.deleteConfirm}</p>
@@ -568,7 +554,7 @@ export function Workflows() {
           </div>
           <p className="text-xs text-danger">{t.common.deleteConfirm}</p>
         </div>
-      </Modal>
+      </ConfirmModal>
 
       <ExecuteDialog
         open={executeDialog.open}

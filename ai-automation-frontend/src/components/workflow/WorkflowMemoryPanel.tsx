@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Brain, ChevronDown, ChevronUp, Check, Pencil, Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { Card, CardHeader, Button, Modal, Select } from '../ui';
+import { Card, CardHeader, Button, Modal, ConfirmModal, Select } from '../ui';
 import { MonacoEditor } from '../shared/MonacoEditor';
 import {
   useWorkflowMemories, useExtractMemory, useActivateMemory,
@@ -299,30 +299,20 @@ export function WorkflowMemoryPanel({ workflowId, runs }: Props) {
       </Modal>
 
       {/* Delete confirmation */}
-      <Modal
+      <ConfirmModal
         open={!!showDelete}
         onClose={() => setShowDelete(null)}
+        onConfirm={() => {
+          if (showDelete) {
+            deleteMemory.mutate(showDelete, { onSuccess: () => setShowDelete(null) });
+          }
+        }}
         title={t.common.delete}
-        size="sm"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowDelete(null)}>{t.common.cancel}</Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (showDelete) {
-                  deleteMemory.mutate(showDelete, { onSuccess: () => setShowDelete(null) });
-                }
-              }}
-              loading={deleteMemory.isPending}
-            >
-              {t.common.delete}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-text-secondary">{t.common.deleteConfirm}</p>
-      </Modal>
+        message={t.common.deleteConfirm}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={deleteMemory.isPending}
+      />
     </Card>
   );
 }

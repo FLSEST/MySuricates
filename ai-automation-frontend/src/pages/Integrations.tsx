@@ -1,7 +1,7 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Plug, Calendar, KanbanSquare, TicketCheck, Mail, ExternalLink, Trash2, Play, CheckCircle2, XCircle, AlertTriangle, ChevronRight, Settings2, ListTodo, GitMerge, GitPullRequest, CalendarDays, Rss, Bell, CloudSun, SquareCheck, Hash, Send, Globe } from 'lucide-react';
-import { Card, Button, Badge, Spinner, Modal } from '../components/ui';
+import { Card, Button, Badge, Spinner, ConfirmModal } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { useIntegrations, useConnectIntegration, useDisconnectIntegration, useDeleteCredentials, useTestIntegrationAction } from '../hooks/useIntegrations';
@@ -409,13 +409,17 @@ export function Integrations() {
       )}
 
       {/* Disconnect Confirmation */}
-      <Modal
+      <ConfirmModal
         open={!!showDisconnect}
         onClose={() => setShowDisconnect(null)}
+        onConfirm={() => showDisconnect && handleDisconnect(showDisconnect)}
         title={t.integrations.disconnectConfirm}
-      >
-        <p className="text-text-secondary mb-4">{t.integrations.disconnectWarning}</p>
-        <div className="flex justify-between gap-2">
+        confirmLabel={t.integrations.disconnect}
+        variant="danger"
+        isPending={disconnect.isPending}
+        cancelVariant="ghost"
+        size="md"
+        extraAction={
           <Button
             variant="ghost"
             onClick={() => {
@@ -426,41 +430,25 @@ export function Integrations() {
           >
             {t.integrations.deleteCredentials}
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => setShowDisconnect(null)}>
-              {t.common.cancel}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => showDisconnect && handleDisconnect(showDisconnect)}
-              loading={disconnect.isPending}
-            >
-              {t.integrations.disconnect}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        }
+      >
+        <p className="text-text-secondary">{t.integrations.disconnectWarning}</p>
+      </ConfirmModal>
 
       {/* Delete Credentials Confirmation */}
-      <Modal
+      <ConfirmModal
         open={!!showDeleteCredentials}
         onClose={() => setShowDeleteCredentials(null)}
+        onConfirm={() => showDeleteCredentials && handleDeleteCredentials(showDeleteCredentials)}
         title={t.integrations.deleteCredentialsConfirm}
+        confirmLabel={t.integrations.deleteCredentials}
+        variant="danger"
+        isPending={deleteCredentials.isPending}
+        cancelVariant="ghost"
+        size="md"
       >
-        <p className="text-text-secondary mb-4">{t.integrations.deleteCredentialsWarning}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setShowDeleteCredentials(null)}>
-            {t.common.cancel}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => showDeleteCredentials && handleDeleteCredentials(showDeleteCredentials)}
-            loading={deleteCredentials.isPending}
-          >
-            {t.integrations.deleteCredentials}
-          </Button>
-        </div>
-      </Modal>
+        <p className="text-text-secondary">{t.integrations.deleteCredentialsWarning}</p>
+      </ConfirmModal>
     </div>
   );
 }

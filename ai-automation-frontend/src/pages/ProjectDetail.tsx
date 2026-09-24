@@ -6,7 +6,7 @@ import {
   Brain, Sparkles,
 } from 'lucide-react';
 import { ModalFooter } from '../components/ui';
-import { Card, CardHeader, Button, Input, Select, Modal, Spinner, DirectoryPicker } from '../components/ui';
+import { Card, CardHeader, Button, Input, Select, Modal, ConfirmModal, Spinner, DirectoryPicker } from '../components/ui';
 import { MonacoEditor } from '../components/shared/MonacoEditor';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -357,26 +357,16 @@ export function ProjectDetail() {
       </Modal>
 
       {/* Archive Confirmation */}
-      <Modal
+      <ConfirmModal
         open={showArchive}
         onClose={() => setShowArchive(false)}
+        onConfirm={handleArchive}
         title={`${t.projects.archive} "${project.name}"?`}
-        size="sm"
-        footer={
-          <ModalFooter
-            onCancel={() => setShowArchive(false)}
-            onAction={handleArchive}
-            cancelLabel={t.common.cancel}
-            actionLabel={t.projects.archive}
-            actionVariant="danger"
-            actionLoading={archiveProject.isPending}
-          />
-        }
-      >
-        <p className="text-sm text-text-secondary">
-          {t.projects.archiveConfirm}
-        </p>
-      </Modal>
+        message={t.projects.archiveConfirm}
+        confirmLabel={t.projects.archive}
+        variant="danger"
+        isPending={archiveProject.isPending}
+      />
     </div>
   );
 }

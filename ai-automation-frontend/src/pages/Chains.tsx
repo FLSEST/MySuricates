@@ -2,7 +2,7 @@ import { Hint } from '../components/hints/Hint';
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link2, Plus, Play, Layers } from 'lucide-react';
-import { Card, Button, Input, Modal, Spinner } from '../components/ui';
+import { Card, Button, Input, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
@@ -247,13 +247,19 @@ export function Chains() {
       )}
 
       {/* Delete Confirm */}
-      <Modal open={deleteConfirm.open} onClose={() => setDeleteConfirm({ open: false, chain: null })} title={t.common.delete}>
-        <p className="text-text-secondary mb-4">{t.chains.deleteConfirm}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setDeleteConfirm({ open: false, chain: null })}>{t.common.cancel}</Button>
-          <Button variant="danger" onClick={handleDelete} disabled={deleteChain.isPending}>{t.common.delete}</Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, chain: null })}
+        onConfirm={handleDelete}
+        title={t.common.delete}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={deleteChain.isPending}
+        cancelVariant="ghost"
+        size="md"
+      >
+        <p className="text-text-secondary">{t.chains.deleteConfirm}</p>
+      </ConfirmModal>
 
       {/* Execute with variables dialog */}
       {executeTarget && (() => {

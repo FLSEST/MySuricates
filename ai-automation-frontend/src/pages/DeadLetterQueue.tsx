@@ -2,7 +2,7 @@ import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, RotateCcw, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button, Modal, Spinner } from '../components/ui';
+import { Button, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import {
   useDeadLetters,
@@ -122,37 +122,32 @@ export function DeadLetterQueue() {
         </div>
       )}
 
-      <Modal
+      <ConfirmModal
         open={!!retryTarget}
         onClose={() => setRetryTarget(null)}
+        onConfirm={handleRetry}
         title={t.dlq.retryConfirm}
+        confirmLabel={t.dlq.retry}
+        isPending={retry.isPending}
+        cancelVariant="ghost"
+        size="md"
       >
-        <p className="text-text-secondary mb-4">{t.dlq.retryConfirmHint}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setRetryTarget(null)}>
-            {t.common.cancel}
-          </Button>
-          <Button onClick={handleRetry} loading={retry.isPending}>
-            {t.dlq.retry}
-          </Button>
-        </div>
-      </Modal>
+        <p className="text-text-secondary">{t.dlq.retryConfirmHint}</p>
+      </ConfirmModal>
 
-      <Modal
+      <ConfirmModal
         open={!!discardTarget}
         onClose={() => setDiscardTarget(null)}
+        onConfirm={handleDiscard}
         title={t.dlq.discardConfirm}
+        confirmLabel={t.dlq.discard}
+        variant="danger"
+        isPending={discard.isPending}
+        cancelVariant="ghost"
+        size="md"
       >
-        <p className="text-text-secondary mb-4">{t.dlq.discardConfirmHint}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setDiscardTarget(null)}>
-            {t.common.cancel}
-          </Button>
-          <Button variant="danger" onClick={handleDiscard} loading={discard.isPending}>
-            {t.dlq.discard}
-          </Button>
-        </div>
-      </Modal>
+        <p className="text-text-secondary">{t.dlq.discardConfirmHint}</p>
+      </ConfirmModal>
     </div>
   );
 }

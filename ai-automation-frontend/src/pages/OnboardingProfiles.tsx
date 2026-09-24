@@ -15,6 +15,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { ModalFooter } from '../components/ui/ModalFooter';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { Spinner } from '../components/ui/Spinner';
 import { Plus, Trash2, RotateCcw, Save, BookOpen, Clock, Shield, ArrowUpCircle, PencilLine } from 'lucide-react';
 import { useI18nStore } from '../i18n';
@@ -400,43 +401,27 @@ export function OnboardingProfiles() {
       </Modal>
 
       {/* Delete Confirmation */}
-      <Modal
+      <ConfirmModal
         open={showDelete}
         onClose={() => setShowDelete(false)}
+        onConfirm={handleDelete}
         title={`${t.common.delete} "${selected ? resolveProfileName(selected, locale) : ''}"?`}
-        size="sm"
-        footer={
-          <ModalFooter
-            onCancel={() => setShowDelete(false)}
-            onAction={handleDelete}
-            cancelLabel={t.common.cancel}
-            actionLabel={t.common.delete}
-            actionVariant="danger"
-            actionLoading={deleteProfile.isPending}
-          />
-        }
-      >
-        <p className="text-sm text-text-secondary">{t.onboardingProfiles.deleteConfirm}</p>
-      </Modal>
+        message={t.onboardingProfiles.deleteConfirm}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={deleteProfile.isPending}
+      />
 
       {/* Reset Confirmation */}
-      <Modal
+      <ConfirmModal
         open={showReset}
         onClose={() => setShowReset(false)}
+        onConfirm={handleReset}
         title={t.onboardingProfiles.reset}
-        size="sm"
-        footer={
-          <ModalFooter
-            onCancel={() => setShowReset(false)}
-            onAction={handleReset}
-            cancelLabel={t.common.cancel}
-            actionLabel={t.onboardingProfiles.reset}
-            actionLoading={resetProfile.isPending}
-          />
-        }
-      >
-        <p className="text-sm text-text-secondary">{t.onboardingProfiles.resetConfirm}</p>
-      </Modal>
+        message={t.onboardingProfiles.resetConfirm}
+        confirmLabel={t.onboardingProfiles.reset}
+        isPending={resetProfile.isPending}
+      />
 
       {/* Shipped text of a built-in profile with an update */}
       {selected && showShipped && (

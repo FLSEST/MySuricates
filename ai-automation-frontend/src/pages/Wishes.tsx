@@ -1,7 +1,7 @@
 import { Hint } from '../components/hints/Hint';
 import { useState, useMemo } from 'react';
 import { Sparkles } from 'lucide-react';
-import { Card, Button, Input, Modal, Spinner } from '../components/ui';
+import { Card, Input, ConfirmModal, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { WishAnalytics } from '../components/wishes/WishAnalytics';
@@ -158,13 +158,19 @@ export function Wishes() {
       )}
 
       {/* Delete Confirm */}
-      <Modal open={deleteConfirm.open} onClose={() => setDeleteConfirm({ open: false, wish: null })} title={t.common.delete}>
-        <p className="text-text-secondary mb-4">{t.wishes.deleteConfirm}</p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setDeleteConfirm({ open: false, wish: null })}>{t.common.cancel}</Button>
-          <Button variant="danger" onClick={handleDelete} disabled={deleteWish.isPending}>{t.common.delete}</Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, wish: null })}
+        onConfirm={handleDelete}
+        title={t.common.delete}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={deleteWish.isPending}
+        cancelVariant="ghost"
+        size="md"
+      >
+        <p className="text-text-secondary">{t.wishes.deleteConfirm}</p>
+      </ConfirmModal>
     </div>
   );
 }

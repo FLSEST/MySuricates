@@ -1,7 +1,7 @@
 import { Hint } from '../components/hints/Hint';
 import { useState } from 'react';
 import { Webhook, Plus, Trash2, RefreshCw, KeyRound, ShieldCheck, ShieldOff } from 'lucide-react';
-import { Card, Button, Input, Select, Modal, ModalFooter, Spinner, Table, Toggle, Badge } from '../components/ui';
+import { Card, Button, Input, Select, Modal, ConfirmModal, Spinner, Table, Toggle, Badge } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { CopyButton } from '../components/shared/CopyButton';
@@ -292,29 +292,20 @@ export function Webhooks() {
       </Modal>
 
       {/* Confirmation for regenerate / delete */}
-      <Modal
+      <ConfirmModal
         open={confirmAction !== null}
         onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmedAction}
         title={confirmAction ? CONFIRM_TEXT[confirmAction.kind](t).title : ''}
-        size="sm"
-        footer={
-          <ModalFooter
-            onCancel={() => setConfirmAction(null)}
-            onAction={runConfirmedAction}
-            cancelLabel={t.common.cancel}
-            actionLabel={confirmAction ? CONFIRM_TEXT[confirmAction.kind](t).title : ''}
-            actionVariant="danger"
-            actionLoading={regenerateToken.isPending || deleteWebhook.isPending || generateSecret.isPending || removeSecret.isPending}
-          />
-        }
+        message={confirmAction && CONFIRM_TEXT[confirmAction.kind](t).text}
+        confirmLabel={confirmAction ? CONFIRM_TEXT[confirmAction.kind](t).title : ''}
+        variant="danger"
+        isPending={regenerateToken.isPending || deleteWebhook.isPending || generateSecret.isPending || removeSecret.isPending}
       >
-        <p className="text-sm text-text-secondary">
-          {confirmAction && CONFIRM_TEXT[confirmAction.kind](t).text}
-        </p>
         {confirmAction && (
           <p className="text-xs font-mono text-text-tertiary mt-3 break-all">{confirmAction.webhook.webhookUrl}</p>
         )}
-      </Modal>
+      </ConfirmModal>
 
       {/* One-time token reveal modal — shown right after create/regenerate, never again */}
       <Modal
