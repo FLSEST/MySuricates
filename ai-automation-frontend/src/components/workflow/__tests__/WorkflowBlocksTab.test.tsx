@@ -7,16 +7,21 @@ const moduleState = { bpmn: true };
 vi.mock('../../../hooks/useModules', () => ({
   useModuleEnabled: (name: string) => (name === 'bpmn' ? moduleState.bpmn : true),
 }));
-// Stand-ins: the list reports hover and edit, the diagram shows the requested flash
+// Stand-ins: the list reports hover and edit, the diagram shows the requested flash. The list
+// also keeps the edit handler it got, so a test can call it where a click could not reach it.
+const listProps: { onEditBlock?: (i: number) => void } = {};
 vi.mock('../SortableBlockList', () => ({
   SortableBlockList: ({ onEditBlock, onHoverBlock, flashBlock }: {
     onEditBlock: (i: number) => void; onHoverBlock?: (i: number) => void; flashBlock?: { index: number } | null;
-  }) => (
-    <div data-testid="block-list" data-flash={flashBlock?.index ?? ''}>
-      <button type="button" onClick={() => onEditBlock(1)}>edit block 1</button>
-      <button type="button" onMouseEnter={() => onHoverBlock?.(0)}>hover block 0</button>
-    </div>
-  ),
+  }) => {
+    listProps.onEditBlock = onEditBlock;
+    return (
+      <div data-testid="block-list" data-flash={flashBlock?.index ?? ''}>
+        <button type="button" onClick={() => onEditBlock(1)}>edit block 1</button>
+        <button type="button" onMouseEnter={() => onHoverBlock?.(0)}>hover block 0</button>
+      </div>
+    );
+  },
 }));
 vi.mock('../WorkflowDiagramTab', () => ({
   default: ({ flashBlock, onHoverBlock }: { flashBlock?: { index: number } | null; onHoverBlock: (i: number) => void }) => (
@@ -30,6 +35,7 @@ import { WorkflowBlocksTab } from '../WorkflowBlocksTab';
 
 beforeEach(() => {
   moduleState.bpmn = true;
+  listProps.onEditBlock = undefined;
   useI18nStore.setState({ locale: 'en' });
 });
 
@@ -68,7 +74,8 @@ describe('WorkflowBlocksTab', () => {
     const handlers = renderTab(workflow({ sealed: true }));
     expect(screen.getByRole('button', { name: /Add Block/ })).toBeDisabled();
     expect(screen.getByTestId('block-list').closest('fieldset')).toBeDisabled();
-    fireEvent.click(screen.getByText('edit block 1'));
+    // The locked fieldset swallows every click, so call what the list got: a handler that does nothing
+    listProps.onEditBlock!(1);
     expect(handlers.onEditBlock).not.toHaveBeenCalled();
   });
 
