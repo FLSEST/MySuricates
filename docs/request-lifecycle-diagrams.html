@@ -150,7 +150,7 @@
 </header>
 
 <nav>
-  <a href="#systemuebersicht">Systemuebersicht</a>
+  <a href="#systemübersicht">Systemübersicht</a>
   <a href="#filterkette">Filterkette</a>
   <a href="#controller-service-repository">Controller → Service → Repository</a>
   <a href="#fehlerformat">Fehlerformat</a>
@@ -160,19 +160,19 @@
 
 <main>
 
-<section id="systemuebersicht">
-  <h2>Systemuebersicht <span>Request Path</span></h2>
-  <p>HTTP-Anfragen laufen ueber den Vite-Proxy (Dev) oder direkt zum Spring Boot Backend, passieren Security-Filter und landen in den REST-Controllern.</p>
+<section id="systemübersicht">
+  <h2>Systemübersicht <span>Request Path</span></h2>
+  <p>HTTP-Anfragen laufen über den Vite-Proxy (Dev) oder direkt zum Spring-Boot-Backend, passieren Spring Security mit dem <code>ApiKeyAuthFilter</code> und den <code>RateLimitFilter</code> und landen in den REST-Controllern. Live-Nachrichten schicken die Services per STOMP.</p>
   <pre class="mermaid">
 flowchart LR
     B["Browser"] --&gt; P["Vite Proxy /api -&gt; :9090"]
-    P --&gt; F["ApiKeyAuthFilter"]
+    P --&gt; F["ApiKeyAuthFilter (Spring Security)"]
     F --&gt; RLF["RateLimitFilter"]
     RLF --&gt; C["REST Controller"]
     C --&gt; S["Service"]
     S --&gt; REPO["Repository (JPA)"]
     REPO --&gt; DB["SQLite (WAL)"]
-    C --&gt; WS["STOMP /topic/**"]
+    S --&gt; WS["STOMP /topic/**"]
 
     style DB fill:#2e1a1a,stroke:#30363d,color:#e6edf3
   </pre>
@@ -180,27 +180,27 @@ flowchart LR
 
 <section id="filterkette">
   <h2>Filterkette <span>Vor den Controllern</span></h2>
-  <p>Reihenfolge: ApiKeyAuth → RateLimit → Controller. Bei Fehlkonfig oder fehlendem Key wird die Anfrage abgewiesen, bevor Business-Logik startet.</p>
+  <p>Reihenfolge: Spring Security mit <code>ApiKeyAuthFilter</code> → <code>RateLimitFilter</code> → Controller. Ohne gültigen Key weist Spring Security geschützte Pfade mit 403 ab, bevor Business-Logik startet; das Rate Limit zählt nur <code>/api/**</code>.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant Client
     participant Proxy as Vite Proxy
     participant API as Spring Boot
-    participant AK as ApiKeyAuthFilter
+    participant AK as ApiKeyAuthFilter + Spring Security
     participant RL as RateLimitFilter
     participant CTR as Controller
 
     Client-&gt;&gt;Proxy: HTTP /api/v1/...
     Proxy-&gt;&gt;API: forwarded request
     API-&gt;&gt;AK: doFilter
-    alt API-Key fehlt/ungueltig (wenn enabled)
-        AK--&gt;&gt;Client: 401 Unauthorized
-    else ok
+    alt API-Key fehlt/ungültig bei geschütztem Pfad
+        AK--&gt;&gt;Client: 403 Forbidden (SECURITY-Eintrag im Activity-Log)
+    else ok oder offener Pfad
         AK-&gt;&gt;RL: proceed
-        alt Limit ueberschritten
-            RL--&gt;&gt;Client: 429 Too Many Requests
+        alt Limit überschritten
+            RL--&gt;&gt;Client: 429 Too Many Requests + Retry-After
         else ok
-            RL-&gt;&gt;CTR: proceed
+            RL-&gt;&gt;CTR: proceed (X-RateLimit-Remaining)
             CTR--&gt;&gt;Client: Response / Error
         end
     end
@@ -209,7 +209,7 @@ sequenceDiagram
 
 <section id="controller-service-repository">
   <h2>Controller → Service → Repository <span>Beispiel: /projects</span></h2>
-  <p>Controller sind schlank; Services kapseln Logik, Repositories sprechen SQLite.</p>
+  <p>Controller sind schlank; Services kapseln Logik und Transaktionen, Repositories sprechen SQLite über eine einzige Verbindung (HikariCP <code>maximum-pool-size: 1</code>). Open Session in View ist aus: Lazy-Laden gehört in den Service, der Controller mappt mit MapStruct in DTOs.</p>
   <pre class="mermaid">
 sequenceDiagram
     participant Client
@@ -220,9 +220,12 @@ sequenceDiagram
 
     Client-&gt;&gt;CTR: GET /api/v1/projects
     CTR-&gt;&gt;SVC: findAll()
-    SVC-&gt;&gt;REP: findAll()
+    SVC-&gt;&gt;REP: findActiveWithContainer() (readOnly-Transaktion)
+    REP-&gt;&gt;DB: SELECT Projekte ohne archived_at, Container per Join
+    DB--&gt;&gt;REP: Zeilen
     REP--&gt;&gt;SVC: List&lt;Project&gt;
-    SVC--&gt;&gt;CTR: DTOs via Mapper
+    SVC--&gt;&gt;CTR: List&lt;Project&gt;
+    CTR-&gt;&gt;CTR: ProjectMapper.toResponseList()
     CTR--&gt;&gt;Client: 200 JSON
   </pre>
 </section>
@@ -232,10 +235,12 @@ sequenceDiagram
   <table>
     <thead><tr><th>Fall</th><th>Status</th><th>Body</th></tr></thead>
     <tbody>
-      <tr><td>Validation</td><td>400</td><td><code>{"error":"Validation failed","fieldErrors":{...}}</code></td></tr>
-      <tr><td>Not Found</td><td>404</td><td><code>{"error":"Resource not found"}</code></td></tr>
-      <tr><td>Rate Limit</td><td>429</td><td><code>{"error":"Too many requests"}</code></td></tr>
-      <tr><td>Server</td><td>500</td><td><code>{"error":"Internal server error"}</code></td></tr>
+      <tr><td>Validierung</td><td>400</td><td><code>{"code":"VALIDATION_FAILED","error":"Validation failed","timestamp":"…","fieldErrors":{...}}</code></td></tr>
+      <tr><td>Ungültiges Argument</td><td>400</td><td><code>{"code":"INVALID_ARGUMENT","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>Nicht gefunden</td><td>404</td><td><code>{"code":"RESOURCE_NOT_FOUND","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>Zustandskonflikt</td><td>409</td><td><code>{"code":"STATE_CONFLICT","error":"…","timestamp":"…"}</code></td></tr>
+      <tr><td>Rate Limit (Filter, nicht Handler)</td><td>429</td><td><code>{"error": "Rate limit exceeded", "retryAfterSeconds": N}</code></td></tr>
+      <tr><td>Server</td><td>500</td><td><code>{"code":"INTERNAL_ERROR","error":"Internal server error","timestamp":"…"}</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -245,15 +250,15 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>API-Key</h3>
-      <p><code>automation.security.enabled=true</code></p>
-      <p>Header: <code>X-API-Key</code></p>
+      <p><code>automation.security.enabled=true</code> (Standard)</p>
+      <p>Header: <code>X-API-Key</code>; ohne <code>automation.security.api-key</code> erzeugt das Backend beim ersten Start einen Schlüssel und legt ihn in <code>app_settings</code> ab</p>
       <p>Constant-Time Vergleich (<code>MessageDigest.isEqual</code>)</p>
     </div>
     <div class="card">
       <h3>Rate Limit</h3>
-      <p><code>automation.security.rate-limit.enabled</code> (default false)</p>
-      <p>Sliding Window, 120 req/min pro Client-IP</p>
-      <p>Header: <code>X-RateLimit-Remaining</code></p>
+      <p><code>automation.security.rate-limit.enabled</code> (Standard <code>true</code>), <code>requests-per-minute</code> (Standard <code>120</code>)</p>
+      <p>Festes 1-Minuten-Fenster je Client-IP; <code>X-Forwarded-For</code> zählt nur hinter <code>trusted-proxies</code></p>
+      <p>Header: <code>X-RateLimit-Remaining</code>, bei 429 <code>Retry-After</code></p>
     </div>
   </div>
 </section>
@@ -261,11 +266,11 @@ sequenceDiagram
 <section id="offene-endpunkte">
   <h2>Offene Endpunkte <span>ohne API-Key</span></h2>
   <ul>
-    <li><code>GET /api/v1/system/health</code></li>
-    <li><code>GET /api/v1/system/info</code></li>
-    <li><code>POST /api/v1/webhook/trigger/{token}</code></li>
-    <li><code>/ws/**</code> (SockJS/STOMP)</li>
-    <li><code>/actuator/**</code></li>
+    <li><code>GET /api/v1/system/health</code>, <code>/info</code>, <code>/auth-status</code>, <code>/jvm-memory</code></li>
+    <li><code>POST /api/v1/webhook/trigger/{token}</code> — mit gesetztem Secret nur mit gültiger HMAC-Signatur (<code>X-Signature</code>)</li>
+    <li><code>GET /api/v1/integrations/{providerId}/callback</code> (OAuth-Rückruf)</li>
+    <li><code>/ws/**</code> (SockJS/STOMP) — ohne Key-Header, der Handshake verlangt aber ein Einmal-Ticket aus <code>POST /api/v1/ws-ticket</code></li>
+    <li><code>/actuator/health</code>; die übrigen <code>/actuator/**</code> nur mit Key</li>
   </ul>
 </section>
 
