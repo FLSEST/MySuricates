@@ -15,7 +15,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,12 +36,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PoolAnalyzerGateTest {
 
+    /**
+     * Schwere Befunde an Definitionen, deren Reparatur ein eigenes TODO trägt: {@code "<Datei> <Regel>"}
+     * → Grund. Nur zum Abbauen — tritt der Befund an der geprüften Datei nicht mehr auf, bricht der Test.
+     */
+    private static final Map<String, String> KNOWN_SEVERE = Map.of(
+            "saas-feature-loop.json items-command-without-source",
+            "46b9b229 (Built-in-Template saas-feature-loop läuft nicht): foreach kann noch keinen"
+                    + " Unter-Workflow ausführen, items_source allein repariert ihn nicht");
+
     private final WorkflowAnalyzer analyzer = new WorkflowAnalyzer();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void ausgelieferteDefinitionenTragenKeineSchwerenBaufehler() throws IOException {
         List<String> severe = new ArrayList<>();
+        Set<String> known = new TreeSet<>();
+        Set<String> labels = new TreeSet<>();
         Map<String, Integer> byRule = new TreeMap<>();
         int checked = 0;
 
@@ -49,12 +62,15 @@ class PoolAnalyzerGateTest {
                 List<BlockDefinition> blocks = blocksOf(root);
                 if (blocks.isEmpty()) continue;
                 checked++;
+                labels.add(variant.label());
 
                 String instructions = root.path("instructions").isTextual()
                         ? root.path("instructions").asText() : null;
                 for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions)) {
                     byRule.merge(finding.rule(), 1, Integer::sum);
-                    if (finding.severity() == AnalyzerFinding.Severity.HIGH) {
+                    if (KNOWN_SEVERE.containsKey(variant.label() + " " + finding.rule())) {
+                        known.add(variant.label() + " " + finding.rule());
+                    } else if (finding.severity() == AnalyzerFinding.Severity.HIGH) {
                         severe.add(variant.label() + " [Block " + finding.blockIndex() + "] "
                                 + finding.rule() + ": " + finding.detail());
                     }
@@ -65,6 +81,9 @@ class PoolAnalyzerGateTest {
         assertThat(checked).as("keine Definitionen mit Blöcken gefunden").isPositive();
         System.out.println("Analyzer über " + checked + " ausgelieferte Definitionen: " + byRule);
         assertThat(severe).as("schwere Baufehler in ausgelieferten Definitionen").isEmpty();
+        assertThat(KNOWN_SEVERE.keySet().stream()
+                .filter(key -> labels.contains(key.substring(0, key.indexOf(' '))) && !known.contains(key)))
+                .as("behoben — aus KNOWN_SEVERE streichen").isEmpty();
     }
 
     /** Die Blöcke einer Pool- oder Template-Datei; beide Formate führen sie unter {@code blocks}. */

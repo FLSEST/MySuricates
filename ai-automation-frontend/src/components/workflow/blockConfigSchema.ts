@@ -1,4 +1,5 @@
 import { AI_BLOCK_TYPES, type BlockType } from '../../types';
+import blockDefaultConfig from '../../data/blockDefaultConfig.json';
 
 /**
  * Describes the `config` object of every block type as a JSON schema, so the Monaco config editor can
@@ -400,29 +401,13 @@ const SPECS: Record<BlockType, BlockSpec> = {
   },
 };
 
-/** Starting config offered when a block type is picked in the add dialog (and as Ctrl+Space snippet). */
-export const BLOCK_DEFAULT_CONFIG: Record<BlockType, Record<string, unknown>> = {
-  simple: { command: '' },
-  shell: { command: '', timeout_seconds: 300 },
-  retry: { command: '', max_retries: 3, delay: 5 },
-  foreach: { items_command: '', variable_name: 'item', command: '' },
-  while: { condition_command: '', command: '', max_iterations: 10 },
-  conditional: { condition: '', then_command: '', else_command: '' },
-  'skill-capability': { capability: '', input: '{{ previous_output }}' },
-  approval: { question: '', options: ['Yes', 'Yes always', 'No'], mode: 'ask', auto_answer: null, on_no: 'continue', variable_name: 'approval_answer', timeout_minutes: 30 },
-  'human-input': { prompt: '', input_type: 'text', variable_name: 'user_input', options: [], default_value: '', required: true, timeout_minutes: 30, use_default_on_timeout: true },
-  agentic: { goal: '', success_criteria: '', max_iterations: 10, iteration_timeout_seconds: 300, total_timeout_seconds: 1800, max_total_tokens: 200000, max_repeated_actions: 3, require_approval: false },
-  'sub-workflow': { workflow_id: '' },
-  switch: { expression: '', cases: [{ value: 'default', blocks: [] }] },
-  document: { file_path: '', variable_name: 'extracted_text', fail_on_empty: false, min_characters: 1 },
-  integration: { provider: '', action: '', params: {} },
-  'todo-create': { title: '', description: '', priority: 'MEDIUM', tags: [], variable_name: 'todo_id' },
-  'todo-update': { id: '{{ todo_id }}', title: '', description: '' },
-  'todo-close': { id: '{{ todo_id }}' },
-  compress: { source: '', stages: [{ op: 'text.normalize' }, { op: 'text.truncate', max_chars: 18000, keep: 'head_tail' }], max_chars: 20000 },
-  'compress-ai': { source: '', instruction: '', max_chars: 4000, provider: 'CLAUDE' },
-  'dashboard-report': { status: 'GREEN', title: '', summary: '', kpis: [], items: [] },
-};
+/**
+ * Starting config offered when a block type is picked in the add dialog (and as Ctrl+Space snippet).
+ * Kept as JSON so the backend runs the same defaults through the executors (`EditorDefaultConfigTest`):
+ * a default the executor does not act on — foreach `items_command` without `items_source: "command"`
+ * ran zero items (TODO 2f01ab01) — fails there, not in a user's first run.
+ */
+export const BLOCK_DEFAULT_CONFIG: Record<BlockType, Record<string, unknown>> = blockDefaultConfig;
 
 const COMPRESS_OPS: Array<[string, Text]> = [
   ['text.normalize', s('ANSI, CR, Leerraum am Zeilenende und Leerzeilen-Folgen entfernen.', 'Strip ANSI, CR, trailing whitespace and blank-line runs.')],

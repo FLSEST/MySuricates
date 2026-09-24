@@ -67,6 +67,13 @@ describe('blockConfigSchema', () => {
     }
   });
 
+  // The executor reads items_command only with items_source "command" — without it a new foreach
+  // block ran zero items (TODO 2f01ab01). The backend runs this default in EditorDefaultConfigTest.
+  it('lets the foreach default take its items from items_command', () => {
+    expect(BLOCK_DEFAULT_CONFIG.foreach).toMatchObject({ items_source: 'command', items_command: '' });
+    expect(allowedConfigValues('foreach', 'items_source')).toContain('command');
+  });
+
   it('explains every key and value in German and English', () => {
     for (const text of allSchemaTexts()) {
       expect(text.de.trim(), JSON.stringify(text)).not.toBe('');

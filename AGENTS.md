@@ -375,7 +375,8 @@ GET /api/v1/workflows/{id}/analyze
 #     "findings":[{"rule","severity","blockIndex","blockName","detail"}]}
 # Regeln: unknown-block-reference, chain-only-placeholder, unwired-output (nur KI-Bloecke),
 #         absolute-home-path, missing-strict-mode, duplicated-instructions, dated-model-id,
-#         on-no-without-reject-option (Approval mit on_no, aber keine Option lehnt ab)
+#         on-no-without-reject-option (Approval mit on_no, aber keine Option lehnt ab),
+#         items-command-without-source (foreach mit items_command, aber ohne items_source "command")
 # Der Analyzer meldet nur — er blockiert keinen Schreibweg und veraendert nichts.
 
 # Bestandslauf ueber alle Definitionen in aktiven Projekten
