@@ -185,6 +185,58 @@ assert "Ratchet" in prompt and "herabstufen" in prompt, "Ratchet-Herabstufung fe
 assert "## cycles" in prompt, "Zyklen-Kriterium fehlt"
 PY'
 
+echo "5b) Struktur-Scan zaehlt nur Kollaborateure (59e22c53)"
+# Werkzeuge, Konfigurationswerte und Zustand sind keine Abhaengigkeiten: gezaehlt werden nur
+# injizierte "private final <Typ> <name>;"-Felder ausserhalb der Ausschlussliste. Eine List/Map/Set
+# ohne Initialisierer ist eine injizierte Bean-Sammlung und zaehlt mit; Deque, Atomic* und Locks
+# ohne Initialisierer bleiben Zustand, Felder mit Initialisierer zaehlen nie.
+SCAN_FIX="$TMP/scan-fixture"
+SCAN_MAIN="$SCAN_FIX/ai-automation-backend/src/main/java/com/automation/service"
+mkdir -p "$SCAN_MAIN"
+{ echo "package com.automation.service;"
+  echo "@Service"
+  echo "public class BusyService {"
+  for i in 1 2 3 4 5 6; do echo "    private final Collaborator$i collaborator$i;"; done
+  echo "    private final ObjectMapper objectMapper;"
+  echo "    private final TransactionTemplate transactionTemplate;"
+  echo "    private final TransactionTemplate readOnlyTransactionTemplate;"
+  echo "    private final String hostHome;"
+  echo "    private final long ttlMs;"
+  echo "    private final Clock clock;"
+  echo "    private final TrayConfig trayConfig;"
+  echo "    private final List<BlockExecutor> blockExecutors;"
+  echo "    private final UnaryOperator<String> env;"
+  echo "    private final LongSupplier nanoClock;"
+  echo "    private final Map<String, Object> locks = new ConcurrentHashMap<>();"
+  echo "    private final AtomicReference<Thread> running;"
+  echo "    private final Deque<String> pending;"
+  echo "    private final ReentrantLock lock;"
+  echo "    private static final Logger log = LoggerFactory.getLogger(BusyService.class);"
+  for i in $(seq 1 200); do echo "    // filler $i"; done
+  echo "}"
+} > "$SCAN_MAIN/BusyService.java"
+{ echo "package com.automation.service;"
+  echo "public class PlainEvent {"
+  for i in 1 2 3 4 5 6 7; do echo "    private final Collaborator$i value$i;"; done
+  for i in $(seq 1 200); do echo "    // filler $i"; done
+  echo "}"
+} > "$SCAN_MAIN/PlainEvent.java"
+python3 - "$POOL" "$SCAN_FIX" > "$TMP/delta-scan.sh" <<'PY'
+import json, sys
+wf = json.load(open(sys.argv[1]))
+block = next(b for b in wf["blocks"] if b.get("name") == "delta_scan")
+assert block["config"].get("shell_escape_variables") is True
+print(block["config"]["command"].replace("{{ project_path }}", "'" + sys.argv[2] + "'"))
+PY
+bash "$TMP/delta-scan.sh" > "$TMP/delta-scan.out" 2> /dev/null
+# 6 einzelne Kollaborateure + die injizierte List<BlockExecutor> = 7.
+check "God-Class-Liste zaehlt 7 Kollaborateure" 'grep -q "| 7 deps | service/BusyService$" "$TMP/delta-scan.out"'
+check "Kopplungsliste zaehlt 7 Kollaborateure"  'grep -qx "7 deps: BusyService" "$TMP/delta-scan.out"'
+check "Nicht-Bean ohne deps"                    'grep -q "| - deps | service/PlainEvent$" "$TMP/delta-scan.out"'
+check "Nicht-Bean nicht in der Kopplungsliste"  '! grep -q "deps: PlainEvent" "$TMP/delta-scan.out"'
+check "Report-Prompt: Zahl meint Kollaborateure" \
+  'python3 -c "import json,sys; p=next(b for b in json.load(open(sys.argv[1]))[\"blocks\"] if b.get(\"name\")==\"report\")[\"config\"][\"command\"]; sys.exit(0 if \"nur Kollaborateure\" in p and \"com.automation.executor.blocks\" in p and \"erst ab >10\" in p else 1)" "$POOL"'
+
 # ---------------------------------------------------------------------------
 # Fixture-Repo: zwei Pakete mit wechselseitiger Abhaengigkeit, eine leere Datei,
 # ein mvnw-Stub, der mit javac nach target/classes baut. Damit laeuft der
