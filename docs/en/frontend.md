@@ -111,6 +111,8 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Pause/resume/cancel buttons during execution
 - Star rating (1-5) after completion
 - Error panel for failed runs
+- Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
+- `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
 
 ### Skills (`/skills`)
 

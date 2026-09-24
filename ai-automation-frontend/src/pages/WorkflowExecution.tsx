@@ -1,10 +1,7 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft, Pause, Play, XCircle, Clock, Send, TerminalSquare,
-  FolderOpen, ListTodo, Save, Trash2, Lock, LockOpen, Minus,
-} from 'lucide-react';
-import { Card, CardHeader, Button, Spinner, Input } from '../components/ui';
+import { ArrowLeft, Pause, Play, XCircle, Clock, FolderOpen, ListTodo, Save, Trash2 } from 'lucide-react';
+import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { GateStatusBadge } from '../components/shared/GateStatusBadge';
 import { GateStatusBanner } from '../components/shared/GateStatusBanner';
@@ -15,21 +12,25 @@ import { Hint } from '../components/hints/Hint';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { AgenticStepCard } from '../components/shared/AgenticStepCard';
 import { ForEachStepCard } from '../components/shared/ForEachStepCard';
-import { CopyButton } from '../components/shared/CopyButton';
 import { InsightsPanel } from '../components/shared/InsightsPanel';
 import { ConversionSuggestion } from '../components/shared/ConversionSuggestion';
 import {
   useWorkflow, useWorkflowRun, useWorkflowBpmn,
-  usePauseExecution, useResumeExecution, useCancelExecution, useRunCommand, useSubmitApproval,
-  useApproveTodos, useResumeFromStep, useUpdateRunNotes, useDeleteRun,
+  usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
+  useResumeFromStep, useUpdateRunNotes, useDeleteRun,
 } from '../hooks/useWorkflows';
 import { type RunStatus, type DiagramSelection } from '../components/workflow/BpmnDiagramView';
 import { ExecutionDiagramPanel } from '../components/workflow/ExecutionDiagramPanel';
 import { ExecutionStepCard } from '../components/workflow/ExecutionStepCard';
 import { latestStepByBlock, stepBlockType } from '../components/workflow/stepMetadata';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
+import { RunContainerPanel } from '../components/workflow/RunContainerPanel';
+import { RunInputVariables } from '../components/workflow/RunInputVariables';
+import { RunPendingTodosPanel } from '../components/workflow/RunPendingTodosPanel';
+import { RunProvenance } from '../components/workflow/RunProvenance';
 import { useCreateTodo } from '../hooks/useTodos';
-import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
+import { useExecutionWebSocket } from '../hooks/useWebSocket';
+import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useRunDeletionAllowed } from '../hooks/useSystemCapabilities';
@@ -37,10 +38,8 @@ import { useToast } from '../hooks/useToast';
 import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
-import { api, openPath } from '../api/client';
-import type { PendingHumanInput, PendingTodoItem } from '../types';
-
-const TerminalPanel = lazy(() => import('../components/shared/TerminalPanel').then(m => ({ default: m.TerminalPanel })));
+import { openPath } from '../api/client';
+import type { PendingTodoItem } from '../types';
 
 export function WorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
@@ -53,7 +52,6 @@ export function WorkflowExecution() {
   const { logs, connected, pendingApproval, pendingHumanInput, agenticStates, forEachStates } = useExecutionWebSocket(runId!, id);
   const toast = useToast();
   const learningModule = useModuleEnabled('learning');
-  const terminalModule = useModuleEnabled('terminal');
   const conversionModule = useModuleEnabled('conversion');
   const rateRun = useRateRun();
   const pauseExecution = usePauseExecution();
@@ -62,53 +60,12 @@ export function WorkflowExecution() {
   const deleteRun = useDeleteRun();
   const runDeletionAllowed = useRunDeletionAllowed();
   const resumeFromStep = useResumeFromStep();
-  const runCommand = useRunCommand();
   const submitApproval = useSubmitApproval();
-  const approveTodos = useApproveTodos();
   const createTodo = useCreateTodo();
   const updateNotes = useUpdateRunNotes();
 
-  const [command, setCommand] = useState('');
   const [notesText, setNotesText] = useState<string | null>(null);
-  const [containerTab, setContainerTab] = useState<'command' | 'terminal'>('command');
-  const [recoveredApproval, setRecoveredApproval] = useState<PendingApproval | null>(null);
-  const [recoveredHumanInput, setRecoveredHumanInput] = useState<PendingHumanInput | null>(null);
-
-  // Recovery: check for pending approval/human-input on page load/reload
-  useEffect(() => {
-    if (!runId) return;
-    api.get<{
-      pending: boolean; blockId?: string; question?: string; options?: string[]; rejectOptions?: string[]; stepIndex?: number;
-      type?: string; inputType?: string; defaultValue?: string; variableName?: string;
-      required?: boolean; validationPattern?: string | null;
-    }>(
-      `/executions/${runId}/approval`
-    ).then((data) => {
-      if (data.pending && data.blockId) {
-        if (data.type === 'human-input') {
-          setRecoveredHumanInput({
-            blockId: data.blockId,
-            prompt: data.question!,
-            inputType: (data.inputType as PendingHumanInput['inputType']) || 'text',
-            options: data.options || [],
-            defaultValue: data.defaultValue || '',
-            required: data.required ?? true,
-            validationPattern: data.validationPattern ?? null,
-            variableName: data.variableName || 'user_input',
-            stepIndex: data.stepIndex!,
-          });
-        } else {
-          setRecoveredApproval({
-            blockId: data.blockId,
-            question: data.question!,
-            options: data.options!,
-            rejectOptions: data.rejectOptions,
-            stepIndex: data.stepIndex!,
-          });
-        }
-      }
-    }).catch(() => { /* ignore */ });
-  }, [runId]);
+  const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
@@ -328,127 +285,16 @@ export function WorkflowExecution() {
         )}
       </div>
 
-      {/* Provenance: seal state, what started the run and which definition it executed. Always shown —
-          the seal chip covers every state, including runs that predate the record. */}
-      <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-provenance">
-        {run.sealed === true && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent text-text-inverse font-medium"
-                data-testid="run-sealed"
-                title={Object.keys(run.sealedSkillPins ?? {}).length > 0
-                  ? t.workflows.sealView.runSealedSkills.replace('{count}', String(Object.keys(run.sealedSkillPins ?? {}).length))
-                  : t.workflows.sealView.runSealedNoSkills}>
-            <Lock className="w-3 h-3" />
-            {t.workflows.sealView.runSealed}
-          </span>
-        )}
-        {run.sealed === false && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-dashed border-border-strong text-text-secondary"
-                data-testid="run-not-sealed">
-            <LockOpen className="w-3 h-3" />
-            {t.workflows.sealView.runNotSealed}
-          </span>
-        )}
-        {run.sealed == null && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-text-tertiary"
-                title={t.workflows.sealView.unrecordedHint} data-testid="run-seal-unrecorded">
-            <Minus className="w-3 h-3" />
-            {t.workflows.sealView.unrecorded}
-          </span>
-        )}
-        {run.triggerSource && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised">
-            <span className="text-text-secondary">{t.workflows.triggeredBy}</span>
-            <span className="text-text font-medium">{t.workflows.triggerSources[run.triggerSource]}</span>
-          </span>
-        )}
-        {run.definitionHash && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
-                title={t.workflows.definitionHashHint}>
-            <span className="text-text-secondary">{t.workflows.definitionHash}</span>
-            <span className="text-text">{run.definitionHash.slice(0, 12)}</span>
-            <CopyButton text={run.definitionHash} />
-          </span>
-        )}
-      </div>
+      {/* Provenance */}
+      <RunProvenance run={run} />
 
       {/* Input Variables */}
       {run.inputContext && Object.keys(run.inputContext).length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-text-secondary">{t.workflows.execution.inputVariables}:</span>
-          {Object.entries(run.inputContext).map(([key, value]) => {
-            const strVal = String(value);
-            const isPath = /^\/(?:[\w.-]+\/)+[\w.-]*$/.test(strVal);
-            return (
-              <span
-                key={key}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-xs font-mono"
-              >
-                <span className="text-text-secondary">{key}</span>
-                <span className="text-text-tertiary">=</span>
-                <span className="text-text">{strVal}</span>
-                {isPath && (
-                  <button
-                    onClick={() => openPath(strVal).catch(() => toast.error(t.workflows.execution.openPathFailed))}
-                    className="ml-0.5 text-text-tertiary hover:text-accent transition-colors"
-                    title={t.workflows.execution.openFolder}
-                  >
-                    <FolderOpen className="w-3 h-3" />
-                  </button>
-                )}
-              </span>
-            );
-          })}
-        </div>
+        <RunInputVariables inputContext={run.inputContext} />
       )}
 
       {/* Pending TODOs approval panel */}
-      {(() => {
-        const pendingTodos = run.metadata?.pending_todos as PendingTodoItem[] | undefined;
-        if (!pendingTodos?.length) return null;
-        return (
-          <div className="rounded-xl border border-accent/40 bg-accent/5 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <ListTodo className="w-5 h-5 text-accent" />
-              <h3 className="text-sm font-semibold text-text">{t.workflows.pendingTodos}</h3>
-            </div>
-            <p className="text-sm text-text-secondary">{t.workflows.pendingTodosHint}</p>
-            <div className="space-y-2">
-              {pendingTodos.map((todo, i) => (
-                <div key={i} className="flex items-start gap-2 bg-surface rounded-lg px-3 py-2">
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 ${
-                    todo.priority === 'HIGH' ? 'bg-danger/10 text-danger' :
-                    todo.priority === 'MEDIUM' ? 'bg-warning/10 text-warning' :
-                    'bg-surface-raised text-text-tertiary'
-                  }`}>{todo.priority}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-text">{todo.title}</p>
-                    {todo.description && (
-                      <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{todo.description}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Button
-                size="sm"
-                onClick={() => approveTodos.mutate({ runId: runId!, approved: true })}
-                loading={approveTodos.isPending}
-              >
-                {t.workflows.approveTodos}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => approveTodos.mutate({ runId: runId!, approved: false })}
-                loading={approveTodos.isPending}
-              >
-                {t.workflows.rejectTodos}
-              </Button>
-            </div>
-          </div>
-        );
-      })()}
+      <RunPendingTodosPanel runId={runId!} pendingTodos={run.metadata?.pending_todos as PendingTodoItem[] | undefined} />
 
       <Hint id="run-steps" />
 
@@ -495,77 +341,7 @@ export function WorkflowExecution() {
       </div>
 
       {/* Container interaction — visible when running or paused */}
-      {isRunning && (
-        <Card>
-          <div className="flex items-center gap-1 mb-4 border-b border-border">
-            <button
-              onClick={() => setContainerTab('command')}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                containerTab === 'command'
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-text-secondary hover:text-text'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Send className="w-4 h-4" />
-                {t.workflows.execution.command}
-              </span>
-            </button>
-            {terminalModule && (
-              <button
-                onClick={() => setContainerTab('terminal')}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  containerTab === 'terminal'
-                    ? 'border-accent text-accent'
-                    : 'border-transparent text-text-secondary hover:text-text'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <TerminalSquare className="w-4 h-4" />
-                  {t.workflows.execution.terminal.title}
-                </span>
-              </button>
-            )}
-          </div>
-
-          {containerTab === 'command' && (
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  placeholder={t.workflows.execution.commandPlaceholder}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && command.trim()) {
-                      runCommand.mutate({ runId: runId!, command: command.trim() });
-                      setCommand('');
-                    }
-                  }}
-                />
-              </div>
-              <Button
-                icon={<Send className="w-4 h-4" />}
-                onClick={() => {
-                  if (command.trim()) {
-                    runCommand.mutate({ runId: runId!, command: command.trim() });
-                    setCommand('');
-                  }
-                }}
-                loading={runCommand.isPending}
-                disabled={!command.trim()}
-              >
-                {t.workflows.execution.sendCommand}
-              </Button>
-            </div>
-          )}
-
-          {containerTab === 'terminal' && terminalModule && (
-            <Suspense fallback={<Spinner text={t.common.loading} />}>
-              <TerminalPanel runId={runId!} />
-            </Suspense>
-          )}
-        </Card>
-      )}
+      {isRunning && <RunContainerPanel runId={runId!} />}
 
       {/* Execution Insights */}
       {!isRunning && run.steps.length > 0 && learningModule && (
@@ -630,11 +406,11 @@ export function WorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={() => setRecoveredApproval(null)}
+          onDismiss={clearRecoveredApproval}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
               onSuccess: () => {
-                setRecoveredApproval(null);
+                clearRecoveredApproval();
               },
             });
           }}
@@ -649,7 +425,7 @@ export function WorkflowExecution() {
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
               onSuccess: () => {
-                setRecoveredHumanInput(null);
+                clearRecoveredHumanInput();
               },
             });
           }}

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Pause, Play, XCircle, CheckCircle2, AlertCircle, CircleSlash,
@@ -14,12 +13,12 @@ import {
   useWorkflow, useWorkflowRun,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
-import { useExecutionWebSocket, type PendingApproval } from '../hooks/useWebSocket';
+import { useExecutionWebSocket } from '../hooks/useWebSocket';
+import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
 import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
-import { api } from '../api/client';
-import type { StepResult, PendingHumanInput, RunStatus } from '../types';
+import type { StepResult, RunStatus } from '../types';
 import { StepCardFrame, StepCardHeader } from '../components/workflow/StepCardChrome';
 import { Hint } from '../components/hints/Hint';
 import { Disclosure } from '../components/simple/Disclosure';
@@ -96,41 +95,7 @@ export function SimpleWorkflowExecution() {
   const cancelExecution = useCancelExecution();
   const submitApproval = useSubmitApproval();
 
-  const [recoveredApproval, setRecoveredApproval] = useState<PendingApproval | null>(null);
-  const [recoveredHumanInput, setRecoveredHumanInput] = useState<PendingHumanInput | null>(null);
-
-  useEffect(() => {
-    if (!runId) return;
-    api.get<{
-      pending: boolean; blockId?: string; question?: string; options?: string[]; rejectOptions?: string[]; stepIndex?: number;
-      type?: string; inputType?: string; defaultValue?: string; variableName?: string;
-      required?: boolean; validationPattern?: string | null;
-    }>(`/executions/${runId}/approval`).then((data) => {
-      if (data.pending && data.blockId) {
-        if (data.type === 'human-input') {
-          setRecoveredHumanInput({
-            blockId: data.blockId,
-            prompt: data.question!,
-            inputType: (data.inputType as PendingHumanInput['inputType']) || 'text',
-            options: data.options || [],
-            defaultValue: data.defaultValue || '',
-            required: data.required ?? true,
-            validationPattern: data.validationPattern ?? null,
-            variableName: data.variableName || 'user_input',
-            stepIndex: data.stepIndex!,
-          });
-        } else {
-          setRecoveredApproval({
-            blockId: data.blockId,
-            question: data.question!,
-            options: data.options!,
-            rejectOptions: data.rejectOptions,
-            stepIndex: data.stepIndex!,
-          });
-        }
-      }
-    }).catch(() => { /* ignore */ });
-  }, [runId]);
+  const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
@@ -245,10 +210,10 @@ export function SimpleWorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={() => setRecoveredApproval(null)}
+          onDismiss={clearRecoveredApproval}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: () => setRecoveredApproval(null),
+              onSuccess: clearRecoveredApproval,
             });
           }}
         />
@@ -261,7 +226,7 @@ export function SimpleWorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: () => setRecoveredHumanInput(null),
+              onSuccess: clearRecoveredHumanInput,
             });
           }}
         />
