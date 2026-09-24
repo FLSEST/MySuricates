@@ -3,6 +3,7 @@ package com.automation.service.workflow;
 import com.automation.entity.Workflow;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,10 +11,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
+import org.springframework.scheduling.annotation.AsyncAnnotationAdvisor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -313,6 +319,43 @@ class WorkflowTaggingServiceTest {
         service.onAppReady();
 
         verify(workflowRepository).findUntagged();
+    }
+
+    /**
+     * The startup event must not wait for the backfill (up to 30 s of model call per untagged
+     * workflow): {@code onAppReady} starts it through the proxy, so {@code @Async} applies.
+     */
+    @Test
+    void should_returnAtOnceAndLeaveTheBackfillToTheAsyncExecutor_when_onAppReady() {
+        List<Runnable> queued = new ArrayList<>();
+        WorkflowTaggingService starting = new WorkflowTaggingService(
+                commandExecutorService, appSettingsRepository, workflowRepository, objectMapper, null);
+        ReflectionTestUtils.setField(starting, "autoTaggingEnabled", true);
+        ReflectionTestUtils.setField(starting, "self", withAsyncApplied(starting, queued::add));
+        Workflow untagged = new Workflow();
+        untagged.setId("wf-1");
+        untagged.setName("Daily Cleanup");
+        when(workflowRepository.findUntagged()).thenReturn(List.of(untagged));
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(untagged));
+        when(commandExecutorService.executeOnHost(any()))
+                .thenReturn(new CliSession.EnrichedCommandResult("", 1, null));
+
+        starting.onAppReady();
+
+        assertThat(queued).as("the backfill waits for the async executor").hasSize(1);
+        verifyNoInteractions(commandExecutorService);
+
+        queued.get(0).run();
+
+        verify(commandExecutorService).executeOnHost(any());
+    }
+
+    /** {@code target} behind a proxy that applies {@code @Async} as the application context does. */
+    private static WorkflowTaggingService withAsyncApplied(WorkflowTaggingService target, Executor executor) {
+        ProxyFactory factory = new ProxyFactory(target);
+        factory.setProxyTargetClass(true);
+        factory.addAdvisor(new AsyncAnnotationAdvisor(() -> executor, SimpleAsyncUncaughtExceptionHandler::new));
+        return (WorkflowTaggingService) factory.getProxy();
     }
 
     // -------- TagResult record --------
