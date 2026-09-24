@@ -16,6 +16,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,7 @@ class AssistantToolExecutorTest {
     @Mock private TodoService todoService;
     @Mock private WorkflowService workflowService;
     @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private RunControlService runControlService;
     @Mock private ChainService chainService;
     @Mock private ActivityLogService activityLogService;
 
@@ -52,7 +54,7 @@ class AssistantToolExecutorTest {
         ObjectMapper mapper = new ObjectMapper();
         executor = new AssistantToolExecutor(
                 new AssistantTodoTools(todoService, mapper),
-                new AssistantWorkflowTools(workflowService, workflowExecutor, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper),
                 new AssistantChainTools(chainService, mapper),
                 registry,
                 new AssistantToolValidator(mapper), guardrailsConfig, activityLogService, ModuleRegistry.allEnabled(),
@@ -196,7 +198,7 @@ class AssistantToolExecutorTest {
         String result = runAllTools(input);
 
         assertThat(result).contains("✓");
-        verify(workflowExecutor).cancelExecution("run-12345678");
+        verify(runControlService).cancelExecution("run-12345678");
     }
 
     @Test
@@ -229,7 +231,7 @@ class AssistantToolExecutorTest {
         ObjectMapper mapper = new ObjectMapper();
         executor = new AssistantToolExecutor(
                 new AssistantTodoTools(todoService, mapper),
-                new AssistantWorkflowTools(workflowService, workflowExecutor, mapper),
+                new AssistantWorkflowTools(workflowService, workflowExecutor, runControlService, mapper),
                 new AssistantChainTools(chainService, mapper),
                 registry,
                 new AssistantToolValidator(mapper), guardrailsConfig, activityLogService,
@@ -276,7 +278,7 @@ class AssistantToolExecutorTest {
         assertThat(result).contains("Ich erstelle:");
         assertThat(result).contains("fertig.");
         verify(todoService).create(any());
-        verify(workflowExecutor).cancelExecution("run-99998888");
+        verify(runControlService).cancelExecution("run-99998888");
     }
 
     @Test
@@ -593,7 +595,7 @@ class AssistantToolExecutorTest {
         assertThat(extraction.cleanedResponse()).contains("Ich schlage ein TODO vor.");
         assertThat(extraction.cleanedResponse()).doesNotContain("awaiting confirmation");
         assertThat(registry.size()).isZero();
-        verifyNoInteractions(todoService, workflowService, workflowExecutor, chainService);
+        verifyNoInteractions(todoService, workflowService, workflowExecutor, runControlService, chainService);
     }
 
     @Test

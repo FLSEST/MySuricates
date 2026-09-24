@@ -21,7 +21,7 @@
   "Pause / Cancel": "Pause / Cancel",
   "ExecutionContext": "ExecutionContext",
   "ExecutionController": "ExecutionController",
-  "WorkflowExecutor / WorkflowExecutionRegistry": "WorkflowExecutor / WorkflowExecutionRegistry",
+  "RunControlService / WorkflowExecutionRegistry": "RunControlService / WorkflowExecutionRegistry",
   "POST /api/v1/executions/{id}/pause": "POST /api/v1/executions/{id}/pause",
   "paused=true": "paused=true",
   "Vor dem nächsten Block setzt der Loop<br/>den Run auf PAUSED und prüft alle 500 ms": "Before the next block the loop sets<br/>the run to PAUSED and checks every 500 ms",

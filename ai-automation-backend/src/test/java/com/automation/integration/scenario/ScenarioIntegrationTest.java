@@ -21,6 +21,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.project.ContainerService;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.analyzer.AnalyzerFinding;
 import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
@@ -98,6 +99,7 @@ class ScenarioIntegrationTest {
     }
 
     @Autowired private WorkflowExecutor workflowExecutor;
+    @Autowired private RunControlService runControlService;
     @Autowired private ChainExecutor chainExecutor;
     @Autowired private WorkflowAnalyzer workflowAnalyzer;
     @Autowired private ProjectRepository projectRepository;
@@ -134,7 +136,7 @@ class ScenarioIntegrationTest {
                 auditReportRepository, auditFindingRepository, scriptedProviders);
         fixtures = new ScenarioFixtures(entityManager, projectRepository, workflowRepository, chainRepository,
                 auditReportRepository, auditFindingRepository, auditOccurrenceRepository, auditFindingTodoRepository);
-        approvals = new ScenarioApprovals(workflowExecutor, workflowRunRepository, entityManager);
+        approvals = new ScenarioApprovals(runControlService, workflowRunRepository, entityManager);
         goals = new ScenarioGoals(goalRepository, goalMilestoneRepository, todoRepository);
     }
 

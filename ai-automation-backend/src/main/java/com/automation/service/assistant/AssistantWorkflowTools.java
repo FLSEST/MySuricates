@@ -7,6 +7,7 @@ import com.automation.entity.ChangeSource;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
+import com.automation.service.workflow.RunControlService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -34,6 +35,7 @@ public class AssistantWorkflowTools {
 
     private final WorkflowService workflowService;
     private final WorkflowExecutor workflowExecutor;
+    private final RunControlService runControlService;
     private final ObjectMapper objectMapper;
 
     public String createWorkflow(String json) {
@@ -156,7 +158,7 @@ public class AssistantWorkflowTools {
             if (runId == null || runId.isBlank())
                 return "⚠ cancel_run: runId is a required field.";
 
-            workflowExecutor.cancelExecution(runId);
+            runControlService.cancelExecution(runId);
             String shortId = runId.substring(0, Math.min(8, runId.length()));
             return "✓ Run cancelled (ID: " + shortId + "…)";
         } catch (Exception e) {

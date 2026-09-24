@@ -110,6 +110,8 @@ class WorkflowExecutorTest {
 
     private WorkflowExecutor workflowExecutor;
     private WorkflowExecutionRegistry registry;
+    /** Cancel and ad-hoc commands go through the real control service, on the executor's registry. */
+    private RunControlService runControl;
 
     /**
      * Real threads for the concurrency tests. Torn down with shutdownNow() — never close(), which
@@ -133,6 +135,7 @@ class WorkflowExecutorTest {
 
         registry = new WorkflowExecutionRegistry();
         workflowExecutor = newExecutor(List.of(simpleBlockExecutor));
+        runControl = runControlFor(registry);
 
         testProject = Project.builder()
                 .id("proj-1")
@@ -176,7 +179,6 @@ class WorkflowExecutorTest {
         return new WorkflowExecutor(
                 blockExecutors,
                 containerService,
-                commandExecutorService,
                 runRepository,
                 stepResultRepository,
                 skillRepository,
@@ -198,6 +200,12 @@ class WorkflowExecutorTest {
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService)
         );
+    }
+
+    /** Control of the runs an executor built on {@code executionRegistry} starts. */
+    private RunControlService runControlFor(WorkflowExecutionRegistry executionRegistry) {
+        return new RunControlService(executionRegistry, runRepository, broadcaster, activityLogService,
+                commandExecutorService);
     }
 
     @org.junit.jupiter.api.AfterEach
@@ -548,24 +556,6 @@ class WorkflowExecutorTest {
     }
 
     @Test
-    void pauseAndResumeExecution() {
-        StepResult step = StepResult.builder()
-                .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
-        when(simpleBlockExecutor.execute(any(), any())).thenReturn(step);
-
-        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
-
-        workflowExecutor.pauseExecution("non-existent-run");
-        workflowExecutor.resumeExecution("non-existent-run");
-    }
-
-    @Test
-    void cancelExecution_nonExistentRun_doesNotThrow() {
-        workflowExecutor.cancelExecution("non-existent-run");
-        // No exception expected
-    }
-
-    @Test
     void getContainerIdForRun_activeExecution_returnsContainerId() {
         StepResult step = StepResult.builder()
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
@@ -716,32 +706,6 @@ class WorkflowExecutorTest {
         assertThat(event.getWorkflowName()).isEqualTo("Test Workflow");
         assertThat(event.getProjectId()).isEqualTo("proj-1");
         assertThat(event.getStatus()).isEqualTo(RunStatus.COMPLETED);
-    }
-
-    @Test
-    void cleanupZombieRuns_marksRunningRunsAsInterrupted() {
-        WorkflowRun orphan1 = WorkflowRun.builder().id("orphan-1").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
-        WorkflowRun orphan2 = WorkflowRun.builder().id("orphan-2").status(RunStatus.RUNNING).startedAt(Instant.now()).build();
-        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(orphan1, orphan2));
-        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
-
-        workflowExecutor.cleanupZombieRuns();
-
-        assertThat(orphan1.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
-        assertThat(orphan1.getCompletedAt()).isNotNull();
-        assertThat(orphan1.getError()).containsKey("message");
-        assertThat(orphan2.getStatus()).isEqualTo(RunStatus.INTERRUPTED);
-        verify(runRepository, times(2)).save(any(WorkflowRun.class));
-    }
-
-    @Test
-    void cleanupZombieRuns_noZombies_doesNothing() {
-        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
-        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of());
-
-        workflowExecutor.cleanupZombieRuns();
-
-        verify(runRepository, never()).save(any(WorkflowRun.class));
     }
 
     // --- resumeFromStep (previously untested; safety net for the WorkflowSnapshot refactoring) ----
@@ -958,14 +922,6 @@ class WorkflowExecutorTest {
 
         // After execution completes, active count should be 0 again
         assertThat(registry.getActiveRunCount()).isEqualTo(0);
-    }
-
-    @Test
-    void executeAdHocCommand_noActiveRun_throws() {
-        org.junit.jupiter.api.Assertions.assertThrows(
-                WorkflowExecutionException.class,
-                () -> workflowExecutor.executeAdHocCommand("non-existent", "echo hello")
-        );
     }
 
     @Test
@@ -1217,7 +1173,7 @@ class WorkflowExecutorTest {
                 .stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenAnswer(inv -> {
-                    workflowExecutor.cancelExecution("run-1");
+                    runControl.cancelExecution("run-1");
                     return step;
                 });
 
@@ -1227,20 +1183,6 @@ class WorkflowExecutorTest {
         // Assert: only first block ran, run was saved with CANCELLED
         verify(simpleBlockExecutor, times(1)).execute(any(BlockDefinition.class), any(ExecutionContext.class));
         WorkflowRun saved = captureLastSavedRun();
-        assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
-    }
-
-    @Test
-    void cancelExecution_ghostRun_updatesPersistedStatusToCancelled() {
-        // Run exists in DB but no active execution context in the registry
-        // (simulates a stale RUNNING row after backend crash/restart).
-        // findById("run-1") is already mocked in setUp to return a RUNNING run.
-
-        workflowExecutor.cancelExecution("run-1");
-
-        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
-        verify(runRepository, atLeastOnce()).save(captor.capture());
-        WorkflowRun saved = captor.getValue();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
     }
 
@@ -1274,7 +1216,6 @@ class WorkflowExecutorTest {
         return new WorkflowExecutor(
                 executors,
                 containerService,
-                commandExecutorService,
                 runRepository,
                 stepResultRepository,
                 skillRepository,
@@ -1830,7 +1771,7 @@ class WorkflowExecutorTest {
         AtomicBoolean cancelled = new AtomicBoolean();
         doAnswer(inv -> {
             if (cancelled.compareAndSet(false, true)) {
-                workflowExecutor.cancelExecution("run-1");
+                runControl.cancelExecution("run-1");
             }
             return null;
         }).when(activityLogService).info(any(), anyString(), anyString(), anyString(), anyString());
@@ -1922,7 +1863,7 @@ class WorkflowExecutorTest {
                 buildExecutor(List.of(simpleBlockExecutor), singleSlot, liveRegistry, realThreads);
 
         executor.execute(testWorkflow, null, TriggerSource.MANUAL);
-        executor.cancelExecution("run-1");
+        runControlFor(liveRegistry).cancelExecution("run-1");
         singleSlot.release();
 
         WorkflowRun finished = awaitTerminalStatus(stored);
@@ -1951,10 +1892,11 @@ class WorkflowExecutorTest {
 
         // The provisional context makes the run cancellable, but there is no container and no
         // project cwd yet — an ad-hoc command must still be refused, not run on the host.
-        assertThatThrownBy(() -> executor.executeAdHocCommand("run-1", "echo hello"))
+        RunControlService liveControl = runControlFor(liveRegistry);
+        assertThatThrownBy(() -> liveControl.executeAdHocCommand("run-1", "echo hello"))
                 .isInstanceOf(WorkflowExecutionException.class);
 
-        executor.cancelExecution("run-1");
+        liveControl.cancelExecution("run-1");
         singleSlot.release();
         awaitTerminalStatus(stored);
 
@@ -1979,7 +1921,7 @@ class WorkflowExecutorTest {
 
         executor.execute(testWorkflow, null, TriggerSource.MANUAL);
         awaitLatch(containerStartEntered, "the run to reach the container start");
-        executor.cancelExecution("run-1");
+        runControlFor(liveRegistry).cancelExecution("run-1");
         containerStartMayFinish.countDown();
 
         assertThat(awaitTerminalStatus(stored).getStatus()).isEqualTo(RunStatus.CANCELLED);

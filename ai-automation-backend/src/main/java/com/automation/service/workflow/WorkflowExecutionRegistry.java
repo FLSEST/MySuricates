@@ -39,7 +39,8 @@ public class WorkflowExecutionRegistry {
      * Registers a placeholder context for a run that is about to be submitted. Without it a run is
      * observable (DB status RUNNING) but not controllable for as long as the execution thread needs
      * to get through the semaphore and the container start — a cancel arriving in that window took
-     * {@code WorkflowExecutor}'s ghost branch and was then overrun by the thread that kept going.
+     * the ghost branch of {@code RunControlService.cancelExecution} and was then overrun by the thread
+     * that kept going.
      *
      * <p>Side effect (intended): {@link #getActiveRunCount()} now counts queued runs too, which is
      * what {@code GhostRunWatchdogService.reconcilePermits} needs — a run parked in

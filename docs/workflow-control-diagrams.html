@@ -201,22 +201,22 @@ flowchart LR
 sequenceDiagram
     participant UI
     participant CTRL as ExecutionController
-    participant WE as WorkflowExecutor / WorkflowExecutionRegistry
+    participant RC as RunControlService / WorkflowExecutionRegistry
     participant CTX as ExecutionContext
 
     UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/pause
-    CTRL-&gt;&gt;WE: pauseExecution(runId)
-    WE-&gt;&gt;CTX: paused=true
+    CTRL-&gt;&gt;RC: pauseExecution(runId)
+    RC-&gt;&gt;CTX: paused=true
     Note over CTX: Vor dem nächsten Block setzt der Loop<br/>den Run auf PAUSED und prüft alle 500 ms
     UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/resume
-    CTRL-&gt;&gt;WE: resumeExecution(runId)
-    WE-&gt;&gt;CTX: paused=false
+    CTRL-&gt;&gt;RC: resumeExecution(runId)
+    RC-&gt;&gt;CTX: paused=false
     UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/cancel
-    CTRL-&gt;&gt;WE: cancelExecution(runId)
+    CTRL-&gt;&gt;RC: cancelExecution(runId)
     alt Run hat einen Kontext (läuft oder wartet auf einen Slot)
-        WE-&gt;&gt;CTX: cancelled=true, laufenden Prozess beenden, offene Freigabe abbrechen
+        RC-&gt;&gt;CTX: cancelled=true, laufenden Prozess beenden, offene Freigabe abbrechen
     else Ghost-Run ohne Thread
-        WE-&gt;&gt;WE: Run direkt auf CANCELLED setzen
+        RC-&gt;&gt;RC: Run direkt auf CANCELLED setzen
     end
   </pre>
 </section>

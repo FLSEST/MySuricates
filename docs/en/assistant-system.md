@@ -15,15 +15,20 @@ The Assistant system consists of four areas:
 
 ### AssistantService
 
-- Main class for chat logic (`service/AssistantService.java`)
+- Main class for chat logic (`service/AssistantService.java`) — orchestrates context, fetch rounds, tools and suggestions
 - Prepares the context (current page, workflow data, etc.)
-- Calls Claude CLI on the host (`HostClaudeService`)
-- Default model: `sonnet` (seeded into `app_settings` on startup, cached in `cachedAssistantModel`)
-- Allowed CLI tools: `Read`, `Grep`, `Glob`, `WebFetch` (`CHAT_ALLOWED_TOOLS`)
+- Every CLI call goes through `AssistantChatCaller` (see below)
 - Auto-fetch loop: up to **3 rounds** with **3 fetches** per round (`MAX_FETCH_ROUNDS`, `MAX_FETCHES_PER_ROUND`)
 - Detects explicit mutation intent via regex (German verbs + target nouns) — only then are mutating actions passed through
 - Action suggestions are fetched in parallel via `AssistantActionSuggestionService` (35s timeout)
 - Returns `AssistantChatResponse` (response text + actions + optional PendingTools)
+
+### AssistantChatCaller
+
+- The CLI side of the chat (`service/assistant/AssistantChatCaller.java`), split out of `AssistantService`
+- Calls Claude CLI on the host (`HostClaudeService`) — interactive (`priority`), with the chat timeout from `HostClaudeConfig`; a non-zero exit code fails the call instead of returning the error text as an answer
+- Default model: `sonnet` (seeded into `app_settings` on startup, cached in `cachedAssistantModel`), plus the base instructions from `assistant-system-prompt.md`
+- Allowed CLI tools: `Read`, `Grep`, `Glob`, `WebFetch` (`CHAT_ALLOWED_TOOLS`)
 
 ### AssistantSessionService
 
@@ -316,7 +321,7 @@ All implement `AssistantContextSection` with `append(StringBuilder sb, boolean c
 
 ## Model Selection
 
-- **Chat model** (`assistant-model` setting): Default `sonnet`, cached in `AssistantService.cachedAssistantModel`
+- **Chat model** (`assistant-model` setting): Default `sonnet`, cached in `AssistantChatCaller.cachedAssistantModel`
 - **Suggestions model** (`suggestions-model` setting): Default `sonnet`, used by `PageSuggestionService` and `AssistantActionSuggestionService`
 - Both models are seeded into `app_settings` on startup and can be changed at runtime via the Settings API: `SystemSettingsService` announces the change as `AppSettingChangedEvent`, `AssistantSettingsListener` calls `refreshCachedModel()`/`refreshCache()` — only while the assistant module is on; switching it on at runtime re-reads all three values
 - Haiku (`haiku`) is too imprecise for assistant tasks

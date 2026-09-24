@@ -3,7 +3,7 @@ package com.automation.integration.scenario;
 import com.automation.entity.RunStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.repository.WorkflowRunRepository;
-import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.RunControlService;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.EntityManager;
 
@@ -22,13 +22,13 @@ final class ScenarioApprovals {
 
     private static final Duration WAIT = Duration.ofSeconds(15);
 
-    private final WorkflowExecutor workflowExecutor;
+    private final RunControlService runControl;
     private final WorkflowRunRepository workflowRunRepository;
     private final EntityManager entityManager;
 
-    ScenarioApprovals(WorkflowExecutor workflowExecutor, WorkflowRunRepository workflowRunRepository,
+    ScenarioApprovals(RunControlService runControl, WorkflowRunRepository workflowRunRepository,
                       EntityManager entityManager) {
-        this.workflowExecutor = workflowExecutor;
+        this.runControl = runControl;
         this.workflowRunRepository = workflowRunRepository;
         this.entityManager = entityManager;
     }
@@ -49,7 +49,7 @@ final class ScenarioApprovals {
                 want.path("rejectOptions").forEach(option -> expected.add(option.asText()));
                 assertThat(pending.getRejectOptions()).as(where + " rejectOptions").containsExactlyElementsOf(expected);
             }
-            workflowExecutor.resolveApproval(runId, want.path("answer").asText());
+            runControl.resolveApproval(runId, want.path("answer").asText());
             awaitAnswered(runId, pending, where);
         }
     }
@@ -57,7 +57,7 @@ final class ScenarioApprovals {
     private ApprovalRequest awaitQuestion(String runId, String where) {
         Instant deadline = Instant.now().plus(WAIT);
         while (Instant.now().isBefore(deadline)) {
-            ApprovalRequest pending = workflowExecutor.getPendingApproval(runId);
+            ApprovalRequest pending = runControl.getPendingApproval(runId);
             if (pending != null) {
                 return pending;
             }
@@ -74,7 +74,7 @@ final class ScenarioApprovals {
     /** The next approval must not be mistaken for the one just answered. */
     private void awaitAnswered(String runId, ApprovalRequest answered, String where) {
         Instant deadline = Instant.now().plus(WAIT);
-        while (workflowExecutor.getPendingApproval(runId) == answered) {
+        while (runControl.getPendingApproval(runId) == answered) {
             if (Instant.now().isAfter(deadline)) {
                 throw new AssertionError(where + " was answered, but the run still waits for it");
             }

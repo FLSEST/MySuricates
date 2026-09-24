@@ -4,6 +4,7 @@ import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleConditions;
 import com.automation.modules.ModuleStateChangedEvent;
 import com.automation.service.assistant.AssistantActionSuggestionService;
+import com.automation.service.assistant.AssistantChatCaller;
 import com.automation.service.system.AppSettingChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -22,14 +23,14 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AssistantSettingsListener {
 
-    private final AssistantService assistantService;
+    private final AssistantChatCaller chatCaller;
     private final PageSuggestionService pageSuggestionService;
     private final AssistantActionSuggestionService actionSuggestionService;
 
     @EventListener(condition = ModuleConditions.ASSISTANT)
     public void onSettingChanged(AppSettingChangedEvent event) {
         switch (event.key()) {
-            case "assistant-model" -> assistantService.refreshCachedModel();
+            case "assistant-model" -> chatCaller.refreshCachedModel();
             case "suggestions-model" -> {
                 pageSuggestionService.refreshCachedModel();
                 actionSuggestionService.refreshCache();
@@ -44,7 +45,7 @@ public class AssistantSettingsListener {
     @EventListener
     public void onModuleStateChanged(ModuleStateChangedEvent event) {
         if (event.getModule() == ModuleCatalog.ASSISTANT && event.isEnabled()) {
-            assistantService.refreshCachedModel();
+            chatCaller.refreshCachedModel();
             pageSuggestionService.refreshCachedModel();
             actionSuggestionService.refreshCache();
         }
