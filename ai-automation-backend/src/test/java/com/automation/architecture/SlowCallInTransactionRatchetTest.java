@@ -1,11 +1,13 @@
 package com.automation.architecture;
 
-import com.automation.architecture.TransactionalCallScan.ClassInfo;
+import com.automation.architecture.CompiledMethods.ClassInfo;
+import com.automation.architecture.CompiledMethods.MethodRef;
 import com.automation.architecture.TransactionalCallScan.Finding;
-import com.automation.architecture.TransactionalCallScan.MethodRef;
 import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.HostCodexService;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.cli.ShellCommandService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,19 +34,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * write in short {@code TransactionTemplate} bursts and call the model in between without a
  * transaction – {@code WorkflowMemoryService#extractKnowledge} shows the shape.
  *
- * <p>Slow calls: {@code CommandExecutorService#executeOnHost}/{@code #executeStepOnHost} and the two
- * CLI entry points of {@code AiProvider}, {@code #reason} and {@code #executeAction} – also when called
- * through an implementing class. The other {@code AiProvider} methods ({@code getId},
- * {@code getCapabilities}, {@code setup}, {@code buildConversationPrompt}) start no process and stay
- * allowed. Which methods count as transactional, and what the bytecode scan cannot see:
- * {@link TransactionalCallScan}.
+ * <p>Slow calls are the ones that start a process: {@link #PROCESS_CALLS} – every {@code execute*} of
+ * {@code CommandExecutorService} (host AI CLI, shell, container CLI), the CLI wrappers behind the
+ * providers and the shell runners – plus the two CLI entry points of {@code AiProvider},
+ * {@code #reason} and {@code #executeAction}, also when called through an implementing class or on a
+ * provider fetched from {@code AiProviderRegistry}. The other {@code AiProvider} methods
+ * ({@code getId}, {@code getCapabilities}, {@code setup}, {@code buildConversationPrompt}) start no
+ * process and stay allowed. Which methods count as transactional, and what the bytecode scan cannot
+ * see: {@link TransactionalCallScan}.
  *
  * <p>A ratchet: {@link #KNOWN_EXCEPTIONS} only ever shrinks. A new finding is fixed, not listed.
  */
 class SlowCallInTransactionRatchetTest {
 
-    static final String COMMAND_EXECUTOR = "com/automation/service/cli/CommandExecutorService";
-    static final Set<String> HOST_CALLS = Set.of("executeOnHost", "executeStepOnHost");
+    /** Owner → the method names that start a process. */
+    static final Map<String, Predicate<String>> PROCESS_CALLS = Map.of(
+            "com/automation/service/cli/CommandExecutorService", name -> name.startsWith("execute"),
+            "com/automation/service/cli/ShellCommandService", "execute"::equals,
+            "com/automation/service/cli/ContainerShellService", "execute"::equals,
+            "com/automation/service/ai/HostClaudeService", Set.of("reason", "reasonStructured", "executeAction")::contains,
+            "com/automation/service/ai/HostCodexService", "execute"::equals,
+            "com/automation/service/ai/HostPiService", Set.of("reason", "executeAction")::contains);
     static final String AI_PROVIDER = "com/automation/service/ai/AiProvider";
     static final Set<String> PROVIDER_CALLS = Set.of("reason", "executeAction");
 
@@ -83,7 +93,7 @@ class SlowCallInTransactionRatchetTest {
     void scanSeesEveryShapeItGuards() {
         Map<String, ClassInfo> classes = new HashMap<>();
         for (Class<?> fixture : List.of(Fixture.class, ClassLevelFixture.class, FixtureProvider.class)) {
-            ClassInfo info = TransactionalCallScan.read(bytecodeOf(fixture));
+            ClassInfo info = CompiledMethods.read(bytecodeOf(fixture));
             classes.put(info.name, info);
         }
         String fixture = Fixture.class.getName();
@@ -96,6 +106,9 @@ class SlowCallInTransactionRatchetTest {
                         fixture + "#viaLambda -> AiProvider#executeAction",
                         fixture + "#viaMethodReference -> CommandExecutorService#executeOnHost",
                         fixture + "#viaImplementation -> FixtureProvider#reason",
+                        fixture + "#viaCliWrapper -> HostCodexService#execute",
+                        fixture + "#viaShell -> ShellCommandService#execute",
+                        fixture + "#viaShell -> CommandExecutorService#executeStepAsShell",
                         fixture + "#insideTemplate (TransactionTemplate) -> CommandExecutorService#executeOnHost",
                         classLevel + "#inheritsTheClassAnnotation -> CommandExecutorService#executeOnHost");
     }
@@ -105,9 +118,9 @@ class SlowCallInTransactionRatchetTest {
     }
 
     static Predicate<MethodRef> slowCalls(Map<String, ClassInfo> classes) {
-        return call -> (COMMAND_EXECUTOR.equals(call.owner()) && HOST_CALLS.contains(call.name()))
+        return call -> PROCESS_CALLS.getOrDefault(call.owner(), name -> false).test(call.name())
                 || (PROVIDER_CALLS.contains(call.name())
-                        && TransactionalCallScan.isSubtype(call.owner(), AI_PROVIDER, classes));
+                        && CompiledMethods.isSubtype(call.owner(), AI_PROVIDER, classes));
     }
 
     private static Map<String, ClassInfo> productionClasses() throws IOException {
@@ -115,7 +128,7 @@ class SlowCallInTransactionRatchetTest {
                 PackageEdges.codeSourceLocation(), PackageEdges.FALLBACK_CLASS_DIRECTORIES);
         Assumptions.assumeTrue(classes != null, "no compiled production classes next to "
                 + PackageEdges.codeSourceLocation() + " – run `mvn test` or `mvn compile` first");
-        return TransactionalCallScan.readDirectory(classes);
+        return CompiledMethods.readDirectory(classes);
     }
 
     private static byte[] bytecodeOf(Class<?> type) {
@@ -134,6 +147,8 @@ class SlowCallInTransactionRatchetTest {
         CommandExecutorService executor;
         AiProvider provider;
         FixtureProvider implementation;
+        HostCodexService codex;
+        ShellCommandService shell;
         TransactionTemplate template;
 
         @Transactional
@@ -169,6 +184,17 @@ class SlowCallInTransactionRatchetTest {
         @Transactional
         public void viaImplementation() throws IOException {
             implementation.reason(null);
+        }
+
+        @Transactional
+        public String viaCliWrapper() throws IOException {
+            return codex.execute(null, null);
+        }
+
+        @Transactional
+        public Object viaShell() {
+            shell.execute(null, null, 0);
+            return executor.executeStepAsShell(null, null, 0, 0);
         }
 
         @Transactional
