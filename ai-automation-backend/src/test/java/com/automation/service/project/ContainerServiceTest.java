@@ -8,7 +8,6 @@ import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -22,10 +21,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,9 +41,6 @@ class ContainerServiceTest {
 
     @Mock
     private ContainerRepository containerRepository;
-
-    @Mock
-    private WorkflowExecutionRegistry executionRegistry;
 
     @Mock
     private ActivityLogService activityLogService;
@@ -85,14 +78,11 @@ class ContainerServiceTest {
         );
         service = new ContainerService(
                 containerRepository,
-                executionRegistry,
                 activityLogService,
                 pathValidator,
                 transactionManager,
                 docker,
-                new DockerOrphanReconciler(docker, activityLogService, 60),
                 new DockerExpectation(dockerClient, "tcp://docker.test:2375"), // Docker eingerichtet
-                60,                 // idleTimeoutMinutes
                 "/home/test"        // hostHome
         );
 
@@ -449,95 +439,6 @@ class ContainerServiceTest {
         assertThatThrownBy(() -> service.getDockerContainerId(testProject))
                 .isInstanceOf(ContainerException.class)
                 .hasMessageContaining("No running container");
-    }
-
-    @Test
-    void cleanupIdle_idleContainer_stopsIt() {
-        Container idle = Container.builder()
-                .id("c1")
-                .project(testProject)
-                .dockerContainerId("docker-idle")
-                .status(ContainerStatus.RUNNING)
-                .lastActivityAt(Instant.now().minus(120, ChronoUnit.MINUTES))
-                .startedAt(Instant.now().minus(120, ChronoUnit.MINUTES))
-                .build();
-        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(idle));
-        when(containerRepository.findById("c1")).thenReturn(Optional.of(idle));
-        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
-        stubDockerRemoveCommands();
-        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        service.cleanupIdleContainers();
-
-        assertThat(idle.getStatus()).isEqualTo(ContainerStatus.STOPPED);
-        verify(containerRepository).save(idle);
-    }
-
-    // --- Reconciliation: Docker-Container ohne RUNNING-DB-Zeile (State-Drift) ---
-
-    private void stubDockerList(List<com.github.dockerjava.api.model.Container> containers) {
-        ListContainersCmd listCmd = mock(ListContainersCmd.class);
-        lenient().when(listCmd.withNameFilter(any())).thenReturn(listCmd);
-        lenient().when(listCmd.exec()).thenReturn(containers);
-        lenient().when(dockerClient.listContainersCmd()).thenReturn(listCmd);
-    }
-
-    private com.github.dockerjava.api.model.Container dockerContainer(String id, Instant created) {
-        var dc = mock(com.github.dockerjava.api.model.Container.class);
-        lenient().when(dc.getId()).thenReturn(id);
-        lenient().when(dc.getCreated()).thenReturn(created.getEpochSecond());
-        return dc;
-    }
-
-    @Test
-    void reconcile_orphanedDockerContainer_isForceStopped() {
-        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
-        stubDockerList(List.of(dockerContainer("docker-orphan", Instant.now().minus(2, ChronoUnit.HOURS))));
-        stubDockerRemoveCommands();
-
-        service.cleanupIdleContainers();
-
-        verify(dockerClient).stopContainerCmd("docker-orphan");
-        verify(dockerClient).removeContainerCmd("docker-orphan");
-    }
-
-    @Test
-    void reconcile_dockerContainerWithRunningDbRow_notTouched() {
-        Container tracked = Container.builder()
-                .id("c1").project(testProject).dockerContainerId("docker-known")
-                .status(ContainerStatus.RUNNING)
-                .lastActivityAt(Instant.now()).startedAt(Instant.now())
-                .build();
-        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of(tracked));
-        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
-        stubDockerList(List.of(dockerContainer("docker-known", Instant.now().minus(2, ChronoUnit.HOURS))));
-
-        service.cleanupIdleContainers();
-
-        verify(dockerClient, never()).stopContainerCmd(anyString());
-    }
-
-    @Test
-    void reconcile_recentlyCreatedOrphan_skippedByGracePeriod() {
-        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of());
-        stubDockerList(List.of(dockerContainer("docker-fresh", Instant.now())));
-
-        service.cleanupIdleContainers();
-
-        verify(dockerClient, never()).stopContainerCmd(anyString());
-    }
-
-    @Test
-    void reconcile_containerWithActiveExecution_skipped() {
-        when(containerRepository.findByStatus(ContainerStatus.RUNNING)).thenReturn(List.of());
-        when(executionRegistry.getActiveContainerIds()).thenReturn(Set.of("docker-busy"));
-        stubDockerList(List.of(dockerContainer("docker-busy", Instant.now().minus(2, ChronoUnit.HOURS))));
-
-        service.cleanupIdleContainers();
-
-        verify(dockerClient, never()).stopContainerCmd(anyString());
     }
 
     // --- Defense-in-depth: PathValidator must be invoked for both project path and hostHome (H2 + M3) ---
