@@ -809,7 +809,7 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ workflow_definition_hash }}` | SHA-256 der ausgeführten Definition (leer, wenn `automation.hardening.provenance` aus ist) |
 | `{{ trigger_source }}` | Auslöser des Runs: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
 | `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
-| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
+| `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 
 > **Plattform-Daten fehlen nie stillschweigend.** `previous_report`, `open_todos` und
 > `request_metrics` werden einzeln injiziert: Scheitert eine dieser Ladungen, bekommen die beiden
@@ -817,6 +817,34 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 > `NICHT GEMESSEN: <name> (nicht verfügbar: <Fehlerart>)` im Kontext — dazu eine WARN-Zeile im
 > Activity-Log mit der Run-Id. Ein Gate-Block sieht also die Lücke und nicht den rohen Platzhalter
 > `{{ … }}` oder einen leeren Wert, der als GREEN durchginge.
+
+#### Ziel-Kontext: `goal_status` und `goal_guard_*`
+
+Nur wenn der zusammengeführte Kontext eines Laufs `goal_id` trägt (Default-Kontext oder Eingabe, etwa
+der Zeitplan des Ziel-Wächters), injiziert die Plattform den Stand dieses Ziels (TODO 259f4f66). Ohne
+`goal_id` gibt es diese Variablen nicht. Alle gelten als nicht vertrauenswürdig (Titel können aus
+importierten Issues stammen) → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben. Eine
+unbekannte `goal_id` setzt **jede** davon auf `NICHT GEMESSEN: <name> (nicht verfügbar: …)` und
+schreibt eine WARN-Zeile ins Activity-Log. Die Sprache der Texte wählt `goal_locale` (`de`/`en`,
+ohne Angabe Deutsch). Kein REST-Aufruf nötig – und keiner erlaubt.
+
+| Variable | Inhalt |
+|----------|--------|
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` mit Ziel, Zieldatum, Fortschritt, Meilensteinen samt Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), überfälligen und bald fälligen (≤ 3 Tage) aktiven TODOs. Titel geglättet, gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) und Blockgrenzen befreit; je Liste höchstens 20 Zeilen |
+| `{{ goal_guard_status }}` | `RED` (etwas überfällig oder Zieldatum mit offener Arbeit vorbei), `YELLOW` (etwas in ≤ 3 Tagen fällig), sonst `GREEN` |
+| `{{ goal_guard_title }}` | `Ziel: <Titel>`, höchstens 80 Zeichen |
+| `{{ goal_guard_summary }}` | Eine Zeile: `7/12 erledigt (58 %) · 2 überfällig · 1 bald fällig · nächster Meilenstein „Beta“ am 2026-10-01`, höchstens 500 Zeichen |
+| `{{ goal_guard_progress }}` | `7/12 (58 %)` |
+| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Anzahl überfälliger bzw. bald fälliger TODOs plus Meilensteine |
+| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | Die dringendsten Punkte (überfällige Meilensteine, überfällige TODOs, Zieldatum, bald Fälliges), je höchstens 200 Zeichen; freie Plätze sind leer und fallen in `dashboard-report` weg |
+| `{{ goal_guard_items }}` | Alle Punkte, eine Zeile je Punkt |
+
+Die Kachelwerte sind frei von Steuer- und Formatzeichen und halten die Längen des Dashboard-Vertrags
+ein – sie passen unverändert in einen `dashboard-report`-Block. Genau so arbeitet die mitgelieferte
+Vorlage **Ziel-Wächter** (`goal-guard`, kein Modell): ein Shell-Block schreibt `{{ goal_status }}` mit
+`shell_escape_variables` ins Protokoll, ein `dashboard-report`-Block füllt die Kachel. Angelegt wird
+sie über den Schalter „Wächter“ auf der Zielseite (`POST /api/v1/goals/{id}/guard`), je Ziel ein
+Workflow mit täglichem Zeitplan.
 
 ### Kontext-Variablen
 

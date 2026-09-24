@@ -796,7 +796,7 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
 | `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
 | `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
-| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 
 > **Platform data is never silently absent.** `previous_report`, `open_todos` and
 > `request_metrics` are injected one by one: if one of those loads fails, the other two still
@@ -804,6 +804,32 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 > `NICHT GEMESSEN: <name> (nicht verfügbar: <error type>)` — plus a WARN entry in the activity log
 > carrying the run id. A gate block therefore sees the stated gap rather than the raw `{{ … }}`
 > placeholder or an empty value that would pass as GREEN.
+
+#### Goal context: `goal_status` and `goal_guard_*`
+
+Only when a run's merged context carries `goal_id` (default context or input, for example the goal
+guard's schedule) does the platform inject that goal's state (TODO 259f4f66). Without `goal_id` these
+variables do not exist. All of them are untrusted (titles may come from imported issues) → always
+single-quoted in shell blocks, so write them unquoted. An unknown `goal_id` sets **each** of them to
+`NICHT GEMESSEN: <name> (nicht verfügbar: …)` and writes a WARN entry to the activity log. The text
+language follows `goal_locale` (`de`/`en`, German when absent). No REST call needed – and none allowed.
+
+| Variable | Content |
+|----------|---------|
+| `{{ goal_status }}` | Block `<goal_status>…</goal_status>` with goal, target date, progress, milestones with state (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`, `REOPENED`), overdue and soon-due (≤ 3 days) active TODOs. Titles flattened, capped and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) and block delimiters; at most 20 lines per list |
+| `{{ goal_guard_status }}` | `RED` (something overdue or the target date passed with work left), `YELLOW` (something due within ≤ 3 days), else `GREEN` |
+| `{{ goal_guard_title }}` | `Goal: <title>`, at most 80 characters |
+| `{{ goal_guard_summary }}` | One line: `7/12 done (58 %) · 2 overdue · 1 due soon · next milestone “Beta” on 2026-10-01`, at most 500 characters |
+| `{{ goal_guard_progress }}` | `7/12 (58 %)` |
+| `{{ goal_guard_overdue }}` / `{{ goal_guard_due_soon }}` | Number of overdue / soon-due TODOs plus milestones |
+| `{{ goal_guard_item_1 }}` … `{{ goal_guard_item_5 }}` | The most urgent items (overdue milestones, overdue TODOs, target date, soon-due items), at most 200 characters each; free slots are empty and drop out in `dashboard-report` |
+| `{{ goal_guard_items }}` | All items, one line each |
+
+The tile values carry no control or format characters and keep the dashboard contract's lengths – they
+fit a `dashboard-report` block unchanged. That is exactly what the shipped template **Goal guard**
+(`goal-guard`, no model) does: a shell block writes `{{ goal_status }}` to the log with
+`shell_escape_variables`, a `dashboard-report` block fills the tile. It is created by the "Guard"
+switch on the goal page (`POST /api/v1/goals/{id}/guard`), one workflow per goal with a daily schedule.
 
 ### Context Variables
 

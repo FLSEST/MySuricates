@@ -30,7 +30,7 @@ Interface das jeder Block-Typ implementieren muss. Definiert `execute(BlockDefin
 19 vordefinierte Skills die beim Start automatisch geseedet werden (z.B. `builtin-code-review`, `builtin-test-generator`). Definiert als Ressourcen unter `src/main/resources/skills/builtin/<id>.json` (Metadaten inkl. `sortOrder`) + `<id>.md` (Prompt), geladen von `BuiltInSkillLoader`.
 
 **Built-in Templates**
-54 vordefinierte Workflow-Vorlagen die beim Start geseedet werden. Definiert als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`), geseedet von `WorkflowTemplateSeeder`. Koennen nicht geloescht werden.
+55 vordefinierte Workflow-Vorlagen die beim Start geseedet werden. Definiert als JSON unter `src/main/resources/templates/builtin/`, eingelesen von `BuiltInTemplateLoader` (Schema: `BuiltInTemplateDefinition`), geseedet von `WorkflowTemplateSeeder`. Koennen nicht geloescht werden.
 
 ## C
 

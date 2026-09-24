@@ -585,7 +585,7 @@ M:N relationship between workflows and skills.
 | `created_at` | TEXT | | |
 | `updated_at` | TEXT | | |
 
-54 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
+55 built-in templates are created by `WorkflowTemplateSeeder` at startup. Template definitions are stored as JSON under `src/main/resources/templates/builtin/`.
 
 ### `template_verifications`
 
@@ -709,10 +709,11 @@ A chain does not belong to any project and can reference workflows from differen
 | `rated_by` | TEXT | | `USER` or `AI` – who assessed last (V85) |
 | `rated_at` | TEXT | | Time of the assessment (V85) |
 | `open_question` | TEXT | | Question that has to be settled before work starts (V85) |
+| `milestone_id` | TEXT | FK → goal_milestones, ON DELETE SET NULL | Milestone of the TODO's own goal (V88) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87)
+**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87), `idx_todos_milestone` (V88)
 
 TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
@@ -1078,6 +1079,7 @@ The only persistent system configuration outside of `application.yml`.
 | `Todo.Complexity` | `S`, `M`, `L`, `XL` | Size and uncertainty, coarse – the same scale for people and AI |
 | `Todo.RatedBy` | `USER`, `AI` | Who set the assessment last; a person overrides the AI |
 | `Goal.Status` | `ACTIVE`, `DONE`, `ARCHIVED` | Archived goals only show up with an explicit filter |
+| `GoalMilestone.State` (V88) | `OPEN`, `DUE_SOON`, `OVERDUE`, `REACHED` | Not stored, computed on read from the date and the assigned TODOs; `DUE_SOON` = at most 3 days |
 
 ### `goals` (V85)
 
@@ -1088,10 +1090,27 @@ The only persistent system configuration outside of `application.yml`.
 | `description` | TEXT | | Markdown: what "done" means |
 | `status` | TEXT | NOT NULL, DEFAULT 'ACTIVE' | `ACTIVE`, `DONE`, `ARCHIVED` |
 | `target_date` | TEXT | | Target date |
+| `guard_workflow_id` | TEXT | FK → workflows, ON DELETE SET NULL | Workflow of the goal guard (template `goal-guard`); whether it runs is up to its schedule (V88) |
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-A goal groups TODOs across projects. Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs.
+A goal groups TODOs across projects. Membership, rank and assessment live on the TODO (`todos.goal_id` …), not on the goal; `GoalService` computes progress and order from lean projections. Deleting a goal keeps its TODOs, removes its milestones and pauses a goal guard.
+
+### `goal_milestones` (V88)
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PK | UUID |
+| `goal_id` | TEXT | NOT NULL, FK → goals, ON DELETE CASCADE | Goal of the milestone |
+| `title` | TEXT | NOT NULL | e.g. "Beta done" |
+| `due_date` | TEXT | NOT NULL | Due date; a bare date counts until 23:59:59 UTC |
+| `reached_at` | TEXT | | First detection of "all assigned TODOs done"; stays even when the milestone opens again |
+| `created_at` | TEXT | NOT NULL | |
+| `updated_at` | TEXT | NOT NULL | |
+
+**Indexes:** `idx_goal_milestones_goal`
+
+Milestones of a goal (TODO 259f4f66). TODOs point to one through `todos.milestone_id`; the state (`OPEN`, `DUE_SOON` ≤ 3 days, `OVERDUE`, `REACHED`) is computed on read, not stored. Deleting a milestone keeps its TODOs in the goal.
 
 ### LogLevel (ActivityLog)
 
@@ -1305,6 +1324,7 @@ The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WO
 | V85 | `V85__goals_and_todo_planning.sql` | new table `goals`; `goal_id`, `goal_rank`, `complexity`, `suggested_effort`, `rating_note`, `rated_by`, `rated_at`, `open_question` in todos |
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (table rebuild: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, existing rows become `default`) |
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | indexes for runs per schedule (workflow_runs, chain_runs) and TODOs per run (`last_fix_run_id`, `workflow_run_id`) |
+| V88 | `V88__goal_milestones_and_guard.sql` | new table `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (goal guard) |
 
 ## SQLite Specifics
 

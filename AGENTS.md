@@ -68,6 +68,24 @@ curl -s http://localhost:9090/api/v1/goals/<goal-id>/relations -H "X-API-Key: $D
 curl -s "http://localhost:9090/api/v1/todos?goalId=none&status=OPEN&tag=release&size=20" -H "X-API-Key: $DEV_KEY"
 ```
 
+Meilensteine (Titel + Datum) legen einen Zeitstrahl ins Ziel; zugeordnet wird ueber `planning`
+(`milestoneId`, nur Meilensteine des eigenen Ziels). Der Zustand (`OPEN`/`DUE_SOON`/`OVERDUE`/`REACHED`)
+wird beim Lesen berechnet. Der Ziel-Waechter legt einmalig einen Workflow aus der Vorlage `goal-guard`
+mit taeglichem Zeitplan an; ausschalten pausiert nur den Zeitplan:
+
+```bash
+curl -s -X POST http://localhost:9090/api/v1/goals/<goal-id>/milestones \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"title": "Beta", "dueDate": "2026-10-01"}'
+curl -s -X PATCH http://localhost:9090/api/v1/todos/<todo-id>/planning \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"milestoneId": "<milestone-id>"}'
+curl -s -X POST http://localhost:9090/api/v1/goals/<goal-id>/guard \
+  -H "Content-Type: application/json" -H "X-API-Key: $DEV_KEY" -d '{"enabled": true, "locale": "de"}'
+```
+
+Im Workflow selbst kommen Ziel-Daten nie per REST, sondern als Kontextvariablen `{{ goal_status }}`
+und `{{ goal_guard_* }}`, sobald der Lauf `goal_id` traegt ([docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md)
+→ „Ziel-Kontext“).
+
 Referenz: [docs/api-referenz.md](docs/api-referenz.md) → „Ziele“.
 
 ## Cypress E2E gegen Dev oder Test
@@ -324,7 +342,7 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 
 **Hinweise:**
 - Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
-- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
+- Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `goal-guard`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
 - Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
 - Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false), `{{ workflow_definition_hash }}`, `{{ trigger_source }}`
 

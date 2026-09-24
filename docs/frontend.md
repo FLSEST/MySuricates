@@ -101,7 +101,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 ### Workflows (`/workflows`, `/workflows/:id`)
 
 - 2-Schritt-Erstellung: Template-Auswahl → Formular (Projekt, Name, Beschreibung)
-- 54 Built-in-Templates (aus DB, via `WorkflowTemplateSeeder`) plus benutzerdefinierte Templates
+- 55 Built-in-Templates (aus DB, via `WorkflowTemplateSeeder`) plus benutzerdefinierte Templates
 - `TemplateSelector`: Vorlagen und Blaupausen, deren Modul aus ist (`requiredModules` vs. `useSystemModules`), stehen hinter einem Zähler; eingeblendet zeigt die Karte Modul und Schalter (`TemplateAvailability.tsx`, `templateAvailability.ts`). Filter „Läuft ohne KI“ über `needsAi` vom Server, Kategorien über `t.templates.categories`. Sind Assistent, Factory und Wünsche alle aus (core), zeigt die Auswahl den Hinweis `build-from-description`
 - Detail-Seite: 2/3-Spalte Block-Editor (Drag & Drop), 1/3-Sidebar (Skills, Runs, Memory, Info)
 - Block-Editor mit `@dnd-kit` für Drag-and-Drop-Sortierung

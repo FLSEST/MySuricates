@@ -88,7 +88,7 @@ Das Backend startet auf **http://localhost:9090**. Beim ersten Start:
 - Flyway fuehrt alle 86 Migrationen aus (V1-V86)
 - SQLite-Datenbank wird unter `data/automation.db` erstellt
 - 19 Built-in Skills werden geseedet
-- 54 Workflow-Templates werden geseedet
+- 55 Workflow-Templates werden geseedet
 
 ### 2.4 Health-Check
 

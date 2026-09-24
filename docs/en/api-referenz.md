@@ -2916,7 +2916,7 @@ Count TODOs by status. Optional query parameter `projectId` counts only that pro
 
 TODO overview with project rollups and "Needs You" items.
 
-**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`
+**Response:** `TodoOverviewResponse` with `projects` (List), `needsYou` (List), `generatedAt`, `staleThresholdDays`, `milestonesDue` (V88: milestones of active goals that are `DUE_SOON`/`OVERDUE` – `id`, `title`, `goalId`, `goalTitle`, `dueDate`, `state`, `total`, `done`)
 
 ### `POST /api/v1/todos/bulk-status`
 
@@ -2951,7 +2951,7 @@ Search for similar TODOs (for duplicate detection).
 
 ### `PATCH /api/v1/todos/{id}/planning`
 
-Set a TODO's goal, rank and assessment (V85). `null` leaves a field alone, an empty string clears it: `goalId: ""` detaches the TODO from its goal, `openQuestion: ""` marks the question as settled. `goalRank <= 0` removes the rank. Without `ratedBy` the assessment counts as human (`USER`); the server sets `ratedAt` whenever `complexity`, `suggestedEffort` or `ratingNote` is sent.
+Set a TODO's goal, rank, milestone and assessment (V85, `milestoneId` V88). `null` leaves a field alone, an empty string clears it: `goalId: ""` detaches the TODO from its goal, `milestoneId: ""` from its milestone, `openQuestion: ""` marks the question as settled. `milestoneId` must be a milestone of the TODO's own goal (else 400, unknown 404; a `goalId` in the same request applies first); when the TODO changes or leaves its goal, `milestoneId` is cleared. `planning` in the response carries `milestoneId`. `goalRank <= 0` removes the rank. Without `ratedBy` the assessment counts as human (`USER`); the server sets `ratedAt` whenever `complexity`, `suggestedEffort` or `ratingNote` is sent.
 
 ```json
 {
@@ -2961,7 +2961,8 @@ Set a TODO's goal, rank and assessment (V85). `null` leaves a field alone, an em
   "suggestedEffort": "high",
   "ratingNote": "Many files, but a clear template",
   "openQuestion": "Which video style?",
-  "ratedBy": "AI"
+  "ratedBy": "AI",
+  "milestoneId": "uuid"
 }
 ```
 
@@ -2979,7 +2980,7 @@ A goal collects TODOs across projects and shows progress (V85). See [architektur
 
 Goals with progress, newest first. **Query:** `status` (repeatable; default `ACTIVE` and `DONE`, archived ones only when asked for).
 
-**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED).
+**Response:** `GoalResponse[]` – `id`, `title`, `description`, `status`, `targetDate`, `createdAt`, `updatedAt`, `progress` (`total`, `open`, `inProgress`, `backlog`, `done`, `openQuestions`, `percentDone`; `total` excludes ARCHIVED), `guard` (`enabled`, `workflowId`, `scheduleId`, `nextRunAt`; never switched on = `enabled: false`, the rest `null`).
 
 ### `POST /api/v1/goals`
 
@@ -2993,7 +2994,7 @@ Goals with progress, newest first. **Query:** `status` (repeatable; default `ACT
 
 The goal with its TODOs in work order (rank, then priority, then age) – without descriptions – and progress per project.
 
-**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`), `byProject[]` (`projectId`, `projectName`, `total`, `done`)
+**Response:** `GoalDetailResponse` – `goal`, `todos[]` (`id`, `title`, `status`, `priority`, `projectId`, `projectName`, `tags`, `goalRank`, `complexity`, `suggestedEffort`, `ratingNote`, `ratedBy`, `ratedAt`, `openQuestion`, `updatedAt`, `dueDate`, `milestoneId`), `byProject[]` (`projectId`, `projectName`, `total`, `done`), `milestones[]` (`GoalMilestoneResponse`, by date). If reading detects a milestone as reached for the first time, it stores `reachedAt`.
 
 ### `GET /api/v1/goals/{id}/relations`
 
@@ -3013,15 +3014,54 @@ Partial update: `title`, `description`, `status`, `targetDate` (`null` = unchang
 
 ### `DELETE /api/v1/goals/{id}`
 
-Deletes the goal; its TODOs stay and only lose the assignment. **Response:** `204`
+Deletes the goal; its TODOs stay and only lose the assignment (milestone included), its milestones go, a goal guard pauses (its workflow stays). **Response:** `204`
 
 ### `POST /api/v1/goals/{id}/todos`
 
-Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here; newly assigned TODOs get no rank. **Response:** `GoalDetailResponse`
+Assign TODOs: `{ "todoIds": ["…"] }`. A TODO from another goal moves here and loses its milestone; newly assigned TODOs get no rank. **Response:** `GoalDetailResponse`
 
 ### `PUT /api/v1/goals/{id}/order`
 
 Set the order: `{ "todoIds": ["…"] }` → rank 1..n in this sequence; all other TODOs of the goal lose their rank. Every ID must already belong to the goal, else 400. **Response:** `GoalDetailResponse`
+
+### Milestones (V88)
+
+A milestone is an entry of its own with title and date; TODOs of the goal are assigned to it via `PATCH /todos/{id}/planning` (`milestoneId`). The state is computed on read: `REACHED` (all assigned TODOs without ARCHIVED done, at least one), else `OVERDUE`, `DUE_SOON` (≤ 3 days) or `OPEN`. `reachedAt` keeps the first detection and stays; if the milestone opens again afterwards, `reopened: true`.
+
+**`GoalMilestoneResponse`:**
+
+```json
+{
+  "id": "b1f0…", "goalId": "6c2e…", "title": "Beta done",
+  "dueDate": "2026-10-01T21:59:59Z", "state": "DUE_SOON",
+  "total": 4, "done": 2, "reachedAt": null, "reopened": false,
+  "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-24T08:00:00Z"
+}
+```
+
+- `GET /api/v1/goals/{id}/milestones` – by date. **Response:** `GoalMilestoneResponse[]`
+- `POST /api/v1/goals/{id}/milestones` – `{ "title": "Beta done", "dueDate": "2026-10-01T21:59:59Z" }`; `dueDate` required, ISO instant or date (`2026-10-01` = until 23:59:59 UTC); title at most 200 characters. **Response:** `201` + `GoalMilestoneResponse`
+- `PUT /api/v1/goals/{id}/milestones/{milestoneId}` – partial update `{ "title"?, "dueDate"? }` (`null` = unchanged). **Response:** `GoalMilestoneResponse`
+- `DELETE /api/v1/goals/{id}/milestones/{milestoneId}` – the TODOs stay in the goal and only lose the assignment. **Response:** `204`
+
+Unknown goal, or a milestone of another goal → `404`.
+
+### `POST /api/v1/goals/{id}/guard`
+
+Switch the goal guard on or off (V88): `{ "enabled": true, "projectId": "…"?, "cron": "0 0 8 * * *"?, "locale": "en"? }`.
+
+- **First switch-on:** creates a workflow "Goal guard: <title>" (`locale` `de`: "Ziel-Wächter: …") from the shipped template `goal-guard` with `defaultContext` `{goal_id, goal_locale}` (`changeSource` `goal-guard`), plus a CRON schedule (default daily 08:00, `inputContext.goal_id`, conflict `SKIP`). Project: `projectId`, else the one with most of the goal's TODOs, else the oldest active one; no project at all → 400.
+- **Switching on again:** re-enables the existing schedule; a given `cron` replaces the old one. If the workflow was deleted, a new one is created.
+- **Switching off** (`enabled: false`): pauses the schedule, the workflow stays. Deleting the goal pauses it as well.
+
+Invalid `cron` → 400, module `dashboard-report` off → 409, unknown goal/project → 404. **Response:** `GoalResponse` with `guard`:
+
+```json
+{ "id": "6c2e…", "title": "Open-source launch", "…": "…",
+  "guard": { "enabled": true, "workflowId": "9a4d…", "scheduleId": "e71b…", "nextRunAt": "2026-09-25T06:00:00Z" } }
+```
+
+"Check now" starts `POST /api/v1/workflows/{workflowId}/execute`; the result shows up as that workflow's dashboard tile.
 
 ---
 
