@@ -74,6 +74,28 @@ describe('usePanelResize', () => {
     expect(onWidth).not.toHaveBeenCalled();
   });
 
+  it('ends the drag on pointercancel and on lost capture, not only on release', () => {
+    const { result, onWidth, onHeight } = setup();
+    act(() => result.current.widthHandle.onPointerDown(pointer(500, 500)));
+    act(() => result.current.widthHandle.onPointerCancel());
+    expect(result.current.isResizing).toBe(false);
+    // Passing over the handle after a cancelled drag must not resize any more
+    act(() => result.current.widthHandle.onPointerMove(pointer(100, 100)));
+    expect(onWidth).not.toHaveBeenCalled();
+
+    act(() => result.current.heightHandle.onPointerDown(pointer(500, 500)));
+    act(() => result.current.heightHandle.onLostPointerCapture());
+    expect(result.current.isResizing).toBe(false);
+    act(() => result.current.heightHandle.onPointerMove(pointer(100, 100)));
+    expect(onHeight).not.toHaveBeenCalled();
+  });
+
+  it('keeps touch input on the handles from scrolling the page', () => {
+    const { result } = setup();
+    expect(result.current.widthHandle.style).toEqual({ touchAction: 'none' });
+    expect(result.current.heightHandle.style).toEqual({ touchAction: 'none' });
+  });
+
   it('ignores moves before the press, after the release and on the other handle', () => {
     const { result, onWidth, onHeight } = setup();
     act(() => result.current.widthHandle.onPointerMove(pointer(100, 100)));
