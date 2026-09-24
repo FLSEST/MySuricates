@@ -749,6 +749,10 @@ Aggregates events from multiple sources (Google Calendar, Trello, Taskwarrior, s
 
 Manages custom colors per calendar source (persisted in `localStorage`).
 
+### `useCalendarNavigation.ts`
+
+What `UnifiedCalendarGrid` shows: the view (month, week, day), the month with its selected day, the date of the week and day view and the range loaded for it (`from`/`to`, ISO); plus back/forward, "Today" and `getMonday()`. Week and day open on the selected day, without a selection on the 1st of the month; a month step clears the selection. The month view is `calendar/CalendarMonthView.tsx`, next to `CalendarWeekView` and `CalendarDayView`.
+
 ### `useConversion.ts`
 
 | Hook | Type | Description |
