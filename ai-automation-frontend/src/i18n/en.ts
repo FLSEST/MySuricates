@@ -162,7 +162,7 @@ export const en = {
       nextRun: 'Next run',
       createTitle: 'New schedule',
       cron: 'Cron expression',
-      cronHint: 'e.g. 0 9 * * * = daily at 9:00',
+      cronHint: 'e.g. 0 0 9 * * * = daily at 9:00',
     },
     todos: {
       title: 'Tasks',

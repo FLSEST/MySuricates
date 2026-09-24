@@ -164,7 +164,7 @@ export const de: TranslationKeys = {
       nextRun: 'Nächster Lauf',
       createTitle: 'Zeitplan anlegen',
       cron: 'Cron-Ausdruck',
-      cronHint: 'z. B. 0 9 * * * = täglich 9 Uhr',
+      cronHint: 'z. B. 0 0 9 * * * = täglich 9 Uhr',
     },
     todos: {
       title: 'Aufgaben',

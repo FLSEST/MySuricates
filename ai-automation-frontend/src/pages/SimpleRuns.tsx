@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 import { useT, useI18nStore } from '../i18n';
-import { useAllRuns, useExecuteWorkflow } from '../hooks/useWorkflows';
+import { useAllRuns, useRetryExecution } from '../hooks/useWorkflows';
 import { Spinner, Button } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -16,7 +16,8 @@ export function SimpleRuns() {
   const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
   const { data: runsPage, isLoading, error, refetch } = useAllRuns({ size: 50 });
-  const executeWorkflow = useExecuteWorkflow();
+  // Retry keeps the run's original input context (same as the rerun button on the run page).
+  const retry = useRetryExecution();
 
   const ordered = useMemo(() => {
     const runs = [...(runsPage?.content ?? [])];
@@ -66,12 +67,11 @@ export function SimpleRuns() {
                     size="sm"
                     variant="secondary"
                     icon={<RotateCcw className="w-3.5 h-3.5" />}
-                    loading={executeWorkflow.isPending}
+                    loading={retry.isPending && retry.variables === run.id}
                     onClick={() =>
-                      executeWorkflow.mutate(
-                        { id: run.workflowId },
-                        { onSuccess: (r) => navigate(`/workflows/${run.workflowId}/run/${r.id}`) },
-                      )
+                      retry.mutate(run.id, {
+                        onSuccess: (next) => navigate(`/workflows/${next.workflowId}/run/${next.id}`),
+                      })
                     }
                   >
                     {t.simple.runs.retry}

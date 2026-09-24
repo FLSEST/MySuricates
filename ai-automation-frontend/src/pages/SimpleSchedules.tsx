@@ -10,6 +10,9 @@ import { SimplePage, SimplePageHeader, SimpleRow, StatusDot } from '../component
 import { AREA_COLORS } from '../utils/homeTiles';
 import { formatDateTime } from '../utils/formatTime';
 
+// Spring cron has six fields: second minute hour day month weekday.
+const DEFAULT_CRON = '0 0 9 * * *';
+
 export function SimpleSchedules() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -21,13 +24,13 @@ export function SimpleSchedules() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [wfId, setWfId] = useState('');
-  const [cron, setCron] = useState('0 9 * * *');
+  const [cron, setCron] = useState(DEFAULT_CRON);
 
   const submitCreate = () => {
     if (!wfId || !cron.trim()) return;
     create.mutate(
       { workflowId: wfId, targetType: 'WORKFLOW', scheduleType: 'CRON', cronExpression: cron.trim() },
-      { onSuccess: () => { setCreateOpen(false); setWfId(''); setCron('0 9 * * *'); } },
+      { onSuccess: () => { setCreateOpen(false); setWfId(''); setCron(DEFAULT_CRON); } },
     );
   };
 
