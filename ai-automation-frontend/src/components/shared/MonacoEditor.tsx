@@ -6,7 +6,7 @@ import { useT } from '../../i18n';
 import { ensureLocalMonaco, registerJsonSchema } from './monacoSetup';
 import { attachPlaceholders } from './monacoPlaceholders';
 import { MonacoValueSync } from './monacoValueSync';
-import type { PlaceholderContext } from '../workflow/placeholderContext';
+import type { PlaceholderContext } from '../../utils/placeholderContext';
 
 interface MonacoEditorProps {
   /**

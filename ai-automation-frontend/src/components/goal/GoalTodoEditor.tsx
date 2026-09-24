@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { TodoEditModal } from '../shared/TodoEditModal';
+import { TodoEditModal } from '../todo/TodoEditModal';
 import { useExportTodo, useTodo, useUpdateTodo } from '../../hooks/useTodos';
 import { useProjects } from '../../hooks/useProjects';
 import { useWorkflows } from '../../hooks/useWorkflows';

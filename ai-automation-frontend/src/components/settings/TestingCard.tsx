@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, CardHeader, Button } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
-import { SyncSelectModal } from '../shared/SyncSelectModal';
+import { SyncSelectModal } from './SyncSelectModal';
 import { useT } from '../../i18n';
 import { useTestingSyncPreview } from '../../hooks/useTesting';
 import type { TestingStatus, SyncResult, SyncDefinitionsRequest } from '../../types';

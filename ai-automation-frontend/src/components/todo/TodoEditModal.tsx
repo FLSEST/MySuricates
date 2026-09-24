@@ -6,7 +6,7 @@ import { useI18nStore, useT } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
 import { useTaskTargets } from '../../hooks/useIntegrations';
 import { useModuleEnabled } from '../../hooks/useModules';
-import { ProviderIcon } from './ProviderIcon';
+import { ProviderIcon } from '../shared/ProviderIcon';
 import { TodoPlanningPanel } from '../goal/TodoPlanningPanel';
 import type { Todo, TodoStatus, TodoPriority, UpdateTodoRequest, Project, Workflow, IntegrationProviderInfo } from '../../types';
 

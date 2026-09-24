@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { BlockDefinition } from '../../../types';
-import { buildPlaceholderContext, checkPlaceholders } from '../placeholderContext';
+import type { BlockDefinition } from '../types';
+import { buildPlaceholderContext, checkPlaceholders } from './placeholderContext';
 
 const blocks: BlockDefinition[] = [
   { type: 'shell', name: 'backend_tests', config: { command: 'mvn test' } },
