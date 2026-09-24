@@ -15,6 +15,8 @@ const VENDOR_CHUNKS: Record<string, string[]> = {
   monaco: ['monaco-editor'],
 };
 
+const PRELOAD_HELPER_ID = 'vite/preload-helper';
+
 function normalizeApiProxyTarget(url: string): string {
   return url.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
 }
@@ -108,12 +110,23 @@ export default defineConfig(() => {
       chunkSizeWarningLimit: 600,
       rolldownOptions: {
         output: {
-          // Rolldown (Vite 8) nimmt manualChunks nur noch als Funktion.
-          manualChunks: (id: string) => {
-            for (const [chunk, packages] of Object.entries(VENDOR_CHUNKS)) {
-              if (packages.some((pkg) => id.includes(`/node_modules/${pkg}/`))) return chunk;
-            }
-            return undefined;
+          // Eine Gruppe je Vendor-Chunk statt einer manualChunks-Funktion: Rolldown zieht die
+          // Abhaengigkeiten erfasster Module mit in die Gruppe (includeDependenciesRecursively).
+          // Bei einer einzigen Namensfunktion bekam ein geteiltes Modul die zuerst erfassende Gruppe —
+          // Vites Preload-Helper (\0vite/preload-helper.js, von jedem import() gebraucht) landete
+          // in monaco, React selbst in dnd; index lud so die 3,7 MB Monaco statisch mit.
+          // Die Prioritaet legt fest, wer ein geteiltes Modul bekommt: Preload-Helper vorn, dann
+          // die Vendor-Chunks in VENDOR_CHUNKS-Reihenfolge. scripts/check-lazy-chunks.mjs prueft
+          // nach jedem Build, dass kein Lazy-Chunk wieder am Einstieg haengt.
+          codeSplitting: {
+            groups: [
+              { name: 'preload-helper', test: (id: string) => id.includes(PRELOAD_HELPER_ID), priority: 100 },
+              ...Object.entries(VENDOR_CHUNKS).map(([chunk, packages], index) => ({
+                name: chunk,
+                test: (id: string) => packages.some((pkg) => id.includes(`/node_modules/${pkg}/`)),
+                priority: 50 - index,
+              })),
+            ],
           },
         },
       },
