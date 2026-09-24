@@ -232,7 +232,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService, AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 16 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, todoist/, trello/; gemeinsam genutzt: ical/)
+│   ├── integration/providers/ 17 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingTool, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── execution/       ExecutionQueryService (Lesen + DTO-Mapping), ExecutionCommandService (Retry, Resume, Notizen), WorkflowDebugService
@@ -794,7 +794,7 @@ Plugin-Framework für externe Dienste:
 - `IntegrationEncryptionService` — Verschlüsselung von Credentials (AES-GCM)
 - `IntegrationConnection`-Entity — Verbindungsstatus (CONNECTED, DISCONNECTED, EXPIRED)
 - `IntegrationController` — `/api/v1/integrations` mit OAuth-Callback, Credentials, Actions
-- 16 Provider in Unterverzeichnissen: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Todoist, Trello
+- 17 Provider in Unterverzeichnissen: CalDav, Confluence, Feed, Gitea, GitHub, GitLab, GoogleCalendar, GoogleGmail, ICalFeed, Jira, Ntfy, OpenMeteo, Slack, Taskwarrior, Telegram, Todoist, Trello
 - `IntegrationBlockExecutor` — Führt Provider-Aktionen als Workflow-Block aus
 - `TaskExportCapable` — Interface für Provider, die TODO-Export unterstützen
 

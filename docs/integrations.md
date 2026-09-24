@@ -118,6 +118,7 @@ Für Google gibt es die Konstante `OAuthConfig.GOOGLE_REVOCATION_URL` und den Wi
 | Open-Meteo | `open-meteo` | keine (freie API ohne Key) | `providers/openmeteo/` | `forecast`, `geocode` | geprüft |
 | Todoist | `todoist` | API-Token (kein OAuth-Flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | nur simuliert |
 | Slack | `slack` | Bot-Token `xoxb-…` (kein OAuth-Flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | nur simuliert |
+| Telegram | `telegram` | Bot-Token von @BotFather (kein OAuth) | `providers/telegram/` | `send_message`, `get_updates` | nur simuliert |
 
 **Prüfstand:** Jeder Provider sagt über `getVerification()`, ob er gegen den echten Dienst geprüft wurde. Standard ist `SIMULATED` — ein neuer Provider ist damit ohne Zutun als „nur simuliert getestet“ markiert; die Integrationen-Seite, der Setup-Bereich und der Block-Editor zeigen dann einen Hinweis. Auf `VERIFIED` wechselt ein Provider nur durch einen Eintrag in `service/integration/VerifiedProviders` (Provider-ID → wogegen geprüft) nach einem Lauf gegen den echten Dienst — ein lokaler Container der echten Software zählt. `IntegrationVerificationGateTest` findet alle Provider per Classpath-Scan und prüft, dass jeder Eintrag einen existierenden Provider nennt.
 
@@ -264,6 +265,12 @@ Hinweise:
   kommen aus dessen Header `x-oauth-scopes`; `post_message` braucht `chat:write`, `list_channels`
   `channels:read`, `get_channel_history` `channels:history`. Aufgeteilt in `SlackHttpClient`, `SlackParams`,
   `SlackActionCatalog`.
+- **Telegram (Bot-Token)** nutzt die Bot API (`https://api.telegram.org/bot<token>/<methode>`, Stand Bot API 10.3):
+  `sendMessage` (`chat_id` als Zahl oder `@kanal`, Text 1–4096 Zeichen, `parse_mode` MarkdownV2/HTML) und
+  `getUpdates` (Kurzabfrage mit `timeout=0`; kollidiert mit einem gesetzten Webhook → 409). Geprüft wird per
+  `getMe`. Fehler kommen als `{"ok":false,"error_code":…,"description":…}`, 429 mit `parameters.retry_after`.
+  Weil der Token im URL-Pfad steht, prüft `TelegramHttpClient` sein Format, bevor eine URI entsteht, wirft
+  Transportfehler ohne Ursache weiter und ersetzt den Token in jeder Meldung durch `***`.
 
 ---
 

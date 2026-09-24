@@ -1362,6 +1362,14 @@ export const en = {
           get_channel_history: 'Read the messages of a channel',
         },
       },
+      telegram: {
+        displayName: 'Telegram',
+        description: 'Send messages through a Telegram bot and fetch incoming updates',
+        actions: {
+          send_message: 'Send a message to a chat, group or channel',
+          get_updates: 'Fetch incoming updates (not while a webhook is set)',
+        },
+      },
     },
   },
   calendar: {

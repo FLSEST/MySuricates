@@ -119,6 +119,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Open-Meteo | `open-meteo` | none (free API without key) | `providers/openmeteo/` | `forecast`, `geocode` | verified |
 | Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
 | Slack | `slack` | Bot token `xoxb-…` (no OAuth flow) | `providers/slack/` | `post_message`, `list_channels`, `get_channel_history` | simulated only |
+| Telegram | `telegram` | Bot token from @BotFather (no OAuth) | `providers/telegram/` | `send_message`, `get_updates` | simulated only |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -268,6 +269,12 @@ Notes:
   missing scope, 429 with `Retry-After`). Validation uses `auth.test`, the scopes come from its `x-oauth-scopes`
   header; `post_message` needs `chat:write`, `list_channels` `channels:read`, `get_channel_history`
   `channels:history`. Split into `SlackHttpClient`, `SlackParams`, `SlackActionCatalog`.
+- **Telegram (bot token)** uses the Bot API (`https://api.telegram.org/bot<token>/<method>`, as of Bot API 10.3):
+  `sendMessage` (`chat_id` as a number or `@channel`, text 1–4096 characters, `parse_mode` MarkdownV2/HTML) and
+  `getUpdates` (short poll with `timeout=0`; clashes with a configured webhook → 409). Validation uses `getMe`.
+  Errors come as `{"ok":false,"error_code":…,"description":…}`, 429 with `parameters.retry_after`. Because the
+  token sits in the URL path, `TelegramHttpClient` checks its format before any URI is built, rethrows transport
+  errors without their cause and replaces the token with `***` in every message.
 
 ---
 

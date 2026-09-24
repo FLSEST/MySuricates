@@ -1130,4 +1130,73 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
       },
     ],
   },
+
+  'telegram': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Bot-Name (optional)', en: 'Bot name (optional)' },
+      clientSecretPlaceholder: { de: 'Bot-Token von @BotFather', en: 'Bot token from @BotFather' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Bot bei @BotFather anlegen',
+          en: 'Create a bot with @BotFather',
+        },
+        instructions: {
+          de: [
+            'In Telegram @BotFather öffnen (Link unten) und /newbot senden',
+            'Einen Anzeigenamen und einen Benutzernamen wählen, der auf "bot" endet',
+            'BotFather antwortet mit dem Token (Form 123456789:AA…) — wie ein Passwort behandeln',
+          ],
+          en: [
+            'Open @BotFather in Telegram (link below) and send /newbot',
+            'Choose a display name and a username ending in "bot"',
+            'BotFather replies with the token (form 123456789:AA…) — treat it like a password',
+          ],
+        },
+        link: {
+          url: 'https://t.me/BotFather',
+          label: { de: '@BotFather öffnen', en: 'Open @BotFather' },
+        },
+      },
+      {
+        title: {
+          de: 'Zugangsdaten eintragen',
+          en: 'Enter credentials',
+        },
+        instructions: {
+          de: [
+            'Erstes Feld: Bot-Name zur Anzeige (optional)',
+            'Zweites Feld: den Bot-Token einfügen',
+            '"Zugangsdaten speichern" klicken — geprüft wird per getMe',
+          ],
+          en: [
+            'First field: bot name for display (optional)',
+            'Second field: paste the bot token',
+            'Click "Save credentials" — it is checked via getMe',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Chat-ID herausfinden',
+          en: 'Find the chat id',
+        },
+        instructions: {
+          de: [
+            'Dem Bot eine Nachricht schreiben oder ihn in die Gruppe bzw. den Kanal aufnehmen (in Kanälen als Admin)',
+            'Die Aktion "get_updates" testen — die Chat-ID steht unter message.chat.id (Gruppen sind negativ)',
+            'Öffentliche Kanäle gehen auch als @kanalname',
+            'Hinweis: get_updates funktioniert nicht, solange für den Bot ein Webhook gesetzt ist',
+          ],
+          en: [
+            'Send the bot a message or add it to the group or channel (as admin in channels)',
+            'Test the "get_updates" action — the chat id is at message.chat.id (groups are negative)',
+            'Public channels also work as @channelname',
+            'Note: get_updates does not work while a webhook is set for the bot',
+          ],
+        },
+      },
+    ],
+  },
 };

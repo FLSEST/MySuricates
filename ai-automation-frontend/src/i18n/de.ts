@@ -1364,6 +1364,14 @@ export const de: TranslationKeys = {
           get_channel_history: 'Nachrichten eines Kanals lesen',
         },
       },
+      telegram: {
+        displayName: 'Telegram',
+        description: 'Nachrichten über einen Telegram-Bot senden und eingehende Updates abrufen',
+        actions: {
+          send_message: 'Nachricht an einen Chat, eine Gruppe oder einen Kanal senden',
+          get_updates: 'Eingehende Updates abrufen (nicht bei gesetztem Webhook)',
+        },
+      },
     },
   },
   calendar: {
