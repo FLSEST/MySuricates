@@ -88,7 +88,7 @@ export function DashboardReportFields({
                 label={t.statusCustom}
                 value={status}
                 onChange={(e) => patch({ status: e.target.value })}
-                placeholder="{{ gate_status }}"
+                placeholder="{{ block.<name>.output }}"
                 hint={t.statusCustomHint}
               />
             )}

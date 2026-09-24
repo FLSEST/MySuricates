@@ -287,7 +287,11 @@ const SPECS: Record<BlockType, BlockSpec> = {
         doc: s('Art der Eingabe.', 'Kind of input.'),
         values: [
           ['text', s('Freitext (Standard).', 'Free text (default).')],
+          ['textarea', s('Mehrzeiliger Text.', 'Multi-line text.')],
+          ['number', s('Zahlenfeld.', 'Number field.')],
           ['select', s('Auswahl aus `options`.', 'Choice from `options`.')],
+          ['checkbox', s('Kontrollkästchen, Antwort `"true"` oder `"false"`.', 'Checkbox, answer `"true"` or `"false"`.')],
+          ['date', s('Datum, Antwort als `JJJJ-MM-TT`.', 'Date, answer as `YYYY-MM-DD`.')],
         ],
       },
       variable_name: VARIABLE_NAME('user_input'),
@@ -309,7 +313,7 @@ const SPECS: Record<BlockType, BlockSpec> = {
   'skill-capability': {
     required: ['capability'],
     fields: {
-      capability: { type: 'string', doc: s('Name der Skill-Fähigkeit, z. B. `analyze`. Der Skill muss am Block oder Workflow aktiv sein.', 'Name of the skill capability, e.g. `analyze`. The skill must be active on the block or workflow.') },
+      capability: { type: 'string', doc: s('Name der Skill-Fähigkeit, z. B. `review_code`. Ihr Skill muss in den `skillIds` des Blocks stehen (neben `config`), Workflow-Skills zählen hier nicht.', 'Name of the skill capability, e.g. `review_code`. Its skill must be in the block\'s `skillIds` (next to `config`); workflow skills do not count here.') },
       input: { type: 'string', doc: s('Eingabe für die Fähigkeit, z. B. `{{ previous_output }}`.', 'Input for the capability, e.g. `{{ previous_output }}`.') },
       params: { type: 'object', doc: s('Zusätzliche Parameter.', 'Additional parameters.') },
       allow_writes: { type: 'boolean', default: false, doc: s('Schreibzugriff aufs Repo erlauben. Pflicht für Fähigkeiten mit `writes: true`.', 'Allow writing to the repo. Required for capabilities with `writes: true`.') },
@@ -392,7 +396,7 @@ const SPECS: Record<BlockType, BlockSpec> = {
   'dashboard-report': {
     required: ['status'],
     fields: {
-      status: { type: 'string', doc: s('Ampel des Runs (Platzhalter erlaubt, z. B. `{{ gate_status }}`).', 'Traffic light of the run (placeholders allowed, e.g. `{{ gate_status }}`).'), values: [['GREEN', s('Grün', 'Green')], ['YELLOW', s('Gelb', 'Yellow')], ['RED', s('Rot', 'Red')]] },
+      status: { type: 'string', doc: s('Ampel des Runs (Platzhalter erlaubt, z. B. `{{ block.<name>.output }}` eines Blocks, der GREEN, YELLOW oder RED ausgibt).', 'Traffic light of the run (placeholders allowed, e.g. `{{ block.<name>.output }}` of a block printing GREEN, YELLOW or RED).'), values: [['GREEN', s('Grün', 'Green')], ['YELLOW', s('Gelb', 'Yellow')], ['RED', s('Rot', 'Red')]] },
       title: { type: 'string', doc: s('Titel, höchstens 80 Zeichen.', 'Title, at most 80 characters.') },
       summary: { type: 'string', doc: s('Zusammenfassung, höchstens 500 Zeichen.', 'Summary, at most 500 characters.') },
       kpis: { type: 'array', items: { $ref: '#/definitions/kpi' }, doc: s('Bis zu 6 Kennzahlen `{ label, value, trend? }`.', 'Up to 6 KPIs `{ label, value, trend? }`.') },

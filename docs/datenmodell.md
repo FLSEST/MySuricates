@@ -1185,24 +1185,32 @@ Blöcke werden als JSON-Array in der `blocks`-Spalte der `workflows`-Tabelle ges
 
 **Typ-spezifische Config-Felder:**
 
+Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+
 | Typ | Wichtigste Config-Felder |
 |---|---|
-| `simple` | `prompt`, `on_failure`, `timeout_seconds` |
-| `shell` | `command` (Shell-Skript), `on_failure`, `timeout_seconds` |
-| `retry` | `prompt`, `maxRetries`, `on_failure`, `timeout_seconds` |
-| `conditional` | `condition`, `thenPrompt`, `elsePrompt` |
-| `foreach` | `items`, `prompt`, `on_failure` |
-| `while` | `condition`, `prompt`, `maxIterations` |
-| `switch` | `expression`, `cases` (Liste mit `value`, `blocks`) |
+| `simple` | `command` (der Prompt), `timeout_seconds` |
+| `shell` | `command` (Shell-Skript), `timeout_seconds`, `shell_escape_variables`, `container_image` |
+| `retry` | `command`, `max_retries` (3), `delay` (5), `exponential_backoff`, `execution_mode` (`ai`/`shell`) |
+| `conditional` | `condition`, `then_command`, `else_command`, `execution_mode` |
+| `foreach` | `command`, `items_source` (`list`/`command`), `items`, `items_command`, `variable_name` (`item`), `execution_mode`, `continue_on_error` |
+| `while` | `command`, `condition_command`, `max_iterations` (100), `execution_mode` |
+| `switch` | `expression`, `cases` (Liste mit `value`, `blocks`), `default` |
 | `agentic` | `goal`, `success_criteria`, `max_iterations` (10), `iteration_timeout_seconds` (300), `total_timeout_seconds` (1800), `max_total_tokens` (200000), `max_repeated_actions` (3), `require_approval` (false) |
-| `approval` | `message`, `timeout_minutes` |
-| `sub-workflow` | `workflowId`, `inputContext` |
-| `skill-capability` | `skillId`, `capabilityName`, `input` |
-| `human-input` | `prompt`, `input_type` (text/select), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout` |
-| `document` | `prompt`, `on_failure`, `timeout_seconds` |
-| `integration` | `provider_id`, `action`, `parameters`, `on_failure`, `timeout_seconds` |
+| `approval` | `question`, `options`, `reject_options`, `on_no`, `variable_name`, `timeout_minutes` (30), `mode`, `auto_answer` |
+| `sub-workflow` | `workflow_id` |
+| `skill-capability` | `capability`, `input`, `params`, `allow_writes`; der Skill der Capability steht in `skillIds` am Block |
+| `human-input` | `prompt`, `input_type` (text/textarea/number/select/checkbox/date), `variable_name`, `options`, `default_value`, `required`, `timeout_minutes` (30), `use_default_on_timeout`, `fields` |
+| `document` | `file_path`, `variable_name`, `fail_on_empty`, `min_characters` |
+| `integration` | `provider` (Integrations-Anbieter), `action`, `params` |
+| `todo-create` | `title`, `description`, `priority`, `tags`, `project_id`, `variable_name` (`todo_id`) |
+| `todo-update` | `id`, `title`, `description`, `priority`, `tags` |
+| `todo-close` | `id` |
+| `compress` | `source`, `stages`, `max_chars` |
+| `compress-ai` | `source`, `instruction`, `max_chars` |
+| `dashboard-report` | `status`, `title`, `summary`, `kpis`, `items` |
 
-**Gemeinsames optionales Feld** `timeout_seconds` übersteuert für alle Block-Typen den globalen Claude-CLI-Timeout (`automation.host-claude.timeout-seconds`, Standard 300s).
+**Gemeinsame optionale Felder:** `on_failure` (`stop` Standard, `continue`) für jeden Block. `timeout_seconds` übersteuert bei KI-Aufrufen den globalen Claude-CLI-Timeout (`automation.host-claude.timeout-seconds`, Standard 300s) und begrenzt Shell-Befehle (Standard 300s).
 
 ## Flyway-Migrationen
 
