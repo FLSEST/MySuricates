@@ -231,6 +231,7 @@ com.automation
 │   ├── notification/    NotificationService
 │   ├── trigger/         CompletionTriggerService, TodoTriggerService, TodoFeedbackListener
 │   ├── health/          HealthAutoTodoService
+│   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
 │   ├── integration/providers/ 18 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult

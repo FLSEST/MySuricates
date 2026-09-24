@@ -7,6 +7,7 @@ import com.automation.repository.*;
 import com.automation.service.activitylog.ActivityLogService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -51,10 +52,12 @@ class AuditIngestionServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuditIngestionService(runRepository, reportRepository, findingRepository, occurrenceRepository,
-                new AuditResultParser(new ObjectMapper()),
-                new AuditAcceptancePolicy(), new AuditRuleKeyCatalog(new ObjectMapper()), activityLog,
-                new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher));
+        AuditRuleKeyCatalog ruleKeyCatalog = new AuditRuleKeyCatalog(new ObjectMapper());
+        service = new AuditIngestionService(runRepository, reportRepository,
+                new AuditResultParser(new ObjectMapper()), ruleKeyCatalog, activityLog,
+                new AuditSnapshotApplier(findingRepository, occurrenceRepository, new AuditAcceptancePolicy(),
+                        ruleKeyCatalog, activityLog,
+                        new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher)));
         when(reportRepository.save(any())).thenAnswer(inv -> {
             AuditReport report = inv.getArgument(0);
             if (report.getId() == null) report.setId("rep-" + UUID.randomUUID());
@@ -476,5 +479,52 @@ class AuditIngestionServiceTest {
         verify(reportRepository).save(report.capture());
         assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
         verify(findingRepository, atLeastOnce()).save(any());
+    }
+
+    /**
+     * Die Naht zum {@link AuditSnapshotApplier} (Audit-TODO aac5fbf7): Der Service prueft und
+     * speichert den Report und reicht nur einen gueltigen weiter — mit den Findings des Envelopes und
+     * den Messwerten des Laufs.
+     */
+    @Nested
+    class HandOverToTheApplier {
+
+        @Mock private AuditSnapshotApplier applier;
+        private AuditIngestionService withMockedApplier;
+
+        /** Nach dem aeusseren setUp: erst dann stehen die Mocks, die der Service bekommt. */
+        @BeforeEach
+        void mockTheApplier() {
+            withMockedApplier = new AuditIngestionService(runRepository, reportRepository,
+                    new AuditResultParser(new ObjectMapper()), new AuditRuleKeyCatalog(new ObjectMapper()),
+                    activityLog, applier);
+        }
+
+        @Test
+        void validReport_isStoredAndHandedOverWithItsFindingsAndTheRunsFacts() {
+            stubRunWithFactSheet("run-1", "FAKT files_over_300: 19");
+            WorkflowRunCompletedEvent event = event("run-1");
+
+            withMockedApplier.ingest(event);
+
+            ArgumentCaptor<AuditReport> stored = ArgumentCaptor.forClass(AuditReport.class);
+            verify(reportRepository).save(stored.capture());
+            assertThat(stored.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.VALID);
+            verify(applier).apply(eq(event), eq(stored.getValue()),
+                    argThat(findings -> findings.size() == 1 && "Big.java".equals(findings.getFirst().subject())),
+                    eq(Set.of("files_over_300")));
+        }
+
+        @Test
+        void invalidReport_neverReachesTheApplier() {
+            stubRunWithRuleKey("run-1", "test-coverage.voellig-erfunden");
+
+            withMockedApplier.ingest(event("run-1", COVERAGE_KEY));
+
+            ArgumentCaptor<AuditReport> stored = ArgumentCaptor.forClass(AuditReport.class);
+            verify(reportRepository).save(stored.capture());
+            assertThat(stored.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
+            verifyNoInteractions(applier);
+        }
     }
 }

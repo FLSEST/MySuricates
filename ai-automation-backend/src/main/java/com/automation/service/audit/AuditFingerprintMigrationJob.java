@@ -217,7 +217,7 @@ public class AuditFingerprintMigrationJob {
     /**
      * Ist ein zusammengefuehrtes Ziel terminal (akzeptiertes Risiko, verworfen, aufgeloest), haengt
      * das umgehaengte managed TODO der Dublette sonst dauerhaft offen im Fix-Loop: die
-     * Abwesenheits-Schleife von {@code AuditIngestionService} fasst terminale Findings nie wieder
+     * Abwesenheits-Schleife von {@code AuditSnapshotApplier} fasst terminale Findings nie wieder
      * an. Dieselbe Regel wie beim Dispositionswechsel im Audit Center.
      */
     private void closeManagedTodosOfTerminalTargets(List<AuditFinding> mergeTargets) {
@@ -254,7 +254,7 @@ public class AuditFingerprintMigrationJob {
 
     /** Erwartet den ueber {@link #normalizedRuleKey} gezogenen ruleKey. */
     private static String newFingerprint(AuditFinding finding, String ruleKey) {
-        return AuditIngestionService.fingerprint(finding.getProjectId(), finding.getAuditKey(),
+        return AuditSnapshotApplier.fingerprint(finding.getProjectId(), finding.getAuditKey(),
                 ruleKey, finding.getSubject());
     }
 
