@@ -234,7 +234,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Settings sub-components for the modular settings page
 - Separate components: `GeneralSettingsCard`, `AppearanceCard`, `SecurityCard`, `ExecutionSettingsCard`, `NotificationsCard`, `BackupCard`, `WishSettingsCard`, `RemoteAccessCard`, `StagingCard`, `TestingCard`, `SystemInfoCard`
 - Navigation via `SettingsNav`, shared layout via `SettingsSection`
-- `SyncSelectModal`: selection modal for the definition sync (`StagingCard`, `TestingCard`)
+- `SyncSelectModal`: selection modal for the definition sync (`StagingCard`, `TestingCard`); the selection (everything that changes is preselected; toggling, collapsing, the request per kind) lives in `useSyncSelection.ts`, section and row including the diff details in `SyncSelectRows.tsx`
 
 ### Shared Components (`src/components/shared/`)
 
