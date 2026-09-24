@@ -1,5 +1,8 @@
 # Workflow Memory — Architecture & Data Flow
 
+> The same flows as Mermaid diagrams (sequence, class, ER):
+> [workflow-memory-diagrams.md](workflow-memory-diagrams.md)
+
 ## Overview
 
 The Workflow Memory feature extracts reusable knowledge from past workflow runs

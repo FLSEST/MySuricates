@@ -776,8 +776,9 @@ nativ, HTML-Dateien im Repository dagegen gar nicht. Die HTML-Fassung ist für G
 und wird erzeugt, ebenso das Verzeichnis [docs/diagramme.md](diagramme.md):
 
 ```bash
-python3 scripts/docs-diagrams.py            # HTML + Verzeichnis neu erzeugen
-python3 scripts/docs-diagrams.py --check    # meldet Drift, Exit-Code 1
+python3 scripts/docs-diagrams.py                # HTML, englische Seiten und Verzeichnisse neu erzeugen
+python3 scripts/docs-diagrams.py --check        # meldet Drift und Übersetzungslücken, Exit-Code 1
+python3 scripts/docs-diagrams.py --add-missing  # fehlende Übersetzungsschlüssel leer eintragen
 python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 ```
 
@@ -790,6 +791,28 @@ Die HTML-Hülle (Farben, Layout, Mermaid-Einbindung) steht als Vorlage im Skript
 dieselbe. Welche Markdown-Mittel die Vorlage kennt, steht im Kopfkommentar von
 `scripts/docs-diagrams.py`; gebraucht werden Überschriften, Absätze, Listen, Tabellen, Codezäune
 und die üblichen Inline-Auszeichnungen.
+
+**Englische Fassung.** Die deutsche Seite ist die Quelle. `docs/en/<name>-diagrams.md` und `.html`
+sowie `docs/en/diagramme.md` entstehen aus ihr — eine zweite, von Hand gepflegte Fassung gibt es
+nicht. Aufbau, Diagrammgerüst, Codeblöcke und Dateibäume kommen aus der deutschen Seite, die Texte
+aus einer Übersetzungstabelle je Seite, `docs/i18n/<name>-diagrams.en.json` (Muster wie `de.ts`/`en.ts`
+der Oberfläche): Schlüssel ist das deutsche Textstück, Wert das englische. Textstücke sind Titel,
+Untertitel, Überschriften samt Beiwort, Absätze, Listenpunkte, Tabellenzellen und die
+Mermaid-Beschriftungen — Knotentexte, Kantenlabels, `subgraph`-Titel, Notizen, Sequenz-Nachrichten,
+`alt`/`loop`-Beschriftungen; die Regeln je Diagrammtyp stehen in `scripts/lib/mermaid_labels.py`.
+Knoten-IDs werden nie übersetzt, auch wo Mermaid sie anzeigt (`PENDING --> RUNNING`,
+`subgraph Compose`): Was in beiden Sprachen verschieden heißen soll, braucht eine Beschriftung
+(`ID["Text"]`). Ein Textstück ohne Buchstaben außerhalb von Inline-Code braucht keinen Eintrag, ein
+Wert gleich dem Schlüssel ist erlaubt (Klassennamen, schon englische Beschriftungen).
+
+`--check` wird rot, wenn ein Textstück keine Übersetzung hat (Schlüssel fehlt oder Wert leer), wenn
+ein Schlüssel verwaist ist, wenn ein Wert Inline-Code oder Zahlen anders nennt als das Original oder
+wenn die Übersetzung den Seitenaufbau bzw. das Gerüst eines Diagramms verändert. Wer eine deutsche
+Diagramm-Seite ändert, zieht die Tabelle deshalb im selben Commit nach: `--add-missing` trägt neue
+Schlüssel mit leerem Wert in Lesereihenfolge ein; verwaiste bleiben stehen, bis sie jemand löscht —
+oft ist ihr Wert, leicht angepasst, die Übersetzung des neuen Schlüssels. Unbekannte Mermaid-Syntax
+(ein neuer Diagrammtyp, eine Zeile ohne Regel) bricht mit Exit-Code 2 ab, statt deutschen Text still
+durchzulassen.
 
 ## Abhängigkeits-Meldungen (Frontend)
 

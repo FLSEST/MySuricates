@@ -43,27 +43,17 @@ from md_common import headings, iter_links, slug, tracked_markdown  # noqa: E402
 MIRRORED_SUBDIRS: tuple[str, ...] = ("onboarding", "konzepte")
 
 # Bekannte, ticketierte Luecken. Format: Pfad -> Begruendung mit TODO-Kennung.
-KNOWN_GAPS: dict[str, str] = {
-    # Die zehn Diagramm-Seiten haben kein englisches Gegenstueck (TODO 47bd4d27).
-    # Die Mermaid-Beschriftungen selbst sind deutsch, eine Uebersetzung muss in die
-    # Diagramme hinein — deshalb nicht nebenbei zu erledigen.
-    "docs/deployment-container-diagrams.md": "47bd4d27",
-    "docs/diagramme.md": "47bd4d27",
-    "docs/frontend-flow-diagrams.md": "47bd4d27",
-    "docs/logging-monitoring-diagrams.md": "47bd4d27",
-    "docs/request-lifecycle-diagrams.md": "47bd4d27",
-    "docs/scheduler-diagrams.md": "47bd4d27",
-    "docs/skills-diagrams.md": "47bd4d27",
-    "docs/workflow-control-diagrams.md": "47bd4d27",
-    "docs/workflow-engine-diagrams.md": "47bd4d27",
-    "docs/workflow-memory-diagrams.md": "47bd4d27",
-}
+# Zurzeit leer: die zehn Diagramm-Seiten, die hier standen, haben seit TODO 47bd4d27 ein
+# englisches Gegenstueck — erzeugt von scripts/docs-diagrams.py aus derselben Quelle.
+KNOWN_GAPS: dict[str, str] = {}
 
 # Einzelne Abschnitte ohne Gegenstueck. Format: "datei::ueberschrift" -> TODO-Kennung.
+# (Der Eintrag "entwicklung.md::## Bekannte Einschränkungen" ist mit TODO 47bd4d27 entfallen:
+# fehlend war in Wahrheit "## Diagramm-Seiten" — der Ebenenvergleich hatte die Luecke nur
+# dem letzten gleichrangigen Abschnitt zugeschrieben.)
 KNOWN_SECTION_GAPS: dict[str, str] = {
     "architektur.md::## Scheduler: verpasste Termine (Standby und Kaltstart)": "c58d7402",
     "architektur.md::## Completion Triggers (V39)": "c58d7402",
-    "entwicklung.md::## Bekannte Einschränkungen": "c58d7402",
 }
 
 
