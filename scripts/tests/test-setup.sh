@@ -189,6 +189,51 @@ check "kept without --reconfigure"                      '[ "$(run --yes --dry-ru
 check "--preset core --force changes only the preset"   '[ "$(run --yes --dry-run --runtime host --preset core --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main MYSURICATES_PORT)" = 9777 ]'
 check "--reconfigure rewrites it"                       '[ "$(run --yes --dry-run --runtime host --reconfigure)" = 0 ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
 
+echo "7b) a kept file: the steps show its values, not ones that never reach it (fd4eb89f)"
+# Frueher meldete der Ports-Schritt „nehme 9091“ (die eigene laufende Instanz belegt 9090) und der
+# KI-Schritt einen neuen Standard-Anbieter — beides landete nie in der behaltenen Datei.
+step() {  # LABEL — was hinter „✓ LABEL“ steht; tui_done fuellt LABEL auf 10 Zeichen auf
+  local pre
+  pre="$1$(printf "%$(( ${#1} < 10 ? 11 - ${#1} : 1 ))s" "")"
+  out | sed -n "s/^ *[^ ]* $pre\\(.*\\)\$/\\1/p" | tail -n 1
+}
+rm -rf "$INST"; mkdir -p "$INST"
+printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=9777\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' > "$INST/main.env"
+cp "$INST/main.env" "$TMP/kept.env"
+check "kept: exit 0, the file stays as it was"          '[ "$(run --yes --dry-run)" = 0 ] && cmp -s "$INST/main.env" "$TMP/kept.env"'
+check "ports: the port of the file, marked"             '[ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
+check "AI: the provider of the file, marked"            '[ "$(step AI)" = "pi · from deploy/instances/main.env" ]'
+check "mode and modules: from the file, marked"         '[ "$(step Mode)" = "One instance — on this machine · from deploy/instances/main.env" ] && [ "$(step Modules)" = "full · from deploy/instances/main.env" ]'
+check "the login hint names the provider of the file"   'out | grep -qF "Log in to pi before the first AI workflow"'
+check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -qF "not used: --runtime container, --port 9555, --provider codex" && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
+check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep -q "not used"'
+cp "$TMP/kept.env" "$INST/main.env"
+check "German: aus der Datei"                           '[ "$(run --yes --dry-run --lang de)" = 0 ] && [ "$(step Ports)" = "9777 · aus deploy/instances/main.env" ]'
+printf 'MYSURICATES_PORT=19730\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_PROJECTS=/srv/projekte\n' > "$INST/main.env"
+check "container file: access and projects from it"     '[ "$(run --yes --dry-run)" = 0 ] && [ "$(step "AI in the container")" = "programs · from deploy/instances/main.env" ] && [ "$(step Ports)" = "19730 · /srv/projekte · from deploy/instances/main.env" ]'
+if command -v python3 >/dev/null 2>&1; then
+  # Der Fall aus dem TODO: die eigene laufende Instanz belegt den Port der Datei
+  LP="$(firstfree 19740)"
+  ( python3 -c "import socket,time; s=socket.socket(); s.bind(('127.0.0.1', $LP)); s.listen(1); time.sleep(60)" >/dev/null 2>&1 & echo $! > "$TMP/listener.pid" )
+  for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$LP") 2>/dev/null && break; sleep 0.05; done
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$LP" > "$INST/main.env"
+  check "own instance on the port: no 'is in use — taking'" '[ "$(run --yes --dry-run)" = 0 ] && ! out | grep -q "is in use" && [ "$(step Ports)" = "$LP · from deploy/instances/main.env" ]'
+  kill "$(cat "$TMP/listener.pid")" 2>/dev/null
+else
+  echo "  skip (no python3 for a listener)"
+fi
+rm -rf "$INST"; mkdir -p "$INST"
+for f in dev:19710 test:19711 prod:19712; do printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=%s\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' "${f#*:}" > "$INST/${f%%:*}.env"; done
+check "staged, all kept: ports from the files, marked"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(step Ports)" = "Dev 19710 · Test 19711 · Prod 19712 · files kept: dev, test, prod" ]'
+check "staged, all kept: AI from the files"             '[ "$(step AI)" = "pi · files kept: dev, test, prod" ]'
+printf 'MYSURICATES_RUNTIME=container\nMYSURICATES_PORT=19711\nAUTOMATION_AI_DEFAULT_PROVIDER=CODEX\n' > "$INST/test.env"
+check "staged, differing providers: each named; flags not used are named" '[ "$(run --yes --dry-run --mode staged --provider claude)" = 0 ] && [ "$(step AI)" = "dev pi · test codex · prod pi · files kept: dev, test, prod" ] && out | grep -qF "Keeping deploy/instances/{dev,test,prod}.env — not used: --provider claude"'
+rm -f "$INST/test.env"
+T2="$(firstfree 8090 "19710 19712")"
+check "staged, one new: its port avoids the kept ones"  '[ "$(run --yes --dry-run --mode staged)" = 0 ] && [ "$(val test MYSURICATES_PORT)" = "$T2" ] && [ "$(step Ports)" = "Dev 19710 · Test $T2 · Prod 19712 · files kept: dev, prod" ]'
+check "staged, one new: the provider goes into the new file" '[ "$(val test AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(step AI)" = "codex · files kept: dev, prod" ]'
+rm -rf "$INST"
+
 echo "8) language"
 rm -rf "$INST"
 run --yes --dry-run --runtime host >/dev/null
@@ -269,6 +314,80 @@ check "stopped, same state: started without a build"    '[ "$(srun --lang de)" =
 P2="$(spid)"
 check "--reconfigure: restarted, not rebuilt"          '[ "$(srun --reconfigure)" = 0 ] && [ "$(builds)" = 2 ] && [ "$(spid)" != "$P2" ] && out | grep -q "Start main — existing build, not rebuilt"'
 sinst down >/dev/null 2>&1
+
+echo "9c) a restart never aborts running workflow runs unasked (29820f58)"
+# Ein Neustart bricht laufende Runs ab, danach stehen sie als Ghost-Runs im Verlauf. Der Installer
+# fragt die Instanz vorher, nur lesend — Key aus `instance.sh key`, Port aus der Instanz-Datei. Die
+# Fake-API ist der curl-Stellvertreter: Health antwortet immer, die Runs-Abfrage nur am Port FAKE_PORT
+# mit dem Key FAKE_KEY auf stdin; ohne FAKE_RUNS antwortet sie nicht (curl-Exit 7).
+cat > "$B2/curl" <<'STUB'
+#!/bin/sh
+case "$*" in
+  --version*) echo "curl 8.5.0 (x86_64)" ;;
+  *system/health*) echo '{"status":"UP"}' ;;
+  *executions*status=RUNNING*)
+    echo "$*" >> "$RUNS_LOG"
+    hdr=""; case "$*" in *"-H @-"*) hdr="$(cat)" ;; esac
+    [ -n "${FAKE_RUNS:-}" ] || exit 7
+    case "$*" in *"http://127.0.0.1:$FAKE_PORT/"*) ;; *) exit 7 ;; esac
+    [ "$hdr" = "X-API-Key: $FAKE_KEY" ] || exit 22
+    printf '{"content":[{"id":"r1","workflowName":"x"}],"page":0,"size":1,"totalElements":%s,"totalPages":%s}\n' "$FAKE_RUNS" "$FAKE_RUNS" ;;
+  *) exit 7 ;;
+esac
+STUB
+chmod +x "$B2/curl"
+export RUNS_LOG="$TMP/runs.log" FAKE_PORT="$SPORT" FAKE_KEY="key-29820f58-test"; : > "$RUNS_LOG"
+SKEY="$SSTATE/mysuricates/main/home/.autotrigger/api-key"   # schreibt das echte Backend beim Start
+sval() { sed -n "s/^$1=//p" "$SINST/main.env" 2>/dev/null; }   # nicht cut: 8b ueberschreibt es als Funktion
+srun >/dev/null; mkdir -p "$(dirname "$SKEY")"; printf '%s\n' "$FAKE_KEY" > "$SKEY"
+echo drei > "$SREPO/drei.txt"; scommit drei; H3="$(git -C "$SREPO" rev-parse HEAD)"; P3="$(spid)"; B3="$(builds)"
+check "runs active, --yes: neither stopped nor rebuilt"  '[ "$(FAKE_RUNS=2 srun)" = 0 ] && [ "$(spid)" = "$P3" ] && kill -0 "$P3" 2>/dev/null && [ "$(builds)" = "$B3" ]'
+check "... says how many and how to restart later"      'out | grep -qF "main: 2 workflow run(s) still running" && out | grep -qF "scripts/instance.sh down --name main && scripts/instance.sh up --name main" && ! out | grep -q "building anew and restarting"'
+check "... names the old and the new state"             'out | grep -qF "main keeps running state ${H2:0:8}, not restarted (the clone is at ${H3:0:8})"'
+check "... done box still shows the running instance"   'out | grep -qF "http://localhost:$SPORT"'
+check "asked with the key on stdin, never in arguments"  '[ -s "$RUNS_LOG" ] && ! grep -qF "$FAKE_KEY" "$RUNS_LOG" && grep -qF "http://127.0.0.1:$SPORT/api/v1/executions?status=RUNNING" "$RUNS_LOG"'
+check "German: the same, in German"                     '[ "$(FAKE_RUNS=1 srun --lang de)" = 0 ] && [ "$(spid)" = "$P3" ] && out | grep -qF "main: noch 1 Workflow-Run(s) aktiv"'
+check "no runs: rebuilt and restarted as before"        '[ "$(FAKE_RUNS=0 srun)" = 0 ] && [ "$(spid)" != "$P3" ] && [ "$(builds)" = "$((B3 + 1))" ] && ! out | grep -q "still running"'
+echo vier > "$SREPO/vier.txt"; scommit vier; P4="$(spid)"; B4="$(builds)"
+check "instance not answering: as before, and says so"  '[ "$(srun)" = 0 ] && [ "$(spid)" != "$P4" ] && [ "$(builds)" = "$((B4 + 1))" ] && out | grep -qF "main: running workflow runs could not be checked"'
+P5="$(spid)"; SPORT2="$(firstfree $((SPORT + 1)))"
+check "--reconfigure, runs active: not restarted"       '[ "$(FAKE_RUNS=1 srun --reconfigure --port "$SPORT2")" = 0 ] && [ "$(spid)" = "$P5" ] && [ "$(sval MYSURICATES_PORT)" = "$SPORT2" ]'
+check "... asked the port it runs on, shows that one"   'out | grep -qF "main: 1 workflow run(s) still running" && out | grep -qF "main keeps running with its previous settings" && out | grep -qF "http://localhost:$SPORT" && ! out | grep -qF "http://localhost:$SPORT2"'
+sinst down >/dev/null 2>&1; srun --reconfigure >/dev/null   # zurueck auf SPORT, laeuft
+printf '%s\n' "$FAKE_KEY" > "$SKEY"; echo fuenf > "$SREPO/fuenf.txt"; scommit fuenf; P6="$(spid)"
+spty() {  # TASTEN → Mitschnitt in $TMP/menu; im Terminal, ohne --yes
+  printf "$1" | timeout 120 script -qec "stty cols 120 rows 50; env HOME='$TMP/home' PATH='$B2:$TMP/tools' XDG_DATA_HOME='$TMP/data' XDG_STATE_HOME='$SSTATE' XDG_CONFIG_HOME='$TMP/home/.config' MYSURICATES_INSTANCES_DIR='$SINST' TERM=xterm-256color INSTANCE_HEALTH_TIMEOUT=10 RUNS_LOG='$RUNS_LOG' FAKE_PORT='$FAKE_PORT' FAKE_KEY='$FAKE_KEY' FAKE_RUNS=3 MVN_LOG='$MVN_LOG' bash '$SREPO/scripts/setup.sh' --lang en --runtime host --preset core --provider codex --port $SPORT" /dev/null > "$TMP/menu" 2>&1
+}
+if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
+  spty 'n\n\n\n'   # pi: nein · bauen und starten: ja · trotzdem neu starten: Vorgabe (nein)
+  check "guided: asks, default is no — keeps running"   'grep -qF "main: 3 workflow run(s) still running — a restart aborts them. Restart anyway?" "$TMP/menu" && grep -qF "[y/N]" "$TMP/menu" && [ "$(spid)" = "$P6" ] && kill -0 "$P6" 2>/dev/null'
+  spty 'n\n\ny\n'  # … trotzdem neu starten: ja
+  check "guided: yes restarts on the new state"         '[ "$(spid)" != "$P6" ] && [ "$(sinst built)" = "current $(git -C "$SREPO" rev-parse HEAD)" ]'
+else
+  echo "  skip (no usable script or timeout command)"
+fi
+sinst down >/dev/null 2>&1
+# Im Container ersetzt `up` einen laufenden Container, sobald sich Image oder Einstellungen geaendert
+# haben — vorher laesst sich das nicht sehen. Laeuft der Container und laufen Runs: erst fragen.
+cat > "$B2/docker" <<'STUB'
+#!/bin/sh
+echo "$*" >> "$DOCKER_LOG"
+case "$1" in --version) echo "Docker version 29.1.3, build x"; exit 0 ;; info) exit 0 ;; build) cat > /dev/null; exit 0 ;; esac
+case "$*" in
+  *com.docker.compose.project*) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo mysuricates-box ;;
+  *"{{.State.Status}} {{.State.Health.Status}}"*) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo "running healthy" ;;
+  *"{{.State.Health.Status}}"*) echo healthy ;;
+  exec*api-key) [ -n "${CONTAINER_UP:-}" ] || exit 1; echo "$FAKE_KEY" ;;
+esac
+exit 0
+STUB
+chmod +x "$B2/docker"; export DOCKER_LOG="$TMP/docker2.log"
+crun() { : > "$DOCKER_LOG"; : > "$RUNS_LOG"; srun --runtime container --name box "$@"; }
+check "container not running: up as before"             '[ "$(crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
+check "container running, runs active: not touched"     '[ "$(CONTAINER_UP=1 FAKE_RUNS=2 crun)" = 0 ] && ! grep -q "up -d" "$DOCKER_LOG" && ! grep -q "^build " "$DOCKER_LOG" && out | grep -qF "box: 2 workflow run(s) still running" && out | grep -qF "scripts/instance.sh down --name box && scripts/instance.sh up --name box"'
+check "... asked with the key from the container"       '[ -s "$RUNS_LOG" ] && grep -q "^exec .*mysuricates-box cat .*api-key" "$DOCKER_LOG"'
+check "container running, no runs: up as before"        '[ "$(CONTAINER_UP=1 FAKE_RUNS=0 crun)" = 0 ] && grep -q "up -d --no-build" "$DOCKER_LOG"'
+rm -f "$SINST/box.env" "$SINST/box.override.yml"
 
 echo "10) bash 3.2 hygiene"
 check "no bash-4-only syntax (code)"                    '! grep -v "^[[:space:]]*#" "$SETUP" | grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" >/dev/null'

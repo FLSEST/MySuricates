@@ -171,9 +171,11 @@ Build your own workflows with the [workflow guide](WORKFLOW-GUIDE.md) next to yo
 
 ## 4. Change settings later
 
-Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). Or edit
-`deploy/instances/main.env` and restart the instance (`scripts/instance.sh down --name main`, then
-`up --name main`):
+Run `./scripts/setup.sh` again → **Change settings** (port, modules, AI provider). With `--yes` and
+without `--reconfigure`, an existing instance file stays as it is: the steps then show its values
+("from deploy/instances/main.env"), and the installer names flags that do not apply against it;
+`--reconfigure` rewrites the file. Or edit `deploy/instances/main.env` and restart the instance
+(`scripts/instance.sh down --name main`, then `up --name main`):
 
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
@@ -199,6 +201,12 @@ machine, `instance.sh` notes the commit when it builds and builds anew as soon a
 another one; `up` does not rebuild a running instance but reports that it still shows the old state.
 `scripts/instance.sh built --name main` shows which commit the build comes from. Your data stays in
 both cases. Running `./scripts/setup.sh` again also brings the instance to the new state.
+
+A restart aborts the workflow runs that are running at that moment. Before the installer restarts a
+running instance, it therefore asks the instance whether any are running (read-only, with the key from
+`instance.sh key`). If some are, it asks you — default: do not restart; with `--yes` it leaves the
+instance running and names the command for later. If the instance does not answer, it goes ahead as
+before and says so. `scripts/instance.sh down` names how many runs it aborts before it stops.
 
 ---
 

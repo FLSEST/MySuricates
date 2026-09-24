@@ -175,6 +175,9 @@ Eigene Workflows baut man danach am besten mit dem
 ## 4. Einstellungen später ändern
 
 `./scripts/setup.sh` erneut starten → **Einstellungen ändern** (Port, Module, KI-Anbieter).
+Mit `--yes` und ohne `--reconfigure` bleibt eine vorhandene Instanz-Datei, wie sie ist: Die Schritte
+zeigen dann ihre Werte („aus deploy/instances/main.env“), und Flags, die dagegen nicht wirken, nennt
+der Installer; `--reconfigure` schreibt die Datei neu.
 Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu starten
 (`scripts/instance.sh down --name main`, dann `up --name main`):
 
@@ -203,6 +206,12 @@ steht; eine laufende Instanz baut `up` nicht um, sondern meldet, dass sie noch d
 Aus welchem Commit der Build stammt, zeigt `scripts/instance.sh built --name main`. Die Daten bleiben
 in beiden Fällen erhalten. Ein erneuter Lauf von `./scripts/setup.sh` bringt die Instanz ebenfalls auf
 den neuen Stand.
+
+Ein Neustart bricht Workflow-Runs ab, die gerade laufen. Bevor der Installer eine laufende Instanz neu
+startet, fragt er sie deshalb, ob welche laufen (nur lesend, mit dem Key aus `instance.sh key`). Laufen
+welche, fragt er zurück — Vorgabe: nicht neu starten; mit `--yes` startet er sie dann nicht neu und
+nennt den Befehl für später. Antwortet die Instanz nicht, geht es weiter wie bisher, mit einem Hinweis.
+`scripts/instance.sh down` nennt vor dem Stoppen, wie viele Runs dabei abbrechen.
 
 ---
 

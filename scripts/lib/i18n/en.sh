@@ -133,8 +133,21 @@ M_build_running_kept="%s is already running — existing build, not rebuilt (sta
 M_build_outdated="%s: built from %s, the clone is at %s — building anew"
 M_build_outdated_running="%s runs state %s, the clone is at %s — building anew and restarting"
 M_build_state_unknown="unknown"
+# A restart aborts running workflow runs (29820f58): asked first
+M_runs_q="%s: %s workflow run(s) still running — a restart aborts them. Restart anyway?"
+M_runs_active="%s: %s workflow run(s) still running — a restart would abort them"
+M_runs_later="Restart once they are done: %s"
+M_runs_kept="%s keeps running, not restarted"
+M_runs_kept_settings="%s keeps running with its previous settings, not restarted"
+M_runs_kept_outdated="%s keeps running state %s, not restarted (the clone is at %s)"
+M_runs_unchecked="%s: running workflow runs could not be checked (no answer or no API key) — going ahead as before"
 M_dry_run="(dry run) would run: %s"
 M_kept_existing="Keeping the existing %s (--reconfigure rewrites it)"
+# A kept instance file: its values count, the steps say so (fd4eb89f)
+M_kept_from="from %s"
+M_kept_into="written into %s"
+M_kept_files="files kept: %s"
+M_kept_ignored="Keeping %s — not used: %s (--reconfigure applies them)"
 M_done_open="→  %s"
 M_done_network="→  %s   (from the network)"
 M_done_network_unknown="→  http://<address of this machine>:%s   (from the network; address not found)"
@@ -167,7 +180,7 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --ai-providers LIST          container: only these providers, e.g. claude,codex (default: all)
   --name NAME                  name of the instance (default main)
   --lang de                    Deutsch (default English)
-  --reconfigure                rewrite an existing instance file
+  --reconfigure                rewrite an existing instance file (otherwise it stays, its values count)
   --preset core --force        in an existing setup change only the preset
   --dry-run                    install, build and start nothing — only show and write the files
   --show-key                   show the full API key at the end (default: masked)

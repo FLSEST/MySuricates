@@ -15,6 +15,7 @@ case "$*" in
   *"compose"*"config"*) exit 0 ;;
   *"com.docker.compose.project"*) [ -n "${OWNER+x}" ] || exit 1; echo "$OWNER"; exit 0 ;;  # Container da? wem gehoert er?
   *"inspect"*) echo healthy ;;
+  "exec "*"api-key") [ -n "${CONTAINER_KEY:-}" ] || exit 1; echo "$CONTAINER_KEY" ;;     # instance.sh key
 esac
 exit 0
 STUB
@@ -253,6 +254,102 @@ mv "$CREPO/.git" "$CREPO/.git-weg"; : > "$DOCKER_LOG"
 GIT_CEILING_DIRECTORIES="$TMP" INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
 check "without git: compose builds from the folder" 'grep -q "compose .* build$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
 mv "$CREPO/.git-weg" "$CREPO/.git"
+
+echo "7) running workflow runs: asked read-only, named before down stops them (29820f58)"
+# Die Instanz-API spielt ein kleiner Server aus der Python-Standardbibliothek — echte HTTP-Antworten
+# fuer das echte curl. Er zaehlt nur mit dem richtigen Key; ein Workflow-Name, der wie das Feld
+# aussieht, darf die Zahl nicht verfaelschen.
+LIBRUNS="$HERE/../lib/instance-runs.sh"
+check "lib: bash -n"                           'bash -n "$LIBRUNS"'
+base() { ( . "$LIBRUNS"; instance_api_base "$1" 19999 ); }
+check "address: loopback and wildcard → 127.0.0.1" '[ "$(base "")" = http://127.0.0.1:19999 ] && [ "$(base 127.0.0.1)" = http://127.0.0.1:19999 ] && [ "$(base 0.0.0.0)" = http://127.0.0.1:19999 ] && [ "$(base ::)" = http://127.0.0.1:19999 ]'
+check "address: a bound address as it is"      '[ "$(base 100.64.1.2)" = http://100.64.1.2:19999 ] && [ "$(base fd00::1)" = "http://[fd00::1]:19999" ] && [ "$(base ::1)" = "http://[::1]:19999" ]'
+printf 'MYSURICATES_PORT=1\nMYSURICATES_BIND=0.0.0.0\n' > "$TMP/a.env"; printf 'MYSURICATES_PORT=2\n' > "$TMP/b.env"
+check "address before a rewrite: the first per name counts" '( . "$LIBRUNS"; instance_remember_addr x "$TMP/a.env"; instance_remember_addr x "$TMP/b.env"; instance_remember_addr y-1 "$TMP/b.env"; [ "$(instance_prev_addr x)" = "1,0.0.0.0" ] && [ "$(instance_prev_addr y-1)" = "2," ] && [ -z "$(instance_prev_addr z)" ] )'
+if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+  cat > "$TMP/fakeapi.py" <<'PY'
+import http.server, json, sys
+port, key, runs = int(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+class Api(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if not self.path.startswith("/api/v1/executions?"):
+            return self.answer(404, {})
+        if self.headers.get("X-API-Key") != key:
+            return self.answer(401, {"error": "Unauthorized"})
+        if "status=RUNNING" not in self.path:
+            return self.answer(400, {})
+        content = [{"id": "r1", "workflowName": 'x "totalElements":99', "status": "RUNNING"}] if runs else []
+        self.answer(200, {"content": content, "page": 0, "size": 1, "totalElements": runs, "totalPages": runs})
+    def answer(self, code, body):
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+    def log_message(self, *args):
+        pass
+http.server.HTTPServer(("127.0.0.1", port), Api).serve_forever()
+PY
+  freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
+  APID=""
+  # Losgeloest gestartet (kein Kind dieser Shell): beendet ihn down, bleibt kein Zombie zurueck, den
+  # kill -0 noch fuer lebendig hielte. stopapi wartet, bis er weg ist — der naechste nimmt denselben Port.
+  fakeapi() {  # PORT KEY RUNS — startet die Fake-API und wartet, bis sie antwortet
+    APID="$( (python3 "$TMP/fakeapi.py" "$1" "$2" "$3" > /dev/null 2>&1 & echo $!) )"
+    for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && return 0; sleep 0.05; done
+    return 1
+  }
+  stopapi() {
+    [ -n "$APID" ] || return 0
+    kill "$APID" 2>/dev/null
+    for _ in $(seq 1 100); do kill -0 "$APID" 2>/dev/null || break; sleep 0.05; done
+    APID=""
+  }
+  trap 'stopapi; rm -rf "$TMP"' EXIT
+  runs() { ( . "$LIBRUNS"; instance_running_runs "$@" ); }
+  RKEY="key-29820f58-$$"; RPORT="$(freeport 19430)"
+  fakeapi "$RPORT" "$RKEY" 2
+  check "lib: counts the running runs"           '[ "$(runs "http://127.0.0.1:$RPORT" "$RKEY")" = 2 ]'
+  check "lib: wrong key → unknown, not 0"        '[ -z "$(runs "http://127.0.0.1:$RPORT" wrong-key)" ]'
+  check "lib: no key → unknown, nothing asked"   '[ -z "$(runs "http://127.0.0.1:$RPORT" "")" ]'
+  mkdir -p "$TMP/curlspy"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s"\nexec "%s" "$@"\n' "$TMP/curlspy.log" "$(command -v curl)" > "$TMP/curlspy/curl"; chmod +x "$TMP/curlspy/curl"
+  check "lib: the key never shows in curl's arguments" '[ "$(PATH="$TMP/curlspy:$PATH" runs "http://127.0.0.1:$RPORT" "$RKEY")" = 2 ] && [ -s "$TMP/curlspy.log" ] && ! grep -qF "$RKEY" "$TMP/curlspy.log"'
+  check "lib: a proxy from the environment is not used" '[ "$(http_proxy=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 all_proxy=http://127.0.0.1:9 runs "http://127.0.0.1:$RPORT" "$RKEY")" = 2 ]'
+  stopapi
+  check "lib: instance not answering → unknown"  '[ -z "$(runs "http://127.0.0.1:$RPORT" "$RKEY")" ]'
+  # Host: die Fake-API ist der Prozess der Instanz — down meldet die Runs und beendet ihn dann
+  printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/runs.env"
+  RSTATE="$TMP/state/mysuricates/runs"; mkdir -p "$RSTATE/home/.autotrigger"
+  printf '%s\n' "$RKEY" > "$RSTATE/home/.autotrigger/api-key"
+  fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
+  OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
+  check "host down: names the runs it aborts, then stops" 'printf "%s" "$OUT" | grep -qF "mysuricates-runs: 3 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
+  stopapi
+  fakeapi "$RPORT" "$RKEY" 0; echo "$APID" > "$RSTATE/instance.pid"
+  OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
+  check "host down: no runs, no warning"         '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt"'
+  stopapi
+  printf 'other-key\n' > "$RSTATE/home/.autotrigger/api-key"
+  fakeapi "$RPORT" "$RKEY" 3; echo "$APID" > "$RSTATE/instance.pid"
+  OUT="$(bash "$SCRIPT" down --name runs 2>&1)"
+  check "host down: not checkable → stops anyway"  '! printf "%s" "$OUT" | grep -q "Workflow-Run" && printf "%s" "$OUT" | grep -q "gestoppt" && ! kill -0 "$APID" 2>/dev/null'
+  stopapi
+  # Container: Key aus dem Container (docker exec), Port aus der Instanz-Datei
+  printf 'MYSURICATES_PORT=%s\n' "$RPORT" > "$TMP/inst/cruns.env"
+  fakeapi "$RPORT" "$RKEY" 1; : > "$DOCKER_LOG"
+  OUT="$(OWNER=mysuricates-cruns CONTAINER_KEY="$RKEY" bash "$SCRIPT" down --name cruns 2>&1)"
+  check "container down: names the runs, then compose down" 'printf "%s" "$OUT" | grep -qF "mysuricates-cruns: 1 Workflow-Run(s) laufen noch" && tail -n 1 "$DOCKER_LOG" | grep -q "mysuricates-cruns.* down$"'
+  OUT="$(OWNER=mysuricates-cruns bash "$SCRIPT" down --name cruns 2>&1)"
+  check "container down: no key (not running) → no warning" '! printf "%s" "$OUT" | grep -q "Workflow-Run" && tail -n 1 "$DOCKER_LOG" | grep -q " down$"'
+  : > "$DOCKER_LOG"; OUT="$(OWNER=ai-automation-backend CONTAINER_KEY="$RKEY" bash "$SCRIPT" down --name cruns 2>&1)"
+  check "container down: a foreign container is not asked" '! grep -q "^exec " "$DOCKER_LOG" && ! printf "%s" "$OUT" | grep -q "Workflow-Run" && tail -n 1 "$DOCKER_LOG" | grep -q -- "-p mysuricates-cruns .* down$"'
+  stopapi
+  rm -f "$TMP/inst/runs.env" "$TMP/inst/cruns.env" "$TMP/inst/cruns.override.yml"
+else
+  echo "  skip (no python3 or curl)"
+fi
 
 check "no bash-4-only syntax"                 '! grep -nE "declare -g?A|mapfile|readarray" "$SCRIPT"'
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

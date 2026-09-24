@@ -132,8 +132,21 @@ M_build_running_kept="%s läuft bereits — vorhanden, nicht neu gebaut (Stand %
 M_build_outdated="%s: gebaut aus Stand %s, der Klon steht auf %s — baue neu"
 M_build_outdated_running="%s läuft mit Stand %s, der Klon steht auf %s — baue neu und starte neu"
 M_build_state_unknown="unbekannt"
+# Ein Neustart bricht laufende Workflow-Runs ab (29820f58): erst fragen
+M_runs_q="%s: noch %s Workflow-Run(s) aktiv — ein Neustart bricht sie ab. Trotzdem neu starten?"
+M_runs_active="%s: noch %s Workflow-Run(s) aktiv — ein Neustart bräche sie ab"
+M_runs_later="Neu starten, sobald sie fertig sind: %s"
+M_runs_kept="%s läuft weiter, nicht neu gestartet"
+M_runs_kept_settings="%s läuft weiter mit den bisherigen Einstellungen, nicht neu gestartet"
+M_runs_kept_outdated="%s läuft weiter mit Stand %s, nicht neu gestartet (der Klon steht auf %s)"
+M_runs_unchecked="%s: laufende Workflow-Runs nicht prüfbar (keine Antwort oder kein API-Key) — weiter wie bisher"
 M_dry_run="(Probelauf) würde ausführen: %s"
 M_kept_existing="Vorhandene %s bleibt (--reconfigure schreibt sie neu)"
+# Eine behaltene Instanz-Datei: ihre Werte gelten, die Schritte sagen es (fd4eb89f)
+M_kept_from="aus %s"
+M_kept_into="in %s eingetragen"
+M_kept_files="Dateien bleiben: %s"
+M_kept_ignored="%s bleibt — nicht übernommen: %s (--reconfigure übernimmt sie)"
 M_done_open="→  %s"
 M_done_network="→  %s   (aus dem Netz)"
 M_done_network_unknown="→  http://<Adresse dieses Rechners>:%s   (aus dem Netz; Adresse nicht ermittelbar)"
@@ -166,7 +179,7 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --ai-providers LISTE         Container: nur diese Anbieter, z. B. claude,codex (Default: alle)
   --name NAME                  Name der Instanz (Default main)
   --lang de                    Deutsch (Default Englisch)
-  --reconfigure                vorhandene Instanz-Datei neu schreiben
+  --reconfigure                vorhandene Instanz-Datei neu schreiben (sonst bleibt sie, ihre Werte gelten)
   --preset core --force        in einer vorhandenen Einrichtung nur das Preset ändern
   --dry-run                    nichts installieren, bauen oder starten — nur zeigen und Dateien schreiben
   --show-key                   API-Key am Ende vollständig zeigen (Default: maskiert)

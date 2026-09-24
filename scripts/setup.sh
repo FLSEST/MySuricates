@@ -5,7 +5,8 @@
 #
 # Ohne Terminal und ohne --yes/--install/--start wird nur geprueft. Jede Instanz landet als Datei
 # in deploy/instances/<name>.env; starten, stoppen und ansehen danach mit scripts/instance.sh.
-# Greift nie auf die Datenbank oder die REST-API einer Instanz zu. bash-3.2-tauglich (macOS).
+# Greift nie auf die Datenbank einer Instanz zu; ihre REST-API fragt er nur lesend, ob Workflow-Runs
+# laufen, bevor er sie neu startet (29820f58). bash-3.2-tauglich (macOS).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +25,10 @@ INSTANCES_DIR="${MYSURICATES_INSTANCES_DIR:-$REPO_ROOT/deploy/instances}"
 . "$LIB/module-preset.sh"
 # shellcheck source=lib/netaddr.sh
 . "$LIB/netaddr.sh"
+# shellcheck source=lib/instance-runs.sh
+. "$LIB/instance-runs.sh"
+# shellcheck source=lib/setup-kept.sh
+. "$LIB/setup-kept.sh"    # eine vorhandene Instanz-Datei, die bleibt: ihre Werte gelten (fd4eb89f)
 # shellcheck source=lib/host-mounts.sh
 . "$LIB/host-mounts.sh"   # claude_token_from_file / claude_token_plausible — dieselbe Regel wie beim Start
 [ -r "$DEPS_DATA/env.sh" ] && . "$DEPS_DATA/env.sh"
@@ -172,11 +177,12 @@ step_mode() {
     rc=$?; [ "$rc" = 0 ] || return "$rc"
     case "$choice" in 0) MODE=one; RUNTIME=container ;; 1) MODE=one; RUNTIME=host ;; 2) MODE=staged; RUNTIME=container ;; esac
   fi
+  kept_load
   MODE="${MODE:-one}"; RUNTIME="${RUNTIME:-container}"; [ "$MODE" = staged ] && RUNTIME=container
   case "$MODE:$RUNTIME" in
-    one:container) tui_done "$(msg step_mode)" "$(msg mode_container)" ;;
-    one:host) tui_done "$(msg step_mode)" "$(msg mode_host)" ;;
-    staged:*) tui_done "$(msg step_mode)" "$(msg mode_staged)" ;;
+    one:container) tui_done "$(msg step_mode)" "$(msg mode_container)$(kept_mark)" ;;
+    one:host) tui_done "$(msg step_mode)" "$(msg mode_host)$(kept_mark)" ;;
+    staged:*) tui_done "$(msg step_mode)" "$(msg mode_staged)$(kept_mark)" ;;
   esac
   return 0
 }
@@ -286,7 +292,7 @@ docker_ready() {
 step_modules() {
   local choice rc items key tier on sel hard label=""
   section 3
-  if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)"; return 0; fi
+  if [ "$MODE" = staged ]; then tui_done "$(msg step_modules)" "$(msg modules_staged)$(kept_mark)"; return 0; fi
   CUSTOM_LINES=""
   if [ -z "$PRESET" ] && [ "$INTERACTIVE" = 1 ]; then
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" 0 \
@@ -333,7 +339,7 @@ step_modules() {
     CUSTOM_LINES="$CUSTOM_LINES$(prop_env "$(module_catalog_get PROPERTY "$key")")=true
 "
   done
-  tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}"
+  tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}$(kept_mark modules)"
   return 0
 }
 
@@ -378,7 +384,7 @@ EOF
       eval "PROVIDER=\"\${$((choice + 1))}\""
     fi
   fi
-  tui_done "$(msg step_ai)" "$PROVIDER"
+  tui_done "$(msg step_ai)" "${AI_LABEL:-$PROVIDER}$(kept_mark)"
   ai_container
 }
 
@@ -400,7 +406,7 @@ ai_container() {
   fi
   present="$(providers_status | awk '$2=="present"{print $1}')"
   all_present="$(echo $present)"
-  if [ -z "$AI_PROVIDERS" ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
+  if [ -z "$AI_PROVIDERS" ] && [ "$KEPT" = 0 ] && [ "$INTERACTIVE" = 1 ] && [ "$(printf '%s\n' $present | grep -c .)" -gt 1 ]; then
     items=()
     for id in $present; do items[${#items[@]}]="on:$id:$id"; done
     tui_checklist sel "$(msg ai_providers_q)" "${items[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
@@ -409,7 +415,7 @@ ai_container() {
   fi
   ai_claude_token
   ai_env_only_hints
-  tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}"
+  tui_done "$(msg ai_access_done)" "$AI_FROM_HOST${AI_PROVIDERS:+ · $AI_PROVIDERS}$(kept_mark)"
   return 0
 }
 
@@ -522,8 +528,10 @@ step_ports() {
   local p
   section 5
   if [ "$MODE" = staged ]; then
-    P_DEV="$(free_port 9090)"; P_TEST="$(free_port 8090 "$P_DEV")"; P_PROD="$(free_port 9091 "$P_DEV $P_TEST")"
-    tui_done "$(msg step_ports)" "Dev $P_DEV · Test $P_TEST · Prod $P_PROD"
+    # Ports behaltener Dateien stehen fest — die uebrigen weichen ihnen aus (fd4eb89f)
+    p="$(for n in dev test prod; do is_kept "$n" && kept_value "$n" MYSURICATES_PORT; done | tr '\n' ' ')"
+    P_DEV="$(kept_port dev 9090 "$p")"; P_TEST="$(kept_port test 8090 "$p $P_DEV")"; P_PROD="$(kept_port prod 9091 "$p $P_DEV $P_TEST")"
+    tui_done "$(msg step_ports)" "Dev $P_DEV · Test $P_TEST · Prod $P_PROD$(kept_mark)"
     return 0
   fi
   if [ -z "$PORT" ]; then
@@ -535,7 +543,7 @@ step_ports() {
     PROJECTS="$(cd "$REPO_ROOT/.." && pwd)"
     [ "$INTERACTIVE" = 1 ] && tui_input PROJECTS "$(msg projects_q)" "$PROJECTS"
   fi
-  tui_done "$(msg step_ports)" "$PORT${PROJECTS:+ · $PROJECTS}"
+  tui_done "$(msg step_ports)" "$PORT${PROJECTS:+ · $PROJECTS}$(kept_mark)"
   return 0
 }
 
@@ -543,6 +551,7 @@ step_ports() {
 write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALED
   local f="$INSTANCES_DIR/$1.env"
   mkdir -p "$INSTANCES_DIR"
+  [ -f "$f" ] && instance_remember_addr "$1" "$f"
   if [ -f "$f" ] && [ "$RECONF" = 0 ]; then
     if [ "$FORCE" = 1 ] && [ -n "$PRESET_FLAG" ]; then
       sed "s/^MYSURICATES_PRESET=.*/MYSURICATES_PRESET=$PRESET_FLAG/" "$f" > "$f.tmp" && cat "$f.tmp" > "$f" && rm -f "$f.tmp"
@@ -571,30 +580,57 @@ write_instance() {  # NAME RUNTIME PORT PRESET ENVIRONMENT SEALING REQUIRE_SEALE
 # Auf dem Rechner baut `instance.sh up` nur, wenn der Build nicht zum Klon passt (instance.sh built,
 # 1c016162). Der Schritt sagt deshalb vorher, ob gebaut wird — statt „✓ bauen 0:00“ nach einem
 # git pull. Eine laufende Instanz haelt `up` nie selbst an; mit altem Stand oder neuen Einstellungen
-# startet sie der Installer neu, denn dazu wurde er aufgerufen. Im Container baut docker compose.
+# startet sie der Installer neu, denn dazu wurde er aufgerufen. Im Container baut docker compose und
+# ersetzt einen laufenden Container, sobald sich Image oder Einstellungen geaendert haben — vorher
+# nicht zu sehen. Beides bricht laufende Workflow-Runs ab; vorher fragt restart_ok (29820f58).
 start_instance() {  # NAME
   local inst="bash '$SCRIPT_DIR/instance.sh'" cmd title st="" built="" head="" running=0
   cmd="$inst up --name $1"; title="$(msg build_run "$1")"
   if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "scripts/instance.sh up --name $1")"; return 0; fi
+  case "$(bash "$SCRIPT_DIR/instance.sh" status --name "$1" 2>/dev/null)" in running*) running=1 ;; esac
   if [ "$RUNTIME" = host ]; then
     read -r st built head <<EOF
 $(bash "$SCRIPT_DIR/instance.sh" built --name "$1" 2>/dev/null)
 EOF
-    case "$(bash "$SCRIPT_DIR/instance.sh" status --name "$1" 2>/dev/null)" in running*) running=1 ;; esac
+    if [ "$running" = 1 ] && [ "$st" != outdated ] && [ "$RECONF" = 0 ]; then
+      tui_done "$(msg step_build)" "$(msg build_running_kept "$1" "$(short_sha "$built")")"; return 0
+    fi
+  fi
+  if [ "$running" = 1 ] && ! restart_ok "$1"; then
+    if [ "$st" = outdated ]; then tui_done "$(msg step_build)" "$(msg runs_kept_outdated "$1" "$(short_sha "$built")" "$(short_sha "$head")")"
+    elif [ "$RECONF" = 1 ]; then tui_done "$(msg step_build)" "$(msg runs_kept_settings "$1")"
+    else tui_done "$(msg step_build)" "$(msg runs_kept "$1")"; fi
+    return 0
+  fi
+  if [ "$RUNTIME" = host ]; then
     if [ "$st" = outdated ]; then
       if [ "$running" = 1 ]; then printf '  %s\n' "$(msg build_outdated_running "$1" "$(short_sha "$built")" "$(short_sha "$head")")"
       else printf '  %s\n' "$(msg build_outdated "$1" "$(short_sha "$built")" "$(short_sha "$head")")"; fi
     fi
-    if [ "$running" = 1 ]; then
-      if [ "$st" != outdated ] && [ "$RECONF" = 0 ]; then
-        tui_done "$(msg step_build)" "$(msg build_running_kept "$1" "$(short_sha "$built")")"; return 0
-      fi
-      cmd="$inst down --name $1 >/dev/null 2>&1; $cmd"
-    fi
+    [ "$running" = 1 ] && cmd="$inst down --name $1 >/dev/null 2>&1; $cmd"
     case "$st" in current|unknown) title="$(msg build_start "$1") — $(msg build_kept "$(short_sha "$built")")" ;; esac
   fi
   [ "$DOCKER_SG" = 1 ] && cmd="sg docker -c \"$cmd\""
   tui_run "$title" "$LOG_DIR/start-$1.log" bash -c "$cmd" || { printf '  %s\n' "$(msg build_failed "$1" "$LOG_DIR/start-$1.log")"; return 1; }
+}
+
+# Vor dem Neustart einer laufenden Instanz ihre laufenden Workflow-Runs (29820f58) — nur lesend, Key
+# aus `instance.sh key`, Port und Adresse aus der Instanz-Datei, wie sie beim Start der Instanz war.
+# Laufen welche: im Terminal fragen (Vorgabe nein), sonst — auch mit --yes — nicht anhalten, nur den
+# Befehl fuer spaeter nennen. Antwortet die Instanz nicht oder fehlt der Key: wie bisher, mit Hinweis.
+KEPT_RUNNING=""   # nicht neu gestartet: " NAME … "
+restart_ok() {  # NAME → 0 = neu starten
+  local a key n
+  a="$(instance_prev_addr "$1")"; [ -n "$a" ] || a="$(instance_file_addr "$INSTANCES_DIR/$1.env")"
+  key="$(bash "$SCRIPT_DIR/instance.sh" key --name "$1" 2>/dev/null)"
+  n="$(instance_running_runs "$(instance_api_base "${a#*,}" "${a%%,*}")" "$key")"
+  if [ -z "$n" ]; then printf '  %s\n' "$(msg runs_unchecked "$1")"; return 0; fi
+  [ "$n" -gt 0 ] || return 0
+  if [ "$INTERACTIVE" = 1 ]; then tui_confirm "$(msg runs_q "$1" "$n")" n && return 0
+  else printf '  %s\n' "$(msg runs_active "$1" "$n")"; fi
+  printf '  %s\n' "$(msg runs_later "scripts/instance.sh down --name $1 && scripts/instance.sh up --name $1")"
+  KEPT_RUNNING="$KEPT_RUNNING $1 "
+  return 1
 }
 short_sha() { if [ "${1:--}" = - ]; then msg build_state_unknown; else printf '%s' "${1:0:8}"; fi; }
 
@@ -627,6 +663,8 @@ step_done() {
     port="$(grep '^MYSURICATES_PORT=' "$INSTANCES_DIR/$n.env" | cut -d= -f2)"
     # Aus der Datei, nicht aus --bind: eine behaltene Instanz-Datei kann anders binden (b8aa3866)
     bind="$(grep '^MYSURICATES_BIND=' "$INSTANCES_DIR/$n.env" | tail -n 1 | cut -d= -f2)"
+    # Nicht neu gestartet (29820f58): sie lauscht noch, wo sie vor dem Schreiben der Datei lauschte
+    case "$KEPT_RUNNING" in *" $n "*) l="$(instance_prev_addr "$n")"; [ -z "$l" ] || { port="${l%%,*}"; bind="${l#*,}"; } ;; esac
     if [ "$STARTED" = 1 ] && [ "$DRY" = 0 ]; then
       first=1
       while IFS= read -r addr; do
