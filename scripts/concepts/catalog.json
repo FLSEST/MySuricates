@@ -5,7 +5,7 @@
     "title_en": "Gates: a machine-readable verdict",
     "sources": [
       "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusResolver.java",
-      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java",
+      "ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java",
       "ai-automation-backend/src/main/java/com/automation/service/workflow/RunCompletionHandler.java"
     ],
     "metrics": [
@@ -93,7 +93,7 @@
     "title_en": "Measure deterministically before AI assessment",
     "sources": [
       "ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java",
-      "ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java"
+      "ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java"
     ],
     "metrics": [
       "steps_shell",

@@ -41,4 +41,4 @@ Measurement: **2026-09-19 (UTC)**, one local development instance. Inventory cou
 ## In the code
 
 - [ShellBlockExecutor.java](../../../ai-automation-backend/src/main/java/com/automation/executor/blocks/ShellBlockExecutor.java)
-- [GateStatusOutputParser.java](../../../ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java)
+- [GateStatusOutputParser.java](../../../ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java)

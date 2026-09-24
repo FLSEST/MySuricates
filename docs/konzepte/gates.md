@@ -37,5 +37,5 @@ Messung: **2026-09-19 (UTC)**, eine lokale Entwicklungsinstanz. Bestandszähler 
 ## Im Code
 
 - [GateStatusResolver.java](../../ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusResolver.java)
-- [GateStatusOutputParser.java](../../ai-automation-backend/src/main/java/com/automation/service/todo/GateStatusOutputParser.java)
+- [GateStatusOutputParser.java](../../ai-automation-backend/src/main/java/com/automation/service/runoutput/GateStatusOutputParser.java)
 - [RunCompletionHandler.java](../../ai-automation-backend/src/main/java/com/automation/service/workflow/RunCompletionHandler.java)

@@ -1,7 +1,7 @@
 package com.automation.executor.blocks;
 
 import com.automation.entity.GateStatus;
-import com.automation.service.todo.GateStatusOutputParser;
+import com.automation.service.runoutput.GateStatusOutputParser;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,7 +1,7 @@
-package com.automation.service.todo;
+package com.automation.service.runoutput;
 
 import com.automation.entity.GateStatus;
-import com.automation.service.todo.GateStatusOutputParser.ParsedGateStatus;
+import com.automation.service.runoutput.GateStatusOutputParser.ParsedGateStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;

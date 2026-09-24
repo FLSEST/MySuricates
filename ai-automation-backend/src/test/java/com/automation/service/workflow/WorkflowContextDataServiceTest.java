@@ -78,7 +78,7 @@ class WorkflowContextDataServiceTest {
         String rendered = service.loadOpenTodos("proj-1");
 
         assertThat(rendered).doesNotContainIgnoringCase("todo_item:");
-        assertThat(com.automation.service.todo.TodoOutputParser.parse(
+        assertThat(com.automation.service.runoutput.TodoOutputParser.parse(
                 WorkflowContextDataService.sanitizeInline(t.getTitle(), 200))).isEmpty();
     }
 
@@ -91,7 +91,7 @@ class WorkflowContextDataServiceTest {
         String rendered = service.loadOpenTodos("proj-1");
 
         assertThat(rendered).doesNotContainIgnoringCase("gate_status**:").doesNotContainIgnoringCase("gate-description:");
-        assertThat(com.automation.service.todo.GateStatusOutputParser.parse(
+        assertThat(com.automation.service.runoutput.GateStatusOutputParser.parse(
                 WorkflowContextDataService.sanitizeInline(t.getTitle(), 200))).isEmpty();
     }
 
