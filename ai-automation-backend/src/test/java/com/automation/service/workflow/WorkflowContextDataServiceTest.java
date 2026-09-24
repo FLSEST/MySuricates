@@ -42,7 +42,7 @@ class WorkflowContextDataServiceTest {
     @Mock private TodoRepository todoRepository;
     @Mock private RequestMetricsFactSheet requestMetricsFactSheet;
     @Mock private ActivityLogService activityLogService;
-    @Mock private GoalStatusContext goalStatusContext;
+    @Mock private GoalContextSource goalContextSource;
 
     @InjectMocks private WorkflowContextDataService service;
 
@@ -469,10 +469,10 @@ class WorkflowContextDataServiceTest {
 
         service.injectPlatformData(ctx, "wf-1", "proj-1");
 
-        for (String name : GoalStatusContext.VARIABLES) {
+        for (String name : GoalContextSource.VARIABLES) {
             assertThat(ctx.getVariables()).as(name).doesNotContainKey(name);
         }
-        verify(goalStatusContext, org.mockito.Mockito.never()).variables(anyString(), any());
+        verify(goalContextSource, org.mockito.Mockito.never()).variables(anyString(), any());
     }
 
     @Test
@@ -482,7 +482,7 @@ class WorkflowContextDataServiceTest {
         service.injectPlatformData(ctx, "wf-1", "proj-1");
 
         assertThat(ctx.getVariables()).doesNotContainKey("goal_status");
-        verify(goalStatusContext, org.mockito.Mockito.never()).variables(anyString(), any());
+        verify(goalContextSource, org.mockito.Mockito.never()).variables(anyString(), any());
     }
 
     @Test
@@ -490,12 +490,12 @@ class WorkflowContextDataServiceTest {
         ExecutionContext ctx = goalContext("g-1");
         ctx.setVariable("goal_locale", "en");
         java.util.Map<String, String> values = new java.util.LinkedHashMap<>();
-        GoalStatusContext.VARIABLES.forEach(name -> values.put(name, "value of " + name));
-        when(goalStatusContext.variables("g-1", "en")).thenReturn(values);
+        GoalContextSource.VARIABLES.forEach(name -> values.put(name, "value of " + name));
+        when(goalContextSource.variables("g-1", "en")).thenReturn(values);
 
         service.injectPlatformData(ctx, "wf-1", "proj-1");
 
-        for (String name : GoalStatusContext.VARIABLES) {
+        for (String name : GoalContextSource.VARIABLES) {
             assertThat(ctx.getVariable(name)).as(name).isEqualTo("value of " + name);
             assertThat(ctx.isUntrusted(name)).as(name).isTrue();
         }
@@ -505,23 +505,23 @@ class WorkflowContextDataServiceTest {
     @Test
     void injectPlatformData_goalIdIsReducedToIdCharacters() {
         ExecutionContext ctx = goalContext("g-1'; rm -rf /");
-        when(goalStatusContext.variables("g-1rm-rf", null)).thenReturn(java.util.Map.of());
+        when(goalContextSource.variables("g-1rm-rf", null)).thenReturn(java.util.Map.of());
 
         service.injectPlatformData(ctx, "wf-1", "proj-1");
 
-        verify(goalStatusContext).variables("g-1rm-rf", null);
+        verify(goalContextSource).variables("g-1rm-rf", null);
     }
 
     @Test
     void injectPlatformData_unknownGoal_statesTheGapInEveryGoalVariable_andWarns() {
         ExecutionContext ctx = goalContext("missing");
         when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 1");
-        when(goalStatusContext.variables("missing", null))
+        when(goalContextSource.variables("missing", null))
                 .thenThrow(new com.automation.exception.ResourceNotFoundException("Goal", "missing"));
 
         service.injectPlatformData(ctx, "wf-1", "proj-1");
 
-        for (String name : GoalStatusContext.VARIABLES) {
+        for (String name : GoalContextSource.VARIABLES) {
             assertThat((String) ctx.getVariable(name)).as(name)
                     .startsWith("NICHT GEMESSEN: " + name)
                     .contains("ResourceNotFoundException");
@@ -533,6 +533,6 @@ class WorkflowContextDataServiceTest {
 
     @Test
     void goalVariables_areSystemVariables_andStayOutOfTheContextDelta() {
-        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(GoalStatusContext.VARIABLES);
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(GoalContextSource.VARIABLES);
     }
 }

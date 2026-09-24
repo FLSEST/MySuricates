@@ -1,4 +1,4 @@
-package com.automation.service.workflow;
+package com.automation.service.goal;
 
 import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.response.GoalMilestoneResponse;
@@ -6,8 +6,8 @@ import com.automation.dto.response.GoalProgressResponse;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
 import com.automation.entity.Todo;
-import com.automation.service.goal.GoalMilestoneService;
-import com.automation.service.goal.GoalSnapshot;
+import com.automation.service.workflow.GoalContextSource;
+import com.automation.util.UntrustedText;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * Die Kontextvariablen eines Ziels (TODO 259f4f66), nur wenn der Lauf {@code goal_id} traegt:
@@ -32,7 +30,7 @@ import java.util.stream.Stream;
  * <p>Titel von Ziel, Meilensteinen und TODOs koennen aus fremden Quellen stammen (importierte
  * Issues, Webhooks, KI-Ausgaben). Jeder Titel wird deshalb wie in {@code open_todos} auf eine Zeile
  * gebracht, gekuerzt und von Plattform-Markern und Blockgrenzen befreit
- * ({@link WorkflowContextDataService#sanitizeInline}); die Kachelwerte zusaetzlich von Steuer- und
+ * ({@link UntrustedText#inline}); die Kachelwerte zusaetzlich von Steuer- und
  * Formatzeichen, die der Dashboard-Vertrag ablehnt, und auf seine Laengen gekuerzt.
  *
  * <p>Ampel: Rot, wenn ein aktives TODO oder ein Meilenstein ueberfaellig ist oder das Zieldatum mit
@@ -40,21 +38,14 @@ import java.util.stream.Stream;
  */
 @Component
 @RequiredArgsConstructor
-public class GoalStatusContext {
+public class GoalStatusContext implements GoalContextSource {
 
-    /** Freie Plaetze fuer Punkte der Kachel: {@code goal_guard_item_1} … {@code _5}. */
-    static final int ITEM_SLOTS = 5;
     /** Zeilen je Liste im Block; der Rest wird als Anzahl genannt. */
     static final int MAX_LINES = 20;
     static final int MAX_TITLE = 80;
     static final int MAX_ITEM = 200;
     static final int MAX_SUMMARY = 500;
 
-    /** Alle Variablen, die gesetzt werden – bei einer Luecke jede mit {@code GAP_FORMAT}. */
-    public static final List<String> VARIABLES = Stream.concat(
-            Stream.of("goal_status", "goal_guard_status", "goal_guard_title", "goal_guard_summary",
-                    "goal_guard_progress", "goal_guard_overdue", "goal_guard_due_soon", "goal_guard_items"),
-            IntStream.rangeClosed(1, ITEM_SLOTS).mapToObj(i -> "goal_guard_item_" + i)).toList();
 
     private static final Set<Todo.Status> ACTIVE = Set.of(Todo.Status.OPEN, Todo.Status.IN_PROGRESS, Todo.Status.BACKLOG);
     private static final Set<Integer> FATAL_TYPES = Set.of((int) Character.CONTROL, (int) Character.FORMAT,
@@ -65,6 +56,7 @@ public class GoalStatusContext {
     private final Clock clock;
 
     /** Name → Wert fuer das Ziel; wirft, wenn es das Ziel nicht gibt. */
+    @Override
     public Map<String, String> variables(String goalId, String locale) {
         return render(milestoneService.snapshot(goalId), locale, clock.instant(), clock.getZone());
     }
@@ -179,7 +171,7 @@ public class GoalStatusContext {
     }
 
     private static String inline(String raw) {
-        return WorkflowContextDataService.sanitizeInline(raw, WorkflowContextDataService.MAX_TITLE_CHARS);
+        return UntrustedText.inline(raw, UntrustedText.MAX_TITLE_CHARS);
     }
 
     private static String date(Instant instant, ZoneId zone) {
