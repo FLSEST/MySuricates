@@ -72,6 +72,7 @@ export function WishHeaderCard({ wish, onCancel, onDelete }: {
           {statusSteps.map((step, i) => {
             const isActive = effectiveStatus === step;
             const isPastStep = currentIndex > i || wish.status === 'COMPLETED';
+            // Never true today: FAILED is no timeline step, currentIndex is -1 (TODO 5165ec90)
             const isFailed = wish.status === 'FAILED' && i === currentIndex;
             const isAwaitingHere = isActive && isPaused(wish.status);
             return (

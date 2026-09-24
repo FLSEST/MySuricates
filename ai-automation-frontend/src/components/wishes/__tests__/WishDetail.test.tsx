@@ -49,7 +49,7 @@ function Location() {
 }
 
 describe('WishDetail', { timeout: 15_000 }, () => {
-  it('shows a failed wish with retry and delete and marks the failed step of the timeline', async () => {
+  it('shows a failed wish with retry and delete, its timeline without any marked step', async () => {
     const responded = serve(wish({ status: 'FAILED', autoRefine: true }));
     const onDelete = vi.fn();
     renderWithProviders(<WishDetail wishId="wish-1" onCancel={vi.fn()} onDelete={onDelete} />);
@@ -59,7 +59,9 @@ describe('WishDetail', { timeout: 15_000 }, () => {
     expect(screen.getByText(en.wishes.autoRefine.enabled)).toBeInTheDocument();
     expect(screen.getByText(`${en.wishes.iteration} 2 / 3`)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: en.wishes.cancel })).toBeNull();
-    // FAILED is not on the timeline: no step is highlighted, none marked as failed
+    // Pins today's behaviour: FAILED is no timeline step (currentIndex -1), so no step is
+    // highlighted and none marked as failed — TODO 5165ec90 (Wunsch mit Status FAILED zeigt
+    // leere Zeitleiste) changes that and this assertion with it.
     expect(timelineBars().querySelectorAll('.bg-border')).toHaveLength(5);
 
     fireEvent.click(screen.getByTitle(en.common.delete));
