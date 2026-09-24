@@ -1,6 +1,7 @@
 package com.automation.service.scheduler;
 
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.entity.ChainRun;
 import com.automation.entity.RunStatus;
 import com.automation.entity.TriggerSource;
@@ -26,7 +27,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +46,14 @@ public class ScheduledWorkflowExecutor {
     private final ActivityLogService activityLogService;
     private final Clock clock;
     private final ModuleRegistry modules;
+
+    /**
+     * Run states in which the target is still busy for a SKIP schedule. PAUSED counts: a paused run
+     * continues later, and a second run next to it is exactly the overlap SKIP avoids. PENDING does
+     * not: both executors create their runs as RUNNING, and the startup cleanup only resolves
+     * RUNNING/PAUSED leftovers — a stale PENDING row would block the schedule for good.
+     */
+    static final Set<RunStatus> BUSY_STATES = EnumSet.of(RunStatus.RUNNING, RunStatus.PAUSED);
 
     /**
      * Execute a scheduled workflow/chain.
@@ -65,25 +78,14 @@ public class ScheduledWorkflowExecutor {
             return Optional.empty();
         }
 
-        // Ghost-run protection: skip if the target already has a RUNNING execution.
-        // Only enforced when conflictBehavior == SKIP (OVERLAP allows parallel runs).
-        if (scheduled.getConflictBehavior() != ScheduledWorkflow.ConflictBehavior.OVERLAP) {
-            if (scheduled.getTargetType() == TargetType.WORKFLOW && scheduled.getWorkflow() != null) {
-                if (workflowRunRepository.existsByWorkflowIdAndStatus(
-                        scheduled.getWorkflow().getId(), RunStatus.RUNNING)) {
-                    log.warn("Schedule {} skipped — workflow '{}' already has a RUNNING execution",
-                            scheduleId, scheduled.getWorkflow().getName());
-                    return Optional.empty();
-                }
-            }
-            if (scheduled.getTargetType() == TargetType.CHAIN && scheduled.getChain() != null) {
-                if (chainRunRepository.existsByChainIdAndStatus(
-                        scheduled.getChain().getId(), RunStatus.RUNNING)) {
-                    log.warn("Schedule {} skipped — chain '{}' already has a RUNNING execution",
-                            scheduleId, scheduled.getChain().getName());
-                    return Optional.empty();
-                }
-            }
+        // Conflict behaviour SKIP (default; OVERLAP allows parallel runs): while the target still has
+        // a run in progress, this occurrence is dropped and the schedule moves on to its next one.
+        // Returning without that left nextRunAt in the past, so every tick retried and the occurrence
+        // started late, as soon as the other run ended (TODO ade3fef8).
+        if (scheduled.getConflictBehavior() != ScheduledWorkflow.ConflictBehavior.OVERLAP
+                && targetBusy(scheduled)) {
+            skipOccurrence(scheduled);
+            return Optional.empty();
         }
 
         log.info("Executing scheduled {}: {} (type: {})",
@@ -137,21 +139,73 @@ public class ScheduledWorkflowExecutor {
                 .orElse(true);
     }
 
+    /** True while the target still has a RUNNING or PAUSED run ({@link #BUSY_STATES}). */
+    private boolean targetBusy(ScheduledWorkflow scheduled) {
+        if (scheduled.getTargetType() == TargetType.CHAIN) {
+            return scheduled.getChain() != null
+                    && chainRunRepository.existsByChainIdAndStatusIn(scheduled.getChain().getId(), BUSY_STATES);
+        }
+        return scheduled.getWorkflow() != null
+                && workflowRunRepository.existsByWorkflowIdAndStatusIn(scheduled.getWorkflow().getId(), BUSY_STATES);
+    }
+
+    /**
+     * Drops the due occurrence without starting a run: the schedule moves on exactly as after a run
+     * (CRON to its next occurrence, ONCE/DELAYED are done), but {@code lastRunAt} and
+     * {@code runCount} stay — nothing ran, so the skip does not use up {@code maxRuns}.
+     */
+    private void skipOccurrence(ScheduledWorkflow scheduled) {
+        Instant skippedAt = scheduled.getNextRunAt();
+        ScheduledWorkflow advanced = advance(scheduled.getId(), scheduled.getScheduleType(),
+                scheduled.getCronExpression(), false);
+        Instant nextRunAt = advanced != null ? advanced.getNextRunAt() : null;
+        log.warn("Schedule {} skipped — {} '{}' still has a running or paused run; next run at {}",
+                scheduled.getId(), scheduled.getTargetType(), scheduled.getTargetName(), nextRunAt);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("reason", "target-busy");
+        if (skippedAt != null) {
+            metadata.put("previousNextRunAt", skippedAt.toString());
+        }
+        if (nextRunAt != null) {
+            metadata.put("nextRunAt", nextRunAt.toString());
+        }
+        activityLogService.log(LogLevel.INFO, LogCategory.SCHEDULE,
+                "Schedule skipped (previous run still in progress): " + scheduled.getTargetName(),
+                "ScheduledWorkflowExecutor", scheduled.getId(), metadata);
+    }
+
     @Transactional
     public void updateScheduleAfterRun(String scheduleId, ScheduleType scheduleType,
                                         String cronExpression) {
-        ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
-        if (scheduled == null) return;
+        advance(scheduleId, scheduleType, cronExpression, true);
+    }
 
-        scheduled.setLastRunAt(Instant.now(clock));
+    /**
+     * Moves a schedule past its due occurrence: ONCE/DELAYED are done and disabled, CRON goes to its
+     * next occurrence unless an end condition is met. Only when {@code ran} (a start was attempted,
+     * successful or not) are {@code lastRunAt} and {@code runCount} updated.
+     *
+     * @return the updated schedule, or {@code null} when it no longer exists
+     */
+    private ScheduledWorkflow advance(String scheduleId, ScheduleType scheduleType, String cronExpression,
+                                      boolean ran) {
+        ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
+        if (scheduled == null) return null;
+
+        if (ran) {
+            scheduled.setLastRunAt(Instant.now(clock));
+        }
 
         if (scheduleType == ScheduleType.ONCE || scheduleType == ScheduleType.DELAYED) {
             scheduled.setNextRunAt(null);
             scheduled.setEnabled(false);
-            log.info("{} schedule {} executed and disabled", scheduleType, scheduleId);
+            log.info("{} schedule {} {} and disabled", scheduleType, scheduleId, ran ? "executed" : "skipped");
         } else {
-            // Increment run counter and check end conditions for CRON schedules
-            scheduled.setRunCount(scheduled.getRunCount() + 1);
+            // Count the run and check the end conditions of a CRON schedule
+            if (ran) {
+                scheduled.setRunCount(scheduled.getRunCount() + 1);
+            }
 
             boolean maxRunsReached = scheduled.getMaxRuns() > 0
                     && scheduled.getRunCount() >= scheduled.getMaxRuns();
@@ -165,12 +219,13 @@ public class ScheduledWorkflowExecutor {
                         scheduleId, scheduled.getMaxRuns(), scheduled.getRunCount(), scheduled.getEndDate());
             } else {
                 scheduled.setNextRunAt(calculateNextRun(cronExpression));
-                log.info("Schedule {} executed, next run at: {}",
-                        scheduleId, scheduled.getNextRunAt());
+                log.info("Schedule {} {}, next run at: {}",
+                        scheduleId, ran ? "executed" : "skipped", scheduled.getNextRunAt());
             }
         }
 
         scheduledRepository.save(scheduled);
+        return scheduled;
     }
 
     private Instant calculateNextRun(String cronExpression) {

@@ -540,6 +540,8 @@ export interface UpdateScheduleRequest {
   endDate?: string | null;
   maxRuns?: number | null;
   catchUpOnResume?: boolean;
+  /** Editable after creation since ade3fef8; omitted = unchanged. */
+  conflictBehavior?: 'SKIP' | 'OVERLAP';
 }
 
 export interface CalendarEvent {

@@ -318,6 +318,17 @@ class WorkflowRunRepositoryTest {
         assertThat(runRepository.existsByWorkflowIdAndStatus(workflowA.getId(), RunStatus.FAILED)).isFalse();
     }
 
+    /** The scheduler's SKIP check: a PAUSED run still occupies the workflow (TODO ade3fef8). */
+    @Test
+    void should_check_existence_by_workflow_id_and_any_of_several_statuses() {
+        run(workflowA, RunStatus.PAUSED, Instant.now());
+        run(workflowB, RunStatus.COMPLETED, Instant.now());
+        var busy = java.util.EnumSet.of(RunStatus.RUNNING, RunStatus.PAUSED);
+
+        assertThat(runRepository.existsByWorkflowIdAndStatusIn(workflowA.getId(), busy)).isTrue();
+        assertThat(runRepository.existsByWorkflowIdAndStatusIn(workflowB.getId(), busy)).isFalse();
+    }
+
     @Test
     void should_find_top_run_by_workflow_id_and_status() {
         run(workflowA, RunStatus.COMPLETED, Instant.now().minusSeconds(60));

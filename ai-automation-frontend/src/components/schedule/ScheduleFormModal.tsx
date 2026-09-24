@@ -1,6 +1,7 @@
 import { Plus, X, ChevronDown } from 'lucide-react';
 import { Modal, Button, Input, Select, CronPicker } from '../ui';
 import { useT } from '../../i18n';
+import { CatchUpOnResumeField } from './CatchUpOnResumeField';
 import type { ScheduledWorkflow, CreateScheduleRequest, Workflow, WorkflowChain } from '../../types';
 
 type TargetType = 'WORKFLOW' | 'CHAIN';
@@ -34,6 +35,8 @@ interface ScheduleFormModalProps {
   chains?: WorkflowChain[];
   /** False when the backend runs without the chains module: only workflows can be scheduled. */
   chainsEnabled?: boolean;
+  /** Global setting "catch up missed runs"; undefined while unknown. */
+  globalCatchUpOnResume?: boolean;
   isLoading: boolean;
   isFormValid: boolean;
   onClose: () => void;
@@ -54,6 +57,7 @@ export function ScheduleFormModal({
   workflows,
   chains,
   chainsEnabled = true,
+  globalCatchUpOnResume,
   isLoading,
   isFormValid,
   onClose,
@@ -314,18 +318,11 @@ export function ScheduleFormModal({
           ]}
         />
 
-        <label className="flex items-start gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={form.catchUpOnResume ?? false}
-            onChange={(e) => onFormChange({ ...form, catchUpOnResume: e.target.checked })}
-          />
-          <span className="text-sm text-text">
-            {t.schedules.catchUpOnResume}
-            <span className="block text-xs text-text-tertiary">{t.schedules.catchUpOnResumeHint}</span>
-          </span>
-        </label>
+        <CatchUpOnResumeField
+          checked={form.catchUpOnResume ?? false}
+          onChange={(checked) => onFormChange({ ...form, catchUpOnResume: checked })}
+          globalCatchUp={globalCatchUpOnResume}
+        />
 
         {/* Variables accordion */}
         <div className="border border-border rounded-lg overflow-hidden">

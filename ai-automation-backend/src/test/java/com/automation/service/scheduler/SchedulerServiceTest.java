@@ -356,7 +356,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, "New description", null, null, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, "New description", null, null, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.getDescription()).isEqualTo("New description");
@@ -368,7 +368,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.getCronExpression()).isEqualTo("0 30 * * * *");
@@ -382,7 +382,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest("0 30 * * * *", null, null, null, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.getCronExpression()).isEqualTo("0 30 * * * *");
@@ -393,7 +393,7 @@ class SchedulerServiceTest {
     void update_invalidCronExpression_throws() {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest("not-a-cron", null, null, null, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest("not-a-cron", null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> schedulerService.update("sched-1", request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -415,7 +415,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-once-upd")).thenReturn(Optional.of(onceSchedule));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-once-upd", request);
 
         assertThat(result.getScheduledAt()).isEqualTo(newTime);
@@ -428,7 +428,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 10, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 10, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.getEndDate()).isEqualTo(endDate);
@@ -440,10 +440,45 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, null, null, true);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, null, null, true, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.isCatchUpOnResume()).isTrue();
+    }
+
+    @Test
+    void update_conflictBehavior_updated() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, null, null, null, "OVERLAP");
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getConflictBehavior()).isEqualTo(ScheduledWorkflow.ConflictBehavior.OVERLAP);
+    }
+
+    @Test
+    void update_withoutConflictBehavior_keepsIt() {
+        testScheduled.setConflictBehavior(ScheduledWorkflow.ConflictBehavior.OVERLAP);
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, "Only the description", null, null, null, null, null, null);
+        ScheduledWorkflow result = schedulerService.update("sched-1", request);
+
+        assertThat(result.getConflictBehavior()).isEqualTo(ScheduledWorkflow.ConflictBehavior.OVERLAP);
+    }
+
+    @Test
+    void update_invalidConflictBehavior_throwsAndSavesNothing() {
+        when(scheduledRepository.findById("sched-1")).thenReturn(Optional.of(testScheduled));
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, null, null, null, "sometimes");
+
+        assertThatThrownBy(() -> schedulerService.update("sched-1", request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid conflict behavior");
+        verify(scheduledRepository, never()).save(any());
     }
 
     // --- getNextRuns ---
@@ -602,7 +637,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> newCtx = Map.of("env", "staging");
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, newCtx, null, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, newCtx, null, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-1", request);
 
         assertThat(result.getInputContext()).isEqualTo(newCtx);
@@ -626,7 +661,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-once-disabled")).thenReturn(Optional.of(onceSchedule));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, newTime, null, null, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-once-disabled", request);
 
         assertThat(result.getScheduledAt()).isEqualTo(newTime);
@@ -650,7 +685,7 @@ class SchedulerServiceTest {
         when(scheduledRepository.findById("sched-once-end")).thenReturn(Optional.of(onceSchedule));
         when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 5, null);
+        UpdateScheduleRequest request = new UpdateScheduleRequest(null, null, null, null, endDate, 5, null, null);
         ScheduledWorkflow result = schedulerService.update("sched-once-end", request);
 
         assertThat(result.getEndDate()).isNull();

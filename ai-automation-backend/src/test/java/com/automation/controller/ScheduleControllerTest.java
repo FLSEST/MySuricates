@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -372,6 +373,19 @@ class ScheduleControllerTest {
                         .content("{\"cronExpression\": \"0 0 12 * * *\", \"description\": \"Updated\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("sched-1"));
+    }
+
+    @Test
+    void updateSchedule_passesConflictBehaviorToTheService() throws Exception {
+        when(schedulerService.update(any(), any(UpdateScheduleRequest.class))).thenReturn(testScheduled);
+        when(scheduleMapper.toResponse(testScheduled)).thenReturn(testResponse);
+
+        mockMvc.perform(put("/api/v1/schedules/sched-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conflictBehavior\": \"OVERLAP\"}"))
+                .andExpect(status().isOk());
+
+        verify(schedulerService).update(eq("sched-1"), argThat(r -> "OVERLAP".equals(r.conflictBehavior())));
     }
 
     @Test

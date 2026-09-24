@@ -209,6 +209,19 @@ class ChainRunRepositoryTest {
         assertThat(exists).isFalse();
     }
 
+    /** The scheduler's SKIP check: a PAUSED run still occupies the chain (TODO ade3fef8). */
+    @Test
+    void existsByChainIdAndStatusIn_matchesAnyOfTheStatuses() {
+        WorkflowChain chain = saveChain("Paused Chain");
+        WorkflowChain other = saveChain("Finished Chain");
+        repository.save(run(chain, RunStatus.PAUSED));
+        repository.save(run(other, RunStatus.FAILED));
+        var busy = java.util.EnumSet.of(RunStatus.RUNNING, RunStatus.PAUSED);
+
+        assertThat(repository.existsByChainIdAndStatusIn(chain.getId(), busy)).isTrue();
+        assertThat(repository.existsByChainIdAndStatusIn(other.getId(), busy)).isFalse();
+    }
+
     // --- findByTriggeredByScheduleIdOrderByStartedAtDesc ---
 
     @Test

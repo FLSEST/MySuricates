@@ -162,6 +162,9 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     boolean existsByWorkflowIdAndStatus(String workflowId, RunStatus status);
 
+    /** Whether the workflow has a run in one of these states — the scheduler's SKIP check (RUNNING, PAUSED). */
+    boolean existsByWorkflowIdAndStatusIn(String workflowId, Collection<RunStatus> statuses);
+
     Optional<WorkflowRun> findTopByWorkflowIdAndStatusOrderByStartedAtDesc(String workflowId, RunStatus status);
 
     @Query("SELECT r FROM WorkflowRun r LEFT JOIN FETCH r.steps WHERE r.id = :id")

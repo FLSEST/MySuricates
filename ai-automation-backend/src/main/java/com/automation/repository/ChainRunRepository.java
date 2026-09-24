@@ -34,6 +34,9 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     boolean existsByChainIdAndStatus(String chainId, RunStatus status);
 
+    /** Whether the chain has a run in one of these states — the scheduler's SKIP check (RUNNING, PAUSED). */
+    boolean existsByChainIdAndStatusIn(String chainId, Collection<RunStatus> statuses);
+
     List<ChainRun> findByStatus(RunStatus status);
 
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);

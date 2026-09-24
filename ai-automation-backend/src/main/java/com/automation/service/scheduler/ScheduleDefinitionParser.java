@@ -1,5 +1,6 @@
 package com.automation.service.scheduler;
 
+import com.automation.entity.ScheduledWorkflow.ConflictBehavior;
 import com.automation.entity.ScheduledWorkflow.ScheduleType;
 import com.automation.entity.ScheduledWorkflow.TargetType;
 import lombok.RequiredArgsConstructor;
@@ -11,10 +12,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Locale;
 
 /**
- * Parses the user-facing schedule definition fields (target type, schedule type, delay
- * expression) and computes the next cron occurrence from the injected clock.
+ * Parses the user-facing schedule definition fields (target type, schedule type, conflict
+ * behaviour, delay expression) and computes the next cron occurrence from the injected clock.
  *
  * <p>Extracted from {@code SchedulerService} (Audit-TODO 05dbd0e9). No persistence.
  */
@@ -43,6 +45,19 @@ public class ScheduleDefinitionParser {
             return ScheduleType.valueOf(scheduleType.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid schedule type: " + scheduleType);
+        }
+    }
+
+    /**
+     * {@code SKIP} or {@code OVERLAP}, case-insensitive. Strict on purpose — an update that names an
+     * unknown value must fail instead of silently keeping the old behaviour.
+     */
+    public ConflictBehavior parseConflictBehavior(String conflictBehavior) {
+        try {
+            return ConflictBehavior.valueOf(conflictBehavior.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid conflict behavior: " + conflictBehavior
+                    + " (expected SKIP or OVERLAP)");
         }
     }
 

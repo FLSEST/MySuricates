@@ -508,6 +508,12 @@ Der Scheduler ist ein 60-s-Tick im Backend (`SchedulerTick`); ohne laufendes Bac
 - Sichtbarkeit: eine WARN-Zeile im Activity-Log pro Ereignis („Cold start detected … N missed schedule(s): X skipped forward, Y queued for sequential catch-up"), `GET /api/v1/schedules/catch-up` (laufender und wartende Einträge) und ein Banner auf der Schedules-Seite.
 - `resume-grace-minutes: 0` schaltet beide Erkennungen ab (Altverhalten: alles Fällige startet sofort).
 
+Weitere Regeln des Ticks:
+
+- **Konflikt `SKIP`** (Standard): Hat das Ziel beim Fälligwerden noch einen Lauf in `RUNNING` oder `PAUSED`, entfällt der Termin — `nextRunAt` springt auf das nächste Vorkommen, `ONCE`/`DELAYED` verfallen, `lastRunAt` und `runCount` bleiben (`ScheduledWorkflowExecutor.skipOccurrence`). Bis 2026-09-24 blieb `nextRunAt` in der Vergangenheit, der Tick versuchte es jede Minute erneut und startete den Termin verspätet, sobald der andere Lauf endete (TODO ade3fef8). `OVERLAP` startet daneben.
+- **`maxRuns`** zählt jeden Start, auch fehlgeschlagene oder abgewiesene, nicht aber per `SKIP` entfallene Termine. Wiedereinschalten setzt `runCount` nicht zurück.
+- **Wartungsmodus** (`scheduler.maintenance-mode`, Pause-Schalter der Schedules-Seite): Der Tick läuft weiter, startet aber nichts; `nextRunAt` bleibt stehen. Beim Ausschalten startet jeder überfällige Zeitplan einmal sofort, alle gleichzeitig — weder Standby-/Kaltstart-Erkennung noch Nachhol-Warteschlange greifen, die Ticks während der Pause haben die Lücke schon verbraucht.
+
 ## Completion Triggers (V39)
 
 Automatische Verkettung von Workflows auf Basis von Abschluss-Ereignissen:

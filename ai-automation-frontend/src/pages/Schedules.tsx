@@ -15,6 +15,7 @@ import { useScheduleForm } from '../hooks/useScheduleForm';
 import { useWorkflows } from '../hooks/useWorkflows';
 import { useChains } from '../hooks/useChains';
 import { useModuleEnabled } from '../hooks/useModules';
+import { useExecutionConfig } from '../hooks/useSystem';
 import { useT } from '../i18n';
 
 export function Schedules() {
@@ -29,6 +30,10 @@ export function Schedules() {
   const { data: catchUpQueue } = useCatchUpQueue();
   const setMaintenance = useSetMaintenanceMode();
   const isMaintenanceMode = maintenanceData?.enabled ?? false;
+  const { data: executionConfig } = useExecutionConfig();
+  const globalCatchUpOnResume = executionConfig?.schedulerCatchUpOnResume === undefined
+    ? undefined
+    : executionConfig.schedulerCatchUpOnResume === 1;
 
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null);
@@ -253,6 +258,7 @@ export function Schedules() {
         workflows={workflows}
         chains={chains}
         chainsEnabled={chainsModule}
+        globalCatchUpOnResume={globalCatchUpOnResume}
         isLoading={scheduleForm.isSubmitting}
         isFormValid={scheduleForm.isFormValid}
         onClose={scheduleForm.closeModal}

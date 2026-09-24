@@ -172,7 +172,10 @@ Update a project.
 }
 ```
 
-All fields are optional; only provided fields are updated.
+All fields are optional; only provided fields are updated. Editable are `cronExpression` (`CRON` only),
+`scheduledAt` (`ONCE` only), `description`, `inputContext`, `endDate` and `maxRuns` (`CRON` only),
+`catchUpOnResume` and `conflictBehavior` (`SKIP`/`OVERLAP`, since 2026-09-24; any other value → `400`).
+Target and type of a schedule stay fixed.
 
 **Response:** `ProjectResponse`
 
@@ -1167,9 +1170,20 @@ Create a new schedule.
 | `scheduledAt` | Instant | No (for `ONCE` schedules) |
 | `delayExpression` | String | No (for `DELAYED` schedules, e.g. `"2h"`, `"30m"`) |
 | `endDate` | Instant | No (optional end date for `CRON` schedules) |
-| `maxRuns` | Integer | No (max executions, 0 = unlimited) |
-| `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP`) |
-| `catchUpOnResume` | boolean | No (default: `false`) |
+| `maxRuns` | Integer | No (max starts, 0 = unlimited — see below) |
+| `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP` — see below) |
+| `catchUpOnResume` | boolean | No (default: `false` — see below) |
+
+- **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
+  `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
+  `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
+  `OVERLAP` starts a second run next to it anyway.
+- **`maxRuns`:** counts every start of the schedule, a failed or refused one too; an occurrence dropped by
+  `SKIP` does not count. Once the number is reached, the schedule is disabled. Re-enabling does not reset
+  `runCount` — exactly one more start follows.
+- **`catchUpOnResume`:** catches up occurrences of this schedule that fell into a standby or a restart,
+  even when the global setting `scheduler-catch-up-on-resume` is off. That setting is on by default — then
+  every schedule is caught up anyway, one after another through the catch-up queue.
 
 **Response:** `201` with `ScheduledWorkflowResponse`
 
@@ -1225,7 +1239,9 @@ Query maintenance mode status.
 
 ### `POST /api/v1/schedules/maintenance`
 
-Toggle maintenance mode on/off. In maintenance mode, no scheduled executions are started.
+Toggle maintenance mode on/off. In maintenance mode no schedule starts; `nextRunAt` stays where it is.
+When it is switched off, every schedule whose time fell into the pause starts once, right away — all at
+the same time, without the catch-up queue.
 
 **Request:**
 

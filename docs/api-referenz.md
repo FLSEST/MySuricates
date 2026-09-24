@@ -174,7 +174,10 @@ Projekt aktualisieren.
 }
 ```
 
-Alle Felder sind optional; nur übergebene Felder werden aktualisiert.
+Alle Felder sind optional; nur übergebene Felder werden aktualisiert. Änderbar sind `cronExpression`
+(nur `CRON`), `scheduledAt` (nur `ONCE`), `description`, `inputContext`, `endDate` und `maxRuns` (nur
+`CRON`), `catchUpOnResume` und `conflictBehavior` (`SKIP`/`OVERLAP`, seit 2026-09-24; ein anderer Wert
+→ `400`). Ziel und Typ eines Zeitplans bleiben fest.
 
 **Response:** `ProjectResponse`
 
@@ -1172,9 +1175,20 @@ Neuen Schedule erstellen.
 | `scheduledAt` | Instant | Nein (für `ONCE`-Schedules) |
 | `delayExpression` | String | Nein (für `DELAYED`-Schedules, z.B. `"2h"`, `"30m"`) |
 | `endDate` | Instant | Nein (optionales Ende für `CRON`-Schedules) |
-| `maxRuns` | Integer | Nein (max. Ausführungen, 0 = unbegrenzt) |
-| `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP`) |
-| `catchUpOnResume` | boolean | Nein (Standard: `false`) |
+| `maxRuns` | Integer | Nein (max. Starts, 0 = unbegrenzt — siehe unten) |
+| `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP` — siehe unten) |
+| `catchUpOnResume` | boolean | Nein (Standard: `false` — siehe unten) |
+
+- **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
+  oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
+  `DELAYED`) verfällt, das Activity-Log vermerkt „Schedule skipped (previous run still in progress)“.
+  `OVERLAP` startet trotzdem einen zweiten Lauf daneben.
+- **`maxRuns`:** zählt jeden Start des Zeitplans, auch einen fehlgeschlagenen oder abgewiesenen; ein per
+  `SKIP` entfallener Termin zählt nicht. Ist die Zahl erreicht, wird der Zeitplan deaktiviert.
+  Wiedereinschalten setzt `runCount` nicht zurück — dann folgt genau ein weiterer Start.
+- **`catchUpOnResume`:** holt Termine dieses Zeitplans nach, die in Standby oder einen Neustart fielen,
+  auch wenn die globale Einstellung `scheduler-catch-up-on-resume` aus ist. Die ist standardmäßig an —
+  dann wird ohnehin jeder Zeitplan nachgeholt, nacheinander über die Catch-up-Warteschlange.
 
 **Response:** `201` mit `ScheduledWorkflowResponse`
 
@@ -1230,7 +1244,9 @@ Wartungsmodus-Status abfragen.
 
 ### `POST /api/v1/schedules/maintenance`
 
-Wartungsmodus ein-/ausschalten. Im Wartungsmodus werden keine geplanten Ausführungen gestartet.
+Wartungsmodus ein-/ausschalten. Im Wartungsmodus startet kein Zeitplan; `nextRunAt` bleibt dabei
+stehen. Beim Ausschalten startet jeder Zeitplan, dessen Termin in die Pause fiel, einmal sofort — alle
+gleichzeitig, ohne Catch-up-Warteschlange.
 
 **Request:**
 

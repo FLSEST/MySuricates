@@ -146,6 +146,9 @@ public class SchedulerService {
         if (request.catchUpOnResume() != null) {
             scheduled.setCatchUpOnResume(request.catchUpOnResume());
         }
+        if (request.conflictBehavior() != null && !request.conflictBehavior().isBlank()) {
+            scheduled.setConflictBehavior(definitionParser.parseConflictBehavior(request.conflictBehavior()));
+        }
 
         if (scheduled.getScheduleType() == ScheduleType.CRON && request.cronExpression() != null) {
             if (!CronExpression.isValidExpression(request.cronExpression())) {

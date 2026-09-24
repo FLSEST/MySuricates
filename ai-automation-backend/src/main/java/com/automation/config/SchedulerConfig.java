@@ -21,9 +21,12 @@ public class SchedulerConfig {
     private long resumeGraceMinutes = 5;
 
     /**
-     * Global default for catch-up behaviour after a system resume. When true, all due schedules
-     * are executed once on resume (catch-up) unless individually overridden. When false, per-schedule
-     * {@code catchUpOnResume} controls the behaviour. Configurable at runtime via the Settings UI.
+     * Global switch for occurrences missed during a suspend or while the backend was stopped.
+     * True (default): every missed schedule is caught up once, one after another (CatchUpQueue).
+     * False: only schedules with their own {@code catchUpOnResume} are caught up, all others skip
+     * forward. The per-schedule flag can only add catch-up, never switch it off. An active
+     * {@link #skipUntil} window wins over both. Configurable at runtime via the Settings UI
+     * ({@code scheduler-catch-up-on-resume}).
      */
     private boolean catchUpOnResume = true;
 }
