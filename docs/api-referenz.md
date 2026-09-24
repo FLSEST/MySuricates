@@ -730,6 +730,8 @@ Alle Ausführungen auflisten (paginiert, filterbar).
 | `projectId` | String | Filter nach Projekt |
 | `search` | String | Volltextsuche |
 
+Bei `status` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `status muss PENDING, RUNNING, … oder INTERRUPTED sein, nicht 'FOO'`.
+
 **Response:** `PageResponse<WorkflowRunListItemResponse>` — **ohne Steps.** Statt der Schritte
 trägt eine Listenzeile `stepCount`, `lastStepStatus` und `lastStepPreview` (Ausgabe des letzten
 Schritts, auf 500 Zeichen gekürzt — in der Datenbank abgeschnitten, die Step-Zeilen werden nicht geladen). Grund: Die Liste trug vorher jeden `step_results.output`
@@ -2697,7 +2699,7 @@ Chain ausführen.
 
 Alle Chain-Runs (paginiert).
 
-**Query-Parameter:** `page`, `size`, `status`, `search`
+**Query-Parameter:** `page`, `size`, `status`, `search` — `status` wie bei `GET /api/v1/executions`: Groß- und Kleinschreibung egal, ein unbekannter Wert ergibt `400` mit den erlaubten Werten.
 
 **Response:** `PageResponse<ChainRunResponse>`
 
@@ -3070,6 +3072,8 @@ Memory-Eintrag löschen.
 Activity-Log auflisten (paginiert, filterbar).
 
 **Query-Parameter:** `page` (Standard: 0), `size` (Standard: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
+
+Bei `level` und `category` zählt die Groß- und Kleinschreibung nicht. Ein unbekannter Wert ergibt `400` (`INVALID_ARGUMENT`) mit den erlaubten Werten, etwa `level muss DEBUG, INFO, WARN oder ERROR sein, nicht 'TRACE'`.
 
 **Response:** `PageResponse<ActivityLogResponse>`
 

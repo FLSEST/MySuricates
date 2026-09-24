@@ -725,6 +725,8 @@ List all executions (paginated, filterable).
 | `projectId` | String | Filter by project |
 | `search` | String | Full-text search |
 
+`status` ignores upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
+
 **Response:** `PageResponse<WorkflowRunListItemResponse>` — **without steps.** Instead of the
 steps, a list row carries `stepCount`, `lastStepStatus` and `lastStepPreview` (the last step's
 output, truncated to 500 characters — cut in the database, the step rows are not loaded). Why: the list used to carry every `step_results.output`
@@ -2669,7 +2671,7 @@ Execute a chain.
 
 All chain runs (paginated).
 
-**Query Parameters:** `page`, `size`, `status`, `search`
+**Query Parameters:** `page`, `size`, `status`, `search` — `status` as for `GET /api/v1/executions`: case does not matter, an unknown value returns `400` listing the allowed values.
 
 **Response:** `PageResponse<ChainRunResponse>`
 
@@ -3042,6 +3044,8 @@ Delete a memory entry.
 List activity log (paginated, filterable).
 
 **Query Parameters:** `page` (default: 0), `size` (default: 50), `level` (`DEBUG`, `INFO`, `WARN`, `ERROR`), `category` (`SYSTEM`, `EXECUTION`, `SCHEDULE`, `WEBHOOK`, `SECURITY`, `CONTAINER`, `PLUGIN`), `workflowId`
+
+`level` and `category` ignore upper and lower case. An unknown value returns `400` (`INVALID_ARGUMENT`), and the message lists the allowed values.
 
 **Response:** `PageResponse<ActivityLogResponse>`
 

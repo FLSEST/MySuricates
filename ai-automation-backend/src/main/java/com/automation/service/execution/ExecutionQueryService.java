@@ -8,6 +8,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.util.EnumParameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,10 +28,7 @@ public class ExecutionQueryService {
                                              String workflowId, String projectId, String search) {
         Pageable pageable = PageRequest.of(page, size);
 
-        RunStatus runStatus = null;
-        if (status != null && !status.isBlank()) {
-            runStatus = RunStatus.valueOf(status.toUpperCase());
-        }
+        RunStatus runStatus = EnumParameter.parseOptional(RunStatus.class, "status", status);
 
         String wfId = (workflowId != null && !workflowId.isBlank()) ? workflowId : null;
         String projId = (projectId != null && !projectId.isBlank()) ? projectId : null;
