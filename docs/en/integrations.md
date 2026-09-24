@@ -113,6 +113,7 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 | Gitea / Forgejo | `gitea` | Server URL + access token (no OAuth flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified (local container) |
 | GitLab | `gitlab` | Server URL (default `https://gitlab.com`) + access token (no OAuth flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simulated |
 | CalDAV | `caldav` | URL + user:app-password (Basic auth, no OAuth flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | verified (Radicale 3.8.0, local container) |
+| iCal feed | `ical-feed` | none (public feed URL as parameter) | `providers/icalfeed/` | `list_events` | verified (public Google holiday feed) |
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
@@ -125,13 +126,13 @@ expects label IDs). Discovery via `instanceof`, contract test `TaskExportContrac
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host; otherwise the connection remains "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 
-### CalDAV
+### CalDAV and iCal feed
 
-CalDAV uses a small iCalendar reader/writer in `providers/ical/` (no third-party library): line folding
+Both share a small iCalendar reader/writer in `providers/ical/` (no third-party library): line folding
 (75 octets, UTF-8 safe), text escapes, `DTSTART`/`DTEND` as UTC, with `TZID` or all-day (`VALUE=DATE`),
 `DURATION`, `SUMMARY`/`DESCRIPTION`/`LOCATION`/`UID`; `RRULE` is only passed through. MySuricates does
 **not** expand series itself. Times use the Google shape (`{date}` or `{dateTime, timeZone}`), so workflows
-read Google Calendar and CalDAV the same way.
+read both calendar sources the same way.
 
 - **CalDAV** (`caldav`, RFC 4791): field 1 = CalDAV URL (Nextcloud `https://<server>/remote.php/dav`,
   Radicale `http://<server>:5232/`), field 2 = `user:app-password`; stored as `url|user:password`, checked by
@@ -152,9 +153,15 @@ read Google Calendar and CalDAV the same way.
   and `expand`, ETag conflict, foreign origin). Nextcloud, Posteo and iCloud are **not** checked live; iCloud
   points to a partition server (`pNN-caldav.icloud.com`) that the provider does not follow because of the
   origin rule — enter that address there.
+- **iCal feed** (`ical-feed`): no credentials (`requiresCredentials() == false`), the feed URL is a parameter
+  of `list_events` (`url`, `from`, `to`, `limit`, `timeZone`); `webcal://` is read as https. Download with a
+  10 s connect / 20 s total timeout, at most 5 MB, only responses containing `BEGIN:VCALENDAR`. It returns single
+  events overlapping the window and series masters with `rrule` and `recurring: true` (first occurrence as
+  `start`; an `UNTIL` in the past hides the series, `EXDATE` is ignored) plus a `note`. Errors name the host
+  only, never path or query — private feed links often contain a secret.
 
 The calendar view shows CalDAV through `caldavAdapter` (all calendars, series already expanded by the
-server).
+server). An iCal feed has no adapter because the feed URL is only known inside a workflow.
 
 ### OAuth Endpoints & Scopes per Provider
 
@@ -262,7 +269,7 @@ For `requiresOAuthFlow() == false` the credentials themselves are the authentica
 `saveCredentials` combines them as `clientId|clientSecret`, calls `fetchAccountInfo()` for
 validation, and on success sets the status directly to `CONNECTED`. There is no expiry and no
 refresh — `getValidAccessToken()` returns the stored credential unchanged.
-For a provider with `requiresCredentials() == false` (currently only Taskwarrior),
+For a provider with `requiresCredentials() == false` (Taskwarrior and the iCal feed),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 

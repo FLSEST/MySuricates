@@ -1275,6 +1275,13 @@ export const en = {
           delete_event: 'Delete an event (for a series: the whole series)',
         },
       },
+      'ical-feed': {
+        displayName: 'iCal feed',
+        description: 'Read public calendar subscriptions (.ics): holidays, school terms, club and event calendars',
+        actions: {
+          list_events: 'Fetch the events of a public iCal feed in a time range (series not expanded)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'Sync GitHub issues: list, create, update and comment',

@@ -1277,6 +1277,13 @@ export const de: TranslationKeys = {
           delete_event: 'Einen Termin löschen (bei Serien: die ganze Serie)',
         },
       },
+      'ical-feed': {
+        displayName: 'iCal-Feed',
+        description: 'Öffentliche Kalender-Abos (.ics) lesen: Feiertage, Ferien, Vereins- und Veranstaltungskalender',
+        actions: {
+          list_events: 'Termine eines öffentlichen iCal-Feeds im Zeitraum abrufen (Serien nicht expandiert)',
+        },
+      },
       github: {
         displayName: 'GitHub',
         description: 'GitHub-Issues synchronisieren: auflisten, erstellen, aktualisieren und kommentieren',

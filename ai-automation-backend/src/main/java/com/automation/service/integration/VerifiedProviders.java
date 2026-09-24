@@ -22,7 +22,8 @@ public final class VerifiedProviders {
             Map.entry("taskwarrior", "Taskwarrior-CLI auf dem Host"),
             Map.entry("github", "GitHub REST API, eigener Account"),
             Map.entry("gitea", "Gitea 1.27.3 und Forgejo 14.0.5, lokaler Container"),
-            Map.entry("caldav", "Radicale 3.8.0, lokaler Container")
+            Map.entry("caldav", "Radicale 3.8.0, lokaler Container"),
+            Map.entry("ical-feed", "öffentlicher Feed: Google-Kalender „Feiertage in Deutschland“")
     );
 
     private VerifiedProviders() {

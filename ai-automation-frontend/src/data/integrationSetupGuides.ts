@@ -823,4 +823,49 @@ export const SETUP_GUIDES: Record<string, SetupGuide> = {
     ],
   },
 
+  'ical-feed': {
+    credentialLabels: {
+      clientIdPlaceholder: { de: 'Nicht nötig — leer lassen', en: 'Not needed — leave empty' },
+      clientSecretPlaceholder: { de: 'Nicht nötig — leer lassen', en: 'Not needed — leave empty' },
+    },
+    steps: [
+      {
+        title: {
+          de: 'Feed-Adresse besorgen',
+          en: 'Get the feed address',
+        },
+        instructions: {
+          de: [
+            'Kalender-Abos heißen oft „Abonnieren“, „iCal“, „ICS“ oder beginnen mit webcal://',
+            'Beispiele: Feiertage, Schulferien, Vereins- oder Veranstaltungskalender',
+            'Private Links (z.B. „geheime Adresse“ eines Google-Kalenders) wirken wie ein Passwort — nur in eigenen Workflows verwenden',
+          ],
+          en: [
+            'Calendar subscriptions are often labelled "Subscribe", "iCal", "ICS" or start with webcal://',
+            'Examples: public holidays, school terms, club or event calendars',
+            'Private links (e.g. the "secret address" of a Google calendar) act like a password — use them in your own workflows only',
+          ],
+        },
+      },
+      {
+        title: {
+          de: 'Aktivieren und im Workflow nutzen',
+          en: 'Enable and use in a workflow',
+        },
+        instructions: {
+          de: [
+            'Felder leer lassen und speichern — es gibt keine Zugangsdaten',
+            'Die Feed-URL ist Parameter der Action list_events, ein Abo pro Aufruf',
+            'Serien werden nicht expandiert: sie stehen einmal mit rrule-Feld in der Liste',
+          ],
+          en: [
+            'Leave the fields empty and save — there are no credentials',
+            'The feed URL is a parameter of the list_events action, one feed per call',
+            'Series are not expanded: they appear once, with an rrule field',
+          ],
+        },
+        code: '{ "provider": "ical-feed", "action": "list_events", "params": { "url": "https://example.org/feiertage.ics", "from": "2026-10-01", "to": "2026-12-31" } }',
+      },
+    ],
+  },
 };
