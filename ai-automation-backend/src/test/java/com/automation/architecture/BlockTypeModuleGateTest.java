@@ -57,10 +57,16 @@ class BlockTypeModuleGateTest {
     private static final Pattern MODULE_CHECK =
             Pattern.compile("isEnabled\\(\\s*(?:ModuleCatalog\\.)?([A-Z][A-Z_]+)\\s*\\)");
 
+    /** Preset full with {@code module} off — and whatever requires it, or the registry refuses to start. */
     private static ModuleRegistry withOff(ModuleCatalog module) {
         Map<String, String> modules = new LinkedHashMap<>();
         modules.put("preset", "full");
         modules.put(module.key(), "false");
+        for (ModuleCatalog dependent : ModuleCatalog.values()) {
+            if (dependent.requires().contains(module)) {
+                modules.put(dependent.key(), "false");
+            }
+        }
         return ModuleRegistry.of(modules, Map.of());
     }
 
