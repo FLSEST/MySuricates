@@ -211,7 +211,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 |---|---|
 | `StatusBadge` | Mappt Status-Strings auf Badge-Varianten |
 | `LogViewer` | Log-Anzeige im Terminal-Look: Level-Farben, Icons pro Live-Zeilenart, Step-Badge, Auto-Scroll nur solange man am Ende ist (sonst „Zu den neuesten Zeilen“) |
-| `MonacoEditor` | Editor für JSON und Markdown (Monaco, folgt dem Theme). `value` darf jeden Tastendruck über den State zurückreichen: Echos des eigenen `onChange` schreibt der Wrapper nicht ins Modell (`monacoValueSync.ts`), jeder andere Wert ersetzt den Inhalt. `prose` für Fließtext (Umbruch, keine Wortvorschläge, sonst übernimmt Enter einen Vorschlag); `jsonSchema` und `placeholders` für Block-Configs |
+| `MonacoEditor` | Editor für JSON und Markdown (Monaco, folgt dem Theme). `value` darf jeden Tastendruck über den State zurückreichen: Echos des eigenen `onChange` schreibt der Wrapper nicht ins Modell (`monacoValueSync.ts`), jeder andere Wert ersetzt den Inhalt. `prose` für Fließtext (Umbruch, keine Wortvorschläge, sonst übernimmt Enter einen Vorschlag); `jsonSchema` und `placeholders` für Block-Configs; `path` gibt jedem Dokument ein eigenes Modell (eigene Undo-Historie beim Umschalten, z. B. je Onboarding-Profil und Sprache), `lineNumbers="off"` blendet die Zeilennummern aus. Kein Feld nutzt `@monaco-editor/react` direkt (Wächter in `MonacoEditor.test.tsx`) |
 | `ErrorState` | Fehlermeldung mit Icon |
 | `EmptyState` | Leerer Zustand mit Beschreibung |
 | `Pagination` | Seitennavigation für paginierte Listen |
