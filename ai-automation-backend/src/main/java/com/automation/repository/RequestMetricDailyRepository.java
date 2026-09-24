@@ -21,6 +21,13 @@ public interface RequestMetricDailyRepository extends JpaRepository<RequestMetri
     /** Baseline window for one route — the days before the one being judged. */
     List<RequestMetricDaily> findByRouteAndDayBetweenOrderByDayAsc(String route, LocalDate from, LocalDate to);
 
+    /**
+     * Baseline window for all routes in one query — chronological, so the rows of each route keep
+     * day order after filtering. The drift watchdog used one query per route before and held the
+     * single connection for about 70 s (2026-09-24).
+     */
+    List<RequestMetricDaily> findByDayBetweenOrderByDayAsc(LocalDate from, LocalDate to);
+
     @Modifying
     @Query("DELETE FROM RequestMetricDaily m WHERE m.day < :cutoff")
     int deleteOlderThan(@Param("cutoff") LocalDate cutoff);

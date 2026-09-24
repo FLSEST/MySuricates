@@ -16,8 +16,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Legt das verwaltete TODO eines Audit-Findings an und hält seinen Status an den verknüpften
@@ -87,13 +90,28 @@ class ManagedTodoWriter {
     void reconcile(List<AuditFinding> touched) {
         List<String> ids = touched.stream().map(AuditFinding::getId).distinct().toList();
         if (ids.isEmpty()) return;
-        for (AuditFindingTodo link : findingTodoRepository.findByFindingIdIn(ids)) {
-            if (!link.isManaged()) continue;
-            Todo todo = todoRepository.findById(link.getTodoId()).orElse(null);
+        // Je Stufe eine Abfrage statt drei je Verknüpfung (TODO be14db43): TODOs, ihre Verknüpfungen
+        // und deren Findings werden gebündelt geladen. Ein TODO mit mehreren verwalteten
+        // Verknüpfungen wird einmal abgeglichen.
+        List<String> todoIds = findingTodoRepository.findByFindingIdIn(ids).stream()
+                .filter(AuditFindingTodo::isManaged).map(AuditFindingTodo::getTodoId).distinct().toList();
+        if (todoIds.isEmpty()) return;
+        Map<String, Todo> todos = todoRepository.findAllById(todoIds).stream()
+                .collect(Collectors.toMap(Todo::getId, Function.identity()));
+        if (todos.isEmpty()) return;
+        Map<String, List<AuditFindingTodo>> linksByTodo = findingTodoRepository.findByTodoIdIn(todos.keySet()).stream()
+                .collect(Collectors.groupingBy(AuditFindingTodo::getTodoId));
+        List<String> linkedFindingIds = linksByTodo.values().stream().flatMap(List::stream)
+                .map(AuditFindingTodo::getFindingId).distinct().toList();
+        Map<String, AuditFinding> findings = linkedFindingIds.isEmpty() ? Map.of()
+                : findingRepository.findAllById(linkedFindingIds).stream()
+                        .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
+        for (String todoId : todoIds) {
+            Todo todo = todos.get(todoId);
             if (todo == null) continue;
-            List<AuditFindingTodo> todoLinks = findingTodoRepository.findByTodoId(todo.getId());
+            List<AuditFindingTodo> todoLinks = linksByTodo.getOrDefault(todoId, List.of());
             List<AuditFinding> linked = todoLinks.stream()
-                    .map(l -> findingRepository.findById(l.getFindingId()).orElse(null))
+                    .map(l -> findings.get(l.getFindingId()))
                     .filter(Objects::nonNull).toList();
             boolean allTerminal = !linked.isEmpty() && linked.stream().allMatch(f -> f.getStatus().isTerminal());
             boolean belowThreshold = !allTerminal && linked.stream()

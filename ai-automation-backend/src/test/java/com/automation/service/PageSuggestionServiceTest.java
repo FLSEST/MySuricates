@@ -139,7 +139,7 @@ class PageSuggestionServiceTest {
         void aiReturnsValidJson_persistsSuggestions() {
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
@@ -153,11 +153,29 @@ class PageSuggestionServiceTest {
             verify(suggestionRepository).save(any());
         }
 
+        /** bdd11037: the query itself is limited to five — not every active memory loaded and cut in memory. */
+        @Test
+        void memoriesComeFromTheTopFiveQuery_notFromAllActiveMemories() {
+            when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
+                    .thenReturn(List.of());
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
+                    .thenReturn(List.of());
+            when(commandExecutorService.executeOnHost(any()))
+                    .thenReturn(new CliSession.EnrichedCommandResult("[\"A\"]", 0, null));
+            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.refreshSuggestions("run");
+
+            verify(workflowMemoryRepository).findTop5ByActiveTrueOrderByCreatedAtDesc();
+            verify(workflowMemoryRepository, never()).findByActiveTrueOrderByCreatedAtDesc();
+        }
+
         @Test
         void aiReturnsMoreThanMax_limitsTo4() {
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
@@ -174,7 +192,7 @@ class PageSuggestionServiceTest {
         void aiReturnsInvalidJson_fallsBackToDefaults() {
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
@@ -192,7 +210,7 @@ class PageSuggestionServiceTest {
         void aiThrowsException_fallsBackToDefaults() {
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenThrow(new RuntimeException("AI unavailable"));
@@ -221,7 +239,7 @@ class PageSuggestionServiceTest {
                 txDuringRead.set(FakeTransactions.active());
                 return List.of();
             });
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any())).thenAnswer(inv -> {
                 txDuringModelCall.set(FakeTransactions.active());
                 return new CliSession.EnrichedCommandResult("[\"Frage A\"]", 0, null);
@@ -254,7 +272,7 @@ class PageSuggestionServiceTest {
                     .build();
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
@@ -272,7 +290,7 @@ class PageSuggestionServiceTest {
         void newPage_createsEntity() {
             when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("chains"))
                     .thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc())
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc())
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(

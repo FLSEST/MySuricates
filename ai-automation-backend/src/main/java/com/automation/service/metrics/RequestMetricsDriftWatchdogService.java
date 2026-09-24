@@ -95,9 +95,13 @@ public class RequestMetricsDriftWatchdogService {
     private List<RequestMetricDaily> loadBaseline(List<RouteSnapshot> today, LocalDate now) {
         LocalDate from = now.minusDays(config.getBaselineDays());
         LocalDate until = now.minusDays(1); // yesterday backwards: today is what we are judging
+        // One query for the whole window instead of one per route: with pool-size 1 a loop over
+        // every live route held the only connection for over a minute.
+        Set<String> routes = new HashSet<>();
+        for (RouteSnapshot snapshot : today) routes.add(snapshot.route());
         List<RequestMetricDaily> history = new ArrayList<>();
-        for (RouteSnapshot snapshot : today) {
-            history.addAll(repository.findByRouteAndDayBetweenOrderByDayAsc(snapshot.route(), from, until));
+        for (RequestMetricDaily row : repository.findByDayBetweenOrderByDayAsc(from, until)) {
+            if (routes.contains(row.getRoute())) history.add(row);
         }
         return history;
     }

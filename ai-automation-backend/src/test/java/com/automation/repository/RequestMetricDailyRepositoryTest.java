@@ -69,6 +69,21 @@ class RequestMetricDailyRepositoryTest {
         assertThat(window).extracting(RequestMetricDaily::getP95Ms).containsExactly(2L, 3L);
     }
 
+    /** The drift watchdog's single baseline query: every route, inclusive window, day order. */
+    @Test
+    void windowOverAllRoutesIsInclusiveAndChronological() {
+        LocalDate far = LocalDate.of(1999, 6, 15); // own window, away from the other tests' rows
+        save(far.minusDays(8), TODOS, 1);
+        save(far.minusDays(1), TODOS, 4);
+        save(far.minusDays(7), RUNS, 2);
+        save(far.minusDays(3), TODOS, 3);
+        save(far, RUNS, 5);
+
+        List<RequestMetricDaily> window = repository.findByDayBetweenOrderByDayAsc(far.minusDays(7), far.minusDays(1));
+
+        assertThat(window).extracting(RequestMetricDaily::getP95Ms).containsExactly(2L, 3L, 4L);
+    }
+
     /** The day is stored as text: ordering must follow the calendar across a month boundary. */
     @Test
     void rangeQueryFollowsTheCalendarAcrossMonths() {

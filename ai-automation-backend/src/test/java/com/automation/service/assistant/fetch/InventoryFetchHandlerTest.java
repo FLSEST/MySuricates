@@ -28,7 +28,11 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -148,10 +152,30 @@ class InventoryFetchHandlerTest {
         WorkflowChain chain = WorkflowChain.builder().id("c1").name("Pipe").stopOnFailure(false)
                 .entries(new ArrayList<>(List.of(entry))).build();
         when(workflowChainRepository.findById("c1")).thenReturn(Optional.of(chain));
-        when(workflowRepository.findById("wf-a")).thenReturn(Optional.empty());
+        when(workflowRepository.findIdAndNameByIdIn(List.of("wf-a"))).thenReturn(List.of());
 
         assertThat(handler.formatChainDetail("c1")).isEqualTo(
                 "**Chain: Pipe** (id: c1)\nStop on failure: no\n\nWorkflows in Chain (1):\n"
                         + "  1. wf-a (id: wf-a)\n    inputs: [branch]\n");
+    }
+
+    /** ad130b6f: the names of all entries come from one query — a workflow used twice is asked for once. */
+    @Test
+    void chain_resolvesAllEntryNamesInOneQuery() {
+        WorkflowChain chain = WorkflowChain.builder().id("c1").name("Pipe").stopOnFailure(true)
+                .entries(new ArrayList<>(List.of(
+                        ChainEntry.builder().workflowId("wf-a").build(),
+                        ChainEntry.builder().workflowId("wf-b").build(),
+                        ChainEntry.builder().workflowId("wf-a").build()))).build();
+        when(workflowChainRepository.findById("c1")).thenReturn(Optional.of(chain));
+        List<Object[]> rows = new ArrayList<>();
+        rows.add(new Object[]{"wf-a", "Build"});
+        rows.add(new Object[]{"wf-b", "Deploy"});
+        when(workflowRepository.findIdAndNameByIdIn(List.of("wf-a", "wf-b"))).thenReturn(rows);
+
+        assertThat(handler.formatChainDetail("c1"))
+                .contains("  1. Build (id: wf-a)\n  2. Deploy (id: wf-b)\n  3. Build (id: wf-a)\n");
+        verify(workflowRepository, times(1)).findIdAndNameByIdIn(any());
+        verify(workflowRepository, never()).findById(any());
     }
 }

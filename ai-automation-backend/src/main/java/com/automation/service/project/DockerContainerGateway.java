@@ -5,6 +5,7 @@ import com.automation.entity.ProjectType;
 import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -91,12 +92,24 @@ public class DockerContainerGateway {
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(10).exec();
         } catch (Exception e) {
-            log.warn("Failed to stop container {}: {}", containerId, e.getMessage());
+            logFailure("stop", containerId, e);
         }
         try {
             dockerClient.removeContainerCmd(containerId).withForce(true).exec();
         } catch (Exception e) {
-            log.warn("Failed to remove container {}: {}", containerId, e.getMessage());
+            logFailure("remove", containerId, e);
+        }
+    }
+
+    /**
+     * A container that is already gone (Docker 404, "No such container") is what stop/remove wanted
+     * anyway — that is DEBUG, not a warning (TODO c1eda062). Every other failure stays WARN.
+     */
+    private static void logFailure(String action, String containerId, Exception e) {
+        if (e instanceof NotFoundException) {
+            log.debug("Container {} already gone on {}: {}", containerId, action, e.getMessage());
+        } else {
+            log.warn("Failed to {} container {}: {}", action, containerId, e.getMessage());
         }
     }
 

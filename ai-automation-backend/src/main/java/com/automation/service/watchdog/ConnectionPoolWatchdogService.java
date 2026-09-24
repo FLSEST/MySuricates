@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -27,11 +28,18 @@ import java.util.Map;
 public class ConnectionPoolWatchdogService {
 
     private static final Duration EXHAUSTION_THRESHOLD = Duration.ofSeconds(60);
+    /**
+     * Waiting threads in one sample are normal traffic on a single connection: 129 of 130 such
+     * warnings were gone at the next sample (TODO c1eda062). Only a wait that is still there one
+     * tick later is worth the WARN line and the thread dump.
+     */
+    private static final int SAMPLES_BEFORE_WARN = 2;
     private static final String SOURCE = "ConnectionPoolWatchdog";
 
     private final ActivityLogService activityLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final HikariDataSource hikariDataSource;
+    private final Clock clock;
     private final ThreadDumpCollector threadDumpCollector = new ThreadDumpCollector();
 
     @Value("${automation.watchdog.dump-stacks-on-exhaustion:true}")
@@ -39,15 +47,19 @@ public class ConnectionPoolWatchdogService {
 
     private volatile Instant exhaustionDetectedAt;
     private volatile boolean alerted;
+    private volatile int exhaustedSamples;
+    private volatile boolean warned;
     private volatile String pendingLogMessage;
     private volatile Map<String, Object> pendingLogMetadata;
 
     public ConnectionPoolWatchdogService(DataSource dataSource,
                                           ActivityLogService activityLogService,
-                                          SimpMessagingTemplate messagingTemplate) {
+                                          SimpMessagingTemplate messagingTemplate,
+                                          Clock clock) {
         this.activityLogService = activityLogService;
         this.messagingTemplate = messagingTemplate;
         this.hikariDataSource = unwrapHikariDataSource(dataSource);
+        this.clock = clock;
     }
 
     @Scheduled(fixedRate = 15_000, initialDelay = 30_000)
@@ -66,23 +78,31 @@ public class ConnectionPoolWatchdogService {
 
         if (active >= 1 && waiting > 0) {
             if (exhaustionDetectedAt == null) {
-                exhaustionDetectedAt = Instant.now();
-                log.warn("Pool exhaustion detected: active={}, waiting={}, idle={}, total={}",
-                        active, waiting, idle, total);
+                exhaustionDetectedAt = clock.instant();
+            }
+            exhaustedSamples++;
+            if (!warned && exhaustedSamples >= SAMPLES_BEFORE_WARN) {
+                warned = true;
+                log.warn("Pool exhaustion detected: active={}, waiting={}, idle={}, total={} ({} consecutive samples)",
+                        active, waiting, idle, total, exhaustedSamples);
                 if (dumpStacksOnExhaustion) {
                     dumpRelevantThreadStacks();
                 }
             }
 
-            Duration elapsed = Duration.between(exhaustionDetectedAt, Instant.now());
+            Duration elapsed = Duration.between(exhaustionDetectedAt, clock.instant());
             if (elapsed.compareTo(EXHAUSTION_THRESHOLD) > 0 && !alerted) {
                 handleExhaustion(active, waiting, idle, total, elapsed);
                 alerted = true;
             }
         } else {
             if (exhaustionDetectedAt != null) {
-                Duration elapsed = Duration.between(exhaustionDetectedAt, Instant.now());
-                log.info("Pool exhaustion resolved after {}s", elapsed.toSeconds());
+                Duration elapsed = Duration.between(exhaustionDetectedAt, clock.instant());
+                if (warned) {
+                    log.info("Pool exhaustion resolved after {}s", elapsed.toSeconds());
+                } else {
+                    log.debug("Waiting threads for one sample only, resolved after {}s", elapsed.toSeconds());
+                }
 
                 if (alerted) {
                     tryLog("Pool exhaustion resolved after " + elapsed.toSeconds() + "s",
@@ -91,6 +111,8 @@ public class ConnectionPoolWatchdogService {
 
                 exhaustionDetectedAt = null;
                 alerted = false;
+                exhaustedSamples = 0;
+                warned = false;
             }
         }
     }
@@ -147,7 +169,7 @@ public class ConnectionPoolWatchdogService {
     private void broadcastAlert(String message) {
         try {
             messagingTemplate.convertAndSend("/topic/activity-log", Map.of(
-                    "timestamp", Instant.now().toString(),
+                    "timestamp", clock.instant().toString(),
                     "level", "ERROR",
                     "category", "SYSTEM",
                     "message", message,

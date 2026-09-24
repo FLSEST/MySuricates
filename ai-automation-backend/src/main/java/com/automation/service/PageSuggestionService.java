@@ -193,8 +193,7 @@ public class PageSuggestionService {
             sb.append("\n");
         }
 
-        List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()
-                .stream().limit(5).toList();
+        List<WorkflowMemory> memories = workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc();
         if (!memories.isEmpty()) {
             sb.append("Bekannte Erkenntnisse aus vergangenen Workflow-Runs:\n");
             memories.forEach(m -> {

@@ -506,6 +506,8 @@ M:N relationship between workflows and skills.
 | `metadata` | TEXT | | JSON: gate status, additional info (`gate_status`, `gate_category`, `gate_description`) |
 | `triggered_by_schedule_id` | TEXT | | ID of the triggering schedule (V43) |
 
+**Indexes:** `idx_workflow_runs_status`, `idx_workflow_runs_started_at`, `idx_workflow_runs_workflow_id` (V10), `idx_workflow_runs_schedule_started` (V87)
+
 ### `step_results`
 
 | Column | Type | Constraints | Description |
@@ -671,7 +673,7 @@ A chain does not belong to any project and can reference workflows from differen
 }
 ```
 
-**Indexes:** `idx_chain_runs_chain_id`, `idx_chain_runs_status`
+**Indexes:** `idx_chain_runs_chain_id`, `idx_chain_runs_status`, `idx_chain_runs_schedule` (V87)
 
 ### `todos`
 
@@ -710,7 +712,7 @@ A chain does not belong to any project and can reference workflows from differen
 | `created_at` | TEXT | NOT NULL | |
 | `updated_at` | TEXT | NOT NULL | |
 
-**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_goal` (V85)
+**Indexes:** `idx_todos_status`, `idx_todos_project`, `idx_todos_source`, `idx_todos_created`, `idx_todos_status_priority_created` (V54), `idx_todos_project_status` (V54), `idx_todos_linked_workflow_id` (V59), `idx_todos_agent_session_ref` (V76), `idx_todos_goal` (V85), `idx_todos_last_fix_run_id` (V87), `idx_todos_workflow_run_id` (V87)
 
 TODOs are automatically created by `AutoTodoService` on RED/YELLOW gate status (RED -> HIGH, YELLOW -> MEDIUM). When a `TodoTrigger` is configured, fix workflows are automatically started (self-improvement loop).
 
@@ -1302,6 +1304,7 @@ The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WO
 | V84 | `V84__seal_signature_and_history.sql` | `sealed_signature` in workflows (HMAC with a key outside the database), new table `workflow_seal_events` (chained history of sealing and unsealing, no foreign key) |
 | V85 | `V85__goals_and_todo_planning.sql` | new table `goals`; `goal_id`, `goal_rank`, `complexity`, `suggested_effort`, `rating_note`, `rated_by`, `rated_at`, `open_question` in todos |
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (table rebuild: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, existing rows become `default`) |
+| V87 | `V87__index_schedule_and_todo_run_lookups.sql` | indexes for runs per schedule (workflow_runs, chain_runs) and TODOs per run (`last_fix_run_id`, `workflow_run_id`) |
 
 ## SQLite Specifics
 
