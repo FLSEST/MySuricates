@@ -34,11 +34,11 @@ class PackageCycleRatchetTest {
      * no longer calls the caches of ai and workflow on a settings change (AppSettingChangedEvent) — 9.
      * AssistantFormatUtils moved to its own leaf package service.assistant.format — 7.
      * The run-output parsers left service.todo for the leaf package service.runoutput — 6.
+     * PendingTool moved to com.automation.dto, next to the chat response that carries it — 5.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
             "com.automation.config <-> com.automation.security",
             "com.automation.config <-> com.automation.service.project",
-            "com.automation.dto <-> com.automation.service.assistant",
             "com.automation.executor <-> com.automation.service.cli",
             "com.automation.service.ai <-> com.automation.service.cli",
             "com.automation.service.project <-> com.automation.service.workflow");

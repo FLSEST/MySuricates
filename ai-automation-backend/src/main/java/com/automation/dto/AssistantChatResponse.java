@@ -1,6 +1,5 @@
 package com.automation.dto;
 
-import com.automation.service.assistant.PendingTool;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;

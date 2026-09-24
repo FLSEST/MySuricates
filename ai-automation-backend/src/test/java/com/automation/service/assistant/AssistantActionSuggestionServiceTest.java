@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
+import com.automation.dto.PendingTool;
 import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;

@@ -2,6 +2,7 @@ package com.automation.service.assistant;
 
 import com.automation.dto.AssistantChatRequest;
 import com.automation.dto.AssistantChatResponse.AssistantAction;
+import com.automation.dto.PendingTool;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.AppSettingsRepository;
@@ -57,13 +58,8 @@ public class AssistantActionSuggestionService {
             "propose_rerun_workflow",
             "propose_update_todo_status");
 
-    private static final Set<String> KNOWN_TYPES;
-    static {
-        var all = new java.util.HashSet<String>();
-        all.addAll(NAV_TYPES);
-        all.addAll(PROPOSE_TYPES);
-        KNOWN_TYPES = Set.copyOf(all);
-    }
+    private static final Set<String> KNOWN_TYPES =
+            Set.copyOf(java.util.stream.Stream.concat(NAV_TYPES.stream(), PROPOSE_TYPES.stream()).toList());
 
     /** Types that require a non-blank id: navigational entity-buttons + propose_* with target. */
     private static final Set<String> TYPES_REQUIRING_ID = Set.of(

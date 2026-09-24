@@ -168,7 +168,7 @@ class AssistantControllerTest {
 
     @Test
     void confirmPendingTool_consumesRegistryAndExecutes() throws Exception {
-        var tool = new com.automation.service.assistant.PendingTool(
+        var tool = new com.automation.dto.PendingTool(
                 "tool-1", "create_todo", "TODO anlegen: X", "{\"title\":\"X\"}",
                 java.time.Instant.now().plusSeconds(60));
         when(pendingToolRegistry.take("tool-1")).thenReturn(java.util.Optional.of(tool));
@@ -204,7 +204,7 @@ class AssistantControllerTest {
 
     @Test
     void rejectPendingTool_consumesWithoutExecuting() throws Exception {
-        var tool = new com.automation.service.assistant.PendingTool(
+        var tool = new com.automation.dto.PendingTool(
                 "tool-2", "delete_workflow", "Workflow löschen", "{\"workflowId\":\"wf-9\"}",
                 java.time.Instant.now().plusSeconds(60));
         when(pendingToolRegistry.take("tool-2")).thenReturn(java.util.Optional.of(tool));

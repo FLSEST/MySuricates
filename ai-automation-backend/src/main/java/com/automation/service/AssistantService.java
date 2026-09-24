@@ -214,7 +214,7 @@ public class AssistantService {
 
             List<AssistantAction> mergedActions = AssistantActionMerger.mergeActions(parsed.actions(), suggestion.actions());
             List<AssistantAction> filteredActions = AssistantMutationGate.filterActions(mergedActions, allowMutatingProposals);
-            List<com.automation.service.assistant.PendingTool> mergedPendingTools =
+            List<com.automation.dto.PendingTool> mergedPendingTools =
                     AssistantActionMerger.mergePendingTools(extraction.pendingTools(), suggestion.pendingTools());
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)

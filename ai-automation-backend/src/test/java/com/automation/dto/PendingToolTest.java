@@ -1,4 +1,4 @@
-package com.automation.service.assistant;
+package com.automation.dto;
 
 import org.junit.jupiter.api.Test;
 

@@ -1,7 +1,7 @@
 package com.automation.service.assistant;
 
 /**
- * Outcome of executing (or rejecting) a previously proposed {@link PendingTool}.
+ * Outcome of executing (or rejecting) a previously proposed {@link com.automation.dto.PendingTool}.
  * Emitted via {@link AssistantController} to the WebSocket broadcaster so the frontend can
  * replace the pending-tool card with the result line.
  */

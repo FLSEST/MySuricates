@@ -6,7 +6,7 @@ import com.automation.dto.response.AssistantSessionDetail;
 import com.automation.dto.response.AssistantSessionSummary;
 import com.automation.entity.AssistantSession;
 import com.automation.repository.AssistantSessionRepository;
-import com.automation.service.assistant.PendingTool;
+import com.automation.dto.PendingTool;
 import com.automation.service.assistant.ToolExecutionResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
