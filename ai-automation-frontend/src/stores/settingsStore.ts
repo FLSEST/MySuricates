@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { withDefaultDividers } from '../utils/sidebarLayout';
+import { isDividerId, withDefaultDividers } from '../utils/sidebarLayout';
 import { HINTS } from '../data/hints';
 
 /** Bounds for the todo page sizes — small enough to stay responsive, large enough to be useful. */
@@ -80,6 +80,23 @@ interface SettingsState {
 /** Persisted shape before v2 — `simpleOnboardingSeen` is gone since. */
 type PersistedSettings = Partial<SettingsState> & { simpleOnboardingSeen?: boolean };
 
+/**
+ * A custom order saved while the goals sat behind the cockpit (or were appended at the end, because
+ * the order did not know them yet) gets them right after the todos. A place chosen on purpose stays.
+ */
+function moveGoalsUnderTodos(order: string[]): string[] {
+  const todos = order.indexOf('/todos');
+  if (todos < 0) return order;
+  const goals = order.indexOf('/goals');
+  let lastRoute = order.length - 1;
+  while (lastRoute >= 0 && isDividerId(order[lastRoute]!)) lastRoute -= 1;
+  const misplaced = goals < 0 || goals === lastRoute || order[goals - 1] === '/cockpit';
+  if (!misplaced || goals === todos + 1) return order;
+  const without = order.filter((entry) => entry !== '/goals');
+  without.splice(without.indexOf('/todos') + 1, 0, '/goals');
+  return without;
+}
+
 /** Upgrades a persisted state from an older `version`. */
 function migrateSettings(persisted: unknown, version: number): SettingsState {
   const state = { ...(persisted as PersistedSettings) };
@@ -94,6 +111,10 @@ function migrateSettings(persisted: unknown, version: number): SettingsState {
       state.dismissedHints = { ...state.dismissedHints, 'simple-home': HINTS['simple-home'].version };
     }
     delete state.simpleOnboardingSeen;
+  }
+  // v3 put the goals directly under the todos (TODO 49080447).
+  if (version < 3 && state.sidebarItemOrder?.length) {
+    state.sidebarItemOrder = moveGoalsUnderTodos(state.sidebarItemOrder);
   }
   return state as SettingsState;
 }
@@ -163,7 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'app-settings',
-      version: 2,
+      version: 3,
       migrate: migrateSettings,
     }
   )

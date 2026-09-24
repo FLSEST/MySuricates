@@ -113,4 +113,33 @@ describe('GoalRelationMap', () => {
     renderMap();
     expect(screen.queryByTestId('goal-map-no-workers')).not.toBeInTheDocument();
   });
+  it('shows an empty state instead of an empty map when the goal has no todos and no candidates', () => {
+    const target = document.createElement('h2');
+    target.id = 'goal-candidates';
+    const scrollIntoView = vi.fn();
+    target.scrollIntoView = scrollIntoView;
+    document.body.appendChild(target);
+    try {
+      renderMap({ todos: [] });
+
+      expect(screen.queryByTestId('goal-relation-map')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('goal-map-no-workers')).not.toBeInTheDocument();
+      const empty = screen.getByRole('button', { name: 'No TODOs yet – add some below under “Might belong here”' });
+      fireEvent.click(empty);
+      expect(scrollIntoView).toHaveBeenCalled();
+    } finally {
+      target.remove();
+    }
+  });
+
+  it('draws only the dashed candidate group for a goal without todos, and says none is assigned', () => {
+    renderMap({ todos: [relation('c1', { title: 'Release notes', candidate: true }), relation('c2', { candidate: true })] });
+
+    const map = screen.getByTestId('goal-relation-map');
+    expect(within(map).getByText('Might belong here')).toBeInTheDocument();
+    expect(within(map).queryByText('AutoPilot')).not.toBeInTheDocument();
+    expect(node('todo:c1').querySelector('rect')).toHaveAttribute('stroke-dasharray', '5 4');
+    expect(screen.getByText('No TODO belongs to this goal yet – suggestions are below.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /No TODOs yet/ })).not.toBeInTheDocument();
+  });
 });

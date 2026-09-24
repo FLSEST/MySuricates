@@ -5,7 +5,7 @@ import { Button, Card, Select, Spinner } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { TodoProgressBar } from '../components/todo/TodoProgressBar';
 import { GoalTodoList } from '../components/goal/GoalTodoList';
-import { GoalRelationMap } from '../components/goal/GoalRelationMap';
+import { GoalMapOutdatedBackend, GoalRelationMap } from '../components/goal/GoalRelationMap';
 import { GoalCandidates, type CandidateFilter } from '../components/goal/GoalCandidates';
 import { GoalTodoEditor } from '../components/goal/GoalTodoEditor';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../hooks/useGoals';
 import { useI18nStore, useT } from '../i18n';
 import { formatDate } from '../utils/localeFormat';
+import { apiErrorStatus } from '../api/client';
 import type { GoalStatus, GoalTodoItem } from '../types';
 
 const GOAL_STATUSES: GoalStatus[] = ['ACTIVE', 'DONE', 'ARCHIVED'];
@@ -174,13 +175,12 @@ export function GoalDetail() {
         <GoalTodoList goalId={goal.id} todos={todos} />
       ) : relations.isLoading || !relations.data ? (
         relations.error
-          ? <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
+          ? apiErrorStatus(relations.error) === 404
+            ? <GoalMapOutdatedBackend onShowList={() => chooseView('list')} />
+            : <ErrorState message={relations.error.message} onRetry={() => relations.refetch()} />
           : <div className="flex justify-center py-8"><Spinner text={t.common.loading} /></div>
       ) : (
-        <>
-          {todos.length === 0 && <Card><p className="text-sm text-text-secondary">{t.goals.map.empty}</p></Card>}
-          <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} />
-        </>
+        <GoalRelationMap relations={relations.data} onOpenTodo={setEditing} onAssign={assignTodo} />
       )}
 
       <GoalCandidates

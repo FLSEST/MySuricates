@@ -354,6 +354,15 @@ export function openPath(path: string): Promise<{ status: string }> {
   return api.post('/system/open-path', { path });
 }
 
+/** HTTP status of an error thrown by the API client (`undefined` for network or other errors). */
+export function apiErrorStatus(err: unknown): number | undefined {
+  if (err && typeof err === 'object' && 'status' in err) {
+    const status = (err as { status: unknown }).status;
+    if (typeof status === 'number') return status;
+  }
+  return undefined;
+}
+
 /** Extract the error message from an API error response, with i18n fallback */
 export function apiErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'error' in err) {

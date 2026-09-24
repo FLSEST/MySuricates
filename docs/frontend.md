@@ -30,7 +30,7 @@
 | `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API-Lookup) |
 | `/calendar` | CalendarPage | Aggregierter Kalender (Schedules, Runs, Integrationen) |
 | `/cockpit` | ProjectCockpit | Projekt-Cockpit mit Todo-Übersicht |
-| `/goals` | Goals | Ziele nach Status (Aktiv · Erledigt · Archiviert), Anlegen |
+| `/goals` | Goals | Ziele nach Status (Aktiv · Erledigt · Archiviert), Anlegen; im Menü eingerückt als Untereintrag direkt unter „Todos“ |
 | `/goals/:goalId` | GoalDetail | Ein Ziel: Liste oder Relationskarte (Herkunft → TODOs → Bearbeitung → Ergebnis), Kandidaten zuordnen |
 | `/onboarding-profiles` | OnboardingProfiles | Onboarding-Profile verwalten |
 | `/settings` | Settings | Sprache, Theme, API-Key, Tailscale, Staging, Testing |

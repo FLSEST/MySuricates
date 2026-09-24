@@ -27,7 +27,7 @@ import { useSystemInfo } from '../../hooks/useSystem';
 import { useSystemModules } from '../../hooks/useModules';
 import { useT } from '../../i18n';
 import {
-  collapseDividers, effectiveOrder, newDividerId, resolveEntries, withDefaultDividers,
+  collapseDividers, effectiveOrder, newDividerId, resolveEntries, withDefaultDividers, type SidebarEntry,
 } from '../../utils/sidebarLayout';
 import { SIMPLE_MODE_ROUTES } from '../../utils/simpleRoutes';
 import { NAV_TILES } from '../../utils/homeTiles';
@@ -115,18 +115,20 @@ interface NavItemDef {
   labelKey: keyof TranslationKeys['nav'];
   /** Optional module the page belongs to; hidden when the backend reports it disabled. */
   module?: FeatureModuleName;
+  /** Sub-entry of this route: indented while it sits directly below it (TODO 49080447). */
+  parent?: string;
 }
 
 const navItems: NavItemDef[] = [
   { to: '/', icon: LayoutDashboard, labelKey: 'dashboard' },
   { to: '/projects', icon: FolderKanban, labelKey: 'projects' },
   { to: '/todos', icon: CheckSquare, labelKey: 'todos' },
+  { to: '/goals', icon: Target, labelKey: 'goals', parent: '/todos' },
   { to: '/workflows', icon: GitBranch, labelKey: 'workflows' },
   { to: '/runs', icon: History, labelKey: 'runs' },
   { to: '/debug', icon: Bug, labelKey: 'debug', module: 'debug' },
   { to: '/chains', icon: Link2, labelKey: 'chains', module: 'chains' },
   { to: '/cockpit', icon: LayoutGrid, labelKey: 'cockpit' },
-  { to: '/goals', icon: Target, labelKey: 'goals' },
   { to: '/calendar', icon: CalendarDays, labelKey: 'calendar' },
   { to: '/schedules', icon: Calendar, labelKey: 'schedules' },
   { to: '/webhooks', icon: Webhook, labelKey: 'webhooks', module: 'webhooks' },
@@ -141,6 +143,16 @@ const navItems: NavItemDef[] = [
   { to: '/docs', icon: BookOpen, labelKey: 'docs' },
   { to: '/reports', icon: ClipboardList, labelKey: 'reports', module: 'audit' },
 ];
+
+/**
+ * Whether the entry at `index` is shown as a sub-entry: it has a parent and follows it directly in
+ * the list as rendered. Moved elsewhere (or with the parent hidden) it is an ordinary entry.
+ */
+function isNestedAt(entries: readonly SidebarEntry<NavItemDef>[], index: number): boolean {
+  const entry = entries[index];
+  const previous = entries[index - 1];
+  return entry?.kind === 'item' && !!entry.item.parent && previous?.kind === 'item' && previous.item.to === entry.item.parent;
+}
 
 /** Default order incl. the default dividers — over all pages, so anchors of disabled modules still count. */
 const DEFAULT_ORDER = withDefaultDividers(navItems.map((i) => i.to));
@@ -322,7 +334,7 @@ export function Sidebar() {
         {editMode && !collapsed ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={editModeEntries.map(entryId)} strategy={verticalListSortingStrategy}>
-              {editModeEntries.map((entry) =>
+              {editModeEntries.map((entry, index) =>
                 entry.kind === 'divider' ? (
                   <SortableDivider
                     key={entry.id}
@@ -336,6 +348,7 @@ export function Sidebar() {
                     key={entry.item.to}
                     id={entry.item.to}
                     item={entry.item}
+                    nested={isNestedAt(editModeEntries, index)}
                     onHide={handleHide}
                   />
                 ),
@@ -350,18 +363,21 @@ export function Sidebar() {
             </button>
           </DndContext>
         ) : (
-          visibleEntries.map((entry) => {
+          visibleEntries.map((entry, index) => {
             if (entry.kind === 'divider') {
               return <SidebarDivider key={entry.id} label={sidebarDividerLabels[entry.id]} showLabels={showLabels} />;
             }
             const item = entry.item;
+            // Icons only (collapsed): a sub-entry looks like any other entry.
+            const nested = showLabels && isNestedAt(visibleEntries, index);
+            const iconSize = nested ? 16 : 18;
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                  `flex items-center gap-3 ${nested ? 'pl-8 pr-3 py-1.5' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors
                    ${isActive
                      ? 'text-[var(--color-sidebar-text)]'
                      : 'text-[var(--color-sidebar-text-muted)] hover:bg-[var(--color-sidebar-hover)] hover:text-[var(--color-sidebar-text)]'
@@ -372,7 +388,7 @@ export function Sidebar() {
                 })}
                 onClick={() => { if (isMobile) setMobileOpen(false); }}
               >
-                <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: 18, height: 18 }} />
+                <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: iconSize, height: iconSize }} />
                 {showLabels && <span className="truncate">{item.label}</span>}
               </NavLink>
             );

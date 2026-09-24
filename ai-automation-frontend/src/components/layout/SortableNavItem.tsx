@@ -13,10 +13,12 @@ interface NavItemDef {
 interface SortableNavItemProps {
   id: string;
   item: NavItemDef;
+  /** Sub-entry directly below its parent: indented like in the sidebar itself. */
+  nested?: boolean;
   onHide: (to: string) => void;
 }
 
-export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
+export function SortableNavItem({ id, item, nested = false, onHide }: SortableNavItemProps) {
   const t = useT();
   const {
     attributes,
@@ -37,7 +39,8 @@ export function SortableNavItem({ id, item, onHide }: SortableNavItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center gap-1 rounded-lg px-1 py-1 ${isDragging ? 'bg-[var(--color-sidebar-hover)]' : ''}`}
+      data-nested={nested || undefined}
+      className={`group flex items-center gap-1 rounded-lg py-1 ${nested ? 'pl-5 pr-1' : 'px-1'} ${isDragging ? 'bg-[var(--color-sidebar-hover)]' : ''}`}
     >
       <button
         {...attributes}

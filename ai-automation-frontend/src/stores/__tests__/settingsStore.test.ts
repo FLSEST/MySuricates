@@ -135,7 +135,46 @@ describe('settingsStore v2 migration (Simple-mode welcome card → hint)', () =>
     expect(useSettingsStore.getState().dismissedHints).toEqual({ 'simple-home': HINTS['simple-home'].version });
     expect(useSettingsStore.getState()).not.toHaveProperty('simpleOnboardingSeen');
     const stored = await storage.getItem('app-settings');
-    expect(stored?.version).toBe(2);
+    expect(stored?.version).toBe(3);
     expect(stored?.state).not.toHaveProperty('simpleOnboardingSeen');
+  });
+});
+
+describe('settingsStore v3 migration (goals directly under todos)', () => {
+  const migrate = (order: string[], extra: Record<string, unknown> = {}) =>
+    useSettingsStore.persist.getOptions().migrate!({ sidebarItemOrder: order, ...extra }, 2) as {
+      sidebarItemOrder: string[]; sidebarHiddenItems?: string[];
+    };
+
+  it('moves /goals from behind /cockpit to right after /todos', () => {
+    const migrated = migrate(['/', '/todos', '/workflows', 'divider:default-triggers', '/cockpit', '/goals', '/calendar']);
+    expect(migrated.sidebarItemOrder).toEqual(['/', '/todos', '/goals', '/workflows', 'divider:default-triggers', '/cockpit', '/calendar']);
+  });
+
+  it('moves /goals from the end of the list (also behind trailing dividers) to right after /todos', () => {
+    expect(migrate(['/', '/todos', '/workflows', '/reports', '/goals']).sidebarItemOrder)
+      .toEqual(['/', '/todos', '/goals', '/workflows', '/reports']);
+    expect(migrate(['/', '/todos', '/reports', '/goals', 'divider:x']).sidebarItemOrder)
+      .toEqual(['/', '/todos', '/goals', '/reports', 'divider:x']);
+  });
+
+  it('puts /goals after /todos when a saved order does not know it yet (it would be appended at the end)', () => {
+    expect(migrate(['/', '/todos', '/workflows']).sidebarItemOrder).toEqual(['/', '/todos', '/goals', '/workflows']);
+  });
+
+  it('keeps a position the user chose on purpose', () => {
+    const chosen = ['/', '/goals', '/todos', '/workflows', '/cockpit', '/calendar'];
+    expect(migrate(chosen).sidebarItemOrder).toEqual(chosen);
+  });
+
+  it('keeps hidden pages hidden and leaves the default (unsaved) order empty', () => {
+    const migrated = migrate(['/', '/todos', '/cockpit', '/goals'], { sidebarHiddenItems: ['/goals', '/debug'] });
+    expect(migrated.sidebarItemOrder).toEqual(['/', '/todos', '/goals', '/cockpit']);
+    expect(migrated.sidebarHiddenItems).toEqual(['/goals', '/debug']);
+    expect(migrate([]).sidebarItemOrder).toEqual([]);
+  });
+
+  it('leaves an order without /todos alone', () => {
+    expect(migrate(['/', '/cockpit', '/goals']).sidebarItemOrder).toEqual(['/', '/cockpit', '/goals']);
   });
 });

@@ -176,4 +176,61 @@ describe('GoalDetail', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(await screen.findByDisplayValue('Full text')).toBeInTheDocument();
   });
+  it('explains an older backend (404 on the map) with a hint and a way back to the list, no error card', async () => {
+    localStorage.setItem('mysuricates-goal-view', 'map');
+    let hits = 0;
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 1 })),
+      http.get('/api/v1/goals/g1/relations', () => {
+        hits += 1;
+        return HttpResponse.json({ error: 'No static resource', timestamp: '' }, { status: 404 });
+      }),
+    );
+    renderGoal();
+
+    const hint = await screen.findByTestId('goal-map-outdated-backend');
+    expect(hint).toHaveTextContent('The map needs a newer backend – restart the backend; the list keeps working.');
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(hits).toBe(1);
+
+    fireEvent.click(within(hint).getByRole('button', { name: 'To the list' }));
+    expect(await screen.findAllByTestId('goal-next-item')).toHaveLength(3);
+    expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute('aria-selected', 'true');
+    expect(localStorage.getItem('mysuricates-goal-view')).toBe('list');
+  });
+
+  it('shows the empty state in the map for a goal without todos and without candidates', async () => {
+    localStorage.setItem('mysuricates-goal-view', 'map');
+    const empty: GoalDetailData = {
+      ...detail,
+      goal: { ...detail.goal, progress: { total: 0, open: 0, inProgress: 0, backlog: 0, done: 0, openQuestions: 0, percentDone: 0 } },
+      todos: [],
+      byProject: [],
+    };
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(empty)),
+      http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 1 })),
+      http.get('/api/v1/goals/g1/relations', () => HttpResponse.json({ goalId: 'g1', activeTriggers: 0, todos: [] })),
+    );
+    renderGoal();
+
+    expect(await screen.findByRole('button', { name: 'No TODOs yet – add some below under “Might belong here”' })).toBeInTheDocument();
+    expect(screen.queryByTestId('goal-relation-map')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the error card with retry for other errors of the map', async () => {
+    localStorage.setItem('mysuricates-goal-view', 'map');
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 1 })),
+      http.get('/api/v1/goals/g1/relations', () => HttpResponse.json({ error: 'boom', timestamp: '' }, { status: 500 })),
+    );
+    renderGoal();
+
+    expect(await screen.findByRole('button', { name: 'Retry' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('boom')).toBeInTheDocument();
+    expect(screen.queryByTestId('goal-map-outdated-backend')).not.toBeInTheDocument();
+  });
 });

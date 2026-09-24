@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../api/client';
+import { api, apiErrorMessage, apiErrorStatus } from '../api/client';
+import { defaultQueryRetry } from '../api/queryDefaults';
 import { useToast } from './useToast';
 import { useT } from '../i18n';
 import { useTodos } from './useTodos';
@@ -34,6 +35,14 @@ export function useGoal(id: string | undefined) {
 }
 
 /**
+ * Ein 404 auf `/relations` heißt: Das Backend ist älter als die Karte (TODO 49080447). Das bleibt so
+ * bis zum Neustart – nicht wiederholen, die Zielseite zeigt dann einen Hinweis statt eines Fehlers.
+ */
+export function goalRelationsRetry(failureCount: number, error: unknown): boolean {
+  return apiErrorStatus(error) !== 404 && defaultQueryRetry(failureCount, error);
+}
+
+/**
  * Relationskarte (TODO c6ea8f5c): je TODO Herkunft, Bearbeitung und Ergebnis. `include` sind die
  * gerade gezeigten Kandidaten; sie kommen gestrichelt mit in die Karte. Beim Wechsel der Kandidaten
  * bleibt die alte Karte stehen, bis die neue da ist.
@@ -46,6 +55,7 @@ export function useGoalRelations(id: string | undefined, include: string[], enab
     enabled: !!id && enabled,
     placeholderData: keepPreviousData,
     staleTime: 15_000,
+    retry: (failureCount, error: Error) => goalRelationsRetry(failureCount, error),
   });
 }
 
