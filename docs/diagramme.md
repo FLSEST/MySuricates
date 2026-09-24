@@ -2,7 +2,7 @@
 
 # Diagramme
 
-Ablauf- und Architekturdiagramme als Mermaid-Zaeune: GitHub rendert sie direkt in der Markdown-Fassung. Jede Seite gibt es zusaetzlich als HTML (`<name>-diagrams.html`) — die wird aus der Markdown-Datei erzeugt und nicht von Hand gepflegt.
+Ablauf- und Architekturdiagramme als Mermaid-Zaeune: GitHub rendert sie direkt in der Markdown-Fassung. Jede Seite gibt es zusaetzlich als HTML (`<name>-diagrams.html`) — die wird aus der Markdown-Datei erzeugt und nicht von Hand gepflegt. Die englische Fassung unter `docs/en/` entsteht aus derselben Quelle und je Seite einer Uebersetzungstabelle (`docs/i18n/<name>-diagrams.en.json`).
 
 | Seite | Inhalt | Diagramme |
 |---|---|---:|
@@ -21,6 +21,7 @@ Zusammen 32 Diagramme in 9 Seiten.
 ## Erzeugen und pruefen
 
 ```bash
-python3 scripts/docs-diagrams.py          # HTML-Fassungen neu erzeugen
-python3 scripts/docs-diagrams.py --check  # meldet Drift, Exit-Code 1
+python3 scripts/docs-diagrams.py                # HTML-Fassungen und englische Seiten neu erzeugen
+python3 scripts/docs-diagrams.py --check        # meldet Drift und Uebersetzungsluecken, Exit-Code 1
+python3 scripts/docs-diagrams.py --add-missing  # fehlende Uebersetzungsschluessel leer eintragen
 ```
