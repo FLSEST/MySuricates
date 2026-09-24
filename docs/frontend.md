@@ -181,6 +181,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Workflow aus Topic-Kategorie generieren
 - Vollständige Pipeline: Generieren → Test-Instanz → Verifizieren → Promoten
 - Topic-Kategorien-Auswahl
+- Formularzustand, „Workflow erstellen“ und „Erstellen & Testen“ (Thema und Projekt Pflicht, Testen nur mit laufender Test-Instanz, ungültiges JSON der Test-Eingaben wird gemeldet und als `{}` gesendet) liegen in `hooks/useFactoryForm.ts`; das Formular ist `components/factory/FactoryCreateForm.tsx`, die Ergebnisliste `FactoryResultsList.tsx` (Ergebnisse der Sitzung vor früher erzeugten Workflows, Status-Icons in den Tönen der Status-Badges)
 
 ### DialogImport (`/dialogs`)
 

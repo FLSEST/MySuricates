@@ -181,6 +181,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Generate workflow from topic category
 - Full pipeline: generate → test instance → verify → promote
 - Topic category selection
+- Form state, "Create Workflow" and "Create & Test" (topic and project required, testing only with the test instance up, invalid JSON in the test inputs is reported and sent as `{}`) live in `hooks/useFactoryForm.ts`; the form is `components/factory/FactoryCreateForm.tsx`, the result list `FactoryResultsList.tsx` (this session's results before earlier generated workflows, status icons in the tones of the status badges)
 
 ### DialogImport (`/dialogs`)
 
