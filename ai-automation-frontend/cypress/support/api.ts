@@ -1,14 +1,10 @@
 /**
  * Direct HTTP helpers for test-data setup against the selected E2E backend.
- * The target comes from Cypress env (`API_BASE_URL`) so setup/cleanup and UI traffic
+ * The target comes from the exposed `API_BASE_URL` (see ./target) so setup/cleanup and UI traffic
  * can point to the same instance (dev on :9090 or test on :8090).
  */
 
-const DEFAULT_API = 'http://localhost:9090/api/v1';
-
-function apiBaseUrl(): string {
-  return String(Cypress.env('API_BASE_URL') || DEFAULT_API).replace(/\/$/, '');
-}
+import { apiBaseUrl, apiKey } from './target';
 
 function apiUrl(path: string): string {
   return `${apiBaseUrl()}${path}`;
@@ -16,9 +12,9 @@ function apiUrl(path: string): string {
 
 function apiHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  const apiKey = Cypress.env('API_KEY');
-  if (apiKey) {
-    headers['X-API-Key'] = apiKey;
+  const key = apiKey();
+  if (key) {
+    headers['X-API-Key'] = key;
   }
   return headers;
 }

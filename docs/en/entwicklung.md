@@ -349,6 +349,18 @@ CYPRESS_API_BASE_URL=http://localhost:8090/api/v1
 CYPRESS_WS_BASE_URL=ws://localhost:8090
 ```
 
+Against a side instance (own port, own key) the frontend address is needed too, because `baseUrl`
+is fixed to `:3000` — for example Vite on `5173` against a backend on `19090`:
+
+```bash
+CYPRESS_API_KEY=<key> CYPRESS_API_BASE_URL=http://localhost:19090/api/v1 CYPRESS_WS_BASE_URL=ws://localhost:19090 \
+  npx cypress run --config baseUrl=http://localhost:5173
+```
+
+Cypress 16 removed `Cypress.env()`: `API_BASE_URL`, `WS_BASE_URL` and `E2E_TARGET` sit under `expose` in
+`cypress.config.ts` (`Cypress.expose()`), the API key under `env`, readable only through the command
+`cy.env()` — `cypress/support/e2e.ts` fetches it once per spec.
+
 ### Test Data and Cleanup
 
 - **Dev target:** Cypress-created projects, workflows, chains, and runs end up in Dev
@@ -361,7 +373,8 @@ CYPRESS_WS_BASE_URL=ws://localhost:8090
 ```
 cypress/
   support/
-    e2e.ts          ← Global beforeEach (set locale to English)
+    e2e.ts          ← API key via cy.env(); before every page load: key, English locale, welcome tour seen
+    target.ts       ← E2E target: API address (Cypress.expose) and the loaded API key
     commands.ts     ← Custom commands (apiCreateProject, shouldShowToast, navTo, ...)
     api.ts          ← HTTP helpers for test data setup (CRUD against backend API)
   e2e/
@@ -386,7 +399,7 @@ cypress/
 ```
 
 **Conventions:**
-- English locale is enforced via `localStorage` before each test
+- English locale and the seen welcome tour are set via `localStorage` before every page load (otherwise the tour covers every page)
 - Selectors use `aria-label`, button text, `h1` text, `placeholder`, `role="switch"` (no `data-testid`)
 - `before()` / `after()` hooks ensure clean test data via `cy.apiCleanup()`
 

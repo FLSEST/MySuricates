@@ -62,11 +62,15 @@ export default defineConfig({
       runMode: 1,
       openMode: 0,
     },
-    env: {
+    // Cypress 16: public values via `expose` (Cypress.expose), sensitive ones via `env` (cy.env only).
+    expose: {
       E2E_TARGET: e2eTarget,
       API_BASE_URL: apiBaseUrl,
       WS_BASE_URL: wsBaseUrl,
-      ...(detectedApiKey ? { API_KEY: detectedApiKey } : {}),
+    },
+    env: {
+      // Always set (empty without a key), so cy.env(['API_KEY']) finds it on targets without auth too.
+      API_KEY: detectedApiKey,
     },
     setupNodeEvents(on) {
       on('before:run', () => {
