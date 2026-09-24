@@ -106,6 +106,29 @@ class BlockTextTest {
                 "instruction", "Kuerze")))).isEmpty();
     }
 
+    /**
+     * TODO ce4abac1: die Aufträge verschachtelter Blöcke, über denselben Walker wie die Typ- und
+     * execution_mode-Prüfung (switch-Cases, default, eine blocks-Liste) — je Blockname, sonst Typ.
+     */
+    @Test
+    void nestedInstructionsLesenVerschachtelteBloeckeJeTyp() {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("expression", "{{ env }}");
+        config.put("cases", List.of(
+                Map.of("value", "a", "blocks", List.of(
+                        Map.of("type", "simple", "name", "notes", "config", Map.of("command", "Notizen")),
+                        Map.of("type", "shell", "config", Map.of("command", "ls")))),
+                Map.of("value", "b", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "als Shell", "execution_mode", "shell"))))));
+        config.put("default", List.of(Map.of("type", "simple", "config", Map.of("command", "Standard"))));
+
+        assertThat(BlockText.nestedInstructions(block("switch", config)))
+                .containsExactly(Map.entry("notes", List.of("Notizen")), Map.entry("simple", List.of("Standard")));
+        assertThat(BlockText.instructions(block("switch", config))).isEmpty();
+        assertThat(BlockText.nestedInstructions(null)).isEmpty();
+        assertThat(BlockText.nestedInstructions(block("simple", Map.of("command", "x")))).isEmpty();
+    }
+
     /** Die Schlüssel stehen in der Spezifikation ihres Typs; die hält BlockSpecConfigKeysGateTest am Executor. */
     @Test
     void promptSchluesselSindDieDerBlockSpezifikation() {

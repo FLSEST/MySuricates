@@ -2,9 +2,11 @@ package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.executor.ExecutionMode;
+import com.automation.executor.NestedBlocks;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -67,14 +69,37 @@ final class BlockText {
      */
     static List<String> instructions(BlockDefinition block) {
         if (block == null || block.getType() == null || block.getConfig() == null) return List.of();
-        if (SHELL_SWITCHABLE.contains(block.getType())
-                && ExecutionMode.SHELL.equals(block.getConfig().get(ExecutionMode.KEY))) {
-            return List.of();
-        }
+        if (SHELL_SWITCHABLE.contains(block.getType()) && runsAsShell(block.getConfig())) return List.of();
+        return promptTexts(block.getType(), block.getConfig());
+    }
+
+    /**
+     * Die Auftragstexte der verschachtelten Blöcke je Blockname (ohne Namen: Typ), in
+     * Definitionsreihenfolge. Gelaufen wird über denselben Walker wie die Typ- und
+     * {@code execution_mode}-Prüfung ({@link NestedBlocks}: switch-Cases, {@code default}, eine
+     * {@code blocks}-Liste). Ein simple-Block im switch-Case bekommt {@code workflow.instructions}
+     * genauso als Systemprompt, mit {@code execution_mode: "shell"} läuft er als Shell
+     * ({@code SwitchBlockExecutor}); gelesen wurden bis TODO ce4abac1 nur die direkten Werte.
+     */
+    static Map<String, List<String>> nestedInstructions(BlockDefinition block) {
+        Map<String, List<String>> texts = new LinkedHashMap<>();
+        if (block == null) return texts;
+        NestedBlocks.visit(block.getConfig(), nested -> {
+            if (nested.type() == null || nested.config() == null || runsAsShell(nested.config())) return;
+            List<String> prompts = promptTexts(nested.type(), nested.config());
+            if (!prompts.isEmpty()) texts.computeIfAbsent(nested.label(), label -> new ArrayList<>()).addAll(prompts);
+        });
+        return texts;
+    }
+
+    private static boolean runsAsShell(Map<String, Object> config) {
+        return ExecutionMode.SHELL.equals(config.get(ExecutionMode.KEY));
+    }
+
+    private static List<String> promptTexts(String type, Map<String, Object> config) {
         List<String> texts = new ArrayList<>();
-        for (String key : PROMPT_KEYS.getOrDefault(block.getType(), List.of())) {
-            String text = directValue(block, key);
-            if (text != null) texts.add(text);
+        for (String key : PROMPT_KEYS.getOrDefault(type, List.of())) {
+            if (config.get(key) instanceof String text) texts.add(text);
         }
         return texts;
     }

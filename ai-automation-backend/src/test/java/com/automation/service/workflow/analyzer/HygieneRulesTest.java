@@ -142,6 +142,37 @@ class HygieneRulesTest {
                 block("simple", "c", Map.of("prompt", PARAGRAPH, "command", "Fasse zusammen")))).isEmpty();
     }
 
+    /**
+     * TODO ce4abac1: ein simple-Block in einem switch-Case bekommt workflow.instructions genauso als
+     * Systemprompt — die Regel las nur die direkten Werte des switch-Blocks.
+     */
+    @Test
+    void kiAuftragEinesVerschachteltenBlocksIstDoppeltUndNenntIhn() {
+        Map<String, Object> config = Map.of("expression", "{{ environment }}",
+                "cases", List.of(Map.of("value", "prod", "blocks", List.of(
+                        Map.of("type", "shell", "config", Map.of("command", "set -e\necho deploy")),
+                        Map.of("type", "simple", "name", "notes",
+                                "config", Map.of("command", "Schreibe Release-Notes.\n" + PARAGRAPH))))));
+
+        assertThat(apply(PARAGRAPH, block("switch", "route", config))).singleElement().satisfies(f -> {
+            assertThat(f.rule()).isEqualTo("duplicated-instructions");
+            assertThat(f.blockName()).isEqualTo("route");
+            assertThat(f.detail()).contains("verschachtelten Block 'notes'");
+        });
+    }
+
+    /** Verschachtelt gilt dasselbe wie oben: Shell geht nicht an die KI — auch simple mit execution_mode "shell". */
+    @Test
+    void verschachtelteShellBefehleSindKeinDoppelterAuftrag() {
+        Map<String, Object> config = Map.of("expression", "x",
+                "cases", List.of(Map.of("value", "x", "blocks", List.of(
+                        Map.of("type", "shell", "config", Map.of("command", "set -e\necho '" + PARAGRAPH + "'"))))),
+                "default", List.of(Map.of("type", "simple",
+                        "config", Map.of("command", PARAGRAPH, "execution_mode", "shell"))));
+
+        assertThat(apply(PARAGRAPH, block("switch", "route", config))).isEmpty();
+    }
+
     @Test
     void datierteModellIdNurImDirektenModellFeld() {
         List<AnalyzerFinding> out = apply(null,
