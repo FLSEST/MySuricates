@@ -20,10 +20,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -134,12 +136,11 @@ class ManagedTodoWriterTest {
         AuditFinding dismissed = finding("f-2", AuditFindingStatus.DISMISSED);
         Todo todo = todo("t-1", Todo.Status.IN_PROGRESS);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(link("t-1", true)));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-1").build(),
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").build()));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(resolved));
-        when(findingRepository.findById("f-2")).thenReturn(Optional.of(dismissed));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(resolved, dismissed));
 
         writer().reconcile(List.of(resolved, resolved));
 
@@ -153,12 +154,11 @@ class ManagedTodoWriterTest {
         AuditFinding open = finding("f-2", AuditFindingStatus.OPEN);
         Todo todo = todo("t-1", Todo.Status.OPEN);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(link("t-1", true)));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-1").build(),
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").build()));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(resolved));
-        when(findingRepository.findById("f-2")).thenReturn(Optional.of(open));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(resolved, open));
 
         writer().reconcile(List.of(resolved));
 
@@ -173,9 +173,9 @@ class ManagedTodoWriterTest {
         Todo todo = todo("t-1", Todo.Status.DONE);
         todo.setWorkflowRunId("run-old");
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(link("t-1", true)));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(link("t-1", true)));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(back));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(link("t-1", true)));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(back));
 
         writer().reconcile(List.of(back));
 
@@ -189,11 +189,12 @@ class ManagedTodoWriterTest {
         AuditFinding resolved = finding(FINDING_ID, AuditFindingStatus.RESOLVED);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID)))
                 .thenReturn(List.of(link("t-manual", false), link("t-gone", true)));
-        when(todoRepository.findById("t-gone")).thenReturn(Optional.empty());
+        when(todoRepository.findAllById(List.of("t-gone"))).thenReturn(List.of());
 
         writer().reconcile(List.of(resolved));
 
-        verify(todoRepository, never()).findById("t-manual");
+        verify(todoRepository).findAllById(List.of("t-gone")); // die manuelle Verknüpfung wird nicht geladen
+        verifyNoInteractions(findingRepository);
         verify(todoRepository, never()).save(any());
     }
 
@@ -207,9 +208,9 @@ class ManagedTodoWriterTest {
         todo.setReferenceId(FINDING_ID);
         AuditFindingTodo managedLink = link("t-1", true);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
 
         writer().reconcile(List.of(medium));
 
@@ -227,9 +228,9 @@ class ManagedTodoWriterTest {
         Todo todo = todo("t-1", Todo.Status.DONE);
         AuditFindingTodo managedLink = link("t-1", true);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(back));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(back));
 
         writer().reconcile(List.of(back));
 
@@ -245,9 +246,9 @@ class ManagedTodoWriterTest {
         Todo todo = todo("t-1", Todo.Status.IN_PROGRESS);
         AuditFindingTodo managedLink = link("t-1", true);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(managedLink));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(managedLink));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(managedLink));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(medium));
 
         writer().reconcile(List.of(medium));
 
@@ -264,18 +265,47 @@ class ManagedTodoWriterTest {
         high.setSeverity(AuditSeverity.HIGH);
         Todo todo = todo("t-1", Todo.Status.OPEN);
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of(link("t-1", true)));
-        when(todoRepository.findById("t-1")).thenReturn(Optional.of(todo));
-        when(findingTodoRepository.findByTodoId("t-1")).thenReturn(List.of(
+        when(todoRepository.findAllById(List.of("t-1"))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-1"))).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-1").managed(true).build(),
                 AuditFindingTodo.builder().findingId("f-2").todoId("t-1").managed(true).build()));
-        when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(medium));
-        when(findingRepository.findById("f-2")).thenReturn(Optional.of(high));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(medium, high));
 
         writer().reconcile(List.of(medium));
 
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(findingTodoRepository, never()).delete(any());
         verify(todoRepository, never()).save(any());
+    }
+
+    /** be14db43: je Stufe eine Abfrage, egal wie viele Findings und TODOs der Ingest berührt. */
+    @Test
+    void reconcile_loadsTodosLinksAndFindingsInOneQueryEach() {
+        AuditFinding a = finding(FINDING_ID, AuditFindingStatus.RESOLVED);
+        AuditFinding b = finding("f-2", AuditFindingStatus.RESOLVED);
+        AuditFinding c = finding("f-3", AuditFindingStatus.OPEN);
+        Todo todoAb = todo("t-ab", Todo.Status.OPEN);
+        Todo todoC = todo("t-c", Todo.Status.DONE);
+        AuditFindingTodo linkA = AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-ab").managed(true).build();
+        AuditFindingTodo linkB = AuditFindingTodo.builder().findingId("f-2").todoId("t-ab").managed(true).build();
+        AuditFindingTodo linkC = AuditFindingTodo.builder().findingId("f-3").todoId("t-c").managed(true).build();
+        when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID, "f-2", "f-3")))
+                .thenReturn(List.of(linkA, linkB, linkC));
+        when(todoRepository.findAllById(List.of("t-ab", "t-c"))).thenReturn(List.of(todoAb, todoC));
+        when(findingTodoRepository.findByTodoIdIn(Set.of("t-ab", "t-c"))).thenReturn(List.of(linkA, linkB, linkC));
+        when(findingRepository.findAllById(any())).thenReturn(List.of(a, b, c));
+
+        writer().reconcile(List.of(a, b, c));
+
+        assertThat(todoAb.getStatus()).as("beide Findings terminal").isEqualTo(Todo.Status.DONE);
+        assertThat(todoC.getStatus()).as("Finding kam zurück").isEqualTo(Todo.Status.OPEN);
+        verify(findingTodoRepository, times(1)).findByFindingIdIn(any());
+        verify(findingTodoRepository, times(1)).findByTodoIdIn(any());
+        verify(todoRepository, times(1)).findAllById(any());
+        verify(findingRepository, times(1)).findAllById(any());
+        verify(todoRepository, never()).findById(any());
+        verify(findingRepository, never()).findById(any());
+        verify(findingTodoRepository, never()).findByTodoId(any());
     }
 
     private static AuditFindingTodo link(String todoId, boolean managed) {
