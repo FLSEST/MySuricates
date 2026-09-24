@@ -3,7 +3,7 @@ package com.automation.service.assistant.context;
 import com.automation.dto.AssistantChatRequest;
 import com.automation.entity.Workflow;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

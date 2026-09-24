@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.entity.IntegrationConnection;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.security.AllowedOrigins;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationOAuthService;

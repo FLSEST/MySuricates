@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.ProjectResponse;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
@@ -9,6 +8,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ProjectMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.example.ExampleProjectService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.project.ProjectOnboardingService;

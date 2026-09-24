@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.UpdateScheduleRequest;
 import com.automation.dto.response.ScheduledWorkflowResponse;
 import com.automation.dto.response.UpcomingScheduleResponse;
@@ -15,6 +14,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.ChainMapper;
 import com.automation.mapper.ScheduleMapper;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.scheduler.CatchUpQueue;
 import com.automation.service.scheduler.SchedulerMaintenanceMode;

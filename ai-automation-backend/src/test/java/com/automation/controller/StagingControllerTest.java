@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncResult;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.staging.StagingService;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;

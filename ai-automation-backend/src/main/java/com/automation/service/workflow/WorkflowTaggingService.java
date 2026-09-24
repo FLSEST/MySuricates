@@ -5,6 +5,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.system.AppSettingChangedEvent;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -101,7 +102,12 @@ public class WorkflowTaggingService {
                 .filter(m -> !m.isBlank()).orElse(null);
     }
 
-    /** Called by {@code SystemSettingsService} when {@code suggestions-model} changes. */
+    /** The settings page changed {@code suggestions-model}: re-read it. */
+    @EventListener
+    public void onSettingChanged(AppSettingChangedEvent event) {
+        if ("suggestions-model".equals(event.key())) refreshCache();
+    }
+
     public void refreshCache() {
         cachedSuggestionsModel = appSettingsRepository.get("suggestions-model")
                 .filter(m -> !m.isBlank()).orElse(null);

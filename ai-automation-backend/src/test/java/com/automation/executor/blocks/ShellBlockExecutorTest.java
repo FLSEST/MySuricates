@@ -453,7 +453,7 @@ class ShellBlockExecutorTest {
 
         StepResult result = runCheckedCommand(script, 0);
 
-        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        var gate = com.automation.service.runoutput.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
         assertThat(gate.category()).isEqualTo("public-claims");
         assertThat(result.getOutput()).doesNotContain("gate_status: GREEN");
@@ -465,7 +465,7 @@ class ShellBlockExecutorTest {
     void execute_checkedCommandFailing_stillEscalatesAMilderScriptGate() {
         StepResult result = runCheckedCommand("gate_status: YELLOW\ngate_category: lint\n", 2);
 
-        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        var gate = com.automation.service.runoutput.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
         assertThat(result.getOutput()).startsWith("gate_status: RED");
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
@@ -476,7 +476,7 @@ class ShellBlockExecutorTest {
         StepResult result = runCheckedCommand(
                 "gate_status: RED\ngate_category: tests\ngate_description: 3 Tests rot\n", 1);
 
-        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        var gate = com.automation.service.runoutput.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
         assertThat(gate.category()).isEqualTo("tests");
         assertThat(gate.description()).isEqualTo("3 Tests rot");
@@ -491,7 +491,7 @@ class ShellBlockExecutorTest {
     void execute_checkedCommandWithABareScriptGate_fillsInCategoryAndDescriptionFromTheBlock() {
         StepResult result = runCheckedCommand("Durchgereicht:\ngate_status: YELLOW\nEnde\n", 0);
 
-        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        var gate = com.automation.service.runoutput.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.YELLOW);
         assertThat(gate.category()).isEqualTo("build-check");
         assertThat(gate.description()).isEqualTo("Command exit 0");
@@ -502,7 +502,7 @@ class ShellBlockExecutorTest {
     void execute_checkedCommandWithScriptGateAndCategoryOnly_keepsTheCategoryAndAddsTheDescription() {
         StepResult result = runCheckedCommand("gate_status: RED\ngate_category: tests\n", 0);
 
-        var gate = com.automation.service.todo.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
+        var gate = com.automation.service.runoutput.GateStatusOutputParser.parse(result.getOutput()).orElseThrow();
         assertThat(gate.status()).isEqualTo(com.automation.entity.GateStatus.RED);
         assertThat(gate.category()).isEqualTo("tests");
         assertThat(gate.description()).isEqualTo("Command exit 0");

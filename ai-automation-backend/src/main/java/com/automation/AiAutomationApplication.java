@@ -1,6 +1,6 @@
 package com.automation;
 
-import com.automation.config.RuntimeClasspathGuard;
+import com.automation.util.RuntimeClasspathGuard;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 

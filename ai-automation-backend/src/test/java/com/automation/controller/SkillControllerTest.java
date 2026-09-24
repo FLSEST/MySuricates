@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.CapabilityResponse;
 import com.automation.dto.response.ExportSkillResponse;
 import com.automation.dto.response.SkillResponse;
@@ -12,6 +11,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.HardeningException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.SkillMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.skill.SkillImportExportService;
 import com.automation.service.skill.SkillService;
 import com.automation.service.system.ApiKeyService;

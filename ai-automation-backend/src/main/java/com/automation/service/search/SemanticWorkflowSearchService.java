@@ -5,6 +5,7 @@ import com.automation.repository.AppSettingsRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
+import com.automation.service.system.AppSettingChangedEvent;
 import com.automation.service.workflow.WorkflowContentChangedEvent;
 import org.springframework.context.event.EventListener;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -90,6 +91,14 @@ public class SemanticWorkflowSearchService {
     public void init() {
         cachedSuggestionsModel = appSettingsRepository.get("suggestions-model")
                 .filter(m -> !m.isBlank()).orElse(null);
+    }
+
+    /** The settings page changed {@code suggestions-model}: re-read it and drop the rankings of the old one. */
+    @EventListener
+    public void onSettingChanged(AppSettingChangedEvent event) {
+        if ("suggestions-model".equals(event.key())) {
+            refreshCache();
+        }
     }
 
     public void refreshCache() {

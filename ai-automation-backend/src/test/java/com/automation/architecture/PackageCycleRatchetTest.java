@@ -30,20 +30,18 @@ class PackageCycleRatchetTest {
      * Canonical form {@code "a <-> b"} with {@code a} lexicographically before {@code b}.
      * State on 2026-09-18 (commit 3c984b58): the 13 pairs that arch-metrics.sh reports as
      * {@code cycle_pairs=13}. 2026-09-24: scheduler and dlq no longer pair with service.workflow
-     * (SuspendState moved, DLQ entries via WorkflowRunCompletedEvent) — 11 pairs.
+     * (SuspendState moved, DLQ entries via WorkflowRunCompletedEvent) — 11 pairs. Then service.system
+     * no longer calls the caches of ai and workflow on a settings change (AppSettingChangedEvent) — 9.
+     * AssistantFormatUtils moved to its own leaf package service.assistant.format — 7.
+     * The run-output parsers left service.todo for the leaf package service.runoutput — 6.
+     * PendingTool moved to com.automation.dto, next to the chat response that carries it — 5.
+     * RateLimitConfig moved to com.automation.security, next to the RateLimitFilter that reads it — 4.
+     * OnboardingProfileSeeder moved to service.project, next to the services it seeds for — 3.
+     * The HostExecutionRequest overload of StepAiMetadata.aiRequest moved to service.cli — 2.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
-            "com.automation.config <-> com.automation.security",
-            "com.automation.config <-> com.automation.service.project",
-            "com.automation.dto <-> com.automation.service.assistant",
-            "com.automation.executor <-> com.automation.service.cli",
             "com.automation.service.ai <-> com.automation.service.cli",
-            "com.automation.service.ai <-> com.automation.service.system",
-            "com.automation.service.assistant <-> com.automation.service.assistant.context",
-            "com.automation.service.assistant <-> com.automation.service.assistant.fetch",
-            "com.automation.service.project <-> com.automation.service.workflow",
-            "com.automation.service.system <-> com.automation.service.workflow",
-            "com.automation.service.todo <-> com.automation.service.workflow");
+            "com.automation.service.project <-> com.automation.service.workflow");
 
     @Test
     void noNewMutualPackageDependencies() {

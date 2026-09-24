@@ -350,7 +350,7 @@ public class CommandExecutorService {
         if (request.systemPrompt() != null && !request.systemPrompt().isBlank()) {
             meta.put("aiSystemPrompt", request.systemPrompt());
         }
-        meta.put(StepAiMetadata.AI_REQUEST, StepAiMetadata.aiRequest(request, provider.getId()));
+        meta.put(StepAiMetadata.AI_REQUEST, HostRequestAiMetadata.aiRequest(request, provider.getId()));
         return meta;
     }
 

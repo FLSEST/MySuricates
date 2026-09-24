@@ -12,7 +12,7 @@ import com.automation.service.AssistantSessionService;
 import com.automation.service.PageSuggestionService;
 import com.automation.service.assistant.AssistantChatBroadcaster;
 import com.automation.service.assistant.AssistantToolExecutor;
-import com.automation.service.assistant.PendingTool;
+import com.automation.dto.PendingTool;
 import com.automation.service.assistant.PendingToolRegistry;
 import com.automation.service.assistant.ToolExecutionResult;
 import jakarta.validation.Valid;

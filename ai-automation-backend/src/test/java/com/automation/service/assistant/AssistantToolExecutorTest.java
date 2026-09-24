@@ -1,6 +1,7 @@
 package com.automation.service.assistant;
 
 import com.automation.config.AssistantGuardrailsConfig;
+import com.automation.dto.PendingTool;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ChangeSource;
 import com.automation.entity.Todo;

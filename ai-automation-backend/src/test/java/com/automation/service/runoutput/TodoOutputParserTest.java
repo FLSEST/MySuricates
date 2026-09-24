@@ -1,6 +1,6 @@
-package com.automation.service.todo;
+package com.automation.service.runoutput;
 
-import com.automation.service.todo.TodoOutputParser.ParsedTodoItem;
+import com.automation.service.runoutput.TodoOutputParser.ParsedTodoItem;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

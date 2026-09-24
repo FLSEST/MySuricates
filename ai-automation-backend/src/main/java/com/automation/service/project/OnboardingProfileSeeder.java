@@ -1,11 +1,10 @@
-package com.automation.config;
+package com.automation.service.project;
 
 import com.automation.entity.OnboardingProfile;
 import com.automation.entity.OnboardingProfileHistory;
 import com.automation.entity.OnboardingProfileType;
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.project.ProjectOnboardingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

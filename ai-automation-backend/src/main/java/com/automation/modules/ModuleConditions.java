@@ -10,6 +10,7 @@ public final class ModuleConditions {
     private static final String PREFIX = "@moduleRegistry.isEnabled(T(com.automation.modules.ModuleCatalog).";
 
     public static final String FACTORY = PREFIX + "FACTORY)";
+    public static final String ASSISTANT = PREFIX + "ASSISTANT)";
 
     private ModuleConditions() {
     }

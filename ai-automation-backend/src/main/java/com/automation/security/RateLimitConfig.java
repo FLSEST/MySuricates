@@ -1,4 +1,4 @@
-package com.automation.config;
+package com.automation.security;
 
 import jakarta.validation.constraints.Min;
 import lombok.Getter;

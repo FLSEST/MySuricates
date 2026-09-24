@@ -1,12 +1,12 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.WorkflowFactoryResult;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.mapper.WorkflowMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.factory.FactoryVerificationService;
 import com.automation.service.factory.WorkflowFactoryService;

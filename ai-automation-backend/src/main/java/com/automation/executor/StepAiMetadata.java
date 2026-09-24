@@ -1,7 +1,6 @@
 package com.automation.executor;
 
 import com.automation.entity.StepResult;
-import com.automation.service.cli.HostExecutionRequest;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,10 +10,11 @@ import java.util.Map;
  * Step metadata that describes the AI call behind a step: {@code aiRequest} (the settings actually
  * used), {@code provider}, {@code requestedModel} and the response {@code model}.
  * <p>
- * Host steps get these keys from {@code CommandExecutorService}; wrapper blocks (foreach, while,
- * conditional, switch, retry, skill-capability) build their own aggregate {@link StepResult} and use
- * {@link #carryAi} to keep the keys of their first inner AI call, so the run view can show which
- * provider/model ran. Provider and model are constant per block, so the first call is representative.
+ * Host steps get these keys from {@code CommandExecutorService} (via {@code HostRequestAiMetadata});
+ * wrapper blocks (foreach, while, conditional, switch, retry, skill-capability) build their own
+ * aggregate {@link StepResult} and use {@link #carryAi} to keep the keys of their first inner AI call,
+ * so the run view can show which provider/model ran. Provider and model are constant per block, so
+ * the first call is representative.
  */
 public final class StepAiMetadata {
 
@@ -24,36 +24,10 @@ public final class StepAiMetadata {
     private StepAiMetadata() {
     }
 
-    /** The {@code aiRequest} map of a host call: the request settings plus the resolved provider id. */
-    public static Map<String, Object> aiRequest(HostExecutionRequest request, String resolvedProviderId) {
-        Map<String, Object> params = aiRequest(resolvedProviderId, request.model(), request.effort());
-        if (request.timeoutSeconds() != null) {
-            params.put("timeoutSeconds", request.timeoutSeconds());
-        }
-        if (request.priority()) {
-            params.put("priority", true);
-        }
-        putTools(params, "allowedTools", request.allowedTools());
-        putTools(params, "disallowedTools", request.disallowedTools());
-        return params;
-    }
-
     /**
-     * Adds a tool list as a comma-separated string, blank entries dropped. The {@code NO_TOOLS} sentinel
-     * ({@code [""]}, "no built-in tools at all") therefore adds nothing instead of an empty string — same
-     * convention as model and effort, which are omitted when blank.
+     * The {@code aiRequest} map: provider, model and effort actually used (agentic loop). A host call adds
+     * its request settings on top ({@code service.cli.HostRequestAiMetadata}); the result is mutable for that.
      */
-    private static void putTools(Map<String, Object> params, String key, List<String> tools) {
-        if (tools == null) {
-            return;
-        }
-        List<String> named = tools.stream().filter(t -> t != null && !t.isBlank()).toList();
-        if (!named.isEmpty()) {
-            params.put(key, String.join(",", named));
-        }
-    }
-
-    /** Same shape without a request object (agentic loop): provider, model and effort actually used. */
     public static Map<String, Object> aiRequest(String providerId, String model, String effort) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("provider", providerId);

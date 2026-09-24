@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.WorkflowSnapshot;
 import com.automation.dto.response.WorkflowResponse;
 import com.automation.dto.response.WorkflowVersionResponse;
@@ -9,6 +8,7 @@ import com.automation.entity.WorkflowVersion;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.WorkflowMapper;
 import com.automation.mapper.WorkflowVersionMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;

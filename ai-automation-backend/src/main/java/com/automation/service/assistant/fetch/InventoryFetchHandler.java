@@ -6,7 +6,7 @@ import com.automation.repository.SkillRepository;
 import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationConnectionNames;
 import com.automation.service.integration.IntegrationProvider;

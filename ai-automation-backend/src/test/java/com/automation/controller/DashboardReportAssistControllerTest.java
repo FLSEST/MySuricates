@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.DashboardReportAssistResponse;
 import com.automation.dto.response.DashboardWorkflowResultResponse.Result;
 import com.automation.exception.GlobalExceptionHandler;
@@ -8,6 +7,7 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.modules.ModuleCatalog;
 import com.automation.modules.ModuleGuardInterceptor;
 import com.automation.modules.ModuleRegistry;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardReportAssistService;
 import com.automation.service.system.ApiKeyService;

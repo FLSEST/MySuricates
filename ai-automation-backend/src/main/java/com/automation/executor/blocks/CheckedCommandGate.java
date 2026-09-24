@@ -1,7 +1,7 @@
 package com.automation.executor.blocks;
 
 import com.automation.entity.GateStatus;
-import com.automation.service.todo.GateStatusOutputParser;
+import com.automation.service.runoutput.GateStatusOutputParser;
 
 /**
  * The {@code gate_status:} header a {@code checked_command} shell block puts in front of its own

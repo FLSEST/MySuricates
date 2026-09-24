@@ -1,7 +1,7 @@
 package com.automation.service.activitylog;
 
-import com.automation.config.RuntimeClasspathGuard;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.util.RuntimeClasspathGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

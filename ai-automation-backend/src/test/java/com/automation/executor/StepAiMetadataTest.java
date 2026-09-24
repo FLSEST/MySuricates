@@ -1,10 +1,8 @@
 package com.automation.executor;
 
 import com.automation.entity.StepResult;
-import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,41 +78,6 @@ class StepAiMetadataTest {
         assertThat(StepAiMetadata.carryAi(wrapper, (StepResult) null)).isFalse();
         assertThat(StepAiMetadata.carryAi(wrapper, (Map<String, Object>) null)).isFalse();
         assertThat(wrapper.getMetadata()).doesNotContainKey("aiRequest");
-    }
-
-    @Test
-    void aiRequest_fromRequest_matchesHostStepShape() {
-        HostExecutionRequest request = HostExecutionRequest.builder()
-                .projectPath("/p")
-                .command("task")
-                .model("opus")
-                .effort("high")
-                .timeoutSeconds(120)
-                .allowedTools(List.of("Read", "Grep"))
-                .build();
-
-        Map<String, Object> aiRequest = StepAiMetadata.aiRequest(request, "CLAUDE");
-
-        assertThat(aiRequest)
-                .containsEntry("provider", "CLAUDE")
-                .containsEntry("model", "opus")
-                .containsEntry("effort", "high")
-                .containsEntry("timeoutSeconds", 120)
-                .containsEntry("allowedTools", "Read,Grep")
-                .doesNotContainKeys("priority", "disallowedTools");
-    }
-
-    @Test
-    void aiRequest_noTools_omitsTheEmptyAllowedToolsEntry() {
-        HostExecutionRequest request = HostExecutionRequest.builder()
-                .projectPath("/p")
-                .command("task")
-                .allowedTools(com.automation.service.ai.AiProvider.NO_TOOLS)
-                .build();
-
-        Map<String, Object> aiRequest = StepAiMetadata.aiRequest(request, "CLAUDE");
-
-        assertThat(aiRequest).containsExactly(Map.entry("provider", "CLAUDE"));
     }
 
     @Test

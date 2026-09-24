@@ -109,7 +109,7 @@ public class AssistantService {
         }
     }
 
-    /** Called by SystemController when assistant-model setting changes. */
+    /** Called by {@link AssistantSettingsListener} when {@code assistant-model} changes. */
     public void refreshCachedModel() {
         cachedAssistantModel = appSettingsRepository.get("assistant-model")
                 .filter(m -> !m.isBlank()).orElse(null);
@@ -214,7 +214,7 @@ public class AssistantService {
 
             List<AssistantAction> mergedActions = AssistantActionMerger.mergeActions(parsed.actions(), suggestion.actions());
             List<AssistantAction> filteredActions = AssistantMutationGate.filterActions(mergedActions, allowMutatingProposals);
-            List<com.automation.service.assistant.PendingTool> mergedPendingTools =
+            List<com.automation.dto.PendingTool> mergedPendingTools =
                     AssistantActionMerger.mergePendingTools(extraction.pendingTools(), suggestion.pendingTools());
             broadcaster.broadcastStatus(requestId, "COMPLETED", null, startNanos);
             return new AssistantChatResponse(parsed.message(), filteredActions, model, resolvedProvider)

@@ -1,6 +1,5 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.request.CreateChainRequest;
 import com.automation.dto.response.ChainResponse;
 import com.automation.dto.response.ChainRunResponse;
@@ -9,6 +8,7 @@ import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowChain;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.ChainMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.chain.ChainService;
 import com.automation.service.system.ApiKeyService;

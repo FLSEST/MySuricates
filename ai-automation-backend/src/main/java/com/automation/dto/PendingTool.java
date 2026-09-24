@@ -1,4 +1,4 @@
-package com.automation.service.assistant;
+package com.automation.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -7,11 +7,12 @@ import java.util.Map;
 
 /**
  * A tool call that the assistant has proposed but not yet executed.
- * Stored in {@link PendingToolRegistry} between the chat response and a user-issued
- * {@code POST /api/v1/assistant/pending-tools/{id}/confirm} or {@code /reject} call.
+ * Stored in {@code PendingToolRegistry} (service.assistant) between the chat response and a
+ * user-issued {@code POST /api/v1/assistant/pending-tools/{id}/confirm} or {@code /reject} call.
+ * A DTO because the chat response carries it to the frontend.
  *
  * <p>{@code payloadJson} is the raw JSON body between the {@code <tool>…</tool>} tags —
- * kept as-is so {@link AssistantToolExecutor#executeConfirmed(PendingTool)} can re-parse it
+ * kept as-is so {@code AssistantToolExecutor#executeConfirmed(PendingTool)} can re-parse it
  * with the same sanitization/error handling as inline execution.
  *
  * <p>The frontend confirmation card formulates its text in the UI language from {@code type},

@@ -2,6 +2,7 @@ package com.automation.service.ai;
 
 import com.automation.config.AiProviderConfig;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.system.AppSettingChangedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -147,6 +148,23 @@ class AiProviderRegistryTest {
 
             assertThat(registry.getDefaultProviderId()).isEqualTo("CODEX");
             assertThat(registry.resolve(null)).isSameAs(codexProvider);
+        }
+
+        @Test
+        void onSettingChanged_defaultAiProvider_refreshesTheCache() {
+            when(appSettingsRepository.get("default-ai-provider")).thenReturn(Optional.of("CODEX"));
+
+            registry.onSettingChanged(new AppSettingChangedEvent("default-ai-provider"));
+
+            assertThat(registry.getDefaultProviderId()).isEqualTo("CODEX");
+        }
+
+        @Test
+        void onSettingChanged_otherKey_leavesTheCacheAlone() {
+            registry.onSettingChanged(new AppSettingChangedEvent("suggestions-model"));
+
+            verify(appSettingsRepository).get("default-ai-provider"); // once, from initCache in setUp
+            assertThat(registry.getDefaultProviderId()).isEqualTo("CLAUDE");
         }
     }
 }

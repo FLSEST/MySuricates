@@ -44,7 +44,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.anyLong;
-import com.automation.service.assistant.PendingTool;
+import com.automation.dto.PendingTool;
 import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
@@ -557,7 +557,7 @@ class AssistantServiceTest {
 
     @Test
     void chat_keepsMutatingToolProposalForExplicitIntent() {
-        var pending = List.of(new com.automation.service.assistant.PendingTool(
+        var pending = List.of(new com.automation.dto.PendingTool(
                 "p1", "create_todo", "TODO anlegen", "{}", java.time.Instant.now().plusSeconds(60)));
         when(toolExecutor.extractTools(any(), argThat((Predicate<String> predicate) -> predicate.test("create_todo"))))
                 .thenReturn(new AssistantToolExecutor.ExtractionResult("Ich schlage das vor.", pending));
@@ -1063,9 +1063,9 @@ class AssistantServiceTest {
 
     @Test
     void chat_mergesInlinePendingToolsBeforeSuggestedOnes() {
-        var inline = new com.automation.service.assistant.PendingTool(
+        var inline = new com.automation.dto.PendingTool(
                 "p-inline", "create_todo", "Inline-Vorschlag", "{}", java.time.Instant.now().plusSeconds(60));
-        var suggested = new com.automation.service.assistant.PendingTool(
+        var suggested = new com.automation.dto.PendingTool(
                 "p-sugg", "create_todo", "Suggestion-Vorschlag", "{}", java.time.Instant.now().plusSeconds(60));
         when(toolExecutor.extractTools(any(), org.mockito.ArgumentMatchers.<Predicate<String>>any()))
                 .thenReturn(new AssistantToolExecutor.ExtractionResult("Antwort mit Vorschlag.", List.of(inline)));

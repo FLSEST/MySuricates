@@ -3,7 +3,7 @@ package com.automation.service.assistant.context;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowMemory;
 import com.automation.repository.WorkflowMemoryRepository;
-import com.automation.service.assistant.AssistantFormatUtils;
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

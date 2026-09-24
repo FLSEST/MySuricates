@@ -1,11 +1,11 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.dto.response.ActivityLogResponse;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.ActivityLog.LogLevel;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.mapper.ActivityLogMapper;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.Test;

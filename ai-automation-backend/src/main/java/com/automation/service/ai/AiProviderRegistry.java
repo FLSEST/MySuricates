@@ -2,8 +2,10 @@ package com.automation.service.ai;
 
 import com.automation.config.AiProviderConfig;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.service.system.AppSettingChangedEvent;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -45,7 +47,14 @@ public class AiProviderRegistry {
         log.info("Default AI provider cached: {}", cachedDefaultProviderId);
     }
 
-    /** Called by SystemController when default-ai-provider setting changes. */
+    /** The settings page changed {@code default-ai-provider}: re-read it. */
+    @EventListener
+    public void onSettingChanged(AppSettingChangedEvent event) {
+        if ("default-ai-provider".equals(event.key())) {
+            refreshDefaultProviderCache();
+        }
+    }
+
     public void refreshDefaultProviderCache() {
         cachedDefaultProviderId = appSettingsRepository.get("default-ai-provider")
                 .filter(v -> !v.isBlank() && providers.containsKey(v.toUpperCase()))

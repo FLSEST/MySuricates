@@ -1,4 +1,4 @@
-package com.automation.config;
+package com.automation.util;
 
 import java.util.Optional;
 import java.util.regex.Pattern;

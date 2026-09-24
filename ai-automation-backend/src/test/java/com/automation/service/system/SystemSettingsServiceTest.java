@@ -2,20 +2,16 @@ package com.automation.service.system;
 
 import com.automation.config.BackupConfig;
 import com.automation.repository.AppSettingsRepository;
-import com.automation.service.AssistantService;
-import com.automation.service.PageSuggestionService;
-import com.automation.service.ai.AiProviderRegistry;
-import com.automation.service.assistant.AssistantActionSuggestionService;
-import com.automation.service.search.SemanticWorkflowSearchService;
-import com.automation.service.workflow.WorkflowTaggingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
-import java.lang.reflect.Field;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,32 +22,14 @@ import static org.mockito.Mockito.*;
 class SystemSettingsServiceTest {
 
     @Mock private AppSettingsRepository appSettingsRepository;
-    @Mock private AiProviderRegistry aiProviderRegistry;
-    @Mock private AssistantService assistantService;
-    @Mock private PageSuggestionService pageSuggestionService;
-    @Mock private AssistantActionSuggestionService actionSuggestionService;
-    @Mock private WorkflowTaggingService workflowTaggingService;
-    @Mock private SemanticWorkflowSearchService semanticSearchService;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @Spy private BackupConfig backupConfig = new BackupConfig();
 
     private SystemSettingsService service;
 
     @BeforeEach
-    void setUp() throws Exception {
-        service = new SystemSettingsService(appSettingsRepository, aiProviderRegistry, backupConfig);
-
-        // Inject @Lazy @Autowired fields via reflection
-        setField(service, "assistantService", assistantService);
-        setField(service, "pageSuggestionService", pageSuggestionService);
-        setField(service, "actionSuggestionService", actionSuggestionService);
-        setField(service, "workflowTaggingService", workflowTaggingService);
-        setField(service, "semanticSearchService", semanticSearchService);
-    }
-
-    private void setField(Object target, String fieldName, Object value) throws Exception {
-        Field field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
+    void setUp() {
+        service = new SystemSettingsService(appSettingsRepository, backupConfig, eventPublisher);
     }
 
     // --- isAllowedKey ---
@@ -115,6 +93,7 @@ class SystemSettingsServiceTest {
                 .hasMessageContaining("Unknown setting: unknown-key");
 
         verifyNoInteractions(appSettingsRepository);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -124,59 +103,45 @@ class SystemSettingsServiceTest {
                 .hasMessageContaining("Value must not be null");
 
         verifyNoInteractions(appSettingsRepository);
+        verifyNoInteractions(eventPublisher);
+    }
+
+    /** The keys whose caches used to be refreshed by direct calls — the listeners pick them up now. */
+    @ParameterizedTest
+    @ValueSource(strings = {"assistant-model", "suggestions-model", "suggestions-enabled", "default-ai-provider"})
+    void setSetting_cachedKey_announcesTheChangeAfterStoringIt(String key) {
+        service.setSetting(key, "value");
+
+        var order = inOrder(appSettingsRepository, eventPublisher);
+        order.verify(appSettingsRepository).set(key, "value");
+        order.verify(eventPublisher).publishEvent(new AppSettingChangedEvent(key));
+        verifyNoMoreInteractions(eventPublisher);
     }
 
     @Test
-    void setSetting_assistantModel_refreshesCachedModel() {
-        service.setSetting("assistant-model", "claude-opus-4-6");
-
-        verify(appSettingsRepository).set("assistant-model", "claude-opus-4-6");
-        verify(assistantService).refreshCachedModel();
-        verifyNoInteractions(pageSuggestionService);
-        verifyNoInteractions(aiProviderRegistry);
-    }
-
-    @Test
-    void setSetting_suggestionsModel_refreshesCachedModel() {
-        service.setSetting("suggestions-model", "claude-haiku-4-5");
-
-        verify(appSettingsRepository).set("suggestions-model", "claude-haiku-4-5");
-        verify(pageSuggestionService).refreshCachedModel();
-        verify(actionSuggestionService).refreshCache();
-        verifyNoInteractions(assistantService);
-        verifyNoInteractions(aiProviderRegistry);
-    }
-
-    @Test
-    void setSetting_suggestionsEnabled_refreshesActionSuggestionCache() {
-        service.setSetting("suggestions-enabled", "false");
-
-        verify(appSettingsRepository).set("suggestions-enabled", "false");
-        verify(actionSuggestionService).refreshCache();
-        verifyNoInteractions(assistantService);
-        verifyNoInteractions(pageSuggestionService);
-        verifyNoInteractions(aiProviderRegistry);
-    }
-
-    @Test
-    void setSetting_defaultAiProvider_refreshesProviderCache() {
-        service.setSetting("default-ai-provider", "CODEX");
-
-        verify(appSettingsRepository).set("default-ai-provider", "CODEX");
-        verify(aiProviderRegistry).refreshDefaultProviderCache();
-        verifyNoInteractions(assistantService);
-        verifyNoInteractions(pageSuggestionService);
-    }
-
-    @Test
-    void setSetting_nonTriggerKey_noSideEffects() {
+    void setSetting_otherKey_isAnnouncedAsWell() {
         service.setSetting("auto-repair-default", "true");
 
         verify(appSettingsRepository).set("auto-repair-default", "true");
-        verifyNoInteractions(assistantService);
-        verifyNoInteractions(pageSuggestionService);
-        verifyNoInteractions(actionSuggestionService);
-        verifyNoInteractions(aiProviderRegistry);
+        verify(eventPublisher).publishEvent(new AppSettingChangedEvent("auto-repair-default"));
+    }
+
+    @Test
+    void setSetting_backupRetainCount_appliesTheCountAndAnnounces() {
+        service.setSetting("backup-retain-count", "14");
+
+        verify(backupConfig).setRetainCount(14);
+        verify(eventPublisher).publishEvent(new AppSettingChangedEvent("backup-retain-count"));
+    }
+
+    @Test
+    void setSetting_backupRetainCountOutOfRange_throwsWithoutAnnouncing() {
+        assertThatThrownBy(() -> service.setSetting("backup-retain-count", "0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 1 and 365");
+
+        verify(backupConfig, never()).setRetainCount(anyInt());
+        verifyNoInteractions(eventPublisher);
     }
 
     // --- all allowed keys ---

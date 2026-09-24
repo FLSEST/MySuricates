@@ -1,5 +1,6 @@
 package com.automation.service.assistant;
 
+import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

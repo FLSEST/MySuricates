@@ -1,7 +1,7 @@
 package com.automation.service.system.settings;
 
 import com.automation.config.AssistantGuardrailsConfig;
-import com.automation.config.RateLimitConfig;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.cli.ContainerShellService;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;

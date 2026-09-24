@@ -1,8 +1,8 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.entity.Workflow;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.execution.ExecutionQueryService;
 import com.automation.service.learning.WorkflowSimilarityService;

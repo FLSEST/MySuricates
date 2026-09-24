@@ -1,6 +1,5 @@
 package com.automation.service.project;
 
-import com.automation.config.OnboardingProfileSeeder;
 import com.automation.dto.request.CreateOnboardingProfileRequest;
 import com.automation.dto.request.UpdateOnboardingProfileRequest;
 import com.automation.entity.OnboardingProfile;

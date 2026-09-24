@@ -1,9 +1,9 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
 import com.automation.entity.RequestMetricDaily;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.metrics.RequestMetricsCollector.RouteSnapshot;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.metrics.RequestMetricsQueryService;
 import com.automation.service.system.ApiKeyService;

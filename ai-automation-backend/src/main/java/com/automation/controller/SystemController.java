@@ -1,10 +1,10 @@
 package com.automation.controller;
 
-import com.automation.config.RateLimitConfig;
-import com.automation.config.RuntimeClasspathGuard;
+import com.automation.security.RateLimitConfig;
 import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
+import com.automation.util.RuntimeClasspathGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

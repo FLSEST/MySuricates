@@ -1,8 +1,7 @@
-package com.automation.config;
+package com.automation.service.project;
 
 import com.automation.repository.OnboardingProfileHistoryRepository;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.project.ProjectOnboardingService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

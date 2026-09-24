@@ -1,4 +1,4 @@
-package com.automation.service.assistant;
+package com.automation.service.assistant.format;
 
 import com.automation.entity.RunStatus;
 import com.automation.entity.WorkflowRun;
