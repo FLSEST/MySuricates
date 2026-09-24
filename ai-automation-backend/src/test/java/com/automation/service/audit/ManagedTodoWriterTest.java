@@ -18,12 +18,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -276,6 +283,73 @@ class ManagedTodoWriterTest {
         assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
         verify(findingTodoRepository, never()).delete(any());
         verify(todoRepository, never()).save(any());
+    }
+
+    /**
+     * Ein TODO mit mehreren verwalteten Verknüpfungen wird einmal abgeglichen (be14db43). Vorher lief
+     * der Abgleich je Verknüpfung: der erste Durchlauf gab das TODO frei (ARCHIVED, verwaltete
+     * Verknüpfungen gelöscht), der zweite sah nur noch die manuelle Verknüpfung auf ein erledigtes
+     * Finding und setzte das TODO auf DONE, als wäre etwas behoben.
+     *
+     * <p>Die Verknüpfungen liegen in einem Speicher, den {@code delete} wirklich ändert und aus dem
+     * die einzelnen wie die gebündelten Abfragen lesen. So hält der Test das Verhalten fest; die
+     * Zahl der Abfragen prüft {@link #reconcile_loadsTodosLinksAndFindingsInOneQueryEach}.
+     */
+    @Test
+    void reconcile_releasesATodoWithSeveralManagedLinksOnce_andKeepsTheManualLink() {
+        AuditFinding f1 = finding(FINDING_ID, AuditFindingStatus.OPEN);
+        f1.setSeverity(AuditSeverity.MEDIUM);
+        AuditFinding f2 = finding("f-2", AuditFindingStatus.RESOLVED);
+        AuditFinding f3 = finding("f-3", AuditFindingStatus.RESOLVED);
+        Todo todo = todo("t-1", Todo.Status.OPEN);
+        AuditFindingTodo l1 = AuditFindingTodo.builder().findingId(FINDING_ID).todoId("t-1").managed(true).build();
+        AuditFindingTodo l2 = AuditFindingTodo.builder().findingId("f-2").todoId("t-1").managed(true).build();
+        AuditFindingTodo l3 = AuditFindingTodo.builder().findingId("f-3").todoId("t-1").managed(false).build();
+        List<AuditFindingTodo> links = storedLinks(todo, List.of(l1, l2, l3), f1, f2, f3);
+
+        writer().reconcile(List.of(f1, f2));
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.ARCHIVED);
+        verify(todoRepository, times(1)).save(any());
+        verify(findingTodoRepository).delete(l1);
+        verify(findingTodoRepository).delete(l2);
+        verify(findingTodoRepository, never()).delete(l3);
+        assertThat(links).containsExactly(l3);
+    }
+
+    /** Verknüpfungen, TODO und Findings in einem Speicher: beide Abfrageformen lesen daraus, delete ändert ihn. */
+    private List<AuditFindingTodo> storedLinks(Todo todo, List<AuditFindingTodo> initial, AuditFinding... findings) {
+        List<AuditFindingTodo> links = new ArrayList<>(initial);
+        Map<String, AuditFinding> findingsById = Arrays.stream(findings)
+                .collect(Collectors.toMap(AuditFinding::getId, f -> f));
+        lenient().when(findingTodoRepository.findByFindingIdIn(any())).thenAnswer(inv -> {
+            List<String> ids = inv.getArgument(0);
+            return links.stream().filter(l -> ids.contains(l.getFindingId())).toList();
+        });
+        lenient().when(findingTodoRepository.findByTodoId(anyString())).thenAnswer(inv -> {
+            String todoId = inv.getArgument(0);
+            return links.stream().filter(l -> l.getTodoId().equals(todoId)).toList();
+        });
+        lenient().when(findingTodoRepository.findByTodoIdIn(any())).thenAnswer(inv -> {
+            Collection<String> ids = inv.getArgument(0);
+            return links.stream().filter(l -> ids.contains(l.getTodoId())).toList();
+        });
+        lenient().doAnswer(inv -> {
+            links.remove((AuditFindingTodo) inv.getArgument(0));
+            return null;
+        }).when(findingTodoRepository).delete(any(AuditFindingTodo.class));
+        lenient().when(todoRepository.findById(todo.getId())).thenReturn(Optional.of(todo));
+        lenient().when(todoRepository.findAllById(any())).thenReturn(List.of(todo));
+        lenient().when(findingRepository.findById(anyString())).thenAnswer(inv ->
+                Optional.ofNullable(findingsById.get((String) inv.getArgument(0))));
+        lenient().when(findingRepository.findAllById(any())).thenAnswer(inv -> {
+            List<AuditFinding> found = new ArrayList<>();
+            for (String id : inv.<Iterable<String>>getArgument(0)) {
+                if (findingsById.containsKey(id)) found.add(findingsById.get(id));
+            }
+            return found;
+        });
+        return links;
     }
 
     /** be14db43: je Stufe eine Abfrage, egal wie viele Findings und TODOs der Ingest berührt. */
