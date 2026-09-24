@@ -27,7 +27,7 @@ stateDiagram-v2
     COMPLETED_WITH_ERRORS --> [*]
 ```
 
-At startup the backend cleans up runs still stored as `RUNNING` or `PAUSED` and sets them to `INTERRUPTED`. A run without an execution thread becomes `FAILED` after `automation.execution.ghost-watchdog-stale-minutes` — or `INTERRUPTED` if a standby was detected shortly before. `resume-from-step` continues after the last completed step; without a completed step a new run starts.
+At startup the backend cleans up runs still stored as `RUNNING` or `PAUSED` and sets them to `INTERRUPTED`. The watchdog sets a run without an execution thread to `FAILED` after `automation.execution.ghost-watchdog-stale-minutes` — or to `INTERRUPTED` if a standby was detected shortly before. `resume-from-step` continues after the last completed step; without a completed step a new run starts.
 
 ## StepResult Status — *StepStatus*
 

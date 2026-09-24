@@ -9,7 +9,7 @@ Instance in a container, Compose setup, agent images, project containers and res
 `scripts/instance.sh up --name NAME` builds backend and frontend into one image with `deploy/Dockerfile` and starts exactly one container (`deploy/compose.yml`); the backend serves the frontend itself.
 
 - Settings per instance: `deploy/instances/NAME.env` — `MYSURICATES_PORT` is required, `MYSURICATES_BIND` is `127.0.0.1` unless set otherwise
-- Mounts for projects, AI providers and the Docker socket are written by `scripts/lib/host-mounts.sh` into an override next to the Compose file
+- Mounts for projects, AI providers and the Docker socket are written by `scripts/lib/host-mounts.sh` into an override (`deploy/instances/NAME.override.yml`)
 - Data lives in named volumes and survives `scripts/instance.sh down`
 - `MYSURICATES_RUNTIME=host` starts the same instance directly on the machine instead of in a container
 

@@ -165,7 +165,7 @@
   <p><code>scripts/instance.sh up --name NAME</code> builds backend and frontend into one image with <code>deploy/Dockerfile</code> and starts exactly one container (<code>deploy/compose.yml</code>); the backend serves the frontend itself.</p>
   <ul>
     <li>Settings per instance: <code>deploy/instances/NAME.env</code> — <code>MYSURICATES_PORT</code> is required, <code>MYSURICATES_BIND</code> is <code>127.0.0.1</code> unless set otherwise</li>
-    <li>Mounts for projects, AI providers and the Docker socket are written by <code>scripts/lib/host-mounts.sh</code> into an override next to the Compose file</li>
+    <li>Mounts for projects, AI providers and the Docker socket are written by <code>scripts/lib/host-mounts.sh</code> into an override (<code>deploy/instances/NAME.override.yml</code>)</li>
     <li>Data lives in named volumes and survives <code>scripts/instance.sh down</code></li>
     <li><code>MYSURICATES_RUNTIME=host</code> starts the same instance directly on the machine instead of in a container</li>
   </ul>

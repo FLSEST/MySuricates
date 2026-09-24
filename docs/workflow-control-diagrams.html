@@ -180,7 +180,7 @@ stateDiagram-v2
     COMPLETED --&gt; [*]
     COMPLETED_WITH_ERRORS --&gt; [*]
   </pre>
-  <p>Beim Start räumt das Backend Runs auf, die noch als <code>RUNNING</code> oder <code>PAUSED</code> gespeichert sind, und setzt sie auf <code>INTERRUPTED</code>. Ein Run ohne Ausführungs-Thread wird nach <code>automation.execution.ghost-watchdog-stale-minutes</code> <code>FAILED</code> — oder <code>INTERRUPTED</code>, wenn kurz zuvor ein Standby erkannt wurde. <code>resume-from-step</code> setzt hinter dem letzten abgeschlossenen Schritt an; ohne abgeschlossenen Schritt startet ein neuer Run.</p>
+  <p>Beim Start räumt das Backend Runs auf, die noch als <code>RUNNING</code> oder <code>PAUSED</code> gespeichert sind, und setzt sie auf <code>INTERRUPTED</code>. Einen Run ohne Ausführungs-Thread setzt der Watchdog nach <code>automation.execution.ghost-watchdog-stale-minutes</code> auf <code>FAILED</code> — oder auf <code>INTERRUPTED</code>, wenn kurz zuvor ein Standby erkannt wurde. <code>resume-from-step</code> setzt hinter dem letzten abgeschlossenen Schritt an; ohne abgeschlossenen Schritt startet ein neuer Run.</p>
 </section>
 
 <section id="stepresult-status">

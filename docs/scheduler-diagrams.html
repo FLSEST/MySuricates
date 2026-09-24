@@ -161,7 +161,7 @@
 
 <section id="systemübersicht">
   <h2>Systemübersicht <span>Scheduler-Tick</span></h2>
-  <p>Alle 60 Sekunden prüft <code>SchedulerTick</code> die fälligen Zeitpläne und startet ihr Ziel — einen Workflow oder eine Kette — mit dem gespeicherten <code>inputContext</code>. Termine, die in einer Lücke fällig wurden (Standby, Kaltstart), holt die <code>CatchUpQueue</code> nacheinander nach oder schiebt sie auf ihr nächstes Vorkommen.</p>
+  <p>Alle 60 Sekunden prüft <code>SchedulerTick</code> die fälligen Zeitpläne und startet ihr Ziel — einen Workflow oder eine Kette — mit dem gespeicherten <code>inputContext</code>. Termine, die in einer Lücke fällig wurden (Standby, Kaltstart), holt die <code>CatchUpQueue</code> nacheinander nach — oder sie rücken auf ihr nächstes Vorkommen.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph DB["SQLite"]
@@ -286,7 +286,7 @@ sequenceDiagram
     <div class="card">
       <h3>Takt &amp; nextRunAt</h3>
       <p>Tick: <code>@Scheduled(fixedRate = 60_000)</code> in <code>SchedulerTick</code>.</p>
-      <p>Nach einem Start: CRON → nächster Termin, deaktiviert, sobald <code>maxRuns</code> oder <code>endDate</code> erreicht ist; ONCE und DELAYED → deaktiviert.</p>
+      <p>Nach einem Start: CRON → nächster Termin (deaktiviert, sobald <code>maxRuns</code> oder <code>endDate</code> erreicht ist); ONCE und DELAYED → deaktiviert.</p>
     </div>
     <div class="card">
       <h3>Konflikt</h3>
@@ -295,7 +295,7 @@ sequenceDiagram
     </div>
     <div class="card">
       <h3>Verpasste Termine</h3>
-      <p>Erkannt als Tick-Lücke über <code>automation.scheduler.resume-grace-minutes</code> (Standard 5) oder als erster Tick nach dem Start.</p>
+      <p>Erkannt als Tick-Lücke über <code>automation.scheduler.resume-grace-minutes</code> (Standard 5 Minuten) oder als erster Tick nach dem Start.</p>
       <p>Nachgeholt wird einzeln über die <code>CatchUpQueue</code> — für alle Zeitpläne, solange <code>scheduler-catch-up-on-resume</code> an ist (Standard), sonst nur mit <code>catchUpOnResume</code>. Alle übrigen springen auf ihren nächsten Termin.</p>
     </div>
     <div class="card">

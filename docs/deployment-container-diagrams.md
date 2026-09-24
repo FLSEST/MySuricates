@@ -7,7 +7,7 @@ Instanz im Container, Compose-Setup, Agent-Images, Projekt-Container und Ressour
 `scripts/instance.sh up --name NAME` baut mit `deploy/Dockerfile` Backend und Frontend in ein Image und startet genau einen Container (`deploy/compose.yml`); das Backend liefert das Frontend selbst aus.
 
 - Einstellungen je Instanz: `deploy/instances/NAME.env` — `MYSURICATES_PORT` ist Pflicht, `MYSURICATES_BIND` steht auf `127.0.0.1`, wenn nichts anderes gesetzt ist
-- Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt `scripts/lib/host-mounts.sh` in ein Override neben der Compose-Datei
+- Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt `scripts/lib/host-mounts.sh` in ein Override (`deploy/instances/NAME.override.yml`)
 - Daten liegen in benannten Volumes und bleiben bei `scripts/instance.sh down` erhalten
 - `MYSURICATES_RUNTIME=host` startet dieselbe Instanz statt im Container direkt auf dem Rechner
 

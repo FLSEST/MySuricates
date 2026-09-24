@@ -4,7 +4,7 @@ Zeitpläne, InputContext, Auslösung und Ausführungspipeline
 
 ## Systemübersicht — *Scheduler-Tick*
 
-Alle 60 Sekunden prüft `SchedulerTick` die fälligen Zeitpläne und startet ihr Ziel — einen Workflow oder eine Kette — mit dem gespeicherten `inputContext`. Termine, die in einer Lücke fällig wurden (Standby, Kaltstart), holt die `CatchUpQueue` nacheinander nach oder schiebt sie auf ihr nächstes Vorkommen.
+Alle 60 Sekunden prüft `SchedulerTick` die fälligen Zeitpläne und startet ihr Ziel — einen Workflow oder eine Kette — mit dem gespeicherten `inputContext`. Termine, die in einer Lücke fällig wurden (Standby, Kaltstart), holt die `CatchUpQueue` nacheinander nach — oder sie rücken auf ihr nächstes Vorkommen.
 
 ```mermaid
 flowchart LR
@@ -125,7 +125,7 @@ ONCE erfordert `scheduledAt`, DELAYED eine `delayExpression`.
 
 Tick: `@Scheduled(fixedRate = 60_000)` in `SchedulerTick`.
 
-Nach einem Start: CRON → nächster Termin, deaktiviert, sobald `maxRuns` oder `endDate` erreicht ist; ONCE und DELAYED → deaktiviert.
+Nach einem Start: CRON → nächster Termin (deaktiviert, sobald `maxRuns` oder `endDate` erreicht ist); ONCE und DELAYED → deaktiviert.
 
 ### Konflikt
 
@@ -135,7 +135,7 @@ Nach einem Start: CRON → nächster Termin, deaktiviert, sobald `maxRuns` oder 
 
 ### Verpasste Termine
 
-Erkannt als Tick-Lücke über `automation.scheduler.resume-grace-minutes` (Standard 5) oder als erster Tick nach dem Start.
+Erkannt als Tick-Lücke über `automation.scheduler.resume-grace-minutes` (Standard 5 Minuten) oder als erster Tick nach dem Start.
 
 Nachgeholt wird einzeln über die `CatchUpQueue` — für alle Zeitpläne, solange `scheduler-catch-up-on-resume` an ist (Standard), sonst nur mit `catchUpOnResume`. Alle übrigen springen auf ihren nächsten Termin.
 

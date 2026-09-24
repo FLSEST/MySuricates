@@ -77,7 +77,7 @@ sequenceDiagram
 
 ## Ausführung (ohne KI) — *Shell-Pfade*
 
-Shell-Mode nutzt keine Modelle und keine Anweisungen und bewertet nur den Exit-Code.
+Der Shell-Modus nutzt weder Modelle noch Anweisungen und bewertet nur den Exit-Code.
 
 ```mermaid
 sequenceDiagram
@@ -165,7 +165,7 @@ flowchart LR
     end
 ```
 
-## Provider & Ausführungsmodi — *KI vs. Kein KI*
+## Provider & Ausführungsmodi — *KI vs. ohne KI*
 
 | Merkmal | KI (Claude, Codex, Pi) | Ohne KI (Shell) |
 |---|---|---|

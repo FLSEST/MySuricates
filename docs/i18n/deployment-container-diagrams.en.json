@@ -5,7 +5,7 @@
   "deploy/": "deploy/",
   "`scripts/instance.sh up --name NAME` baut mit `deploy/Dockerfile` Backend und Frontend in ein Image und startet genau einen Container (`deploy/compose.yml`); das Backend liefert das Frontend selbst aus.": "`scripts/instance.sh up --name NAME` builds backend and frontend into one image with `deploy/Dockerfile` and starts exactly one container (`deploy/compose.yml`); the backend serves the frontend itself.",
   "Einstellungen je Instanz: `deploy/instances/NAME.env` — `MYSURICATES_PORT` ist Pflicht, `MYSURICATES_BIND` steht auf `127.0.0.1`, wenn nichts anderes gesetzt ist": "Settings per instance: `deploy/instances/NAME.env` — `MYSURICATES_PORT` is required, `MYSURICATES_BIND` is `127.0.0.1` unless set otherwise",
-  "Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt `scripts/lib/host-mounts.sh` in ein Override neben der Compose-Datei": "Mounts for projects, AI providers and the Docker socket are written by `scripts/lib/host-mounts.sh` into an override next to the Compose file",
+  "Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt `scripts/lib/host-mounts.sh` in ein Override (`deploy/instances/NAME.override.yml`)": "Mounts for projects, AI providers and the Docker socket are written by `scripts/lib/host-mounts.sh` into an override (`deploy/instances/NAME.override.yml`)",
   "Daten liegen in benannten Volumes und bleiben bei `scripts/instance.sh down` erhalten": "Data lives in named volumes and survives `scripts/instance.sh down`",
   "`MYSURICATES_RUNTIME=host` startet dieselbe Instanz statt im Container direkt auf dem Rechner": "`MYSURICATES_RUNTIME=host` starts the same instance directly on the machine instead of in a container",
   "Docker Compose": "Docker Compose",

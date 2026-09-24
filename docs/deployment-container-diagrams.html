@@ -165,7 +165,7 @@
   <p><code>scripts/instance.sh up --name NAME</code> baut mit <code>deploy/Dockerfile</code> Backend und Frontend in ein Image und startet genau einen Container (<code>deploy/compose.yml</code>); das Backend liefert das Frontend selbst aus.</p>
   <ul>
     <li>Einstellungen je Instanz: <code>deploy/instances/NAME.env</code> — <code>MYSURICATES_PORT</code> ist Pflicht, <code>MYSURICATES_BIND</code> steht auf <code>127.0.0.1</code>, wenn nichts anderes gesetzt ist</li>
-    <li>Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt <code>scripts/lib/host-mounts.sh</code> in ein Override neben der Compose-Datei</li>
+    <li>Mounts für Projekte, KI-Anbieter und Docker-Socket schreibt <code>scripts/lib/host-mounts.sh</code> in ein Override (<code>deploy/instances/NAME.override.yml</code>)</li>
     <li>Daten liegen in benannten Volumes und bleiben bei <code>scripts/instance.sh down</code> erhalten</li>
     <li><code>MYSURICATES_RUNTIME=host</code> startet dieselbe Instanz statt im Container direkt auf dem Rechner</li>
   </ul>

@@ -161,7 +161,7 @@
 
 <section id="system-overview">
   <h2>System Overview <span>Scheduler Tick</span></h2>
-  <p>Every 60 seconds <code>SchedulerTick</code> checks the due schedules and starts their target — a workflow or a chain — with the stored <code>inputContext</code>. Occurrences that fell due during a gap (standby, cold start) are caught up one after another by the <code>CatchUpQueue</code> or moved to their next occurrence.</p>
+  <p>Every 60 seconds <code>SchedulerTick</code> checks the due schedules and starts their target — a workflow or a chain — with the stored <code>inputContext</code>. Occurrences that fell due during a gap (standby, cold start) are caught up one after another by the <code>CatchUpQueue</code> — or they move on to their next occurrence.</p>
   <pre class="mermaid">
 flowchart LR
     subgraph DB["SQLite"]
@@ -286,7 +286,7 @@ sequenceDiagram
     <div class="card">
       <h3>Tick &amp; nextRunAt</h3>
       <p>Tick: <code>@Scheduled(fixedRate = 60_000)</code> in <code>SchedulerTick</code>.</p>
-      <p>After a start: CRON → next occurrence, disabled once <code>maxRuns</code> or <code>endDate</code> is reached; ONCE and DELAYED → disabled.</p>
+      <p>After a start: CRON → next occurrence (disabled once <code>maxRuns</code> or <code>endDate</code> is reached); ONCE and DELAYED → disabled.</p>
     </div>
     <div class="card">
       <h3>Conflict</h3>
@@ -295,7 +295,7 @@ sequenceDiagram
     </div>
     <div class="card">
       <h3>Missed Occurrences</h3>
-      <p>Detected as a tick gap above <code>automation.scheduler.resume-grace-minutes</code> (default 5) or as the first tick after startup.</p>
+      <p>Detected as a tick gap above <code>automation.scheduler.resume-grace-minutes</code> (default 5 minutes) or as the first tick after startup.</p>
       <p>Catch-up runs one at a time through the <code>CatchUpQueue</code> — for all schedules while <code>scheduler-catch-up-on-resume</code> is on (default), otherwise only with <code>catchUpOnResume</code>. All others jump to their next occurrence.</p>
     </div>
     <div class="card">

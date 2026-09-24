@@ -79,7 +79,7 @@ sequenceDiagram
 
 ## Execution (Without AI) — *Shell Paths*
 
-Shell mode uses no models and no instructions and only evaluates the exit code.
+Shell mode uses neither models nor instructions and only evaluates the exit code.
 
 ```mermaid
 sequenceDiagram

@@ -6,7 +6,7 @@ Schedules, InputContext, triggering and execution pipeline
 
 ## System Overview — *Scheduler Tick*
 
-Every 60 seconds `SchedulerTick` checks the due schedules and starts their target — a workflow or a chain — with the stored `inputContext`. Occurrences that fell due during a gap (standby, cold start) are caught up one after another by the `CatchUpQueue` or moved to their next occurrence.
+Every 60 seconds `SchedulerTick` checks the due schedules and starts their target — a workflow or a chain — with the stored `inputContext`. Occurrences that fell due during a gap (standby, cold start) are caught up one after another by the `CatchUpQueue` — or they move on to their next occurrence.
 
 ```mermaid
 flowchart LR
@@ -127,7 +127,7 @@ ONCE requires `scheduledAt`, DELAYED a `delayExpression`.
 
 Tick: `@Scheduled(fixedRate = 60_000)` in `SchedulerTick`.
 
-After a start: CRON → next occurrence, disabled once `maxRuns` or `endDate` is reached; ONCE and DELAYED → disabled.
+After a start: CRON → next occurrence (disabled once `maxRuns` or `endDate` is reached); ONCE and DELAYED → disabled.
 
 ### Conflict
 
@@ -137,7 +137,7 @@ After a start: CRON → next occurrence, disabled once `maxRuns` or `endDate` is
 
 ### Missed Occurrences
 
-Detected as a tick gap above `automation.scheduler.resume-grace-minutes` (default 5) or as the first tick after startup.
+Detected as a tick gap above `automation.scheduler.resume-grace-minutes` (default 5 minutes) or as the first tick after startup.
 
 Catch-up runs one at a time through the `CatchUpQueue` — for all schedules while `scheduler-catch-up-on-resume` is on (default), otherwise only with `catchUpOnResume`. All others jump to their next occurrence.
 
