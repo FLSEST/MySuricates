@@ -241,7 +241,7 @@ The assistant can load additional data via `<fetch type="..." id="..."/>` tags. 
 |------|------------|------------|
 | `run_detail` | Run detail with steps | Error: smart(200,400), Output: smart(200,600) — tail-aware |
 | `step_output` | Single step output (`runId/stepNumber`); paging via `?offset=<n>` / `?tail=<n>` | Default smart(2000,6000); window/tail max 8000 |
-| `workflow_detail` | Workflow overview | Desc: 150, Instructions: 400, Prompt: 200 |
+| `workflow_detail` | Workflow overview; per block the keys its executor reads (`BlockConfigSummaryFormatter`, checked by `BlockSpecConfigKeysGateTest`) | Desc: 150, Instructions: 400, prompt/goal/command: 200, shell command: 300 |
 | `workflow-full` | Complete workflow including config | Instructions: 600, Config values: 300 |
 | `workflow-inputs` | Workflow input variables | Values: 100 |
 | `workflow_runs` | Latest runs of a workflow | Top 5, Error: 100 |
@@ -249,7 +249,7 @@ The assistant can load additional data via `<fetch type="..." id="..."/>` tags. 
 | `wish_detail` | Wish detail | Text: 200, Error: 300 |
 | `docs` | Documentation section | Full: 8000, Section: 12000 |
 | `pool_workflows` | All workflows in the pool | Desc: 120 |
-| `pool_workflow` | Single pool workflow | Instructions: 500 |
+| `pool_workflow` | Single pool workflow, blocks as in `workflow_detail` | Instructions: 500 |
 | `project_context` | Project context via `ProjectContextService` | — |
 | `project_files` | Project file listing | Max 50 top-level, depth 1, max 10 sub-entries |
 | `project_file` | Single project file | Max 500KB, Content: 8000 |

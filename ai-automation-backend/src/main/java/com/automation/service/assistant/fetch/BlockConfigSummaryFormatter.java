@@ -5,6 +5,7 @@ import com.automation.service.assistant.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,87 +13,87 @@ import java.util.Map;
  * Renders a one-glance summary of a block's config (prompt/command/condition/…)
  * per block type. Shared by {@link WorkflowFetchHandler} and {@link PoolFetchHandler}
  * so stored workflows and pool templates read identically.
+ *
+ * <p>It shows the keys the executors read ({@link #SHOWN}); {@code BlockSpecConfigKeysGateTest}
+ * checks each against the executor source. It used to read {@code prompt}, {@code true_blocks},
+ * {@code max_attempts} and others no executor has, so the assistant saw neither prompts nor goals,
+ * and every conditional had 0/0 branches (TODO e6ea63bc). A type without an entry shows all its
+ * non-blank keys.
  */
 @Component
 @RequiredArgsConstructor
 public class BlockConfigSummaryFormatter {
 
+    /** A shown key: its value cut to {@code maxChars}, or — with {@code maxChars} 0 — the size of its list. */
+    private record Shown(String key, int maxChars) {
+    }
+
+    private static final int SHORT = 80;
+    private static final int LONG = 200;
+
+    /** What the summary shows per block type, in this order. */
+    private static final Map<String, List<Shown>> SHOWN = Map.ofEntries(
+            Map.entry("simple", List.of(text("command", LONG), text("model", SHORT))),
+            Map.entry("agentic", List.of(text("goal", LONG), text("success_criteria", 120),
+                    text("max_iterations", SHORT), text("model", SHORT))),
+            Map.entry("shell", List.of(text("command", 300), text("container_image", SHORT))),
+            Map.entry("conditional", List.of(text("condition", LONG), text("then_command", 150),
+                    text("else_command", 150), text("execution_mode", SHORT))),
+            Map.entry("foreach", List.of(text("items_source", SHORT), text("items", 150), text("items_command", 150),
+                    text("command", LONG), text("execution_mode", SHORT))),
+            Map.entry("while", List.of(text("condition_command", 150), text("command", LONG),
+                    text("max_iterations", SHORT), text("execution_mode", SHORT))),
+            Map.entry("switch", List.of(text("expression", 120), count("cases"), count("default"))),
+            Map.entry("retry", List.of(text("command", LONG), text("max_retries", SHORT), text("execution_mode", SHORT))),
+            Map.entry("approval", List.of(text("question", LONG), text("options", SHORT))),
+            Map.entry("human-input", List.of(text("prompt", LONG), text("input_type", SHORT), count("fields"))),
+            Map.entry("sub-workflow", List.of(text("workflow_id", SHORT))),
+            Map.entry("compress", List.of(text("source", SHORT), count("stages"))),
+            Map.entry("compress-ai", List.of(text("source", SHORT), text("instruction", LONG))));
+
     private final WorkflowRepository workflowRepository;
 
-    @SuppressWarnings("unchecked")
+    private static Shown text(String key, int maxChars) {
+        return new Shown(key, maxChars);
+    }
+
+    private static Shown count(String key) {
+        return new Shown(key, 0);
+    }
+
+    /** The keys the summary shows per block type — for the drift gate. */
+    public static Map<String, List<String>> shownKeys() {
+        Map<String, List<String>> keys = new LinkedHashMap<>();
+        SHOWN.forEach((type, shown) -> keys.put(type, shown.stream().map(Shown::key).toList()));
+        return keys;
+    }
+
     public void appendBlockConfigSummary(StringBuilder sb, String type, Map<String, Object> cfg) {
-        switch (type) {
-            case "simple", "agentic" -> {
-                Object prompt = cfg.get("prompt");
-                if (prompt != null) sb.append("     prompt: ").append(AssistantFormatUtils.truncate(String.valueOf(prompt).trim(), 200)).append("\n");
-                Object model = cfg.get("model");
-                if (model != null && !String.valueOf(model).isBlank()) sb.append("     model: ").append(model).append("\n");
-            }
-            case "shell" -> {
-                Object command = cfg.get("command");
-                if (command != null) sb.append("     command: ").append(AssistantFormatUtils.truncate(String.valueOf(command).trim(), 300)).append("\n");
-            }
-            case "conditional" -> {
-                Object condition = cfg.get("condition");
-                if (condition != null) sb.append("     condition: ").append(condition).append("\n");
-                Object trueBlocks = cfg.get("true_blocks");
-                Object falseBlocks = cfg.get("false_blocks");
-                int trueCount  = trueBlocks  instanceof List<?> l ? l.size() : 0;
-                int falseCount = falseBlocks instanceof List<?> l ? l.size() : 0;
-                sb.append("     if true: ").append(trueCount).append(" block(s), if false: ").append(falseCount).append(" block(s)\n");
-            }
-            case "foreach" -> {
-                Object items = cfg.get("items");
-                if (items != null) sb.append("     items: ").append(items).append("\n");
-                Object nested = cfg.get("blocks");
-                int count = nested instanceof List<?> l ? l.size() : 0;
-                sb.append("     nested blocks: ").append(count).append("\n");
-            }
-            case "switch" -> {
-                Object cases = cfg.get("cases");
-                int count = cases instanceof List<?> l ? l.size() : 0;
-                sb.append("     cases: ").append(count).append("\n");
-            }
-            case "approval" -> {
-                Object question = cfg.get("question");
-                if (question != null) sb.append("     question: ").append(question).append("\n");
-            }
-            case "retry" -> {
-                Object maxAttempts = cfg.get("max_attempts");
-                if (maxAttempts != null) sb.append("     max_attempts: ").append(maxAttempts).append("\n");
-                Object innerBlock = cfg.get("block");
-                if (innerBlock instanceof Map<?, ?> inner) {
-                    sb.append("     inner block type: ").append(inner.get("type")).append("\n");
+        List<Shown> shown = SHOWN.get(type);
+        if (shown == null) {
+            cfg.forEach((key, value) -> {
+                if (value != null && !String.valueOf(value).isBlank()) {
+                    line(sb, key, AssistantFormatUtils.truncate(String.valueOf(value), SHORT));
                 }
-            }
-            case "sub-workflow" -> {
-                Object wfId = cfg.get("workflow_id");
-                if (wfId != null) {
-                    String name = workflowRepository.findById(String.valueOf(wfId))
-                            .map(w -> w.getName()).orElse(String.valueOf(wfId));
-                    sb.append("     sub-workflow: ").append(name).append("\n");
+            });
+            return;
+        }
+        for (Shown item : shown) {
+            Object value = cfg.get(item.key());
+            if (item.maxChars() == 0) {
+                if (value instanceof List<?> list) line(sb, item.key(), String.valueOf(list.size()));
+            } else if (value != null && !String.valueOf(value).isBlank()) {
+                String text = String.valueOf(value).trim();
+                if ("workflow_id".equals(item.key())) {
+                    line(sb, "sub-workflow", workflowRepository.findById(text).map(w -> w.getName()).orElse(text));
+                } else {
+                    line(sb, item.key(), AssistantFormatUtils.truncate(text, item.maxChars()));
                 }
-            }
-            case "human-input" -> {
-                Object prompt = cfg.get("prompt");
-                if (prompt != null) sb.append("     prompt: ").append(prompt).append("\n");
-                Object inputType = cfg.get("input_type");
-                if (inputType != null) sb.append("     input_type: ").append(inputType).append("\n");
-            }
-            case "compress", "compress-ai" -> {
-                Object source = cfg.get("source");
-                if (source != null) sb.append("     source: ").append(source).append("\n");
-                if (cfg.get("stages") instanceof List<?> stages) sb.append("     stages: ").append(stages.size()).append("\n");
-                Object instruction = cfg.get("instruction");
-                if (instruction != null) sb.append("     instruction: ").append(AssistantFormatUtils.truncate(String.valueOf(instruction).trim(), 200)).append("\n");
-            }
-            default -> {
-                cfg.forEach((k, v) -> {
-                    if (v != null && !String.valueOf(v).isBlank()) {
-                        sb.append("     ").append(k).append(": ").append(AssistantFormatUtils.truncate(String.valueOf(v), 80)).append("\n");
-                    }
-                });
             }
         }
+    }
+
+    private static void line(StringBuilder sb, String key, String value) {
+        sb.append("     ").append(key).append(": ").append(value).append("\n");
     }
 }

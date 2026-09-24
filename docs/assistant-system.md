@@ -245,7 +245,7 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 |-----|-------------|------------|
 | `run_detail` | Run-Detail mit Steps | Error: smart(200,400), Output: smart(200,600) — tail-bewusst |
 | `step_output` | Einzelner Step-Output (`runId/stepNumber`); Paging via `?offset=<n>` / `?tail=<n>` | Default smart(2000,6000); Window/Tail max 8000 |
-| `workflow_detail` | Workflow-Überblick | Desc: 150, Instructions: 400, Prompt: 200 |
+| `workflow_detail` | Workflow-Überblick; je Block die Schlüssel, die sein Executor liest (`BlockConfigSummaryFormatter`, von `BlockSpecConfigKeysGateTest` geprüft) | Desc: 150, Instructions: 400, Prompt/Goal/Befehl: 200, Shell-Befehl: 300 |
 | `workflow-full` | Vollständiger Workflow inkl. Config | Instructions: 600, Config-Values: 300 |
 | `workflow-inputs` | Workflow-Input-Variablen | Values: 100 |
 | `workflow_runs` | Letzte Runs eines Workflows | Top 5, Error: 100 |
@@ -253,7 +253,7 @@ Der Assistent kann über `<fetch type="..." id="..."/>`-Tags zusätzliche Daten 
 | `wish_detail` | Wish-Detail | Text: 200, Error: 300 |
 | `docs` | Dokumentations-Sektion | Voll: 8000, Sektion: 12000 |
 | `pool_workflows` | Alle Workflows im Pool | Desc: 120 |
-| `pool_workflow` | Einzelner Pool-Workflow | Instructions: 500 |
+| `pool_workflow` | Einzelner Pool-Workflow, Blöcke wie `workflow_detail` | Instructions: 500 |
 | `project_context` | Projekt-Kontext via `ProjectContextService` | — |
 | `project_files` | Projekt-Dateiliste | Max 50 Top-Level, Tiefe 1, Max 10 Sub-Einträge |
 | `project_file` | Einzelne Projektdatei | Max 500KB, Content: 8000 |

@@ -1,6 +1,7 @@
 package com.automation.service.assistant;
 
 import com.automation.service.assistant.context.BlockTypesIndexSection;
+import com.automation.service.assistant.fetch.BlockConfigSummaryFormatter;
 import com.automation.service.assistant.fetch.BlockSpecs;
 import com.automation.service.assistant.fetch.DocsFetchHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Drift gate for the assistant's block specifications (TODO c4b81017): every config key that
- * {@code <fetch type="block-spec"/>} or a summary of {@link BlockTypesIndexSection} names has to be
- * read where that block type runs. About ten of the sixteen older specifications named keys no
+ * {@code <fetch type="block-spec"/>}, a summary of {@link BlockTypesIndexSection} or the block
+ * summary of {@link BlockConfigSummaryFormatter} names has to be read where that block type runs. About ten of the sixteen older specifications named keys no
  * executor reads ({@code skill_id}, {@code provider_id}, {@code true_blocks}, …), and the assistant
  * built configs from them that did nothing.
  *
@@ -83,6 +85,23 @@ class BlockSpecConfigKeysGateTest {
             String where = "BlockTypesIndexSection summary of '" + entry.type() + "'";
             ExecutorConfigReads.reportUnread(entry.type(), where, namedKeys(entry.summary(), where, problems), problems);
         }
+        assertThat(problems).as(HINT).isEmpty();
+    }
+
+    /**
+     * The keys the assistant's workflow and pool summaries show (TODO e6ea63bc): the formatter read
+     * {@code prompt}, {@code true_blocks}, {@code max_attempts} and others no executor has.
+     */
+    @Test
+    void everyKeyTheBlockSummaryShowsIsReadWhereTheBlockTypeRuns() throws IOException {
+        List<String> problems = new ArrayList<>();
+        BlockConfigSummaryFormatter.shownKeys().forEach((type, keys) -> {
+            try {
+                ExecutorConfigReads.reportUnread(type, "BlockConfigSummaryFormatter for '" + type + "'", keys, problems);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
         assertThat(problems).as(HINT).isEmpty();
     }
 

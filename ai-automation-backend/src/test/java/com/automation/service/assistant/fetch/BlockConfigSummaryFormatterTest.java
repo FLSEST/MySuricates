@@ -29,18 +29,20 @@ class BlockConfigSummaryFormatterTest {
         return sb.toString();
     }
 
+    /** simple keeps its prompt in command, agentic in goal — the summary read prompt and showed neither (TODO e6ea63bc). */
     @Test
-    void simpleAndAgentic_showTrimmedPromptAndNonBlankModel() {
-        assertThat(summary("simple", Map.of("prompt", "  Analysiere X  ", "model", "opus")))
-                .isEqualTo("     prompt: Analysiere X\n     model: opus\n");
-        assertThat(summary("agentic", Map.of("prompt", "Refactor", "model", " ")))
+    void simpleAndAgentic_showTrimmedPromptOrGoalAndNonBlankModel() {
+        assertThat(summary("simple", Map.of("command", "  Analysiere X  ", "model", "opus")))
+                .isEqualTo("     command: Analysiere X\n     model: opus\n");
+        assertThat(summary("agentic", Map.of("goal", "Refactor", "success_criteria", "mvn test grün",
+                "max_iterations", 5, "model", " ")))
                 .as("blank model is omitted")
-                .isEqualTo("     prompt: Refactor\n");
+                .isEqualTo("     goal: Refactor\n     success_criteria: mvn test grün\n     max_iterations: 5\n");
     }
 
     @Test
     void simple_longPrompt_isTruncatedAt200() {
-        String out = summary("simple", Map.of("prompt", "p".repeat(250)));
+        String out = summary("simple", Map.of("command", "p".repeat(250)));
 
         assertThat(out).contains("p".repeat(200))
                 .doesNotContain("p".repeat(201))
@@ -50,27 +52,37 @@ class BlockConfigSummaryFormatterTest {
     @Test
     void shell_showsCommandTruncatedAt300() {
         assertThat(summary("shell", Map.of("command", " ls -la "))).isEqualTo("     command: ls -la\n");
+        assertThat(summary("shell", Map.of("command", "make", "container_image", "node:22")))
+                .isEqualTo("     command: make\n     container_image: node:22\n");
         assertThat(summary("shell", Map.of("command", "x".repeat(400))))
                 .contains("[Output truncated: 300 of 400 characters]");
         assertThat(summary("shell", Map.of())).isEmpty();
     }
 
+    /** The branches are commands — the summary counted true_blocks/false_blocks and always said 0/0. */
     @Test
-    void conditional_countsBranchBlocks_nonListCountsAsZero() {
+    void conditional_showsConditionAndBothBranches() {
         String out = summary("conditional", Map.of(
-                "condition", "{{score}} > 0.8",
-                "true_blocks", List.of(Map.of(), Map.of()),
-                "false_blocks", "not-a-list"));
+                "condition", "test -f package.json", "then_command", "npm test", "else_command", "echo none",
+                "execution_mode", "shell"));
 
-        assertThat(out).isEqualTo("     condition: {{score}} > 0.8\n"
-                + "     if true: 2 block(s), if false: 0 block(s)\n");
+        assertThat(out).isEqualTo("     condition: test -f package.json\n     then_command: npm test\n"
+                + "     else_command: echo none\n     execution_mode: shell\n");
     }
 
     @Test
-    void switch_countsCases() {
-        assertThat(summary("switch", Map.of("cases", List.of(Map.of(), Map.of(), Map.of()))))
-                .isEqualTo("     cases: 3\n");
-        assertThat(summary("switch", Map.of())).isEqualTo("     cases: 0\n");
+    void switch_showsExpressionAndCountsCasesAndDefault() {
+        assertThat(summary("switch", Map.of("expression", "{{ env }}",
+                "cases", List.of(Map.of(), Map.of(), Map.of()), "default", List.of(Map.of()))))
+                .isEqualTo("     expression: {{ env }}\n     cases: 3\n     default: 1\n");
+        assertThat(summary("switch", Map.of("cases", "not-a-list"))).as("a non-list is no count").isEmpty();
+    }
+
+    @Test
+    void while_showsConditionCommandAndLimit() {
+        assertThat(summary("while", Map.of("condition_command", "test ! -f done", "command", "./next.sh",
+                "max_iterations", 10)))
+                .isEqualTo("     condition_command: test ! -f done\n     command: ./next.sh\n     max_iterations: 10\n");
     }
 
     @Test
@@ -78,13 +90,12 @@ class BlockConfigSummaryFormatterTest {
         assertThat(summary("approval", Map.of("question", "Deployen?"))).isEqualTo("     question: Deployen?\n");
     }
 
+    /** retry runs a command — the summary read max_attempts and an inner block, keys no executor has. */
     @Test
-    void retry_showsMaxAttemptsAndInnerBlockType() {
-        assertThat(summary("retry", Map.of("max_attempts", 3, "block", Map.of("type", "shell"))))
-                .isEqualTo("     max_attempts: 3\n     inner block type: shell\n");
-        assertThat(summary("retry", Map.of("block", "kein-map")))
-                .as("non-map inner block is skipped silently")
-                .isEmpty();
+    void retry_showsCommandRetriesAndMode() {
+        assertThat(summary("retry", Map.of("command", "npm test", "max_retries", 2, "execution_mode", "shell")))
+                .isEqualTo("     command: npm test\n     max_retries: 2\n     execution_mode: shell\n");
+        assertThat(summary("retry", Map.of("max_attempts", 3))).as("keys retry does not read are not shown").isEmpty();
     }
 
     @Test
@@ -98,11 +109,15 @@ class BlockConfigSummaryFormatterTest {
                 .isEqualTo("     source: previous\n     instruction: Kurz fassen\n");
     }
 
-    /** Die echten Typnamen sind kleingeschrieben bzw. mit Bindestrich (TODO f8d74d01). */
+    /** Die echten Typnamen sind kleingeschrieben bzw. mit Bindestrich (TODO f8d74d01); foreach führt einen Befehl je Item aus. */
     @Test
-    void foreach_showsItemsAndNestedBlockCount() {
-        assertThat(summary("foreach", Map.of("items", "{{ dateien }}", "blocks", List.of(Map.of(), Map.of()))))
-                .isEqualTo("     items: {{ dateien }}\n     nested blocks: 2\n");
+    void foreach_showsWhereItsItemsComeFromAndItsCommand() {
+        assertThat(summary("foreach", Map.of("items_source", "command", "items_command", "ls docs",
+                "command", "wc -l {{ item }}", "execution_mode", "shell")))
+                .isEqualTo("     items_source: command\n     items_command: ls docs\n     command: wc -l {{ item }}\n"
+                        + "     execution_mode: shell\n");
+        assertThat(summary("foreach", Map.of("items", List.of("a", "b"), "blocks", List.of(Map.of()))))
+                .isEqualTo("     items: [a, b]\n");
     }
 
     @Test
@@ -114,9 +129,10 @@ class BlockConfigSummaryFormatterTest {
     }
 
     @Test
-    void humanInput_showsPromptAndInputType() {
-        assertThat(summary("human-input", Map.of("prompt", "Welche Version?", "input_type", "text")))
-                .contains("     prompt: Welche Version?\n").contains("     input_type: text\n");
+    void humanInput_showsPromptInputTypeAndFormFields() {
+        assertThat(summary("human-input", Map.of("prompt", "Welche Version?", "input_type", "select",
+                "fields", List.of(Map.of(), Map.of()))))
+                .isEqualTo("     prompt: Welche Version?\n     input_type: select\n     fields: 2\n");
     }
 
     @Test
