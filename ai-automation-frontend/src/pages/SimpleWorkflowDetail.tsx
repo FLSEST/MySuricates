@@ -5,6 +5,7 @@ import { Card, CardHeader, Button, Spinner } from '../components/ui';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ErrorState } from '../components/shared/ErrorState';
 import { ExecuteDialog } from '../components/workflow/ExecuteDialog';
+import { ProHandoff } from '../components/simple/ProHandoff';
 import {
   useWorkflow, useWorkflowRuns, useExecuteWorkflow,
 } from '../hooks/useWorkflows';
@@ -117,6 +118,9 @@ export function SimpleWorkflowDetail() {
           )}
         </dl>
       </Card>
+
+      {/* Editing the steps is Pro work — say so instead of hiding it */}
+      <ProHandoff reason={t.simple.handoff.changeSteps} to={`/workflows/${workflow.id}`} />
 
       {/* Recent runs */}
       <Card padding={false}>

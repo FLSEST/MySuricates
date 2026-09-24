@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 interface FeatureTileProps {
   icon: LucideIcon;
@@ -8,10 +8,12 @@ interface FeatureTileProps {
   /** Accent hue (works on light + dark). */
   color: string;
   onClick: () => void;
+  /** Optional marker next to the title (e.g. the Pro badge for tiles leading into Pro pages). */
+  badge?: ReactNode;
 }
 
 /** Color-accented launcher card for a Simple-mode area. Theme-token base + per-tile hue. */
-export function FeatureTile({ icon: Icon, title, description, color, onClick }: FeatureTileProps) {
+export function FeatureTile({ icon: Icon, title, description, color, onClick, badge }: FeatureTileProps) {
   return (
     <button
       onClick={onClick}
@@ -28,7 +30,10 @@ export function FeatureTile({ icon: Icon, title, description, color, onClick }: 
       >
         <Icon className="w-5 h-5" />
       </div>
-      <h3 className="text-[15px] font-semibold text-text mb-0.5 tracking-tight">{title}</h3>
+      <h3 className="flex items-center gap-2 text-[15px] font-semibold text-text mb-0.5 tracking-tight">
+        <span className="min-w-0 truncate">{title}</span>
+        {badge}
+      </h3>
       {description && <p className="text-xs text-text-secondary leading-snug">{description}</p>}
       <span
         className="absolute top-[18px] right-[18px] opacity-0 group-hover:opacity-90 group-hover:translate-x-0.5 transition"

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Plus, Play, Square, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
 import { useProjects, useCreateProject, useStartContainer, useStopContainer } from '../hooks/useProjects';
@@ -8,6 +7,8 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import { SimplePage, SimplePageHeader, SimpleCard, StatusDot } from '../components/simple/kit';
+import { ProBadge } from '../components/simple/ProHandoff';
+import { useOpenInPro } from '../hooks/useOpenInPro';
 import { AREA_COLORS } from '../utils/homeTiles';
 import type { ProjectType } from '../types';
 
@@ -16,7 +17,7 @@ const TYPES: ProjectType[] = ['CODE', 'RESEARCH', 'CONTENT', 'BUSINESS', 'PERSON
 
 export function SimpleProjects() {
   const t = useT();
-  const navigate = useNavigate();
+  const openInPro = useOpenInPro();
   const { data: projects, isLoading, error, refetch } = useProjects();
   const create = useCreateProject();
   const startC = useStartContainer();
@@ -64,7 +65,8 @@ export function SimpleProjects() {
             const busy = p.status === 'STARTING' || startC.isPending || stopC.isPending;
             return (
               <SimpleCard key={p.id} color={C}>
-                <button onClick={() => navigate(`/projects/${p.id}`)} className="block text-left w-full">
+                {/* The project page is a Pro page: the badge says so, the click switches modes openly */}
+                <button onClick={() => openInPro(`/projects/${p.id}`)} className="block text-left w-full">
                   <div className="flex items-start justify-between mb-3">
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center"
@@ -72,7 +74,10 @@ export function SimpleProjects() {
                     >
                       <FolderKanban className="w-5 h-5" />
                     </div>
-                    <StatusDot status={p.status} />
+                    <div className="flex items-center gap-2">
+                      <ProBadge />
+                      <StatusDot status={p.status} />
+                    </div>
                   </div>
                   <h3 className="text-[15px] font-semibold text-text truncate tracking-tight">{p.name}</h3>
                   <p className="text-xs text-text-secondary mt-0.5 truncate">

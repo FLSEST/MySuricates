@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { ProPageNotice } from './ProPageNotice';
 import { SecurityBanner } from './SecurityBanner';
 import { RateLimitBanner } from './RateLimitBanner';
 import { ApiKeyGuard } from './ApiKeyGuard';
@@ -57,6 +58,7 @@ export function Layout() {
           <SecurityBanner />
           <RateLimitBanner />
           <Header />
+          <ProPageNotice />
           <main className={isMobile ? 'p-4 pb-20' : 'p-6 pb-20'}>
             <Suspense fallback={<div className="flex items-center justify-center h-64"><Spinner /></div>}>
               <Outlet />

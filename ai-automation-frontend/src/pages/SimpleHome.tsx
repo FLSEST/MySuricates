@@ -17,6 +17,8 @@ import { SimpleOnboarding } from '../components/simple/SimpleOnboarding';
 import { AiProviderStartCard } from '../components/dashboard/AiProviderStartCard';
 import { SimpleOverview } from '../components/simple/SimpleOverview';
 import { FeatureTile } from '../components/simple/FeatureTile';
+import { ProBadge } from '../components/simple/ProHandoff';
+import { simpleRouteKind } from '../utils/simpleRoutes';
 import { StatusDot } from '../components/simple/kit';
 import type { Workflow } from '../types';
 
@@ -137,6 +139,7 @@ export function SimpleHome() {
               color={tile.color}
               title={t.simple.home.tiles[tile.id].title}
               description={t.simple.home.tiles[tile.id].desc}
+              badge={simpleRouteKind(tile.to) === 'pro' ? <ProBadge /> : undefined}
               onClick={() => navigate(tile.to)}
             />
           ))}

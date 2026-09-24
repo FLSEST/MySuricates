@@ -25,6 +25,7 @@ import { StartupConfigCard } from '../components/settings/StartupConfigCard';
 import { useModuleEnabled } from '../hooks/useModules';
 import { useRequestMetrics } from '../hooks/useRequestMetrics';
 import { ApiLatencyCard } from '../components/dashboard/ApiLatencyCard';
+import { ProHandoff } from '../components/simple/ProHandoff';
 
 export function Settings() {
   const t = useT();
@@ -107,6 +108,9 @@ export function Settings() {
           <SettingsSection id="tray" title={t.settings.trayNavTitle}>
             <TraySettingsCard />
           </SettingsSection>
+
+          {/* Simple mode hides execution + infrastructure — name them and offer the switch */}
+          {simpleMode && <ProHandoff reason={t.simple.handoff.settingsHidden} />}
 
           {!simpleMode && (
             <SettingsSection id="execution" title={t.settings.settingsNavExecution} collapsible open={!!openSections['execution']} onToggle={() => toggleSection('execution')}>

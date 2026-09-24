@@ -6,6 +6,7 @@ import { renderWithProviders } from '../../../test/utils';
 import { modulesFixture } from '../../../test/modules';
 import { useI18nStore } from '../../../i18n';
 import { useSettingsStore } from '../../../stores/settingsStore';
+import { useSidebarStore } from '../../../stores/sidebarStore';
 import { Sidebar } from '../Sidebar';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
@@ -15,6 +16,7 @@ beforeEach(() => {
   localStorage.clear();
   useI18nStore.setState({ locale: 'en' });
   useSettingsStore.setState({ simpleMode: false, sidebarItemOrder: [], sidebarHiddenItems: [], sidebarDividerLabels: {} });
+  useSidebarStore.setState({ collapsed: false });
 });
 
 describe('Sidebar modules', () => {
@@ -152,5 +154,46 @@ describe('Sidebar edit controls', () => {
       .toHaveAttribute('title', 'Standard-Reihenfolge, ausgeblendete Seiten und Unterteiler wiederherstellen');
     expect(screen.getByRole('button', { name: 'Workflows ausblenden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Workflows verschieben' })).toBeInTheDocument();
+  });
+});
+
+describe('Sidebar in simple mode', () => {
+  beforeEach(() => {
+    localStorage.setItem('mysuricates-modules', JSON.stringify(modulesFixture('full', [])));
+    useSettingsStore.setState({ simpleMode: true });
+  });
+
+  it('names the seven pages like their Simple titles', () => {
+    useI18nStore.setState({ locale: 'de' });
+    renderWithProviders(<Sidebar />);
+
+    const labels = ['Start', 'Meine Workflows', 'Ergebnisse', 'Projekte', 'Geplant', 'Aufgaben', 'Aktivität'];
+    for (const name of labels) expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    // Pro pages stay out of the Simple sidebar
+    expect(screen.queryByRole('link', { name: 'Factory' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ketten' })).not.toBeInTheDocument();
+  });
+
+  it('names them in English too', () => {
+    renderWithProviders(<Sidebar />);
+    for (const name of ['Home', 'My Workflows', 'Results', 'Projects', 'Scheduled', 'Tasks', 'Activity']) {
+      expect(screen.getByRole('link', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('offers no menu editing', () => {
+    renderWithProviders(<Sidebar />);
+    expect(screen.queryByRole('button', { name: 'Edit menu' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a mode switch when the sidebar is collapsed', () => {
+    useSidebarStore.setState({ collapsed: true });
+    renderWithProviders(<Sidebar />);
+
+    const toggle = screen.getByRole('button', { name: 'Switch to Pro' });
+    expect(toggle).toHaveAttribute('title', 'Switch to Pro');
+    fireEvent.click(toggle);
+    expect(useSettingsStore.getState().simpleMode).toBe(false);
+    expect(screen.getByRole('button', { name: 'Switch to Simple' })).toBeInTheDocument();
   });
 });

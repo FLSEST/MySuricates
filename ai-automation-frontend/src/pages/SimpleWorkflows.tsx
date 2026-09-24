@@ -178,7 +178,7 @@ export function SimpleWorkflows() {
   return (
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.workflows.title}</h1>
+        <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.tiles.workflows.title}</h1>
         <Button icon={<GitBranch className="w-4 h-4" />} onClick={openCreate}>
           {t.workflows.create}
         </Button>
