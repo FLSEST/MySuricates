@@ -2062,6 +2062,18 @@ export const de: TranslationKeys = {
     result: 'Ergebnis',
     delete: 'Lauf löschen',
     deleteConfirm: 'Diesen Lauf endgültig löschen? Die Schritte und der zugehörige Dead-Letter-Eintrag verschwinden mit. Verknüpfte TODOs bleiben erhalten, verlieren aber den Verweis.',
+    // Statusfilter der Lauflisten (Workflow- und Ketten-Läufe)
+    statuses: {
+      COMPLETED: 'Abgeschlossen',
+      COMPLETED_WITH_ERRORS: 'Abgeschlossen (alt)',
+      FAILED: 'Fehlgeschlagen',
+      RUNNING: 'Läuft',
+      CANCELLED: 'Abgebrochen',
+      PAUSED: 'Pausiert',
+      PENDING: 'Wartend',
+      INTERRUPTED: 'Unterbrochen',
+    },
+    chainFailedCount: '({count} fehlgeschlagen)',
   },
   activityLog: {
     title: 'Aktivitätslog',

@@ -2065,6 +2065,18 @@ export const en = {
     result: 'Result',
     delete: 'Delete run',
     deleteConfirm: 'Permanently delete this run? Its steps and the matching dead-letter entry go with it. Linked todos are kept, but lose the reference.',
+    // Status filter of the run lists (workflow and chain runs)
+    statuses: {
+      COMPLETED: 'Completed',
+      COMPLETED_WITH_ERRORS: 'Completed (legacy)',
+      FAILED: 'Failed',
+      RUNNING: 'Running',
+      CANCELLED: 'Cancelled',
+      PAUSED: 'Paused',
+      PENDING: 'Pending',
+      INTERRUPTED: 'Interrupted',
+    },
+    chainFailedCount: '({count} failed)',
   },
   activityLog: {
     title: 'Activity Log',

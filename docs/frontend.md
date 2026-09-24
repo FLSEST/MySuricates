@@ -118,6 +118,12 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
 - `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
 
+### Runs (`/runs`)
+
+- Tabs „Workflows“ und „Ketten“ (nur mit Modul `chains`); beide Listen laden unabhängig vom Tab
+- `hooks/useRunsFilters.ts`: gemerkte Filter je Tab, entprellte Suche (setzt die Seite zurück), Tabwechsel leert die Filter des verlassenen Tabs, Statusoptionen in der App-Sprache (`t.runs.statuses`)
+- Bausteine in `components/runs/`: `WorkflowsTab`, `ChainsTab`, Spalten in `runColumns.tsx` (`useWorkflowRunColumns`, `useChainRunColumns`; die Löschspalte nur, wenn `automation.executions.allow-delete` es erlaubt), `DeleteRunButton`, `RunResultText`, `ChainProgress`
+
 ### Skills (`/skills`)
 
 - Suchfilter + Kategorie-Filter

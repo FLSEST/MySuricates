@@ -118,6 +118,12 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
 - `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
 
+### Runs (`/runs`)
+
+- Tabs "Workflows" and "Chains" (only with the `chains` module); both lists load regardless of the tab
+- `hooks/useRunsFilters.ts`: remembered filters per tab, debounced search (resets the page), switching tabs clears the filters of the tab left, status options in the app language (`t.runs.statuses`)
+- Building blocks in `components/runs/`: `WorkflowsTab`, `ChainsTab`, columns in `runColumns.tsx` (`useWorkflowRunColumns`, `useChainRunColumns`; the delete column only when `automation.executions.allow-delete` allows it), `DeleteRunButton`, `RunResultText`, `ChainProgress`
+
 ### Skills (`/skills`)
 
 - Search filter + category filter
