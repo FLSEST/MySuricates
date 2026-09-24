@@ -161,6 +161,7 @@
 
 <section id="workflowrun-state-machine">
   <h2>WorkflowRun State Machine <span>RunStatus</span></h2>
+  <p>Ein Workflow-Run entsteht direkt als <code>RUNNING</code> (<code>PENDING</code> ist nur der Vorgabewert der Entität). Weist <code>RunAdmission</code> den Start ab — ein versiegelter Workflow passt nicht mehr zu seinem Siegel, oder ein unbeaufsichtigter Start trifft mit <code>require-sealed-for-unattended</code> auf einen unversiegelten Workflow —, entsteht gar kein Run.</p>
   <pre class="mermaid">
 stateDiagram-v2
     [*] --&gt; RUNNING : execute()
@@ -169,11 +170,17 @@ stateDiagram-v2
     RUNNING --&gt; FAILED : step failed + on_failure=stop / exception
     RUNNING --&gt; CANCELLED : cancelExecution(runId)
     RUNNING --&gt; COMPLETED : alle Schritte ok
+    RUNNING --&gt; COMPLETED_WITH_ERRORS : ein checked_command-Schritt schlug fehl, der Run lief weiter
     PAUSED --&gt; CANCELLED : cancelExecution(runId)
+    RUNNING --&gt; INTERRUPTED : Neustart des Backends oder Standby
+    PAUSED --&gt; INTERRUPTED : Neustart des Backends
+    INTERRUPTED --&gt; RUNNING : resume-from-step
     FAILED --&gt; [*]
     CANCELLED --&gt; [*]
     COMPLETED --&gt; [*]
+    COMPLETED_WITH_ERRORS --&gt; [*]
   </pre>
+  <p>Beim Start räumt das Backend Runs auf, die noch als <code>RUNNING</code> oder <code>PAUSED</code> gespeichert sind, und setzt sie auf <code>INTERRUPTED</code>. Ein Run ohne Ausführungs-Thread wird nach <code>automation.execution.ghost-watchdog-stale-minutes</code> <code>FAILED</code> — oder <code>INTERRUPTED</code>, wenn kurz zuvor ein Standby erkannt wurde. <code>resume-from-step</code> setzt hinter dem letzten abgeschlossenen Schritt an; ohne abgeschlossenen Schritt startet ein neuer Run.</p>
 </section>
 
 <section id="stepresult-status">
@@ -185,7 +192,7 @@ flowchart LR
     RUNNING --&gt; FAILED
     RUNNING --&gt; SKIPPED
   </pre>
-  <p>Setzen durch BlockExecutor: Shell/Claude Exit-Code -&gt; COMPLETED/FAILED; Conditional ohne Branch -&gt; SKIPPED.</p>
+  <p><code>BlockStepRunner</code> legt jeden Schritt gleich als <code>RUNNING</code> an (<code>PENDING</code> ist der Vorgabewert der Entität) und setzt dann das Ergebnis des BlockExecutors: Exit-Code der Shell bzw. der KI-CLI → COMPLETED/FAILED; Conditional ohne Befehl für den gewählten Zweig und abgelehntes Approval mit <code>on_no: skip</code> → SKIPPED.</p>
 </section>
 
 <section id="pause-cancel">
@@ -193,17 +200,24 @@ flowchart LR
   <pre class="mermaid">
 sequenceDiagram
     participant UI
-    participant CTRL as ExecutionController (n/a)
-    participant WE as WorkflowExecutor
+    participant CTRL as ExecutionController
+    participant WE as WorkflowExecutor / WorkflowExecutionRegistry
     participant CTX as ExecutionContext
 
-    UI-&gt;&gt;WE: pauseExecution(runId)
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/pause
+    CTRL-&gt;&gt;WE: pauseExecution(runId)
     WE-&gt;&gt;CTX: paused=true
-    Note over CTX: Block-Loop pollt paused<br/>und wartet 500ms
-    UI-&gt;&gt;WE: resumeExecution(runId)
+    Note over CTX: Vor dem nächsten Block setzt der Loop<br/>den Run auf PAUSED und prüft alle 500 ms
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/resume
+    CTRL-&gt;&gt;WE: resumeExecution(runId)
     WE-&gt;&gt;CTX: paused=false
-    UI-&gt;&gt;WE: cancelExecution(runId)
-    WE-&gt;&gt;CTX: cancelled=true + cancel pending approvals
+    UI-&gt;&gt;CTRL: POST /api/v1/executions/{id}/cancel
+    CTRL-&gt;&gt;WE: cancelExecution(runId)
+    alt Run hat einen Kontext (läuft oder wartet auf einen Slot)
+        WE-&gt;&gt;CTX: cancelled=true, laufenden Prozess beenden, offene Freigabe abbrechen
+    else Ghost-Run ohne Thread
+        WE-&gt;&gt;WE: Run direkt auf CANCELLED setzen
+    end
   </pre>
 </section>
 
@@ -213,19 +227,26 @@ sequenceDiagram
 sequenceDiagram
     participant BE as ApprovalBlockExecutor
     participant CTX as ExecutionContext
-    participant WS as WebSocket /topic/...
+    participant WS as WebSocket /topic/executions/{runId}/logs
     participant USER as User
+    participant API as ExecutionController
 
     BE-&gt;&gt;CTX: requestApproval(question, options)
     BE-&gt;&gt;WS: broadcast approval_required
-    USER--&gt;&gt;WS: answer via UI
-    WE-&gt;&gt;CTX: resolveApproval(answer)
+    USER-&gt;&gt;API: POST /api/v1/executions/{id}/approve (Feld answer)
+    API-&gt;&gt;CTX: resolveApproval(answer), nur angebotene Optionen, sonst 400
     CTX--&gt;&gt;BE: future completes
+    BE-&gt;&gt;WS: broadcast approval_resolved
     alt answer == "Yes always"
-        CTX-&gt;&gt;CTX: rememberApproval(question, answer)
+        BE-&gt;&gt;CTX: rememberApproval(question, answer)
     end
-    BE--&gt;&gt;WE: StepResult (COMPLETED/FAILED/SKIPPED je nach on_no)
+    alt Ablehnung (reject_options, Standard No/Nein)
+        BE--&gt;&gt;BE: on_no: continue → COMPLETED, skip → SKIPPED, fail → FAILED
+    else Zustimmung
+        BE--&gt;&gt;BE: COMPLETED, Antwort in approval_answer
+    end
   </pre>
+  <p>Ohne Antwort nach <code>timeout_minutes</code> (Standard 30) oder beim Abbruch des Runs endet der Schritt <code>FAILED</code>. Wartende Freigaben listet <code>GET /api/v1/executions/pending-input</code> (Seite <code>/approvals</code>). Der Agentic-Block fragt mit <code>require_approval</code> über dieselbe Mechanik (<code>agentic_approval_required</code>); „No“ lässt dort die Iteration mit einem neuen Vorschlag wiederholen.</p>
 </section>
 
 <section id="fehlerpfade-stop-on-failure">
@@ -233,13 +254,13 @@ sequenceDiagram
   <div class="grid">
     <div class="card">
       <h3>Default Verhalten</h3>
-      <p><code>on_failure</code> fehlt → stoppt Run bei FAILED-Step.</p>
-      <p>Setzbar auf <code>"continue"</code> falls Folge-Schritte trotzdem laufen sollen.</p>
+      <p><code>on_failure</code> fehlt oder steht auf <code>"stop"</code> → ein FAILED-Schritt beendet den Run mit <code>FAILED</code>.</p>
+      <p>Mit <code>"continue"</code> laufen die Folge-Schritte trotzdem; scheitert dabei ein Schritt mit <code>checked_command</code>, endet der Run als <code>COMPLETED_WITH_ERRORS</code>.</p>
     </div>
     <div class="card">
       <h3>Agentic Speziell</h3>
-      <p>Stop-Gründe: ITERATION_TIMEOUT, TOTAL_TIMEOUT, TOKEN_BUDGET_EXCEEDED, REPEATED_ACTIONS, GOAL_STATUS=IMPOSSIBLE.</p>
-      <p>Status: FAILED wenn Ziel nicht erreicht.</p>
+      <p>Stop-Gründe: TOTAL_TIMEOUT, ITERATION_TIMEOUT, TOKEN_BUDGET_EXCEEDED, REPEATED_ACTIONS, TOKEN_TRACKING_FAILED; außerdem GOAL_STATUS=IMPOSSIBLE und das Erreichen von <code>max_iterations</code>.</p>
+      <p>Status: COMPLETED nur bei GOAL_STATUS=ACHIEVED, sonst FAILED.</p>
     </div>
   </div>
 </section>
