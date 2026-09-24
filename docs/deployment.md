@@ -265,6 +265,7 @@ Test-Instanz auf Port 8090 (nutzt `docker/Dockerfile.stable` als Build-Basis):
 | `AUTOMATION_HARDENING_<NAME>` | `provenance`: `true`, Rest `false` | Härtungs-Flags `PROVENANCE`, `SEALING` (braucht provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (braucht sealing), `WEBHOOK_SIGNATURES` (braucht Modul webhooks) — siehe [Workflow-Härtung](architektur.md#workflow-härtung-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Globaler Claude-CLI-Timeout in Sekunden (in `application.yml` deklariert) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (leer) | Optionales per-Call Token-Limit für Claude CLI |
+| `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags und Kategorie eines Workflows per KI (`suggestions-model`), nach jedem Anlegen/Ändern und beim Start für Workflows ohne Tags — `false` spart diese Hintergrund-Aufrufe (Test- und Nebeninstanzen) |
 | `AUTOMATION_SSL_ENABLED` | `false` | SSL/TLS aktivieren |
 | `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Pfad zum PKCS12-Keystore |
 | `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore-Passwort |

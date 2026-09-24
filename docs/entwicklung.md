@@ -372,6 +372,37 @@ Seit Cypress 16 gibt es `Cypress.env()` nicht mehr: `API_BASE_URL`, `WS_BASE_URL
 in `cypress.config.ts` unter `expose` (`Cypress.expose()`), der API-Key unter `env` und ist nur über den
 Befehl `cy.env()` lesbar — `cypress/support/e2e.ts` holt ihn einmal je Spec.
 
+### Nebeninstanz für E2E starten
+
+Eine Wegwerf-Instanz (etwa aus einem Worktree-JAR) bekommt ein eigenes Verzeichnis `$S` und läuft
+vollständig darin — auch für die KI-CLIs, die sie startet:
+
+```bash
+S=$(mktemp -d); cp ai-automation-backend/target/ai-automation-backend-*.jar "$S/app.jar"
+mkdir -p "$S/home" "$S/config" "$S/data"
+HOME="$S/home" XDG_CONFIG_HOME="$S/config" \
+AUTOMATION_PORT=19090 AUTOMATION_DB_PATH="$S/data/automation.db" AUTOMATION_API_KEY=<key> \
+AUTOMATION_BACKUP_DIR="$S/backups" AUTOMATION_TRAY_ENABLED=false AUTOMATION_MODULES_PRESET=full \
+AUTOMATION_RATE_LIMIT_RPM=6000 AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false \
+  java -Duser.home="$S/home" -jar "$S/app.jar"
+```
+
+- **`-Duser.home`**: Java liest `user.home` aus dem Benutzerkonto, nicht aus `$HOME`. Ohne die Angabe
+  liest und schreibt die Instanz die Dateien der Dev-Instanz unter `~/.autotrigger/` (API-Key-Datei,
+  Schlüssel für Integrationen und Siegel, Backups).
+- **`HOME` und `XDG_CONFIG_HOME` im Scratch-Verzeichnis**: Die KI-CLIs, die das Backend startet, erben `HOME` —
+  mit dem echten nutzen sie deine Anmeldung, also echte Tokens. Unter `XDG_CONFIG_HOME` sucht das Backend
+  `mysuricates/ai.env` (Claude-Token für Projekt-Container). Aus demselben Grund dürfen
+  `CLAUDE_CODE_OAUTH_TOKEN` und `ANTHROPIC_API_KEY` in der startenden Shell nicht gesetzt sein.
+- **`AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED=false`**: Sonst startet jeder angelegte oder geänderte Workflow
+  — und viele Specs legen welche an — im Hintergrund einen `claude`-Aufruf für Tags und Kategorie
+  (`WorkflowTaggingService`); beim Start dazu einen je Workflow ohne Tags. Mit `HOME` im Scratch läuft er
+  ohne Anmeldung ins Leere, mit dem echten kostet er Tokens. Die Integrationstests setzen denselben
+  Schalter (`application-integration.yml`, bewacht von `IntegrationProfileAiIsolationTest`).
+- **`AUTOMATION_RATE_LIMIT_RPM=6000`**: Das Limit von 120 Anfragen je Minute bricht einen Cypress-Lauf sonst ab.
+- Vite für die Oberfläche auf Port `5173` (CORS lässt nur 3000/5173 zu):
+  `VITE_HTTPS=false VITE_API_BASE_URL=http://localhost:19090/api/v1 VITE_WS_BASE_URL=ws://localhost:19090 npx vite --port 5173`.
+
 ### Testdaten und Cleanup
 
 - **Dev-Target:** erzeugte Cypress-Projekte, Workflows, Chains und Runs landen auf Dev

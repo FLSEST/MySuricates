@@ -263,6 +263,7 @@ Test instance on port 8090 (uses `docker/Dockerfile.stable` as build base):
 | `AUTOMATION_HARDENING_<NAME>` | `provenance`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
+| `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags and category of a workflow via AI (`suggestions-model`), after every create/change and at startup for untagged workflows — `false` saves these background calls (test and side instances) |
 | `AUTOMATION_SSL_ENABLED` | `false` | Enable SSL/TLS |
 | `AUTOMATION_SSL_KEYSTORE` | `./certs/dev.p12` | Path to PKCS12 keystore |
 | `AUTOMATION_SSL_PASSWORD` | `mysuricates` | Keystore password |

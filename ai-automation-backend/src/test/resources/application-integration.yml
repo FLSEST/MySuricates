@@ -70,6 +70,11 @@ automation:
   host-claude:
     timeout-seconds: 10
     max-concurrent-calls: 1
+  discovery:
+    # Every created or changed workflow (and every context start, as a backfill) made
+    # WorkflowTaggingService start `claude -p` in user.home — with the developer's CLI login, i.e.
+    # real tokens on every local mvn test (TODO efc18b68). Guarded by IntegrationProfileAiIsolationTest.
+    auto-tagging-enabled: false
   backup:
     # Without this override every @SpringBootTest context wrote a startup backup of its
     # throwaway test DB into the developer's real ${user.home}/.autotrigger/backups/dev and
