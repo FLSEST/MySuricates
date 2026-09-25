@@ -21,6 +21,9 @@ public interface WorkflowMemoryRepository extends JpaRepository<WorkflowMemory, 
 
     /** The five newest active memories — the page suggestions only show that many (TODO bdd11037). */
     List<WorkflowMemory> findTop5ByActiveTrueOrderByCreatedAtDesc();
+
+    /** The eight newest active memories — the assistant's "Learnings &amp; Pitfalls" show that many (TODO 8c791a45). */
+    List<WorkflowMemory> findTop8ByActiveTrueOrderByCreatedAtDesc();
     long countByActiveTrue();
 
     @Modifying
