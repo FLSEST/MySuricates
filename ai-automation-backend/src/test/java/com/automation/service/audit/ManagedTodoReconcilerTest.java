@@ -143,6 +143,55 @@ class ManagedTodoReconcilerTest {
         verify(findingRepository, never()).findById(any());
     }
 
+    /** Ein verwaltetes TODO, das es nicht mehr gibt, wird uebersprungen – ohne weitere Abfrage. */
+    @Test
+    void skipsAManagedLinkWhoseTodoIsGone() {
+        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link(FINDING_ID, TODO_ID, true)));
+        when(todoRepository.findAllById(List.of(TODO_ID))).thenReturn(List.of());
+
+        assertThat(reconciler().reconcileFinding(FINDING_ID)).isZero();
+
+        verify(todoRepository, never()).save(any());
+        verify(findingTodoRepository, never()).findByTodoIdIn(any());
+        verify(findingRepository, never()).findAllById(any());
+    }
+
+    /** Ein geloeschtes Finding zaehlt nicht mit: sind die uebrigen terminal, wird geschlossen. */
+    @Test
+    void ignoresADeletedFinding_andClosesWhenTheRestIsTerminal() {
+        Todo todo = todo(Todo.Status.OPEN);
+        AuditFindingTodo link = link(FINDING_ID, TODO_ID, true);
+        AuditFindingTodo deleted = link("f-deleted", TODO_ID, true);
+        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link));
+        when(todoRepository.findAllById(List.of(TODO_ID))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of(TODO_ID))).thenReturn(List.of(link, deleted));
+        when(findingRepository.findAllById(List.of(FINDING_ID, "f-deleted")))
+                .thenReturn(List.of(finding(AuditFindingStatus.RESOLVED)));
+
+        assertThat(reconciler().reconcileFinding(FINDING_ID)).isEqualTo(1);
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.DONE);
+        verify(todoRepository).save(todo);
+    }
+
+    /** Dasselbe mit einem noch offenen Finding daneben: das geloeschte macht das TODO nicht erledigt. */
+    @Test
+    void aDeletedFindingDoesNotCloseATodoWithAnOpenOne() {
+        Todo todo = todo(Todo.Status.OPEN);
+        AuditFindingTodo link = link(FINDING_ID, TODO_ID, true);
+        AuditFindingTodo deleted = link("f-deleted", TODO_ID, true);
+        when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link));
+        when(todoRepository.findAllById(List.of(TODO_ID))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of(TODO_ID))).thenReturn(List.of(link, deleted));
+        when(findingRepository.findAllById(List.of(FINDING_ID, "f-deleted")))
+                .thenReturn(List.of(finding(AuditFindingStatus.OPEN)));
+
+        assertThat(reconciler().reconcileFinding(FINDING_ID)).isZero();
+
+        assertThat(todo.getStatus()).isEqualTo(Todo.Status.OPEN);
+        verify(todoRepository, never()).save(any());
+    }
+
     private void stub(Todo todo, AuditFindingStatus status) {
         AuditFindingTodo link = link(FINDING_ID, TODO_ID, true);
         when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link));
