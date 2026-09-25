@@ -95,6 +95,15 @@ automation:
     # Same reason as integration.key.path above: without this the seal signing key would be written
     # to the developer's real home (${user.home}/.autotrigger/seal-signing.key) on every test run.
     key-file: ${integration.seal.key.path:${java.io.tmpdir}/autotrigger-integrationtest-seal.key}
+  # SummarizationSetupService and FactorySetupService write CLAUDE.md/AGENTS.md into <base-dir>/<provider>
+  # on every context start; the defaults ${user.home}/.autotrigger/summarization|factory made every local
+  # test run rewrite them in the developer's real home (TODO 6507e230). integration.setup.dir is set per
+  # test JVM by IntegrationTestDbSessionListener (deleted on session close); the fallback path only
+  # applies when the listener did not run. Guarded by IntegrationProfileHomeIsolationTest.
+  summarization:
+    base-dir: ${integration.setup.dir:${java.io.tmpdir}/autotrigger-integrationtest-setup}/summarization
+  factory:
+    base-dir: ${integration.setup.dir:${java.io.tmpdir}/autotrigger-integrationtest-setup}/factory
 
 
 server:
