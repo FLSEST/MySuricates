@@ -106,14 +106,17 @@ rm -rf "$TMP/home/.config"; unstub claude
 echo "4c) pi only on request; the downloaded Node in the user's shell (0a078449, 2605ed1f)"
 export NPM_LOG="$TMP/npm.log"; : > "$NPM_LOG"
 OLD_SHELL="${SHELL:-}"; export SHELL=/bin/bash   # Profil: ~/.profile (ohne ~/.bash_profile)
+# Der Befehl aus dem Katalog, in einer festen Version (c3a4cbf6) — die Version steht nur dort
+PI_NPM="$(. "$HERE/../lib/provider-catalog.generated.sh"; printf '%s' "${PROVIDER__pi__install#npm }")"
+check "pi comes in a pinned version"                    'printf "%s" "$PI_NPM" | grep -qE "^install -g @earendil-works/pi-coding-agent@[0-9]+\.[0-9]+\.[0-9]+$"'
 rm -rf "$INST"
 check "default: no pi, also with --yes"                 '[ "$(run --yes --dry-run --runtime host)" = 0 ] && ! out | grep -q "pi-coding-agent" && [ ! -s "$NPM_LOG" ]'
 rm -rf "$INST"
-check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm install -g @earendil-works/pi-coding-agent"'
+check "--with-pi: npm -g with sudo where root owns it"  '[ "$(run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: sudo npm $PI_NPM"'
 mkdir -p "$TMP/npmprefix"; rm -rf "$INST"
-check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm install -g @earendil-works/pi-coding-agent" && ! out | grep -qF "sudo npm"'
+check "--with-pi: without sudo where npm may write"     '[ "$(NPM_PREFIX="$TMP/npmprefix" run --yes --dry-run --runtime host --with-pi)" = 0 ] && out | grep -qF "would run: npm $PI_NPM" && ! out | grep -qF "sudo npm"'
 rm -rf "$INST"
-check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qx "install -g @earendil-works/pi-coding-agent" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
+check "--with-pi installs pi, nothing started"          '[ "$(NPM_PREFIX="$TMP/npmprefix" NPM_CREATES="$TMP/bin/pi" run --install --runtime host --with-pi)" = 0 ] && grep -qxF "$PI_NPM" "$NPM_LOG" && out | grep -qE "Install pi \(npm\)" && [ -x "$TMP/bin/pi" ] && [ -f "$INST/main.env" ]'
 unstub pi; unstub npm; rm -rf "$INST"
 check "--with-pi without npm: says so, carries on"     '[ "$(run --yes --dry-run --runtime container --with-pi)" = 0 ] && out | grep -q -- "--with-pi needs npm"'
 stub npm "$NPM_STUB"

@@ -31,6 +31,8 @@ class ProviderCatalogTest {
 
     private static final Path GENERATED = Path.of("..", "scripts", "lib", "provider-catalog.generated.sh");
 
+    private static final Path DOCKERFILE = Path.of("..", "deploy", "Dockerfile");
+
     private static final String WRITE_PROPERTY = "provider.catalog.write";
 
     private static final String REGENERATE_HINT =
@@ -77,6 +79,27 @@ class ProviderCatalogTest {
 
         assertThat(GENERATED).as(REGENERATE_HINT).exists();
         assertThat(Files.readString(GENERATED)).as(REGENERATE_HINT).isEqualTo(expected);
+    }
+
+    /**
+     * pi kommt in einer festen Version, im Installer wie im Tryout-Image (c3a4cbf6): eine neue Version
+     * kann {@code --thinking} oder {@code <backend>/<model>} brechen, ohne dass es auffaellt. Beide Wege
+     * nennen dieselbe Version — das Tryout-Image traegt sie als {@code ARG PI_VERSION}.
+     */
+    @Test
+    void piIsPinnedAlikeInInstallerAndTryoutImage() throws Exception {
+        assertThat(PiAiProvider.PINNED_VERSION).as("pi-Version").matches("\\d+\\.\\d+\\.\\d+");
+        ProviderSetup pi = new PiAiProvider(mock(HostPiService.class)).setup();
+        assertThat(pi.install()).as("Installer (--with-pi)")
+                .isEqualTo("npm install -g @earendil-works/pi-coding-agent@" + PiAiProvider.PINNED_VERSION);
+
+        List<String> dockerfile = Files.readAllLines(DOCKERFILE);
+        assertThat(dockerfile).as(DOCKERFILE + ": ARG PI_VERSION wie PiAiProvider.PINNED_VERSION")
+                .contains("ARG PI_VERSION=" + PiAiProvider.PINNED_VERSION);
+        assertThat(dockerfile).as(DOCKERFILE + ": die Tryout-Stufe installiert pi in dieser Version")
+                .anySatisfy(line -> assertThat(line).startsWith("RUN npm install -g")
+                        .contains(" @earendil-works/pi-coding-agent@${PI_VERSION}"))
+                .noneSatisfy(line -> assertThat(line).containsPattern("@earendil-works/pi-coding-agent(\\s|$)"));
     }
 
     // ── Anbieter finden, ohne Spring-Kontext ─────────────────────────────────

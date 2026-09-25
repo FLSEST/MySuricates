@@ -94,8 +94,8 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   Beim gestaffelten Betrieb bekommt Dev alle Module, Test und Prod Standard mit Siegeln
   („unbeaufsichtigt nur versiegelte Workflows“).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
-  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren (Vorgabe nein, ohne Terminal
-  `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
+  Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren — in der geprüften, festen Version
+  (Vorgabe nein, ohne Terminal `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
   Im Container nutzt die Instanz die CLI **und** deine Anmeldung vom Rechner — kein zweites Login
   (unter macOS nur die Anmeldung, das Programm liegt im Image).
 - **Ports:** Default 9090, belegte Ports werden übersprungen — nicht der, den die laufende Instanz

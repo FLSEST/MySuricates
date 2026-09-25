@@ -489,6 +489,7 @@ the working tree. Requires Docker.
 ./scripts/installer-probe.sh --ref main             # automatic run with report
 ./scripts/installer-probe.sh --image rockylinux:9   # the same on a dnf system
 ./scripts/installer-probe.sh --ref main --keep      # then look at the fresh instance in the browser
+./scripts/installer-probe.sh --setup-flags "--with-pi"   # phase 2 with extra flags, here installing pi too
 ```
 
 The interactive machine shares the host network (`--network host`): open the address `setup.sh`
@@ -517,6 +518,23 @@ Before a release it runs as the workflow **Installer probe** (pool entry
 from the state under test, not from the branch that happens to be checked out. The script tests run
 without Docker: `bash scripts/tests/test-installer-probe.sh` and
 `python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
+### pi version (installer and tryout)
+
+pi comes in a fixed version (c3a4cbf6): a new pi version can break the calls of
+`PiAiProvider`/`HostPiService` (`--thinking`, `<backend>/<model>`) without anyone noticing. The
+version lives in one place, `PiAiProvider.PINNED_VERSION`; from it come the install command in the
+installer's catalog (`--with-pi`, status card) and — kept equal by a test — `ARG PI_VERSION` of the
+tryout stage in `deploy/Dockerfile`. Moving to a new version:
+
+1. Install the new version on your own machine (`npm install -g @earendil-works/pi-coding-agent@<version>`)
+   and run a workflow with pi — with a `<backend>/<model>` model and `effort` set.
+2. Set `PINNED_VERSION` in `PiAiProvider` and `ARG PI_VERSION` in `deploy/Dockerfile`.
+3. Regenerate the catalog:
+   `cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true`
+   (the same test then checks it matches the Dockerfile).
+4. `./scripts/installer-probe.sh --setup-flags "--with-pi"` and, before the next tryout image,
+   `scripts/tryout.sh build --ref HEAD`.
 
 ## Versioning & Releases
 

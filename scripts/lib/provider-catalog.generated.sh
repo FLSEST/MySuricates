@@ -31,7 +31,7 @@ PROVIDER__codex__login_files=".codex/auth.json"
 PROVIDER__codex__login_env="OPENAI_API_KEY CODEX_API_KEY"
 
 PROVIDER__pi__cli="pi"
-PROVIDER__pi__install="npm install -g @earendil-works/pi-coding-agent"
+PROVIDER__pi__install="npm install -g @earendil-works/pi-coding-agent@0.74.2"
 PROVIDER__pi__login="pi, then /login   (or an API key as environment variable, see pi --help)"
 PROVIDER__pi__login_files=".pi/agent/auth.json:\""
 PROVIDER__pi__login_env="ANTHROPIC_API_KEY ANTHROPIC_OAUTH_TOKEN OPENAI_API_KEY GEMINI_API_KEY OPENROUTER_API_KEY"

@@ -28,6 +28,8 @@ check "compose builds the runtime stage only"  'grep -q "target: runtime" "$R/de
 check "runtime stage comes before tryout"      '[ "$(grep -n "AS runtime$" "$DF" | cut -d: -f1)" -lt "$(grep -n "AS tryout$" "$DF" | cut -d: -f1)" ]'
 check "tryout builds on runtime"               'grep -q "^FROM runtime AS tryout$" "$DF"'
 check "tryout brings the AI CLIs"              'grep -q "@anthropic-ai/claude-code" "$DF" && grep -q "@openai/codex" "$DF" && grep -q "@earendil-works/pi-coding-agent" "$DF"'
+PI_PIN="$(. "$R/scripts/lib/provider-catalog.generated.sh"; printf '%s' "${PROVIDER__pi__install##*@}")"
+check "tryout pins pi like the installer catalog (c3a4cbf6)" 'grep -qx "ARG PI_VERSION=$PI_PIN" "$DF" && grep -qF "@earendil-works/pi-coding-agent@\${PI_VERSION}" "$DF"'
 check "tryout brings pip/venv, JDK, Maven"     'grep -q "python3-venv" "$DF" && grep -q "JAVA_HOME=/opt/java/jdk" "$DF" && grep -q "/usr/local/bin/mvn" "$DF"'
 check "tryout home lives on the data volume"   'grep -q "HOST_HOME=/app/data/home" "$DF" && grep -q "TRYOUT_HOME=\"/app/data/home\"" "$R/scripts/tryout.sh"'
 check "tryout names itself in the UI"          'grep -q "AUTOMATION_ENVIRONMENT=Tryout" "$DF"'

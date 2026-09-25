@@ -110,7 +110,8 @@ without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/te
 
 `deploy/Dockerfile` has two targets. `runtime` is the image of an installed instance (above; tools
 and AI logins come from the machine). `tryout` builds on it and brings everything itself, so
-MySuricates can be tried without installing it: AI CLIs, `python3-pip`/`-venv`, JDK and Maven from
+MySuricates can be tried without installing it: AI CLIs (pi in the same fixed version as the
+installer, [entwicklung.md → pi version](entwicklung.md#pi-version-installer-and-tryout)), `python3-pip`/`-venv`, JDK and Maven from
 the build stage (`JAVA_HOME=/opt/java/jdk`), preset `research`. `HOME` lives on the data volume
 (`/app/data/home`), so logins and the API key survive a rebuild. Deliberately left out: gcc/make,
 Go, Rust, Gradle — if you need more, build `FROM mysuricates:tryout`.

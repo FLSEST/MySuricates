@@ -496,6 +496,7 @@ sonst `--ref`), nie der Arbeitsbaum. Braucht Docker.
 ./scripts/installer-probe.sh --ref main             # automatischer Lauf mit Report
 ./scripts/installer-probe.sh --image rockylinux:9   # dasselbe auf einem dnf-System
 ./scripts/installer-probe.sh --ref main --keep      # danach die frische Instanz im Browser ansehen
+./scripts/installer-probe.sh --setup-flags "--with-pi"   # Phase 2 mit Zusatz-Flags, hier pi mitinstallieren
 ```
 
 Die interaktive Maschine teilt das Netz des Rechners (`--network host`): Die Adresse, die
@@ -523,6 +524,23 @@ Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
 aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-Tests laufen ohne
 Docker: `bash scripts/tests/test-installer-probe.sh` und
 `python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'`.
+
+### pi-Version (Installer und Tryout)
+
+pi kommt in einer festen Version (c3a4cbf6): Eine neue pi-Version kann die Aufrufe von
+`PiAiProvider`/`HostPiService` (`--thinking`, `<backend>/<model>`) brechen, ohne dass es auffällt.
+Die Version steht an einer Stelle, `PiAiProvider.PINNED_VERSION`; daraus entstehen der
+Installationsbefehl im Katalog des Installers (`--with-pi`, Statuskarte) und — per Test abgeglichen —
+`ARG PI_VERSION` der Tryout-Stufe in `deploy/Dockerfile`. Auf eine neue Version heben:
+
+1. Die neue Version auf dem eigenen Rechner installieren (`npm install -g @earendil-works/pi-coding-agent@<version>`)
+   und einen Workflow mit pi laufen lassen — mit Modell `<backend>/<model>` und gesetztem `effort`.
+2. `PINNED_VERSION` in `PiAiProvider` und `ARG PI_VERSION` in `deploy/Dockerfile` setzen.
+3. Den Katalog neu erzeugen:
+   `cd ai-automation-backend && ./mvnw test -Dtest=ProviderCatalogTest -Dprovider.catalog.write=true`
+   (derselbe Test prüft danach den Gleichstand mit dem Dockerfile).
+4. `./scripts/installer-probe.sh --setup-flags "--with-pi"` und, vor dem nächsten Tryout-Image,
+   `scripts/tryout.sh build --ref HEAD`.
 
 ## Versionierung & Releases
 
