@@ -697,6 +697,67 @@ check "ohne dist: eine Luecke wie bisher" \
   '[ "$(grep -c "^NICHT GEMESSEN: frontend_" "$TMP/perf-dist-none.out")" -eq 1 ] \
      && grep -q "^NICHT GEMESSEN: frontend_bundle_js_bytes (kein Build-Artefakt" "$TMP/perf-dist-none.out"'
 
+echo "6e) Performance-Audit: Klammern in Annotationsargumenten beenden keinen Rumpf (e8226de2)"
+# Wie in @EventListener({ApplicationReadyEvent.class}) oeffnen die Klammern in
+# @Transactional(rollbackFor = {…}) keinen Block. Frueher endete der Rumpf schon in der
+# Annotationszeile, und der langsame Aufruf darunter blieb ungezaehlt; bei Argumenten ueber mehrere
+# Zeilen galt das auch fuer den Startlauf-Listener. Eine { in einem String verlaengert keinen Rumpf.
+FIX4="$TMP/fixture-annotations"
+MAIN4="$FIX4/ai-automation-backend/src/main/java/com/automation"
+mkdir -p "$MAIN4/service"
+cat > "$MAIN4/service/TxService.java" <<'JAVA'
+package com.automation.service;
+
+class TxService {
+    @Transactional(rollbackFor = {java.io.IOException.class, IllegalStateException.class})
+    void syncRemote() {
+        restTemplate.getForObject("http://example.invalid", String.class);
+    }
+
+    @Transactional(rollbackFor = {
+            java.io.IOException.class,
+            IllegalStateException.class})
+    void pushRemote() {
+        webClient.post();
+    }
+
+    @Transactional(rollbackFor = {java.io.IOException.class})
+    void saveOnly() {
+        log("{");
+    }
+
+    void callOutside() {
+        hostClaudeService.execute("x");
+    }
+}
+JAVA
+cat > "$MAIN4/service/BootListener.java" <<'JAVA'
+package com.automation.service;
+
+class BootListener {
+    @EventListener(classes = {
+            ApplicationReadyEvent.class})
+    void onBoot(java.util.List<String> ids) {
+        for (String id : ids) {
+            bootRepository.save(id);
+        }
+    }
+}
+JAVA
+printf '%s' "$FIX4" > "$TMP/base4.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base4.txt" request_metrics=)" > "$TMP/perf-facts4.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts4.sh" > "$TMP/perf-facts4.out" 2> "$TMP/perf-facts4.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts4.err" ]'
+check "rollbackFor = {…} in einer Zeile: der Rumpf danach zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/TxService.java:6 restTemplate (@Transactional ab Zeile 4)" "$TMP/perf-facts4.out"'
+check "rollbackFor = {…} ueber drei Zeilen: der Rumpf danach zaehlt" \
+  'grep -qx "TREFFER transactional_slow_call: service/TxService.java:13 webClient (@Transactional ab Zeile 9)" "$TMP/perf-facts4.out"'
+check "Rumpf endet an seiner Klammer, auch mit { im String" '! grep -q "hostClaudeService" "$TMP/perf-facts4.out"'
+check "FAKT transactional_slow_call_count: 2" 'grep -qx "FAKT transactional_slow_call_count: 2" "$TMP/perf-facts4.out"'
+check "@EventListener(classes = {…}) ueber zwei Zeilen: Startlauf, kein N+1" \
+  'grep -qx "FAKT startup_repository_loop_count: 1" "$TMP/perf-facts4.out" \
+     && grep -qx "FAKT repository_loop_count: 0" "$TMP/perf-facts4.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
