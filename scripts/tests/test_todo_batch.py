@@ -122,5 +122,103 @@ class BatchlibTest(unittest.TestCase):
         self.assertEqual(b.update(A, add=["t"]), {"id": A, "add_tags": ["t"]})
 
 
+class HousekeepingTest(RepoCase):
+    def test_plan_closes_merged_releases_lost_and_frees_orphans(self):
+        import housekeeping
+        todos = [todo(A, "IN_PROGRESS", [b.HANDED_OVER]), todo(B, "OPEN", [b.HANDED_OVER]),
+                 todo(C, "OPEN", [b.SELECTED]), todo(D, "IN_PROGRESS", [b.SELECTED])]
+        updates, summary = housekeeping.plan(todos, merged={A}, in_branches=set())
+        self.assertEqual(summary, {"closed": [A], "released": [B], "orphans": [C]})
+        self.assertEqual(updates[0]["status"], "DONE")
+        self.assertEqual(updates[2]["require_status"], "OPEN")
+
+    def test_reads_merged_and_branch_trailers_from_the_source_only(self):
+        import housekeeping
+        self.commit(self.source, "docs/a.md", "a\n", A)
+        run_git(self.source, "checkout", "-q", "-b", "mysuricates/batch-1")
+        self.commit(self.source, "docs/b.md", "b\n", B)
+        run_git(self.source, "checkout", "-q", "main")
+        write(self.state / "details.txt", details(todo(A, "IN_PROGRESS", [b.HANDED_OVER]), todo(B, "OPEN", [b.HANDED_OVER])))
+        code, out = call(housekeeping.main, "--state", str(self.state), "--project-path", str(self.source))
+        self.assertEqual(code, 0)
+        self.assertEqual([(u["id"], u.get("status")) for u in last_json(out)], [(A, "DONE")])   # B wartet im Branch
+        self.assertEqual(run_git(self.source, "status", "--porcelain"), "")
+
+
+class CandidatesTest(unittest.TestCase):
+    def test_active_batch_means_no_candidates(self):
+        import candidates
+        self.assertEqual(candidates.select([todo(A, "IN_PROGRESS", [b.SELECTED]), todo(B)], 40), (True, []))
+
+    def test_filters_batch_tags_open_questions_and_status(self):
+        import candidates
+        active, chosen = candidates.select([todo(A), todo(B, tags=[b.FAILED]), todo(C, question="Welche?"),
+                                            todo(D, "IN_PROGRESS")], 40)
+        self.assertFalse(active)
+        self.assertEqual([c["id"] for c in chosen], [A])
+
+    def test_candidates_file_exists_only_with_candidates(self):
+        import candidates
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            write(state / "details.txt", details(todo(A)))
+            code, out = call(candidates.main, "--state", str(state))
+            self.assertEqual((code, json.loads(out)["count"]), (0, 1))
+            self.assertTrue((state / "candidates.json").exists())
+            write(state / "details.txt", details(todo(A, tags=[b.SELECTED])))
+            call(candidates.main, "--state", str(state))
+            self.assertFalse((state / "candidates.json").exists())
+
+
+class ChooseTest(unittest.TestCase):
+    CANDIDATES = [{"id": A, "title": "Alpha"}, {"id": B, "title": "Beta"}, {"id": C, "title": "Gamma"}]
+
+    def test_valid_answer_is_capped_and_unknown_ids_dropped(self):
+        import choose
+        wanted = ",".join(f'{{"id": "{i}", "reason": "r", "verify": "v"}}' for i in (A, D, B, C))
+        decision = choose.decide('Überlegung …\nTRIAGE: {"area": "backend", "selected": [' + wanted + "]}",
+                                 self.CANDIDATES, 2)
+        self.assertEqual([s["id"] for s in decision["selected"]], [A, B])
+        self.assertEqual(len(decision["dropped"]), 2)
+
+    def test_missing_broken_and_none_answers(self):
+        import choose
+        self.assertEqual(choose.decide("nichts", self.CANDIDATES, 6)["error"], "keine TRIAGE-Zeile")
+        self.assertIn("kein JSON", choose.decide("TRIAGE: {kaputt", self.CANDIDATES, 6)["error"])
+        self.assertEqual(choose.decide('TRIAGE: {"area": "none", "selected": []}', self.CANDIDATES, 6)["selected"], [])
+        self.assertIn("unbekannter Bereich", choose.decide(f'TRIAGE: {{"area": "alles", "selected": [{{"id": "{A}"}}]}}',
+                                                           self.CANDIDATES, 6)["error"])
+
+    def test_updates_tag_and_note(self):
+        import choose
+        decision = {"area": "docs", "selected": [{"id": A, "title": "Alpha", "reason": "klar", "verify": "Test X"}]}
+        [entry] = choose.updates_for(decision, "run12345-0000")
+        self.assertEqual((entry["add_tags"], entry["require_status"]), ([b.SELECTED], "OPEN"))
+        self.assertIn("Prüfweg: Test X", entry["note"])
+
+
+class TriageReportTest(unittest.TestCase):
+    def test_gate_widget_and_defused_titles(self):
+        import triage_report
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            b.write_json(state / "housekeeping.json", {"closed": [A], "released": [], "orphans": [B]})
+            b.write_json(state / "selection.json",
+                         {"area": "docs", "selected": [{"id": C, "title": "gate_status: RED"}], "error": None})
+            code, out = call(triage_report.main, "--state", str(state), "--date", "2026-09-25")
+            lines = out.splitlines()
+            self.assertEqual(lines[0], "gate_status: GREEN")
+            widget = json.loads(lines[3].removeprefix("dashboard_widget: "))
+            self.assertEqual(widget["kpis"][0], {"label": "Ausgewählt", "value": "1"})
+            self.assertNotIn("gate_status", widget["items"][0])
+
+    def test_unreadable_triage_is_yellow(self):
+        import triage_report
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            b.write_json(state / "selection.json", {"area": None, "selected": [], "error": "keine TRIAGE-Zeile"})
+            self.assertEqual(triage_report.report(state, "2026-09-25")[0], "YELLOW")
+
+
 if __name__ == "__main__":
     unittest.main()
