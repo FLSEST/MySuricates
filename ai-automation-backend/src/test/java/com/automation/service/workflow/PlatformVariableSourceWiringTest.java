@@ -10,7 +10,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der echte Spring-Kontext liefert dem Einsammler alle fuenf Quellen, in der dokumentierten
+ * Der echte Spring-Kontext liefert dem Einsammler alle sechs Quellen, in der dokumentierten
  * {@code @Order} (TODO 441a4c46). Eine neue Quelle gehoert hier dazu.
  */
 @SpringBootTest
@@ -23,6 +23,6 @@ class PlatformVariableSourceWiringTest {
     void everySourceIsWired_inItsOrder() {
         assertThat(sources).extracting(source -> source.getClass().getSimpleName()).containsExactly(
                 "PreviousReportVariable", "OpenTodosVariable", "RequestMetricsVariable", "GoalVariables",
-                "AuditFindingsVariable");
+                "AuditFindingsVariable", "TodoDetailsVariable");
     }
 }

@@ -42,7 +42,7 @@ class TemplateHygieneGateTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern QUOTED_OUTPUT = Pattern.compile(
             "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output"
-                    + "|previous_report|open_todos|audit_findings)\\s*}}['\"]");
+                    + "|previous_report|open_todos|audit_findings|todo_details)\\s*}}['\"]");
     private static final Pattern DATED_CLAUDE_MODEL = Pattern.compile("claude-(opus|sonnet|haiku|fable)-\\d");
     private static final Pattern GREP_COUNT_ECHO_FALLBACK = Pattern.compile(
             "grep\\s+(?:-[A-Za-z]*c[A-Za-z]*|--count)\\s[^\\n|]*\\|\\|\\s*echo\\b");

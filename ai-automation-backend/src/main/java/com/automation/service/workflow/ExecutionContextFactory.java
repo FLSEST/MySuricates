@@ -94,6 +94,8 @@ public class ExecutionContextFactory {
             // A value handed over by a parent run (sub-workflow copies every variable) or passed as input
             // would otherwise stay here as a trusted variable — unquoted in shell blocks (TODO 3643beac).
             if (AuditContextSource.VARIABLE.equals(name)) return;
+            // todo_details likewise: platform data only, never from input or a parent run (TODO cc0eb3ba)
+            if (TodoDetailsVariable.NAME.equals(name)) return;
             if (untrustedKeys.contains(name)) {
                 context.setUntrustedVariable(name, value);
             } else {
