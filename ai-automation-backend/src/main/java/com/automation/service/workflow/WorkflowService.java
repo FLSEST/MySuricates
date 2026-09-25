@@ -87,8 +87,8 @@ public class WorkflowService {
                 .templateId(request.templateId())
                 .build();
 
-        if (request.version() != null && !request.version().isBlank()) {
-            workflow.setVersion(request.version());
+        if (request.version() != null && !request.version().isBlank()) { // blank keeps the default 1.0.0
+            workflow.setVersion(normalizeVersion(request.version()));
         }
 
         if (request.metadata() != null) {
@@ -207,8 +207,9 @@ public class WorkflowService {
     }
 
     /**
-     * The version label, trimmed. Blank is rejected (400) — {@code null} in the request is the way to
-     * leave it unchanged. The column is TEXT without a limit (V5); 255 is the entity's mapped length.
+     * The version label, trimmed. Blank is rejected (400) — {@code null} in the update request is the
+     * way to leave it unchanged; create checks for blank itself and keeps the default. The column is
+     * TEXT without a limit (V5); 255 is the entity's mapped length.
      */
     private static String normalizeVersion(String version) {
         String trimmed = version.strip();

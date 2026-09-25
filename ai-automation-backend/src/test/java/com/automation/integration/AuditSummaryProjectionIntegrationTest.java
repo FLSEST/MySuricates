@@ -209,6 +209,53 @@ class AuditSummaryProjectionIntegrationTest {
                 .isEqualTo(onePage.statements());
     }
 
+    /**
+     * Vom Kontext eines Laufs kommt nur der Eltern-Ausloeser nach Java, gelesen in SQLite: Ein Ketteneintrag
+     * mit ungekuerzter previous_chain_output liefert eine Zeile mit genau diesem Wert. Ein kaputter Kontext
+     * (kein JSON) laesst die Seite laden — der Ausloeser faellt auf CHAIN zurueck, ohne Ausloeser am Lauf
+     * auf null. Mit dem Kontext durch den JsonMapConverter scheiterte daran die ganze Seite.
+     */
+    @Test
+    void reportPageReadsOnlyTheParentTriggerSource_andSurvivesABrokenContext() {
+        String projectId = UUID.randomUUID().toString();
+        Workflow workflow = workflow();
+        WorkflowChain chain = chainRepository.save(WorkflowChain.builder().name("Nacht-Audits").build());
+        ChainRun chainRun = chainRunRepository.save(ChainRun.builder().chain(chain).status(RunStatus.COMPLETED)
+                .startedAt(NOW).triggeredByScheduleId("sched-night").build());
+        Map<String, Object> entryContext = new HashMap<>(Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE",
+                TriggerSource.CHAIN_RUN_CONTEXT_KEY, chainRun.getId(), "previous_chain_output", "x".repeat(200_000)));
+        WorkflowRun bigContext = runRepository.save(WorkflowRun.builder().workflow(workflow).workflowName(workflow.getName())
+                .status(RunStatus.COMPLETED).startedAt(NOW).triggerSource(TriggerSource.CHAIN)
+                .chainRunId(chainRun.getId()).inputContext(entryContext).build());
+        WorkflowRun broken = run(workflow, TriggerSource.CHAIN, null, chainRun.getId(), null, "SCHEDULE");
+        WorkflowRun brokenWithoutSource = run(workflow, null, null, null, null, "MANUAL");
+        report(projectId, "a.context", bigContext.getId(), NOW);
+        report(projectId, "a.context", broken.getId(), NOW.minusSeconds(60));
+        report(projectId, "a.context", brokenWithoutSource.getId(), NOW.minusSeconds(120));
+        entityManager.flush();
+        for (WorkflowRun run : List.of(broken, brokenWithoutSource)) {
+            entityManager.createNativeQuery("UPDATE workflow_runs SET input_context = :context WHERE id = :id")
+                    .setParameter("context", "{\"" + TriggerSource.PARENT_CONTEXT_KEY + "\": \"SCHED")
+                    .setParameter("id", run.getId()).executeUpdate();
+        }
+        entityManager.clear();
+
+        List<Object[]> columns = runRepository.findOriginColumns(List.of(bigContext.getId()));
+        Counted<List<AuditReportResponse>> page = counted(() -> auditCenterService.listReports(projectId, "a.context", 0, 20).content());
+
+        assertThat(columns).singleElement().satisfies(row -> {
+            assertThat(row).as("id, source, schedule, chain run, version, parent source — no context").hasSize(6);
+            assertThat(row[5]).isEqualTo("SCHEDULE");
+        });
+        assertThat(page.result()).extracting(AuditReportResponse::triggerSource)
+                .containsExactly(TriggerSource.SCHEDULE, TriggerSource.CHAIN, null);
+        assertThat(page.result()).extracting(AuditReportResponse::chainName)
+                .containsExactly("Nacht-Audits", "Nacht-Audits", null);
+        assertThat(page.result().get(1).scheduleId()).isEqualTo("sched-night");
+        assertThat(page.statements()).as("reports, finding counts, runs, chain runs; no versions on this page")
+                .isEqualTo(4);
+    }
+
     private record Counted<T>(T result, int statements) {}
 
     private static <T> Counted<T> counted(Supplier<T> call) {

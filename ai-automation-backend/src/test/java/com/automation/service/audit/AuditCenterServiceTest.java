@@ -290,11 +290,9 @@ class AuditCenterServiceTest {
         when(occurrenceRepository.countByReportIds(List.of("r-chain", "r-direct", "r-old", "r-gone")))
                 .thenReturn(countRows("r-chain", 3, "r-direct", 1));
         when(runRepository.findOriginRows(List.of("run-r-chain", "run-r-direct", "run-r-old", "run-r-gone"))).thenReturn(List.of(
-                new RunOriginRow("run-r-chain", TriggerSource.CHAIN, null, "cr-1", "v-7",
-                        Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE", TriggerSource.CHAIN_RUN_CONTEXT_KEY, "cr-1")),
-                new RunOriginRow("run-r-direct", TriggerSource.SCHEDULE, "sched-direct", null, "v-8", Map.of()),
-                new RunOriginRow("run-r-old", TriggerSource.CHAIN, null, null, null,
-                        Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"))));
+                new RunOriginRow("run-r-chain", TriggerSource.CHAIN, null, "cr-1", "v-7", "SCHEDULE"),
+                new RunOriginRow("run-r-direct", TriggerSource.SCHEDULE, "sched-direct", null, "v-8", null),
+                new RunOriginRow("run-r-old", TriggerSource.CHAIN, null, null, null, "MANUAL")));
         when(chainRunRepository.findOriginRows(Set.of("cr-1")))
                 .thenReturn(List.of(new ChainRunOriginRow("cr-1", "chain-1", "Wochen-Audits", "sched-chain")));
         when(versionRepository.findVersionNumbers(Set.of("v-7", "v-8")))
@@ -348,7 +346,7 @@ class AuditCenterServiceTest {
         when(reportRepository.findById("r-1")).thenReturn(Optional.of(
                 report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
         when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(new RunOriginRow(
-                "run-r-1", TriggerSource.CHAIN, null, "cr-gone", null, Map.of(TriggerSource.PARENT_CONTEXT_KEY, "WISH"))));
+                "run-r-1", TriggerSource.CHAIN, null, "cr-gone", null, "WISH")));
         when(chainRunRepository.findOriginRows(Set.of("cr-gone"))).thenReturn(List.of());
 
         AuditReportResponse report = service.getReport("r-1");
@@ -359,6 +357,26 @@ class AuditCenterServiceTest {
         assertThat(report.chainName()).isNull();
         assertThat(report.scheduleId()).isNull();
         verify(versionRepository, never()).findVersionNumbers(any());
+    }
+
+    /**
+     * Kein lesbarer Eltern-Ausloeser — der Kontext war kein gueltiges JSON oder nannte keinen bekannten
+     * Ausloeser: der Ketteneintrag bleibt CHAIN, samt Kette und deren Zeitplan.
+     */
+    @Test
+    void getReport_unreadableParentSource_fallsBackToChain() {
+        when(reportRepository.findById("r-1")).thenReturn(Optional.of(
+                report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
+        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
+                new RunOriginRow("run-r-1", TriggerSource.CHAIN, null, "cr-1", null, null)));
+        when(chainRunRepository.findOriginRows(Set.of("cr-1")))
+                .thenReturn(List.of(new ChainRunOriginRow("cr-1", "chain-1", "Wochen-Audits", "sched-chain")));
+
+        AuditReportResponse report = service.getReport("r-1");
+
+        assertThat(report.triggerSource()).isEqualTo(TriggerSource.CHAIN);
+        assertThat(report.chainName()).isEqualTo("Wochen-Audits");
+        assertThat(report.scheduleId()).isEqualTo("sched-chain");
     }
 
     /** Ohne Ketten und Versionen auf der Seite fragt die Aufloesung dort gar nicht erst nach. */

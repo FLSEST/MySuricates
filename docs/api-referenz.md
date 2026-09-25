@@ -495,7 +495,7 @@ Workflow ausführen.
 }
 ```
 
-`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`), sonst `null`; Läufe von vor V89 haben keinen. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
+`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`, nach einem Fortsetzen `RESUME`), sonst `null` — auch bei Retry und Sub-Workflows, die `{{ chain_run_id }}` nur mit dem Kontext erben; Läufe von vor V89 haben keinen. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
 
 ### `GET /api/v1/workflows/{id}/runs`
 

@@ -86,7 +86,8 @@ public enum TriggerSource {
         return inputContext.get(CHAIN_RUN_CONTEXT_KEY) instanceof String id && !id.isBlank() ? id : null;
     }
 
-    private static TriggerSource parse(Object value) {
+    /** The source of that name, or {@code null} for {@code null} and for a name that is no source. */
+    public static TriggerSource parse(Object value) {
         if (value == null) {
             return null;
         }

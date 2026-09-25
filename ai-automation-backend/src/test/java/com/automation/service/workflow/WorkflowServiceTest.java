@@ -319,6 +319,35 @@ class WorkflowServiceTest {
         verifyNoInteractions(mutations);
     }
 
+    private static CreateWorkflowRequest createWithVersion(String version) {
+        return new CreateWorkflowRequest("proj-1", "WF", null, null, List.of(), null,
+                null, null, null, null, null, null, version, null);
+    }
+
+    /** Create applies the same rules as update; blank keeps the default instead of being rejected. */
+    @Test
+    void create_trimsTheVersionLabel_blankKeepsTheDefault() {
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(workflowService.create(createWithVersion(" 4.4.0 "), ChangeSource.POOL_INSTALL).getVersion())
+                .isEqualTo("4.4.0");
+        assertThat(workflowService.create(createWithVersion("   "), ChangeSource.POOL_INSTALL).getVersion())
+                .isEqualTo("1.0.0");
+        assertThat(workflowService.create(createWithVersion(null), ChangeSource.USER).getVersion())
+                .isEqualTo("1.0.0");
+    }
+
+    @Test
+    void create_overlongVersion_isRejectedBeforeSaving() {
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+        String overlong = "1." + "0".repeat(WorkflowService.MAX_VERSION_LENGTH);
+
+        assertThatThrownBy(() -> workflowService.create(createWithVersion(overlong), ChangeSource.POOL_INSTALL))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("255");
+        verify(workflowRepository, never()).save(any());
+    }
+
     /** The label is not part of the definition: the gateway sees the same snapshot before and after. */
     @Test
     void update_versionLabelLeavesTheDefinitionSnapshotUnchanged() {

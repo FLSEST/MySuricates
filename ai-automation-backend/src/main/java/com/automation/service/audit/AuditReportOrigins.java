@@ -74,7 +74,9 @@ class AuditReportOrigins {
         if (run.chainRunId() == null) {
             return new Origin(run.triggerSource(), run.triggeredByScheduleId(), null, null, null, versionNumber);
         }
-        TriggerSource starter = run.triggerSource() != null ? run.triggerSource().effective(run.inputContext()) : null;
+        Map<String, Object> parent = run.parentTriggerSource() != null
+                ? Map.of(TriggerSource.PARENT_CONTEXT_KEY, run.parentTriggerSource()) : Map.of();
+        TriggerSource starter = run.triggerSource() != null ? run.triggerSource().effective(parent) : null;
         return new Origin(starter != null ? starter : run.triggerSource(),
                 chainRun != null ? chainRun.triggeredByScheduleId() : null, run.chainRunId(),
                 chainRun != null ? chainRun.chainId() : null, chainRun != null ? chainRun.chainName() : null,
