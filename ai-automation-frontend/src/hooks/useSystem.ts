@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { api, apiErrorMessage, applyServerRateLimitConfig } from '../api/client';
 import { useToast } from './useToast';
 import { useT, useI18nStore } from '../i18n';
@@ -186,10 +186,24 @@ export function useRefreshAiProviderStatus() {
   });
 }
 
+/** Queries that show a setting besides its own `['system', 'settings', key, …]` entries. */
+const SETTING_DEPENDENT_QUERIES: Record<string, QueryKey[]> = {
+  // `default` of the provider list is this setting
+  'default-ai-provider': [['system', 'ai-providers']],
+};
+
 export function useUpdateSystemSetting() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ key, value }: { key: string; value: string }) =>
       api.put(`/system/settings/${key}`, { value }),
+    // Readers cache a setting under ['system', 'settings', key, …] with their own parsing, so it is re-read
+    // rather than written into the cache (5f4761db: a card mounted again showed the old value for minutes).
+    // Returned, so the mutation settles only once the fresh value is there.
+    onSuccess: (_data, { key }) => Promise.all([
+      qc.invalidateQueries({ queryKey: ['system', 'settings', key] }),
+      ...(SETTING_DEPENDENT_QUERIES[key] ?? []).map((queryKey) => qc.invalidateQueries({ queryKey, exact: true })),
+    ]),
   });
 }
 

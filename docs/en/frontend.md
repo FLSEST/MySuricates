@@ -117,7 +117,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Star rating (1-5) after completion
 - Error panel for failed runs
 - Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger as `TriggerSourceChip` – the Audit Center uses the chip too –, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
-- `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
+- `hooks/useRunPendingInput.ts` is the one source for the approval and the input dialog, shared with `SimpleWorkflowExecution`: WebSocket events first, plus `GET /executions/{id}/approval` (`hooks/useRunInputRecovery.ts`) after loading and again whenever the WebSocket connects or the run status or current step changes (only while the run is running or paused). An answered question disappears at once, even while the WebSocket still reports it; one closed with X stays open, and while it does, “Answer open approval” (`OpenApprovalButton`, in `RunHeader` or below the head of the simple view) opens the dialog again. `connected` also drops when the WebSocket closes abruptly (`onWebSocketClose`), so the reconnect asks again
 - The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `components/workflow/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
 
 ### Runs (`/runs`)
@@ -174,7 +174,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Enter natural language wishes and have them fulfilled asynchronously
 - Iteration display, provide feedback, cancel or crystallize wishes
-- Detail (`components/wishes/WishDetail.tsx`): the head with actions, status timeline and iteration counter is `WishHeaderCard.tsx`, the collapsible iteration history `WishIterationHistory.tsx`; `WishDetail` holds whether it is open, so it stays open when another wish is selected
+- Detail (`components/wishes/WishDetail.tsx`): the head with actions, status timeline and iteration counter is `WishHeaderCard.tsx` (for FAILED the timeline shows the steps reached and marks the one that failed; the backend stores no phase, it follows from the newest iteration entry), the collapsible iteration history `WishIterationHistory.tsx`; `WishDetail` holds whether it is open, so it stays open when another wish is selected
 
 ### WorkflowFactory (`/factory`)
 
@@ -203,7 +203,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - **Overview:** per audit the gate, trend, “open X · accepted Y” (open with critical/high from `openFindingsBySeverity`, accepted from `findingsByStatus`) and the last run; “last attempt invalid” when the newest report was not valid
 - **Report:** the page shows the report named by `latestReportId`, i.e. the newest valid one. Its head names date and time, the run (short ID, link), the trigger as `TriggerSourceChip`, the chain (link to the chain run; there is no page per chain) or, without a chain, the schedule unless the chip already names it, plus “Definition #N”, workflow version and provider/model. When the newest attempt was invalid, a notice with date and error text says that the report is older. “Evidence run” and the history point at the run of the respective report; each history entry carries trigger and chain
-- **Findings:** status filter as `FilterChips`: “Open” (`OPEN` + `AWAITING_VERIFICATION`, the default), “Accepted”, “Dismissed”, “Resolved”, counts from `findingsByStatus`. `useAuditFindingsByStatus` loads one page (200) per chosen status through the `status` parameter, so a status with many findings cannot push the others out; when one page is not enough, a note says so. `?finding=<id>` opens the finding and switches its chip on as well. When a finding leaves the filter after being filed, a toast names its new chip and switches it on on request
+- **Findings:** status filter as `FilterChips`: “Open” (`OPEN` + `AWAITING_VERIFICATION`, the default), “Accepted”, “Dismissed”, “Resolved”, counts from `findingsByStatus`. `useAuditFindingsByStatus` loads one page (200) per chosen status through the `status` parameter, so a status with many findings cannot push the others out; when one page is not enough, a note says so. `?finding=<id>` opens the finding, switches its chip on as well and scrolls it into view once its list is complete; “not found” appears only once both the finding and the audit list have loaded. A click on an audit in the overview uses the link up (the parameter goes away), and every audit starts with its own chips. “Evidence unverified” marks `unverifiedEvidence` (no managed TODO); when filing, creating or linking a TODO fails, a toast gives the reason (`apiErrorMessage`). When a finding leaves the filter after being filed, a toast names its new chip and switches it on on request
 - **Legacy:** file-based Markdown reports, read-only
 - **Structure:** the page wires view, tabs and `hooks/useActiveAudit.ts`: only project and key are kept, the audit comes from the current `/audits` list, so counts follow after a finding was filed. Building blocks in `components/audit/`: `AuditOverview` (with `FindingCounts`), `AuditDetail`, `ReportOrigin` (head, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` with `AuditFindingItem` and `FindingDisposition`, `LegacyReports` and small parts in `AuditParts`. Filing, creating and linking TODOs live in `hooks/useFindingActions.ts`, the filter model in `utils/auditFindingFilter.ts`, the shown report in `useShownAuditReport`. A mutation writes its answer into the findings pages and into the single finding (`['audit-finding', id]`) that a deep link reads the next time it opens
 
@@ -495,7 +495,7 @@ All API data is managed via React Query:
 | `usePiCatalog()` | Query | Pi provider catalog |
 | `useAiProviderStatus()` | Query (60 s stale) | Readiness of the AI CLIs per provider |
 | `useRefreshAiProviderStatus()` | Mutation | Check readiness again at once |
-| `useUpdateSystemSetting()` | Mutation | Change system setting |
+| `useUpdateSystemSetting()` | Mutation | Change system setting; re-reads `['system', 'settings', key]` (for `default-ai-provider` also the provider list) before the mutation settles |
 | `useAssistantModelSetting()` | Query | Assistant model setting |
 | `useAutoRepairModeSetting()` | Query | Auto-repair mode setting |
 | `useSuggestionsModelSetting()` | Query | Suggestions model setting |
@@ -821,7 +821,7 @@ What `UnifiedCalendarGrid` shows: the view (month, week, day), the month with it
 
 ### `usePaletteSelection.ts` (`components/palette/`)
 
-Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
+Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. The results follow the input debounced by 250 ms; while they still show an earlier input (debounce running, or the server search of the run context, `pending` from `useResults`), Enter or Alt+N searches at once and acts only on the results of the current input, any other key in between drops it. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 

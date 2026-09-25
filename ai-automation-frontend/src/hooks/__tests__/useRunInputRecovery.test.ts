@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { http, HttpResponse } from 'msw';
+import { renderHook, waitFor } from '@testing-library/react';
+import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../test/server';
 import { useRunInputRecovery } from '../useRunInputRecovery';
 
@@ -13,7 +13,8 @@ function serveApproval(body: Record<string, unknown>) {
 }
 
 describe('useRunInputRecovery', () => {
-  it('stellt eine wartende Freigabe wieder her und räumt sie auf Wunsch weg', async () => {
+  // Schließen nach Antwort oder per X: useRunPendingInput (settle) — der Hook hier liefert nur, was der Server meldet.
+  it('stellt eine wartende Freigabe wieder her', async () => {
     serveApproval({ pending: true, blockId: 'b1', question: 'Weiter?', options: ['Ja'], rejectOptions: ['Nein'], stepIndex: 2 });
     const { result } = renderHook(() => useRunInputRecovery('run-1'));
     await waitFor(() => expect(result.current.recoveredApproval).not.toBeNull());
@@ -21,8 +22,6 @@ describe('useRunInputRecovery', () => {
       blockId: 'b1', question: 'Weiter?', options: ['Ja'], rejectOptions: ['Nein'], stepIndex: 2,
     });
     expect(result.current.recoveredHumanInput).toBeNull();
-    act(() => result.current.clearRecoveredApproval());
-    expect(result.current.recoveredApproval).toBeNull();
   });
 
   it('stellt eine wartende Eingabe mit Vorgabewerten wieder her', async () => {
@@ -54,5 +53,62 @@ describe('useRunInputRecovery', () => {
     renderHook(() => useRunInputRecovery(undefined));
     await new Promise((r) => setTimeout(r, 50));
     expect(calls).toBe(0);
+  });
+
+  it('fragt bei neuem refreshKey erneut und räumt auf, sobald nichts mehr wartet', async () => {
+    let pending = false;
+    let calls = 0;
+    server.use(http.get('/api/v1/executions/:runId/approval', () => {
+      calls++;
+      return HttpResponse.json(pending
+        ? { pending: true, blockId: 'approval-1', question: 'Weiter?', options: ['Ja', 'Nein'], stepIndex: 1 }
+        : { pending: false });
+    }));
+    const { result, rerender } = renderHook(({ key }) => useRunInputRecovery('run-1', key), { initialProps: { key: 'a' } });
+    await waitFor(() => expect(calls).toBe(1));
+    rerender({ key: 'a' });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(calls).toBe(1);
+
+    pending = true;
+    rerender({ key: 'b' });
+    await waitFor(() => expect(result.current.recoveredApproval?.question).toBe('Weiter?'));
+
+    pending = false;
+    rerender({ key: 'c' });
+    await waitFor(() => expect(result.current.recoveredApproval).toBeNull());
+    expect(calls).toBe(3);
+  });
+
+  it('übernimmt nur die Antwort der jüngsten Abfrage', async () => {
+    let calls = 0;
+    server.use(http.get('/api/v1/executions/:runId/approval', async () => {
+      calls++;
+      if (calls === 1) {
+        // die erste Abfrage kommt zuletzt zurück, mit dem inzwischen veralteten Stand
+        await delay(80);
+        return HttpResponse.json({ pending: true, blockId: 'approval-0', question: 'Alt?', options: ['Ja'], stepIndex: 0 });
+      }
+      return HttpResponse.json({ pending: false });
+    }));
+    const { result, rerender } = renderHook(({ key }) => useRunInputRecovery('run-1', key), { initialProps: { key: 'a' } });
+    await waitFor(() => expect(calls).toBe(1));
+    rerender({ key: 'b' });
+    await waitFor(() => expect(calls).toBe(2));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(result.current.recoveredApproval).toBeNull();
+  });
+
+  it('gibt die Frage eines Laufs nicht an den nächsten weiter', async () => {
+    server.use(http.get('/api/v1/executions/:runId/approval', async ({ params }) => {
+      if (params.runId === 'run-2') await delay(80);
+      return HttpResponse.json(params.runId === 'run-1'
+        ? { pending: true, blockId: 'approval-3', question: 'Lauf 1?', options: ['Ja'], stepIndex: 3 }
+        : { pending: false });
+    }));
+    const { result, rerender } = renderHook(({ runId }) => useRunInputRecovery(runId), { initialProps: { runId: 'run-1' } });
+    await waitFor(() => expect(result.current.recoveredApproval).not.toBeNull());
+    rerender({ runId: 'run-2' });
+    expect(result.current.recoveredApproval).toBeNull();
   });
 });

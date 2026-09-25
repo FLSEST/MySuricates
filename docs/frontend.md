@@ -117,7 +117,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Sternebewertung (1-5) nach Abschluss
 - Fehler-Panel bei fehlgeschlagenen Runs
 - Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser als `TriggerSourceChip` – den Chip nutzt auch das Audit Center –, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
-- `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
+- `hooks/useRunPendingInput.ts` ist die eine Quelle für Freigabe- und Eingabedialog, gemeinsam mit `SimpleWorkflowExecution`: WebSocket-Meldungen zuerst, dazu `GET /executions/{id}/approval` (`hooks/useRunInputRecovery.ts`) nach dem Laden und erneut, sobald der WebSocket verbindet oder Laufstatus bzw. aktueller Schritt wechseln (nur solange der Lauf läuft oder pausiert). Eine beantwortete Frage verschwindet sofort, auch wenn der WebSocket sie noch meldet; eine per X geschlossene bleibt offen, und solange sie das ist, öffnet „Offene Freigabe beantworten“ (`OpenApprovalButton`, im `RunHeader` bzw. unter dem Kopf der einfachen Ansicht) den Dialog wieder. `connected` fällt auch bei abruptem Abriss des WebSockets (`onWebSocketClose`), damit der Reconnect neu fragt
 - Der Kopf mit Zurück, Status und den Aktionen je Zustand (Pausieren, Fortsetzen, Abbrechen, Löschen, ab letztem Schritt fortsetzen, TODO aus einem fehlgeschlagenen Lauf) ist `RunHeader`, die Notizen sind `RunNotesCard` (der ungespeicherte Text bleibt in der Seite). `components/workflow/useRunDiagramSync.ts` färbt die Diagramm-Kästen nach Step-Status und hebt beim Klick auf einen Kasten dessen Step hervor; das TODO eines fehlgeschlagenen Laufs baut `utils/failedRunTodo.ts` (`buildFailedRunTodo`) in der App-Sprache
 
 ### Runs (`/runs`)
@@ -174,7 +174,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - Natürlichsprachige Wünsche eingeben und asynchron erfüllen lassen
 - Iterationsanzeige, Feedback geben, Wunsch abbrechen oder kristallisieren
-- Detail (`components/wishes/WishDetail.tsx`): Kopf mit Aktionen, Status-Zeitleiste und Iterationszähler ist `WishHeaderCard.tsx`, der aufklappbare Iterationsverlauf `WishIterationHistory.tsx`; ob er offen ist, hält `WishDetail`, deshalb bleibt er beim Wechsel zu einem anderen Wunsch offen
+- Detail (`components/wishes/WishDetail.tsx`): Kopf mit Aktionen, Status-Zeitleiste und Iterationszähler ist `WishHeaderCard.tsx` (bei FAILED zeigt die Zeitleiste die erreichten Schritte und markiert den gescheiterten; das Backend speichert die Phase nicht, sie folgt aus dem neuesten Iterationseintrag), der aufklappbare Iterationsverlauf `WishIterationHistory.tsx`; ob er offen ist, hält `WishDetail`, deshalb bleibt er beim Wechsel zu einem anderen Wunsch offen
 
 ### WorkflowFactory (`/factory`)
 
@@ -203,7 +203,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - **Übersicht:** je Audit Gate, Trend, „offen X · akzeptiert Y“ (offen samt kritisch/hoch aus `openFindingsBySeverity`, akzeptiert aus `findingsByStatus`) und der letzte Lauf; „letzter Versuch ungültig“, wenn der neueste Report nicht gültig war
 - **Bericht:** angezeigt wird der Report zu `latestReportId`, also der neueste gültige. Der Kopf nennt Datum mit Uhrzeit, den Run (Kurz-ID, Link), den Auslöser als `TriggerSourceChip`, die Kette (Link auf den Ketten-Lauf, eine Seite je Kette gibt es nicht) oder ohne Kette den Zeitplan, sofern der Chip ihn nicht schon nennt, dazu „Definition #N“, Workflow-Version und Provider/Modell. War der neueste Versuch ungültig, sagt ein Hinweis mit Datum und Fehlertext, dass der Bericht älter ist. „Evidenz-Run“ und die Historie zeigen auf den Run des jeweiligen Reports; die Historie trägt je Eintrag Auslöser und Kette
-- **Findings:** Statusfilter als `FilterChips`: „Offen“ (`OPEN` + `AWAITING_VERIFICATION`, Standard), „Akzeptiert“, „Verworfen“, „Behoben“, Zähler aus `findingsByStatus`. `useAuditFindingsByStatus` lädt je gewähltem Status eine Seite (200) über den Parameter `status`, damit ein Status mit vielen Befunden die übrigen nicht verdrängt; reicht eine Seite nicht, sagt das ein Hinweis. `?finding=<id>` öffnet den Befund und schaltet seinen Chip mit ein. Fällt ein Befund nach dem Einordnen aus dem Filter, nennt ein Toast den neuen Chip und schaltet ihn auf Wunsch ein
+- **Findings:** Statusfilter als `FilterChips`: „Offen“ (`OPEN` + `AWAITING_VERIFICATION`, Standard), „Akzeptiert“, „Verworfen“, „Behoben“, Zähler aus `findingsByStatus`. `useAuditFindingsByStatus` lädt je gewähltem Status eine Seite (200) über den Parameter `status`, damit ein Status mit vielen Befunden die übrigen nicht verdrängt; reicht eine Seite nicht, sagt das ein Hinweis. `?finding=<id>` öffnet den Befund, schaltet seinen Chip mit ein und scrollt ihn einmal ins Bild, sobald seine Liste vollständig ist; „nicht gefunden“ erscheint erst, wenn Befund und Audit-Liste geladen sind. Ein Klick auf ein Audit in der Übersicht verbraucht den Link (der Parameter fällt weg), jedes Audit beginnt mit eigenen Chips. „Beleg ungeprüft“ markiert `unverifiedEvidence` (kein verwaltetes TODO); scheitert Einordnen, TODO anlegen oder Verknüpfen, meldet ein Toast den Grund (`apiErrorMessage`). Fällt ein Befund nach dem Einordnen aus dem Filter, nennt ein Toast den neuen Chip und schaltet ihn auf Wunsch ein
 - **Legacy:** dateibasierte Markdown-Berichte, nur lesend
 - **Aufbau:** Die Seite verdrahtet Ansicht, Reiter und `hooks/useActiveAudit.ts`: Gemerkt werden nur Projekt und Schlüssel, das Audit kommt aus der aktuellen `/audits`-Liste, damit Zähler nach dem Einordnen nachziehen. Bausteine in `components/audit/`: `AuditOverview` (mit `FindingCounts`), `AuditDetail`, `ReportOrigin` (Kopf, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` mit `AuditFindingItem` und `FindingDisposition`, `LegacyReports` und kleine Teile in `AuditParts`. Einordnen, TODO anlegen und verknüpfen hält `hooks/useFindingActions.ts`, das Filtermodell `utils/auditFindingFilter.ts`, den angezeigten Report `useShownAuditReport`. Eine Mutation schreibt ihre Antwort in die Findings-Seiten und in den Einzel-Befund (`['audit-finding', id]`), den ein Deep-Link beim nächsten Öffnen liest
 
@@ -495,7 +495,7 @@ Alle API-Daten werden über React Query verwaltet:
 | `usePiCatalog()` | Query | Pi-Provider-Katalog |
 | `useAiProviderStatus()` | Query (60 s stale) | Bereitschaft der KI-CLIs je Anbieter |
 | `useRefreshAiProviderStatus()` | Mutation | Bereitschaft sofort neu prüfen |
-| `useUpdateSystemSetting()` | Mutation | System-Einstellung ändern |
+| `useUpdateSystemSetting()` | Mutation | System-Einstellung ändern; liest danach `['system', 'settings', key]` neu (für `default-ai-provider` auch die Anbieterliste), bevor die Mutation endet |
 | `useAssistantModelSetting()` | Query | Assistenten-Modell-Einstellung |
 | `useAutoRepairModeSetting()` | Query | Auto-Repair-Modus-Einstellung |
 | `useSuggestionsModelSetting()` | Query | Suggestions-Modell-Einstellung |
@@ -821,7 +821,7 @@ Was `UnifiedCalendarGrid` zeigt: Ansicht (Monat, Woche, Tag), Monat mit gewählt
 
 ### `usePaletteSelection.ts` (`components/palette/`)
 
-Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
+Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. Die Treffer folgen der Eingabe um 250 ms entprellt; zeigen sie noch eine frühere Eingabe (Entprellung läuft oder die Serversuche des Lauf-Kontexts, `pending` aus `useResults`), sucht Enter bzw. Alt+N sofort und wirkt erst auf die Treffer der aktuellen Eingabe, jede andere Taste dazwischen verwirft das. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 

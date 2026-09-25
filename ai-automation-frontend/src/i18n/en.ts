@@ -1025,6 +1025,7 @@ export const en = {
       approval: {
         title: 'Approval Required',
         description: 'This workflow step requires your decision to continue.',
+        reopen: 'Answer open approval',
       },
       humanInput: {
         title: 'Input Required',
@@ -2280,6 +2281,11 @@ export const en = {
     dispositionNote: 'Disposition note',
     unknownRuleKey: 'Rule not in the catalog',
     unknownRuleKeyHint: 'This ruleKey is not listed in audit/rule-keys.json. The rule identity is therefore unverified: if the next run spells it differently, a new finding appears instead of a repeat sighting.',
+    unverifiedEvidence: 'Evidence unverified',
+    unverifiedEvidenceHint: 'The evidence names no measurement of this run (no FAKT or TREFFER line from its fact sheet). The finding stays visible but gets no managed TODO while its evidence does not check out.',
+    fileFailed: 'Could not file the finding',
+    createTodoFailed: 'Could not create the TODO',
+    linkTodoFailed: 'Could not link the TODO',
   },
   cockpit: {
     title: 'Cockpit',

@@ -6,14 +6,14 @@ import { usePaletteSelection, type PaletteKeyActions } from '../usePaletteSelect
 const item = (id: string): PaletteItem => ({ id, title: id, raw: null });
 
 function setup(overrides: { isEmptyQuery?: boolean; pinnedItems?: PaletteItem[]; recentItems?: PaletteItem[];
-  results?: PaletteItem[]; hasAssistantRow?: boolean; keys?: Partial<PaletteKeyActions> } = {}) {
+  results?: PaletteItem[]; hasAssistantRow?: boolean; resultsPending?: boolean; keys?: Partial<PaletteKeyActions> } = {}) {
   const keys: PaletteKeyActions = {
     close: vi.fn(), cycleContext: vi.fn(), enter: vi.fn(), open: vi.fn(), openInNewTab: vi.fn(),
     askAssistant: vi.fn(), collecting: false, cancelCollecting: vi.fn(), ...overrides.keys,
   };
   const props = {
     isEmptyQuery: false, pinnedItems: [], recentItems: [], results: [item('a'), item('b')], hasAssistantRow: true,
-    ...overrides, keys,
+    resultsPending: false, searchNow: vi.fn(), ...overrides, keys,
   };
   const hook = renderHook((p) => usePaletteSelection(p), { initialProps: props });
   return { ...hook, keys, props };
@@ -118,5 +118,46 @@ describe('usePaletteSelection', () => {
     unmount();
     expect(press('Enter')).toBe(true);
     expect(keys.enter).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds Enter while the rows answer an earlier query, searches at once and runs the current row', () => {
+    const { rerender, props, keys } = setup({ resultsPending: true, results: [item('old')] });
+    expect(press('Enter', { shiftKey: true })).toBe(false);
+    expect(props.searchNow).toHaveBeenCalledTimes(1);
+    expect(keys.open).not.toHaveBeenCalled();
+
+    rerender({ ...props, resultsPending: false, results: [item('new')] });
+    expect(keys.open).toHaveBeenCalledWith(expect.objectContaining({ id: 'new' }));
+    expect(keys.open).toHaveBeenCalledTimes(1);
+    expect(keys.enter).not.toHaveBeenCalled();
+  });
+
+  it('holds Alt+N and the alt action the same way', () => {
+    const run = vi.fn();
+    const { rerender, props, keys } = setup({ resultsPending: true, results: [item('old')], keys: { altAction: { shortcut: 'r', run } } });
+    press('1', { altKey: true });
+    rerender({ ...props, resultsPending: false, results: [item('new')] });
+    expect(keys.enter).toHaveBeenCalledWith(expect.objectContaining({ id: 'new' }));
+
+    rerender({ ...props, resultsPending: true, results: [item('new')] });
+    press('r', { altKey: true });
+    expect(run).not.toHaveBeenCalled();
+    rerender({ ...props, resultsPending: false, results: [item('newer')] });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ id: 'newer' }));
+  });
+
+  it('drops a held key when another key comes first', () => {
+    const { rerender, props, keys } = setup({ resultsPending: true });
+    press('Enter');
+    press('x');
+    rerender({ ...props, resultsPending: false });
+    expect(keys.enter).not.toHaveBeenCalled();
+
+    rerender({ ...props, resultsPending: true });
+    press('Enter');
+    press('Escape');
+    rerender({ ...props, resultsPending: false });
+    expect(keys.enter).not.toHaveBeenCalled();
+    expect(keys.close).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,6 +4,7 @@ import { Button } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { ExecutionRerunButton } from './ExecutionRerunButton';
+import { OpenApprovalButton } from './OpenApprovalButton';
 import {
   usePauseExecution, useResumeExecution, useCancelExecution, useResumeFromStep, useDeleteRun,
 } from '../../hooks/useWorkflows';
@@ -25,14 +26,16 @@ interface RunHeaderProps {
   connected: boolean;
   /** RUNNING or PAUSED. */
   isRunning: boolean;
+  /** Set while an approval closed without an answer is still open: shows the button that opens it again. */
+  onOpenApproval?: () => void;
 }
 
 /**
  * Head of the run page: back, status (gate, live marker), workflow link, project folder and the
- * actions by state — TODO from a failed run, resume after an interruption, run again, delete a
- * finished run, and pause/resume/cancel while it runs.
+ * actions by state — answer an approval closed without an answer, TODO from a failed run, resume after
+ * an interruption, run again, delete a finished run, and pause/resume/cancel while it runs.
  */
-export function RunHeader({ run, workflow, workflowId, connected, isRunning }: RunHeaderProps) {
+export function RunHeader({ run, workflow, workflowId, connected, isRunning, onOpenApproval }: RunHeaderProps) {
   const navigate = useNavigate();
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -89,6 +92,7 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning }: R
           )}
         </p>
       </div>
+      {onOpenApproval && <OpenApprovalButton onClick={onOpenApproval} />}
       {(run.status === 'INTERRUPTED' || run.status === 'FAILED') && (
         <div className="flex items-center gap-2">
           {run.status === 'FAILED' && (

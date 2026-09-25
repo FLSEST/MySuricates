@@ -175,6 +175,36 @@ describe('useExecutionWebSocket', () => {
     expect(mockActivate).toHaveBeenCalled();
   });
 
+  // stompjs calls onDisconnect only after a DISCONNECT receipt — an abrupt close (backend restart,
+  // standby) left `connected` true, so the reconnect was no rising edge for the approval query (78af069c)
+  it('turns connected off when the socket closes abruptly, and on again with the reconnect', async () => {
+    const { result } = renderHook(() => useExecutionWebSocket('run-1', 'wf-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+
+    act(() => (lastClientConfig!.onWebSocketClose as (event: unknown) => void)({ code: 1006 }));
+    expect(result.current.connected).toBe(false);
+
+    act(() => onConnectCb!());
+    expect(result.current.connected).toBe(true);
+  });
+
+  it('starts the next run disconnected and ignores the late close of the socket it left', async () => {
+    const { result, rerender } = renderHook(({ id }) => useExecutionWebSocket(id, 'wf-1'), {
+      wrapper: createWrapper(), initialProps: { id: 'run-1' },
+    });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    const firstClient = lastClientConfig!;
+    mockActivate.mockImplementationOnce(() => { /* the next socket takes its time */ });
+
+    rerender({ id: 'run-2' });
+    expect(result.current.connected).toBe(false);
+    act(() => onConnectCb!());
+    expect(result.current.connected).toBe(true);
+
+    act(() => (firstClient.onWebSocketClose as (event: unknown) => void)({ code: 1000 }));
+    expect(result.current.connected).toBe(true);
+  });
+
   it('deactivates on unmount', () => {
     const { unmount } = renderHook(() => useExecutionWebSocket('run-1'), { wrapper: createWrapper() });
 
@@ -544,5 +574,26 @@ describe('useExecutionWebSocket', () => {
     rerender({ id: 'run-2' });
 
     await waitFor(() => expect(result.current.logs).toHaveLength(0));
+  });
+
+  it('clears the open question when the runId changes', async () => {
+    const { result, rerender } = renderHook(({ id }) => useExecutionWebSocket(id, 'wf-1'), {
+      wrapper: createWrapper(), initialProps: { id: 'run-1' },
+    });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    act(() => {
+      sendMessage({ type: 'approval_required', blockId: 'approval-1', question: 'OK?', options: ['Yes', 'No'], stepIndex: 1 });
+      sendMessage({
+        type: 'human_input_required', blockId: 'input-2', prompt: 'Name?', inputType: 'text', options: [],
+        defaultValue: '', required: true, validationPattern: null, variableName: 'name', stepIndex: 2,
+      });
+    });
+    await waitFor(() => expect(result.current.pendingHumanInput).not.toBeNull());
+    expect(result.current.pendingApproval).not.toBeNull();
+
+    rerender({ id: 'run-2' });
+
+    await waitFor(() => expect(result.current.pendingApproval).toBeNull());
+    expect(result.current.pendingHumanInput).toBeNull();
   });
 });

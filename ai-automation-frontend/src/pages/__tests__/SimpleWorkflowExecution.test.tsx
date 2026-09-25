@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
-import { screen, fireEvent, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -174,5 +174,36 @@ describe('SimpleWorkflowExecution', () => {
     expect(await screen.findByText('The run was cancelled before it finished.')).toBeInTheDocument();
     expect(screen.queryByTestId('run-result')).not.toBeInTheDocument();
     expect(screen.queryByTestId('run-failure')).not.toBeInTheDocument();
+  });
+});
+
+describe('SimpleWorkflowExecution approval', () => {
+  it('shows a waiting approval, sends nothing on X, opens it again from its button and answers with {answer}', async () => {
+    const answers: unknown[] = [];
+    serve(baseRun({ status: 'RUNNING', completedAt: null, steps: [step(0), step(1, { status: 'RUNNING', blockType: 'approval' })] }));
+    server.use(
+      http.get('/api/v1/executions/:runId/approval', () => HttpResponse.json(answers.length > 0 ? { pending: false } : {
+        pending: true, blockId: 'approval-1', question: 'Send the report?', options: ['Yes', 'No'], rejectOptions: ['No'], stepIndex: 1,
+      })),
+      http.post('/api/v1/executions/:runId/approve', async ({ request }) => {
+        answers.push(await request.json());
+        return new HttpResponse(null, { status: 200 });
+      }),
+    );
+    renderPage();
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Send the report?');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(answers).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Answer open approval' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Yes' }));
+
+    await waitFor(() => expect(answers).toEqual([{ answer: 'Yes' }]));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Answer open approval' })).toBeNull();
   });
 });

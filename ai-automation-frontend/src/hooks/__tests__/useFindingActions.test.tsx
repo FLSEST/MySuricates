@@ -90,6 +90,42 @@ describe('useFindingActions', () => {
     expect(sent).toEqual([{ method: 'POST', path: '/api/v1/audit-findings/f-1/todo-links', body: { todoId: 't-42' } }]);
   });
 
+  // 6ff1c580: a failed filing, TODO or link said nothing
+  it('reports a failed filing with the server reason and keeps the reason form open', async () => {
+    server.use(http.patch('/api/v1/audit-findings/:id', () =>
+      HttpResponse.json({ error: 'dispositionNote required' }, { status: 400 })));
+    const { result } = renderHook(() => useFindingActions(['open'], vi.fn()), { wrapper });
+
+    act(() => result.current.chooseStatus(finding, 'DISMISSED'));
+    act(() => result.current.saveDisposition());
+
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    expect(useToastStore.getState().toasts[0]).toMatchObject({
+      type: 'error', message: 'Could not file the finding: dispositionNote required',
+    });
+    expect(result.current.disposing).toEqual({ findingId: 'f-1', status: 'DISMISSED', note: '' });
+  });
+
+  it('reports a failed link and a failed TODO, and keeps the link form with its id', async () => {
+    server.use(
+      http.post('/api/v1/audit-findings/:id/todo-links', () => HttpResponse.json({ error: 'TODO t-42 not found' }, { status: 404 })),
+      http.post('/api/v1/audit-findings/:id/todos', () => new HttpResponse(null, { status: 500 })),
+    );
+    const { result } = renderHook(() => useFindingActions(['open'], vi.fn()), { wrapper });
+
+    act(() => result.current.toggleLinking('f-1'));
+    act(() => result.current.setTodoId('t-42'));
+    act(() => result.current.submitLink('f-1'));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
+    expect(useToastStore.getState().toasts[0]!.message).toBe('Could not link the TODO: TODO t-42 not found');
+    expect(result.current.linking).toBe('f-1');
+    expect(result.current.todoId).toBe('t-42');
+
+    act(() => result.current.createTodo('f-1'));
+    await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(2));
+    expect(useToastStore.getState().toasts[1]).toMatchObject({ type: 'error', message: expect.stringMatching(/^Could not create the TODO/) });
+  });
+
   it('closes the link form when the same finding is toggled again', () => {
     const { result } = renderHook(() => useFindingActions(['open'], vi.fn()), { wrapper });
 

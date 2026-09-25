@@ -26,6 +26,10 @@ interface PaletteSelectionOptions {
   recentItems: PaletteItem[];
   results: PaletteItem[];
   hasAssistantRow: boolean;
+  /** The result rows on screen belong to an earlier query: the debounce is running or its search is under way. */
+  resultsPending: boolean;
+  /** Starts the search for the current query right away instead of after the debounce. */
+  searchNow: () => void;
   keys: PaletteKeyActions;
 }
 
@@ -33,11 +37,16 @@ interface PaletteSelectionOptions {
  * Selected row of the command palette and its keyboard control on the window, so the keys work
  * while the search field has the focus: ↑/↓ move, Enter runs (Shift opens, Cmd/Ctrl opens in a
  * new tab), Alt+1–9 runs row N, Tab/Shift+Tab switches the context, Escape closes.
+ *
+ * A key that acts on a row while the rows still answer an earlier query (9ded5db0: Enter within the
+ * debounce ran the match of the previous input) starts the search at once and waits: it goes off on
+ * the first render whose rows answer the current query. Any other key in between drops it.
  */
 export function usePaletteSelection({
-  isEmptyQuery, pinnedItems, recentItems, results, hasAssistantRow, keys,
+  isEmptyQuery, pinnedItems, recentItems, results, hasAssistantRow, resultsPending, searchNow, keys,
 }: PaletteSelectionOptions) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const waitingKey = useRef<KeyboardEvent | null>(null);
 
   const assistantIdx = hasAssistantRow ? results.length : -1;
   const totalItems = isEmptyQuery
@@ -52,6 +61,10 @@ export function usePaletteSelection({
     return results[idx] ?? null;
   };
 
+  const actsOnRow = (e: KeyboardEvent) =>
+    e.key === 'Enter' || (e.altKey && /^[1-9]$/.test(e.key))
+    || (!!keys.altAction && e.altKey && e.key.toLowerCase() === keys.altAction.shortcut);
+
   const handleKey = (e: KeyboardEvent) => {
     if (keys.collecting) {
       if (e.key === 'Escape') {
@@ -60,6 +73,13 @@ export function usePaletteSelection({
       }
       return;
     }
+    if (resultsPending && actsOnRow(e)) {
+      e.preventDefault();
+      waitingKey.current = e;
+      searchNow();
+      return;
+    }
+    waitingKey.current = null;
     if (e.key === 'Escape') {
       e.preventDefault();
       keys.close();
@@ -126,6 +146,13 @@ export function usePaletteSelection({
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
+  // The waiting key goes off once the rows answer the current query — through the handler of that render.
+  useEffect(() => {
+    const waiting = waitingKey.current;
+    if (resultsPending || !waiting) return;
+    waitingKey.current = null;
+    handleKeyRef.current(waiting);
+  }, [resultsPending]);
 
   return { selectedIdx, select: setSelectedIdx, itemAt, assistantIdx };
 }

@@ -40,6 +40,17 @@ describe('stepKind', () => {
 
   it('treats a provider without aiRequest as ai (runs from before aiRequest was recorded)', () => {
     expect(stepKind(step({ blockType: 'retry', metadata: { provider: 'CLAUDE', model: 'opus' } }))).toBe('ai');
+    expect(stepKind(step({ metadata: { provider: 'CLAUDE', model: 'opus' } }))).toBe('ai');
+  });
+
+  it('does not read the integration provider of an integration step as an AI call', () => {
+    const metadata = { provider: 'feed', connection: 'default', action: 'fetch', executionMode: 'integration' };
+    expect(stepKind(step({ blockType: 'integration', metadata }))).toBe('deterministic');
+    expect(stepKind(step({ blockType: 'integration', status: 'FAILED', metadata: { ...metadata, error: 'timeout' } })))
+      .toBe('deterministic');
+    // steps without a block type: the integration's execution mode tells them apart
+    expect(stepKind(step({ metadata }))).toBe('deterministic');
+    expect(stepKind(step({ metadata: { blockType: 'integration', provider: 'open-meteo' } }))).toBe('deterministic');
   });
 
   it('falls back to the block type while no AI metadata exists yet (running or failed early)', () => {

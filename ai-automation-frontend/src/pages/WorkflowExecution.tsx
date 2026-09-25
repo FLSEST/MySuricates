@@ -23,7 +23,7 @@ import { RunInputVariables } from '../components/workflow/RunInputVariables';
 import { RunPendingTodosPanel } from '../components/workflow/RunPendingTodosPanel';
 import { RunProvenance } from '../components/workflow/RunProvenance';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
-import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
+import { useRunPendingInput } from '../hooks/useRunPendingInput';
 import { useRunDiagramSync } from '../components/workflow/useRunDiagramSync';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
@@ -47,18 +47,15 @@ export function WorkflowExecution() {
   // belong to one run, so a draft never follows "Run again" onto the next run on this page.
   const [notes, setNotes] = useState<{ runId: string | undefined; draft: string | null }>({ runId, draft: null });
   const notesDraft = notes.runId === runId ? notes.draft : null;
-  const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
+  const {
+    approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
   // BPMN-Diagramm nur laden, wenn es einen Run mit Schritten gibt (Ablauf-Visualisierung)
   const { data: bpmnXml } = useWorkflowBpmn(id!, (run?.steps?.length ?? 0) > 0);
   const { statusByBlock, stepHighlight, selectStep } = useRunDiagramSync(run?.steps);
-
-  // Recovered dialogs only apply while the run is still active
-  const runFinished = !!run && !isRunning;
-  const activeApproval = pendingApproval ?? (runFinished ? null : recoveredApproval);
-  const activeHumanInput = pendingHumanInput ?? (runFinished ? null : recoveredHumanInput);
 
   const handleRate = (rating: number) => {
     rateRun.mutate({ runId: runId!, rating, workflowId: id! });
@@ -78,7 +75,8 @@ export function WorkflowExecution() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <RunHeader run={run} workflow={workflow} workflowId={id!} connected={connected} isRunning={isRunning} />
+      <RunHeader run={run} workflow={workflow} workflowId={id!} connected={connected} isRunning={isRunning}
+        onOpenApproval={dismissedApproval ? reopen : undefined} />
 
       <GateStatusBanner run={run} />
 
@@ -203,12 +201,10 @@ export function WorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={clearRecoveredApproval}
+          onDismiss={() => dismiss(activeApproval)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: () => {
-                clearRecoveredApproval();
-              },
+              onSuccess: () => markAnswered(activeApproval),
             });
           }}
         />
@@ -221,9 +217,7 @@ export function WorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: () => {
-                clearRecoveredHumanInput();
-              },
+              onSuccess: () => markAnswered(activeHumanInput),
             });
           }}
         />

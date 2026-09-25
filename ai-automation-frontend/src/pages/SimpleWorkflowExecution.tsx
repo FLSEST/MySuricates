@@ -9,12 +9,13 @@ import { ApprovalDialog } from '../components/workflow/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
+import { OpenApprovalButton } from '../components/workflow/OpenApprovalButton';
 import {
   useWorkflow, useWorkflowRun,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
-import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
+import { useRunPendingInput } from '../hooks/useRunPendingInput';
 import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
@@ -95,14 +96,11 @@ export function SimpleWorkflowExecution() {
   const cancelExecution = useCancelExecution();
   const submitApproval = useSubmitApproval();
 
-  const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
+  const {
+    approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
-
-  // Recovered dialogs only apply while the run is still active
-  const runFinished = !!run && !isRunning;
-  const activeApproval = pendingApproval ?? (runFinished ? null : recoveredApproval);
-  const activeHumanInput = pendingHumanInput ?? (runFinished ? null : recoveredHumanInput);
 
   if (runError) {
     return <ErrorState message={runError.message} onRetry={() => refetchRun()} />;
@@ -178,6 +176,13 @@ export function SimpleWorkflowExecution() {
         )}
       </div>
 
+      {/* Its own row: in the narrow simple view the header has no room left for the workflow name */}
+      {dismissedApproval && (
+        <div className="flex">
+          <OpenApprovalButton onClick={reopen} />
+        </div>
+      )}
+
       {ACTIVE_STATUSES.has(run.status) ? (
         <section aria-label={t.simple.result.progress}>
           <SectionLabel>{t.simple.result.progress}</SectionLabel>
@@ -210,10 +215,10 @@ export function SimpleWorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={clearRecoveredApproval}
+          onDismiss={() => dismiss(activeApproval)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: clearRecoveredApproval,
+              onSuccess: () => markAnswered(activeApproval),
             });
           }}
         />
@@ -226,7 +231,7 @@ export function SimpleWorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: clearRecoveredHumanInput,
+              onSuccess: () => markAnswered(activeHumanInput),
             });
           }}
         />
