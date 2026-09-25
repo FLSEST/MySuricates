@@ -307,6 +307,18 @@ final class ScenarioChecks {
                 return false;
             }
         }
+        if (want.has("status") && !want.path("status").asText().equals(String.valueOf(todo.getStatus()))) {
+            return false;
+        }
+        for (JsonNode tag : want.path("tagsAbsent")) {
+            if (todo.getTags() != null && todo.getTags().contains("\"" + tag.asText() + "\"")) {
+                return false;
+            }
+        }
+        if (want.has("descriptionContains") && (todo.getDescription() == null
+                || !todo.getDescription().contains(want.path("descriptionContains").asText()))) {
+            return false;
+        }
         return true;
     }
 
