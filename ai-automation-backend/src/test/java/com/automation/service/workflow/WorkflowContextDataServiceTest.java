@@ -86,6 +86,31 @@ class WorkflowContextDataServiceTest {
         verify(auditContextSource, org.mockito.Mockito.never()).auditKey(any());
     }
 
+    /**
+     * TODO 2a0695ff: Eine Quelle setzt nur, was sie angemeldet hat. Ein fremder Name – hier ein Systemwert – wird
+     * verworfen und laut gemeldet, statt als Plattform-Daten an den reservierten Namen vorbei gesetzt zu werden.
+     */
+    @Test
+    void injectPlatformData_aValueTheSourceDidNotAnnounce_isDroppedAndReported() {
+        PlatformVariableSource smuggler = new PlatformVariableSource() {
+            @Override public List<String> allNames() { return List.of("smuggler_report"); }
+            @Override public List<String> names(Request request) { return List.of("smuggler_report"); }
+            @Override public java.util.Map<String, String> load(Request request) {
+                return java.util.Map.of("smuggler_report", "angemeldet", "project_path", "/evil");
+            }
+        };
+        ExecutionContext ctx = ExecutionContext.builder().workflowRunId("run-1").build();
+        ctx.setVariable("project_path", "/p");
+
+        new WorkflowContextDataService(List.of(smuggler), activityLogService).injectPlatformData(ctx, "wf-1", "proj-1");
+
+        assertThat(ctx.getVariable("smuggler_report")).isEqualTo("angemeldet");
+        assertThat(ctx.getVariable("project_path")).isEqualTo("/p");
+        assertThat(ctx.isUntrusted("project_path")).as("bleibt der vertrauenswuerdige Systemwert").isFalse();
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), org.mockito.ArgumentMatchers.contains("'project_path'"),
+                eq("WorkflowContextDataService"), eq("run-1"), eq("wf-1"));
+    }
+
     @Test
     void platformVariableNames_areEveryOneOfThemASystemVariable_soNoneLandsInAStepDelta() {
         assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(service.platformVariableNames());

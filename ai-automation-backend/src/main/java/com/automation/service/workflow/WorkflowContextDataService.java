@@ -101,6 +101,10 @@ public class WorkflowContextDataService {
      * <p>Two separate guards on purpose: a loader that throws still gets its variables set — each to
      * the stated gap, reported once under the first name — and a failure while <i>setting</i> one is at
      * least loud. Neither one reaches the next variable or source.
+     *
+     * <p>Only what the source announced for this run is set (TODO 2a0695ff). A value under any other name is
+     * dropped, loudly: a source could otherwise set any variable as platform data — a system value such as
+     * {@code project_path} included — past the reserved names that input contexts and sub-workflows are kept from.
      */
     private void inject(ExecutionContext context, String workflowId, PlatformVariableSource source,
                         PlatformVariableSource.Request request) {
@@ -119,6 +123,10 @@ public class WorkflowContextDataService {
             }
         }
         for (Map.Entry<String, String> value : values.entrySet()) {
+            if (!names.contains(value.getKey())) {
+                reportUndeclared(context, workflowId, source, value.getKey());
+                continue;
+            }
             try {
                 context.setUntrustedPlatformVariable(value.getKey(), value.getValue());
             } catch (Exception e) {
@@ -131,20 +139,33 @@ public class WorkflowContextDataService {
 
     /**
      * A gap in the injected platform data is an operational fact, not a debug detail: it goes into
-     * the activity log with the run id, so it is visible where the run is. Its own try/catch —
-     * a failing log write must not become the failure that eats the next injection.
+     * the activity log with the run id, so it is visible where the run is.
      */
     private void reportGap(ExecutionContext context, String workflowId, String name, Exception cause) {
         String runId = context != null ? context.getWorkflowRunId() : null;
         log.warn("Platform variable '{}' could not be injected (run {}): {}", name, runId, cause.toString());
+        recordWarning(runId, workflowId,
+                "Kontextvariable '%s' konnte nicht gesetzt werden — der Workflow sieht die Lücke statt des Werts: %s"
+                        .formatted(name, cause.toString()));
+    }
+
+    /** A value the source did not announce: a bug in that source, not a detail — as loud as a gap. */
+    private void reportUndeclared(ExecutionContext context, String workflowId, PlatformVariableSource source,
+                                  String name) {
+        String runId = context != null ? context.getWorkflowRunId() : null;
+        String sourceName = source.getClass().getSimpleName().isEmpty()
+                ? source.getClass().getName() : source.getClass().getSimpleName();
+        log.warn("Platform source {} delivered '{}' without announcing it — dropped (run {})", sourceName, name, runId);
+        recordWarning(runId, workflowId,
+                "Plattform-Quelle %s lieferte die nicht angemeldete Variable '%s' — verworfen".formatted(sourceName, name));
+    }
+
+    /** Its own try/catch — a failing log write must not become the failure that eats the next injection. */
+    private void recordWarning(String runId, String workflowId, String message) {
         try {
-            activityLogService.warn(LogCategory.EXECUTION,
-                    "Kontextvariable '%s' konnte nicht gesetzt werden — der Workflow sieht die Lücke statt des Werts: %s"
-                            .formatted(name, cause.toString()),
-                    "WorkflowContextDataService", runId, workflowId);
+            activityLogService.warn(LogCategory.EXECUTION, message, "WorkflowContextDataService", runId, workflowId);
         } catch (Exception loggingFailure) {
-            log.warn("Could not record the platform-data gap for '{}' in the activity log: {}",
-                    name, loggingFailure.toString());
+            log.warn("Could not record in the activity log: {} ({})", message, loggingFailure.toString());
         }
     }
 }
