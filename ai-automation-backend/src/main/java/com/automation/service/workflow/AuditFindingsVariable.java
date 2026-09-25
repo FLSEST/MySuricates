@@ -20,9 +20,13 @@ class AuditFindingsVariable implements PlatformVariableSource {
     private final AuditContextSource auditContextSource;
 
     @Override
+    public List<String> allNames() {
+        return List.of(AuditContextSource.VARIABLE);
+    }
+
+    @Override
     public List<String> names(Request request) {
-        return auditContextSource.auditKey(request.workflowMeta()) != null
-                ? List.of(AuditContextSource.VARIABLE) : List.of();
+        return auditContextSource.auditKey(request.workflowMeta()) != null ? allNames() : List.of();
     }
 
     @Override

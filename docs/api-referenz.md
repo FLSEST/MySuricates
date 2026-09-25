@@ -421,8 +421,9 @@ Workflow aus JSON importieren (exportiertes Format + Zielprojekt).
 | `instructions` | String | Nein |
 | `model` | String | Nein |
 | `updateIfExists` | Boolean | Nein (Standard: `false`) |
+| `version` | String | Nein — Versions-Label des Exports (`4.4.0`); fehlt es oder ist es leer, bleibt es beim Standard `1.0.0` bzw. beim bisherigen Label |
 
-Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt.
+Wenn `updateIfExists=true` und ein Workflow gleichen Namens im Zielprojekt existiert, wird dieser aktualisiert statt neu erstellt – samt `version`, wie bei `PUT` und der Pool-Neuinstallation.
 
 #### Block-Config: `timeout_seconds`
 

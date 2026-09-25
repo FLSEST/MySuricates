@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Prüft eine Workflow-Definition deterministisch auf bekannte Baufehler — ohne KI-Aufruf.
@@ -19,10 +20,13 @@ import java.util.List;
  * über die ausgelieferten Pool-Definitionen. Der Speicherweg bleibt unangetastet — der Analyzer
  * meldet, er blockiert nicht.
  *
- * <p><b>Was er heute prüft</b> — neun Regeln, jede eindeutig am Text entscheidbar:
+ * <p><b>Was er heute prüft</b> — zehn Regeln, jede eindeutig am Text entscheidbar, eine davon am Text samt
+ * den Metadaten der Definition:
  * <ul>
  *   <li>{@code unknown-block-reference} — Verweis auf einen Block, den es nicht gibt</li>
  *   <li>{@code chain-only-placeholder} — Chain-Variable in einem einzeln laufenden Workflow</li>
+ *   <li>{@code audit-only-placeholder} — {@code {{ audit_findings }}} in einem Workflow ohne gültiges
+ *       {@code metadata.audit}: die Variable gibt es dort nicht</li>
  *   <li>{@code unwired-output} — erzeugte Ausgabe, die kein späterer Block liest</li>
  *   <li>{@code absolute-home-path} — Pfad mit Klarnamen unter {@code /home/…}</li>
  *   <li>{@code missing-strict-mode} — Shell-Block ohne {@code set -euo pipefail}</li>
@@ -60,16 +64,25 @@ public class WorkflowAnalyzer {
         if (workflow == null || workflow.getBlocks() == null || workflow.getBlocks().isEmpty()) {
             return List.of();
         }
-        return analyze(workflow.getBlocks(), workflow.getInstructions());
+        return analyze(workflow.getBlocks(), workflow.getInstructions(), workflow.getMetadata());
     }
 
-    /** Wie {@link #analyze(Workflow)}, aber auf einer losen Blockliste — für Pool-Dateien und Tests. */
+    /** Wie {@link #analyze(Workflow)}, aber auf einer losen Blockliste ohne Metadaten — also kein Audit-Workflow. */
     public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions) {
+        return analyze(blocks, instructions, Map.of());
+    }
+
+    /**
+     * Wie {@link #analyze(Workflow)}, auf einer losen Blockliste samt den Metadaten der Definition — für
+     * Pool-Dateien und Tests. {@code metadata.audit} entscheidet, ob {@code {{ audit_findings }}} belegt wird.
+     */
+    public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions,
+                                         Map<String, Object> metadata) {
         if (blocks == null || blocks.isEmpty()) {
             return List.of();
         }
         List<AnalyzerFinding> findings = new ArrayList<>();
-        WiringRules.apply(blocks, findings);
+        WiringRules.apply(blocks, metadata != null ? metadata : Map.of(), findings);
         HygieneRules.apply(blocks, instructions, findings);
         ApprovalRules.apply(blocks, findings);
         ForEachRules.apply(blocks, findings);

@@ -353,6 +353,29 @@ class AuditFingerprintMigrationJobTest {
                 .isNotEqualTo(AuditIngestionService.fingerprint(projectId, AUDIT_KEY, RULE_KEY, "package"));
     }
 
+    /**
+     * v4 (90c4f7db): {@code audit_findings} zeigt ein {@code |} im subject als {@code ¦}. Ein Finding, das schon
+     * mit {@code ¦} gespeichert ist, und sein Zwilling mit {@code |} sind derselbe Befund.
+     */
+    @Test
+    void mergesAFindingStoredWithTheMaskedSeparatorOntoItsPipeTwin() {
+        AuditFinding older = saveFinding("scripts/install.sh | sh", AuditFindingStatus.ACCEPTED_RISK, 2, T0, T1,
+                reportOld, "run-old");
+        AuditFinding masked = saveFinding("scripts/install.sh ¦ sh", AuditFindingStatus.OPEN, 1, T2, T2,
+                reportNew, "run-new");
+
+        job.migrate();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(findingRepository.findByProjectIdAndAuditKey(projectId, AUDIT_KEY)).extracting(AuditFinding::getId)
+                .containsExactly(older.getId());
+        assertThat(findingRepository.findById(masked.getId())).isEmpty();
+        assertThat(findingRepository.findById(older.getId()).orElseThrow().getFingerprint())
+                .isEqualTo(AuditIngestionService.fingerprint(projectId, AUDIT_KEY, RULE_KEY, "scripts/install.sh | sh"))
+                .isEqualTo(AuditIngestionService.fingerprint(projectId, AUDIT_KEY, RULE_KEY, "scripts/install.sh ¦ sh"));
+    }
+
     @Test
     void writesTheCatalogueKeyAndFingerprintOfALoneDriftedFinding() {
         String subject = "service/workflow/RunAdmission.java";

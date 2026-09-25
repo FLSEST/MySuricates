@@ -88,12 +88,14 @@ public class ExecutionContextFactory {
                 .build();
         context.setProjectPath(project.getPath());
         Set<String> untrustedKeys = reservedNames(inputContext, ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
+        Set<String> platformNames = contextDataService.platformVariableNames();
         inputContext.forEach((name, value) -> {
             if (name.startsWith("execution_path_")) return;
-            // audit_findings describes the running workflow itself and is set by injectPlatformData only.
-            // A value handed over by a parent run (sub-workflow copies every variable) or passed as input
-            // would otherwise stay here as a trusted variable — unquoted in shell blocks (TODO 3643beac).
-            if (AuditContextSource.VARIABLE.equals(name)) return;
+            // Platform data describes the running workflow itself and is set by injectPlatformData only, as
+            // untrusted platform data. A value handed over by a parent run or passed as input would otherwise
+            // stay here as a trusted variable — unquoted in shell blocks — wherever this run's own source does
+            // not apply: audit_findings without metadata.audit, goal_* without goal_id (TODO 3643beac, 2a0695ff).
+            if (platformNames.contains(name)) return;
             if (untrustedKeys.contains(name)) {
                 context.setUntrustedVariable(name, value);
             } else {

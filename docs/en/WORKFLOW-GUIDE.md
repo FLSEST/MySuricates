@@ -529,6 +529,8 @@ Executes another workflow as a nested step.
 
 **Limits**: Maximum nesting depth of 5 levels. Circular references are detected. 30-minute timeout.
 
+**Context**: The child run gets the parent run's variables and its `{{ previous_output }}`, but not its platform data (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): the platform injects those into the child run itself, computed for it. A value under one of these names is not taken from any other input context either. The parent run's taint travels along.
+
 **Markers**: The step merely passes the child run's last output through (step metadata `derivedOutput: true`). Any `gate_status:` and `todo_item:` markers inside it are evaluated in the child run only — the parent run deliberately leaves them out of its gate summary and TODO list.
 
 **When to use**: Composing complex workflows from smaller, reusable ones.
@@ -796,9 +798,9 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the definition has changed since the last successful run (hash comparison; timestamps when no hash exists) |
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
 | `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
-| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. An audit envelope is cut off, platform markers lose their colon (`gate_status GREEN` stays readable but is no longer taken as a verdict when a model repeats the line), block boundaries such as `</audit_findings>` read `[audit_findings]`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 | `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
-| `{{ audit_findings }}` | **Only in audit workflows** (valid `metadata.audit`): the known findings of the workflow's own audit in the project — open, awaiting verification, accepted, dismissed — inside an `<audit_findings>…</audit_findings>` block, one line per finding with status, severity, `ruleKey`, `subject`, title and disposition, at most 250 lines and 60,000 bytes (classified findings first, the rest as a count per status); without findings `"(keine bekannten Befunde)"`. Other workflows do not have the variable, not even through the variable hand-over to a sub-workflow. Format and purpose: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt". Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
+| `{{ audit_findings }}` | **Only in audit workflows** (valid `metadata.audit`): the known findings of the workflow's own audit in the project — open, awaiting verification, accepted, dismissed — inside an `<audit_findings>…</audit_findings>` block, one line per finding with status, severity, `ruleKey`, `subject`, title and disposition, at most 250 lines and 60,000 bytes (classified findings first, the rest as a count per status); without findings `"(keine bekannten Befunde)"`. Other workflows do not have the variable, not even through the variable hand-over to a sub-workflow; there the placeholder would stay literally (analyzer rule `audit-only-placeholder`). Format and purpose: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt". Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 
 > **Platform data is never silently absent.** `previous_report`, `open_todos` and
 > `request_metrics` (in audit workflows also `audit_findings`) are injected one by one: if one of
@@ -1061,7 +1063,7 @@ else
 fi
 ```
 
-When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN).
+When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN). On a tie, RED and YELLOW keep the first gate – the cause, whose category also names the auto-TODO – while GREEN takes the last one, the closing verdict rather than the `Command exit 0` of a `checked_command` before it – unless it says less: the synthetic `Command exit N` never replaces a description in words of its own, not even after the verdict, and a GREEN without `gate_description` does not replace one that has it. If the later one has no `gate_category`, the current one stays (TODO 2aa9ddd5).
 
 **`run.metadata.gate_summary`** additionally aggregates all parsed gates of the run:
 

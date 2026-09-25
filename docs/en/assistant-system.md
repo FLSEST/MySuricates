@@ -207,7 +207,7 @@ The assistant can suggest actions via `<tool type="...">JSON</tool>` tags. `Assi
 | `create_todo` | `title` | Create a todo (optional: description, priority, tags, projectId) |
 | `update_todo_status` | `id`, `status` | Change todo status (OPEN/IN_PROGRESS/DONE/BACKLOG) |
 | `create_workflow` | `projectId`, `name` | Create a workflow (optional: blocks, instructions, model, defaultContext) |
-| `update_workflow` | `workflowId` | Update workflow fields (only provided fields are changed) |
+| `update_workflow` | `workflowId` | Update workflow fields (only provided fields are changed, the version label `version` too, as with `PUT`) |
 | `delete_workflow` | `workflowId` | Soft-delete a workflow |
 | `start_workflow` | `workflowId` | Start a workflow (optional: context for input variables) |
 | `cancel_run` | `runId` | Cancel a running run |

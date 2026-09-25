@@ -236,6 +236,55 @@ class WorkflowControllerTest {
                 eq(ChangeSource.USER));
     }
 
+    // --- import: the version label travels with the export file (TODO 5e2e73a5) ------------
+
+    @Test
+    void importWorkflow_updateIfExists_takesOverTheVersionLabel() throws Exception {
+        when(workflowService.findByNameAndProjectId("Test Workflow", "proj-1")).thenReturn(java.util.Optional.of(testWorkflow));
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/workflows/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\": \"proj-1\", \"name\": \"Test Workflow\", \"version\": \"4.4.0\","
+                                + " \"updateIfExists\": true, \"blocks\": []}"))
+                .andExpect(status().isOk());
+
+        verify(workflowService).update(eq("wf-1"),
+                argThat(req -> "4.4.0".equals(req.version()) && "Imported workflow update".equals(req.changeMessage())),
+                eq(ChangeSource.IMPORT));
+    }
+
+    @Test
+    void importWorkflow_updateIfExists_withoutOrWithBlankVersion_keepsTheLabel() throws Exception {
+        when(workflowService.findByNameAndProjectId("Test Workflow", "proj-1")).thenReturn(java.util.Optional.of(testWorkflow));
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        for (String body : List.of(
+                "{\"projectId\": \"proj-1\", \"name\": \"Test Workflow\", \"updateIfExists\": true}",
+                "{\"projectId\": \"proj-1\", \"name\": \"Test Workflow\", \"version\": \"  \", \"updateIfExists\": true}")) {
+            mockMvc.perform(post("/api/v1/workflows/import").contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk());
+        }
+
+        verify(workflowService, times(2)).update(eq("wf-1"), argThat(req -> req.version() == null), eq(ChangeSource.IMPORT));
+    }
+
+    @Test
+    void importWorkflow_asNewWorkflow_takesOverTheVersionLabel() throws Exception {
+        when(workflowService.create(any(), eq(ChangeSource.IMPORT))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        mockMvc.perform(post("/api/v1/workflows/import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\": \"proj-1\", \"name\": \"Neu\", \"version\": \"4.4.0\"}"))
+                .andExpect(status().isCreated());
+
+        verify(workflowService).create(argThat(req -> "4.4.0".equals(req.version()) && "Neu".equals(req.name())),
+                eq(ChangeSource.IMPORT));
+    }
+
     @Test
     void deleteWorkflow_existingId_returns204() throws Exception {
         doNothing().when(workflowService).delete("wf-1");

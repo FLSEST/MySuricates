@@ -151,6 +151,9 @@ public class WorkflowController {
             projectId = projectService.getOrCreateCollectionProject().getId();
         }
 
+        // Blank keeps the label, as on create and on a pool reinstall — an export file is no PUT (TODO 5e2e73a5)
+        String version = request.version() == null || request.version().isBlank() ? null : request.version();
+
         // Check for existing workflow if updateIfExists is true
         if (Boolean.TRUE.equals(request.updateIfExists())) {
             var existing = workflowService.findByNameAndProjectId(request.name(), projectId);
@@ -165,7 +168,11 @@ public class WorkflowController {
                         null,
                         null,
                         null,
-                        "Imported workflow update"
+                        "Imported workflow update",
+                        null,
+                        null,
+                        null,
+                        version
                 );
                 var updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.IMPORT);
                 return ResponseEntity.ok(workflowMapper.toResponse(updated));
@@ -185,7 +192,7 @@ public class WorkflowController {
                 null,
                 request.metadata(),
                 request.defaultContext(),
-                null
+                version
         );
         var workflow = workflowService.create(createRequest, ChangeSource.IMPORT);
         return ResponseEntity.status(HttpStatus.CREATED).body(workflowMapper.toResponse(workflow));

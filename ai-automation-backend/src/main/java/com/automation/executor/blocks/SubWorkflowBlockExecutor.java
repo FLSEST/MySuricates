@@ -6,6 +6,7 @@ import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.StepResultRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.workflow.WorkflowContextDataService;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import lombok.extern.slf4j.Slf4j;
@@ -27,15 +28,18 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
     private final WorkflowExecutor workflowExecutor;
     private final WorkflowRunRepository runRepository;
     private final StepResultRepository stepResultRepository;
+    private final WorkflowContextDataService contextDataService;
 
     public SubWorkflowBlockExecutor(WorkflowService workflowService,
                                     @Lazy WorkflowExecutor workflowExecutor,
                                     WorkflowRunRepository runRepository,
-                                    StepResultRepository stepResultRepository) {
+                                    StepResultRepository stepResultRepository,
+                                    WorkflowContextDataService contextDataService) {
         this.workflowService = workflowService;
         this.workflowExecutor = workflowExecutor;
         this.runRepository = runRepository;
         this.stepResultRepository = stepResultRepository;
+        this.contextDataService = contextDataService;
     }
 
     @Override
@@ -85,8 +89,11 @@ public class SubWorkflowBlockExecutor implements BlockExecutor {
         try {
             Workflow subWorkflow = workflowService.findById(workflowId);
 
-            // Build child context with parent variables
+            // Build child context with parent variables — without the parent's platform data: the child gets its
+            // own injected, and the copy only bloated the child's stored input_context (open_todos alone carries
+            // up to 150 titles). Its taint still travels, see exportTaint below (TODO 2a0695ff).
             Map<String, Object> childContext = new HashMap<>(context.getVariables());
+            childContext.keySet().removeAll(contextDataService.platformVariableNames());
             childContext.put("previous_output", context.getPreviousOutput() != null ? context.getPreviousOutput() : "");
             List<String> newParentIds = new ArrayList<>(parentIds);
             newParentIds.add(workflowId);

@@ -417,8 +417,9 @@ Import a workflow from JSON (exported format + target project).
 | `instructions` | String | No |
 | `model` | String | No |
 | `updateIfExists` | Boolean | No (default: `false`) |
+| `version` | String | No — the export's version label (`4.4.0`); missing or blank keeps the default `1.0.0` or the current label |
 
-When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one.
+When `updateIfExists=true` and a workflow with the same name exists in the target project, it will be updated instead of creating a new one — `version` included, as with `PUT` and a pool reinstall.
 
 #### Block Config: `timeout_seconds`
 

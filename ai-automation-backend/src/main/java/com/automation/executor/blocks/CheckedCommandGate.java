@@ -1,6 +1,7 @@
 package com.automation.executor.blocks;
 
 import com.automation.entity.GateStatus;
+import com.automation.service.runoutput.CommandExitDescription;
 import com.automation.service.runoutput.GateStatusOutputParser;
 
 /**
@@ -30,7 +31,7 @@ final class CheckedCommandGate {
         GateStatusOutputParser.ParsedGateStatus own = GateStatusOutputParser.parse(output).orElse(null);
         String category = String.valueOf(rawCategory == null ? "build-check" : rawCategory)
                 .replaceAll("[^a-zA-Z0-9_-]", "-");
-        String description = "Command exit " + exitCode;
+        String description = CommandExitDescription.of(exitCode);
 
         StringBuilder header = new StringBuilder();
         if (own == null || own.status().ordinal() < fromExit.ordinal()) {

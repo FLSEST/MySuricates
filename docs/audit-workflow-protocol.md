@@ -52,9 +52,10 @@ Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird a
 `"findings": []` ausgegeben.
 
 Stehen mehrere Envelopes in der Ausgabe, zählt der **letzte** mit lesbarem JSON (TODO `1cf996df`).
-Der eigene schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen:
-`{{ previous_report }}` sind die ersten 3000 Zeichen des letzten Reports, bei kurzen Reports samt
-Envelope, oft abgeschnitten. Ein Envelope beginnt mit `<!--`, dem Marker und dem JSON-Beginn `{`;
+Der eigene schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen. In
+`{{ previous_report }}` fehlt der Envelope des letzten Reports seit TODO `3bf8c9d8` ganz, auch ein
+abgebrochener, und `gate_status:`, `todo_item:` & Co. verlieren ihren Doppelpunkt; die Regel bleibt
+die zweite Sicherung für einen Vorlauf, den ein Modell auf anderem Weg wiedergibt. Ein Envelope beginnt mit `<!--`, dem Marker und dem JSON-Beginn `{`;
 ein zitierter Marker ohne JSON zählt nicht, ebenso wenig ein Anfang im Text eines Findings. Beginnt
 hinter dem letzten lesbaren noch ein Envelope, etwa weil die Antwort abbricht, ist der Report
 ungültig; auf einen früheren greift die Ingestion nicht zurück. Der Gate-Block der Test-Abdeckung
@@ -223,6 +224,10 @@ ACCEPTED_RISK | MEDIUM | performance.bundle-size | frontend/dist | Bundle über 
   gekürzt (Titel 200, `subject` 300, Einordnung 200 Zeichen) und von Plattform-Markern, dem
   Envelope-Marker `mysuricates:audit-result` und Blockgrenzen befreit – auch in Verkleidung
   (Vollbreite, unsichtbare Zeichen, Unicode-Leerraum), die ein Modell als ASCII wiedergäbe.
+- Ein `|` in `ruleKey`, `subject`, Titel oder Einordnung steht als `¦` (TODO `90c4f7db`): Das
+  Trennzeichen kommt in keinem Feld vor, ein Skript darf die Zeile an `|` zerlegen. Für die
+  Identität zählt `¦` wie `|` – ein Prompt, der den Befund so weiterführt, wie der Block ihn zeigt,
+  trifft denselben Befund.
 - Ohne bekannte Befunde steht `(keine bekannten Befunde)` da. Scheitert die Abfrage, steht
   `NICHT GEMESSEN: audit_findings (nicht verfügbar: <Fehlerart>)` da, dazu eine WARN-Zeile im
   Activity-Log; ist das Modul `audit` aus, `… (nicht verfügbar: Modul audit ist aus)`.
