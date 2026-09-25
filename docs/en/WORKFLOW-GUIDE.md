@@ -746,7 +746,7 @@ In the example, an earlier block `ampel` prints only `GREEN`, `YELLOW` or `RED` 
 - A placeholder that **could not be resolved** (unknown variable — the resolver leaves it literally) **causes the block to fail** and names the field. Better a red step than `{{ hunt_count }}` as a KPI on the dashboard.
 - Any breach of the contract (too long, unknown field in a KPI, number instead of string, invisible characters) causes the step to be **FAILED**; the message names the field (`kpis[2].value`), never the value.
 - Unknown keys at the top level are ignored (legitimate platform keys like `timeout_seconds` live there); unknown keys **inside** a KPI object are rejected.
-- Step output contains only counts, never contract values.
+- Step output contains only counts, never contract values — in English like every other block, e.g. `✓ Dashboard report GREEN · title · 4 KPIs · 0 items`.
 
 **Precedence over the marker:** Once a `dashboard-report` block has written a result, the marker `dashboard_widget:` is not evaluated in **any** step output. The block is the explicitly configured way; without this rule, a marker line in a later AI step's output could overwrite the report. Two `dashboard-report` blocks in one workflow: the one executed last wins.
 

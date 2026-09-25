@@ -758,7 +758,7 @@ Im Beispiel gibt ein früherer Block `ampel` nur `GREEN`, `YELLOW` oder `RED` au
 - Ein Platzhalter, der **nicht aufgelöst** werden konnte (unbekannte Variable — der Resolver lässt ihn wörtlich stehen), **lässt den Block scheitern** und nennt das Feld. Lieber ein roter Schritt als `{{ hunt_count }}` als Kennzahl auf dem Dashboard.
 - Jeder Verstoß gegen den Vertrag (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt **FAILED** werden; die Meldung nennt das Feld (`kpis[2].value`), nie den Wert.
 - Unbekannte Schlüssel auf oberster Ebene werden ignoriert (dort stehen legitim Plattform-Schlüssel wie `timeout_seconds`); unbekannte Schlüssel **innerhalb** eines KPI-Objekts werden abgelehnt.
-- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte.
+- Die Schritt-Ausgabe enthält nur Zählwerte, nie Vertragswerte — auf Englisch wie bei den übrigen Blöcken, etwa `✓ Dashboard report GREEN · title · 4 KPIs · 0 items`.
 
 **Vorrang vor dem Marker:** Hat ein `dashboard-report`-Block ein Ergebnis geschrieben, wird der Marker `dashboard_widget:` in **keiner** Schritt-Ausgabe mehr ausgewertet. Der Block ist der bewusst konfigurierte Weg; ohne diese Regel könnte eine Markerzeile in der Ausgabe eines späteren KI-Schritts den Bericht überschreiben. Zwei `dashboard-report`-Blöcke in einem Workflow: der zuletzt ausgeführte gewinnt.
 
