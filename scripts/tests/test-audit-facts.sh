@@ -160,6 +160,10 @@ TXT
 
 head -c 4096 /dev/zero | tr '\0' 'x' > "$FIX/ai-automation-frontend/dist/assets/index-abc.js"
 echo "export const x = 1;" > "$FIX/ai-automation-frontend/src/x.ts"
+# Ein frisches Build: vite schreibt dist/index.html zuletzt, juenger als jede Quelle (df68037b).
+printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
+  > "$FIX/ai-automation-frontend/dist/index.html"
+touch -d '2026-09-20 08:00:00' "$FIX/ai-automation-frontend/src/x.ts"
 head -c 2048 /dev/zero | tr '\0' 'y' > "$FIX/ai-automation-backend/data/automation.db"
 TODAY="$(date +%F)"
 { echo "$TODAY 10:00:00 [main] INFO  com.automation.Boot - Starte Kontext"
@@ -642,6 +646,56 @@ check "Docker-404 nur in der Nachricht, nicht in Zeitstempel oder ID" \
   'grep -qx "FAKT non_main_runtime_warn_logger_2: DockerContainerGateway 2 (40% der WARN-Zeilen, davon bekanntes Rauschen 1)" "$TMP/perf-facts2.out"'
 check "Pflicht-Fakten bleiben im Blatt" \
   '( for F in database_bytes source_files_scanned transactional_slow_call_count repository_loop_count unindexed_findby_columns_count; do grep -q "^FAKT $F: \|^NICHT GEMESSEN: $F (" "$TMP/perf-facts2.out" || exit 1; done )'
+
+echo "6d) Performance-Audit: ein veraltetes dist wird nicht gemessen (df68037b)"
+# Das Faktenblatt misst das vorhandene dist, gebaut wird nicht. Ein dist vom 23.09. meldete am 25.09.
+# noch den vorgeladenen monaco-Chunk, obwohl der Fix laengst in src stand. Ist dist/index.html aelter
+# als eine Datei unter src/ oder vite.config.ts, steht jede Bundle-Zahl als Luecke mit Grund im Blatt;
+# die Gegenprobe zeigt, dass dasselbe dist nach dem Bauen wieder gemessen wird.
+FIX3="$TMP/fixture-dist"
+FE3="$FIX3/ai-automation-frontend"
+mkdir -p "$FE3/src" "$FE3/dist/assets"
+echo "export const app = 1;" > "$FE3/src/app.tsx"
+echo "export default {};" > "$FE3/vite.config.ts"
+head -c 1024 /dev/zero | tr '\0' 'x' > "$FE3/dist/assets/index-abc.js"
+head -c 2048 /dev/zero | tr '\0' 'm' > "$FE3/dist/assets/monaco-def.js"
+printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
+  '<link rel="modulepreload" crossorigin href="/assets/monaco-def.js">' > "$FE3/dist/index.html"
+printf '%s' "$FIX3" > "$TMP/base3.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base3.txt" request_metrics=)" > "$TMP/perf-facts3.sh"
+run_dist_case() {  # $1 = Fall, $2..$4 = mtime von dist/index.html, src/app.tsx, vite.config.ts
+  touch -d "$2" "$FE3/dist/index.html"; touch -d "$3" "$FE3/src/app.tsx"; touch -d "$4" "$FE3/vite.config.ts"
+  PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-$1.out" 2> "$TMP/perf-dist-$1.err"
+}
+bundle_gaps() {  # $1 = Faktenblatt, $2 = Grund: jede Bundle-Zahl genau als Luecke mit diesem Grund
+  for F in frontend_bundle_js_bytes frontend_bundle_js_files frontend_bundle_largest_js frontend_lazy_chunk_preloaded; do
+    grep -qxF "NICHT GEMESSEN: $F ($2)" "$1" || return 1
+  done
+}
+run_dist_case src '2026-09-23 10:00:00' '2026-09-25 09:13:40' '2026-09-01 12:00:00'
+check "src juenger als dist: jede Bundle-Zahl ist Luecke mit beiden Staenden" \
+  'bundle_gaps "$TMP/perf-dist-src.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < src/app.tsx 2026-09-25T09:13:40 — vor dem Audit npm run build"'
+check "src juenger als dist: keine Bundle-FAKT-Zeile, auch kein monaco-Preload" \
+  '! grep -qE "^FAKT frontend_(bundle_[a-z_]+|lazy_chunk_preloaded):" "$TMP/perf-dist-src.out"'
+check "src juenger als dist: laeuft ohne stderr" '[ ! -s "$TMP/perf-dist-src.err" ]'
+run_dist_case vite '2026-09-23 10:00:00' '2026-09-22 08:00:00' '2026-09-24 17:05:00'
+check "nur vite.config.ts juenger: ebenfalls veraltet" \
+  'bundle_gaps "$TMP/perf-dist-vite.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < vite.config.ts 2026-09-24T17:05:00 — vor dem Audit npm run build"'
+run_dist_case fresh '2026-09-25 10:00:00' '2026-09-25 09:13:40' '2026-09-24 17:05:00'
+check "Gegenprobe: nach dem Bauen wird das Bundle gemessen" 'grep -qx "FAKT frontend_bundle_js_bytes: 3072" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: der monaco-Preload wird gemessen" \
+  'grep -qx "FAKT frontend_lazy_chunk_preloaded: 1 (/assets/monaco-def.js)" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: Bauzeit aus dist/index.html" 'grep -qx "FAKT frontend_bundle_built_at: 2026-09-25T10:00:00" "$TMP/perf-dist-fresh.out"'
+check "Gegenprobe: keine Luecke im Bundle" '! grep -q "^NICHT GEMESSEN: frontend_" "$TMP/perf-dist-fresh.out"'
+rm "$FE3/dist/index.html"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-noindex.out" 2>/dev/null
+check "dist ohne index.html: Stand nicht pruefbar, nichts gemessen" \
+  'bundle_gaps "$TMP/perf-dist-noindex.out" "$FE3/dist/index.html fehlt — Stand des Build-Artefakts nicht pruefbar"'
+rm -rf "$FE3/dist"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-none.out" 2>/dev/null
+check "ohne dist: eine Luecke wie bisher" \
+  '[ "$(grep -c "^NICHT GEMESSEN: frontend_" "$TMP/perf-dist-none.out")" -eq 1 ] \
+     && grep -q "^NICHT GEMESSEN: frontend_bundle_js_bytes (kein Build-Artefakt" "$TMP/perf-dist-none.out"'
 
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
