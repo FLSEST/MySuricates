@@ -183,6 +183,15 @@ assert ">300 Zeilen" in prompt and ">7 Abhaengigkeiten" in prompt, "God-Class-Kr
 assert ">200 Zeilen" in prompt and ">5 Abhaengigkeiten" in prompt, "HIGH-Stufe der God Classes fehlt"
 assert "Ratchet" in prompt and "herabstufen" in prompt, "Ratchet-Herabstufung fehlt"
 assert "## cycles" in prompt, "Zyklen-Kriterium fehlt"
+# 810b12e9: bekannte Zyklus-Komponenten (CYCLE_COMPONENTS) eine Stufe tiefer, neue und gewachsene nicht.
+assert "PackageCycleRatchetTest.CYCLE_COMPONENTS" in prompt, "Zyklen-Herabstufung liest CYCLE_COMPONENTS nicht"
+assert "(HIGH -> MEDIUM)" in prompt and "bekannt und testueberwacht" in prompt, "Herabstufung bekannter Zyklen fehlt"
+assert "neu oder gewachsen und bleibt HIGH" in prompt, "neue oder gewachsene Zyklen muessen HIGH bleiben"
+assert "Ein CRITICAL (neues pair) wird nie herabgestuft" in prompt, "CRITICAL darf nicht herabgestuft werden"
+# Unter Last brauchte der Struktur-Scan fast 60 s; laeuft er in den Timeout, fehlen die Ratchet-Listen,
+# und jedes Paar gaelte als neu (CRITICAL).
+delta = next(b for b in blocks if b.get("name") == "delta_scan")
+assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
 PY'
 
 echo "5b) Struktur-Scan zaehlt nur Kollaborateure (59e22c53)"
@@ -221,6 +230,29 @@ mkdir -p "$SCAN_MAIN"
   for i in $(seq 1 200); do echo "    // filler $i"; done
   echo "}"
 } > "$SCAN_MAIN/PlainEvent.java"
+# Nur Felder der aeusseren Klasse (e8226de2): RunStatistics.runs und .totals sind Zustand eines
+# Wertobjekts. Die Klammer hinter https:// im Javadoc, die in Literalen und die im Textblock duerfen
+# die Tiefe nicht verschieben, sonst fiele lateCollaborator als Feld der Bean heraus.
+{ echo "package com.automation.service;"
+  echo "/**"
+  echo " * Zaehlt Laeufe, Quelle {@code https://example.invalid/runs}."
+  echo " */"
+  echo "@Service"
+  echo "public class StatsService {"
+  for i in 1 2 3 4 5 6; do echo "    private final Collaborator$i collaborator$i;"; done
+  echo "    private static final String OPEN = \"{\";"
+  echo "    private static final char BRACE = '{';"
+  echo "    private static final String TEMPLATE = \"\"\""
+  echo "            { \"offen\": true"
+  echo "            \"\"\";"
+  echo "    private final LateCollaborator lateCollaborator;"
+  echo "    static final class RunStatistics {"
+  echo "        private final RunList runs;"
+  echo "        private final Totals totals;"
+  echo "    }"
+  for i in $(seq 1 200); do echo "    // filler $i"; done
+  echo "}"
+} > "$SCAN_MAIN/StatsService.java"
 python3 - "$POOL" "$SCAN_FIX" > "$TMP/delta-scan.sh" <<'PY'
 import json, sys
 wf = json.load(open(sys.argv[1]))
@@ -234,8 +266,79 @@ check "God-Class-Liste zaehlt 7 Kollaborateure" 'grep -q "| 7 deps | service/Bus
 check "Kopplungsliste zaehlt 7 Kollaborateure"  'grep -qx "7 deps: BusyService" "$TMP/delta-scan.out"'
 check "Nicht-Bean ohne deps"                    'grep -q "| - deps | service/PlainEvent$" "$TMP/delta-scan.out"'
 check "Nicht-Bean nicht in der Kopplungsliste"  '! grep -q "deps: PlainEvent" "$TMP/delta-scan.out"'
+# 6 Kollaborateure + lateCollaborator = 7; die zwei Felder der inneren Klasse zaehlen nicht.
+check "God-Class-Liste ohne Felder innerer Klassen" 'grep -q "| 7 deps | service/StatsService$" "$TMP/delta-scan.out"'
+check "Kopplungsliste ohne Felder innerer Klassen"  'grep -qx "7 deps: StatsService" "$TMP/delta-scan.out"'
 check "Report-Prompt: Zahl meint Kollaborateure" \
   'python3 -c "import json,sys; p=next(b for b in json.load(open(sys.argv[1]))[\"blocks\"] if b.get(\"name\")==\"report\")[\"config\"][\"command\"]; sys.exit(0 if \"nur Kollaborateure\" in p and \"com.automation.executor.blocks\" in p and \"erst ab >10\" in p else 1)" "$POOL"'
+
+echo "5c) Struktur-Scan nennt die festgehaltenen Zyklus-Komponenten (810b12e9)"
+# PackageCycleRatchetTest haelt jede Zyklus-Komponente mit mehr als zwei Paketen fest. Der Scan gibt sie
+# aus wie die cycle-Zeilen von ## cycles (Groesse, Mitglieder sortiert), damit der Report bekannte,
+# testueberwachte Komponenten erkennt und eine Stufe herabsetzt.
+delta_scan_on() {  # $1 = Wurzel, $2 = Ausgabe
+  python3 - "$POOL" "$1" > "$TMP/delta-scan-on.sh" <<'PY'
+import json, sys
+block = next(b for b in json.load(open(sys.argv[1]))["blocks"] if b.get("name") == "delta_scan")
+print(block["config"]["command"].replace("{{ project_path }}", "'" + sys.argv[2] + "'"))
+PY
+  bash "$TMP/delta-scan-on.sh" > "$2" 2> /dev/null
+}
+cycle_lines() {  # $1 = Scan-Ausgabe -> Zeilen des Abschnitts CYCLE_COMPONENTS
+  sed -n '/^--- PackageCycleRatchetTest.CYCLE_COMPONENTS/,/^$/p' "$1" | sed '1d;/^$/d'
+}
+ARCH_TESTS="ai-automation-backend/src/test/java/com/automation/architecture"
+mkdir -p "$SCAN_FIX/$ARCH_TESTS"
+cat > "$SCAN_FIX/$ARCH_TESTS/PackageCycleRatchetTest.java" <<'JAVA'
+package com.automation.architecture;
+
+/** Grenzen in {@link #CYCLE_COMPONENTS} und {@link #ALLOWED_PAIRS}. */
+class PackageCycleRatchetTest {
+    static final Set<String> ALLOWED_PAIRS = Set.of(
+            "com.automation.a <-> com.automation.b");
+
+    static final int MAX_CYCLE_COMPONENT_SIZE = 4;
+
+    static final List<Set<String>> CYCLE_COMPONENTS = List.of(
+            Set.of(
+                    "com.automation.d",
+                    "com.automation.b",
+                    "com.automation.a",
+                    "com.automation.c"),
+            Set.of("com.automation.z", "com.automation.x", "com.automation.y"));
+
+    void check() {
+        grownComponents(edges, CYCLE_COMPONENTS, MAX_CYCLE_COMPONENT_SIZE);
+    }
+}
+JAVA
+delta_scan_on "$SCAN_FIX" "$TMP/delta-cycles.out"
+cycle_lines "$TMP/delta-cycles.out" > "$TMP/cycle-lines.txt"
+printf '%s\n' "4 com.automation.a,com.automation.b,com.automation.c,com.automation.d" \
+  "3 com.automation.x,com.automation.y,com.automation.z" > "$TMP/cycle-lines.exp"
+check "je Komponente eine Zeile, Mitglieder sortiert, Reihenfolge wie im Test" \
+  'diff -q "$TMP/cycle-lines.exp" "$TMP/cycle-lines.txt" >/dev/null'
+check "ALLOWED_PAIRS stehen weiter daneben" \
+  'grep -qx "com.automation.a <-> com.automation.b" "$TMP/delta-cycles.out"'
+# Die echte Testdatei: faellt ihre Schreibweise aus dem Muster, faellt es hier auf und nicht erst im
+# Report (dort hiesse ein leerer Abschnitt nur "nicht herabstufen").
+REAL_CYCLES="$REPO/$ARCH_TESTS/PackageCycleRatchetTest.java"
+mkdir -p "$TMP/scan-real/$ARCH_TESTS"
+cp "$REAL_CYCLES" "$TMP/scan-real/$ARCH_TESTS/"
+delta_scan_on "$TMP/scan-real" "$TMP/delta-real-cycles.out"
+cycle_lines "$TMP/delta-real-cycles.out" > "$TMP/real-cycle-lines.txt"
+REAL_MAX="$(sed -nE 's/.*MAX_CYCLE_COMPONENT_SIZE = ([0-9]+);.*/\1/p' "$REAL_CYCLES")"
+REAL_GROUPS="$(sed -n '/CYCLE_COMPONENTS = List.of(/,/);/p' "$REAL_CYCLES" | grep -c 'Set.of(')"
+check "echter Test: eine Zeile je Set.of-Gruppe" \
+  '[ "$REAL_GROUPS" -ge 1 ] && [ "$(wc -l < "$TMP/real-cycle-lines.txt")" -eq "$REAL_GROUPS" ]'
+check "echter Test: die erste Komponente hat MAX_CYCLE_COMPONENT_SIZE Pakete" \
+  '[ -n "$REAL_MAX" ] && head -1 "$TMP/real-cycle-lines.txt" | grep -q "^$REAL_MAX com\.automation\."'
+check "echter Test: jede Zeile nennt so viele Pakete wie ihre Groesse" \
+  'awk "{ if (split(\$2, m, \",\") != \$1) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
+mkdir -p "$TMP/scan-none"
+delta_scan_on "$TMP/scan-none" "$TMP/delta-none.out"
+check "ohne Testdatei: nicht gefunden statt einer leeren Liste" \
+  '[ "$(cycle_lines "$TMP/delta-none.out")" = "(nicht gefunden)" ]'
 
 # ---------------------------------------------------------------------------
 # Fixture-Repo: zwei Pakete mit wechselseitiger Abhaengigkeit, eine leere Datei,

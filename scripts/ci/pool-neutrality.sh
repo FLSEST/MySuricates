@@ -156,6 +156,11 @@ PY
 # (mocking-gap-audit fuehrt es als Suchmuster in einer Liste), "automation.db"
 # allein auch nicht (mysuricates-performance-audit sieht nur die Dateigroesse an).
 # Gemeldet wird erst die Kombination mit einem Aufruf bzw. einem Lesezugriff.
+#
+# Im Shell-Code eines Blocks genuegt dagegen ein konkreter Endpunkt, der nicht auf
+# der Liste schluesselfreier Sonden steht: der Aufruf kann beliebig weit entfernt
+# stehen, etwa ueber eine Schleifenvariable (for E in /api/v1/...; do curl ...$E,
+# TODO 28007626). Verglichen wird exakt, wie im ApiKeyAuthFilter.
 # ---------------------------------------------------------------------------
 scan_api_and_credentials() {
   POOL_CREDENTIAL_MARKERS="$(printf '%s\n' "${HYGIENE_POOL_CREDENTIAL_MARKERS[@]}")" \
@@ -165,7 +170,7 @@ scan_api_and_credentials() {
   POOL_DB_FILES="$(printf '%s\n' "${HYGIENE_POOL_DB_FILES[@]}")" \
   POOL_DB_ACCESS="$(printf '%s\n' "${HYGIENE_POOL_DB_ACCESS[@]}")" \
   python3 - "$@" <<'PY'
-import os, re, sys
+import json, os, re, sys
 
 def env_list(name):
     return [v for v in os.environ.get(name, '').splitlines() if v]
@@ -187,6 +192,32 @@ VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + re.escape(API_PREFI
 # Praefix ist ein Suchmuster, kein Aufruf — mocking-gap-audit fuehrt '/api/v1/'
 # in einer Liste von Netzwerk-Kennzeichen, direkt neben 'fetch(' und 'axios.'.
 PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
+
+
+def path_of(endpoint):
+    """Der Pfad ohne Satzpunkt am Ende: "Heap aus /api/v1/system/jvm-memory." nennt die Sonde selbst."""
+    return endpoint.group(0).rstrip('.')
+
+# Schluessel, unter denen ein Block Shell-Code ausfuehrt: der Befehl eines shell-Blocks und, bei
+# execution_mode: shell, auch Bedingung und Zweige (conditional, while, retry, foreach, im switch
+# jeder Block); items_command von foreach laeuft immer in der Shell.
+SHELL_KEYS = ('command', 'condition', 'condition_command', 'then_command', 'else_command')
+
+
+def shell_code(node, out):
+    """Die Shell-Texte einer Definition, verschachtelte Bloecke eingeschlossen."""
+    if isinstance(node, dict):
+        config = node.get('config')
+        if isinstance(node.get('type'), str) and isinstance(config, dict):
+            if node['type'] == 'shell' or config.get('execution_mode') == 'shell':
+                out.extend(config[key] for key in SHELL_KEYS if isinstance(config.get(key), str))
+            if isinstance(config.get('items_command'), str):
+                out.append(config['items_command'])
+        for value in node.values():
+            shell_code(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            shell_code(item, out)
 
 
 def windows(text, needle):
@@ -212,22 +243,32 @@ for path in sys.argv[1:]:
                   f"— eine mitveroeffentlichte Definition darf das nicht erklaeren")
             break
 
-    for i, window in windows(raw, API_PREFIX):
-        endpoint = PATH_AT.match(raw, i)
-        if endpoint is None:
-            continue
-        hit = endpoint.group(0)
-        if any(hit.startswith(allowed) for allowed in API_ALLOWED):
-            continue
-        caller = next((c for c in API_CALLERS if c in window), None)
-        if caller is None and VERB_CALL.search(window):
-            caller = 'HTTP-Verb'
-        if caller is None:
-            continue
-        print(f"{path}\tSELF-API\truft die eigene REST-API auf: '{hit}' (via {caller}) "
+    shells = []
+    try:
+        shell_code(json.loads(raw), shells)
+    except ValueError:
+        pass  # PARSE meldet scan_definition_rules
+    self_api = next(((path_of(endpoint), 'im Shell-Code') for text in shells
+                     for endpoint in PATH_AT.finditer(text) if path_of(endpoint) not in API_ALLOWED), None)
+    if self_api is None:
+        for i, window in windows(raw, API_PREFIX):
+            endpoint = PATH_AT.match(raw, i)
+            if endpoint is None:
+                continue
+            hit = path_of(endpoint)
+            if any(hit.startswith(allowed) for allowed in API_ALLOWED):
+                continue
+            caller = next((c for c in API_CALLERS if c in window), None)
+            if caller is None and VERB_CALL.search(window):
+                caller = 'HTTP-Verb'
+            if caller is None:
+                continue
+            self_api = (hit, f"via {caller}")
+            break
+    if self_api:
+        print(f"{path}\tSELF-API\truft die eigene REST-API auf: '{self_api[0]}' ({self_api[1]}) "
               f"— Plattformdaten kommen als Kontextvariable, "
               f"TODOs ueber die Bloecke todo-create/todo-update/todo-close")
-        break
 
     # sqlite3 ist fuer sich schon der Zugriff, egal welche Datei gemeint ist.
     if 'sqlite3' in raw:

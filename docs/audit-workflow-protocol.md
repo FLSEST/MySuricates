@@ -58,8 +58,8 @@ abgebrochener, und `gate_status:`, `todo_item:` & Co. verlieren ihren Doppelpunk
 die zweite Sicherung für einen Vorlauf, den ein Modell auf anderem Weg wiedergibt. Ein Envelope beginnt mit `<!--`, dem Marker und dem JSON-Beginn `{`;
 ein zitierter Marker ohne JSON zählt nicht, ebenso wenig ein Anfang im Text eines Findings. Beginnt
 hinter dem letzten lesbaren noch ein Envelope, etwa weil die Antwort abbricht, ist der Report
-ungültig; auf einen früheren greift die Ingestion nicht zurück. Der Gate-Block der Test-Abdeckung
-zählt denselben Envelope.
+ungültig; auf einen früheren greift die Ingestion nicht zurück. Die Gate-Blöcke der Test-Abdeckung
+und der Doku-Zehrprobe zählen denselben Envelope, mit demselben awk-Baustein (TODO `d8dae725`).
 
 Überlässt der Prompt das `subject` dem Modell, driftet es: Zwischen zwei Läufen wurde aus
 `docs/deployment.md` `host-reaching-endpoints`, und der Befund kam als Wiedergänger ohne seine
@@ -170,7 +170,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`, Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
-| Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py` |
+| Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py`, Gate: `scripts/tests/test-audit-facts.sh` |
 
 ### Wann `expectedFindings` **nicht** passt
 
