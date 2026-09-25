@@ -4,6 +4,7 @@ import com.automation.entity.AuditFinding;
 import com.automation.entity.AuditReport;
 import com.automation.entity.ChainRun;
 import com.automation.entity.Todo;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditReportRepository;
@@ -97,7 +98,10 @@ final class ScenarioChecks {
         }
     }
 
-    /** A chain: its status, each entry's run like a single run ({@code entries}), and the AI calls of all. */
+    /**
+     * A chain: its status, each entry's run like a single run ({@code entries}), and the AI calls of all.
+     * Every entry run knows its chain run — on the row and as {@code {{ chain_run_id }}} (TODO a3b89355).
+     */
     void checkChain(String projectId, ChainRun chainRun, JsonNode expect) {
         if (expect.has("chainStatus")) {
             assertThat(chainRun.getStatus().name()).as("chain status").isEqualTo(expect.path("chainStatus").asText());
@@ -108,7 +112,11 @@ final class ScenarioChecks {
             String runId = chainRun.getEntryRuns().get(i).getWorkflowRunId();
             assertThat(runId).as("entry #%d started a run", i).isNotNull();
             entityManager.clear();
-            checkRun(projectId, workflowRunRepository.findById(runId).orElseThrow(), entries.get(i));
+            WorkflowRun run = workflowRunRepository.findById(runId).orElseThrow();
+            assertThat(run.getChainRunId()).as("entry #%d records its chain run", i).isEqualTo(chainRun.getId());
+            assertThat(run.getInputContext()).as("entry #%d gets {{ chain_run_id }}", i)
+                    .containsEntry(TriggerSource.CHAIN_RUN_CONTEXT_KEY, chainRun.getId());
+            checkRun(projectId, run, entries.get(i));
         }
         checkAiCalls(expect);
         checkTodos(projectId, expect);

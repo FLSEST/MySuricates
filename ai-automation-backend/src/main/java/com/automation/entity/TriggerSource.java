@@ -31,6 +31,12 @@ public enum TriggerSource {
     /** Reserved context key carrying the parent's effective source into chains and sub-workflows. */
     public static final String PARENT_CONTEXT_KEY = "__parent_trigger_source";
 
+    /**
+     * Context key carrying the chain run into its entry runs — the placeholder {@code {{ chain_run_id }}}.
+     * Set by the chain executor after the chain's own input, so it is never taken from the input.
+     */
+    public static final String CHAIN_RUN_CONTEXT_KEY = "chain_run_id";
+
     private final boolean unattended;
     private final boolean inheritsFromParent;
 
@@ -65,6 +71,19 @@ public enum TriggerSource {
     public static TriggerSource effectiveOfRun(Map<String, ?> runVariables) {
         TriggerSource own = parse(runVariables.get("trigger_source"));
         return own != null ? own.effective(runVariables) : null;
+    }
+
+    /**
+     * The chain run a new run belongs to, for its run row: {@link #CHAIN_RUN_CONTEXT_KEY} from the
+     * context — only for {@link #CHAIN}, the one source the chain executor starts with. Any other run
+     * may carry the key (a retry keeps its context, a sub-workflow inherits its parent's), but it was
+     * not started by that chain run: {@code null}.
+     */
+    public static String chainRunIdOf(TriggerSource source, Map<String, ?> inputContext) {
+        if (source != CHAIN || inputContext == null) {
+            return null;
+        }
+        return inputContext.get(CHAIN_RUN_CONTEXT_KEY) instanceof String id && !id.isBlank() ? id : null;
     }
 
     private static TriggerSource parse(Object value) {

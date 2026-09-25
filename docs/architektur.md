@@ -1187,6 +1187,7 @@ Die DB-Migrationen (`src/main/resources/db/migration/`) dokumentieren die Featur
 | V86 | Mehrere benannte Verbindungen je Integrations-Anbieter: `integration_connections.connection_name` |
 | V87 | Indizes für Läufe je Schedule (`workflow_runs`, `chain_runs`) und TODOs je Lauf (`todos.last_fix_run_id`, `todos.workflow_run_id`) |
 | V88 | Ziele: Tabelle `goal_milestones`, `todos.milestone_id`, `goals.guard_workflow_id` (Ziel-Wächter) |
+| V89 | Kettenbezug eines Laufs: `workflow_runs.chain_run_id` + Index |
 
 ## Architektur-Gates
 
@@ -1230,7 +1231,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev-Profil
 │           ├── agent-instructions.md  ← Basis-Agent-Instructions
 │           ├── templates/builtin/     ← Built-in Template JSON-Dateien
-│           └── db/migration/          ← 88 Flyway-Migrationen (V1–V88)
+│           └── db/migration/          ← 89 Flyway-Migrationen (V1–V89)
 │
 └── ai-automation-frontend/
     ├── package.json

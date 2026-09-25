@@ -4,6 +4,7 @@ import com.automation.dto.response.PageResponse;
 import com.automation.dto.response.WorkflowRunListItemResponse;
 import com.automation.dto.response.WorkflowRunResponse;
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.exception.ErrorCode;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.HardeningException;
@@ -102,6 +103,28 @@ class ExecutionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("run-1"))
                 .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    /** The run detail names its chain run — null outside a chain, but always present (TODO a3b89355). */
+    @Test
+    void getExecution_carriesTheChainRunId() throws Exception {
+        WorkflowRunResponse inChain = new WorkflowRunResponse(
+                "run-1", "wf-1", "Test Workflow", null, null, RunStatus.COMPLETED, List.of(),
+                Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of(), null,
+                null, null, TriggerSource.CHAIN, false, null, "chain-run-7");
+        WorkflowRunResponse single = new WorkflowRunResponse(
+                "run-2", "wf-1", "Test Workflow", null, null, RunStatus.COMPLETED, List.of(),
+                Instant.now(), Instant.now(), 1000L, null, null, Map.of(), Map.of(), null);
+        when(executionQueryService.getExecutionResponse("run-1")).thenReturn(inChain);
+        when(executionQueryService.getExecutionResponse("run-2")).thenReturn(single);
+
+        mockMvc.perform(get("/api/v1/executions/run-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chainRunId").value("chain-run-7"))
+                .andExpect(jsonPath("$.triggerSource").value("CHAIN"));
+        mockMvc.perform(get("/api/v1/executions/run-2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chainRunId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

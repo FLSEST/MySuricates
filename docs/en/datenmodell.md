@@ -79,6 +79,7 @@ erDiagram
         TEXT error "JSON"
         TEXT metadata "JSON"
         TEXT triggered_by_schedule_id
+        TEXT chain_run_id
     }
 
     step_results {
@@ -505,8 +506,9 @@ M:N relationship between workflows and skills.
 | `error` | TEXT | | JSON: error description |
 | `metadata` | TEXT | | JSON: gate status, additional info (`gate_status`, `gate_category`, `gate_description`) |
 | `triggered_by_schedule_id` | TEXT | | ID of the triggering schedule (V43) |
+| `chain_run_id` | TEXT | | Chain run that started the run as one of its entries (`trigger_source` = `CHAIN`), set on creation; otherwise and for runs from before V89 `NULL`. No foreign key: deleting a chain deletes its chain runs, the runs stay (V89) |
 
-**Indexes:** `idx_workflow_runs_status`, `idx_workflow_runs_started_at`, `idx_workflow_runs_workflow_id` (V10), `idx_workflow_runs_schedule_started` (V87)
+**Indexes:** `idx_workflow_runs_status`, `idx_workflow_runs_started_at`, `idx_workflow_runs_workflow_id` (V10), `idx_workflow_runs_schedule_started` (V87), `idx_workflow_runs_chain_run_id` (V89)
 
 ### `step_results`
 
@@ -1325,6 +1327,7 @@ The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WO
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (table rebuild: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, existing rows become `default`) |
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | indexes for runs per schedule (workflow_runs, chain_runs) and TODOs per run (`last_fix_run_id`, `workflow_run_id`) |
 | V88 | `V88__goal_milestones_and_guard.sql` | new table `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (goal guard) |
+| V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (chain run of a chain entry, no backfill for existing runs) + index `idx_workflow_runs_chain_run_id` |
 
 ## SQLite Specifics
 

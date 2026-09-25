@@ -357,7 +357,7 @@ DELETE /api/v1/webhooks/{id}/secret
 
 - Versiegelt: PUT/DELETE mit Definitionsänderung → `409 WORKFLOW_SEALED`; manipulierte Definition startet nicht → `409 WORKFLOW_TAMPERED`
 - `require-sealed-for-unattended`: Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair und Wishes (auch über Chains/Sub-Workflows) starten nur versiegelte Workflows → sonst `403 UNATTENDED_REQUIRES_SEAL`
-- Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`
+- Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`; Einträge einer Chain zusätzlich `chainRunId`
 
 ### 9. Test-Instanz
 

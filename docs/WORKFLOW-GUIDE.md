@@ -784,6 +784,7 @@ Variablen verwenden doppelte Klammern: `{{ variable_name }}` oder `{{variable_na
 | `{{ step_N_output }}` | Auto | Ausgabe von Step N (z.B. `{{ step_0_output }}` für den ersten Block) |
 | `{{ block.<name>.output }}` | Auto | Ausgabe eines benannten Blocks (Block muss ein `name`-Feld haben) |
 | `{{ previous_chain_output }}` | Auto | Ausgabe des vorherigen Chain-Eintrags (nur Chains) |
+| `{{ chain_run_id }}` | Auto | ID des Chain-Runs, der den Eintrag gestartet hat (nur Chains); derselbe Wert steht als `chainRunId` am Lauf |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Aktuelles Schleifen-Item |
 
 ### System-injizierte Variablen
@@ -1521,6 +1522,7 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
 - **Projektübergreifend**: Eine Chain kann Workflows aus beliebigen Projekten referenzieren
 - **Sequentiell**: Workflows laufen nacheinander (nicht parallel)
 - **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
+- **Kettenbezug**: Jeder Eintrag kennt seinen Chain-Run: `{{ chain_run_id }}` im Kontext, `chainRunId` am Lauf (`GET /api/v1/executions/{id}`). Beides setzt die Chain selbst, nach ihrem Eingabe-Kontext — ein mitgegebener `chain_run_id` überschreibt es nicht. Einzeln gestartet bleibt der Platzhalter wörtlich stehen (Analyzer-Regel `chain-only-placeholder`)
 - **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level müssen `true` sein)
 
 ### Chain-Struktur
