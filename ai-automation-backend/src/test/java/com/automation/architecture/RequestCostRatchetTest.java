@@ -1,6 +1,12 @@
 package com.automation.architecture;
 
 import com.automation.dto.response.WorkflowRunListItemResponse;
+import com.automation.entity.AuditFinding;
+import com.automation.entity.AuditFindingStatus;
+import com.automation.entity.AuditIngestionStatus;
+import com.automation.entity.AuditReport;
+import com.automation.entity.AuditSeverity;
+import com.automation.entity.GateStatus;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
 import com.automation.entity.Project;
@@ -12,9 +18,13 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.TodoTrigger;
+import com.automation.entity.Wish;
+import com.automation.entity.WishStatus;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
+import com.automation.repository.AuditFindingRepository;
+import com.automation.repository.AuditReportRepository;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
@@ -22,25 +32,32 @@ import com.automation.repository.StepResultRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
+import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import org.hibernate.Session;
-import org.hibernate.engine.spi.EntityKey;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.EntityStatistics;
+import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -81,10 +98,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * describes an N+1. Routes with a known, open N+1 are exempt via {@link #KNOWN_GROWING}, and
  * {@link #knownGrowingRoutesStillGrow} takes them off that list again as soon as they are fixed.
  *
- * <p>Counting comes from {@link SqlStatementCounter}, fed by Hibernate's StatementInspector. The
- * persistence context is cleared before every measurement, so the request re-reads what it needs
- * instead of finding the seeded entities in the first-level cache — otherwise a lazy-loading N+1
- * would stay invisible here.
+ * <p>Counting comes from {@link SqlStatementCounter}, fed by Hibernate's StatementInspector.
+ *
+ * <p><b>No surrounding transaction.</b> Every route is measured the way production serves it: OSIV
+ * is off, so a service without a transaction of its own gets a fresh persistence context for every
+ * repository call, and what one call loaded, the next one loads again. This class used to measure
+ * inside the test transaction; the request joined it and shared one persistence context from the
+ * first query to the last — a context it never has in production. {@code /learning/dashboard}
+ * measured 10 statements that way while it cost 52 without (TODO 5c56b3d1): the ratchet could not
+ * see what a service without a transaction of its own really costs. The seed is therefore
+ * committed, {@link #measure} refuses to count inside an open transaction, and
+ * {@link #removeTheSeed} empties the seeded tables after every test.
  *
  * <p><b>Its own database.</b> The ceilings describe <em>this seed</em>, so nothing else may be in
  * the tables when it is measured. The integration tests of one JVM share one SQLite file, and a
@@ -100,7 +124,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("integration")
-@Transactional
 @DirtiesContext
 class RequestCostRatchetTest {
 
@@ -114,12 +137,13 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * The tables {@link #seedBatch} writes to — empty before the first batch, see
-     * {@link #nothingButTheSeedIsMeasured()}.
+     * The tables {@link #seedBatch} writes to, a referenced table before the tables pointing at it —
+     * empty before the first batch (see {@link #nothingButTheSeedIsMeasured()}) and emptied again in
+     * reverse order after every test ({@link #removeTheSeed()}).
      */
     private static final List<String> SEEDED_TABLES = List.of(
-            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "todos", "goals",
-            "goal_milestones", "todo_triggers");
+            "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
+            "goal_milestones", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -127,9 +151,14 @@ class RequestCostRatchetTest {
     private static final int RUNS_PER_WORKFLOW = 2;
     private static final int STEPS_PER_RUN = 3;
     private static final int TODOS = 50;
+    private static final int WISHES = 10;
+    private static final int AUDITS_PER_PROJECT = 2;
 
     /** A step output big enough that fetching it by accident is visible in the response size. */
     private static final String FAT_STEP_OUTPUT = "x".repeat(20_000);
+
+    /** An audit report's markdown, as big as a step output: in the /audits list it would show in the bytes. */
+    private static final String FAT_REPORT_MARKDOWN = "#".repeat(20_000);
 
     /** Start of every seeded run — a Tuesday. */
     private static final Instant RUN_STARTED = Instant.parse("2026-09-01T10:00:00Z");
@@ -141,10 +170,27 @@ class RequestCostRatchetTest {
     private static final String CALENDAR =
             "/api/v1/schedules/calendar?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z";
 
+    /**
+     * The dashboard over a window that reaches back past {@link #RUN_STARTED}. Its default window
+     * is the last 30 days up to today, and the seed has a fixed date: from 2026-10-02 on, the route
+     * would have measured an empty window — cheap, green and blind (TODO 5c56b3d1). A century back
+     * holds the seed for as long as this test lives; the queries are the same as for 30 days.
+     * {@link #windowedRoutesSeeTheWholeSeed} checks that the window actually holds it.
+     */
+    private static final String DASHBOARD = "/api/v1/learning/dashboard?days=36500";
+
     record Cost(int statements, int responseBytes) {}
 
     /**
      * Route -> ceiling, measured on 2026-09-18 against the seed above.
+     *
+     * <p>Measured again on 2026-09-25 without the test transaction (TODO 5c56b3d1): every ceiling
+     * held to the statement, none had to rise. {@code /learning/dashboard} — the route that had cost
+     * 52 instead of 10 statements outside the test transaction — still runs without a transaction
+     * of its own, but since TODO 13d1e2a2 the query for its recent runs
+     * ({@code findByIdInWithStepsAndWorkflow}) fetches the project's container itself. Inside the
+     * test transaction the recent runs had borrowed the containers the window query left in the
+     * shared persistence context, so dropping that fetch stayed green here; now it shows.
      *
      * <p><b>Some of these ceilings pin a known defect, not a target.</b> The first run of this test
      * found three N+1 patterns and one unbounded response; the ones still open are pinned so that
@@ -229,6 +275,16 @@ class RequestCostRatchetTest {
      *       row until it got the same LEFT JOIN FETCH as {@code findAllWithTargets()}. That only
      *       showed once the seeded schedules carried a {@code nextRunAt} like real ones.
      *       {@code {sched}} is the schedule of the first seeded workflow.</li>
+     *   <li>{@code /wishes} and {@code /audits}: added with TODO cda29eab. Their N+1 fixes had only
+     *       been proven by counted repository calls in unit tests, so a relapse would have passed
+     *       the gate. {@code /wishes} is the list plus one name lookup each for projects and
+     *       workflows ({@code WishMapper}, TODO 5bf5a9c8) — 3 statements, measured 7 761 bytes for
+     *       ten wishes. {@code /audits} reads two lean projections: the report rows without their
+     *       markdown and the finding counts per audit, status and severity in one GROUP BY
+     *       ({@code AuditCenterService.listAudits}, TODO 3d7e3987) — 2 statements, measured 3 301
+     *       bytes for six audits, whose markdown alone would add 20 000 bytes each. Their
+     *       {@code stale} flag (older than 30 days) turns true for the fixed seed on 2026-10-01: one
+     *       byte less per audit, the same queries.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
@@ -237,7 +293,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
             Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
-            Map.entry("/api/v1/learning/dashboard", new Cost(10, 650_000)),
+            Map.entry(DASHBOARD, new Cost(10, 650_000)),
             Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
             Map.entry("/api/v1/schedules", new Cost(3, 20_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
@@ -245,6 +301,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
+            Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
+            Map.entry("/api/v1/audits", new Cost(2, 4_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
@@ -257,7 +315,13 @@ class RequestCostRatchetTest {
     @Autowired private GoalRepository goalRepository;
     @Autowired private GoalMilestoneRepository milestoneRepository;
     @Autowired private TodoTriggerRepository todoTriggerRepository;
-    @PersistenceContext private EntityManager entityManager;
+    @Autowired private WishRepository wishRepository;
+    @Autowired private AuditReportRepository auditReportRepository;
+    @Autowired private AuditFindingRepository auditFindingRepository;
+    @Autowired private TransactionTemplate transactions;
+    @Autowired private JdbcTemplate jdbc;
+    @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private ObjectMapper objectMapper;
 
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
     private String firstWorkflowId;
@@ -274,17 +338,31 @@ class RequestCostRatchetTest {
     }
 
     /**
+     * Raeumt die Saat wieder ab. Ohne Testtransaktion rollt nichts mehr zurueck: Was
+     * {@link #seedBatch} committet hat, laege sonst im naechsten Test unter dessen Saat. Geloescht
+     * wird per SQL und in umgekehrter Reihenfolge von {@link #SEEDED_TABLES}, also jede Tabelle vor
+     * der, auf die sie zeigt; per SQL auch deshalb, weil {@code @SQLRestriction} weich geloeschte
+     * Workflows vor dem Repository verbirgt.
+     */
+    @AfterEach
+    void removeTheSeed() {
+        for (String table : SEEDED_TABLES.reversed()) {
+            jdbc.update("DELETE FROM " + table);
+        }
+    }
+
+    /**
      * Stellt den Bestand vor der Saat fest: In den Tabellen, die die Saat beschreibt, darf nichts
      * stehen. Gezaehlt wird per SQL, damit auch weich geloeschte Workflows auffallen, die
      * {@code @SQLRestriction} vor dem Repository verbirgt. Schlaegt das fehl, misst die Klasse nicht
-     * mehr gegen ihre eigene Datenbank — oder ein Start-Seeder legt neuerdings Zeilen an; beides
-     * verschiebt jede Obergrenze in {@link #BASELINE}, ohne dass sich eine Route geaendert haette.
+     * mehr gegen ihre eigene Datenbank, {@link #removeTheSeed} hat eine Tabelle vergessen — oder ein
+     * Start-Seeder legt neuerdings Zeilen an; alles das verschiebt jede Obergrenze in
+     * {@link #BASELINE}, ohne dass sich eine Route geaendert haette.
      */
     private void nothingButTheSeedIsMeasured() {
         Map<String, Long> foreignRows = new TreeMap<>();
         for (String table : SEEDED_TABLES) {
-            long rows = ((Number) entityManager.createNativeQuery("SELECT COUNT(*) FROM " + table)
-                    .getSingleResult()).longValue();
+            long rows = jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
             if (rows > 0) {
                 foreignRows.put(table, rows);
             }
@@ -297,13 +375,21 @@ class RequestCostRatchetTest {
 
     /**
      * Eine Saat-Charge: {@link #PROJECTS} Projekte mit je {@link #WORKFLOWS_PER_PROJECT}
-     * Workflows, deren Runs und Steps, einem Zeitplan je Workflow und {@link #TODOS} Todos.
+     * Workflows, deren Runs und Steps, einem Zeitplan je Workflow, {@link #TODOS} Todos,
+     * {@link #WISHES} Wuensche und {@link #AUDITS_PER_PROJECT} Audits je Projekt.
      *
      * <p>Ein zweiter Aufruf verdoppelt jede dieser Tabellen — genau darauf beruht
      * {@link #statementCountMustNotGrowWithTheNumberOfRows}. Alle Namen und Pfade tragen die
      * Chargen-Kennung, damit die zweite Charge neue Zeilen anlegt statt die erste zu treffen.
+     *
+     * <p>Die Charge entsteht in einer eigenen Transaktion und wird committet: Gemessen wird danach
+     * ohne Transaktion, gegen das, was wirklich in der Datenbank steht (TODO 5c56b3d1).
      */
     private void seedBatch(String batch) {
+        transactions.executeWithoutResult(status -> writeBatch(batch));
+    }
+
+    private void writeBatch(String batch) {
         List<Workflow> workflows = new ArrayList<>();
         for (int p = 0; p < PROJECTS; p++) {
             Project project = projectRepository.save(Project.builder()
@@ -415,6 +501,85 @@ class RequestCostRatchetTest {
                     .fixAttempts(fromRun ? 1 : 0)
                     .build());
         }
+        seedWishes(batch, workflows);
+        seedAudits(batch, workflows, runIds);
+    }
+
+    /**
+     * Wuensche (TODO cda29eab), gleichmaessig ueber die Workflows der Charge und damit ueber ihre
+     * Projekte verteilt: Jeder hat ein Projekt, zwei erzeugte Workflows und eine Vorlage. GET
+     * /wishes loest Projekt- und Workflow-Namen fuer die ganze Liste in je einer Abfrage auf
+     * ({@code WishMapper}, TODO 5bf5a9c8) — ein Nachschlagen je Wunsch faellt als Wachstum auf.
+     */
+    private void seedWishes(String batch, List<Workflow> workflows) {
+        for (int w = 0; w < WISHES; w++) {
+            int first = w * workflows.size() / WISHES;
+            Workflow generated = workflows.get(first);
+            wishRepository.save(Wish.builder()
+                    .originalText("Cost Wish " + batch + w)
+                    .status(WishStatus.COMPLETED)
+                    .projectId(generated.getProject().getId())
+                    .generatedWorkflowIds(List.of(generated.getId(),
+                            workflows.get((first + 1) % workflows.size()).getId()))
+                    .referenceWorkflowIds(List.of(workflows.get((first + 2) % workflows.size()).getId()))
+                    .iterationCount(1)
+                    .resultSummary("Seeded for the request cost ratchet")
+                    .build());
+        }
+    }
+
+    /**
+     * Audits (TODO cda29eab): je Projekt {@link #AUDITS_PER_PROJECT}, jedes mit zwei gueltigen
+     * Reports — der neueste und sein Vorgaenger fuer den Trend — und drei Findings, eins davon
+     * erledigt. GET /audits liest zwei schlanke Projektionen, die Reports ohne Markdown und die
+     * Findings als GROUP BY je Audit, Status und Schwere ({@code AuditCenterService.listAudits},
+     * TODO 3d7e3987). Das Markdown ist absichtlich fett: Geraet es in die Liste, zeigen es die Bytes.
+     */
+    private void seedAudits(String batch, List<Workflow> workflows, List<String> runIds) {
+        int nextRun = 0;
+        for (int p = 0; p < PROJECTS; p++) {
+            Workflow auditWorkflow = workflows.get(p * WORKFLOWS_PER_PROJECT);
+            String projectId = auditWorkflow.getProject().getId();
+            for (int a = 0; a < AUDITS_PER_PROJECT; a++) {
+                String auditKey = "cost-audit-" + batch + p + "-" + a;
+                List<AuditReport> reports = new ArrayList<>();
+                for (int r = 0; r < 2; r++) {
+                    reports.add(auditReportRepository.save(AuditReport.builder()
+                            .projectId(projectId)
+                            .workflowId(auditWorkflow.getId())
+                            .workflowRunId(runIds.get(nextRun++))
+                            .auditKey(auditKey)
+                            .category("quality")
+                            .title("Cost Audit " + batch + p + "-" + a)
+                            .markdownContent(FAT_REPORT_MARKDOWN)
+                            .gateStatus(r == 0 ? GateStatus.YELLOW : GateStatus.GREEN)
+                            .ingestionStatus(AuditIngestionStatus.VALID)
+                            .generatedAt(RUN_STARTED.plusSeconds(3_600L * r))
+                            .build()));
+                }
+                AuditReport previous = reports.getFirst();
+                AuditReport latest = reports.getLast();
+                List<AuditSeverity> severities = List.of(AuditSeverity.HIGH, AuditSeverity.MEDIUM, AuditSeverity.LOW);
+                for (int f = 0; f < severities.size(); f++) {
+                    auditFindingRepository.save(AuditFinding.builder()
+                            .projectId(projectId)
+                            .auditKey(auditKey)
+                            .fingerprint("cost-finding-" + f)
+                            .ruleKey("cost-rule")
+                            .subject("Cost subject " + f)
+                            .severity(severities.get(f))
+                            .title("Cost Finding " + batch + p + "-" + a + "-" + f)
+                            .status(f == severities.size() - 1 ? AuditFindingStatus.RESOLVED : AuditFindingStatus.OPEN)
+                            .firstSeenReportId(previous.getId())
+                            .lastSeenReportId(latest.getId())
+                            .firstSeenRunId(previous.getWorkflowRunId())
+                            .lastSeenRunId(latest.getWorkflowRunId())
+                            .firstSeenAt(previous.getGeneratedAt())
+                            .lastSeenAt(latest.getGeneratedAt())
+                            .build());
+                }
+            }
+        }
     }
 
     @Test
@@ -473,9 +638,10 @@ class RequestCostRatchetTest {
      * Statement-Zahl gegen die Zeilenzahl haelt, braucht keine geratene Seed-Groesse: Es findet
      * jedes N+1 in den gepinnten Routen, unabhaengig davon, wie gross der Seed zufaellig ist.
      *
-     * <p>Gemessen wird in einer Transaktion: erst mit einer Saat-Charge, dann mit zweien. Der
-     * Persistenzkontext wird vor jeder Messung geleert, sonst faende die zweite Messung die
-     * Zeilen der ersten im First-Level-Cache und jedes N+1 bliebe unsichtbar.
+     * <p>Gemessen wird erst mit einer Saat-Charge, dann mit zweien, und beide Male ohne
+     * umschliessende Transaktion: Jede Anfrage beginnt ohne Persistenzkontext, die zweite Messung
+     * findet also keine Zeile der ersten im First-Level-Cache, hinter dem sich ein N+1 verstecken
+     * koennte.
      */
     @Test
     void statementCountMustNotGrowWithTheNumberOfRows() throws Exception {
@@ -560,42 +726,91 @@ class RequestCostRatchetTest {
     }
 
     /**
+     * Two routes show a time window only: the dashboard the days up to today, the calendar the week
+     * of {@link #CALENDAR}. With the seed outside its window a route measures nothing — below every
+     * ceiling, flat in the growth criterion, and blind to any N+1 (the dashboard's default window
+     * would have lost the seed on 2026-10-02, TODO 5c56b3d1). Each of them therefore has to show the
+     * whole seed, not just something.
+     */
+    @Test
+    void windowedRoutesSeeTheWholeSeed() throws Exception {
+        int seededRuns = PROJECTS * WORKFLOWS_PER_PROJECT * RUNS_PER_WORKFLOW;
+
+        JsonNode dashboard = json(DASHBOARD);
+        int runsInWindow = 0;
+        for (JsonNode day : dashboard.path("timeSeries")) {
+            runsInWindow += day.path("count").asInt();
+        }
+        assertThat(runsInWindow).as("seeded runs in the dashboard window").isEqualTo(seededRuns);
+        assertThat(dashboard.path("recentRuns").size()).as("recent runs on the dashboard").isPositive();
+
+        JsonNode calendar = json(CALENDAR);
+        assertThat(calendar.path("pastRuns").size()).as("seeded runs in the calendar week")
+                .isEqualTo(seededRuns);
+        assertThat(calendar.path("upcoming").size()).as("seeded schedules due in the calendar week")
+                .isEqualTo(PROJECTS * WORKFLOWS_PER_PROJECT);
+    }
+
+    private JsonNode json(String route) throws Exception {
+        MvcResult result = mockMvc.perform(get(resolve(route))).andReturn();
+        assertThat(result.getResponse().getStatus()).as("%s", route).isEqualTo(200);
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    /**
      * The run lists show a step count and a preview of the last output — and must get both without
-     * loading a step row (TODO 7fd9f654). Two checks: after the request no {@link StepResult} sits in
-     * the persistence context (the service joins this test's transaction, so whatever it loaded is
-     * still there), and the response does not grow when every step output grows tenfold.
+     * loading a step row (TODO 7fd9f654). Two checks: Hibernate loads no {@link StepResult} while the
+     * request runs, and the response does not grow when every step output grows tenfold.
+     *
+     * <p>The loads are counted by Hibernate's statistics, switched on for this test only. They are
+     * global, not per thread — which is fine here: the integration profile runs no scheduled jobs
+     * ({@code SchedulingConfig}), so nothing but the request loads a step while it is measured.
+     * The persistence context cannot tell any more: without a surrounding transaction, whatever
+     * the request loaded is gone with it.
      */
     @Test
     void runListsLoadNoStepRows() throws Exception {
-        for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs",
-                "/api/v1/schedules/{sched}/runs", CALENDAR)) {
-            Cost before = measure(route);
-            assertThat(stepRowsInPersistenceContext())
-                    .as("%s loaded step rows — the list must count and preview them in the database", route)
-                    .isZero();
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean statisticsWereEnabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        try {
+            // The probe first: a step loaded on purpose has to show up, or the zero below means nothing.
+            long probe = stepRowsLoaded(statistics);
+            stepResultRepository.findAll(PageRequest.of(0, 1));
+            assertThat(stepRowsLoaded(statistics))
+                    .as("Hibernate's statistics do not count step loads — the check below would be blind")
+                    .isGreaterThan(probe);
 
-            MvcResult result = mockMvc.perform(get(resolve(route))).andReturn();
-            String body = result.getResponse().getContentAsString();
-            assertThat(body).contains("\"stepCount\":" + STEPS_PER_RUN)
-                    .contains("\"lastStepStatus\":\"COMPLETED\"")
-                    .contains("\"lastStepPreview\":\"" + "x".repeat(WorkflowRunListItemResponse.PREVIEW_LENGTH) + " […]\"");
+            for (String route : List.of("/api/v1/executions", "/api/v1/workflows/{wf}/runs",
+                    "/api/v1/schedules/{sched}/runs", CALENDAR)) {
+                long stepsLoadedBefore = stepRowsLoaded(statistics);
+                Cost before = measure(route);
+                assertThat(stepRowsLoaded(statistics) - stepsLoadedBefore)
+                        .as("%s loaded step rows — the list must count and preview them in the database", route)
+                        .isZero();
 
-            entityManager.createQuery("UPDATE StepResult s SET s.output = :output")
-                    .setParameter("output", FAT_STEP_OUTPUT.repeat(10))
-                    .executeUpdate();
-            Cost after = measure(route);
-            assertThat(after.responseBytes())
-                    .as("%s grew with the step output — something serialises or reads the full output", route)
-                    .isEqualTo(before.responseBytes());
-            assertThat(after.statements()).isEqualTo(before.statements());
+                MvcResult result = mockMvc.perform(get(resolve(route))).andReturn();
+                String body = result.getResponse().getContentAsString();
+                assertThat(body).contains("\"stepCount\":" + STEPS_PER_RUN)
+                        .contains("\"lastStepStatus\":\"COMPLETED\"")
+                        .contains("\"lastStepPreview\":\"" + "x".repeat(WorkflowRunListItemResponse.PREVIEW_LENGTH) + " […]\"");
+
+                jdbc.update("UPDATE step_results SET output = ?", FAT_STEP_OUTPUT.repeat(10));
+                Cost after = measure(route);
+                assertThat(after.responseBytes())
+                        .as("%s grew with the step output — something serialises or reads the full output", route)
+                        .isEqualTo(before.responseBytes());
+                assertThat(after.statements()).isEqualTo(before.statements());
+            }
+        } finally {
+            statistics.setStatisticsEnabled(statisticsWereEnabled);
         }
     }
 
-    private long stepRowsInPersistenceContext() {
-        return entityManager.unwrap(Session.class).getStatistics().getEntityKeys().stream()
-                .map(EntityKey.class::cast)
-                .filter(key -> StepResult.class.getName().equals(key.getEntityName()))
-                .count();
+    /** Step rows Hibernate has loaded or fetched since the statistics were switched on. */
+    private static long stepRowsLoaded(Statistics statistics) {
+        EntityStatistics steps = statistics.getEntityStatistics(StepResult.class.getName());
+        return steps.getLoadCount() + steps.getFetchCount();
     }
 
     private String resolve(String route) {
@@ -604,8 +819,13 @@ class RequestCostRatchetTest {
     }
 
     private Cost measure(String route) throws Exception {
-        entityManager.flush();
-        entityManager.clear();
+        // The request has to open its own transactions, or none — exactly as in production. Inside
+        // an open transaction it would share that transaction's persistence context, and a service
+        // without a transaction of its own would look as cheap as one with (TODO 5c56b3d1).
+        assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                .as("%s would be measured inside an open transaction — the request would share its "
+                        + "persistence context, which it never has in production", route)
+                .isFalse();
 
         SqlStatementCounter.start();
         MvcResult result;
