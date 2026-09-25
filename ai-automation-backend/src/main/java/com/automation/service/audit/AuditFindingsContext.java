@@ -103,6 +103,14 @@ public class AuditFindingsContext implements AuditContextSource {
         return config != null ? config.key() : null;
     }
 
+    /**
+     * Ob ein Workflow mit diesen Metadaten die Variable bekommt – dieselbe Pruefung wie zur Laufzeit, ohne Bean
+     * und ohne Abfrage: fuer den Workflow-Analyzer, der den Platzhalter sonst meldet (TODO 5ae9bd32).
+     */
+    public static boolean appliesTo(Map<String, Object> workflowMeta) {
+        return AuditConfig.from(workflowMeta) != null;
+    }
+
     @Override
     public String findings(String projectId, String auditKey) {
         if (!modules.isEnabled(ModuleCatalog.AUDIT)) {   // je Aufruf: ein Umschalten zur Laufzeit wirkt sofort

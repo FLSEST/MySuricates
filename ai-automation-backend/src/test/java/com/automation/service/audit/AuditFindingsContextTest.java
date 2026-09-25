@@ -352,6 +352,11 @@ class AuditFindingsContextTest {
         assertThat(findingsContext.auditKey(withoutReportBlock)).isNull();
         assertThat(findingsContext.auditKey(Map.of("autoTodo", Map.of("enabled", true)))).isNull();
         assertThat(findingsContext.auditKey(null)).isNull();
+        // Der Analyzer fragt ohne Bean, entschieden wird gleich (TODO 5ae9bd32)
+        assertThat(AuditFindingsContext.appliesTo(AUDIT_META)).isTrue();
+        assertThat(AuditFindingsContext.appliesTo(disabled)).isFalse();
+        assertThat(AuditFindingsContext.appliesTo(withoutReportBlock)).isFalse();
+        assertThat(AuditFindingsContext.appliesTo(null)).isFalse();
     }
 
     @Test

@@ -2,11 +2,13 @@ package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.executor.PlaceholderSyntax;
+import com.automation.service.audit.AuditFindingsContext;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -25,7 +27,11 @@ final class WiringRules {
     private static final Set<String> CHAIN_ONLY = Set.of(
             "previous_chain_output", "chain_run_id", "chain_step_output");
 
-    static void apply(List<BlockDefinition> blocks, List<AnalyzerFinding> out) {
+    /** Nur in einem Audit-Workflow belegt (gültiges {@code metadata.audit}) — sonst bleibt er Literal. */
+    private static final String AUDIT_ONLY = "audit_findings";
+
+    /** @param metadata die Metadaten der Definition; leer für eine ohne — dann ist sie kein Audit-Workflow */
+    static void apply(List<BlockDefinition> blocks, Map<String, Object> metadata, List<AnalyzerFinding> out) {
         Set<String> names = blockNames(blocks);
         List<String> texts = new ArrayList<>();
         for (BlockDefinition block : blocks) {
@@ -34,6 +40,7 @@ final class WiringRules {
 
         unknownBlockReference(blocks, names, texts, out);
         chainOnlyPlaceholder(blocks, texts, out);
+        auditOnlyPlaceholder(blocks, texts, metadata, out);
         unwiredOutput(blocks, texts, out);
     }
 
@@ -68,6 +75,23 @@ final class WiringRules {
                             "{{ " + key + " }} wird nur innerhalb einer Chain belegt; läuft der Workflow "
                                     + "einzeln, steht die Zeichenfolge selbst im Prompt"));
                 }
+            }
+        }
+    }
+
+    /**
+     * {@code audit_findings} in einer Definition ohne gültiges {@code metadata.audit} (TODO 5ae9bd32). Die Variable
+     * gibt es nur für einen Audit-Workflow, entschieden wie zur Laufzeit ({@link AuditFindingsContext#appliesTo});
+     * sonst — auch als Sub-Workflow eines Audit-Workflows — steht die Zeichenfolge selbst im Prompt.
+     */
+    private static void auditOnlyPlaceholder(List<BlockDefinition> blocks, List<String> texts,
+                                             Map<String, Object> metadata, List<AnalyzerFinding> out) {
+        if (AuditFindingsContext.appliesTo(metadata)) return;
+        for (int i = 0; i < blocks.size(); i++) {
+            if (PlaceholderSyntax.keysIn(texts.get(i)).contains(AUDIT_ONLY)) {
+                out.add(AnalyzerFinding.of("audit-only-placeholder", Severity.MEDIUM, i, blocks.get(i).getName(),
+                        "{{ " + AUDIT_ONLY + " }} wird nur in einem Audit-Workflow belegt (metadata.audit mit "
+                                + "enabled, key, category und reportBlock); hier steht die Zeichenfolge selbst im Prompt"));
             }
         }
     }

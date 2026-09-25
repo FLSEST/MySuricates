@@ -1,6 +1,7 @@
 package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.Workflow;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -56,6 +57,34 @@ class WorkflowAnalyzerTest {
                 block("simple", "a", Map.of("command", "Nimm {{ previous_chain_output }} und fasse zusammen")));
 
         assertThat(rules(blocks, null)).contains("chain-only-placeholder");
+    }
+
+    /** TODO 5ae9bd32: {@code audit_findings} gibt es nur in einem Audit-Workflow – die Metadaten entscheiden. */
+    @Test
+    void auditBefundeOhneAuditWorkflowSindEinBefund_mitGueltigemAuditBlockNicht() {
+        var blocks = List.of(block("simple", "bericht", Map.of("command", "Bekannte Befunde: {{ audit_findings }}")));
+        Map<String, Object> audit = Map.of("audit", Map.of(
+                "enabled", true, "key", "project.security", "category", "security", "reportBlock", "bericht"));
+
+        assertThat(rules(blocks, null)).contains("audit-only-placeholder");
+        assertThat(analyzer.analyze(blocks, null, Map.of("autoTodo", Map.of("enabled", true))))
+                .extracting(AnalyzerFinding::rule).contains("audit-only-placeholder");
+        assertThat(analyzer.analyze(blocks, null, audit)).extracting(AnalyzerFinding::rule)
+                .doesNotContain("audit-only-placeholder");
+        assertThat(analyzer.analyze(blocks, null, null)).extracting(AnalyzerFinding::rule)
+                .as("ohne Metadaten: kein Audit-Workflow").contains("audit-only-placeholder");
+    }
+
+    /** Der REST-Weg analysiert die Entity: deren Metadaten muessen ankommen, sonst meldete er jeden Audit-Workflow. */
+    @Test
+    void analyseDerEntityLiestDerenMetadaten() {
+        var blocks = List.of(block("simple", "bericht", Map.of("command", "Bekannte Befunde: {{ audit_findings }}")));
+        Workflow audit = Workflow.builder().blocks(blocks).metadata(Map.of("audit", Map.of(
+                "enabled", true, "key", "project.security", "category", "security", "reportBlock", "bericht"))).build();
+        Workflow plain = Workflow.builder().blocks(blocks).build();
+
+        assertThat(analyzer.analyze(audit)).extracting(AnalyzerFinding::rule).doesNotContain("audit-only-placeholder");
+        assertThat(analyzer.analyze(plain)).extracting(AnalyzerFinding::rule).contains("audit-only-placeholder");
     }
 
     @Test

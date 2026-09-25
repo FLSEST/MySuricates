@@ -68,7 +68,7 @@ class PoolAnalyzerGateTest {
 
                 String instructions = root.path("instructions").isTextual()
                         ? root.path("instructions").asText() : null;
-                for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions)) {
+                for (AnalyzerFinding finding : analyzer.analyze(blocks, instructions, metadataOf(root))) {
                     byRule.merge(finding.rule(), 1, Integer::sum);
                     if (KNOWN_SEVERE.containsKey(variant.label() + " " + finding.rule())) {
                         known.add(variant.label() + " " + finding.rule());
@@ -104,6 +104,12 @@ class PoolAnalyzerGateTest {
             out.add(block);
         }
         return out;
+    }
+
+    /** Die Metadaten der Definition: {@code metadata.audit} entscheidet, ob {@code audit_findings} belegt wird. */
+    private Map<String, Object> metadataOf(JsonNode root) {
+        JsonNode metadata = root.path("metadata");
+        return configOf(metadata.isObject() ? metadata : root.path("definition").path("metadata"));
     }
 
     @SuppressWarnings("unchecked")
