@@ -168,7 +168,7 @@ function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding
   // Kept here, not in the tab: switching to the report and back keeps the chosen chips.
   const [findingFilter, setFindingFilter] = useState(() => initialFindingFilter(requestedFindingStatus));
   const shown = shownReport(reports.data?.content ?? [], audit);
-  // Header link, report head and history all point at the run of the report on screen.
+  // The header link follows the report on screen, like the run link in its head — not the latest attempt.
   const evidenceRun = shown ? `/workflows/${shown.workflowId}/run/${shown.workflowRunId}` : `/workflows/${audit.workflowId}/run/${audit.latestRunId}`;
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-4">
