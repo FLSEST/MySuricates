@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -51,6 +53,7 @@ class GoalApiIntegrationTest {
     @Autowired private WorkflowRepository workflowRepository;
     @Autowired private WorkflowRunRepository runRepository;
     @Autowired private TodoTriggerRepository triggerRepository;
+    @Autowired private EntityManager entityManager;
 
     private Project projectA;
     private Project projectB;
@@ -141,6 +144,39 @@ class GoalApiIntegrationTest {
         perform(patch("/api/v1/todos/" + todo.getId() + "/planning"), Map.of("goalId", ""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.planning.goalId").doesNotExist());
+    }
+
+    /**
+     * Ein zweites Ordnen mit weniger TODOs nimmt den uebrigen ihren Rang (TODO f83dcc48): reorder laedt
+     * die nicht mehr genannten gebuendelt nach (findAllById) und speichert sie ohne Rang. Der
+     * Persistenzkontext wird vorher geleert wie zwischen zwei echten Anfragen, sonst kaemen die TODOs
+     * aus dem Cache statt aus der Datenbank.
+     */
+    @Test
+    void reorderWithFewerTodos_dropsTheRankOfTheOthers() throws Exception {
+        String goalId = createGoal("Release", null);
+        Todo docs = todo("Doku", Todo.Priority.LOW, projectA);
+        Todo privacy = todo("Privatdaten", Todo.Priority.HIGH, projectA);
+        Todo videos = todo("Videos", Todo.Priority.MEDIUM, projectB);
+        List<String> all = List.of(docs.getId(), privacy.getId(), videos.getId());
+        perform(post("/api/v1/goals/" + goalId + "/todos"), Map.of("todoIds", all)).andExpect(status().isOk());
+        perform(put("/api/v1/goals/" + goalId + "/order"), Map.of("todoIds", all)).andExpect(status().isOk());
+        entityManager.flush();
+        entityManager.clear();
+
+        JsonNode reordered = json(perform(put("/api/v1/goals/" + goalId + "/order"),
+                Map.of("todoIds", List.of(videos.getId()))).andExpect(status().isOk()));
+
+        // Mit Rang zuerst, dann ohne Rang nach Prioritaet (HIGH vor LOW).
+        assertThat(ids(reordered)).containsExactly(videos.getId(), privacy.getId(), docs.getId());
+        assertThat(reordered.at("/todos/0/goalRank").asInt()).isEqualTo(1);
+        assertThat(reordered.at("/todos/1/goalRank").isNull()).isTrue();
+        assertThat(reordered.at("/todos/2/goalRank").isNull()).isTrue();
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(todoRepository.findAllById(all)).extracting(Todo::getId, Todo::getGoalRank)
+                .containsExactlyInAnyOrder(tuple(docs.getId(), null), tuple(privacy.getId(), null),
+                        tuple(videos.getId(), 1));
     }
 
     @Test
