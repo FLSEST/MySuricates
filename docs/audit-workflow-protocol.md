@@ -231,6 +231,31 @@ mit **wörtlich demselben `ruleKey` und `subject`** weiterführen. Nur ein gemel
 `ACCEPTED_RISK`-Befund wird neu bewertet (siehe Lebenszyklus), und ein Befund in neuer
 Schreibweise wäre ein Wiedergänger ohne seine Einordnung.
 
+### Die Report-Prompts nutzen `audit_findings`
+
+Die fünf Audits im `workflow-pool/` (Architektur-Review, Performance-Audit, Test-Abdeckung,
+Security-Audit, Health-Check) bekommen die Variable im Report-Prompt direkt nach `OFFENE TODOS`
+als Abschnitt `BEKANNTE BEFUNDE` (TODO `1cf996df`). Vor dem Envelope-Abschnitt steht in allen
+fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
+
+- **Identität:** `ruleKey` und `subject` eines bekannten Befunds werden exakt übernommen, auch
+  wenn das Modell ihn anders benennen würde.
+- **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
+  Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
+  verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert.
+- **Envelope:** Jeder Befund, der laut Messung noch besteht, wird weitergeführt, auch
+  `ACCEPTED_RISK` und `DISMISSED`. Weg bleibt nur Behobenes und Altbestand mit einem `ruleKey`,
+  den der Prompt nicht erlaubt. Einen `AWAITING_VERIFICATION`-Befund prüft das Modell gegen die
+  Messung: Meldet es ihn, wird er wieder `OPEN`; fehlt er, ist die Behebung bestätigt.
+- Den Status setzt die Plattform, nicht der Envelope. Den letzten Report gibt das Modell nicht
+  wörtlich wieder, vor allem nicht seinen Envelope.
+
+Die Test-Abdeckung empfiehlt als nächsten Schritt und in der Roadmap nur Klassen, die nicht
+eingeordnet sind. Ihr Envelope enthält weiter jede gelistete Klasse, sonst stimmte
+`expectedFindings` nicht. Dass alle fünf Prompts die Variable und denselben Regelblock tragen und
+keiner mehr verlangt, bekannte Befunde wegzulassen, prüft `scripts/tests/test-audit-facts.sh`
+(Abschnitt 10).
+
 ## Lebenszyklus
 
 - Fehlgeschlagene Runs, fehlende Report-Blöcke und ungültige Envelopes werden als

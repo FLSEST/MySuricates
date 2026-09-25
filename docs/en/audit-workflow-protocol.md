@@ -233,6 +233,30 @@ finding forward with **literally the same `ruleKey` and `subject`**. Only a repo
 finding is re-assessed (see Lifecycle), and a finding in a new spelling would be a revenant without
 its disposition.
 
+### The report prompts use `audit_findings`
+
+The five audits in `workflow-pool/` (architecture review, performance audit, test coverage, security
+audit, health check) receive the variable in their report prompt right after `OFFENE TODOS`, as the
+section `BEKANNTE BEFUNDE` (TODO `1cf996df`). Before the envelope section, all five carry the same
+rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the prompts are German):
+
+- **Identity:** `ruleKey` and `subject` of a known finding are taken over exactly, even if the model
+  would name it differently.
+- **Markdown:** the findings table shows only `OPEN`, `AWAITING_VERIFICATION` and new findings.
+  Classified ones are summed up in one line, `Bewusst eingeordnet: <N> (akzeptiert <x>, verworfen
+  <y>) - siehe Audit Center`, unless one has measurably degraded.
+- **Envelope:** every finding that the measurement still shows is carried forward, `ACCEPTED_RISK`
+  and `DISMISSED` included. Only fixed findings stay out, and legacy ones with a `ruleKey` the prompt
+  does not allow. The model checks an `AWAITING_VERIFICATION` finding against the measurement: if it
+  reports it, the finding is `OPEN` again; if it is missing, the fix is confirmed.
+- The platform sets the status, not the envelope. The model does not echo the last report verbatim,
+  least of all its envelope.
+
+The test coverage audit recommends as its next step and in its roadmap only classes that are not
+classified. Its envelope still carries every listed class, otherwise `expectedFindings` would not
+match. That all five prompts carry the variable and the same rule block, and that none still asks to
+leave known findings out, is checked by `scripts/tests/test-audit-facts.sh` (section 10).
+
 ## Lifecycle
 
 - Failed runs, missing report blocks, and invalid envelopes are historized as

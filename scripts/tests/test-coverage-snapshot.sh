@@ -132,6 +132,13 @@ check "Prompt nennt 'UNTESTED gesamt'"        'grep -q "UNTESTED gesamt" "$PROMP
 check "Prompt nennt kein Top-15-Fenster"      '! grep -q "Top 15" "$PROMPT"'
 check "Prompt begruendet snapshotComplete"    'grep -q "snapshotComplete" "$PROMPT"'
 check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *false\|snapshotComplete\":false" "$PROMPT"'
+# 1cf996df: Empfohlen wird nur, was nicht bewusst eingeordnet ist; im Snapshot bleibt jede gelistete
+# Klasse, sonst stimmte die Soll-Zahl nicht mehr.
+check "Prompt bekommt die bekannten Befunde"   'grep -q "{{ audit_findings }}" "$PROMPT"'
+check "Empfehlung nur nicht eingeordnete Klassen" \
+  'grep -q "^Waehlbar fuer NAECHSTER SCHRITT und die Roadmap (naechste 5) sind nur Klassen, die unter BEKANNTE BEFUNDE nicht ACCEPTED_RISK oder DISMISSED sind" "$PROMPT"'
+check "eingeordnete Klassen bleiben im Envelope" \
+  'grep -q "lass keine gelistete Klasse weg, auch keine eingeordnete (ACCEPTED_RISK, DISMISSED; sie zaehlen in ERWARTETE FINDINGS mit)" "$PROMPT"'
 
 echo "6) Gate-Verdict prueft den Snapshot deterministisch"
 # Platzhalter werden wie in TemplateResolver.resolveShellSafe single-quoted eingesetzt
