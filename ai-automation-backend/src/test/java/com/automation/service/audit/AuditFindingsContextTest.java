@@ -349,6 +349,8 @@ class AuditFindingsContextTest {
                 .contains("\nOPEN | MEDIUM | dep.outdated | pom.xml | Titel pom.xml\n");
         assertThat(ctx.isUntrusted("audit_findings")).isTrue();
         assertThat(ctx.hasUntrustedInput()).isFalse();
+        assertThat(ctx.getVariables()).as("every platform variable source is wired, not only the audit one")
+                .containsKeys("previous_report", "open_todos", "request_metrics");
     }
 
     @Test
