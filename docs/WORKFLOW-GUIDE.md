@@ -640,7 +640,19 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 | `source_agent` | string | `workflow` | Quell-Agent-Label |
 | `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
 
-**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert.
+**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert, leere Texte gelten als nicht gesetzt.
+
+**`todo-update` mit `updates`** (statt `id`): ändert viele TODOs **des Lauf-Projekts** in einem Schritt. `updates` ist eine JSON-Liste (als Text, Template-fähig, meist `{{ block.<shell>.output }}`; ist die ganze Ausgabe kein JSON, gilt ihre letzte nicht-leere Zeile – ein Skript darf also vorher Zeilen für Menschen ausgeben):
+
+| Schlüssel je Eintrag | Bedeutung |
+|---|---|
+| `id` | volle UUID eines TODOs im Projekt des Laufs |
+| `status` | `OPEN`, `IN_PROGRESS`, `DONE` oder `BACKLOG` (DONE wie beim Schließen, auch für Audit-TODOs) |
+| `add_tags` / `remove_tags` | Tags hinzufügen / entfernen (je höchstens 10, Zeichen `A–Z a–z 0–9 _ : . -`) |
+| `note` | Vermerk, an die Beschreibung angehängt als `— <Datum> · <Workflow> (Lauf <id8>): <note>` (≤ 1000 Zeichen, Marker entschärft) |
+| `require_tags` / `require_status` | Bedingung – sonst wird der Eintrag übersprungen |
+
+Höchstens 50 Einträge. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag (ungültige ID, fremdes Projekt, Bedingung nicht erfüllt) wird mit Grund übersprungen. Ausgabe: `✓ N aktualisiert, M übersprungen` und je Eintrag eine Zeile.
 
 **`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
 

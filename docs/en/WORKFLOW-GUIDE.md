@@ -629,7 +629,19 @@ Create or change TODOs directly through the TodoService — **no REST self-call,
 | `source_agent` | string | `workflow` | Source agent label |
 | `variable_name` | string | `todo_id` | Context variable that receives the new TODO id |
 
-**`todo-update`**: `id` (required, template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed.
+**`todo-update`**: `id` (required, template-capable — e.g. `{{ todo_id }}`), optionally `title`/`description`/`priority`/`tags` — only the fields that are set are changed, empty texts count as not set.
+
+**`todo-update` with `updates`** (instead of `id`): changes many TODOs **of the run's project** in one step. `updates` is a JSON list (as text, template-capable, usually `{{ block.<shell>.output }}`; if the whole output is no JSON, its last non-empty line counts – a script may print lines for people first):
+
+| Key per entry | Meaning |
+|---|---|
+| `id` | full UUID of a TODO in the run's project |
+| `status` | `OPEN`, `IN_PROGRESS`, `DONE` or `BACKLOG` (DONE as when closing, audit TODOs included) |
+| `add_tags` / `remove_tags` | add / remove tags (at most 10 each, characters `A–Z a–z 0–9 _ : . -`) |
+| `note` | note appended to the description as `— <date> · <workflow> (Lauf <id8>): <note>` (≤ 1000 characters, markers defused) |
+| `require_tags` / `require_status` | condition – otherwise the entry is skipped |
+
+At most 50 entries. Broken JSON, no list or an unknown key fail the step before anything is written; an entry that does not fit (invalid id, other project, condition not met) is skipped with a reason. Output: `✓ N aktualisiert, M übersprungen` and one line per entry.
 
 **`todo-close`**: `id` (required, template-capable) — sets the status to DONE.
 
