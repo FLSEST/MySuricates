@@ -14,11 +14,18 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * The integration tests of one JVM share one database, and not all of them roll back. So the
+ * list queries below are checked against what they returned before the test saved its own
+ * projects ({@code before} + saved), never against an empty table — a project another test left
+ * behind turned them red depending on the class order (TODO 437afb05).
+ */
 @SpringBootTest
 @ActiveProfiles("integration")
 @Transactional
@@ -52,121 +59,142 @@ class ProjectRepositoryTest {
                 .build();
     }
 
+    /** Ids in query order; a list, not a set, so a duplicated row still fails the comparison. */
+    private static List<String> ids(List<Project> projects) {
+        return projects.stream().map(Project::getId).toList();
+    }
+
+    /** What a query must return after the test saved {@code saved}: its earlier result plus them. */
+    private static List<String> plus(List<String> before, Project... saved) {
+        List<String> expected = new ArrayList<>(before);
+        for (Project project : saved) {
+            expected.add(project.getId());
+        }
+        return expected;
+    }
+
     // --- findByArchivedAtIsNull ---
 
     @Test
     void findByArchivedAtIsNull_returnsOnlyNonArchivedProjects() {
-        repository.save(project("Active Project", "/tmp/proj-active", ProjectStatus.RUNNING));
-        repository.save(archivedProject("Archived Project", "/tmp/proj-archived"));
+        Project active = repository.save(project("Active Project", "/tmp/proj-active", ProjectStatus.RUNNING));
+        Project archived = repository.save(archivedProject("Archived Project", "/tmp/proj-archived"));
 
         List<Project> result = repository.findByArchivedAtIsNull();
 
-        assertThat(result).isNotEmpty();
+        assertThat(ids(result)).contains(active.getId()).doesNotContain(archived.getId());
         assertThat(result).allMatch(p -> p.getArchivedAt() == null);
     }
 
     @Test
-    void findByArchivedAtIsNull_emptyWhenAllArchived() {
+    void findByArchivedAtIsNull_unchangedWhenOnlyArchivedProjectsAreAdded() {
+        List<String> before = ids(repository.findByArchivedAtIsNull());
         repository.save(archivedProject("Archived A", "/tmp/proj-arch-a"));
         repository.save(archivedProject("Archived B", "/tmp/proj-arch-b"));
 
         List<Project> result = repository.findByArchivedAtIsNull();
 
-        assertThat(result).isEmpty();
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(before);
     }
 
     @Test
     void findByArchivedAtIsNull_includesProjectsWithNullArchivedAt() {
+        List<String> before = ids(repository.findByArchivedAtIsNull());
         Project p1 = repository.save(project("Live Alpha", "/tmp/proj-live-alpha", ProjectStatus.STOPPED));
         Project p2 = repository.save(project("Live Beta", "/tmp/proj-live-beta", ProjectStatus.RUNNING));
         repository.save(archivedProject("Archived Only", "/tmp/proj-archived-only"));
 
         List<Project> result = repository.findByArchivedAtIsNull();
 
-        assertThat(result).hasSize(2);
-        assertThat(result).extracting(Project::getId)
-                .containsExactlyInAnyOrder(p1.getId(), p2.getId());
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(plus(before, p1, p2));
     }
 
     // --- findByArchivedAtIsNotNull ---
 
     @Test
     void findByArchivedAtIsNotNull_returnsOnlyArchivedProjects() {
+        List<String> before = ids(repository.findByArchivedAtIsNotNull());
         repository.save(project("Active Only", "/tmp/proj-active-only", ProjectStatus.STOPPED));
-        repository.save(archivedProject("Archived One", "/tmp/proj-arc-one"));
-        repository.save(archivedProject("Archived Two", "/tmp/proj-arc-two"));
+        Project one = repository.save(archivedProject("Archived One", "/tmp/proj-arc-one"));
+        Project two = repository.save(archivedProject("Archived Two", "/tmp/proj-arc-two"));
 
         List<Project> result = repository.findByArchivedAtIsNotNull();
 
-        assertThat(result).hasSize(2);
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(plus(before, one, two));
         assertThat(result).allMatch(p -> p.getArchivedAt() != null);
     }
 
     @Test
-    void findByArchivedAtIsNotNull_emptyWhenNoneArchived() {
+    void findByArchivedAtIsNotNull_unchangedWhenOnlyActiveProjectsAreAdded() {
+        List<String> before = ids(repository.findByArchivedAtIsNotNull());
         repository.save(project("Non Archived", "/tmp/proj-non-arch", ProjectStatus.RUNNING));
 
         List<Project> result = repository.findByArchivedAtIsNotNull();
 
-        assertThat(result).isEmpty();
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(before);
     }
 
     // --- findByStatus ---
 
     @Test
     void findByStatus_returnsProjectsWithMatchingStatus() {
-        repository.save(project("Running A", "/tmp/proj-run-a", ProjectStatus.RUNNING));
-        repository.save(project("Running B", "/tmp/proj-run-b", ProjectStatus.RUNNING));
+        List<String> before = ids(repository.findByStatus(ProjectStatus.RUNNING));
+        Project a = repository.save(project("Running A", "/tmp/proj-run-a", ProjectStatus.RUNNING));
+        Project b = repository.save(project("Running B", "/tmp/proj-run-b", ProjectStatus.RUNNING));
         repository.save(project("Stopped C", "/tmp/proj-stop-c", ProjectStatus.STOPPED));
 
         List<Project> result = repository.findByStatus(ProjectStatus.RUNNING);
 
-        assertThat(result).hasSize(2);
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(plus(before, a, b));
         assertThat(result).allMatch(p -> p.getStatus() == ProjectStatus.RUNNING);
     }
 
     @Test
-    void findByStatus_emptyWhenNoMatchingStatus() {
+    void findByStatus_unchangedWhenNoAddedProjectMatches() {
+        List<String> before = ids(repository.findByStatus(ProjectStatus.ERROR));
         repository.save(project("Stopped Only", "/tmp/proj-stop-only", ProjectStatus.STOPPED));
 
         List<Project> result = repository.findByStatus(ProjectStatus.ERROR);
 
-        assertThat(result).isEmpty();
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(before);
     }
 
     @Test
     void findByStatus_doesNotReturnOtherStatuses() {
-        repository.save(project("Starting", "/tmp/proj-starting", ProjectStatus.STARTING));
+        List<String> before = ids(repository.findByStatus(ProjectStatus.STARTING));
+        Project starting = repository.save(project("Starting", "/tmp/proj-starting", ProjectStatus.STARTING));
         repository.save(project("Stopped", "/tmp/proj-stopped", ProjectStatus.STOPPED));
         repository.save(project("Error", "/tmp/proj-error", ProjectStatus.ERROR));
 
         List<Project> result = repository.findByStatus(ProjectStatus.STARTING);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getStatus()).isEqualTo(ProjectStatus.STARTING);
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(plus(before, starting));
+        assertThat(result).allMatch(p -> p.getStatus() == ProjectStatus.STARTING);
     }
 
     // --- findByNameContainingIgnoreCase ---
 
     @Test
     void findByNameContainingIgnoreCase_returnsMatchingProjects() {
-        repository.save(project("Alpha Workflow", "/tmp/proj-alpha-wf", ProjectStatus.STOPPED));
-        repository.save(project("Beta Workflow", "/tmp/proj-beta-wf", ProjectStatus.STOPPED));
+        List<String> before = ids(repository.findByNameContainingIgnoreCase("Workflow"));
+        Project alpha = repository.save(project("Alpha Workflow", "/tmp/proj-alpha-wf", ProjectStatus.STOPPED));
+        Project beta = repository.save(project("Beta Workflow", "/tmp/proj-beta-wf", ProjectStatus.STOPPED));
         repository.save(project("Gamma Tracker", "/tmp/proj-gamma", ProjectStatus.STOPPED));
 
         List<Project> result = repository.findByNameContainingIgnoreCase("Workflow");
 
-        assertThat(result).hasSize(2);
+        assertThat(ids(result)).containsExactlyInAnyOrderElementsOf(plus(before, alpha, beta));
         assertThat(result).allMatch(p -> p.getName().toLowerCase().contains("workflow"));
     }
 
     @Test
     void findByNameContainingIgnoreCase_isCaseInsensitive() {
-        repository.save(project("Delta Pipeline", "/tmp/proj-delta", ProjectStatus.STOPPED));
+        Project delta = repository.save(project("Delta Pipeline", "/tmp/proj-delta", ProjectStatus.STOPPED));
 
-        assertThat(repository.findByNameContainingIgnoreCase("delta")).isNotEmpty();
-        assertThat(repository.findByNameContainingIgnoreCase("DELTA")).isNotEmpty();
-        assertThat(repository.findByNameContainingIgnoreCase("DeLtA")).isNotEmpty();
+        // By id: "not empty" would also hold for a project named "Delta..." that another test left behind
+        assertThat(ids(repository.findByNameContainingIgnoreCase("delta"))).contains(delta.getId());
+        assertThat(ids(repository.findByNameContainingIgnoreCase("DELTA"))).contains(delta.getId());
+        assertThat(ids(repository.findByNameContainingIgnoreCase("DeLtA"))).contains(delta.getId());
     }
 
     @Test
@@ -180,12 +208,11 @@ class ProjectRepositoryTest {
 
     @Test
     void findByNameContainingIgnoreCase_matchesPartialName() {
-        repository.save(project("Zeta Automation Suite", "/tmp/proj-zeta", ProjectStatus.STOPPED));
+        Project zeta = repository.save(project("Zeta Automation Suite", "/tmp/proj-zeta", ProjectStatus.STOPPED));
 
         List<Project> result = repository.findByNameContainingIgnoreCase("Automation");
 
-        assertThat(result).isNotEmpty();
-        assertThat(result).anyMatch(p -> p.getName().equals("Zeta Automation Suite"));
+        assertThat(ids(result)).contains(zeta.getId());
     }
 
     // --- findFirstByName ---
