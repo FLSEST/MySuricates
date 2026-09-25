@@ -228,17 +228,30 @@ Maven run; count tests via the `<testcase>`, `<failure>` and `<error>` elements 
 `target/surefire-reports/TEST-<Class>.xml` (every `@Nested` class ends up there too, there is no
 separate file per inner class) or via the per-class console lines.
 
-**Caveat for same-named methods in `@Nested` classes:** the final `Results: Tests run: N` line and
-the `<testsuite tests=… failures=…>` header of the XML merge results under the key outer class +
-method name. When methods in two `@Nested` classes of the same outer class share a name, they count
-only once there; several failures of the same name show up under `Failures:` as `Run 1`, `Run 2`, …
-like reruns. Targeted failing probe (2026-09-25, Surefire 3.5.4): three `@Nested` classes with a red
-`sameName()` in each, one unique red method in two of them and a green `passesEverywhere()` in two —
-class lines 7 runs/5 failures, `Results` 5/3, XML header `tests="4" failures="3"`, XML elements
-7 `<testcase>`/5 `<failure>`; exit code 1, so correct. It turns dangerous with
-`-Dsurefire.rerunFailingTestsCount` > 0: a red test whose namesake in a sibling `@Nested` class is
-green then counts as a "flake", and the build ends with `BUILD SUCCESS` and exit code 0 although
-the test failed in both attempts. The `pom.xml` enables no reruns; keep it that way.
+**Caveat for same-named methods in `@Nested` classes:** the final `Results: Tests run: N` line
+merges results under the key outer class + method name. When methods in two `@Nested` classes of
+the same outer class share a name, they count only once there; several failures of the same name
+show up under `Failures:` as `Run 1`, `Run 2`, … like reruns. The `<testsuite tests=… failures=…>`
+header of the XML is no good for counting either, and what it shows depends on the Surefire
+version — which comes unpinned from the Spring Boot parent (this repo: 3.5.6). Under 3.5.4 it only
+carries the numbers of the outer class itself, like its `.txt`, so mostly 0; under 3.5.6 it merges
+by method name like the `Results` line and has an additional `flakes` attribute. Targeted failing
+probe (2026-09-25, the same test class under both versions): three `@Nested` classes with a red
+`sameName()` in each, one unique red method in two of them and a green `passesEverywhere()` in two.
+
+| Source (runs / failures) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Per-class console lines, summed | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>` header of the XML | 0 / 0 | 4 / 3 |
+| `<testcase>` / `<failure>` elements of the XML | 7 / 5 | 7 / 5 |
+| `.txt` of the outer class | 0 / 0 | 0 / 0 |
+| Exit code | 1 | 1 |
+
+It turns dangerous with `-Dsurefire.rerunFailingTestsCount` > 0 (checked under 3.5.6): a red test
+whose namesake in a sibling `@Nested` class is green then counts as a "flake", and the build ends
+with `BUILD SUCCESS` and exit code 0 although the test failed in both attempts. The `pom.xml`
+enables no reruns; keep it that way.
 
 **`ERROR` lines in a green run:** Many tests exercise failure paths — a mock throws, the code
 catches it and correctly logs it at `ERROR`, stack trace included. A green run therefore writes

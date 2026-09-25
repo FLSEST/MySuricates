@@ -234,17 +234,30 @@ gezählt wird über die `<testcase>`-, `<failure>`- und `<error>`-Elemente in
 eigene Datei je innerer Klasse gibt es nicht) oder über die Klassenzeilen der Konsole.
 
 **Vorbehalt bei gleichnamigen Methoden in `@Nested`-Klassen:** Die abschließende
-`Results: Tests run: N`-Zeile und der `<testsuite tests=… failures=…>`-Kopf der XML fassen
-Ergebnisse unter dem Schlüssel äußere Klasse + Methodenname zusammen. Heißen Methoden in zwei
-`@Nested`-Klassen derselben äußeren Klasse gleich, zählen sie dort nur einmal; mehrere
-Fehlschläge desselben Namens erscheinen unter `Failures:` als `Run 1`, `Run 2`, … wie
-Wiederholungen. Gezielte Fehlprobe (2026-09-25, Surefire 3.5.4): drei `@Nested`-Klassen mit
-einem roten `sameName()` in jeder, je einer eindeutigen roten Methode in zweien und einem grünen
-`passesEverywhere()` in zweien — Klassenzeilen 7 Läufe/5 Fehlschläge, `Results` 5/3,
-XML-Kopf `tests="4" failures="3"`, XML-Elemente 7 `<testcase>`/5 `<failure>`; Exit-Code 1,
-also richtig. Gefährlich wird es mit `-Dsurefire.rerunFailingTestsCount` > 0: Dann gilt ein
-roter Test, dessen Namensvetter in einer Nachbar-`@Nested`-Klasse grün ist, als „Flake“, und der
-Build endet mit `BUILD SUCCESS` und Exit-Code 0, obwohl der Test in beiden Durchgängen
+`Results: Tests run: N`-Zeile fasst Ergebnisse unter dem Schlüssel äußere Klasse +
+Methodenname zusammen. Heißen Methoden in zwei `@Nested`-Klassen derselben äußeren Klasse
+gleich, zählen sie dort nur einmal; mehrere Fehlschläge desselben Namens erscheinen unter
+`Failures:` als `Run 1`, `Run 2`, … wie Wiederholungen. Der `<testsuite tests=… failures=…>`-Kopf
+der XML taugt ebenfalls nicht zum Zählen, und was er zeigt, hängt von der Surefire-Version ab —
+die kommt ungepinnt aus dem Spring-Boot-Parent (Stand dieses Repos: 3.5.6). Unter 3.5.4 trägt er
+nur die Zahlen der äußeren Klasse selbst wie deren `.txt`, also meist 0; unter 3.5.6 fasst er wie
+die `Results`-Zeile nach Methodenname zusammen und hat zusätzlich ein `flakes`-Attribut.
+Gezielte Fehlprobe (2026-09-25, dieselbe Testklasse unter beiden Versionen): drei
+`@Nested`-Klassen mit einem roten `sameName()` in jeder, je einer eindeutigen roten Methode in
+zweien und einem grünen `passesEverywhere()` in zweien.
+
+| Quelle (Läufe / Fehlschläge) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Klassenzeilen der Konsole, summiert | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>`-Kopf der XML | 0 / 0 | 4 / 3 |
+| `<testcase>`- / `<failure>`-Elemente der XML | 7 / 5 | 7 / 5 |
+| `.txt` der äußeren Klasse | 0 / 0 | 0 / 0 |
+| Exit-Code | 1 | 1 |
+
+Gefährlich wird es mit `-Dsurefire.rerunFailingTestsCount` > 0 (geprüft unter 3.5.6): Dann gilt
+ein roter Test, dessen Namensvetter in einer Nachbar-`@Nested`-Klasse grün ist, als „Flake“, und
+der Build endet mit `BUILD SUCCESS` und Exit-Code 0, obwohl der Test in beiden Durchgängen
 scheiterte. Die `pom.xml` schaltet keine Wiederholungen ein; dabei soll es bleiben.
 
 **`ERROR`-Zeilen in einem grünen Lauf:** Viele Tests prüfen Fehlerpfade — ein Mock wirft, der
