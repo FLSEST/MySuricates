@@ -414,7 +414,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
   binst() { env PATH="$TMP/bbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" "$@" --name bound 2>&1; }
   OTHER="$(listen 127.0.0.1 proxy "$BPORT" "$TMP/other.log")"
   OUT="$(binst up)"; RC=$?
-  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -q "^mysuricates-bound läuft"'
+  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -qF "mysuricates-bound läuft: http://$BADDR:$BPORT"'
   check "status: running healthy"                 '[ "$(binst status)" = "running healthy" ]'
   OUT="$(binst down)"
   check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -qF "mysuricates-bound: 1 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt'

@@ -104,7 +104,7 @@ export HOST_UID HOST_GID HOST_USER HOST_HOME
 # "läuft"-Meldung: lokal eine Zeile wie bisher; bindet die Instanz ins Netz (--bind 0.0.0.0), dazu
 # die Netzadresse(n) dieses Rechners und der VPN-Hinweis (b8aa3866, scripts/lib/netaddr.sh)
 say_running() {  # WORT
-  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: http://localhost:$PORT"; return 0; fi
+  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: $(netaddr_local_url "$BIND" "$PORT")"; return 0; fi
   i18n_load "${MYSURICATES_LANG:-de}"
   echo "mysuricates-$NAME $1:"
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
