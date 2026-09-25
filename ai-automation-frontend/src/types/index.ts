@@ -346,6 +346,8 @@ export interface WorkflowRun {
   definitionHash?: string | null;
   definitionVersionId?: string | null;
   triggerSource?: TriggerSource | null;
+  /** Chain run this run is an entry of; null outside a chain and for runs from before V89 */
+  chainRunId?: string | null;
   /** Seal state recorded at start: true = sealed and verified, false = not sealed, null/absent = older run */
   sealed?: boolean | null;
   /** Skill content hashes verified at start (detail route only) */

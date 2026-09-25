@@ -13,3 +13,4 @@ export { CronPicker } from './CronPicker';
 export { TagInput } from './TagInput';
 export { ModalFooter } from './ModalFooter';
 export { ConfirmModal } from './ConfirmModal';
+export { FilterChips, type FilterChipOption } from './FilterChips';

@@ -24,7 +24,7 @@
 | `/dlq` | DeadLetterQueue | Dead letter queue for failed events |
 | `/debug` | WorkflowDebug | Analyze workflows with failed runs |
 | `/docs` | Docs | Markdown documentation (split layout) |
-| `/reports` | Reports | View generated reports |
+| `/reports` | AuditCenter | Audit Center: audits at a glance, report with origin, findings with status filter, legacy reports |
 | `/insights` | Insights | Platform insights and analytics |
 | `/integrations` | Integrations | Manage integration providers |
 | `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API lookup) |
@@ -116,7 +116,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - Pause/resume/cancel buttons during execution
 - Star rating (1-5) after completion
 - Error panel for failed runs
-- Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
+- Building blocks in `components/workflow/`: `RunProvenance` (seal, trigger as `TriggerSourceChip` – the Audit Center uses the chip too –, definition hash), `RunInputVariables`, `RunPendingTodosPanel` (approve/reject proposed TODOs), `RunContainerPanel` (send a command or open the terminal, only while the run is running or paused)
 - `hooks/useRunInputRecovery.ts` restores a waiting approval or input after loading via `GET /executions/{id}/approval` — shared with `SimpleWorkflowExecution`
 - The header with back, status and the actions per state (pause, resume, cancel, delete, resume from the last step, TODO from a failed run) is `RunHeader`, the notes are `RunNotesCard` (the unsaved text stays in the page). `components/workflow/useRunDiagramSync.ts` colours the diagram boxes by step status and highlights the step of a clicked box; `utils/failedRunTodo.ts` (`buildFailedRunTodo`) builds the TODO of a failed run in the app language
 
@@ -198,6 +198,14 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 - Platform analytics and statistics
 - Visualization of workflow performance and usage patterns
+
+### Audit Center (`/reports`)
+
+- **Overview:** per audit the gate, trend, “open X · accepted Y” (open with critical/high from `openFindingsBySeverity`, accepted from `findingsByStatus`) and the last run; “last attempt invalid” when the newest report was not valid
+- **Report:** the page shows the report named by `latestReportId`, i.e. the newest valid one. Its head names date and time, the run (short ID, link), the trigger as `TriggerSourceChip`, the chain (link to the chain run; there is no page per chain) or, without a chain, the schedule unless the chip already names it, plus “Definition #N”, workflow version and provider/model. When the newest attempt was invalid, a notice with date and error text says that the report is older. “Evidence run” and the history point at the run of the respective report; each history entry carries trigger and chain
+- **Findings:** status filter as `FilterChips`: “Open” (`OPEN` + `AWAITING_VERIFICATION`, the default), “Accepted”, “Dismissed”, “Resolved”, counts from `findingsByStatus`. `useAuditFindingsByStatus` loads one page (200) per chosen status through the `status` parameter, so a status with many findings cannot push the others out; when one page is not enough, a note says so. `?finding=<id>` opens the finding and switches its chip on as well. When a finding leaves the filter after being filed, a toast names its new chip and switches it on on request
+- **Legacy:** file-based Markdown reports, read-only
+- **Structure:** the page wires view, tabs and `hooks/useActiveAudit.ts`: only project and key are kept, the audit comes from the current `/audits` list, so counts follow after a finding was filed. Building blocks in `components/audit/`: `AuditOverview` (with `FindingCounts`), `AuditDetail`, `ReportOrigin` (head, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` with `AuditFindingItem` and `FindingDisposition`, `LegacyReports` and small parts in `AuditParts`. Filing, creating and linking TODOs live in `hooks/useFindingActions.ts`, the filter model in `utils/auditFindingFilter.ts`, the shown report in `useShownAuditReport`. A mutation writes its answer into the findings pages and into the single finding (`['audit-finding', id]`) that a deep link reads the next time it opens
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
@@ -293,6 +301,7 @@ All components in `src/components/ui/`:
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag input with autocomplete |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardized modal footer |
 | `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Confirmation dialog on top of `Modal` (Escape and backdrop close it). Every yes/no dialog uses it instead of assembling `Modal` + `ModalFooter` itself; `isPending` locks the confirm button |
+| `FilterChips` | `options` (`value`, `label`, `count?`), `selected`, `onChange`, `ariaLabel` | Multi-select as a row of chips (`role="group"`, `aria-pressed`); the selection comes back in option order, an empty one is allowed. Status filter in the Audit Center |
 
 ## Design System
 
@@ -693,9 +702,11 @@ Connects to the backend via SockJS/STOMP and receives live logs, approval prompt
 
 ```typescript
 useToast() → {
-  success(message), error(message), info(message), warning(message)
+  success(message, action?), error(message, action?), info(message, action?), warning(message, action?)
 }
 ```
+
+`action` (`{ label, onClick }`) shows a button in the toast that runs the action and closes the toast; such toasts stay 8 instead of 4 seconds and hold while the pointer is on them or focus is inside.
 
 ### `useAssistantWebSocket.ts`
 

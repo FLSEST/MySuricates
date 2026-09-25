@@ -41,6 +41,15 @@ describe('toastStore', () => {
     expect(toasts.map((t) => t.type)).toEqual([...types]);
   });
 
+  it('addToast keeps an optional action, and none without one', () => {
+    const onClick = () => {};
+    useToastStore.getState().addToast('success', 'Moved', { label: 'Show', onClick });
+    useToastStore.getState().addToast('info', 'Plain');
+    const [withAction, plain] = useToastStore.getState().toasts;
+    expect(withAction!.action).toEqual({ label: 'Show', onClick });
+    expect(plain!.action).toBeUndefined();
+  });
+
   it('removeToast removes the correct toast', () => {
     useToastStore.getState().addToast('info', 'Keep');
     useToastStore.getState().addToast('error', 'Remove');

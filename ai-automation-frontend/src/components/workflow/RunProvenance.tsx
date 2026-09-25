@@ -1,5 +1,6 @@
 import { Lock, LockOpen, Minus } from 'lucide-react';
 import { CopyButton } from '../shared/CopyButton';
+import { TriggerSourceChip } from './TriggerSourceChip';
 import { useT } from '../../i18n';
 import type { WorkflowRun } from '../../types';
 
@@ -35,12 +36,7 @@ export function RunProvenance({ run }: { run: WorkflowRun }) {
           {t.workflows.sealView.unrecorded}
         </span>
       )}
-      {run.triggerSource && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised">
-          <span className="text-text-secondary">{t.workflows.triggeredBy}</span>
-          <span className="text-text font-medium">{t.workflows.triggerSources[run.triggerSource]}</span>
-        </span>
-      )}
+      <TriggerSourceChip source={run.triggerSource} />
       {run.definitionHash && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised font-mono"
               title={t.workflows.definitionHashHint}>
