@@ -13,7 +13,9 @@ import org.springframework.test.context.ActiveProfiles;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * rewrote {@code summarization/claude/CLAUDE.md}, {@code summarization/codex/AGENTS.md} and
  * {@code factory/codex/AGENTS.md} in the real home on every local {@code mvn test}. The profile points
  * all of them at per-JVM temp paths from {@code IntegrationTestDbSessionListener}; the second test
- * catches the next configured default of that kind before it ships.
+ * catches the next default of that kind that an {@code application*.yml} configures. Paths the code
+ * builds from {@code user.home} itself (such as the API key file, {@code InstanceAddress.apiKeyFile()})
+ * are outside its view.
  */
 @SpringBootTest
 @ActiveProfiles("integration")
@@ -36,6 +40,11 @@ class IntegrationProfileHomeIsolationTest {
 
     /** The developer's real state directory — the test JVM runs as the developer. */
     private static final Path REAL_STATE_DIR = Path.of(System.getProperty("user.home"), ".autotrigger");
+
+    /** Keys whose default in application.yml points into {@link #REAL_STATE_DIR}; the scan must see them. */
+    private static final List<String> KNOWN_HOME_KEYS = List.of(
+            "automation.summarization.base-dir", "automation.factory.base-dir", "automation.backup.directory",
+            "automation.integration.key-file", "automation.seal.key-file");
 
     @Autowired
     private ConfigurableEnvironment environment;
@@ -66,6 +75,7 @@ class IntegrationProfileHomeIsolationTest {
 
     @Test
     void noConfiguredPathResolvesIntoTheRealStateDirectory() {
+        Set<String> scanned = new TreeSet<>();
         Map<String, String> offenders = new TreeMap<>();
         for (PropertySource<?> source : environment.getPropertySources()) {
             // Only the application*.yml sources: their defaults are what a context start acts on.
@@ -73,6 +83,7 @@ class IntegrationProfileHomeIsolationTest {
             if (source instanceof EnumerablePropertySource<?> enumerable
                     && source.getName().contains("Config resource")) {
                 for (String name : enumerable.getPropertyNames()) {
+                    scanned.add(name);
                     String value = resolved(name);
                     if (value != null && value.contains(REAL_STATE_DIR.toString())) {
                         offenders.put(name, value);
@@ -81,6 +92,10 @@ class IntegrationProfileHomeIsolationTest {
             }
         }
 
+        // A renamed property source would otherwise leave the scan empty — and the test green
+        assertThat(scanned)
+                .as("the scan must reach the application*.yml keys that point into the home by default")
+                .containsAll(KNOWN_HOME_KEYS);
         assertThat(offenders)
                 .as("These keys resolve into the developer's real %s under the integration profile. "
                         + "Redirect each in application-integration.yml to a per-JVM temp path from "
