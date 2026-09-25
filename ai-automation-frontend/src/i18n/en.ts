@@ -1025,6 +1025,7 @@ export const en = {
       approval: {
         title: 'Approval Required',
         description: 'This workflow step requires your decision to continue.',
+        reopen: 'Answer open approval',
       },
       humanInput: {
         title: 'Input Required',

@@ -47,9 +47,9 @@ export function WorkflowExecution() {
   // belong to one run, so a draft never follows "Run again" onto the next run on this page.
   const [notes, setNotes] = useState<{ runId: string | undefined; draft: string | null }>({ runId, draft: null });
   const notesDraft = notes.runId === runId ? notes.draft : null;
-  const { approval: activeApproval, humanInput: activeHumanInput, settle } = useRunPendingInput(runId, run, {
-    connected, approval: pendingApproval, humanInput: pendingHumanInput,
-  });
+  const {
+    approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
@@ -75,7 +75,8 @@ export function WorkflowExecution() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <RunHeader run={run} workflow={workflow} workflowId={id!} connected={connected} isRunning={isRunning} />
+      <RunHeader run={run} workflow={workflow} workflowId={id!} connected={connected} isRunning={isRunning}
+        onOpenApproval={dismissedApproval ? reopen : undefined} />
 
       <GateStatusBanner run={run} />
 
@@ -200,10 +201,10 @@ export function WorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={() => settle(activeApproval)}
+          onDismiss={() => dismiss(activeApproval)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: () => settle(activeApproval),
+              onSuccess: () => markAnswered(activeApproval),
             });
           }}
         />
@@ -216,7 +217,7 @@ export function WorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: () => settle(activeHumanInput),
+              onSuccess: () => markAnswered(activeHumanInput),
             });
           }}
         />

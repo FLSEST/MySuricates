@@ -113,15 +113,30 @@ describe('WorkflowExecution approval dialog', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(endpoint.answers).toEqual([{ answer: 'Yes' }]);
     expect(socket.snapshot().pendingApproval).toEqual(APPROVAL); // no approval_resolved yet
+    // answered is answered: nothing left to open again
+    expect(screen.queryByRole('button', { name: 'Answer open approval' })).not.toBeInTheDocument();
   });
 
-  it('closes a dialog opened by the socket with its close button', async () => {
-    serve();
+  it('closes the dialog with X without answering, and offers the question again — in the header and after a remount', async () => {
+    const endpoint = serve();
+    endpoint.open = true;
     socket.set({ connected: true, pendingApproval: APPROVAL });
-    renderPage();
+    const { unmount } = renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
-
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(endpoint.answers).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Answer open approval' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Deploy to production?');
+    expect(screen.queryByRole('button', { name: 'Answer open approval' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    unmount();
+    renderPage();
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Deploy to production?');
+    expect(endpoint.answers).toEqual([]);
   });
 });

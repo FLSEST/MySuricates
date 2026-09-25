@@ -9,6 +9,7 @@ import { ApprovalDialog } from '../components/workflow/ApprovalDialog';
 import { HumanInputDialog } from '../components/shared/HumanInputDialog';
 import { PathLinkedOutput } from '../components/shared/PathLinkedOutput';
 import { ExecutionRerunButton } from '../components/workflow/ExecutionRerunButton';
+import { OpenApprovalButton } from '../components/workflow/OpenApprovalButton';
 import {
   useWorkflow, useWorkflowRun,
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
@@ -95,9 +96,9 @@ export function SimpleWorkflowExecution() {
   const cancelExecution = useCancelExecution();
   const submitApproval = useSubmitApproval();
 
-  const { approval: activeApproval, humanInput: activeHumanInput, settle } = useRunPendingInput(runId, run, {
-    connected, approval: pendingApproval, humanInput: pendingHumanInput,
-  });
+  const {
+    approval: activeApproval, humanInput: activeHumanInput, dismissedApproval, markAnswered, dismiss, reopen,
+  } = useRunPendingInput(runId, run, { connected, approval: pendingApproval, humanInput: pendingHumanInput });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
 
@@ -139,6 +140,7 @@ export function SimpleWorkflowExecution() {
             {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
           </p>
         </div>
+        {dismissedApproval && <OpenApprovalButton onClick={reopen} />}
         {/* A failed run offers its rerun in the failure card below — one button, not two. */}
         {!FAILURE_STATUSES.has(run.status) && <ExecutionRerunButton run={run} />}
         {isRunning && (
@@ -207,10 +209,10 @@ export function SimpleWorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={() => settle(activeApproval)}
+          onDismiss={() => dismiss(activeApproval)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: () => settle(activeApproval),
+              onSuccess: () => markAnswered(activeApproval),
             });
           }}
         />
@@ -223,7 +225,7 @@ export function SimpleWorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: () => settle(activeHumanInput),
+              onSuccess: () => markAnswered(activeHumanInput),
             });
           }}
         />

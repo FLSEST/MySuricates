@@ -1027,6 +1027,7 @@ export const de: TranslationKeys = {
       approval: {
         title: 'Genehmigung erforderlich',
         description: 'Dieser Workflow-Schritt erfordert Ihre Entscheidung zum Fortfahren.',
+        reopen: 'Offene Freigabe beantworten',
       },
       humanInput: {
         title: 'Eingabe erforderlich',

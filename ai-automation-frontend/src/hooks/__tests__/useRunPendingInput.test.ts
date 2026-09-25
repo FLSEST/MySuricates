@@ -87,7 +87,7 @@ describe('useRunPendingInput', () => {
     expect(endpoint.calls).toBe(1);
   });
 
-  it('closes a settled question at once, although the socket still reports it', async () => {
+  it('closes an answered question at once, although the socket still reports it', async () => {
     const endpoint = serveApproval();
     endpoint.open = true;
     const live = { connected: true, approval: APPROVAL, humanInput: null };
@@ -95,10 +95,11 @@ describe('useRunPendingInput', () => {
     expect(result.current.approval).toEqual(APPROVAL);
     await waitFor(() => expect(endpoint.calls).toBe(1));
 
-    act(() => result.current.settle(APPROVAL));
+    act(() => result.current.markAnswered(APPROVAL));
     expect(result.current.approval).toBeNull();
+    expect(result.current.dismissedApproval).toBeNull();
 
-    // the query still returns it until the server has moved on — settled stays closed
+    // the query still returns it until the server has moved on — answered stays closed
     rerender({ runId: 'run-1', run: run('RUNNING', [step(0, 'COMPLETED'), step(1, 'RUNNING'), step(2, 'RUNNING')]), live });
     await waitFor(() => expect(endpoint.calls).toBe(2));
     expect(result.current.approval).toBeNull();
@@ -109,7 +110,7 @@ describe('useRunPendingInput', () => {
     expect(result.current.approval).toEqual(next);
   });
 
-  it('treats a human input the same way: queried on connect, closed when settled', async () => {
+  it('treats a human input the same way: queried on connect, closed once answered', async () => {
     let calls = 0;
     server.use(http.get('/api/v1/executions/:runId/approval', () => {
       calls++;
@@ -123,7 +124,7 @@ describe('useRunPendingInput', () => {
     await waitFor(() => expect(result.current.humanInput?.prompt).toBe('Name?'));
     expect(result.current.approval).toBeNull();
 
-    act(() => result.current.settle(result.current.humanInput!));
+    act(() => result.current.markAnswered(result.current.humanInput!));
     expect(result.current.humanInput).toBeNull();
   });
 
@@ -136,15 +137,51 @@ describe('useRunPendingInput', () => {
     expect(result.current.approval?.question).toBe('Live?');
   });
 
-  it('forgets settled questions when another run opens on the page', () => {
+  it('forgets answered and dismissed questions when another run opens on the page', () => {
     // "Run again": the same workflow asks the same question at the same step — same key, new run
     serveApproval();
     const live = { connected: true, approval: APPROVAL, humanInput: null };
     const { result, rerender } = renderPendingInput({ runId: 'run-1', run: run('RUNNING'), live });
-    act(() => result.current.settle(APPROVAL));
+    act(() => result.current.markAnswered(APPROVAL));
     expect(result.current.approval).toBeNull();
 
     rerender({ runId: 'run-2', run: { ...run('RUNNING'), id: 'run-2' }, live });
     expect(result.current.approval).toEqual(APPROVAL);
+
+    act(() => result.current.dismiss(APPROVAL));
+    expect(result.current.dismissedApproval).toEqual(APPROVAL);
+    rerender({ runId: 'run-3', run: { ...run('RUNNING'), id: 'run-3' }, live });
+    expect(result.current.approval).toEqual(APPROVAL);
+    expect(result.current.dismissedApproval).toBeNull();
+  });
+
+  it('keeps an approval closed without an answer on offer until it is reopened or resolved', async () => {
+    const endpoint = serveApproval();
+    endpoint.open = true;
+    const live = { connected: true, approval: APPROVAL, humanInput: null };
+    const { result, rerender } = renderPendingInput({ runId: 'run-1', run: run('RUNNING'), live });
+    await waitFor(() => expect(endpoint.calls).toBe(1));
+
+    act(() => result.current.dismiss(APPROVAL));
+    expect(result.current.approval).toBeNull();
+    expect(result.current.dismissedApproval).toEqual(APPROVAL);
+
+    // a query on the next change returns the same question: it stays closed, still on offer
+    rerender({ runId: 'run-1', run: run('PAUSED'), live });
+    await waitFor(() => expect(endpoint.calls).toBe(2));
+    expect(result.current.approval).toBeNull();
+    expect(result.current.dismissedApproval).toEqual(APPROVAL);
+
+    act(() => result.current.reopen());
+    expect(result.current.approval).toEqual(APPROVAL);
+    expect(result.current.dismissedApproval).toBeNull();
+
+    // closed again, then answered elsewhere: the socket resolves it, the next query finds nothing
+    act(() => result.current.dismiss(APPROVAL));
+    endpoint.open = false;
+    rerender({ runId: 'run-1', run: run('RUNNING', [step(0, 'COMPLETED'), step(1, 'COMPLETED')]), live: { ...live, approval: null } });
+    await waitFor(() => expect(endpoint.calls).toBe(3));
+    await waitFor(() => expect(result.current.dismissedApproval).toBeNull());
+    expect(result.current.approval).toBeNull();
   });
 });
