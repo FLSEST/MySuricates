@@ -17,6 +17,8 @@
 # und mysuricates:tryout (= zuletzt gebaut). Der Container bindet nichts vom Rechner ein — kein
 # Projektordner, kein Docker-Socket, keine Logins; alles liegt auf den Volumes
 # mysuricates-tryout-data/-secrets. Einrichten fuer die echte Arbeit: scripts/setup.sh.
+# MYSURICATES_APT_REFRESH=<neuer Wert, etwa der Monat> beim build holt NodeSource- und Docker-Repo
+# frisch statt aus dem Layer-Cache, und damit auch die KI-CLIs der Tryout-Stufe (8b7a39b9).
 set -uo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/provider-login.sh
@@ -77,6 +79,7 @@ cmd_build() {
         --label "org.opencontainers.image.title=MySuricates tryout" \
         --label "org.opencontainers.image.version=$version" \
         --label "org.opencontainers.image.revision=$sha" \
+        --build-arg "APT_REFRESH=${MYSURICATES_APT_REFRESH:-}" \
         -t "$IMAGE_REPO:$version-tryout" -t "$IMAGE_REPO:tryout" - \
     || die "Build fehlgeschlagen"
   echo "Fertig: $IMAGE_REPO:$version-tryout (auch $IMAGE_REPO:tryout) — starten mit scripts/tryout.sh start"

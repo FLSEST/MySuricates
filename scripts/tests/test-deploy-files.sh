@@ -65,6 +65,28 @@ check "the gh layer uses APT_REFRESH itself"      'grep -q "RUN echo \"APT_REFRE
 check "compose passes AGENT_APT_REFRESH"          'grep -q "APT_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
 check "pinned checksums are 64 hex chars"         '[ "$(grep -cE "^ARG (GITLEAKS|TRIVY)_LINUX_(X64|ARM64)_SHA256=[0-9a-f]{64}$" "$ADF")" -eq 4 ]'
 
+echo "5b) the same in every image: third-party repos and unpinned packages refreshable (8b7a39b9)"
+# deploy/Dockerfile und Dockerfile.stable holen NodeSource und Docker aus Fremd-Repos, agent-python
+# ungepinnte pip-Pakete — alles blieb beim ersten Bau stehen. Jedes getrackte Dockerfile mit einem
+# Fremd-Repo braucht das ARG davor, auch ein kuenftiges.
+lof() { grep -n "$2" "$1" | head -n 1 | cut -d: -f1; }   # DATEI MUSTER — Nummer der ersten Zeile
+SDF="$R/ai-automation-backend/docker/Dockerfile.stable"; PDF="$R/ai-automation-backend/docker/Dockerfile.agent-python"
+DFS="$(cd "$R" && git ls-files '*Dockerfile*' 2>/dev/null)"
+check "Dockerfiles found (deploy, stable, agent-devops)" 'printf "%s\n" "$DFS" | grep -qx deploy/Dockerfile && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.stable && printf "%s\n" "$DFS" | grep -qx ai-automation-backend/docker/Dockerfile.agent-devops'
+for f in $DFS; do
+  grep -q "sources.list.d/" "$R/$f" || continue
+  check "$f: every third-party repo behind ARG APT_REFRESH" '[ -n "$(lof "$R/$f" "^ARG APT_REFRESH=")" ] && [ "$(lof "$R/$f" "^ARG APT_REFRESH=")" -lt "$(lof "$R/$f" "sources.list.d/")" ] && grep -q "RUN echo \"APT_REFRESH=\${APT_REFRESH" "$R/$f"'
+done
+for f in "$DF" "$SDF"; do
+  check "${f#"$R"/}: base packages stay before it (cached)" '[ "$(lof "$f" "curl git gosu")" -lt "$(lof "$f" "^ARG APT_REFRESH=")" ]'
+done
+check "deploy/compose.yml passes MYSURICATES_APT_REFRESH" 'grep -q "APT_REFRESH: \${MYSURICATES_APT_REFRESH:-}" "$R/deploy/compose.yml"'
+for c in docker-compose.stable.yml docker-compose.test.yml docker-compose.dev-container.yml; do
+  check "$c passes MYSURICATES_APT_REFRESH" 'grep -q "APT_REFRESH: \${MYSURICATES_APT_REFRESH:-}" "$R/ai-automation-backend/$c"'
+done
+check "agent-python: pip packages behind PIP_REFRESH" '[ -n "$(lof "$PDF" "^ARG PIP_REFRESH=")" ] && [ "$(lof "$PDF" "^ARG PIP_REFRESH=")" -lt "$(lof "$PDF" "pip install")" ] && grep -q "RUN echo \"PIP_REFRESH=\${PIP_REFRESH" "$PDF"'
+check "compose: the same AGENT_APT_REFRESH for agent-python" 'grep -q "PIP_REFRESH: \${AGENT_APT_REFRESH:-}" "$DC"'
+
 echo "6) health checks ask the own instance directly, never through a proxy (cf662c01)"
 # Docker reicht Proxy-Variablen in den Container (~/.docker/config.json, „proxies“), und curl 8.5 schickt
 # auch localhost ueber sie: die Pruefung scheiterte am Proxy, der Container wurde nie gesund, up wartete

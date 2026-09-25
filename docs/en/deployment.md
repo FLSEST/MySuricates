@@ -25,6 +25,7 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_AI_PROVIDERS` | selection from `claude,codex,pi`, default: all present |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
+| `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
@@ -127,7 +128,8 @@ uncommitted changes and the local `config/` never get in. The Dockerfile itself 
 tags before v0.7.6 do not know the `tryout` stage yet and are refused. Tags are
 `mysuricates:<version>-tryout` and `mysuricates:tryout` (last built), with the labels
 `org.opencontainers.image.version`/`.revision`. For a new version: `build`, then `remove` (data
-stays) and `start`.
+stays) and `start`. `MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/tryout.sh build` fetches the
+NodeSource and Docker repos afresh instead of from the layer cache — and with them the AI CLIs.
 
 The container mounts nothing from the machine (no project folder, no Docker socket, no login) — a
 shell block or `--dangerously-skip-permissions` only affects the container. The instance name
@@ -189,7 +191,9 @@ The agent images are only built (`profiles: build-only`), not started directly v
 
 - **Base:** `python:3.12-slim`
 - **Tools:** git, curl, jq
-- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4
+- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4 — unpinned, behind `ARG PIP_REFRESH`:
+  the same `AGENT_APT_REFRESH` as for agent-devops installs the current ones, otherwise they would stay
+  at the state of the first build (8b7a39b9)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 
@@ -769,6 +773,10 @@ The test instance is a dedicated Docker container for automated workflow tests:
 ./scripts/staging.sh write-override stable|test   # write the override file (what comes from the machine), print its path
 ./scripts/staging.sh login stable|test claude     # own login inside the container (only *_AI_FROM_HOST=programs)
 ```
+
+`MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (likewise `test-promote`) fetches
+the image's NodeSource and Docker repos (`Dockerfile.stable`) afresh instead of taking them from the
+layer cache of the first build (8b7a39b9).
 
 ### Definition Sync (Dev → Stable / Dev → Test)
 
