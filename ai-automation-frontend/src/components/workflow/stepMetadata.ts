@@ -62,6 +62,14 @@ const WRAPPER_BLOCK_TYPES = new Set(['foreach', 'while', 'retry', 'conditional',
 const WRAPPER_RESULT_KEYS = ['totalItems', 'iterationCount', 'attempts', 'conditionMet', 'matchedCase'];
 
 /**
+ * Integration steps write their integration provider (`feed`, `open-meteo` …) into `metadata.provider`, so the
+ * key is no AI evidence there. `executionMode` tells them apart when the step carries no block type.
+ */
+function isIntegrationStep(step: StepResult, blockType: string): boolean {
+  return blockType === 'integration' || step.metadata?.executionMode === 'integration';
+}
+
+/**
  * Classifies a step by what actually ran: wrappers (foreach, while, retry, conditional, switch) count as AI only
  * when an inner AI call happened — the backend then carries `aiRequest` (older runs: `provider`) onto the step.
  */
@@ -69,7 +77,8 @@ export function stepKind(step: StepResult): StepKind {
   const blockType = stepBlockType(step);
   if (HUMAN_BLOCK_TYPES.has(blockType)) return 'human';
   const { provider, aiRequest } = stepMetadataSummary(step);
-  if (aiRequest || provider || ALWAYS_AI_BLOCK_TYPES.has(blockType)) return 'ai';
+  const legacyAiProvider = provider !== null && !isIntegrationStep(step, blockType);
+  if (aiRequest || legacyAiProvider || ALWAYS_AI_BLOCK_TYPES.has(blockType)) return 'ai';
   if (WRAPPER_BLOCK_TYPES.has(blockType)) {
     const metadata = step.metadata ?? {};
     return WRAPPER_RESULT_KEYS.some((key) => metadata[key] !== undefined) ? 'deterministic' : 'unknown';
