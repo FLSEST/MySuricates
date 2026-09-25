@@ -13,6 +13,7 @@ import com.automation.executor.compress.CompressionSources;
 import com.automation.repository.ContainerRepository;
 import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.live.LiveLineKind;
 import com.automation.service.live.LiveOutput;
@@ -50,6 +51,7 @@ class BlockStepRunnerTest {
     @Mock private ContainerRepository containerRepository;
     @Mock private BlockExecutor blockExecutor;
     @Mock private RunLiveLogService liveLog;
+    @Mock private CommandExecutorService runIfShell;
 
     private BlockStepRunner runner;
     private WorkflowRun run;
@@ -58,7 +60,7 @@ class BlockStepRunnerTest {
     @BeforeEach
     void setUp() {
         runner = new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                activityLogService, containerRepository, liveLog);
+                activityLogService, containerRepository, liveLog, new RunIfGate(runIfShell));
         run = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING)
                 .startedAt(Instant.now()).steps(new ArrayList<>()).build();
         context = ExecutionContext.builder().workflowRunId("run-1").build();
@@ -495,5 +497,21 @@ class BlockStepRunnerTest {
         CompressionSources.Resolved previous = CompressionSources.resolve(context, "previous");
         assertThat(previous.origin().blockName()).isEqualTo("verteiler");
         assertThat(previous.label()).isEqualTo("verteiler");
+    }
+
+    @Test
+    void runIfUnmet_skipsWithoutCallingTheExecutor_andRecordsTheText() {
+        when(runIfShell.executeShellCommandOnHost(any(), eq("false"), eq(60)))
+                .thenReturn(new CliSession.CommandResult("", 1));
+        BlockDefinition block = BlockDefinition.builder().type("approval").name("freigabe")
+                .config(new HashMap<>(Map.of("run_if", "false"))).build();
+        StepResult step = runner.startStep(run, 0, block, 0);
+
+        runner.runStep(step, block, blockExecutor, context, run, null);
+
+        verify(blockExecutor, never()).execute(any(), any());
+        assertThat(step.getStatus()).isEqualTo(StepStatus.SKIPPED);
+        assertThat(context.getBlockOutput("freigabe")).isEqualTo("Übersprungen (run_if: exit 1)");
+        assertThat(context.getVariable("approval_answer")).isNull();
     }
 }

@@ -56,6 +56,7 @@ const ON_FAILURE: Field = {
 const COMMON_FIELDS: Record<string, Field> = {
   label: { type: 'string', doc: s('Anzeigename des Schritts, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.', 'Display label of the step, description only. No effect on execution.') },
   description: { type: 'string', doc: s('Notiz zum Schritt, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.', 'Note on the step, description only. No effect on execution.') },
+  run_if: { type: 'string', doc: s('Shell-Test vor dem Block (nur oberste Ebene): Exit 0 → der Block läuft, sonst wird er übersprungen (SKIPPED, ohne KI-Aufruf). Läuft im Arbeitsverzeichnis des Laufs, höchstens 60 s; Platzhalter wie in jedem Shell-Feld.', 'Shell test before the block (top level only): exit 0 → the block runs, otherwise it is skipped (SKIPPED, no AI call). Runs in the run working directory, at most 60 s; placeholders as in any shell field.') },
   workspace: {
     type: 'object',
     doc: s(

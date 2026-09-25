@@ -26,7 +26,7 @@ import java.util.Set;
  * execution including output validation and retries, and copying the result into the step, the
  * execution context and the database.
  *
- * <p>The order inside {@link #runStep} is behavior: execute → retry loop → final check (all with the
+ * <p>The order inside {@link #runStep} is behavior: run_if ({@link RunIfGate}, TODO cc0eb3ba) → execute → retry loop → final check (all with the
  * step's live-log sink bound, see {@link LiveOutput}) → flush live lines → step fields → context
  * variables → context delta → container activity → broadcast → persist. The
  * decision whether a failed step stops the run stays in {@code WorkflowExecutor}, because it
@@ -45,6 +45,7 @@ public class BlockStepRunner {
     private final ActivityLogService activityLogService;
     private final ContainerRepository containerRepository;
     private final RunLiveLogService liveLog;
+    private final RunIfGate runIfGate;
 
     /**
      * Pre-creates, persists and broadcasts the RUNNING placeholder so the UI shows the step immediately.
@@ -97,7 +98,8 @@ public class BlockStepRunner {
         try {
             result = LiveOutput.bind(liveLog.sinkFor(run.getId(), step.getStepIndex(), block.getName()),
                     () -> ProcessTracking.bind(context.processTracker(),
-                            () -> executeValidated(step, block, executor, context, run)));
+                            () -> runIfGate.skipIfUnmet(block, context)
+                                    .orElseGet(() -> executeValidated(step, block, executor, context, run))));
         } finally {
             liveLog.flush(run.getId()); // live lines must reach the client before the final step message
         }

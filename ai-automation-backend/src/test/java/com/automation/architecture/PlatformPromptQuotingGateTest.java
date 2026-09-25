@@ -33,7 +33,7 @@ class PlatformPromptQuotingGateTest {
 
     /** Felder, die ein Block als Kommandozeile ausfuehrt (identisch zu {@link TemplateHygieneGateTest}). */
     private static final List<String> SHELL_FIELDS =
-            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command");
+            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command", "run_if");
 
     /** Ausgabe-Platzhalter, die ein Shell-Block von einem Vorgaengerblock uebernimmt. */
     private static final java.util.regex.Pattern OUTPUT_PLACEHOLDER = java.util.regex.Pattern.compile(

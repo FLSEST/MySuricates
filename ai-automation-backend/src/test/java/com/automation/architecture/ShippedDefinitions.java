@@ -29,7 +29,7 @@ public final class ShippedDefinitions {
 
     /** Config fields that can be run through a shell, see {@link #isShellField}. */
     public static final List<String> SHELL_FIELDS =
-            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command");
+            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command", "run_if");
 
     private ShippedDefinitions() {
     }
