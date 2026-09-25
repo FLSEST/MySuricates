@@ -137,7 +137,7 @@ export function SimpleWorkflowExecution() {
             )}
           </div>
           <p className="text-xs text-text-tertiary mt-0.5">
-            {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
+            {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs, locale)}
           </p>
         </div>
         {/* A failed run offers its rerun in the failure card below — one button, not two. */}

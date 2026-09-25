@@ -63,7 +63,7 @@ export function useWorkflowRunColumns(): RunColumn<WorkflowRunListItem>[] {
       header: t.runs.duration,
       render: (r: WorkflowRunListItem) => (
         <span className="text-text-secondary font-mono text-xs">
-          {formatDuration(r.durationMs)}
+          {formatDuration(r.durationMs, locale)}
         </span>
       ),
       width: '100px',
@@ -121,7 +121,7 @@ export function useChainRunColumns(): RunColumn<ChainRun>[] {
       header: t.runs.duration,
       render: (r: ChainRun) => (
         <span className="text-text-secondary font-mono text-xs">
-          {formatDuration(r.durationMs)}
+          {formatDuration(r.durationMs, locale)}
         </span>
       ),
       width: '100px',

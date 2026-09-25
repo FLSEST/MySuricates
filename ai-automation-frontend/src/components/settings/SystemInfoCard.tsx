@@ -10,6 +10,12 @@ export function SystemInfoCard() {
   const locale = useI18nStore((s) => s.locale);
   const { data: health } = useSystemHealth();
   const { data: sysInfo } = useSystemInfo();
+  const s = t.settings;
+  const fieldLabels: Record<string, string> = {
+    name: s.systemFieldName, version: s.systemFieldVersion, buildType: s.systemFieldBuildType,
+    buildTimestamp: s.systemFieldBuildTimestamp, java: s.systemFieldJava, runtimeMode: s.systemFieldRuntimeMode,
+    tailscale: s.systemFieldTailscale, environment: s.systemFieldEnvironment,
+  };
 
   return (
     <Card>
@@ -29,7 +35,8 @@ export function SystemInfoCard() {
               .filter(([, value]) => value !== null && typeof value !== 'object')
               .map(([key, value]) => (
                 <div key={key} className="flex justify-between">
-                  <span className="text-text-secondary capitalize">{key}</span>
+                  {/* A field the UI does not know yet keeps its key as the label */}
+                  <span className={`text-text-secondary ${fieldLabels[key] ? '' : 'capitalize'}`}>{fieldLabels[key] ?? key}</span>
                   <span className="text-text font-mono">{String(value)}</span>
                 </div>
               ))}
@@ -46,7 +53,7 @@ export function SystemInfoCard() {
               />
             </div>
             <div className="flex justify-between">
-              <span className="text-text-secondary">Last Check</span>
+              <span className="text-text-secondary">{t.settings.systemLastCheck}</span>
               <span className="text-text-tertiary text-xs">{formatTimeOfDay(health.timestamp, locale)}</span>
             </div>
           </div>

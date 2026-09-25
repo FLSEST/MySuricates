@@ -55,7 +55,7 @@ export function WorkflowStatusWidget({ config }: WidgetProps) {
         <dt className="text-text-tertiary">{texts.duration}</dt>
         <dd className="flex items-center gap-1 text-text-secondary">
           <Clock className="h-3 w-3 shrink-0" />
-          {formatDuration(run.durationMs)}
+          {formatDuration(run.durationMs, locale)}
         </dd>
         {run.gateStatus && (
           <>

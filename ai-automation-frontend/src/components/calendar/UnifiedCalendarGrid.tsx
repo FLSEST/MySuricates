@@ -9,10 +9,9 @@ import { CalendarDayView } from './CalendarDayView';
 import { useCalendarAggregated } from '../../hooks/useCalendarAggregated';
 import { useCalendarNavigation, type CalendarViewMode } from '../../hooks/useCalendarNavigation';
 import { useT, useI18nStore } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
+import { formatDate, formatDateRange } from '../../utils/localeFormat';
 
-const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const DAY_MONTH_YEAR = { day: 'numeric', month: 'long', year: 'numeric' } as const;
 
 const VIEW_LABELS = {
   month: { de: 'Monat', en: 'Month' },
@@ -24,7 +23,6 @@ export function UnifiedCalendarGrid() {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const isGerman = locale === 'de';
-  const months = isGerman ? MONTHS_DE : MONTHS_EN;
 
   const {
     viewMode, year, month, selectedDay, currentDate, weekStart, from, to, isNotToday,
@@ -45,22 +43,16 @@ export function UnifiedCalendarGrid() {
     });
   };
 
-  // Title for header
+  // Title for header, written the way the UI language writes dates (6bb7ed36)
   const headerTitle = useMemo(() => {
-    if (viewMode === 'month') return `${months[month]} ${year}`;
+    if (viewMode === 'month') return formatDate(new Date(year, month, 1), locale, { month: 'long', year: 'numeric' });
     if (viewMode === 'week') {
       const sunday = new Date(weekStart);
       sunday.setDate(sunday.getDate() + 6);
-      const fmtDay = (d: Date) => `${d.getDate()}. ${months[d.getMonth()]}`;
-      if (weekStart.getMonth() === sunday.getMonth()) {
-        return `${weekStart.getDate()}. – ${fmtDay(sunday)} ${sunday.getFullYear()}`;
-      }
-      return `${fmtDay(weekStart)} – ${fmtDay(sunday)} ${sunday.getFullYear()}`;
+      return formatDateRange(weekStart, sunday, locale, DAY_MONTH_YEAR);
     }
-    return formatDate(currentDate, locale, {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    });
-  }, [viewMode, month, year, currentDate, weekStart, months, locale]);
+    return formatDate(currentDate, locale, { weekday: 'long', ...DAY_MONTH_YEAR });
+  }, [viewMode, month, year, currentDate, weekStart, locale]);
 
   return (
     <div className="space-y-4">
@@ -142,7 +134,7 @@ export function UnifiedCalendarGrid() {
           events={events.filter(
             (ev) => ev.start.getFullYear() === year && ev.start.getMonth() === month && ev.start.getDate() === selectedDay
           )}
-          dayLabel={`${selectedDay}. ${months[month]} ${year}`}
+          dayLabel={formatDate(new Date(year, month, selectedDay), locale, DAY_MONTH_YEAR)}
         />
       )}
     </div>

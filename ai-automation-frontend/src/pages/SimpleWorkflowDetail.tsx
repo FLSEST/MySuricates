@@ -138,7 +138,7 @@ export function SimpleWorkflowDetail() {
                 </div>
                 <div className="flex items-center gap-1 text-xs text-text-tertiary shrink-0">
                   <Clock className="w-3 h-3" />
-                  <span>{formatDuration(run.durationMs)}</span>
+                  <span>{formatDuration(run.durationMs, locale)}</span>
                 </div>
               </div>
             ))}

@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
 import { Card, Button, Badge, Spinner } from '../components/ui';
 import { useChainRun, useCancelChainRun } from '../hooks/useChains';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import type { ChainRunEntry } from '../types';
 
@@ -37,6 +37,7 @@ export function ChainExecution() {
   const { id: chainId, runId } = useParams<{ id: string; runId: string }>();
   const navigate = useNavigate();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: run, isLoading } = useChainRun(chainId ?? '', runId ?? '');
   const cancelRun = useCancelChainRun();
 
@@ -62,7 +63,7 @@ export function ChainExecution() {
         <div className="flex items-center gap-3">
           <StatusBadge status={run.status} />
           {run.durationMs != null && (
-            <span className="text-sm text-text-tertiary">{formatDuration(run.durationMs)}</span>
+            <span className="text-sm text-text-tertiary">{formatDuration(run.durationMs, locale)}</span>
           )}
           {isRunning && (
             <Button
@@ -114,6 +115,7 @@ export function ChainExecution() {
 
 function EntryCard({ entry }: { entry: ChainRunEntry }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
   const canNavigate = entry.workflowRunId && entry.workflowId;
@@ -138,7 +140,7 @@ function EntryCard({ entry }: { entry: ChainRunEntry }) {
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-text-tertiary">#{entry.entryIndex + 1}</span>
                 {entry.durationMs != null && (
-                  <span className="text-xs text-text-tertiary">{formatDuration(entry.durationMs)}</span>
+                  <span className="text-xs text-text-tertiary">{formatDuration(entry.durationMs, locale)}</span>
                 )}
               </div>
             </div>

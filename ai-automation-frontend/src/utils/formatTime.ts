@@ -1,11 +1,12 @@
 import type { Locale } from '../i18n';
-import { formatDate, formatRelativeUnit, formatTimeOfDay } from './localeFormat';
+import { formatDate, formatDecimal, formatRelativeUnit, formatTimeOfDay } from './localeFormat';
 
-export function formatDuration(ms: number | null): string {
+/** Run or step duration: "500ms", "1.5s" / "1,5s", "2.5m" / "2,5m"; nothing measured reads "-". */
+export function formatDuration(ms: number | null, locale: Locale): string {
   if (!ms) return '-';
   if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
+  if (ms < 60_000) return `${formatDecimal(ms / 1000, locale)}s`;
+  return `${formatDecimal(ms / 60_000, locale)}m`;
 }
 
 export function formatRelativeTime(dateStr: string, locale: Locale): string {

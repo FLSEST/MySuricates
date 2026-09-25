@@ -52,7 +52,7 @@ export function WorkflowRecentRuns({ workflowId, variant, onOpenRun, page = 0, o
                     </div>
                     <div className="flex items-center gap-2 text-xs text-text-tertiary">
                       <Clock className="w-3 h-3" />
-                      {formatDuration(run.durationMs)}
+                      {formatDuration(run.durationMs, locale)}
                     </div>
                   </div>
                   {(run.metadata?.notes as string) && (
@@ -109,7 +109,7 @@ export function WorkflowRecentRuns({ workflowId, variant, onOpenRun, page = 0, o
               </span>
               {run.durationMs != null && (
                 <span className="text-text-tertiary/60 text-xs tabular-nums">
-                  {formatDuration(run.durationMs)}
+                  {formatDuration(run.durationMs, locale)}
                 </span>
               )}
             </button>

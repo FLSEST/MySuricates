@@ -1,5 +1,6 @@
 import type { AssistantAction, AssistantPageContext } from '../hooks/useAssistant';
-import type { TranslationKeys } from '../i18n';
+import type { Locale, TranslationKeys } from '../i18n';
+import { formatDecimal } from '../utils/localeFormat';
 
 export function parsePageContext(pathname: string): AssistantPageContext {
   const segments = pathname.replace(/^\//, '').split('/');
@@ -38,9 +39,9 @@ export function formatAssistantTime(ts?: number) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function formatAssistantResponseTime(ms?: number) {
+export function formatAssistantResponseTime(ms: number | undefined, locale: Locale) {
   if (ms == null) return null;
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+  return ms >= 1000 ? `${formatDecimal(ms / 1000, locale)}s` : `${ms}ms`;
 }
 
 /** The actions worth a button: run/show actions without an id have nowhere to go. */

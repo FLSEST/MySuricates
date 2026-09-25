@@ -52,6 +52,16 @@ describe('AssistantComposer', () => {
     expect(screen.queryByText('Shift+Enter for a line break')).not.toBeInTheDocument();
   });
 
+  // 6bb7ed36: the icon-only button had no accessible name
+  it('names the send button for screen readers', () => {
+    const { rerender, onChange, onSend, inputRef } = renderComposer('Hi');
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled();
+
+    act(() => useI18nStore.setState({ locale: 'de' }));
+    rerender(<AssistantComposer value="Hi" onChange={onChange} onSend={onSend} inputRef={inputRef} />);
+    expect(screen.getByRole('button', { name: 'Nachricht senden' })).toBeEnabled();
+  });
+
   it('grows with a programmatic value up to its maximum height', () => {
     stubScrollHeight(120);
     const { input, rerender, onChange, onSend, inputRef } = renderComposer('one line');

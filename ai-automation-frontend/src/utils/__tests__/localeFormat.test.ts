@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatNumber, formatRelativeUnit, formatTimeOfDay, formatTimestamp, intlLocale } from '../localeFormat';
+import {
+  formatDate, formatDateRange, formatDecimal, formatNumber, formatRelativeUnit, formatTimeOfDay, formatTimestamp, formatUsd,
+  intlLocale,
+} from '../localeFormat';
 
 // Local time, so the expectations hold in every time zone. ICU may put a narrow no-break space
 // before AM/PM; the tests compare with plain spaces.
@@ -37,6 +40,32 @@ describe('localeFormat', () => {
   it('writes numbers with the separators of the app language', () => {
     expect(formatNumber(1234.5, 'en')).toBe('1,234.5');
     expect(formatNumber(1234.5, 'de')).toBe('1.234,5');
+  });
+
+  // 6bb7ed36: toFixed wrote "1.5" in the German UI too
+  it('writes fixed decimals with the decimal separator of the app language', () => {
+    expect(formatDecimal(1.5, 'en')).toBe('1.5');
+    expect(formatDecimal(1.5, 'de')).toBe('1,5');
+    expect(formatDecimal(2, 'de')).toBe('2,0');
+    expect(formatDecimal(0.12345, 'de', 3)).toBe('0,123');
+    expect(formatDecimal(1234.56, 'de')).toBe('1.234,6');
+  });
+
+  it('writes dollar amounts in the app language, fractions of a cent with four decimals', () => {
+    expect(formatUsd(0.12, 'en')).toBe('$0.12');
+    expect(plain(formatUsd(0.12, 'de'))).toBe('0,12 $');
+    expect(formatUsd(0.0042, 'en')).toBe('$0.0042');
+    expect(plain(formatUsd(0.0042, 'de'))).toBe('0,0042 $');
+    expect(formatUsd(0, 'en')).toBe('$0.00');
+    expect(plain(formatUsd(1234.5, 'de'))).toBe('1.234,50 $');
+    expect(formatUsd(0.5, 'en', 4)).toBe('$0.5000');
+  });
+
+  it('writes a span of dates with the shared parts once', () => {
+    const options = { day: 'numeric', month: 'long', year: 'numeric' } as const;
+    expect(plain(formatDateRange(new Date(2026, 8, 21), new Date(2026, 8, 27), 'en', options))).toBe('September 21 – 27, 2026');
+    expect(formatDateRange(new Date(2026, 8, 21), new Date(2026, 8, 27), 'de', options)).toBe('21.–27. September 2026');
+    expect(plain(formatDateRange(new Date(2026, 8, 28), new Date(2026, 9, 4), 'de', options))).toBe('28. September – 4. Oktober 2026');
   });
 
   it('reads relative time in the app language', () => {

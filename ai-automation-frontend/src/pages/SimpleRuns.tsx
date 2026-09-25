@@ -57,7 +57,7 @@ export function SimpleRuns() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-text truncate">{run.workflowName}</p>
                     <p className="text-xs text-text-tertiary truncate">
-                      {run.startedAt ? formatDateTime(run.startedAt, locale) : '-'} · {formatDuration(run.durationMs)}
+                      {run.startedAt ? formatDateTime(run.startedAt, locale) : '-'} · {formatDuration(run.durationMs, locale)}
                       {isFailed && run.error?.message ? ` · ${run.error.message}` : ''}
                     </p>
                   </div>

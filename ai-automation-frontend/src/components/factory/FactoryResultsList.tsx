@@ -3,7 +3,7 @@ import {
   Factory, CheckCircle2, XCircle, Clock, ArrowUpRight, RotateCcw, Award, Package,
 } from 'lucide-react';
 import { Card, Button, Spinner, Badge } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import type { Workflow, WorkflowFactoryResult } from '../../types';
 
@@ -58,6 +58,7 @@ export function FactoryResultsList({
   onExport: (target: FactoryExportTarget) => void;
 }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
   return (
@@ -90,7 +91,7 @@ export function FactoryResultsList({
                 )}
               </div>
               {r.durationMs > 0 && (
-                <span className="text-xs text-text-secondary">{formatDuration(r.durationMs)}</span>
+                <span className="text-xs text-text-secondary">{formatDuration(r.durationMs, locale)}</span>
               )}
               <div className="flex gap-1">
                 {r.workflowId && (

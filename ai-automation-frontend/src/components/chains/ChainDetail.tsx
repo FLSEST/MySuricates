@@ -129,7 +129,7 @@ export function ChainDetail({ chain, onExecute, onEdit, onDelete }: {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-text-tertiary">{formatDuration(run.durationMs)}</span>
+                    <span className="text-xs text-text-tertiary">{formatDuration(run.durationMs, locale)}</span>
                     {run.startedAt && (
                       <span className="text-xs text-text-tertiary">{formatRelativeTime(run.startedAt, locale)}</span>
                     )}

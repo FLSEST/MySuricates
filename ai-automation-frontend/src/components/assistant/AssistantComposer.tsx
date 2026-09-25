@@ -62,6 +62,8 @@ export function AssistantComposer({ value, onChange, onSend, inputRef }: {
         <button
           onClick={onSend}
           disabled={!value.trim()}
+          aria-label={t.assistant.send}
+          title={t.assistant.send}
           className="shrink-0 w-7 h-7 rounded-lg bg-accent text-text-inverse flex items-center justify-center
                      disabled:opacity-40 hover:bg-accent-hover transition-colors"
         >

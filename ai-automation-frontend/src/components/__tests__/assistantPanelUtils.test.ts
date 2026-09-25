@@ -46,8 +46,9 @@ describe('assistantPanelUtils', () => {
   });
 
   it('formats short and long response times', () => {
-    expect(formatAssistantResponseTime(240)).toBe('240ms');
-    expect(formatAssistantResponseTime(1500)).toBe('1.5s');
-    expect(formatAssistantResponseTime(undefined)).toBeNull();
+    expect(formatAssistantResponseTime(240, 'en')).toBe('240ms');
+    expect(formatAssistantResponseTime(1500, 'en')).toBe('1.5s');
+    expect(formatAssistantResponseTime(1500, 'de')).toBe('1,5s');
+    expect(formatAssistantResponseTime(undefined, 'en')).toBeNull();
   });
 });
