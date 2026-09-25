@@ -26,12 +26,14 @@ import java.util.StringJoiner;
  * wird neu bewertet ({@link AuditAcceptancePolicy#reassess}), und ein umbenannter waere ein Wiedergaenger
  * ohne Einordnung.
  *
- * <p>Nicht dabei sind RESOLVED – Behobenes soll der Prompt nicht wiederbeleben – und Befunde mit
- * unbekanntem {@code ruleKey}: markierte (historisch, V75) und Altbestand aus der Zeit vor dem Katalog, dessen
- * Key auch normalisiert nicht im {@link AuditRuleKeyCatalog} steht (TODO 1cf996df; im Architektur- und
- * Health-Audit eingeordnete wie {@code god-class | HostClaudeService}, nie markiert). Fuehrte der Prompt so
- * einen Key weiter, verwuerfe die Ingestion den ganzen Report ({@code AuditIngestionService}); ein eingeordneter
- * Altbefund bleibt ohnehin, wie er ist, auch wenn ihn kein Report mehr nennt.
+ * <p>Nicht dabei sind RESOLVED – Behobenes soll der Prompt nicht wiederbeleben – und Befunde, deren
+ * {@code ruleKey} auch normalisiert nicht im {@link AuditRuleKeyCatalog} steht (TODO 1cf996df): Altbestand aus
+ * der Zeit vor dem Katalog, im Architektur- und Health-Audit etwa eingeordnete wie
+ * {@code god-class | HostClaudeService}. Fuehrte der Prompt so einen Key weiter, verwuerfe die Ingestion den
+ * ganzen Report ({@code AuditIngestionService}); ein eingeordneter Altbefund bleibt ohnehin, wie er ist, auch
+ * wenn ihn kein Report mehr nennt. Allein der Katalog entscheidet, nicht die Markierung {@code unknownRuleKey}
+ * (V75): Sie faellt erst bei erneuter Meldung weg und haette einen Befund versteckt, dessen Key inzwischen im
+ * Katalog steht.
  *
  * <p>Titel, subjects und Notizen stammen aus KI-Ausgaben und Nutzereingaben. Jeder Freitext wird wie in
  * {@code open_todos} auf eine Zeile gebracht, gekuerzt und von Plattform-Markern und Blockgrenzen befreit
@@ -102,7 +104,7 @@ public class AuditFindingsContext implements AuditContextSource {
         if (!modules.isEnabled(ModuleCatalog.AUDIT)) {   // je Aufruf: ein Umschalten zur Laufzeit wirkt sofort
             return MODULE_OFF;
         }
-        // Die Abfrage laesst markierte unbekannte Keys weg, der Katalog auch die nie markierten (Klassen-Javadoc).
+        // Unbekannte Keys entscheidet allein der Katalog, nicht die Markierung (Klassen-Javadoc).
         return render(auditKey, findingRepository.findContextRows(projectId, auditKey, SHOWN).stream()
                 .filter(row -> !ruleKeyCatalog.resolve(auditKey, row.ruleKey()).unknown())
                 .toList());
