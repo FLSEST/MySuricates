@@ -69,7 +69,7 @@ export function AssistantComposer({ value, onChange, onSend, inputRef }: {
         </button>
       </div>
       <p className="text-[10px] text-text-tertiary text-center mt-1.5">
-        Shift+Enter für Zeilenumbruch
+        {t.assistant.newlineHint}
       </p>
     </div>
   );

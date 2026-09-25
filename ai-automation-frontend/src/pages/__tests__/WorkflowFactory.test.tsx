@@ -5,6 +5,8 @@ import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { en } from '../../i18n/en';
+import { de } from '../../i18n/de';
+import { useToastStore } from '../../stores/toastStore';
 import type { WorkflowFactoryResult } from '../../types';
 import { WorkflowFactory } from '../WorkflowFactory';
 
@@ -56,7 +58,7 @@ async function createWorkflow() {
   await waitFor(() => expect(within(projectSelect()).getByRole('option', { name: 'Test Project' })).toBeInTheDocument());
   fireEvent.change(projectSelect(), { target: { value: 'p1' } });
   fireEvent.click(screen.getByRole('button', { name: en.factory.createWorkflow }));
-  await screen.findByText('CREATED');
+  await screen.findByText(en.factory.statusCreated);
 }
 
 describe('WorkflowFactory', { timeout: 15_000 }, () => {
@@ -64,12 +66,12 @@ describe('WorkflowFactory', { timeout: 15_000 }, () => {
     renderWithProviders(<WorkflowFactory />);
     expect(await screen.findByText('Earlier Pipeline')).toBeInTheDocument();
     expect(screen.queryByText('Hand-made')).toBeNull();
-    expect(within(card('Earlier Pipeline')).getByText('FAILED')).toBeInTheDocument();
+    expect(within(card('Earlier Pipeline')).getByText(en.factory.statusFailed)).toBeInTheDocument();
 
     await waitFor(() => expect(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting)).toBeInTheDocument());
     fireEvent.click(within(card('Earlier Pipeline')).getByTitle(en.factory.verifyExisting));
 
-    await waitFor(() => expect(within(card('Earlier Pipeline')).getByText('VERIFIED')).toBeInTheDocument());
+    await waitFor(() => expect(within(card('Earlier Pipeline')).getByText(en.factory.statusVerified)).toBeInTheDocument());
     expect(calls).toEqual(['verify wf-old']);
     expect(screen.getAllByText('Earlier Pipeline')).toHaveLength(1);
     expect(within(card('Earlier Pipeline')).getByTitle(en.factory.promoteTemplate)).toBeInTheDocument();
@@ -82,11 +84,11 @@ describe('WorkflowFactory', { timeout: 15_000 }, () => {
     expect(within(created).queryByTitle(en.factory.promoteTemplate)).toBeNull();
     fireEvent.click(within(created).getByTitle(en.factory.verifyExisting));
 
-    await waitFor(() => expect(within(card('Review Pipeline')).getByText('VERIFIED')).toBeInTheDocument());
+    await waitFor(() => expect(within(card('Review Pipeline')).getByText(en.factory.statusVerified)).toBeInTheDocument());
     expect(within(card('Review Pipeline')).getByText('1.1m')).toBeInTheDocument();
     fireEvent.click(within(card('Review Pipeline')).getByTitle(en.factory.promoteTemplate));
 
-    await waitFor(() => expect(within(card('Review Pipeline')).getByText('PROMOTED')).toBeInTheDocument());
+    await waitFor(() => expect(within(card('Review Pipeline')).getByText(en.factory.statusPromoted)).toBeInTheDocument());
     expect(calls).toEqual(['generate', 'verify wf-new', 'promote wf-new']);
     expect(screen.getAllByText('Review Pipeline')).toHaveLength(1);
   });
@@ -97,10 +99,28 @@ describe('WorkflowFactory', { timeout: 15_000 }, () => {
     fireEvent.click(within(card('Review Pipeline')).getByTitle(en.factory.verifyExisting));
     await waitFor(() => expect(within(card('Review Pipeline')).getByTitle(en.factory.promoteTemplate)).toBeInTheDocument());
     fireEvent.click(within(card('Review Pipeline')).getByTitle(en.factory.promoteTemplate));
-    await screen.findByText('PROMOTED');
+    await screen.findByText(en.factory.statusPromoted);
 
     const icon = card('Review Pipeline').querySelector('svg');
     expect(icon).toHaveClass('text-warning');
     expect(document.querySelector('[class*="amber-"], [class*="violet-"], [class*="red-4"], [class*="yellow-4"]')).toBeNull();
+  });
+
+  it('speaks the UI language in status, titles and toasts (38a32469)', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    useToastStore.setState({ toasts: [] });
+    server.use(http.post('/api/v1/factory/verify/:id', () => HttpResponse.json(
+      result({ workflowId: 'wf-old', workflowName: 'Earlier Pipeline', status: 'FAILED', testStatus: 'FAILED' }),
+    )));
+    renderWithProviders(<WorkflowFactory />);
+
+    const earlier = await screen.findByText('Earlier Pipeline').then((el) => el.closest('.p-4') as HTMLElement);
+    expect(within(earlier).getByText(de.factory.statusFailed)).toBeInTheDocument();
+    expect(within(earlier).getByTitle('Workflow öffnen')).toBeInTheDocument();
+
+    await waitFor(() => expect(within(earlier).getByTitle(de.factory.verifyExisting)).toBeInTheDocument());
+    fireEvent.click(within(earlier).getByTitle(de.factory.verifyExisting));
+    await waitFor(() => expect(useToastStore.getState().toasts.map((toast) => toast.message))
+      .toEqual(['Verifizierung fehlgeschlagen: Unbekannter Fehler']));
   });
 });

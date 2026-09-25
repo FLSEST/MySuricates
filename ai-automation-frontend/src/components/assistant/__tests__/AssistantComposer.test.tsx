@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRef } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useI18nStore } from '../../../i18n';
 import { en } from '../../../i18n/en';
 import { AssistantComposer } from '../AssistantComposer';
@@ -40,6 +40,16 @@ describe('AssistantComposer', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(onSend).toHaveBeenCalledTimes(1);
     expect(inputRef.current).toBe(input);
+  });
+
+  it('explains the line break in the UI language (38a32469)', () => {
+    const { rerender, onChange, onSend, inputRef } = renderComposer('');
+    expect(screen.getByText('Shift+Enter for a line break')).toBeInTheDocument();
+
+    act(() => useI18nStore.setState({ locale: 'de' }));
+    rerender(<AssistantComposer value="" onChange={onChange} onSend={onSend} inputRef={inputRef} />);
+    expect(screen.getByText('Shift+Enter für Zeilenumbruch')).toBeInTheDocument();
+    expect(screen.queryByText('Shift+Enter for a line break')).not.toBeInTheDocument();
   });
 
   it('grows with a programmatic value up to its maximum height', () => {
