@@ -140,7 +140,6 @@ export function SimpleWorkflowExecution() {
             {formatTimestamp(run.startedAt, locale)} · {t.workflows.execution.duration}: {formatDuration(run.durationMs)}
           </p>
         </div>
-        {dismissedApproval && <OpenApprovalButton onClick={reopen} />}
         {/* A failed run offers its rerun in the failure card below — one button, not two. */}
         {!FAILURE_STATUSES.has(run.status) && <ExecutionRerunButton run={run} />}
         {isRunning && (
@@ -176,6 +175,13 @@ export function SimpleWorkflowExecution() {
           </div>
         )}
       </div>
+
+      {/* Its own row: in the narrow simple view the header has no room left for the workflow name */}
+      {dismissedApproval && (
+        <div className="flex">
+          <OpenApprovalButton onClick={reopen} />
+        </div>
+      )}
 
       {ACTIVE_STATUSES.has(run.status) ? (
         <section aria-label={t.simple.result.progress}>
