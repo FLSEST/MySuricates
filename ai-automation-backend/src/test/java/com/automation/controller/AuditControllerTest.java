@@ -10,6 +10,7 @@ import com.automation.service.audit.AuditCenterService;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.AuditIngestionStatus;
 import com.automation.entity.GateStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.service.audit.AuditCenterService.AuditFindingResponse;
 import com.automation.service.audit.AuditCenterService.AuditReportResponse;
 import com.automation.service.audit.AuditCenterService.AuditSummary;
@@ -29,6 +30,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -161,6 +163,34 @@ class AuditControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** Herkunft des Laufs im Report (TODO a3b89355): jedes Feld steht im JSON, unbekannt als null. */
+    @Test
+    void getReport_serialisesTheRunOrigin_unknownFieldsAsNull() throws Exception {
+        when(auditCenterService.getReport("r-chain")).thenReturn(new AuditReportResponse("r-chain", "proj-1", "wf-1",
+                "run-1", "mysuricates.health", "health", "Health", "# Health", GateStatus.GREEN, null, "CLAUDE", "opus",
+                "4.4.0", AuditIngestionStatus.VALID, null, Instant.parse("2026-09-15T10:00:00Z"), 3,
+                TriggerSource.SCHEDULE, "sched-1", "cr-1", "chain-1", "Wochen-Audits", 12));
+        when(auditCenterService.getReport("r-old")).thenReturn(report("r-old"));
+
+        mockMvc.perform(get("/api/v1/audit-reports/r-chain"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workflowVersion").value("4.4.0"))
+                .andExpect(jsonPath("$.triggerSource").value("SCHEDULE"))
+                .andExpect(jsonPath("$.scheduleId").value("sched-1"))
+                .andExpect(jsonPath("$.chainRunId").value("cr-1"))
+                .andExpect(jsonPath("$.chainId").value("chain-1"))
+                .andExpect(jsonPath("$.chainName").value("Wochen-Audits"))
+                .andExpect(jsonPath("$.definitionVersionNumber").value(12));
+        mockMvc.perform(get("/api/v1/audit-reports/r-old"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.triggerSource").value(nullValue()))
+                .andExpect(jsonPath("$.scheduleId").value(nullValue()))
+                .andExpect(jsonPath("$.chainRunId").value(nullValue()))
+                .andExpect(jsonPath("$.chainId").value(nullValue()))
+                .andExpect(jsonPath("$.chainName").value(nullValue()))
+                .andExpect(jsonPath("$.definitionVersionNumber").value(nullValue()));
+    }
+
     @Test
     void listFindings_defaultsToFiftyAndPassesEnumFilters() throws Exception {
         when(auditCenterService.listFindings(0, 50, "proj-1", "mysuricates.health", AuditFindingStatus.OPEN,
@@ -226,7 +256,7 @@ class AuditControllerTest {
     private static AuditReportResponse report(String id) {
         return new AuditReportResponse(id, "proj-1", "wf-1", "run-1", "mysuricates.health", "health", "Health",
                 "# Health", GateStatus.GREEN, null, "CLAUDE", "opus", "3", AuditIngestionStatus.VALID, null,
-                Instant.parse("2026-09-15T10:00:00Z"), 3);
+                Instant.parse("2026-09-15T10:00:00Z"), 3, null, null, null, null, null, null);
     }
 
     private static AuditFindingResponse finding(String id, List<TodoLink> todos) {

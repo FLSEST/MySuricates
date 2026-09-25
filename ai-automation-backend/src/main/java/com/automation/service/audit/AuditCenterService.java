@@ -29,6 +29,7 @@ public class AuditCenterService {
     private final AuditAcceptancePolicy acceptancePolicy;
     private final ManagedTodoReconciler managedTodoReconciler;
     private final AuditFindingTodoLinker todoLinker;
+    private final AuditReportOrigins reportOrigins;
 
     /**
      * Eine Report-Projektion ohne Markdown und eine GROUP-BY-Zaehlung der Findings – statt alle
@@ -77,21 +78,21 @@ public class AuditCenterService {
                 .orElse(latest);
         List<AuditFinding> findings = findingRepository.findByProjectIdAndAuditKey(projectId, auditKey);
         return new AuditDetail(toSummary(summaryRow(latest), previous == null ? null : summaryRow(previous),
-                summaryRow(latestAttempt), countsOf(findings)), toReport(latest));
+                summaryRow(latestAttempt), countsOf(findings)), toReports(List.of(latest)).getFirst());
     }
 
     @Transactional(readOnly = true)
     public PageResponse<AuditReportResponse> listReports(String projectId, String auditKey, int page, int size) {
         Page<AuditReport> result = reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc(
                 projectId, auditKey, PageRequest.of(page, size));
-        return new PageResponse<>(result.getContent().stream().map(this::toReport).toList(),
+        return new PageResponse<>(toReports(result.getContent()),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     @Transactional(readOnly = true)
     public AuditReportResponse getReport(String id) {
-        return toReport(reportRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("AuditReport", id)));
+        return toReports(List.of(reportRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("AuditReport", id)))).getFirst();
     }
 
     @Transactional(readOnly = true)
@@ -192,12 +193,28 @@ public class AuditCenterService {
                 f.getProjectId(), f.getAuditKey(), f.getStatus(), f.getSeverity(), 1L)).toList();
     }
 
-    private AuditReportResponse toReport(AuditReport report) {
-        List<AuditFindingOccurrence> occurrences = occurrenceRepository.findByReportId(report.getId());
+    /**
+     * Reports with finding count and origin, for a whole page in a fixed number of queries: one
+     * GROUP BY for the counts, the origins in {@link AuditReportOrigins} — not per report (TODO a3b89355).
+     */
+    private List<AuditReportResponse> toReports(List<AuditReport> reports) {
+        if (reports.isEmpty()) return List.of();
+        Map<String, Long> findingCounts = occurrenceRepository
+                .countByReportIds(reports.stream().map(AuditReport::getId).toList()).stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> ((Number) row[1]).longValue()));
+        Map<String, AuditReportOrigins.Origin> origins =
+                reportOrigins.byRunId(reports.stream().map(AuditReport::getWorkflowRunId).toList());
+        return reports.stream().map(report -> toReport(report, findingCounts.getOrDefault(report.getId(), 0L).intValue(),
+                origins.getOrDefault(report.getWorkflowRunId(), AuditReportOrigins.Origin.UNKNOWN))).toList();
+    }
+
+    private static AuditReportResponse toReport(AuditReport report, int findingCount, AuditReportOrigins.Origin origin) {
         return new AuditReportResponse(report.getId(), report.getProjectId(), report.getWorkflowId(), report.getWorkflowRunId(),
                 report.getAuditKey(), report.getCategory(), report.getTitle(), report.getMarkdownContent(), report.getGateStatus(),
                 report.getGateDescription(), report.getProvider(), report.getModel(), report.getWorkflowVersion(),
-                report.getIngestionStatus(), report.getIngestionError(), report.getGeneratedAt(), occurrences.size());
+                report.getIngestionStatus(), report.getIngestionError(), report.getGeneratedAt(), findingCount,
+                origin.triggerSource(), origin.scheduleId(), origin.chainRunId(), origin.chainId(), origin.chainName(),
+                origin.definitionVersionNumber());
     }
 
     private AuditFindingResponse withTodos(AuditFinding finding) {
@@ -231,11 +248,22 @@ public class AuditCenterService {
                                String trend, boolean stale, Map<String, Long> findingsByStatus,
                                Map<String, Long> openFindingsBySeverity) {}
     public record AuditDetail(AuditSummary summary, AuditReportResponse latestReport) {}
+    /**
+     * A stored audit report. The fields after {@code findingCount} say where its run came from (TODO
+     * a3b89355), each {@code null} when unknown; their rules are on {@link AuditReportOrigins.Origin}.
+     *
+     * @param workflowVersion         the workflow's version label when the report was stored (e.g. the pool version)
+     * @param triggerSource           effective trigger — for a chain entry the source that started the chain
+     * @param scheduleId              schedule that started the run, for a chain entry the chain's schedule
+     * @param definitionVersionNumber number of the workflow version whose definition the run executed
+     */
     public record AuditReportResponse(String id, String projectId, String workflowId, String workflowRunId,
                                       String auditKey, String category, String title, String markdownContent,
                                       GateStatus gateStatus, String gateDescription, String provider, String model,
                                       String workflowVersion, AuditIngestionStatus ingestionStatus,
-                                      String ingestionError, Instant generatedAt, int findingCount) {}
+                                      String ingestionError, Instant generatedAt, int findingCount,
+                                      TriggerSource triggerSource, String scheduleId, String chainRunId,
+                                      String chainId, String chainName, Integer definitionVersionNumber) {}
     public record AuditFindingResponse(String id, String projectId, String auditKey, String fingerprint,
                                        String ruleKey, String subject, AuditSeverity severity, String title,
                                        String description, String evidence, List<String> tags, AuditFindingStatus status,

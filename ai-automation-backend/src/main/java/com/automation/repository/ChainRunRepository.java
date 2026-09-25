@@ -41,6 +41,14 @@ public interface ChainRunRepository extends JpaRepository<ChainRun, String> {
 
     List<ChainRun> findByTriggeredByScheduleIdOrderByStartedAtDesc(String scheduleId);
 
+    /**
+     * Chain-Runs samt Id und Name ihrer Chain in EINER Abfrage, ohne entry_runs und input_context —
+     * fuer die Herkunft der Audit-Reports (TODO a3b89355).
+     */
+    @Query("SELECT new com.automation.dto.projection.ChainRunOriginRow(cr.id, c.id, c.name, cr.triggeredByScheduleId) "
+           + "FROM ChainRun cr JOIN cr.chain c WHERE cr.id IN :ids")
+    List<com.automation.dto.projection.ChainRunOriginRow> findOriginRows(@Param("ids") Collection<String> ids);
+
     /** Wie {@code WorkflowRunRepository.findStatusesByScheduleIds}, fuer Ketten-Runs (TODO 172a6a67). */
     @Query("SELECT r.triggeredByScheduleId, r.status, r.startedAt FROM ChainRun r "
            + "WHERE r.triggeredByScheduleId IN :scheduleIds "

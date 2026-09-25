@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,4 +28,8 @@ public interface WorkflowVersionRepository extends JpaRepository<WorkflowVersion
 
     @Query("select v.id from WorkflowVersion v where v.definitionHash is null")
     List<String> findIdsWithoutDefinitionHash();
+
+    /** Id and number of the given versions, without their snapshots — one query for a page of runs. */
+    @Query("select v.id, v.versionNumber from WorkflowVersion v where v.id in :ids")
+    List<Object[]> findVersionNumbers(@Param("ids") Collection<String> ids);
 }

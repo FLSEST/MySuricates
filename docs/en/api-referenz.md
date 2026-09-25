@@ -1861,6 +1861,18 @@ Retrieve a single audit report.
 
 **Response:** `AuditReportResponse`
 
+Besides content, gate and `findingCount`, every report (also in the list and in `AuditDetail.latestReport`) carries the origin of its run, each field `null` when unknown:
+
+| Field | Meaning |
+|---|---|
+| `workflowVersion` | The workflow's version label when the report was stored (e.g. the pool version) |
+| `triggerSource` | Effective trigger; for a chain entry the trigger of the chain (`SCHEDULE`, `MANUAL`, …). A chain run from before V89 stays `CHAIN`, a sub-workflow run `SUB_WORKFLOW` |
+| `scheduleId` | Triggering schedule; for a chain entry the chain's schedule |
+| `chainRunId`, `chainId`, `chainName` | Chain run and chain of a chain entry; `chainRunId` stays when the chain has been deleted |
+| `definitionVersionNumber` | Number of the definition version the run executed (empty without `automation.hardening.provenance`) |
+
+The list resolves counts and origins for the whole page with one query each, not per report.
+
 ### `GET /api/v1/audit-findings`
 
 List findings across all audits, paginated (`page`, `size`). Optional filters: `projectId`, `auditKey`, `status`, `severity`.

@@ -1867,6 +1867,18 @@ Einzelnen Audit-Report abrufen.
 
 **Response:** `AuditReportResponse`
 
+Neben Inhalt, Gate und `findingCount` trägt jeder Report (auch in der Liste und in `AuditDetail.latestReport`) die Herkunft seines Laufs, jedes Feld `null`, wenn unbekannt:
+
+| Feld | Bedeutung |
+|---|---|
+| `workflowVersion` | Versions-Label des Workflows beim Speichern (z. B. die Pool-Version) |
+| `triggerSource` | Effektiver Auslöser; bei einem Ketteneintrag der Auslöser der Kette (`SCHEDULE`, `MANUAL`, …). Ein Kettenlauf von vor V89 bleibt `CHAIN`, ein Sub-Workflow-Lauf `SUB_WORKFLOW` |
+| `scheduleId` | Auslösender Zeitplan; bei einem Ketteneintrag der Zeitplan der Kette |
+| `chainRunId`, `chainId`, `chainName` | Chain-Run und Kette eines Ketteneintrags; `chainRunId` bleibt, wenn die Kette gelöscht ist |
+| `definitionVersionNumber` | Nummer der Definitionsversion, die der Lauf ausgeführt hat (leer ohne `automation.hardening.provenance`) |
+
+Die Liste löst Zählung und Herkunft für die ganze Seite mit je einer Abfrage auf, nicht je Report.
+
 ### `GET /api/v1/audit-findings`
 
 Findings über alle Audits auflisten, paginiert (`page`, `size`). Optionale Filter: `projectId`, `auditKey`, `status`, `severity`.

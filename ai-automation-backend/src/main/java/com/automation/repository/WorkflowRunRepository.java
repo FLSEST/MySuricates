@@ -142,6 +142,11 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
          + "wr.status, wr.startedAt, wr.completedAt) FROM WorkflowRun wr WHERE wr.id IN :ids")
     List<com.automation.dto.projection.RunStateRow> findRunStates(@Param("ids") Collection<String> ids);
 
+    /** Herkunft je Lauf in einer Abfrage, ohne Schritte, Metadaten und Fehler — fuer die Audit-Reports (TODO a3b89355). */
+    @Query("SELECT new com.automation.dto.projection.RunOriginRow(wr.id, wr.triggerSource, wr.triggeredByScheduleId, "
+         + "wr.chainRunId, wr.definitionVersionId, wr.inputContext) FROM WorkflowRun wr WHERE wr.id IN :ids")
+    List<com.automation.dto.projection.RunOriginRow> findOriginRows(@Param("ids") Collection<String> ids);
+
     List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
 
     long countByStatusAndStartedAtAfter(RunStatus status, Instant since);
