@@ -102,6 +102,85 @@ class RunCompletionHandlerTest {
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
     }
 
+    // --- Gleichstand (TODO 2aa9ddd5) -------------------------------------------------------
+
+    /** Der Kopf, den CheckedCommandGate einem erfolgreichen checked_command voranstellt. */
+    private static String checkedCommandOutput(String category, int exitCode, String output) {
+        return "gate_status: " + (exitCode == 0 ? "GREEN" : "RED") + "\ngate_category: " + category
+                + "\ngate_description: Command exit " + exitCode + "\n\n" + output;
+    }
+
+    /**
+     * Der Health-Check vom 25.09.: alle Schritte GREEN, der erste ein checked_command. Sein synthetisches
+     * „Command exit 0“ stand seit dem 14.09. in jedem Report statt des Urteils am Ende.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void complete_allGreen_theClosingVerdictSpeaksForTheRun_notTheFirstChecksCommandExit() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                checkedCommandOutput("backend-test-failure", 0, "mvn test: exit 0"),
+                checkedCommandOutput("frontend-build-failure", 0, "npm run build: exit 0"),
+                "### Scorecard\n**Gesamtscore: 9.0 / 10**\n\ngate_status: GREEN\ngate_category: project-health\n"
+                        + "gate_description: Score 9.0/10, Trend gleich",
+                "Health Check: GUT\ngate_status: GREEN\ngate_category: project-health\n"
+                        + "gate_description: Gesundheit gut, Faktenblatt vollstaendig");
+        run.getSteps().get(0).setMetadata(Map.of("checkedCommand", true, "exitCode", 0));
+        run.getSteps().get(1).setMetadata(Map.of("checkedCommand", true, "exitCode", 0));
+
+        handler.complete(run, ctx, "wf-1", "Health", null, "proj-1", List.of());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_status", "GREEN")
+                .containsEntry("gate_category", "project-health")
+                .containsEntry("gate_description", "Gesundheit gut, Faktenblatt vollstaendig");
+        Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
+        assertThat((List<Map<String, Object>>) summary.get("items")).as("jedes Gate bleibt in der Zusammenfassung")
+                .extracting(item -> item.get("description"))
+                .containsExactly("Command exit 0", "Command exit 0", "Score 9.0/10, Trend gleich",
+                        "Gesundheit gut, Faktenblatt vollstaendig");
+    }
+
+    /**
+     * Bei RED und YELLOW bleibt der erste: die Ursache. Nach seiner Kategorie heisst und findet sich das
+     * AutoTodo-Incident ({@code GateStatusResolver} liest genau diese Metadaten) – ein abschliessendes Urteil
+     * darf es nicht umbenennen.
+     */
+    @Test
+    void complete_equalRedOrYellow_theFirstGateKeepsItsCategory_forTheIncident() {
+        WorkflowRun red = run(RunStatus.RUNNING,
+                checkedCommandOutput("backend-test-failure", 1, "mvn test: exit 1"),
+                "Build Gate: FAILED\ngate_status: RED\ngate_category: mysuricates-build\n"
+                        + "gate_description: MySuricates Build Gate fehlgeschlagen");
+        WorkflowRun yellow = run(RunStatus.RUNNING,
+                "gate_status: YELLOW\ngate_category: lint\ngate_description: 2 Warnungen",
+                "gate_status: YELLOW\ngate_category: summary\ngate_description: Ausbaufaehig");
+        ExecutionContext yellowCtx = ExecutionContext.builder().workflowRunId("run-2").build();
+
+        handler.complete(red, ctx, "wf-1", "Build Gate", null, "proj-1", List.of());
+        handler.complete(yellow, yellowCtx, "wf-1", "Build Gate", null, "proj-1", List.of());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_status", "RED")
+                .containsEntry("gate_category", "backend-test-failure")
+                .containsEntry("gate_description", "Command exit 1");
+        assertThat(yellowCtx.getRunMetadata())
+                .containsEntry("gate_category", "lint")
+                .containsEntry("gate_description", "2 Warnungen");
+    }
+
+    @Test
+    void complete_laterGreenWithoutDescription_doesNotReplaceOneThatHasIt() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "gate_status: GREEN\ngate_category: tests\ngate_description: 200 Tests gruen",
+                "gate_status: GREEN\ngate_category: verdict");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_category", "tests")
+                .containsEntry("gate_description", "200 Tests gruen");
+    }
+
     @Test
     void complete_yellowGate_logsWarning_butRunIsCompleted() {
         WorkflowRun run = run(RunStatus.RUNNING, "gate_status: YELLOW\ngate_category: lint");

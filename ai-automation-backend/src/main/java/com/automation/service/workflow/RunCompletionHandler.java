@@ -46,7 +46,7 @@ public class RunCompletionHandler {
     public void complete(WorkflowRun run, ExecutionContext context, String workflowId,
                          String workflowName, String templateId, String projectId,
                          List<BlockDefinition> blocks) {
-        // Parse gate_status markers from ALL blocks — highest severity wins.
+        // Parse gate_status markers from ALL blocks — highest severity wins, between equals see speaksForTheRun.
         // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
         GateStatus highestGate = null;
         String gateCategory = null;
@@ -60,7 +60,7 @@ public class RunCompletionHandler {
                 var parsedGate = GateStatusOutputParser.parse(step.getOutput());
                 if (parsedGate.isPresent()) {
                     var gate = parsedGate.get();
-                    if (highestGate == null || gate.status().ordinal() > highestGate.ordinal()) {
+                    if (speaksForTheRun(gate, highestGate, gateDescription)) {
                         highestGate = gate.status();
                         gateCategory = gate.category();
                         gateDescription = gate.description();
@@ -187,6 +187,25 @@ public class RunCompletionHandler {
                     "Workflow execution failed: " + run.getId(),
                     "WorkflowExecutor", run.getId(), workflowId);
         }
+    }
+
+    /**
+     * Whether this gate replaces the one so far as the run's {@code gate_status}/{@code _category}/{@code _description}:
+     * a worse one always does. Between equals it depends on the status (TODO 2aa9ddd5).
+     *
+     * <p>RED and YELLOW keep the first: the cause — typically a {@code checked_command} whose category names what
+     * failed — and exactly what an AutoTodo incident is keyed and titled by, so a closing verdict must not rename it.
+     * GREEN has no cause, so the last verdict speaks for the run: the health check's first step, a
+     * {@code checked_command} with its synthetic {@code Command exit 0}, used to stand in for its closing verdict in
+     * every report. A later GREEN without a description does not replace one that has it.
+     */
+    private static boolean speaksForTheRun(GateStatusOutputParser.ParsedGateStatus gate, GateStatus highest,
+                                           String highestDescription) {
+        if (highest == null || gate.status().ordinal() > highest.ordinal()) {
+            return true;
+        }
+        return gate.status() == highest && highest == GateStatus.GREEN
+                && (gate.description() != null || highestDescription == null);
     }
 
     /** Compression steps copy their source's text; markers stay authoritative only on the original step (6e5d6e2c). */
