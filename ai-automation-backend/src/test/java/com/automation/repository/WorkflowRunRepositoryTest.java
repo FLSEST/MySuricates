@@ -8,10 +8,8 @@ import com.automation.entity.ProjectType;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
-import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
-import com.automation.dto.projection.RunOriginRow;
 import com.automation.metrics.SqlStatementCounter;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -105,35 +102,6 @@ class WorkflowRunRepositoryTest {
         WorkflowRun r = run(workflow, status, startedAt);
         r.setCompletedAt(completedAt);
         return runRepository.save(r);
-    }
-
-    /**
-     * Vom Kontext liest {@code findOriginColumns} nur den Eltern-Ausloeser, als Text (TODO a3b89355) — auch
-     * wenn die erste Zeile keinen hat. Fuer einen Ausdruck ohne deklarierten Typ nimmt sqlite-jdbc den Typ
-     * des Werts der aktuellen Zeile; ein NULL dort meldet NUMERIC. Die Zeilen kommen nach Id sortiert.
-     */
-    @Test
-    void findOriginColumns_readsTheParentSourceAsText_evenWhenTheFirstRowHasNone() {
-        WorkflowRun withParent = originRun(Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"));
-        WorkflowRun withoutParent = originRun(Map.of());
-        for (int i = 0; i < 64 && withoutParent.getId().compareTo(withParent.getId()) > 0; i++) {
-            withoutParent = originRun(Map.of());
-        }
-        assertThat(withoutParent.getId()).as("a run without parent sorts first").isLessThan(withParent.getId());
-        entityManager.flush();
-        entityManager.clear();
-
-        List<Object[]> columns = runRepository.findOriginColumns(List.of(withParent.getId(), withoutParent.getId()));
-        List<RunOriginRow> rows = runRepository.findOriginRows(List.of(withParent.getId(), withoutParent.getId()));
-
-        assertThat(columns).extracting(row -> row[0]).containsExactly(withoutParent.getId(), withParent.getId());
-        assertThat(rows).extracting(RunOriginRow::parentTriggerSource).containsExactly(null, "SCHEDULE");
-        assertThat(rows).extracting(RunOriginRow::triggerSource).containsOnly(TriggerSource.CHAIN);
-    }
-
-    private WorkflowRun originRun(Map<String, Object> context) {
-        return runRepository.save(WorkflowRun.builder().workflow(workflowA).workflowName(workflowA.getName())
-                .status(RunStatus.COMPLETED).triggerSource(TriggerSource.CHAIN).inputContext(new HashMap<>(context)).build());
     }
 
     @Test
@@ -629,18 +597,5 @@ class WorkflowRunRepositoryTest {
         List<WorkflowRun> broken = runRepository.findBrokenWorkflows(BROKEN);
 
         assertThat(broken.stream().map(r -> r.getWorkflow().getId())).doesNotContain(workflowA.getId());
-    }
-
-    @Test
-    void findWorkflowRefsByRunIds_returnsIdWorkflowAndRecordedName_onlyForAskedRuns() {
-        WorkflowRun waiting = run(workflowA, RunStatus.RUNNING, Instant.now());
-        run(workflowB, RunStatus.RUNNING, Instant.now());
-        entityManager.flush();
-        entityManager.clear();
-
-        List<Object[]> rows = runRepository.findWorkflowRefsByRunIds(List.of(waiting.getId(), "no-such-run"));
-
-        assertThat(rows).hasSize(1);
-        assertThat(rows.get(0)).containsExactly(waiting.getId(), workflowA.getId(), workflowA.getName());
     }
 }

@@ -25,6 +25,7 @@ import com.automation.repository.ChainRunRepository;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.WorkflowChainRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.repository.WorkflowVersionRepository;
 import com.automation.service.audit.AuditCenterService;
@@ -69,6 +70,7 @@ class AuditSummaryProjectionIntegrationTest {
     @Autowired private WorkflowChainRepository chainRepository;
     @Autowired private ChainRunRepository chainRunRepository;
     @Autowired private WorkflowRunRepository runRepository;
+    @Autowired private WorkflowRunProjectionRepository runProjections;
     @Autowired private EntityManager entityManager;
 
     @Test
@@ -240,7 +242,7 @@ class AuditSummaryProjectionIntegrationTest {
         }
         entityManager.clear();
 
-        List<Object[]> columns = runRepository.findOriginColumns(List.of(bigContext.getId()));
+        List<Object[]> columns = runProjections.findOriginColumns(List.of(bigContext.getId()));
         Counted<List<AuditReportResponse>> page = counted(() -> auditCenterService.listReports(projectId, "a.context", 0, 20).content());
 
         assertThat(columns).singleElement().satisfies(row -> {

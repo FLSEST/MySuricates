@@ -2,7 +2,7 @@ package com.automation.service.execution;
 
 import com.automation.dto.response.PendingInputResponse;
 import com.automation.executor.ApprovalRequest;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.automation.service.workflow.WorkflowExecutionRegistry.PendingInput;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class PendingInputServiceTest {
     @Mock
     private WorkflowExecutionRegistry executionRegistry;
     @Mock
-    private WorkflowRunRepository runRepository;
+    private WorkflowRunProjectionRepository runProjections;
     @InjectMocks
     private PendingInputService service;
 
@@ -35,7 +35,7 @@ class PendingInputServiceTest {
         when(executionRegistry.listPendingInputs()).thenReturn(List.of());
 
         assertThat(service.listPendingInputs()).isEmpty();
-        verify(runRepository, never()).findWorkflowRefsByRunIds(any());
+        verify(runProjections, never()).findWorkflowRefsByRunIds(any());
     }
 
     @Test
@@ -50,7 +50,7 @@ class PendingInputServiceTest {
                 .stepIndex(2).requestedAt(since.plusSeconds(60)).build();
         when(executionRegistry.listPendingInputs()).thenReturn(List.of(
                 new PendingInput("run-1", approval), new PendingInput("run-gone", input)));
-        when(runRepository.findWorkflowRefsByRunIds(List.of("run-1", "run-gone")))
+        when(runProjections.findWorkflowRefsByRunIds(List.of("run-1", "run-gone")))
                 .thenReturn(List.<Object[]>of(new Object[] {"run-1", "wf-1", "Rundgang-Illustrationen erzeugen"}));
 
         List<PendingInputResponse> result = service.listPendingInputs();

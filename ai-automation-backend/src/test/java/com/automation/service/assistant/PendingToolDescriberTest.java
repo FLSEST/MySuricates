@@ -3,7 +3,7 @@ package com.automation.service.assistant;
 import com.automation.entity.Todo;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,16 +30,16 @@ class PendingToolDescriberTest {
     private static final String TODO_ID = "33334444-aaaa-bbbb-cccc-000000000003";
 
     @Mock private WorkflowRepository workflowRepository;
-    @Mock private WorkflowRunRepository workflowRunRepository;
+    @Mock private WorkflowRunProjectionRepository runProjections;
     @Mock private TodoRepository todoRepository;
 
     private PendingToolDescriber describer;
 
     @BeforeEach
     void setUp() {
-        describer = new PendingToolDescriber(new ObjectMapper(), workflowRepository, workflowRunRepository, todoRepository);
+        describer = new PendingToolDescriber(new ObjectMapper(), workflowRepository, runProjections, todoRepository);
         lenient().when(workflowRepository.findIdAndNameByIdIn(any())).thenReturn(List.of());
-        lenient().when(workflowRunRepository.findWorkflowRefsByRunIds(any())).thenReturn(List.of());
+        lenient().when(runProjections.findWorkflowRefsByRunIds(any())).thenReturn(List.of());
         lenient().when(todoRepository.findById(any())).thenReturn(Optional.empty());
     }
 
@@ -54,7 +54,7 @@ class PendingToolDescriberTest {
         assertThat(label.subject()).isEqualTo("Call Anna");
         assertThat(label.params()).containsExactlyEntriesOf(Map.of("priority", "HIGH"));
         assertThat(label.description()).isEqualTo("Create TODO: \"Call Anna\" (priority: HIGH)");
-        verifyNoInteractions(workflowRepository, workflowRunRepository, todoRepository);
+        verifyNoInteractions(workflowRepository, runProjections, todoRepository);
     }
 
     @Test
@@ -132,7 +132,7 @@ class PendingToolDescriberTest {
 
     @Test
     void cancelRun_usesWorkflowNameSnapshotOfRun() {
-        when(workflowRunRepository.findWorkflowRefsByRunIds(List.of(RUN_ID)))
+        when(runProjections.findWorkflowRefsByRunIds(List.of(RUN_ID)))
                 .thenReturn(List.<Object[]>of(new Object[]{RUN_ID, WF_ID, "Nightly Build"}));
 
         PendingToolLabel label = describer.describe("cancel_run", "{\"runId\":\"" + RUN_ID + "\"}");
@@ -144,7 +144,7 @@ class PendingToolDescriberTest {
 
     @Test
     void cancelRun_withoutSnapshot_usesCurrentWorkflowName() {
-        when(workflowRunRepository.findWorkflowRefsByRunIds(List.of(RUN_ID)))
+        when(runProjections.findWorkflowRefsByRunIds(List.of(RUN_ID)))
                 .thenReturn(List.<Object[]>of(new Object[]{RUN_ID, WF_ID, null}));
         workflowNamed(WF_ID, "Daily Report");
 
@@ -171,7 +171,7 @@ class PendingToolDescriberTest {
         assertThat(wf.description()).isEqualTo("Create workflow: \"Inbox Triage\"");
         assertThat(chain.subject()).isEqualTo("Release");
         assertThat(chain.description()).isEqualTo("Create chain: \"Release\"");
-        verifyNoInteractions(workflowRepository, workflowRunRepository, todoRepository);
+        verifyNoInteractions(workflowRepository, runProjections, todoRepository);
     }
 
     @Test

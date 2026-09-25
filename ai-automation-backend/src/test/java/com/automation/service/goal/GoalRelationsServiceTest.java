@@ -18,7 +18,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +55,7 @@ class GoalRelationsServiceTest {
     @Mock private TodoRepository todoRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private WorkflowRepository workflowRepository;
-    @Mock private WorkflowRunRepository runRepository;
+    @Mock private WorkflowRunProjectionRepository runProjections;
     @Mock private TodoTriggerRepository triggerRepository;
     @Mock private AuditFindingTodoRepository findingTodoRepository;
 
@@ -64,7 +64,7 @@ class GoalRelationsServiceTest {
     @BeforeEach
     void setUp() {
         service = new GoalRelationsService(goalRepository, todoRepository, projectRepository, workflowRepository,
-                runRepository, triggerRepository, findingTodoRepository);
+                runProjections, triggerRepository, findingTodoRepository);
     }
 
     @Test
@@ -84,7 +84,7 @@ class GoalRelationsServiceTest {
                 row("user").build()));
         when(findingTodoRepository.findByTodoIdIn(anyCollection())).thenReturn(List.of(
                 AuditFindingTodo.builder().findingId("f-2").todoId("audit").build()));
-        when(runRepository.findRunStates(anyCollection())).thenReturn(List.of(
+        when(runProjections.findRunStates(anyCollection())).thenReturn(List.of(
                 new RunStateRow("run-audit", "wf-audit", "Audit (alt)", RunStatus.COMPLETED, T0, T0.plusSeconds(60)),
                 new RunStateRow("run-gate", "wf-gate", "Gate", RunStatus.FAILED, T0, T0.plusSeconds(5))));
         when(workflowRepository.findIdAndNameByIdIn(anyCollection())).thenReturn(List.<Object[]>of(
@@ -144,7 +144,7 @@ class GoalRelationsServiceTest {
                 row("fixed").fix("run-fix", 2, Todo.ResolutionState.SUCCEEDED).build(),
                 row("running").fix("run-live", 1, Todo.ResolutionState.RUNNING).build(),
                 row("never").build()));
-        when(runRepository.findRunStates(anyCollection())).thenReturn(List.of(
+        when(runProjections.findRunStates(anyCollection())).thenReturn(List.of(
                 new RunStateRow("run-fix", "wf", "Fix", RunStatus.COMPLETED, T0, T0.plusSeconds(90)),
                 new RunStateRow("run-live", "wf", "Fix", RunStatus.RUNNING, T0, null)));
 
@@ -197,7 +197,7 @@ class GoalRelationsServiceTest {
         verify(todoRepository, times(1)).findGoalRelationRows("g");
         verify(projectRepository, times(1)).findIdAndNameByIdIn(anyCollection());
         verify(workflowRepository, times(1)).findIdAndNameByIdIn(anyCollection());
-        verify(runRepository, times(1)).findRunStates(anyCollection());
+        verify(runProjections, times(1)).findRunStates(anyCollection());
         verify(triggerRepository, times(1)).findActiveMatchRows();
         verify(findingTodoRepository, times(1)).findByTodoIdIn(anyCollection());
         verify(todoRepository, never()).findUnassignedRelationRows(any());
@@ -212,7 +212,7 @@ class GoalRelationsServiceTest {
         assertThat(response.todos()).isEmpty();
         verify(projectRepository, never()).findIdAndNameByIdIn(any());
         verify(workflowRepository, never()).findIdAndNameByIdIn(any());
-        verify(runRepository, never()).findRunStates(any());
+        verify(runProjections, never()).findRunStates(any());
         verify(findingTodoRepository, never()).findByTodoIdIn(any());
     }
 

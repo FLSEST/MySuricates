@@ -26,7 +26,7 @@ import com.automation.repository.AuditFindingTodoRepository;
 import com.automation.repository.AuditReportRepository;
 import com.automation.repository.ChainRunRepository;
 import com.automation.repository.TodoRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.repository.WorkflowVersionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ class AuditCenterServiceTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
-    @Mock private WorkflowRunRepository runRepository;
+    @Mock private WorkflowRunProjectionRepository runProjections;
     @Mock private ChainRunRepository chainRunRepository;
     @Mock private WorkflowVersionRepository versionRepository;
 
@@ -88,7 +88,7 @@ class AuditCenterServiceTest {
                 new AuditAcceptancePolicy(),
                 new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
                 new AuditFindingTodoLinker(findingRepository, findingTodoRepository, todoRepository, managedTodoWriter),
-                new AuditReportOrigins(runRepository, chainRunRepository, versionRepository));
+                new AuditReportOrigins(runProjections, chainRunRepository, versionRepository));
     }
 
     @Test
@@ -289,7 +289,7 @@ class AuditCenterServiceTest {
                 .thenReturn(new PageImpl<>(List.of(viaChain, direct, oldChain, runGone), PageRequest.of(0, 20), 4));
         when(occurrenceRepository.countByReportIds(List.of("r-chain", "r-direct", "r-old", "r-gone")))
                 .thenReturn(countRows("r-chain", 3, "r-direct", 1));
-        when(runRepository.findOriginRows(List.of("run-r-chain", "run-r-direct", "run-r-old", "run-r-gone"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-r-chain", "run-r-direct", "run-r-old", "run-r-gone"))).thenReturn(List.of(
                 new RunOriginRow("run-r-chain", TriggerSource.CHAIN, null, "cr-1", "v-7", "SCHEDULE"),
                 new RunOriginRow("run-r-direct", TriggerSource.SCHEDULE, "sched-direct", null, "v-8", null),
                 new RunOriginRow("run-r-old", TriggerSource.CHAIN, null, null, null, "MANUAL")));
@@ -334,10 +334,10 @@ class AuditCenterServiceTest {
             assertThat(r.definitionVersionNumber()).isNull();
         });
         verify(occurrenceRepository).countByReportIds(any());
-        verify(runRepository).findOriginRows(any());
+        verify(runProjections).findOriginRows(any());
         verify(chainRunRepository).findOriginRows(any());
         verify(versionRepository).findVersionNumbers(any());
-        verifyNoMoreInteractions(occurrenceRepository, runRepository, chainRunRepository, versionRepository);
+        verifyNoMoreInteractions(occurrenceRepository, runProjections, chainRunRepository, versionRepository);
     }
 
     /** Die Kette ist geloescht (samt Chain-Runs): der Lauf behaelt seinen chainRunId, Name und Zeitplan fehlen. */
@@ -345,7 +345,7 @@ class AuditCenterServiceTest {
     void getReport_chainGone_keepsTheChainRunIdAndTheStarterButNamesNothing() {
         when(reportRepository.findById("r-1")).thenReturn(Optional.of(
                 report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
-        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(new RunOriginRow(
+        when(runProjections.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(new RunOriginRow(
                 "run-r-1", TriggerSource.CHAIN, null, "cr-gone", null, "WISH")));
         when(chainRunRepository.findOriginRows(Set.of("cr-gone"))).thenReturn(List.of());
 
@@ -367,7 +367,7 @@ class AuditCenterServiceTest {
     void getReport_unreadableParentSource_fallsBackToChain() {
         when(reportRepository.findById("r-1")).thenReturn(Optional.of(
                 report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
-        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
                 new RunOriginRow("run-r-1", TriggerSource.CHAIN, null, "cr-1", null, null)));
         when(chainRunRepository.findOriginRows(Set.of("cr-1")))
                 .thenReturn(List.of(new ChainRunOriginRow("cr-1", "chain-1", "Wochen-Audits", "sched-chain")));
@@ -385,7 +385,7 @@ class AuditCenterServiceTest {
         AuditReport manual = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
         when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(0, 20)))
                 .thenReturn(new PageImpl<>(List.of(manual), PageRequest.of(0, 20), 1));
-        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
                 new RunOriginRow("run-r-1", TriggerSource.MANUAL, null, null, null, null)));
 
         AuditReportResponse report = service.listReports("p-1", "a.health", 0, 20).content().getFirst();
@@ -401,7 +401,7 @@ class AuditCenterServiceTest {
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         assertThat(service.listReports("p-1", "a.none", 0, 20).content()).isEmpty();
-        verifyNoInteractions(occurrenceRepository, runRepository, chainRunRepository, versionRepository);
+        verifyNoInteractions(occurrenceRepository, runProjections, chainRunRepository, versionRepository);
     }
 
     // --- Findings ---

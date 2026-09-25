@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** The columns of {@code WorkflowRunRepository.findOriginColumns} as a row (TODO a3b89355). */
+/** The columns of {@code WorkflowRunProjectionRepository.findOriginColumns} as a row (TODO a3b89355). */
 class RunOriginRowTest {
 
     @Test
