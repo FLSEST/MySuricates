@@ -226,6 +226,40 @@ GATE_METRICS="$(printf 'UNTESTED gesamt: 1\nDUENNE TESTS gesamt: 0\nERWARTETE FI
   'Nachsatz ohne Envelope')"
 check "einzeiliger Envelope wird gezaehlt, der Nachsatz nicht" \
   '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+# Zitate beginnen und beenden nichts, wie im Parser: ein Marker ohne "<!--" oder ohne JSON-Beginn, ein
+# Envelope-Anfang mitten in einer Zeile eines offenen Envelopes (Text eines Findings), ein "-->" im Text.
+# Je Zeile ein Finding, das Zitat im elften: Begaenne das Gate dort neu oder schloesse es dort, fehlten
+# Findings, und es meldete RED, obwohl die Ingestion den Report annimmt.
+envelope_lines() {  # $1 = anzahl findings, $2 = description des elften
+  local i sep desc
+  printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' '<!-- mysuricates:audit-result:v1' \
+    '{"snapshotComplete":true,"findings":['
+  for ((i = 0; i < $1; i++)); do
+    sep=','; [ "$i" -eq $(($1 - 1)) ] && sep=''
+    desc='d'; [ "$i" -eq 10 ] && desc="$2"
+    printf '{"ruleKey":"test-coverage.untested-class","subject":"p/C%d.java","severity":"MEDIUM","title":"t","description":"%s"}%s\n' \
+      "$i" "$desc" "$sep"
+  done
+  printf '%s\n' ']}' '-->'
+}
+for QUOTE_CASE in "Marker ohne Kommentarbeginn|erwaehnt mysuricates:audit-result:v1 im Text" \
+                  "Anfang mit JSON mitten in der Zeile|Zitat <!-- mysuricates:audit-result:v1 {x" \
+                  "Kommentarende ohne Klammer|a --> b"; do
+  run_gate "$(envelope_lines 20 "${QUOTE_CASE#*|}")"
+  check "Zitat im Finding (${QUOTE_CASE%%|*}): alle 20 gezaehlt" \
+    '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+done
+NACHSATZ_NR=0
+for NACHSATZ in 'Hinweis: mysuricates:audit-result:v1 steht oben.' \
+                'Der Envelope beginnt mit `<!-- mysuricates:audit-result:v1`.'; do
+  NACHSATZ_NR=$((NACHSATZ_NR + 1))
+  run_gate "$(envelope_lines 20 d; printf '%s\n' "$NACHSATZ")"
+  check "Nachsatz nennt den Marker ohne JSON ($NACHSATZ_NR): kein offener Envelope" \
+    '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+done
+run_gate "$(envelope_lines 20 d; printf '%s\n' 'Nachtrag: <!-- mysuricates:audit-result:v1 {')"
+check "Nachsatz mit Marker und JSON-Beginn: offener Envelope, RED wie die Ingestion" \
+  'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
 check "Gate laeuft auch hier ohne stderr" '[ ! -s "$TMP/gate-err.txt" ]'
 
 echo

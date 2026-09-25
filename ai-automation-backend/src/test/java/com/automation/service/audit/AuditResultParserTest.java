@@ -1,6 +1,7 @@
 package com.automation.service.audit;
 
 import com.automation.entity.AuditSeverity;
+import com.automation.service.audit.AuditResultParser.ParsedFinding;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -186,7 +187,7 @@ class AuditResultParserTest {
         var result = parser.parse(output);
 
         assertThat(result.valid()).isFalse();
-        assertThat(result.error()).contains("not closed");
+        assertThat(result.error()).isEqualTo("The last audit result envelope v1 is incomplete or unreadable");
         assertThat(result.findings()).isEmpty();
     }
 
@@ -203,5 +204,61 @@ class AuditResultParserTest {
         assertThat(result.findings()).singleElement()
                 .satisfies(finding -> assertThat(finding.description()).contains("aus Nutzertext"));
         assertThat(result.markdown()).isEqualTo("# Report");
+    }
+
+    private static String envelopeDescribing(String description) {
+        return "<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"sec.xss\","
+                + "\"subject\":\"Report.tsx\",\"severity\":\"LOW\",\"title\":\"t\",\"description\":\""
+                + description + "\"},{\"ruleKey\":\"sec.xss\",\"subject\":\"Other.tsx\",\"severity\":\"LOW\","
+                + "\"title\":\"t\"}]}\n-->";
+    }
+
+    /**
+     * Zitiert das Modell den Anfang samt JSON-Beginn im Text eines Findings, reicht dieser Kandidat bis zum
+     * Ende des eigenen Envelopes, ist aber kein JSON (auch nicht mit leeren Klammern): Es gilt der umschliessende.
+     */
+    @Test
+    void quotedStartWithJsonInsideAFinding_keepsTheEnclosingEnvelope() {
+        for (String quote : new String[] {"Zeigt <!-- mysuricates:audit-result:v1 {\\\"a\\\":1 an",
+                "Zeigt <!-- mysuricates:audit-result:v1 {} an"}) {
+            var result = parser.parse("# Report\n" + envelopeDescribing(quote));
+
+            assertThat(result.valid()).as(quote).isTrue();
+            assertThat(result.findings()).as(quote).extracting(ParsedFinding::subject)
+                    .containsExactly("Report.tsx", "Other.tsx");
+        }
+    }
+
+    /** Ein Nachsatz, der den Marker ohne JSON zitiert, beginnt keinen Envelope: gueltig wie vorher. */
+    @Test
+    void quotedMarkerAfterTheEnvelope_withoutJson_isNoEnvelope() {
+        var result = parser.parse(envelopeWith("size.class", "A.java")
+                + "\nDer Envelope beginnt mit `<!-- mysuricates:audit-result:v1`.");
+
+        assertThat(result.valid()).isTrue();
+        assertThat(result.findings()).singleElement()
+                .satisfies(finding -> assertThat(finding.subject()).isEqualTo("A.java"));
+        assertThat(result.markdown()).isEqualTo("Der Envelope beginnt mit `<!-- mysuricates:audit-result:v1`.");
+    }
+
+    /** Marker und JSON-Beginn hinter dem letzten vollstaendigen Envelope: ein offener Envelope, kein Rueckgriff. */
+    @Test
+    void startWithJsonAfterTheLastCompleteEnvelope_makesTheReportInvalid() {
+        var result = parser.parse(envelopeWith("size.class", "A.java")
+                + "\nNachtrag: <!-- mysuricates:audit-result:v1 {\"snapshotComplete\":");
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.error()).isEqualTo("The last audit result envelope v1 is incomplete or unreadable");
+    }
+
+    /** Unlesbares JSON im einzigen Envelope: ungueltig, und der Grund des JSON-Parsers bleibt sichtbar. */
+    @Test
+    void unreadableJson_isInvalid_andNamesTheParserReason() {
+        var result = parser.parse("<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[],}\n-->");
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.error()).startsWith("The last audit result envelope v1 is incomplete or unreadable: ")
+                .contains("Unexpected character");
+        assertThat(result.markdown()).isEmpty();
     }
 }

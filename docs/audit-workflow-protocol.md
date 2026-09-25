@@ -51,10 +51,12 @@ JSON-Envelope:
 Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
-Stehen mehrere Envelopes in der Ausgabe, zählt der **letzte** (TODO `1cf996df`). Der eigene
-schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen: `{{ previous_report }}`
-sind die ersten 3000 Zeichen des letzten Reports, bei kurzen Reports samt Envelope, oft
-abgeschnitten. Ist der letzte Envelope nicht geschlossen, weil die Antwort abbricht, ist der Report
+Stehen mehrere Envelopes in der Ausgabe, zählt der **letzte** mit lesbarem JSON (TODO `1cf996df`).
+Der eigene schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen:
+`{{ previous_report }}` sind die ersten 3000 Zeichen des letzten Reports, bei kurzen Reports samt
+Envelope, oft abgeschnitten. Ein Envelope beginnt mit `<!--`, dem Marker und dem JSON-Beginn `{`;
+ein zitierter Marker ohne JSON zählt nicht, ebenso wenig ein Anfang im Text eines Findings. Beginnt
+hinter dem letzten lesbaren noch ein Envelope, etwa weil die Antwort abbricht, ist der Report
 ungültig; auf einen früheren greift die Ingestion nicht zurück. Der Gate-Block der Test-Abdeckung
 zählt denselben Envelope.
 
