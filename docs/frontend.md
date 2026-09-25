@@ -251,7 +251,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 ### Shared-Komponenten (`src/components/shared/`)
 
-**Regel:** `shared` importiert keine Fachordner (`workflow`, `goal`, `hints`, `todo`, `settings` …) und nicht `assistantPanelUtils`, sondern nur `ui`, `api`, `hooks`, `utils`, `types`, `stores` und `i18n`. Eine Komponente, die einen Fachordner braucht, gehört in diesen Ordner; fachfreie Helfer liegen in `src/utils/` (z. B. `placeholderContext.ts`, `internalAppPath.ts`). Deshalb liegen `AgenticStepCard`, `ForEachStepCard` und `ApprovalDialog` (Freigabe-Dialog im Run, nutzt `Hint`) in `components/workflow/`, `TodoEditModal` in `components/todo/`.
+**Regel:** `shared` importiert keine Fachordner (`workflow`, `goal`, `hints`, `todo`, `settings` …) und nicht `assistantPanelUtils`, sondern nur `ui`, `api`, `hooks`, `utils`, `types`, `stores` und `i18n`. Eine Komponente, die einen Fachordner braucht, gehört in diesen Ordner; fachfreie Helfer liegen in `src/utils/` (z. B. `placeholderContext.ts`, `internalAppPath.ts`). Deshalb liegen `AgenticStepCard`, `ForEachStepCard` und `ApprovalDialog` (Freigabe-Dialog im Run, nutzt `Hint`) in `components/workflow/`, `TodoEditModal` in `components/todo/`. ESLint prüft die Regel (`no-restricted-imports`, für `import()` `no-restricted-syntax`, in `eslint.config.js`); `npm run lint` scheitert an einem Verstoß.
 
 | Komponente | Beschreibung |
 |---|---|
