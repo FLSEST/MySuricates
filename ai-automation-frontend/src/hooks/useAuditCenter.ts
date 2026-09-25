@@ -104,6 +104,18 @@ export function useAuditReports(projectId: string | null, auditKey: string | nul
   });
 }
 
+/**
+ * The reports of an audit and the one to show: the report the summary names (`latestReportId`, the
+ * newest valid one); if the page lacks it, the first valid one.
+ */
+export function useShownAuditReport(audit: AuditSummary) {
+  const query = useAuditReports(audit.projectId, audit.auditKey);
+  const reports = query.data?.content ?? [];
+  const shown = reports.find((report) => report.id === audit.latestReportId)
+    ?? reports.find((report) => report.ingestionStatus === 'VALID');
+  return { reports, shown, isLoading: query.isLoading };
+}
+
 /** Findings loaded per status; the chip counts come from `AuditSummary.findingsByStatus`, not from here. */
 export const FINDINGS_PAGE_SIZE = 200;
 

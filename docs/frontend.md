@@ -205,6 +205,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - **Bericht:** angezeigt wird der Report zu `latestReportId`, also der neueste gültige. Der Kopf nennt Datum mit Uhrzeit, den Run (Kurz-ID, Link), den Auslöser als `TriggerSourceChip`, die Kette (Link auf den Ketten-Lauf, eine Seite je Kette gibt es nicht) oder ohne Kette den Zeitplan, sofern der Chip ihn nicht schon nennt, dazu „Definition #N“, Workflow-Version und Provider/Modell. War der neueste Versuch ungültig, sagt ein Hinweis mit Datum und Fehlertext, dass der Bericht älter ist. „Evidenz-Run“ und die Historie zeigen auf den Run des jeweiligen Reports; die Historie trägt je Eintrag Auslöser und Kette
 - **Findings:** Statusfilter als `FilterChips`: „Offen“ (`OPEN` + `AWAITING_VERIFICATION`, Standard), „Akzeptiert“, „Verworfen“, „Behoben“, Zähler aus `findingsByStatus`. `useAuditFindingsByStatus` lädt je gewähltem Status eine Seite (200) über den Parameter `status`, damit ein Status mit vielen Befunden die übrigen nicht verdrängt; reicht eine Seite nicht, sagt das ein Hinweis. `?finding=<id>` öffnet den Befund und schaltet seinen Chip mit ein. Fällt ein Befund nach dem Einordnen aus dem Filter, nennt ein Toast den neuen Chip und schaltet ihn auf Wunsch ein
 - **Legacy:** dateibasierte Markdown-Berichte, nur lesend
+- **Aufbau:** Die Seite verdrahtet Ansicht, Reiter und `hooks/useActiveAudit.ts`: Gemerkt werden nur Projekt und Schlüssel, das Audit kommt aus der aktuellen `/audits`-Liste, damit Zähler nach dem Einordnen nachziehen. Bausteine in `components/audit/`: `AuditOverview` (mit `FindingCounts`), `AuditDetail`, `ReportOrigin` (Kopf, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` mit `AuditFindingItem` und `FindingDisposition`, `LegacyReports` und kleine Teile in `AuditParts`. Einordnen, TODO anlegen und verknüpfen hält `hooks/useFindingActions.ts`, das Filtermodell `utils/auditFindingFilter.ts`, den angezeigten Report `useShownAuditReport`. Eine Mutation schreibt ihre Antwort in die Findings-Seiten und in den Einzel-Befund (`['audit-finding', id]`), den ein Deep-Link beim nächsten Öffnen liest
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
@@ -705,7 +706,7 @@ useToast() → {
 }
 ```
 
-`action` (`{ label, onClick }`) zeigt einen Knopf im Toast, der die Aktion ausführt und den Toast schließt; solche Toasts bleiben 8 statt 4 Sekunden.
+`action` (`{ label, onClick }`) zeigt einen Knopf im Toast, der die Aktion ausführt und den Toast schließt; solche Toasts bleiben 8 statt 4 Sekunden und halten an, solange der Zeiger darauf liegt oder der Fokus darin ist.
 
 ### `useAssistantWebSocket.ts`
 

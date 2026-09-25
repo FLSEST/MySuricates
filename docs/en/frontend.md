@@ -205,6 +205,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 - **Report:** the page shows the report named by `latestReportId`, i.e. the newest valid one. Its head names date and time, the run (short ID, link), the trigger as `TriggerSourceChip`, the chain (link to the chain run; there is no page per chain) or, without a chain, the schedule unless the chip already names it, plus “Definition #N”, workflow version and provider/model. When the newest attempt was invalid, a notice with date and error text says that the report is older. “Evidence run” and the history point at the run of the respective report; each history entry carries trigger and chain
 - **Findings:** status filter as `FilterChips`: “Open” (`OPEN` + `AWAITING_VERIFICATION`, the default), “Accepted”, “Dismissed”, “Resolved”, counts from `findingsByStatus`. `useAuditFindingsByStatus` loads one page (200) per chosen status through the `status` parameter, so a status with many findings cannot push the others out; when one page is not enough, a note says so. `?finding=<id>` opens the finding and switches its chip on as well. When a finding leaves the filter after being filed, a toast names its new chip and switches it on on request
 - **Legacy:** file-based Markdown reports, read-only
+- **Structure:** the page wires view, tabs and `hooks/useActiveAudit.ts`: only project and key are kept, the audit comes from the current `/audits` list, so counts follow after a finding was filed. Building blocks in `components/audit/`: `AuditOverview` (with `FindingCounts`), `AuditDetail`, `ReportOrigin` (head, `OlderReportNotice`, `ReportChain`), `ReportHistory`, `AuditFindings` with `AuditFindingItem` and `FindingDisposition`, `LegacyReports` and small parts in `AuditParts`. Filing, creating and linking TODOs live in `hooks/useFindingActions.ts`, the filter model in `utils/auditFindingFilter.ts`, the shown report in `useShownAuditReport`. A mutation writes its answer into the findings pages and into the single finding (`['audit-finding', id]`) that a deep link reads the next time it opens
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
@@ -705,7 +706,7 @@ useToast() → {
 }
 ```
 
-`action` (`{ label, onClick }`) shows a button in the toast that runs the action and closes the toast; such toasts stay 8 instead of 4 seconds.
+`action` (`{ label, onClick }`) shows a button in the toast that runs the action and closes the toast; such toasts stay 8 instead of 4 seconds and hold while the pointer is on them or focus is inside.
 
 ### `useAssistantWebSocket.ts`
 
