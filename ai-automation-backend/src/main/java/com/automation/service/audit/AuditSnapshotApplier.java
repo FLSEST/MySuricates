@@ -46,7 +46,8 @@ class AuditSnapshotApplier {
         List<AuditFinding> touched = new ArrayList<>();
         List<String> collisions = new ArrayList<>();
 
-        for (ParsedFinding item : parsedFindings) {
+        for (ParsedFinding reported : parsedFindings) {
+            ParsedFinding item = unmasked(reported);
             AuditRuleKeyCatalog.Resolution resolution = resolveRuleKey(event, report, item, reportedRuleKeys);
             String ruleKey = resolution.ruleKey();
             String fingerprint = fingerprint(event.getProjectId(), report.getAuditKey(), ruleKey, item.subject());
@@ -133,6 +134,17 @@ class AuditSnapshotApplier {
             }
         }
         managedTodoWriter.reconcile(touched);
+    }
+
+    /**
+     * {@code audit_findings} zeigt ein {@code |} in ruleKey, subject und Titel als {@code ¦}, und ein Modell fuehrt
+     * den Befund genau so weiter. Gespeichert – und im Audit Center gezeigt – wird wieder das {@code |}
+     * (TODO 90c4f7db); die Identitaet ist ohnehin dieselbe ({@link #fingerprint}).
+     */
+    private static ParsedFinding unmasked(ParsedFinding item) {
+        return new ParsedFinding(AuditFindingsContext.unmask(item.ruleKey()), AuditFindingsContext.unmask(item.subject()),
+                item.severity(), AuditFindingsContext.unmask(item.title()), item.description(), item.evidence(),
+                item.tags());
     }
 
     /**
