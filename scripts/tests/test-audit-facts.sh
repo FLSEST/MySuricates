@@ -292,6 +292,29 @@ check "ohne Messbloecke: keine stille Null bei tsc" \
      && grep -q "^NICHT GEMESSEN: frontend_tsc_errors (" "$TMP/health-facts-empty.out"'
 check "ohne Messbloecke laeuft ohne stderr" '[ ! -s "$TMP/health-facts-empty.err" ]'
 
+# ESLint schreibt bei null Befunden keine Summenzeile. Exit 0 ohne Summe ist also eine gemessene
+# Null, kein fehlender Wert (sonst hielt der Report einen behobenen Lint-Befund offen, 2026-09-25).
+# Ein Fehlschlag ohne Summenzeile bleibt dagegen eine Luecke.
+printf 'npm run lint: exit 0\n\n> mysuricates-frontend lint\n> eslint .\n' > "$TMP/lint-clean.txt"
+printf 'npm run lint: exit 2\n\nOops! Something went wrong!\n' > "$TMP/lint-crash.txt"
+for CASE in clean crash; do
+  CASE_VALUES="$(json_values execution_path="$TMP/base.txt" \
+    block.backend_tests.output="$TMP/tests-out.txt" \
+    block.frontend_build.output="$TMP/build-out.txt" \
+    block.frontend_lint.output="$TMP/lint-$CASE.txt")"
+  render "$HEALTH" name:facts "$CASE_VALUES" > "$TMP/health-facts-lint-$CASE.sh"
+  bash "$TMP/health-facts-lint-$CASE.sh" > "$TMP/health-facts-lint-$CASE.out" 2>/dev/null
+done
+check "Lint sauber: Exit 0 ohne Summenzeile ist FAKT 0" \
+  'grep -qx "FAKT frontend_lint_problems: 0" "$TMP/health-facts-lint-clean.out" \
+     && grep -qx "FAKT frontend_lint_errors: 0" "$TMP/health-facts-lint-clean.out" \
+     && grep -qx "FAKT frontend_lint_warnings: 0" "$TMP/health-facts-lint-clean.out"'
+check "Lint sauber: keine Luecke fuer frontend_lint_problems" \
+  '! grep -q "^NICHT GEMESSEN: frontend_lint_problems" "$TMP/health-facts-lint-clean.out"'
+check "Lint abgestuerzt ohne Summenzeile: Luecke statt stiller Null" \
+  'grep -q "^NICHT GEMESSEN: frontend_lint_problems (" "$TMP/health-facts-lint-crash.out" \
+     && ! grep -q "^FAKT frontend_lint_problems: " "$TMP/health-facts-lint-crash.out"'
+
 # Laufzeitstatus kommt seit 25ed5f84 direkt aus der Actuator-Sonde des Faktenblatts. Ein
 # curl-Stellvertreter antwortet nur auf genau die URL des Workflows (localhost:9090) und
 # protokolliert den Aufruf; leer heisst "keine Verbindung" (curl-Exit 7). Nachfolger der
