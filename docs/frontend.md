@@ -24,7 +24,7 @@
 | `/dlq` | DeadLetterQueue | Dead-Letter-Queue für fehlgeschlagene Events |
 | `/debug` | WorkflowDebug | Workflows mit fehlgeschlagenen Runs analysieren |
 | `/docs` | Docs | Markdown-Dokumentation (Split-Layout) |
-| `/reports` | Reports | Generierte Berichte anzeigen |
+| `/reports` | AuditCenter | Audit Center: Audits im Überblick, Bericht mit Herkunft, Findings mit Statusfilter, Legacy-Berichte |
 | `/insights` | Insights | Plattform-Einblicke und Analysen |
 | `/integrations` | Integrations | Integrations-Provider verwalten |
 | `/runs/:runId` | RunRedirect | Redirect → `/workflows/:workflowId/run/:runId` (API-Lookup) |
@@ -116,7 +116,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Pause/Resume/Cancel-Buttons während der Ausführung
 - Sternebewertung (1-5) nach Abschluss
 - Fehler-Panel bei fehlgeschlagenen Runs
-- Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
+- Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser als `TriggerSourceChip` – den Chip nutzt auch das Audit Center –, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
 - `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
 - Der Kopf mit Zurück, Status und den Aktionen je Zustand (Pausieren, Fortsetzen, Abbrechen, Löschen, ab letztem Schritt fortsetzen, TODO aus einem fehlgeschlagenen Lauf) ist `RunHeader`, die Notizen sind `RunNotesCard` (der ungespeicherte Text bleibt in der Seite). `components/workflow/useRunDiagramSync.ts` färbt die Diagramm-Kästen nach Step-Status und hebt beim Klick auf einen Kasten dessen Step hervor; das TODO eines fehlgeschlagenen Laufs baut `utils/failedRunTodo.ts` (`buildFailedRunTodo`) in der App-Sprache
 
@@ -198,6 +198,13 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 
 - Plattform-Analysen und Statistiken
 - Visualisierung von Workflow-Performance und Nutzungsmustern
+
+### Audit Center (`/reports`)
+
+- **Übersicht:** je Audit Gate, Trend, „offen X · akzeptiert Y“ (offen samt kritisch/hoch aus `openFindingsBySeverity`, akzeptiert aus `findingsByStatus`) und der letzte Lauf; „letzter Versuch ungültig“, wenn der neueste Report nicht gültig war
+- **Bericht:** angezeigt wird der Report zu `latestReportId`, also der neueste gültige. Der Kopf nennt Datum mit Uhrzeit, den Run (Kurz-ID, Link), den Auslöser als `TriggerSourceChip`, die Kette (Link auf den Ketten-Lauf, eine Seite je Kette gibt es nicht) oder ohne Kette den Zeitplan, sofern der Chip ihn nicht schon nennt, dazu „Definition #N“, Workflow-Version und Provider/Modell. War der neueste Versuch ungültig, sagt ein Hinweis mit Datum und Fehlertext, dass der Bericht älter ist. „Evidenz-Run“ und die Historie zeigen auf den Run des jeweiligen Reports; die Historie trägt je Eintrag Auslöser und Kette
+- **Findings:** Statusfilter als `FilterChips`: „Offen“ (`OPEN` + `AWAITING_VERIFICATION`, Standard), „Akzeptiert“, „Verworfen“, „Behoben“, Zähler aus `findingsByStatus`. `useAuditFindingsByStatus` lädt je gewähltem Status eine Seite (200) über den Parameter `status`, damit ein Status mit vielen Befunden die übrigen nicht verdrängt; reicht eine Seite nicht, sagt das ein Hinweis. `?finding=<id>` öffnet den Befund und schaltet seinen Chip mit ein. Fällt ein Befund nach dem Einordnen aus dem Filter, nennt ein Toast den neuen Chip und schaltet ihn auf Wunsch ein
+- **Legacy:** dateibasierte Markdown-Berichte, nur lesend
 
 ### WorkflowDetail (`/workflows/:id`) — Erweiterungen
 
@@ -293,6 +300,7 @@ Alle Komponenten in `src/components/ui/`:
 | `TagInput` | `tags`, `onChange`, `suggestions`, `label`, `hint`, `placeholder`, `compact` | Tag-Eingabe mit Autovervollständigung |
 | `ModalFooter` | `onCancel`, `onAction`, `actionLabel`, `actionVariant`, `actionLoading`, `actionDisabled`, `cancelLabel`, `cancelVariant` | Standardisierter Modal-Footer |
 | `ConfirmModal` | `open`, `onClose`, `onConfirm`, `title`, `message`/children, `confirmLabel`, `variant` (primary/danger), `isPending`, `cancelDisabled`, `confirmIcon`, `cancelVariant`, `size` (sm/md), `extraAction` | Bestätigungsdialog auf `Modal` (Escape und Backdrop schließen). Jeder Ja/Nein-Dialog nutzt ihn statt `Modal` + `ModalFooter` selbst zusammenzusetzen; `isPending` sperrt den Bestätigen-Button |
+| `FilterChips` | `options` (`value`, `label`, `count?`), `selected`, `onChange`, `ariaLabel` | Mehrfachauswahl als Chip-Reihe (`role="group"`, `aria-pressed`); die Auswahl kommt in der Reihenfolge der Optionen zurück, leer ist erlaubt. Statusfilter im Audit Center |
 
 ## Design-System
 
@@ -693,9 +701,11 @@ Verbindet sich über SockJS/STOMP mit dem Backend und empfängt Live-Logs, Appro
 
 ```typescript
 useToast() → {
-  success(message), error(message), info(message), warning(message)
+  success(message, action?), error(message, action?), info(message, action?), warning(message, action?)
 }
 ```
+
+`action` (`{ label, onClick }`) zeigt einen Knopf im Toast, der die Aktion ausführt und den Toast schließt; solche Toasts bleiben 8 statt 4 Sekunden.
 
 ### `useAssistantWebSocket.ts`
 

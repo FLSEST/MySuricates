@@ -541,7 +541,7 @@ Audit-Workflows (Metadata `audit.enabled=true`, `key`, `category`, `reportBlock`
 
 - **Neu** → `OPEN`; **wieder da** nach `RESOLVED` → `OPEN` + `regressionCount`; `AWAITING_VERIFICATION` → `OPEN`; **nicht mehr im Snapshot** → `RESOLVED` (nur OPEN/AWAITING_VERIFICATION). Terminale Status `ACCEPTED_RISK` und `DISMISSED` werden bei Abwesenheit nicht angefasst.
 - **Verwaltete TODOs**: nur für `CRITICAL`/`HIGH`-Findings im Status `OPEN` (`ensureManagedTodo`, Tag `audit`, `auto:workflow`, `TodoCreatedEvent` → TodoTrigger). Akzeptierte/verworfene Risiken und Wiedervorlagen lösen keinen Fix-Loop aus. `reconcileManagedTodos` schließt das TODO, sobald alle verknüpften Findings terminal sind, und öffnet es beim Wiederauftauchen. Liegt keines der offenen verknüpften Findings mehr über der Schwelle (etwa nach geänderten Kriterien HIGH → MEDIUM), wird das TODO freigegeben: Verknüpfung gelöst, Status `ARCHIVED` (nicht `DONE` — behoben ist nichts); ein `IN_PROGRESS`-TODO bleibt unangetastet (TODO ba0dcb3a).
-- **Gate-Status** kommt aus den Run-Metadaten des Workflows (`gate_status`), nicht aus den Findings; `AuditSummary.openFindingsBySeverity` zählt nur nicht-terminale Findings, `findingsByStatus` liefert Akzeptierte getrennt (Audit Center: „davon N akzeptiert").
+- **Gate-Status** kommt aus den Run-Metadaten des Workflows (`gate_status`), nicht aus den Findings; `AuditSummary.openFindingsBySeverity` zählt nur nicht-terminale Findings, `findingsByStatus` liefert Akzeptierte getrennt (Audit Center: „offen X · akzeptiert Y“; der Findings-Reiter filtert standardmäßig auf offene).
 
 **Risiko-Akzeptanz** (`PATCH /api/v1/audit-findings/{id}` mit `status=ACCEPTED_RISK`, `dispositionNote`) — Regeln in `AuditAcceptancePolicy`, Zahlen-Parser `EvidenceMetrics`:
 
