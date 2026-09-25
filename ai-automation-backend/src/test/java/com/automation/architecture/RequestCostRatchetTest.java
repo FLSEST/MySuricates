@@ -1,6 +1,12 @@
 package com.automation.architecture;
 
 import com.automation.dto.response.WorkflowRunListItemResponse;
+import com.automation.entity.AuditFinding;
+import com.automation.entity.AuditFindingStatus;
+import com.automation.entity.AuditIngestionStatus;
+import com.automation.entity.AuditReport;
+import com.automation.entity.AuditSeverity;
+import com.automation.entity.GateStatus;
 import com.automation.entity.Goal;
 import com.automation.entity.GoalMilestone;
 import com.automation.entity.Project;
@@ -12,9 +18,13 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.TodoTrigger;
+import com.automation.entity.Wish;
+import com.automation.entity.WishStatus;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;
 import com.automation.metrics.SqlStatementCounter;
+import com.automation.repository.AuditFindingRepository;
+import com.automation.repository.AuditReportRepository;
 import com.automation.repository.GoalMilestoneRepository;
 import com.automation.repository.GoalRepository;
 import com.automation.repository.ProjectRepository;
@@ -22,6 +32,7 @@ import com.automation.repository.StepResultRepository;
 import com.automation.repository.ScheduledWorkflowRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
+import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -130,7 +141,7 @@ class RequestCostRatchetTest {
      */
     private static final List<String> SEEDED_TABLES = List.of(
             "projects", "workflows", "workflow_runs", "step_results", "scheduled_workflows", "goals",
-            "goal_milestones", "todos", "todo_triggers");
+            "goal_milestones", "todos", "todo_triggers", "wishes", "audit_reports", "audit_findings");
 
     /** Seed size — large enough that a per-row query shows up as a multiple, small enough to stay fast. */
     private static final int PROJECTS = 3;
@@ -138,9 +149,14 @@ class RequestCostRatchetTest {
     private static final int RUNS_PER_WORKFLOW = 2;
     private static final int STEPS_PER_RUN = 3;
     private static final int TODOS = 50;
+    private static final int WISHES = 10;
+    private static final int AUDITS_PER_PROJECT = 2;
 
     /** A step output big enough that fetching it by accident is visible in the response size. */
     private static final String FAT_STEP_OUTPUT = "x".repeat(20_000);
+
+    /** An audit report's markdown, as big as a step output: in the /audits list it would show in the bytes. */
+    private static final String FAT_REPORT_MARKDOWN = "#".repeat(20_000);
 
     /** Start of every seeded run — a Tuesday. */
     private static final Instant RUN_STARTED = Instant.parse("2026-09-01T10:00:00Z");
@@ -248,6 +264,14 @@ class RequestCostRatchetTest {
      *       row until it got the same LEFT JOIN FETCH as {@code findAllWithTargets()}. That only
      *       showed once the seeded schedules carried a {@code nextRunAt} like real ones.
      *       {@code {sched}} is the schedule of the first seeded workflow.</li>
+     *   <li>{@code /wishes} and {@code /audits}: added with TODO cda29eab. Their N+1 fixes had only
+     *       been proven by counted repository calls in unit tests, so a relapse would have passed
+     *       the gate. {@code /wishes} is the list plus one name lookup each for projects and
+     *       workflows ({@code WishMapper}, TODO 5bf5a9c8) — 3 statements, measured 7 761 bytes for
+     *       ten wishes. {@code /audits} reads two lean projections: the report rows without their
+     *       markdown and the finding counts per audit, status and severity in one GROUP BY
+     *       ({@code AuditCenterService.listAudits}, TODO 3d7e3987) — 2 statements, measured 3 301
+     *       bytes for six audits, whose markdown alone would add 20 000 bytes each.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
@@ -264,6 +288,8 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/goals/{goal}", new Cost(2, 40_000)),
             Map.entry("/api/v1/goals/{goal}/relations", new Cost(6, 35_000)),
             Map.entry("/api/v1/goals/{goal}/milestones", new Cost(2, 2_000)),
+            Map.entry("/api/v1/wishes", new Cost(3, 9_000)),
+            Map.entry("/api/v1/audits", new Cost(2, 4_000)),
             Map.entry(CALENDAR, new Cost(7, 95_000))));
 
     @Autowired private MockMvc mockMvc;
@@ -276,6 +302,9 @@ class RequestCostRatchetTest {
     @Autowired private GoalRepository goalRepository;
     @Autowired private GoalMilestoneRepository milestoneRepository;
     @Autowired private TodoTriggerRepository todoTriggerRepository;
+    @Autowired private WishRepository wishRepository;
+    @Autowired private AuditReportRepository auditReportRepository;
+    @Autowired private AuditFindingRepository auditFindingRepository;
     @Autowired private TransactionTemplate transactions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManagerFactory entityManagerFactory;
@@ -332,7 +361,8 @@ class RequestCostRatchetTest {
 
     /**
      * Eine Saat-Charge: {@link #PROJECTS} Projekte mit je {@link #WORKFLOWS_PER_PROJECT}
-     * Workflows, deren Runs und Steps, einem Zeitplan je Workflow und {@link #TODOS} Todos.
+     * Workflows, deren Runs und Steps, einem Zeitplan je Workflow, {@link #TODOS} Todos,
+     * {@link #WISHES} Wuensche und {@link #AUDITS_PER_PROJECT} Audits je Projekt.
      *
      * <p>Ein zweiter Aufruf verdoppelt jede dieser Tabellen — genau darauf beruht
      * {@link #statementCountMustNotGrowWithTheNumberOfRows}. Alle Namen und Pfade tragen die
@@ -456,6 +486,85 @@ class RequestCostRatchetTest {
                     .lastFixRunId(fromRun ? runIds.get((t + 1) % runIds.size()) : null)
                     .fixAttempts(fromRun ? 1 : 0)
                     .build());
+        }
+        seedWishes(batch, workflows);
+        seedAudits(batch, workflows, runIds);
+    }
+
+    /**
+     * Wuensche (TODO cda29eab), gleichmaessig ueber die Workflows der Charge und damit ueber ihre
+     * Projekte verteilt: Jeder hat ein Projekt, zwei erzeugte Workflows und eine Vorlage. GET
+     * /wishes loest Projekt- und Workflow-Namen fuer die ganze Liste in je einer Abfrage auf
+     * ({@code WishMapper}, TODO 5bf5a9c8) — ein Nachschlagen je Wunsch faellt als Wachstum auf.
+     */
+    private void seedWishes(String batch, List<Workflow> workflows) {
+        for (int w = 0; w < WISHES; w++) {
+            int first = w * workflows.size() / WISHES;
+            Workflow generated = workflows.get(first);
+            wishRepository.save(Wish.builder()
+                    .originalText("Cost Wish " + batch + w)
+                    .status(WishStatus.COMPLETED)
+                    .projectId(generated.getProject().getId())
+                    .generatedWorkflowIds(List.of(generated.getId(),
+                            workflows.get((first + 1) % workflows.size()).getId()))
+                    .referenceWorkflowIds(List.of(workflows.get((first + 2) % workflows.size()).getId()))
+                    .iterationCount(1)
+                    .resultSummary("Seeded for the request cost ratchet")
+                    .build());
+        }
+    }
+
+    /**
+     * Audits (TODO cda29eab): je Projekt {@link #AUDITS_PER_PROJECT}, jedes mit zwei gueltigen
+     * Reports — der neueste und sein Vorgaenger fuer den Trend — und drei Findings, eins davon
+     * erledigt. GET /audits liest zwei schlanke Projektionen, die Reports ohne Markdown und die
+     * Findings als GROUP BY je Audit, Status und Schwere ({@code AuditCenterService.listAudits},
+     * TODO 3d7e3987). Das Markdown ist absichtlich fett: Geraet es in die Liste, zeigen es die Bytes.
+     */
+    private void seedAudits(String batch, List<Workflow> workflows, List<String> runIds) {
+        int nextRun = 0;
+        for (int p = 0; p < PROJECTS; p++) {
+            Workflow auditWorkflow = workflows.get(p * WORKFLOWS_PER_PROJECT);
+            String projectId = auditWorkflow.getProject().getId();
+            for (int a = 0; a < AUDITS_PER_PROJECT; a++) {
+                String auditKey = "cost-audit-" + batch + p + "-" + a;
+                List<AuditReport> reports = new ArrayList<>();
+                for (int r = 0; r < 2; r++) {
+                    reports.add(auditReportRepository.save(AuditReport.builder()
+                            .projectId(projectId)
+                            .workflowId(auditWorkflow.getId())
+                            .workflowRunId(runIds.get(nextRun++))
+                            .auditKey(auditKey)
+                            .category("quality")
+                            .title("Cost Audit " + batch + p + "-" + a)
+                            .markdownContent(FAT_REPORT_MARKDOWN)
+                            .gateStatus(r == 0 ? GateStatus.YELLOW : GateStatus.GREEN)
+                            .ingestionStatus(AuditIngestionStatus.VALID)
+                            .generatedAt(RUN_STARTED.plusSeconds(3_600L * r))
+                            .build()));
+                }
+                AuditReport previous = reports.getFirst();
+                AuditReport latest = reports.getLast();
+                List<AuditSeverity> severities = List.of(AuditSeverity.HIGH, AuditSeverity.MEDIUM, AuditSeverity.LOW);
+                for (int f = 0; f < severities.size(); f++) {
+                    auditFindingRepository.save(AuditFinding.builder()
+                            .projectId(projectId)
+                            .auditKey(auditKey)
+                            .fingerprint("cost-finding-" + f)
+                            .ruleKey("cost-rule")
+                            .subject("Cost subject " + f)
+                            .severity(severities.get(f))
+                            .title("Cost Finding " + batch + p + "-" + a + "-" + f)
+                            .status(f == severities.size() - 1 ? AuditFindingStatus.RESOLVED : AuditFindingStatus.OPEN)
+                            .firstSeenReportId(previous.getId())
+                            .lastSeenReportId(latest.getId())
+                            .firstSeenRunId(previous.getWorkflowRunId())
+                            .lastSeenRunId(latest.getWorkflowRunId())
+                            .firstSeenAt(previous.getGeneratedAt())
+                            .lastSeenAt(latest.getGeneratedAt())
+                            .build());
+                }
+            }
         }
     }
 
