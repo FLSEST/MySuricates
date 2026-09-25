@@ -211,6 +211,8 @@ export const en = {
       createTitle: 'New schedule',
       when: 'When',
       customTiming: 'Custom timing',
+      deleteTitle: 'Delete schedule',
+      deleteConfirm: 'The schedule for “{name}” is deleted. The workflow itself stays.',
     },
     todos: {
       title: 'Tasks',
@@ -229,6 +231,7 @@ export const en = {
       overdue: 'overdue',
       editTitle: 'Edit task',
       titleLabel: 'Title',
+      deleteTitle: 'Delete “{title}”?',
     },
     activity: {
       title: 'Activity',
@@ -487,6 +490,8 @@ export const en = {
       adoptViewConfirm: 'This device has unsaved dashboard changes. Replace the view “{name}” with the one from this version?',
       adoptViewMissing: 'This version does not contain that view.',
       adoptViewLimit: 'The dashboard already has {max} views. Delete one before taking another.',
+      adoptViewTitle: 'Replace view',
+      adoptViewReplace: 'Replace',
     },
   },
   projects: {
@@ -1101,6 +1106,7 @@ export const en = {
     categoryLabel: 'Category',
     aiContextHint: 'This text goes into the prompt of every block that uses the skill. Markdown is fine.',
     deleteConfirm: 'Delete skill "{name}"? Workflows that activated it lose it. The version history is kept.',
+    deleteTitle: 'Delete skill',
     importInvalidFile: 'Not a valid skill file: name and category are missing.',
     sealedByNames: 'Sealed workflows use this skill: {names}.',
     sealedUnsealHint: 'Changing and deleting it is locked until they are unsealed.',
@@ -2411,6 +2417,7 @@ export const en = {
       editAction: 'Edit',
       delete: 'Delete',
       deleteConfirm: 'Delete the milestone “{title}”? Its TODOs stay in the goal.',
+      deleteTitle: 'Delete milestone',
       states: { OPEN: 'open', DUE_SOON: 'due soon', OVERDUE: 'overdue', REACHED: 'reached' },
       reopened: 'open again',
       progress: '{done} of {total} done',

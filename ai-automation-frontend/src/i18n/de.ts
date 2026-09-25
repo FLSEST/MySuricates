@@ -213,6 +213,8 @@ export const de: TranslationKeys = {
       createTitle: 'Zeitplan anlegen',
       when: 'Wann',
       customTiming: 'Eigener Takt',
+      deleteTitle: 'Zeitplan löschen',
+      deleteConfirm: 'Der Zeitplan für „{name}“ wird gelöscht. Der Workflow selbst bleibt.',
     },
     todos: {
       title: 'Aufgaben',
@@ -231,6 +233,7 @@ export const de: TranslationKeys = {
       overdue: 'überfällig',
       editTitle: 'Aufgabe bearbeiten',
       titleLabel: 'Titel',
+      deleteTitle: '„{title}“ löschen?',
     },
     activity: {
       title: 'Aktivität',
@@ -489,6 +492,8 @@ export const de: TranslationKeys = {
       adoptViewConfirm: 'Auf diesem Gerät gibt es ungespeicherte Dashboard-Änderungen. Die Ansicht „{name}“ durch die aus dieser Version ersetzen?',
       adoptViewMissing: 'Diese Version enthält diese Ansicht nicht.',
       adoptViewLimit: 'Das Dashboard hat schon {max} Ansichten. Lösche eine, bevor du eine weitere übernimmst.',
+      adoptViewTitle: 'Ansicht ersetzen',
+      adoptViewReplace: 'Ersetzen',
     },
   },
   projects: {
@@ -1103,6 +1108,7 @@ export const de: TranslationKeys = {
     categoryLabel: 'Kategorie',
     aiContextHint: 'Dieser Text geht in den Prompt jedes Blocks, der den Skill nutzt. Markdown ist erlaubt.',
     deleteConfirm: 'Skill „{name}“ löschen? Workflows, die ihn aktiviert haben, verlieren ihn. Die Versionsgeschichte bleibt erhalten.',
+    deleteTitle: 'Skill löschen',
     importInvalidFile: 'Keine gültige Skill-Datei: name und category fehlen.',
     sealedByNames: 'Versiegelte Workflows nutzen diesen Skill: {names}.',
     sealedUnsealHint: 'Ändern und Löschen sind gesperrt, bis sie entsiegelt werden.',
@@ -2408,6 +2414,7 @@ export const de: TranslationKeys = {
       editAction: 'Bearbeiten',
       delete: 'Löschen',
       deleteConfirm: 'Meilenstein „{title}“ löschen? Seine TODOs bleiben im Ziel.',
+      deleteTitle: 'Meilenstein löschen',
       states: { OPEN: 'offen', DUE_SOON: 'bald fällig', OVERDUE: 'überfällig', REACHED: 'erreicht' },
       reopened: 'wieder offen',
       progress: '{done} von {total} erledigt',

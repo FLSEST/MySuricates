@@ -115,6 +115,30 @@ describe('SimpleSchedules list', () => {
   });
 });
 
+// 23635ef6: the app's own dialog instead of window.confirm
+describe('SimpleSchedules delete', () => {
+  it('names the schedule and deletes it only after confirmation', async () => {
+    const deleted: string[] = [];
+    serve([schedule('s-1', 'Morning digest', '0 0 9 * * *')]);
+    server.use(http.delete('/api/v1/schedules/:id', ({ params }) => {
+      deleted.push(String(params.id));
+      return new HttpResponse(null, { status: 204 });
+    }));
+    useI18nStore.setState({ locale: 'de' });
+    renderWithProviders(<SimpleSchedules />);
+
+    fireEvent.click(await screen.findByRole('button', { name: de.common.delete }));
+    const dialog = screen.getByRole('dialog', { name: 'Zeitplan löschen' });
+    expect(within(dialog).getByText('Der Zeitplan für „Morning digest“ wird gelöscht. Der Workflow selbst bleibt.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: de.common.cancel }));
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: de.common.delete }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Zeitplan löschen' })).getByRole('button', { name: de.common.delete }));
+    await waitFor(() => expect(deleted).toEqual(['s-1']));
+  });
+});
+
 describe('SimpleSchedules — ?new=1&workflow= (the home field)', () => {
   function LocationProbe() {
     const location = useLocation();

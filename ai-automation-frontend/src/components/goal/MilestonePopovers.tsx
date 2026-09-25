@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type FormEvent, type RefObject } from 're
 import { Button, Input } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
-import { useCreateMilestone, useDeleteMilestone, useUpdateMilestone } from '../../hooks/useGoalTimeline';
+import { useCreateMilestone, useUpdateMilestone } from '../../hooks/useGoalTimeline';
 import { dayOf, dayOfIsoDate, dueDateOfDay, isoDateOfDay } from './timelineLayout';
 import { MilestoneDiamond } from './MilestoneDiamond';
 import { TimelinePopover } from './TimelinePopover';
@@ -68,24 +68,22 @@ export function MilestoneForm({ goalId, milestone, initialDay, onClose, ...place
   );
 }
 
-/** Kleine Karte einer Raute: Zustand, Fortschritt, die zugeordneten TODOs, Bearbeiten und Löschen. */
-export function MilestoneCard({ goalId, milestone, todos, onEdit, onClose, ...placement }: {
-  goalId: string;
+/**
+ * Kleine Karte einer Raute: Zustand, Fortschritt, die zugeordneten TODOs, Bearbeiten und Löschen.
+ * Löschen fragt der Zeitstrahl in seinem eigenen Dialog nach (23635ef6) – nicht in der Karte, die
+ * ein Klick daneben schließt.
+ */
+export function MilestoneCard({ milestone, todos, onEdit, onDelete, onClose, ...placement }: {
   milestone: GoalMilestone;
   todos: GoalTodoItem[];
   onEdit: () => void;
+  onDelete: () => void;
   onClose: () => void;
 } & Placement) {
   const t = useT();
   const tm = t.goals.milestones;
   const locale = useI18nStore((s) => s.locale);
-  const remove = useDeleteMilestone(goalId);
   const assigned = todos.filter((todo) => todo.milestoneId === milestone.id && todo.status !== 'ARCHIVED');
-
-  const confirmRemove = () => {
-    if (!window.confirm(tm.deleteConfirm.replace('{title}', milestone.title))) return;
-    remove.mutate(milestone.id, { onSuccess: onClose });
-  };
 
   return (
     <TimelinePopover label={tm.card.replace('{title}', milestone.title)} onClose={onClose} {...placement}>
@@ -115,8 +113,7 @@ export function MilestoneCard({ goalId, milestone, todos, onEdit, onClose, ...pl
         </ul>
       )}
       <div className="mt-3 flex justify-end gap-2 border-t border-border pt-2">
-        <button type="button" onClick={confirmRemove} disabled={remove.isPending}
-          className="btn-base px-3 py-1.5 text-xs text-danger hover:bg-danger-subtle disabled:opacity-50">
+        <button type="button" onClick={onDelete} className="btn-base px-3 py-1.5 text-xs text-danger hover:bg-danger-subtle">
           {tm.delete}
         </button>
         {/* Den Fokus bekommt Bearbeiten, nicht das Löschen daneben. */}

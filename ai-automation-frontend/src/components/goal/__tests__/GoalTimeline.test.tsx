@@ -242,7 +242,6 @@ describe('GoalTimeline', () => {
 
   it('a diamond opens the milestone card with its TODOs, to edit or delete it', async () => {
     const sent = recordWrites();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderTimeline();
 
     fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
@@ -259,10 +258,19 @@ describe('GoalTimeline', () => {
       { method: 'PUT', path: '/api/v1/goals/g1/milestones/m-beta', body: { title: 'Public beta' } },
     ]));
 
+    // 23635ef6: the timeline asks in its own dialog; the card closes, a click in the dialog must not matter to it
     fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Milestone Beta' })).getByRole('button', { name: 'Delete' }));
-    expect(confirm).toHaveBeenCalledWith('Delete the milestone “Beta”? Its TODOs stay in the goal.');
+    expect(screen.queryByRole('dialog', { name: 'Milestone Beta' })).not.toBeInTheDocument();
+    const question = screen.getByRole('dialog', { name: 'Delete milestone' });
+    expect(within(question).getByText('Delete the milestone “Beta”? Its TODOs stay in the goal.')).toBeInTheDocument();
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    expect(sent.filter((call) => call.method === 'DELETE')).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Milestone Beta/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Milestone Beta' })).getByRole('button', { name: 'Delete' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete milestone' })).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/milestones/m-beta', body: null }));
-    confirm.mockRestore();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete milestone' })).not.toBeInTheDocument());
   });
 });

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { useT } from '../../i18n';
 
@@ -31,21 +31,13 @@ const resizableWidths = {
   xl: 'w-[min(64rem,96vw)]',
 };
 
-export function Modal({ open, onClose, title, children, footer, size = 'md', resizable = false }: ModalProps) {
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      const handleEsc = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-      };
-      window.addEventListener('keydown', handleEsc);
-      return () => {
-        document.body.style.overflow = '';
-        window.removeEventListener('keydown', handleEsc);
-      };
-    }
-  }, [open, onClose]);
+/**
+ * The open dialogs, the one opened last on top. A confirmation can open above another dialog
+ * (23635ef6): Escape then closes only the top one, and the page stays locked until the last closes.
+ */
+const openDialogs: object[] = [];
 
+export function Modal({ open, onClose, title, children, footer, size = 'md', resizable = false }: ModalProps) {
   if (!open) return null;
 
   // Own component so its size state resets with every open (it unmounts while closed)
@@ -60,6 +52,26 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
   const t = useT();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [maximized, setMaximized] = useState(false);
+  // Identity of this open dialog in `openDialogs`; the frame only lives while the dialog is open
+  const [self] = useState(() => ({}));
+  const titleId = useId();
+
+  useEffect(() => {
+    openDialogs.push(self);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      openDialogs.splice(openDialogs.indexOf(self), 1);
+      if (openDialogs.length === 0) document.body.style.overflow = '';
+    };
+  }, [self]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && openDialogs[openDialogs.length - 1] === self) onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [self, onClose]);
 
   const toggleMaximized = () => {
     // Drop the size the user dragged to, so maximise and restore always land on a defined size
@@ -81,6 +93,7 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         className={`relative mx-2 sm:mx-4 bg-surface-overlay border border-border rounded-xl shadow-2xl animate-slide-up ${
           !resizable
             ? `w-full ${sizeStyles[size]}`
@@ -92,7 +105,7 @@ function ModalFrame({ onClose, title, children, footer, size, resizable }: Omit<
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <h2 className="text-lg font-semibold text-text">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold text-text">{title}</h2>
           <div className="flex items-center gap-1">
             {resizable && (
               <button

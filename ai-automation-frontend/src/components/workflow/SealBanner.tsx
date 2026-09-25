@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Lock, LockOpen, ShieldAlert, Ban } from 'lucide-react';
 import { Button } from '../ui';
 import { useT, useI18nStore } from '../../i18n';
 import { useSealWorkflow } from '../../hooks/useWorkflows';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { formatDateTime, formatRelativeTime } from '../../utils/formatTime';
+import { SealConfirmModal } from './SealConfirmModal';
 import type { Workflow, WorkflowSealStatus } from '../../types';
 
 /**
@@ -16,6 +18,7 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
   const locale = useI18nStore((s) => s.locale);
   const sealingModule = useModuleEnabled('sealing');
   const sealWorkflow = useSealWorkflow();
+  const [confirmUnseal, setConfirmUnseal] = useState(false);
   const s = t.workflows.sealView;
 
   const refused = status && status.refusedStarts > 0 && status.lastRefusedAt ? (
@@ -30,9 +33,18 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
   const unsealButton = sealingModule ? (
     <Button variant="secondary" size="sm" icon={<LockOpen className="w-4 h-4" />}
             loading={sealWorkflow.isPending}
-            onClick={() => { if (confirm(t.workflows.unsealConfirm)) sealWorkflow.mutate({ id: workflow.id, lock: false }); }}>
+            onClick={() => setConfirmUnseal(true)}>
       {t.workflows.unseal}
     </Button>
+  ) : null;
+  // Next to the banner, not in it: the violated banner is an alert region
+  const unsealDialog = sealingModule ? (
+    <SealConfirmModal
+      lock={confirmUnseal ? false : null}
+      pending={sealWorkflow.isPending}
+      onClose={() => setConfirmUnseal(false)}
+      onConfirm={() => sealWorkflow.mutate({ id: workflow.id, lock: false }, { onSettled: () => setConfirmUnseal(false) })}
+    />
   ) : null;
 
   if (status?.state === 'VIOLATED') {
@@ -42,17 +54,20 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
       : status.problem === 'SIGNATURE_INVALID' ? s.problemSignature
       : status.problem === 'SIGNATURE_MISSING' ? s.problemSignatureMissing : s.problemUnverifiable;
     return (
-      <div role="alert" data-testid="seal-banner" data-state="violated"
-           className="flex items-start gap-3 p-3 rounded-lg border border-danger/40 bg-danger-subtle text-danger">
-        <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold">{s.violatedTitle}</p>
-          <p className="text-sm text-text mt-0.5">{reason}</p>
-          <p className="text-xs text-text-secondary mt-1">{s.violatedAction}</p>
-          {refused}
+      <>
+        <div role="alert" data-testid="seal-banner" data-state="violated"
+             className="flex items-start gap-3 p-3 rounded-lg border border-danger/40 bg-danger-subtle text-danger">
+          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{s.violatedTitle}</p>
+            <p className="text-sm text-text mt-0.5">{reason}</p>
+            <p className="text-xs text-text-secondary mt-1">{s.violatedAction}</p>
+            {refused}
+          </div>
+          {unsealButton}
         </div>
-        {unsealButton}
-      </div>
+        {unsealDialog}
+      </>
     );
   }
 
@@ -62,27 +77,30 @@ export function SealBanner({ workflow, status }: { workflow: Workflow; status?: 
       ? s.intactBody.replace('{count}', String(status.pinnedSkillCount))
       : s.intactBodyNoSkills;
     return (
-      <div data-testid="seal-banner" data-state="intact"
-           className="flex items-start gap-3 p-3 rounded-lg border border-border-strong bg-surface-raised">
-        <Lock className="w-5 h-5 shrink-0 mt-0.5 text-accent" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-text">
-            {workflow.sealedAt ? s.intactTitle.replace('{date}', formatDateTime(workflow.sealedAt, locale)) : t.workflows.sealed}
-          </p>
-          <p className="text-sm text-text-secondary mt-0.5">{body}</p>
-          {!pinned && <p className="text-xs text-warning mt-1" data-testid="seal-legacy">{s.legacyBody}</p>}
-          {status && !status.signed && (
-            <p className="text-xs text-warning mt-1" data-testid="seal-unsigned">{s.unsignedBody}</p>
+      <>
+        <div data-testid="seal-banner" data-state="intact"
+             className="flex items-start gap-3 p-3 rounded-lg border border-border-strong bg-surface-raised">
+          <Lock className="w-5 h-5 shrink-0 mt-0.5 text-accent" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-text">
+              {workflow.sealedAt ? s.intactTitle.replace('{date}', formatDateTime(workflow.sealedAt, locale)) : t.workflows.sealed}
+            </p>
+            <p className="text-sm text-text-secondary mt-0.5">{body}</p>
+            {!pinned && <p className="text-xs text-warning mt-1" data-testid="seal-legacy">{s.legacyBody}</p>}
+            {status && !status.signed && (
+              <p className="text-xs text-warning mt-1" data-testid="seal-unsigned">{s.unsignedBody}</p>
+            )}
+          </div>
+          {!pinned && sealingModule && (
+            <Button variant="secondary" size="sm" icon={<Lock className="w-4 h-4" />} loading={sealWorkflow.isPending}
+                    onClick={() => sealWorkflow.mutate({ id: workflow.id, lock: true })}>
+              {s.pinSkills}
+            </Button>
           )}
+          {unsealButton}
         </div>
-        {!pinned && sealingModule && (
-          <Button variant="secondary" size="sm" icon={<Lock className="w-4 h-4" />} loading={sealWorkflow.isPending}
-                  onClick={() => sealWorkflow.mutate({ id: workflow.id, lock: true })}>
-            {s.pinSkills}
-          </Button>
-        )}
-        {unsealButton}
-      </div>
+        {unsealDialog}
+      </>
     );
   }
 

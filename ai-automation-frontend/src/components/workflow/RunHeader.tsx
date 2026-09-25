@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Pause, Play, XCircle, FolderOpen, ListTodo, Trash2 } from 'lucide-react';
 import { Button } from '../ui';
@@ -5,6 +6,7 @@ import { StatusBadge } from '../shared/StatusBadge';
 import { GateStatusBadge } from '../shared/GateStatusBadge';
 import { ExecutionRerunButton } from './ExecutionRerunButton';
 import { OpenApprovalButton } from './OpenApprovalButton';
+import { DeleteRunModal } from '../runs/DeleteRunModal';
 import {
   usePauseExecution, useResumeExecution, useCancelExecution, useResumeFromStep, useDeleteRun,
 } from '../../hooks/useWorkflows';
@@ -44,6 +46,7 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning, onO
   const resumeExecution = useResumeExecution();
   const cancelExecution = useCancelExecution();
   const deleteRun = useDeleteRun();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const runDeletionAllowed = useRunDeletionAllowed();
   const resumeFromStep = useResumeFromStep();
   const createTodo = useCreateTodo();
@@ -123,15 +126,21 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning, onO
           variant="secondary" size="sm"
           icon={<Trash2 className="w-4 h-4" />}
           loading={deleteRun.isPending}
-          onClick={() => {
-            if (!window.confirm(t.runs.deleteConfirm)) return;
-            // Der Lauf existiert gleich nicht mehr — weg von seiner Detailseite.
-            deleteRun.mutate(run.id, { onSuccess: () => navigate(`/workflows/${workflowId}`) });
-          }}
+          onClick={() => setConfirmDelete(true)}
         >
           {t.runs.delete}
         </Button>
       )}
+      <DeleteRunModal
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        deleting={deleteRun.isPending}
+        onDelete={() => deleteRun.mutate(run.id, {
+          // Der Lauf existiert gleich nicht mehr — weg von seiner Detailseite.
+          onSuccess: () => navigate(`/workflows/${workflowId}`),
+          onSettled: () => setConfirmDelete(false),
+        })}
+      />
       {isRunning && (
         <div className="flex items-center gap-2">
           {run.status === 'RUNNING' && (

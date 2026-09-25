@@ -275,6 +275,37 @@ describe('GoalDetail', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
+  // 23635ef6: the app's own dialog instead of window.confirm
+  it('deletes the goal only after confirmation and goes back to the goals', async () => {
+    const deleted: string[] = [];
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.delete('/api/v1/goals/g1', () => {
+        deleted.push('g1');
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(
+      <Routes>
+        <Route path="/goals/:goalId" element={<GoalDetail />} />
+        <Route path="/goals" element={<p>goal list</p>} />
+      </Routes>,
+      { route: '/goals/g1' },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete goal' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete goal' });
+    expect(within(dialog).getByText('Delete this goal? Its TODOs stay and only lose the assignment.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete goal' })).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('goal list')).toBeInTheDocument();
+    expect(deleted).toEqual(['g1']);
+  });
+
   it('keeps the error card with retry for other errors of the map', async () => {
     localStorage.setItem('mysuricates-goal-view', 'map');
     server.use(

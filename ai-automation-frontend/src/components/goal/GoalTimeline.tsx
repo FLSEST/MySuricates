@@ -4,12 +4,12 @@ import {
   type Announcements, type DragEndEvent, type DragMoveEvent, type Modifier, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
-import { Plus } from 'lucide-react';
-import { Button, Card } from '../ui';
+import { Plus, Trash2 } from 'lucide-react';
+import { Button, Card, ConfirmModal } from '../ui';
 import { Hint } from '../hints/Hint';
 import { useT } from '../../i18n';
 import { useElementWidth } from '../../hooks/useElementWidth';
-import { usePlanGoalTodo } from '../../hooks/useGoalTimeline';
+import { useDeleteMilestone, usePlanGoalTodo } from '../../hooks/useGoalTimeline';
 import {
   CHIP_ANCHOR, CHIP_WIDTH, FALLBACK_WIDTH, axisFor, buildRows, dayAtX, dayOf, dropTargetOf, isOverdue, planChanges,
   xOfDay, type PlanChanges,
@@ -75,6 +75,9 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
   const [dragging, setDragging] = useState<GoalTodoItem | null>(null);
   const [preview, setPreview] = useState<{ row: string; day: number } | null>(null);
   const [panel, setPanel] = useState<MilestonePanel | null>(null);
+  // Milestone whose deletion waits for the confirmation (23635ef6)
+  const [removing, setRemoving] = useState<GoalMilestone | null>(null);
+  const removeMilestone = useDeleteMilestone(goal.id);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const closePanel = useCallback(() => setPanel(null), []);
   const planFromMenu = useCallback(
@@ -170,8 +173,12 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
                   <MilestoneForm goalId={goal.id} initialDay={panel.day} onClose={closePanel} style={panelAt(panel.x)} />
                 )}
                 {openMilestone && panel?.kind === 'view' && (
-                  <MilestoneCard goalId={goal.id} milestone={openMilestone} todos={todos} style={openMilestoneAt}
-                    onEdit={() => setPanel({ kind: 'edit', id: openMilestone.id })} onClose={closePanel} />
+                  <MilestoneCard milestone={openMilestone} todos={todos} style={openMilestoneAt}
+                    onEdit={() => setPanel({ kind: 'edit', id: openMilestone.id })} onClose={closePanel}
+                    onDelete={() => {
+                      setPanel(null);
+                      setRemoving(openMilestone);
+                    }} />
                 )}
                 {openMilestone && panel?.kind === 'edit' && (
                   <MilestoneForm goalId={goal.id} milestone={openMilestone} initialDay={null} onClose={closePanel} style={openMilestoneAt} />
@@ -193,6 +200,18 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
           )}
         </DragOverlay>
       </DndContext>
+
+      <ConfirmModal
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => removing && removeMilestone.mutate(removing.id, { onSettled: () => setRemoving(null) })}
+        title={t.goals.milestones.deleteTitle}
+        message={removing ? t.goals.milestones.deleteConfirm.replace('{title}', () => removing.title) : null}
+        confirmLabel={t.goals.milestones.delete}
+        confirmIcon={<Trash2 className="h-4 w-4" />}
+        variant="danger"
+        isPending={removeMilestone.isPending}
+      />
     </section>
   );
 }

@@ -71,6 +71,12 @@ async function applyVersion(id: string): Promise<boolean> {
 }
 
 /**
+ * Asks whether the local view `name` may be replaced by the one of an older version; resolves false
+ * when the user declines. The page shows the question as its own dialog (23635ef6: was window.confirm).
+ */
+export type ConfirmReplaceView = (name: string) => Promise<boolean>;
+
+/**
  * Keeps the per-browser dashboard layout in step with the version history on the server (spec E1).
  * Reads store state directly so the actions never work with a stale render snapshot. The active
  * view is chosen per device and never counts as a difference.
@@ -210,7 +216,7 @@ export function useDashboardLayoutSync() {
       useDashboardSyncStore.getState().markDirty();
       await persistSnapshot(true);
     })),
-    adoptView: (versionId: string, viewId: string) => run(() => loadAndThen(async () => {
+    adoptView: (versionId: string, viewId: string, confirmReplace: ConfirmReplaceView) => run(() => loadAndThen(async () => {
       const t = getTranslations();
       const layout = layoutFromVersion(await fetchDashboardLayoutVersion(versionId));
       if (!layout) {
@@ -227,7 +233,7 @@ export function useDashboardLayoutSync() {
       if (local && hasLocalLayoutChanges()) {
         const views = useDashboardLayoutStore.getState().views;
         const name = viewLabels(views, t.dashboard.views.defaultName, (n) => t.dashboard.views.numbered.replace('{n}', () => String(n))).get(local.id) ?? local.name;
-        if (!window.confirm(t.dashboard.history.adoptViewConfirm.replace('{name}', () => name))) return;
+        if (!(await confirmReplace(name))) return;
       }
       if (!useDashboardLayoutStore.getState().upsertView(view)) {
         notify('warning', t.dashboard.history.adoptViewLimit.replace('{max}', () => String(LAYOUT_LIMITS.views)));

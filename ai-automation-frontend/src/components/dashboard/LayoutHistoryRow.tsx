@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Layers, Pencil, RotateCcw } from 'lucide-react';
-import { Badge, Button, Input, Spinner } from '../ui';
+import { Badge, Button, ConfirmModal, Input, Spinner } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDateTime, formatRelativeTime } from '../../utils/formatTime';
 import { useDashboardLayoutVersion, useRenameDashboardLayoutVersion } from '../../hooks/useDashboardLayoutVersions';
@@ -21,6 +21,8 @@ export function LayoutHistoryRow({ version, isCurrent, busy, onRestore, onAdoptV
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState(version.name ?? '');
   const [showViews, setShowViews] = useState(false);
+  // Restoring asks first, in a dialog above the history (23635ef6: was window.confirm)
+  const [confirmRestore, setConfirmRestore] = useState(false);
   const rename = useRenameDashboardLayoutVersion();
   const { data: full } = useDashboardLayoutVersion(version.id, showViews);
   const views = full ? layoutFromVersion(full)?.views ?? [] : [];
@@ -54,9 +56,7 @@ export function LayoutHistoryRow({ version, isCurrent, busy, onRestore, onAdoptV
             size="sm"
             icon={<RotateCcw className="w-3.5 h-3.5" />}
             disabled={busy}
-            onClick={() => {
-              if (window.confirm(t.dashboard.history.restoreConfirm)) onRestore(version.id);
-            }}
+            onClick={() => setConfirmRestore(true)}
           >
             {t.dashboard.history.restore}
           </Button>
@@ -102,6 +102,19 @@ export function LayoutHistoryRow({ version, isCurrent, busy, onRestore, onAdoptV
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmRestore}
+        onClose={() => setConfirmRestore(false)}
+        onConfirm={() => {
+          setConfirmRestore(false);
+          onRestore(version.id);
+        }}
+        title={t.dashboard.history.restore}
+        message={t.dashboard.history.restoreConfirm}
+        confirmLabel={t.dashboard.history.restore}
+        confirmIcon={<RotateCcw className="w-4 h-4" />}
+      />
     </li>
   );
 }

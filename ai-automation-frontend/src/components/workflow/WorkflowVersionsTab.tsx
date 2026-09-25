@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { History, RotateCcw, ChevronDown, ChevronRight, User, Bot, Download, Globe, Sparkles, Link2, Undo2, AlertTriangle, Target } from 'lucide-react';
 import { useWorkflowVersions, useRestoreWorkflowVersion } from '../../hooks/useWorkflowVersions';
+import { ConfirmModal } from '../ui';
 import { useT, useI18nStore } from '../../i18n';
 import { formatRelativeTime } from '../../utils/formatTime';
 import type { WorkflowVersion } from '../../types';
@@ -50,6 +51,8 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
   const locale = useI18nStore((s) => s.locale);
   const [page, setPage] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Version whose restore waits for the confirmation (23635ef6)
+  const [restoring, setRestoring] = useState<WorkflowVersion | null>(null);
   const { data, isLoading } = useWorkflowVersions(workflowId, page);
   const restoreMutation = useRestoreWorkflowVersion(workflowId);
 
@@ -74,11 +77,7 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
     );
   }
 
-  const handleRestore = (version: WorkflowVersion) => {
-    if (confirm(t.workflows.restoreConfirm.replace('{version}', String(version.versionNumber)))) {
-      restoreMutation.mutate(version.id);
-    }
-  };
+  const handleRestore = (version: WorkflowVersion) => setRestoring(version);
 
   const sourceLabels = t.workflows.sourceLabels;
 
@@ -179,6 +178,17 @@ export default function WorkflowVersionsTab({ workflowId, currentHash }: { workf
           </button>
         </div>
       )}
+
+      <ConfirmModal
+        open={restoring !== null}
+        onClose={() => setRestoring(null)}
+        onConfirm={() => restoring && restoreMutation.mutate(restoring.id, { onSettled: () => setRestoring(null) })}
+        title={t.workflows.restoreVersion}
+        message={restoring ? t.workflows.restoreConfirm.replace('{version}', String(restoring.versionNumber)) : null}
+        confirmLabel={t.workflows.restoreVersion}
+        confirmIcon={<RotateCcw className="w-4 h-4" />}
+        isPending={restoreMutation.isPending}
+      />
     </div>
   );
 }

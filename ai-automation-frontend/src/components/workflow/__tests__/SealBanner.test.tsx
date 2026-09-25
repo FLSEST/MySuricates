@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { en } from '../../../i18n/en';
@@ -81,6 +82,27 @@ describe('SealBanner', () => {
     renderWithProviders(<SealBanner workflow={workflow({ sealed: true })} status={status({ signed: false })} />);
 
     expect(screen.getByTestId('seal-unsigned')).toHaveTextContent(en.workflows.sealView.unsignedBody);
+  });
+
+  // 23635ef6: the app's own dialog instead of window.confirm
+  it('unseals from the banner only after confirmation', async () => {
+    const unsealed: string[] = [];
+    server.use(http.post('/api/v1/workflows/wf-1/unseal', () => {
+      unsealed.push('wf-1');
+      return HttpResponse.json(workflow());
+    }));
+    renderWithProviders(<SealBanner workflow={workflow({ sealed: true })} status={status({ state: 'VIOLATED', problem: 'DEFINITION_CHANGED' })} />);
+
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: en.workflows.unseal }));
+    const dialog = screen.getByRole('dialog', { name: en.workflows.unseal });
+    expect(within(dialog).getByText(en.workflows.unsealConfirm)).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(unsealed).toEqual([]);
+
+    fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: en.workflows.unseal }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: en.workflows.unseal })).getByRole('button', { name: en.workflows.unseal }));
+    await waitFor(() => expect(unsealed).toEqual(['wf-1']));
   });
 
   it('names a forged signature as the reason', () => {

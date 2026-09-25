@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -89,5 +89,29 @@ describe('SimpleWorkflows — ?template= and ?pool= (hits of the home field)', (
     expect(within(dialog).getByText(en.workflows.create)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/workflows$/));
     expect(within(screen.getByRole('dialog')).queryByDisplayValue('Invoice reminder')).toBeNull();
+  });
+});
+
+// 23635ef6: the app's own dialog instead of window.confirm
+describe('SimpleWorkflows — delete', () => {
+  it('names the workflow and deletes it only after confirmation', async () => {
+    const deleted: string[] = [];
+    server.use(http.delete('/api/v1/workflows/:id', ({ params }) => {
+      deleted.push(String(params.id));
+      return new HttpResponse(null, { status: 204 });
+    }));
+    renderAt('/workflows');
+
+    await screen.findByText('Test Workflow');
+    fireEvent.click(screen.getByRole('button', { name: en.common.delete }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete "Test Workflow"?' });
+    expect(within(dialog).getByText(`${en.common.deleteConfirm} ${en.workflows.deleteConfirm}`)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: en.common.cancel }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: en.common.delete }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: en.common.delete }));
+    await waitFor(() => expect(deleted).toEqual(['w1']));
   });
 });
