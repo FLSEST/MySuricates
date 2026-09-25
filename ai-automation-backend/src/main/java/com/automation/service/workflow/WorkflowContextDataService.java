@@ -24,9 +24,10 @@ import java.util.regex.Pattern;
 
 /**
  * Loads platform data that is injected into the {@link ExecutionContext} as template
- * variables ({@code previous_report}, {@code open_todos}, {@code request_metrics}, and with
- * {@code goal_id} also {@code goal_status}/{@code goal_guard_*}) so workflows never need direct
- * DB or API access. Extracted from {@code WorkflowExecutor} (pure data queries).
+ * variables ({@code previous_report}, {@code open_todos}, {@code request_metrics}, with
+ * {@code goal_id} also {@code goal_status}/{@code goal_guard_*}, and for an audit workflow
+ * {@code audit_findings}) so workflows never need direct DB or API access. Extracted from
+ * {@code WorkflowExecutor} (pure data queries).
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +40,7 @@ public class WorkflowContextDataService {
     private final RequestMetricsFactSheet requestMetricsFactSheet;
     private final ActivityLogService activityLogService;
     private final GoalContextSource goalContextSource;
+    private final AuditContextSource auditContextSource;
 
     /**
      * What a failed injection writes into the context instead of leaving the variable absent.
@@ -68,8 +70,12 @@ public class WorkflowContextDataService {
      * was never set, six tests stayed green because the two variables set before it still looked
      * right, and a gate block reading the empty value passed as GREEN. TODO 62d186b8,
      * {@code docs/belege.md} → „Sechs grüne Tests über einer Variable, die nie gesetzt wurde".
+     *
+     * <p>{@code workflowMeta} decides about {@code audit_findings} (TODO 3643beac): only a workflow with
+     * a valid {@code metadata.audit} gets it, through the same error path as the others.
      */
-    public void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
+    public void injectPlatformData(ExecutionContext context, String workflowId, String projectId,
+                                   Map<String, Object> workflowMeta) {
         // Untrusted: both carry foreign text — an earlier run's output (which may have processed a
         // webhook payload) and TODO titles from imports. In shell blocks they are always quoted;
         // in prompts nothing changes. See ExecutionContext#setUntrustedPlatformVariable.
@@ -79,6 +85,16 @@ public class WorkflowContextDataService {
         // shell block to see them, since it must not call the REST API (CLAUDE.md).
         inject(context, workflowId, "request_metrics", this::renderRequestMetrics);
         injectGoal(context, workflowId);
+        String auditKey = auditContextSource.auditKey(workflowMeta);
+        if (auditKey != null) {   // no audit workflow: the variable does not exist
+            inject(context, workflowId, AuditContextSource.VARIABLE,
+                    () -> auditContextSource.findings(projectId, auditKey));
+        }
+    }
+
+    /** Short form without workflow metadata — a run that is no audit workflow. */
+    public void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
+        injectPlatformData(context, workflowId, projectId, Map.of());
     }
 
     /**

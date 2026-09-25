@@ -193,11 +193,47 @@ class ExecutionContextFactoryTest {
     void create_injectsPlatformData_andBlankModelProviderEffortStayNull() {
         ExecutionContext ctx = factory.create(seed(Map.of()));
 
-        verify(contextDataService).injectPlatformData(ctx, "wf-1", "proj-1");
+        // The short seed carries no workflow metadata: no audit workflow
+        verify(contextDataService).injectPlatformData(ctx, "wf-1", "proj-1", Map.of());
         assertThat(ctx.getModel()).isNull();
         assertThat(ctx.getProvider()).isNull();
         assertThat(ctx.getEffort()).isNull();
         assertThat(ctx.getInstructionPrefix()).isNull();
+    }
+
+    /** TODO 3643beac: metadata.audit reaches the platform injection, which decides about audit_findings. */
+    @Test
+    void create_passesTheWorkflowMetadataToThePlatformInjection() {
+        Map<String, Object> meta = Map.of("audit", Map.of("enabled", true, "key", "project.security",
+                "category", "security", "reportBlock", "report"));
+
+        ExecutionContext ctx = factory.create(new ExecutionContextFactory.ContextSeed("run-1", "wf-1", "Demo", project,
+                "docker-1", Map.of(), null, "", "", "", null, null, TriggerSource.SCHEDULE, false, meta));
+
+        verify(contextDataService).injectPlatformData(ctx, "wf-1", "proj-1", meta);
+    }
+
+    @Test
+    void create_nullWorkflowMetadata_isTreatedAsNone() {
+        ExecutionContextFactory.ContextSeed seed = new ExecutionContextFactory.ContextSeed("run-1", "wf-1", "Demo",
+                project, "docker-1", Map.of(), null, "", "", "", null, null, null, false, null);
+
+        assertThat(seed.workflowMeta()).isEmpty();
+    }
+
+    /**
+     * TODO 3643beac: audit_findings describes the running workflow. A parent run hands every variable to
+     * its sub-workflow — the parent's findings must not survive there as a trusted, unquoted variable.
+     */
+    @Test
+    void create_handedOverAuditFindings_areDropped_soOnlyThePlatformSetsThem() {
+        ExecutionContext ctx = factory.create(seed(Map.of("audit_findings", "OPEN | HIGH | x | $(id) | y",
+                "foo", "bar")));
+
+        assertThat(ctx.getVariables()).doesNotContainKey("audit_findings").containsEntry("foo", "bar");
+        assertThat(ctx.resolveShellTemplate("echo {{ audit_findings }}", false))
+                .as("left to the platform injection — the mock sets nothing, so the placeholder stays")
+                .isEqualTo("echo {{ audit_findings }}");
     }
 
     @Test

@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 /**
  * Macht nicht vertrauenswuerdigen Text – Titel von TODOs, Zielen und Meilensteinen aus Importen,
  * Webhooks oder KI-Ausgaben – zu einer begrenzten Zeile ohne Plattform-Marker und ohne Blockgrenzen.
- * Gebraucht fuer die Kontextvariablen {@code open_todos} (service.workflow) und {@code goal_status}
- * (service.goal); liegt hier, damit beide denselben Sanierer nutzen, ohne voneinander abzuhaengen
- * (TODO d2844a58).
+ * Gebraucht fuer die Kontextvariablen {@code open_todos} (service.workflow), {@code goal_status}
+ * (service.goal) und {@code audit_findings} (service.audit); liegt hier, damit alle denselben Sanierer
+ * nutzen, ohne voneinander abzuhaengen (TODO d2844a58, TODO 3643beac).
  */
 public final class UntrustedText {
 
@@ -20,8 +20,8 @@ public final class UntrustedText {
     /** Ausgabe-Marker, die die Plattform auswertet (todo_item, gate_*, dashboard_widget) – entschaerft durch Entfernen des Doppelpunkts. */
     private static final Pattern MARKERS = Pattern.compile(
             "(?i)(todo[_-]item|gate[_-](?:status|category|description)|dashboard[_-]widget)[*`\\s]*:");
-    /** Die Blockgrenzen selbst ({@code open_todos}, {@code goal_status}) duerfen aus einem Titel heraus nicht faelschbar sein. */
-    private static final Pattern DELIMITER = Pattern.compile("(?i)</?\\s*(open_todos|goal_status)\\s*>");
+    /** Die Blockgrenzen selbst ({@code open_todos}, {@code goal_status}, {@code audit_findings}) duerfen aus einem Titel heraus nicht faelschbar sein. */
+    private static final Pattern DELIMITER = Pattern.compile("(?i)</?\\s*(open_todos|goal_status|audit_findings)\\s*>");
 
     private UntrustedText() {
     }

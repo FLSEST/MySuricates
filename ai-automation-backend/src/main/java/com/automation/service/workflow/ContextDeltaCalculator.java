@@ -17,6 +17,8 @@ final class ContextDeltaCalculator {
                     "workflow_name", "project_id", "project_path",
                     "model", "provider", "effort", "started_at", "run_timestamp",
                     "previous_report", "open_todos", "request_metrics",
+                    // audit_findings (TODO 3643beac): platform data of an audit workflow, re-injected on every run
+                    AuditContextSource.VARIABLE,
                     "workflow_version", "workflow_changed_since_last_run", "workflow_definition_hash", "trigger_source"),
             // goal_status + goal_guard_* (TODO 259f4f66): platform data, re-injected on every run
             GoalContextSource.VARIABLES.stream())

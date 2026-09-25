@@ -1,0 +1,131 @@
+{
+  "id": "audit-findings-reach-the-next-run",
+  "title": "Ein Audit-Workflow sieht in {{ audit_findings }} die Befunde seines Vorlaufs, sein Kind-Workflow ohne Audit sieht sie nicht",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE → audit_findings: nur ein Workflow mit gültigem metadata.audit bekommt die bekannten Befunde seines Audits (OPEN, AWAITING_VERIFICATION, ACCEPTED_RISK, DISMISSED), ohne Befunde „(keine bekannten Befunde)“; in jedem anderen Workflow gibt es die Variable nicht, auch nicht über die Variablen-Übergabe an einen Sub-Workflow",
+    "incidents": [
+      "3643beac (Offene Audit-Befunde als Kontextvariable für Audit-Workflows): Report-Prompts kannten weder den Stand noch die Einordnung ihrer Befunde und vergaben Identitäten neu"
+    ]
+  },
+  "workflows": {
+    "kind": {
+      "provider": "SCRIPTED",
+      "blocks": [
+        {
+          "type": "simple",
+          "name": "kind_pruefen",
+          "config": {
+            "command": "Kind sieht: {{ audit_findings }}"
+          }
+        }
+      ]
+    }
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "metadata": {
+      "audit": {
+        "enabled": true,
+        "key": "scenario.findings-context",
+        "category": "quality",
+        "reportBlock": "bericht"
+      }
+    },
+    "blocks": [
+      {
+        "type": "sub-workflow",
+        "name": "kind_laufen",
+        "config": {
+          "workflow_id": "@kind"
+        }
+      },
+      {
+        "type": "simple",
+        "name": "bericht",
+        "config": {
+          "command": "Bekannte Befunde:\n{{ audit_findings }}\nPrüfe den Stand und liefere den Audit-Envelope."
+        }
+      }
+    ]
+  },
+  "runs": [
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "match": "Kind sieht:",
+            "respond": "Kind fertig."
+          },
+          {
+            "match": "Bekannte Befunde:",
+            "respond": "## Befunde\n\n2 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ApprovalBlockExecutor\", \"severity\": \"LOW\", \"title\": \"Freigabe ohne Pfad-Test\"}, {\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette ohne Pfad-Test\"}]} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "VALID",
+        "auditFindingCount": 2,
+        "aiCallCount": {
+          "SCRIPTED": 2
+        },
+        "aiCalls": {
+          "SCRIPTED": [
+            {
+              "promptContains": ["Kind sieht: {{ audit_findings }}"]
+            },
+            {
+              "promptContains": ["Bekannte Befunde:\n(keine bekannten Befunde)\nPrüfe den Stand"],
+              "promptNotContains": ["{{ audit_findings }}"]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ai": {
+        "SCRIPTED": [
+          {
+            "match": "Kind sieht:",
+            "respond": "Kind fertig."
+          },
+          {
+            "match": "Bekannte Befunde:",
+            "respond": "## Befunde\n\n2 Befund(e).\n\n<!-- mysuricates:audit-result:v1 {\"snapshotComplete\": true, \"findings\": [{\"ruleKey\": \"missing-path-test\", \"subject\": \"ApprovalBlockExecutor\", \"severity\": \"LOW\", \"title\": \"Freigabe ohne Pfad-Test\"}, {\"ruleKey\": \"missing-path-test\", \"subject\": \"ChainExecutor\", \"severity\": \"MEDIUM\", \"title\": \"Kette ohne Pfad-Test\"}]} -->"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "auditReport": "VALID",
+        "auditFindingCount": 2,
+        "auditFindings": [
+          {
+            "subject": "ChainExecutor",
+            "status": "OPEN",
+            "occurrenceCount": 2
+          }
+        ],
+        "aiCalls": {
+          "SCRIPTED": [
+            {
+              "promptContains": ["Kind sieht: {{ audit_findings }}"],
+              "promptNotContains": ["<audit_findings>", "Pfad-Test"]
+            },
+            {
+              "promptContains": [
+                "<audit_findings>\n",
+                "\nAudit scenario.findings-context: OPEN 2 · AWAITING_VERIFICATION 0 · ACCEPTED_RISK 0 · DISMISSED 0\n",
+                "\nOPEN | MEDIUM | missing-path-test | ChainExecutor | Kette ohne Pfad-Test\nOPEN | LOW | missing-path-test | ApprovalBlockExecutor | Freigabe ohne Pfad-Test\n</audit_findings>"
+              ],
+              "promptNotContains": ["{{ audit_findings }}"]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "expect": {
+    "auditFindingCount": 2
+  }
+}

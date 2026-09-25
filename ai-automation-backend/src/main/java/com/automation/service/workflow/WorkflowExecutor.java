@@ -200,7 +200,7 @@ public class WorkflowExecutor {
             context = executionContextFactory.create(new ExecutionContextFactory.ContextSeed(
                     runId, workflowId, workflowName, project, containerId, inputContext,
                     instructions, model, provider, effort, resumePreviousOutput, run.getDefinitionHash(),
-                    run.getTriggerSource(), UserPreferencesService.requestedBy(workflowMeta)));
+                    run.getTriggerSource(), UserPreferencesService.requestedBy(workflowMeta), workflowMeta));
 
             context.startStepIndicesAt(resume.firstStepIndex());
             executionRegistry.promote(runId, context);
