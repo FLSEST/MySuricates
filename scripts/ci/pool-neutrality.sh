@@ -193,6 +193,11 @@ VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + re.escape(API_PREFI
 # in einer Liste von Netzwerk-Kennzeichen, direkt neben 'fetch(' und 'axios.'.
 PATH_AT = re.compile(re.escape(API_PREFIX) + r'[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
 
+
+def path_of(endpoint):
+    """Der Pfad ohne Satzpunkt am Ende: "Heap aus /api/v1/system/jvm-memory." nennt die Sonde selbst."""
+    return endpoint.group(0).rstrip('.')
+
 # Schluessel, unter denen ein Block Shell-Code ausfuehrt: der Befehl eines shell-Blocks und, bei
 # execution_mode: shell, auch Bedingung und Zweige (conditional, while, retry, foreach, im switch
 # jeder Block); items_command von foreach laeuft immer in der Shell.
@@ -243,14 +248,14 @@ for path in sys.argv[1:]:
         shell_code(json.loads(raw), shells)
     except ValueError:
         pass  # PARSE meldet scan_definition_rules
-    self_api = next(((endpoint.group(0), 'im Shell-Code') for text in shells
-                     for endpoint in PATH_AT.finditer(text) if endpoint.group(0) not in API_ALLOWED), None)
+    self_api = next(((path_of(endpoint), 'im Shell-Code') for text in shells
+                     for endpoint in PATH_AT.finditer(text) if path_of(endpoint) not in API_ALLOWED), None)
     if self_api is None:
         for i, window in windows(raw, API_PREFIX):
             endpoint = PATH_AT.match(raw, i)
             if endpoint is None:
                 continue
-            hit = endpoint.group(0)
+            hit = path_of(endpoint)
             if any(hit.startswith(allowed) for allowed in API_ALLOWED):
                 continue
             caller = next((c for c in API_CALLERS if c in window), None)

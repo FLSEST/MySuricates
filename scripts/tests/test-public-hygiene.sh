@@ -373,6 +373,20 @@ write_pool api-keyfree-loop-ok <<JSON
  "blocks": [{"type": "shell", "config": {"command": "for E in /actuator/health /api/v1/system/jvm-memory; do\n  # $PAD\n  curl -s -m 5 http://localhost:9090\$E\ndone"}}]}
 JSON
 
+# Ein Satzpunkt gehoert nicht zum Pfad: die Sonde am Satzende bleibt erlaubt, der Schluessel-Endpunkt am
+# Satzende wird ohne Punkt gemeldet.
+write_pool api-probe-sentence-ok <<'JSON'
+{"name": {"de": "Satz", "en": "Sentence"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "# Heap aus /api/v1/system/jvm-memory.\ncurl -s -m 5 http://localhost:9090/api/v1/system/jvm-memory"}}]}
+JSON
+
+write_pool self-api-sentence <<'JSON'
+{"name": {"de": "Satz", "en": "Sentence"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "# Die Kosten stehen unter /api/v1/todos.\necho ok"}}]}
+JSON
+
 write_pool api-path-in-prompt-ok <<'JSON'
 {"name": {"de": "Prompt", "en": "Prompt"},
  "description": {"de": "Text.", "en": "Text."}, "scope": "repo", "tags": ["quality"],
@@ -421,6 +435,9 @@ check "items_command von foreach erkannt"        'grep -q "self-api-items-comman
 check "Umweg ueber eine Sonde erkannt"           'grep -q "self-api-probe-detour.*SELF-API" <<<"$OUT"'
 check "Sonden in der Schleife bleiben erlaubt"   '! grep -q "api-keyfree-loop-ok" <<<"$OUT"'
 check "Pfad im Prompt ohne Aufruf bleibt erlaubt" '! grep -q "api-path-in-prompt-ok" <<<"$OUT"'
+check "Sonde mit Satzpunkt bleibt erlaubt"       '! grep -q "api-probe-sentence-ok" <<<"$OUT"'
+check "Endpunkt mit Satzpunkt: gemeldet ohne den Punkt" \
+  'grep -q "self-api-sentence.*SELF-API.*'"'"'/api/v1/todos'"'"' (im Shell-Code)" <<<"$OUT"'
 
 echo "13) Blocktyp-Drift: die erzeugte Gate-Liste deckt sich mit der Registry im Backend"
 # Seit TODO bdc784e1 ist HYGIENE_POOL_BLOCK_TYPES nicht mehr handgepflegt, sondern
