@@ -19,16 +19,19 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      hinein. Ein am 2026-09-18 auf main aufgefallener Paketzyklus wurde deshalb erst beim
      Integrations-Checkpoint sichtbar, nicht schon im Feature-Branch.
    - **Gezielter Lauf gegen eine Klasse mit `@Nested`-Tests:** `-Dtest='Klasse'` wählt in diesem
-     Repo (Surefire 3.5.4) auch die `@Nested`-Inneren-Klassen aus — verifiziert per gezielter
-     Fehlprobe in einer `@Nested`-Methode, die den Build zuverlässig scheitern ließ. **Trotzdem**
-     als Konvention `-Dtest='Klasse*'` verwenden (auch mit Wildcard, matcht ebenfalls alle
-     `@Nested`-Klassen und bleibt unabhängig von Surefire-Version/-Konfiguration verlässlich) —
-     und sich **nie** an der Summenzeile der äußeren Klasse allein orientieren: Der eigene
-     Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet grundsätzlich
-     `Tests run: 0`, weil die äußere Klasse selbst keine `@Test`-Methoden hat — das ist normal
-     und **kein** Hinweis auf einen leeren Lauf. Maßgeblich ist die abschließende
-     `Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code, nicht eine
-     einzelne Klassenzeile oder ein abgeschnittener `tail`.
+     Repo (Surefire 3.5.6 aus dem Spring-Boot-Parent) auch die `@Nested`-Inneren-Klassen aus —
+     verifiziert per gezielter Fehlprobe, die den Build zuverlässig scheitern ließ. **Trotzdem**
+     als Konvention `-Dtest='Klasse*'` verwenden (matcht ebenfalls alle `@Nested`-Klassen und
+     bleibt unabhängig von Surefire-Version/-Konfiguration verlässlich). Maßgeblich sind der
+     Exit-Code des gesamten Maven-Laufs und die `<testcase>`-/`<failure>`-/`<error>`-Elemente in
+     `target/surefire-reports/TEST-<Klasse>.xml` (dort landen auch alle `@Nested`-Klassen). Nicht
+     zum Zählen taugen: die `.txt` der äußeren Klasse (grundsätzlich `Tests run: 0`, weil sie
+     selbst keine `@Test`-Methoden hat — normal, **kein** leerer Lauf), der `<testsuite>`-Kopf der
+     XML (je nach Surefire-Version), eine einzelne Klassenzeile, ein abgeschnittener `tail` — und
+     auch die abschließende `Results: Tests run: N`-Zeile nicht: Sie zählt gleichnamige Methoden
+     verschiedener `@Nested`-Klassen nur einmal. Keine Reruns
+     (`-Dsurefire.rerunFailingTestsCount` > 0): Dann gilt ein roter Test mit grünem Namensvetter
+     nebenan als „Flake“ und der Build als grün. Probe-Zahlen: [docs/entwicklung.md](docs/entwicklung.md).
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
    - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten,

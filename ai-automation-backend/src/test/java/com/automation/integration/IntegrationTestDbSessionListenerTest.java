@@ -15,16 +15,19 @@ class IntegrationTestDbSessionListenerTest {
     private static final String DB_PROPERTY = "integration.db.path";
     private static final String KEY_PROPERTY = "integration.key.path";
     private static final String BACKUP_DIR_PROPERTY = "integration.backup.dir";
+    private static final String SETUP_DIR_PROPERTY = "integration.setup.dir";
 
     private String previousDbValue;
     private String previousKeyValue;
     private String previousBackupDirValue;
+    private String previousSetupDirValue;
 
     @BeforeEach
     void savePropertyState() {
         previousDbValue = System.getProperty(DB_PROPERTY);
         previousKeyValue = System.getProperty(KEY_PROPERTY);
         previousBackupDirValue = System.getProperty(BACKUP_DIR_PROPERTY);
+        previousSetupDirValue = System.getProperty(SETUP_DIR_PROPERTY);
     }
 
     @AfterEach
@@ -32,6 +35,7 @@ class IntegrationTestDbSessionListenerTest {
         restore(DB_PROPERTY, previousDbValue);
         restore(KEY_PROPERTY, previousKeyValue);
         restore(BACKUP_DIR_PROPERTY, previousBackupDirValue);
+        restore(SETUP_DIR_PROPERTY, previousSetupDirValue);
     }
 
     private static void restore(String property, String previousValue) {
@@ -192,6 +196,55 @@ class IntegrationTestDbSessionListenerTest {
         listener.launcherSessionClosed(null);
 
         assertThat(System.getProperty(BACKUP_DIR_PROPERTY)).isNull();
+    }
+
+    @Test
+    void sessionOpened_setsPerProcessUniqueSetupDir() {
+        System.clearProperty(SETUP_DIR_PROPERTY);
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+
+        listener.launcherSessionOpened(null);
+
+        String path = System.getProperty(SETUP_DIR_PROPERTY);
+        assertThat(path)
+                .isNotNull()
+                .contains("autotrigger-it-setup-")
+                .contains(String.valueOf(ProcessHandle.current().pid()));
+        // Summarization and factory instructions must never land in the developer's real ~/.autotrigger
+        assertThat(path).doesNotContain(System.getProperty("user.home"));
+
+        listener.launcherSessionClosed(null);
+    }
+
+    @Test
+    void sessionOpened_respectsExternallySetSetupDir() {
+        System.setProperty(SETUP_DIR_PROPERTY, "/tmp/externally-managed-setup");
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+
+        listener.launcherSessionOpened(null);
+        assertThat(System.getProperty(SETUP_DIR_PROPERTY)).isEqualTo("/tmp/externally-managed-setup");
+
+        listener.launcherSessionClosed(null);
+        assertThat(System.getProperty(SETUP_DIR_PROPERTY)).isEqualTo("/tmp/externally-managed-setup");
+    }
+
+    @Test
+    void sessionClosed_deletesSetupDirRecursivelyAndClearsProperty() throws IOException {
+        System.clearProperty(SETUP_DIR_PROPERTY);
+        IntegrationTestDbSessionListener listener = new IntegrationTestDbSessionListener();
+        listener.launcherSessionOpened(null);
+
+        // The layout SummarizationSetupService and FactorySetupService create on context start
+        Path dir = Path.of(System.getProperty(SETUP_DIR_PROPERTY));
+        Files.createDirectories(dir.resolve("summarization/claude"));
+        Files.writeString(dir.resolve("summarization/claude/CLAUDE.md"), "instructions");
+        Files.createDirectories(dir.resolve("factory/codex"));
+        Files.writeString(dir.resolve("factory/codex/AGENTS.md"), "instructions");
+
+        listener.launcherSessionClosed(null);
+
+        assertThat(Files.exists(dir)).as("setup dir removed with contents").isFalse();
+        assertThat(System.getProperty(SETUP_DIR_PROPERTY)).isNull();
     }
 
     @Test

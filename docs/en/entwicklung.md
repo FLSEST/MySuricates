@@ -223,8 +223,35 @@ version/configuration. **Warning:** whichever form you pick, the outer class's o
 (`target/surefire-reports/<Class>.txt`) always reports `Tests run: 0` for the outer class itself,
 because it has no `@Test` methods of its own — that is normal, not empty. A run whose `@Nested`
 tests genuinely did not execute for some other reason can still look "green" from that single line
-if you only check it, or a truncated `tail`. What actually matters is the final
-`Results: Tests run: N` line of the whole Maven run, or its exit code.
+if you only check it, or a truncated `tail`. What actually matters is the exit code of the whole
+Maven run; count tests via the `<testcase>`, `<failure>` and `<error>` elements in
+`target/surefire-reports/TEST-<Class>.xml` (every `@Nested` class ends up there too, there is no
+separate file per inner class) or via the per-class console lines.
+
+**Caveat for same-named methods in `@Nested` classes:** the final `Results: Tests run: N` line
+merges results under the key outer class + method name. When methods in two `@Nested` classes of
+the same outer class share a name, they count only once there; several failures of the same name
+show up under `Failures:` as `Run 1`, `Run 2`, … like reruns. The `<testsuite tests=… failures=…>`
+header of the XML is no good for counting either, and what it shows depends on the Surefire
+version — which comes unpinned from the Spring Boot parent (this repo: 3.5.6). Under 3.5.4 it only
+carries the numbers of the outer class itself, like its `.txt`, so mostly 0; under 3.5.6 it merges
+by method name like the `Results` line and has an additional `flakes` attribute. Targeted failing
+probe (2026-09-25, the same test class under both versions): three `@Nested` classes with a red
+`sameName()` in each, one unique red method in two of them and a green `passesEverywhere()` in two.
+
+| Source (runs / failures) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Per-class console lines, summed | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>` header of the XML | 0 / 0 | 4 / 3 |
+| `<testcase>` / `<failure>` elements of the XML | 7 / 5 | 7 / 5 |
+| `.txt` of the outer class | 0 / 0 | 0 / 0 |
+| Exit code | 1 | 1 |
+
+It turns dangerous with `-Dsurefire.rerunFailingTestsCount` > 0 (checked under 3.5.6): a red test
+whose namesake in a sibling `@Nested` class is green then counts as a "flake", and the build ends
+with `BUILD SUCCESS` and exit code 0 although the test failed in both attempts. The `pom.xml`
+enables no reruns; keep it that way.
 
 **`ERROR` lines in a green run:** Many tests exercise failure paths — a mock throws, the code
 catches it and correctly logs it at `ERROR`, stack trace included. A green run therefore writes
@@ -280,6 +307,8 @@ Which tool when:
 **Integration encryption key pinned to a temp path in the test profile:** Since 2026-09-12, just like `integration.db.path`, `IntegrationTestDbSessionListener` also sets `integration.key.path` (a per-JVM temp file, deleted on teardown), which `application-integration.yml`'s `automation.integration.key-file` points to — without this pin, `IntegrationEncryptionService.init()` would generate a fresh AES key into the developer's real `~/.autotrigger/` on every `@SpringBootTest` with empty `app_settings` (happened 2026-08-06, shadowing the real key for months).
 
 **Backups disabled and pinned to a temp directory in the test profile:** The same trap a third time (2026-09-13): `automation.backup` defaults to `enabled: true` and `directory: ${user.home}/.autotrigger/backups/dev`, and `application-integration.yml` did not override either — every Spring context of an integration test backed up its throwaway test DB into the real Dev backup directory on startup, rotating away real backups in the process (retain count 30). Since then the test profile sets `automation.backup.enabled: false` and points `directory` at `integration.backup.dir`, which `IntegrationTestDbSessionListener` points at a temp directory per test JVM and deletes recursively at session end. The rotation in `DatabaseBackupService` is additionally hardened: it only counts and deletes files matching its own naming scheme `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manual copies or foreign `.db` files in the same directory stay visible but are never rotated. Check: `ls ~/.autotrigger/backups/dev | wc -l` must stay the same before and after `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest`.
+
+**Summarization and factory setup directories pinned to a temp directory in the test profile:** The trap a fourth time (2026-09-24): `SummarizationSetupService` and `FactorySetupService` write their instruction files into `automation.summarization.base-dir` and `automation.factory.base-dir` on every context start (`@PostConstruct`), defaulting to `${user.home}/.autotrigger/summarization` and `.../factory` — every Spring context of an integration test wrote `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` and `factory/codex/AGENTS.md` into the real home. Since then both point at `integration.setup.dir`, which `IntegrationTestDbSessionListener` sets to a temp directory per test JVM and deletes recursively at session end. `config/IntegrationProfileHomeIsolationTest` pins this and also checks every key of the `application*.yml` files: if one resolves into the real `~/.autotrigger` under the test profile, the test fails. That only catches the next writer of this kind when its path is a key in an `application*.yml`, though; paths the code builds from `user.home` itself (such as the API key file via `InstanceAddress.apiKeyFile()`) stay invisible to the test.
 
 **Scenario tests without an AI CLI:** `ScenarioIntegrationTest` runs workflow definitions from `src/test/resources/scenarios/*.json` through the real executor. Every AI call goes to a `ScriptedAiProvider` (provider ids `SCRIPTED`, `SCRIPTED_B`) with fixed answers, which also records every call. That way prompt, model, timeout and provider can be checked before the call, and gate, auto-TODO and run status after it, all without `claude`/`codex`/`pi` and without a display. Instead of one run, a scenario can also drive several runs of the same workflow (`runs`, e.g. for the audit lifecycle) or a chain (`chain`), and answer approvals (`answers`). A new case is a new JSON file. Every file names its spec source and the incident it was derived from. Catalog and format are in `scenarios/README.md`.
 

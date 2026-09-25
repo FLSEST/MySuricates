@@ -228,8 +228,37 @@ Text-Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet
 `Tests run: 0` für die äußere Klasse selbst, weil dort keine eigenen `@Test`-Methoden liegen; das
 ist normal, nicht leer. Ein Lauf, dessen `@Nested`-Tests aus irgendeinem Grund wirklich nicht
 mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur diese eine Zeile oder
-einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
-`Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
+einen abgeschnittenen `tail` prüft. Maßgeblich ist der Exit-Code des gesamten Maven-Laufs;
+gezählt wird über die `<testcase>`-, `<failure>`- und `<error>`-Elemente in
+`target/surefire-reports/TEST-<Klasse>.xml` (dort landen auch alle `@Nested`-Klassen, eine
+eigene Datei je innerer Klasse gibt es nicht) oder über die Klassenzeilen der Konsole.
+
+**Vorbehalt bei gleichnamigen Methoden in `@Nested`-Klassen:** Die abschließende
+`Results: Tests run: N`-Zeile fasst Ergebnisse unter dem Schlüssel äußere Klasse +
+Methodenname zusammen. Heißen Methoden in zwei `@Nested`-Klassen derselben äußeren Klasse
+gleich, zählen sie dort nur einmal; mehrere Fehlschläge desselben Namens erscheinen unter
+`Failures:` als `Run 1`, `Run 2`, … wie Wiederholungen. Der `<testsuite tests=… failures=…>`-Kopf
+der XML taugt ebenfalls nicht zum Zählen, und was er zeigt, hängt von der Surefire-Version ab —
+die kommt ungepinnt aus dem Spring-Boot-Parent (Stand dieses Repos: 3.5.6). Unter 3.5.4 trägt er
+nur die Zahlen der äußeren Klasse selbst wie deren `.txt`, also meist 0; unter 3.5.6 fasst er wie
+die `Results`-Zeile nach Methodenname zusammen und hat zusätzlich ein `flakes`-Attribut.
+Gezielte Fehlprobe (2026-09-25, dieselbe Testklasse unter beiden Versionen): drei
+`@Nested`-Klassen mit einem roten `sameName()` in jeder, je einer eindeutigen roten Methode in
+zweien und einem grünen `passesEverywhere()` in zweien.
+
+| Quelle (Läufe / Fehlschläge) | Surefire 3.5.4 | Surefire 3.5.6 |
+|---|---|---|
+| Klassenzeilen der Konsole, summiert | 7 / 5 | 7 / 5 |
+| `Results: Tests run:` | 5 / 3 | 5 / 3 |
+| `<testsuite>`-Kopf der XML | 0 / 0 | 4 / 3 |
+| `<testcase>`- / `<failure>`-Elemente der XML | 7 / 5 | 7 / 5 |
+| `.txt` der äußeren Klasse | 0 / 0 | 0 / 0 |
+| Exit-Code | 1 | 1 |
+
+Gefährlich wird es mit `-Dsurefire.rerunFailingTestsCount` > 0 (geprüft unter 3.5.6): Dann gilt
+ein roter Test, dessen Namensvetter in einer Nachbar-`@Nested`-Klasse grün ist, als „Flake“, und
+der Build endet mit `BUILD SUCCESS` und Exit-Code 0, obwohl der Test in beiden Durchgängen
+scheiterte. Die `pom.xml` schaltet keine Wiederholungen ein; dabei soll es bleiben.
 
 **`ERROR`-Zeilen in einem grünen Lauf:** Viele Tests prüfen Fehlerpfade — ein Mock wirft, der
 Code fängt ab und loggt das korrekt auf `ERROR`, samt Stacktrace. Ein grüner Lauf schreibt so
@@ -285,6 +314,8 @@ Welches Werkzeug wann:
 **Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.autotrigger/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
 
 **Backups im Testprofil abgeschaltet und auf Temp-Verzeichnis gepinnt:** Dieselbe Falle ein drittes Mal (2026-09-13): `automation.backup` hat als Default `enabled: true` und `directory: ${user.home}/.autotrigger/backups/dev`, und `application-integration.yml` überschrieb beides nicht — jeder Spring-Kontext eines Integrationstests legte beim Start ein Backup seiner Wegwerf-Test-DB ins echte Dev-Backup-Verzeichnis und rotierte damit (retain-count 30) echte Backups weg. Seitdem setzt das Testprofil `automation.backup.enabled: false` und `directory` auf `integration.backup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis zeigt und beim Session-Ende rekursiv löscht. Zusätzlich ist die Rotation in `DatabaseBackupService` abgesichert: Sie zählt und löscht nur Dateien im eigenen Namensschema `mysuricates-backup-yyyy-MM-dd_HH-mm-ss.db` (`BackupFileNaming.isOwnBackupFile`); manuelle Kopien oder fremde `.db`-Dateien im selben Verzeichnis bleiben sichtbar, werden aber nie rotiert. Prüfen: `ls ~/.autotrigger/backups/dev | wc -l` vor und nach `mvn test -Dtest=ContainerServiceStaleRowIntegrationTest` muss gleich bleiben.
+
+**Setup-Verzeichnisse von Zusammenfassung und Factory im Testprofil auf Temp-Verzeichnis gepinnt:** Die Falle ein viertes Mal (2026-09-24): `SummarizationSetupService` und `FactorySetupService` schreiben bei jedem Kontextstart (`@PostConstruct`) ihre Anweisungsdateien nach `automation.summarization.base-dir` bzw. `automation.factory.base-dir`, Default `${user.home}/.autotrigger/summarization` bzw. `.../factory` — jeder Spring-Kontext eines Integrationstests schrieb `summarization/claude/CLAUDE.md`, `summarization/codex/AGENTS.md` und `factory/codex/AGENTS.md` ins echte Home. Seitdem zeigen beide auf `integration.setup.dir`, das `IntegrationTestDbSessionListener` pro Test-JVM auf ein Temp-Verzeichnis setzt und beim Session-Ende rekursiv löscht. `config/IntegrationProfileHomeIsolationTest` hält das fest und prüft zusätzlich jeden Schlüssel der `application*.yml`: Zeigt einer im Testprofil aufgelöst ins echte `~/.autotrigger`, schlägt der Test fehl. Das fängt den nächsten Schreiber dieser Art aber nur, wenn sein Pfad als Schlüssel in einer `application*.yml` steht; Pfade, die der Code selbst aus `user.home` baut (etwa die API-Key-Datei über `InstanceAddress.apiKeyFile()`), sieht der Test nicht.
 
 **Szenario-Tests ohne KI-CLI:** `ScenarioIntegrationTest` fährt Workflow-Definitionen aus `src/test/resources/scenarios/*.json` durch den echten Executor. Jeder KI-Aufruf geht dabei an einen `ScriptedAiProvider` (Provider-IDs `SCRIPTED`, `SCRIPTED_B`) mit festen Antworten, der zugleich jeden Aufruf mitschreibt. So lassen sich Prompt, Modell, Timeout und Provider vor dem Aufruf prüfen, und danach Gate, Auto-TODO und Laufstatus, alles ohne `claude`/`codex`/`pi` und ohne Display. Ein Szenario kann statt eines Laufs auch mehrere Läufe desselben Workflows (`runs`, etwa für den Audit-Lebenszyklus) oder eine Kette (`chain`) fahren und auf Freigaben antworten (`answers`). Ein neuer Fall ist eine neue JSON-Datei. Jede Datei nennt ihre Spec-Quelle und den Vorfall, aus dem sie abgeleitet ist. Katalog und Format stehen in `scenarios/README.md`.
 
