@@ -1330,6 +1330,8 @@ Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in 
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | Indizes für Läufe je Schedule (workflow_runs, chain_runs) und TODOs je Lauf (`last_fix_run_id`, `workflow_run_id`) |
 | V88 | `V88__goal_milestones_and_guard.sql` | neue Tabelle `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (Ziel-Wächter) |
 | V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (Chain-Run eines Ketteneintrags, ohne Nachtrag für Altbestand) + Index `idx_workflow_runs_chain_run_id` |
+| V90 | `V90__keyless_integration_account_names.sql` | Kontonamen ohne Sprache für RSS/Atom und Open-Meteo in `integration_connections.account_info` (Bestand nachgezogen) |
+| V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (Tabellenneubau: `UNIQUE(page)` → `UNIQUE(page, locale)`, Bestand gilt als deutsch) |
 
 ## SQLite-Besonderheiten
 

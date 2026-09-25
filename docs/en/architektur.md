@@ -1125,6 +1125,8 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V87 | Indexes for runs per schedule (`workflow_runs`, `chain_runs`) and TODOs per run (`todos.last_fix_run_id`, `todos.workflow_run_id`) |
 | V88 | Goals: table `goal_milestones`, `todos.milestone_id`, `goals.guard_workflow_id` (goal guard) |
 | V89 | A run's chain: `workflow_runs.chain_run_id` + index |
+| V90 | Language-neutral account names for RSS/Atom and Open-Meteo (`integration_connections.account_info`, existing rows updated) |
+| V91 | Assistant page suggestions per page and language: `page_suggestions.locale`, `UNIQUE(page, locale)` (table rebuild) |
 
 ## Architecture Gates
 
@@ -1168,7 +1170,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 89 Flyway migrations (V1–V89)
+│           └── db/migration/          ← 91 Flyway migrations (V1–V91)
 │
 └── ai-automation-frontend/
     ├── package.json
