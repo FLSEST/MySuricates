@@ -165,6 +165,8 @@ function useFindingMutation<T>(mutationFn: (input: T) => Promise<AuditFinding>) 
         ...page,
         content: page.content.map((finding) => (finding.id === updated.id ? updated : finding)),
       });
+      // A deep link takes its first chips from this entry; a stale status would hide the finding on return.
+      queryClient.setQueryData(['audit-finding', updated.id], updated);
       queryClient.invalidateQueries({ queryKey: ['audits'] });
       queryClient.invalidateQueries({ queryKey: ['audit-findings'] });
     },

@@ -66,7 +66,9 @@ export function AuditCenter() {
   const requestedFinding = searchParams.get('finding');
   const [view, setView] = useState<MainView>(requestedFinding ? 'audit' : 'overview');
   const [auditTab, setAuditTab] = useState<AuditTab>(requestedFinding ? 'findings' : 'report');
-  const [selected, setSelected] = useState<AuditSummary | null>(null);
+  // Only the key: the summary comes from the current list, so counts that change after a finding
+  // was filed reach the open audit instead of a copy taken at the click (46a94a34).
+  const [selectedKey, setSelectedKey] = useState<Pick<AuditSummary, 'projectId' | 'auditKey'> | null>(null);
   const { data: audits, isLoading } = useAudits();
   const { data: projects } = useProjects();
   const linkedFindingQuery = useAuditFinding(requestedFinding);
@@ -74,11 +76,11 @@ export function AuditCenter() {
   const projectNames = useMemo(() => new Map(projects?.map((project) => [project.id, project.name]) ?? []), [projects]);
 
   const linkedFinding = linkedFindingQuery.data;
-  const linkedAudit = linkedFinding && audits?.find((item) => item.projectId === linkedFinding.projectId && item.auditKey === linkedFinding.auditKey);
-  const activeAudit = requestedFinding ? linkedAudit ?? null : selected;
+  const activeKey = requestedFinding ? linkedFinding ?? null : selectedKey;
+  const activeAudit = (activeKey && audits?.find((item) => item.projectId === activeKey.projectId && item.auditKey === activeKey.auditKey)) ?? null;
 
   const openAudit = (audit: AuditSummary) => {
-    setSelected(audit);
+    setSelectedKey({ projectId: audit.projectId, auditKey: audit.auditKey });
     setView('audit');
     setAuditTab('report');
   };

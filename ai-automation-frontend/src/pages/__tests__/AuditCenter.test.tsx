@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
@@ -302,19 +304,26 @@ describe('AuditCenter findings filter', () => {
   const finding = (id: string, status: AuditFinding['status'], title: string): AuditFinding => ({
     ...accepted, id, status, title, dispositionNote: null, dispositionAt: null, dispositionEvidence: null,
   });
-  const counted: AuditSummary = {
-    ...summary,
-    findingsByStatus: { OPEN: 1, AWAITING_VERIFICATION: 1, ACCEPTED_RISK: 1, RESOLVED: 250 },
-    openFindingsBySeverity: { HIGH: 2 },
-  };
+  /** The summary the backend would send for `findings` — with more resolved ones than one page holds. */
+  function summaryOf(findings: AuditFinding[]): AuditSummary {
+    const findingsByStatus: Record<string, number> = { RESOLVED: 250 };
+    const openFindingsBySeverity: Record<string, number> = {};
+    for (const item of findings.filter((each) => each.status !== 'RESOLVED')) {
+      findingsByStatus[item.status] = (findingsByStatus[item.status] ?? 0) + 1;
+      if (item.status === 'OPEN' || item.status === 'AWAITING_VERIFICATION') {
+        openFindingsBySeverity[item.severity] = (openFindingsBySeverity[item.severity] ?? 0) + 1;
+      }
+    }
+    return { ...summary, findingsByStatus, openFindingsBySeverity };
+  }
 
-  /** Serves `initial` like the backend, PATCH included; returns the statuses the page asked for. */
+  /** Serves `initial` like the backend, PATCH and counts included; returns the statuses the page asked for. */
   function useFindings(initial: AuditFinding[]) {
     const store = new Map(initial.map((item) => [item.id, item]));
     const requested: string[] = [];
     useAuditEndpoints();
     server.use(
-      http.get(`${BASE}/audits`, () => HttpResponse.json([counted])),
+      http.get(`${BASE}/audits`, () => HttpResponse.json([summaryOf([...store.values()])])),
       http.get(`${BASE}/audit-findings/:id`, ({ params }) => HttpResponse.json(store.get(String(params.id)))),
       http.get(`${BASE}/audit-findings`, (info) => {
         requested.push(new URL(info.request.url).searchParams.get('status') ?? 'ALL');
@@ -428,5 +437,89 @@ describe('AuditCenter findings filter', () => {
     await waitFor(() => expect(within(section).getByTestId('finding-status')).toHaveValue('AWAITING_VERIFICATION'));
     expect(screen.getByText('Open finding')).toBeInTheDocument();
     expect(useToastStore.getState().toasts).toEqual([]);
+  });
+});
+
+// 46a94a34 review: the open audit was a copy from the click, and a deep link started from a stale status
+describe('AuditCenter after filing a finding', () => {
+  const filed = (id: string, status: AuditFinding['status'], title: string): AuditFinding => ({
+    ...accepted, id, status, title, dispositionNote: null, dispositionAt: null, dispositionEvidence: null,
+  });
+
+  /** Serves `initial` like the backend; `/audits` counts what the store holds right now. */
+  function useStoredFindings(initial: AuditFinding[]) {
+    const store = new Map(initial.map((item) => [item.id, item]));
+    const counts = () => {
+      const byStatus: Record<string, number> = {};
+      for (const item of store.values()) byStatus[item.status] = (byStatus[item.status] ?? 0) + 1;
+      return byStatus;
+    };
+    useAuditEndpoints();
+    server.use(
+      http.get(`${BASE}/audits`, () => HttpResponse.json([{ ...summary, findingsByStatus: counts(), openFindingsBySeverity: {} }])),
+      http.get(`${BASE}/audit-findings/:id`, ({ params }) => HttpResponse.json(store.get(String(params.id)))),
+      http.get(`${BASE}/audit-findings`, findingsPage(() => [...store.values()])),
+      http.patch(`${BASE}/audit-findings/:id`, async ({ params, request }) => {
+        const id = String(params.id);
+        store.set(id, { ...store.get(id)!, ...(await request.json() as Partial<AuditFinding>) });
+        return HttpResponse.json(store.get(id));
+      }),
+    );
+  }
+
+  const two = [filed('f-1', 'OPEN', 'First open finding'), filed('f-2', 'OPEN', 'Second open finding')];
+  const chips = () => within(screen.getByRole('group', { name: 'Filter findings by status' }));
+
+  async function accept(title: string) {
+    const section = (await screen.findByText(title)).closest('section')!;
+    fireEvent.change(within(section).getByTestId('finding-status'), { target: { value: 'ACCEPTED_RISK' } });
+    fireEvent.change(within(section).getByRole('textbox'), { target: { value: 'Tragbar' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.queryByText(title)).toBeNull());
+  }
+
+  it('updates chip counts and tab title of an audit opened from the overview', async () => {
+    useStoredFindings(two);
+    renderWithProviders(<AuditCenter />);
+    fireEvent.click(await screen.findByText('Health Audit'));
+    fireEvent.click(screen.getByRole('button', { name: /^Findings/ }));
+    expect(chips().getByRole('button', { name: /^Open/ })).toHaveTextContent('Open2');
+
+    await accept('First open finding');
+
+    await waitFor(() => expect(chips().getByRole('button', { name: /^Open/ })).toHaveTextContent('Open1'));
+    expect(chips().getByRole('button', { name: /^Accepted/ })).toHaveTextContent('Accepted1');
+    expect(screen.getByRole('button', { name: /^Findings/ })).toHaveTextContent('Findings (1 open)');
+  });
+
+  it('shows a deep-linked finding filed elsewhere when coming back to it', async () => {
+    useStoredFindings(two);
+    // gcTime as in the app: the cache outlives the page, unlike renderWithProviders (gcTime 0)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    function Navigation() {
+      const navigate = useNavigate();
+      return <>
+        <button onClick={() => navigate('/elsewhere')}>away</button>
+        <button onClick={() => navigate('/?finding=f-1')}>back</button>
+      </>;
+    }
+    render(<QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/?finding=f-1']}>
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<AuditCenter />} />
+          <Route path="/elsewhere" element={<p>Elsewhere</p>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>);
+
+    await accept('First open finding');
+    fireEvent.click(screen.getByRole('button', { name: 'away' }));
+    expect(await screen.findByText('Elsewhere')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+
+    expect(await screen.findByText('First open finding')).toBeInTheDocument();
+    expect(chips().getByRole('button', { name: /^Accepted/ })).toHaveAttribute('aria-pressed', 'true');
+    queryClient.clear();
   });
 });
