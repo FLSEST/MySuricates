@@ -1787,11 +1787,11 @@ Create a new todo trigger.
 | `description` | No | Human-readable description |
 | `maxAttempts` | No | Max fix attempts per TODO (default: 3) |
 | `autoClose` | No | Automatically close TODO on GREEN gate (default: true) |
+| `processBacklog` | No | Process existing matching TODOs on creation (default: true) |
+| `contextTemplate` | No | Static context variables, merged with TODO data |
 
 `sourceFilter` and `minPriority` are accepted in any case and stored as the constant; any other value
 → `400`, and the message names the allowed values.
-| `processBacklog` | No | Process existing matching TODOs on creation (default: true) |
-| `contextTemplate` | No | Static context variables, merged with TODO data |
 
 **Response:** `201` with `TodoTriggerResponse`
 

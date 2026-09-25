@@ -1793,11 +1793,11 @@ Neuen Todo-Trigger erstellen.
 | `description` | Nein | Menschenlesbare Beschreibung |
 | `maxAttempts` | Nein | Max. Fix-Versuche pro TODO (Default: 3) |
 | `autoClose` | Nein | TODO bei GREEN Gate automatisch schliessen (Default: true) |
+| `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
+| `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
 `sourceFilter` und `minPriority` werden in beliebiger Schreibweise angenommen und als Konstante
 gespeichert; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
-| `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
-| `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
 **Response:** `201` mit `TodoTriggerResponse`
 
