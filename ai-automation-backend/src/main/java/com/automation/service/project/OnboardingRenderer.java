@@ -7,7 +7,7 @@ import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.modules.ModuleRegistry;
 import com.automation.repository.OnboardingProfileRepository;
-import com.automation.service.workflow.WorkflowService;
+import com.automation.repository.WorkflowRepository;
 import com.automation.util.LocalizedJson;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ import java.util.List;
 public class OnboardingRenderer {
 
     private final OnboardingProfileRepository profileRepository;
-    private final WorkflowService workflowService;
+    private final WorkflowRepository workflowRepository;
     private final InstanceAddress instanceAddress;
     private final ModuleRegistry modules;
 
@@ -69,7 +69,7 @@ public class OnboardingRenderer {
     /** The table of the project's workflows plus how to start one, in {@code lang}. */
     public String renderWorkflowList(Project project, String lang) {
         boolean de = "de".equals(LocalizedJson.normalize(lang));
-        List<Workflow> workflows = workflowService.findByProjectId(project.getId());
+        List<Workflow> workflows = workflowRepository.findByProjectId(project.getId());
         String heading = de ? "## Projekt-Workflows\n\n" : "## Project workflows\n\n";
         if (workflows.isEmpty()) {
             return heading + (de ? "_Noch keine Workflows in diesem Projekt._\n" : "_No workflows in this project yet._\n");

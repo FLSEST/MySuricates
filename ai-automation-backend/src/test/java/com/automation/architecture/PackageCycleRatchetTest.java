@@ -57,10 +57,10 @@ class PackageCycleRatchetTest {
      * OnboardingProfileSeeder moved to service.project, next to the services it seeds for — 3.
      * The HostExecutionRequest overload of StepAiMetadata.aiRequest moved to service.cli — 2.
      * 2026-09-26: the Claude CLI output classes left service.cli for the leaf package
-     * service.cli.claude, which ai and cli both read — 1.
+     * service.cli.claude, which ai and cli both read — 1. ProjectWorkflowsChangedEvent moved to
+     * com.automation.event and OnboardingRenderer reads the workflows through WorkflowRepository — 0.
      */
-    static final Set<String> ALLOWED_PAIRS = Set.of(
-            "com.automation.service.project <-> com.automation.service.workflow");
+    static final Set<String> ALLOWED_PAIRS = Set.of();
 
     /**
      * Size of the largest strongly connected component – the first {@code cycle} line of

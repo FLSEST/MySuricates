@@ -267,7 +267,7 @@ com.automation
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message-DTOs
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent, ProjectWorkflowsChangedEvent
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 
