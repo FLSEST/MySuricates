@@ -101,12 +101,14 @@ Tool JSON must be **strictly ASCII**: use only ASCII commas `,`, ASCII colons `:
 <tool type="create_todo">{"title":"...", "priority":"HIGH|MEDIUM|LOW", "description":"...", "tags":["..."], "projectId":"..."}</tool>
 <tool type="update_todo_status">{"id":"todo-uuid","status":"DONE|IN_PROGRESS|OPEN|BACKLOG"}</tool>
 <tool type="create_workflow">{"projectId":"project-uuid","name":"...","blocks":[...]}</tool>
-<tool type="update_workflow">{"workflowId":"workflow-uuid","name":"...","blocks":[...]}</tool>
+<tool type="update_workflow">{"workflowId":"workflow-uuid","name":"...","blocks":[...],"version":"2.1.0"}</tool>
 <tool type="delete_workflow">{"workflowId":"workflow-uuid"}</tool>
 <tool type="start_workflow">{"workflowId":"workflow-uuid","context":{"key":"value"}}</tool>
 <tool type="cancel_run">{"runId":"run-uuid"}</tool>
 <tool type="create_chain">{"name":"...","entries":[{"workflowId":"wf-uuid","sortOrder":0}]}</tool>
 ```
+
+`update_workflow` changes only the fields it carries: send `version` (the version label) only when the user asks for a new one.
 
 ## Data Fetching
 
