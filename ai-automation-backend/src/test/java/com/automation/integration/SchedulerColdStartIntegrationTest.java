@@ -33,6 +33,7 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -76,6 +77,7 @@ class SchedulerColdStartIntegrationTest {
     @Autowired private ScheduleSkipPolicy skipPolicy;
     @Autowired private Clock clock;
     @Autowired private RunControlService runControlService;
+    @Autowired private SchedulerTick contextTick;
     @Autowired private ProjectRepository projectRepository;
     @Autowired private WorkflowRepository workflowRepository;
     @Autowired private WorkflowRunRepository workflowRunRepository;
@@ -99,6 +101,15 @@ class SchedulerColdStartIntegrationTest {
         for (int i = cleanup.size() - 1; i >= 0; i--) {
             cleanup.get(i).run();
         }
+    }
+
+    /**
+     * The tests below open their fresh tick by hand; this one checks the wiring: the context's own
+     * tick received Spring Boot's ACCEPTING_TRAFFIC and is open once the context has started.
+     */
+    @Test
+    void theContextsTick_isOpenedByTheReadinessEventOfTheStartup() {
+        assertThat(ReflectionTestUtils.getField(contextTick, "startupCleanupDone")).isEqualTo(true);
     }
 
     /** The leftover RUNNING row made the target look busy: the first tick used to drop the catch-up. */
