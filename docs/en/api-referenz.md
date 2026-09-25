@@ -332,13 +332,16 @@ Update a workflow.
   "name": "New Name",
   "description": "New description",
   "icon": "✨",
-  "blocks": []
+  "blocks": [],
+  "version": "4.4.0"
 }
 ```
 
 **Response:** `WorkflowResponse`
 
-The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming still works.
+All fields are optional; a missing field stays unchanged. `version` is the version label (at most 255 characters, blank → `400`), not part of the definition: it creates no new version and changes no hash. A pool reinstall sets it to the pool file's version.
+
+The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming and `version` still work.
 
 ### `DELETE /api/v1/workflows/{id}`
 
@@ -483,11 +486,12 @@ Execute a workflow.
   "triggeredByScheduleId": null,
   "triggerSource": "MANUAL",
   "definitionHash": "3f1c…e9",
-  "definitionVersionId": "version-uuid"
+  "definitionVersionId": "version-uuid",
+  "chainRunId": null
 }
 ```
 
-`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
+`definitionHash`/`definitionVersionId` are `null` when `automation.hardening.provenance` is off. `chainRunId` names the chain run that started the run as one of its entries (`triggerSource: CHAIN`, after a resume `RESUME`), otherwise `null` — also for retries and sub-workflows, which only inherit `{{ chain_run_id }}` with the context; runs from before V89 have none. Refused starts create no run: `409 WORKFLOW_TAMPERED` (sealed definition modified), `403 UNATTENDED_REQUIRES_SEAL` (unattended triggers only).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -1856,6 +1860,18 @@ All reports of an audit, paginated (`page`, `size`). Required parameter: `projec
 Retrieve a single audit report.
 
 **Response:** `AuditReportResponse`
+
+Besides content, gate and `findingCount`, every report (also in the list and in `AuditDetail.latestReport`) carries the origin of its run, each field `null` when unknown:
+
+| Field | Meaning |
+|---|---|
+| `workflowVersion` | The workflow's version label when the report was stored (e.g. the pool version) |
+| `triggerSource` | Effective trigger; for a chain entry the trigger of the chain (`SCHEDULE`, `MANUAL`, …). A chain run from before V89 stays `CHAIN`, a sub-workflow run `SUB_WORKFLOW` |
+| `scheduleId` | Triggering schedule; for a chain entry the chain's schedule |
+| `chainRunId`, `chainId`, `chainName` | Chain run and chain of a chain entry; `chainRunId` stays when the chain has been deleted |
+| `definitionVersionNumber` | Number of the definition version the run executed (empty without `automation.hardening.provenance`) |
+
+The list resolves counts and origins for the whole page with one query each, not per report.
 
 ### `GET /api/v1/audit-findings`
 

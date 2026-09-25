@@ -54,6 +54,19 @@ class UpdateWorkflowRequestTest {
     }
 
     @Test
+    void should_carryTheVersionLabel_onlyWhenGiven() {
+        var withVersion = new UpdateWorkflowRequest(NAME, null, null, null, null, null, null, null, null,
+                null, null, null, "high", "4.4.0");
+        var beforeVersionExisted = new UpdateWorkflowRequest(NAME, null, null, null, null, null, null, null, null,
+                null, null, null, "high");
+
+        assertThat(withVersion.version()).isEqualTo("4.4.0");
+        assertThat(withVersion.effort()).isEqualTo("high");
+        assertThat(beforeVersionExisted.version()).as("null = leave the label unchanged").isNull();
+        assertThat(beforeVersionExisted.effort()).isEqualTo("high");
+    }
+
+    @Test
     void should_notCarryAChangeSource_becauseTheServerDecidesWhoChangedAWorkflow() {
         assertThat(Arrays.stream(UpdateWorkflowRequest.class.getRecordComponents()).map(c -> c.getName()))
                 .doesNotContain("changeSource");

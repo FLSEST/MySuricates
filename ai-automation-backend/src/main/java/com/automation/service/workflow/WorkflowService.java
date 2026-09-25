@@ -32,6 +32,8 @@ import java.util.Optional;
 @Slf4j
 public class WorkflowService {
 
+    static final int MAX_VERSION_LENGTH = 255;
+
     private final WorkflowRepository workflowRepository;
     private final ProjectRepository projectRepository;
     private final SkillRepository skillRepository;
@@ -85,8 +87,8 @@ public class WorkflowService {
                 .templateId(request.templateId())
                 .build();
 
-        if (request.version() != null && !request.version().isBlank()) {
-            workflow.setVersion(request.version());
+        if (request.version() != null && !request.version().isBlank()) { // blank keeps the default 1.0.0
+            workflow.setVersion(normalizeVersion(request.version()));
         }
 
         if (request.metadata() != null) {
@@ -161,6 +163,10 @@ public class WorkflowService {
             workflow.setCategory(request.category());
             workflow.setTagsUserEdited(true);
         }
+        if (request.version() != null) {
+            // A label like the name: not in WorkflowSnapshot, so the gateway writes no version row for it.
+            workflow.setVersion(normalizeVersion(request.version()));
+        }
 
         boolean contentChanged = request.name() != null
                 || request.description() != null
@@ -198,6 +204,22 @@ public class WorkflowService {
         log.info("Restored workflow: {} ({}) from snapshot", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow restored: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
+    }
+
+    /**
+     * The version label, trimmed. Blank is rejected (400) — {@code null} in the update request is the
+     * way to leave it unchanged; create checks for blank itself and keeps the default. The column is
+     * TEXT without a limit (V5); 255 is the entity's mapped length.
+     */
+    private static String normalizeVersion(String version) {
+        String trimmed = version.strip();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException("Invalid version: must not be blank (omit it to keep the current one)");
+        }
+        if (trimmed.length() > MAX_VERSION_LENGTH) {
+            throw new IllegalArgumentException("Invalid version: at most " + MAX_VERSION_LENGTH + " characters");
+        }
+        return trimmed;
     }
 
     /** Blank clears the level (null); invalid values are rejected with 400. */

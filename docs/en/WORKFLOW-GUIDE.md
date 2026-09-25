@@ -772,6 +772,7 @@ Variables use double braces: `{{ variable_name }}` or `{{variable_name}}`. The s
 | `{{ step_N_output }}` | Auto | Output of step N (e.g. `{{ step_0_output }}` for the first block) |
 | `{{ block.<name>.output }}` | Auto | Output of a named block (block must have a `name` field) |
 | `{{ previous_chain_output }}` | Auto | Output of the previous chain entry (chains only) |
+| `{{ chain_run_id }}` | Auto | ID of the chain run that started the entry (chains only); the run the chain starts carries the same value as `chainRunId` — runs that only inherit the context do not (retry, resume without a completed step, sub-workflow): there the placeholder is set, `chainRunId` stays `null` |
 | `{{ item }}` / `{{ <variable_name> }}` | ForEach | Current loop item |
 
 ### System-Injected Variables
@@ -1497,6 +1498,7 @@ Chains group multiple workflows for **sequential execution**.
 - **Cross-project**: A chain can reference workflows from any project
 - **Sequential**: Workflows run one after another (not in parallel)
 - **Context passing**: Each entry can access `{{ previous_chain_output }}` from the last completed workflow
+- **Chain link**: Each entry knows its chain run: `{{ chain_run_id }}` in the context, `chainRunId` on the run (`GET /api/v1/executions/{id}`). The chain sets both itself, after its input context — a `chain_run_id` passed in does not override it. Started on its own, the placeholder stays literally (analyzer rule `chain-only-placeholder`). Only the run the chain starts carries `chainRunId`, also after a resume; a retry, a resume without a completed step (which starts a new run) and sub-workflows inherit `{{ chain_run_id }}` with the context, their `chainRunId` stays `null`
 - **stopOnFailure**: Controls whether the chain stops on workflow failure — stops only when **both** flags are set (chain-level AND entry-level must be `true`)
 
 ### Chain Structure

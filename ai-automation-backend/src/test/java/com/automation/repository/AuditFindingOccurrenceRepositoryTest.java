@@ -13,7 +13,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -81,6 +84,22 @@ class AuditFindingOccurrenceRepositoryTest {
         assertThat(occurrenceRepository.findByReportId(report1))
                 .extracting(AuditFindingOccurrence::getFindingId).containsExactlyInAnyOrder(a, b);
         assertThat(occurrenceRepository.findByReportId(report2)).hasSize(1);
+    }
+
+    /** Eine GROUP-BY-Abfrage fuer eine ganze Report-Seite; ein Report ohne Findings fehlt (TODO a3b89355). */
+    @Test
+    void countByReportIds_countsPerReport_inOneQuery() {
+        String a = saveFinding("fp-a");
+        String b = saveFinding("fp-b");
+        saveOccurrence(a, report1);
+        saveOccurrence(b, report1);
+        saveOccurrence(a, report2);
+        String empty = saveReport();
+
+        Map<String, Long> counts = occurrenceRepository.countByReportIds(List.of(report1, report2, empty)).stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+
+        assertThat(counts).containsExactlyInAnyOrderEntriesOf(Map.of(report1, 2L, report2, 1L));
     }
 
     @Test

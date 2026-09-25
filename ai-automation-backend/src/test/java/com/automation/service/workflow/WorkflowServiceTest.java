@@ -278,6 +278,89 @@ class WorkflowServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // --- version label (TODO a3b89355) ---
+
+    private static UpdateWorkflowRequest versionOnly(String version) {
+        return new UpdateWorkflowRequest(null, null, null, null, null, null, null,
+                null, null, null, null, null, null, version);
+    }
+
+    @Test
+    void update_setsTheVersionLabel_trimmed() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Workflow result = workflowService.update("wf-1", versionOnly(" 4.4.0 "), ChangeSource.POOL_INSTALL);
+
+        assertThat(result.getVersion()).isEqualTo("4.4.0");
+    }
+
+    @Test
+    void update_nullVersion_keepsTheLabel() {
+        testWorkflow.setVersion("3.0.0");
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateWorkflowRequest("New Name", null, null, null, null, null, null, null, null);
+
+        assertThat(workflowService.update("wf-1", request, ChangeSource.USER).getVersion()).isEqualTo("3.0.0");
+    }
+
+    @Test
+    void update_blankOrOverlongVersion_isRejectedBeforeSaving() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+
+        assertThatThrownBy(() -> workflowService.update("wf-1", versionOnly("  "), ChangeSource.USER))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("version");
+        String overlong = "1." + "0".repeat(WorkflowService.MAX_VERSION_LENGTH);
+        assertThatThrownBy(() -> workflowService.update("wf-1", versionOnly(overlong), ChangeSource.USER))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("255");
+        verify(workflowRepository, never()).save(any());
+        verifyNoInteractions(mutations);
+    }
+
+    private static CreateWorkflowRequest createWithVersion(String version) {
+        return new CreateWorkflowRequest("proj-1", "WF", null, null, List.of(), null,
+                null, null, null, null, null, null, version, null);
+    }
+
+    /** Create applies the same rules as update; blank keeps the default instead of being rejected. */
+    @Test
+    void create_trimsTheVersionLabel_blankKeepsTheDefault() {
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(workflowService.create(createWithVersion(" 4.4.0 "), ChangeSource.POOL_INSTALL).getVersion())
+                .isEqualTo("4.4.0");
+        assertThat(workflowService.create(createWithVersion("   "), ChangeSource.POOL_INSTALL).getVersion())
+                .isEqualTo("1.0.0");
+        assertThat(workflowService.create(createWithVersion(null), ChangeSource.USER).getVersion())
+                .isEqualTo("1.0.0");
+    }
+
+    @Test
+    void create_overlongVersion_isRejectedBeforeSaving() {
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+        String overlong = "1." + "0".repeat(WorkflowService.MAX_VERSION_LENGTH);
+
+        assertThatThrownBy(() -> workflowService.create(createWithVersion(overlong), ChangeSource.POOL_INSTALL))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("255");
+        verify(workflowRepository, never()).save(any());
+    }
+
+    /** The label is not part of the definition: the gateway sees the same snapshot before and after. */
+    @Test
+    void update_versionLabelLeavesTheDefinitionSnapshotUnchanged() {
+        when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));
+        when(workflowRepository.save(any(Workflow.class))).thenAnswer(inv -> inv.getArgument(0));
+        com.automation.dto.WorkflowSnapshot before = com.automation.dto.WorkflowSnapshot.from(testWorkflow);
+
+        Workflow result = workflowService.update("wf-1", versionOnly("4.4.0"), ChangeSource.POOL_INSTALL);
+
+        verify(mutations).record(result, before, ChangeSource.POOL_INSTALL, null);
+        assertThat(com.automation.dto.WorkflowSnapshot.from(result)).isEqualTo(before);
+    }
+
     @Test
     void delete_existingWorkflow_softDeletes() {
         when(workflowRepository.findByIdWithSkills("wf-1")).thenReturn(Optional.of(testWorkflow));

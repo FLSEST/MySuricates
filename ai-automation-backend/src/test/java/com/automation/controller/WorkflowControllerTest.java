@@ -222,6 +222,21 @@ class WorkflowControllerTest {
     }
 
     @Test
+    void updateWorkflow_bindsTheVersionLabel() throws Exception {
+        when(workflowService.update(eq("wf-1"), any(), eq(ChangeSource.USER))).thenReturn(testWorkflow);
+        when(workflowMapper.toResponse(testWorkflow)).thenReturn(testResponse);
+
+        mockMvc.perform(put("/api/v1/workflows/wf-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"version\": \"4.4.0\", \"effort\": \"high\"}"))
+                .andExpect(status().isOk());
+
+        verify(workflowService).update(eq("wf-1"),
+                argThat(req -> "4.4.0".equals(req.version()) && "high".equals(req.effort()) && req.name() == null),
+                eq(ChangeSource.USER));
+    }
+
+    @Test
     void deleteWorkflow_existingId_returns204() throws Exception {
         doNothing().when(workflowService).delete("wf-1");
 

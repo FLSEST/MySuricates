@@ -334,13 +334,16 @@ Workflow aktualisieren.
   "name": "Neuer Name",
   "description": "Neue Beschreibung",
   "icon": "✨",
-  "blocks": []
+  "blocks": [],
+  "version": "4.4.0"
 }
 ```
 
 **Response:** `WorkflowResponse`
 
-Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen bleibt möglich.
+Alle Felder sind optional; ein fehlendes Feld bleibt unverändert. `version` ist das Versions-Label (höchstens 255 Zeichen, leer → `400`), kein Teil der Definition: Es erzeugt keine neue Version und ändert keinen Hash. Die Pool-Neuinstallation setzt es auf die Version der Pool-Datei.
+
+Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen und `version` bleiben möglich.
 
 ### `DELETE /api/v1/workflows/{id}`
 
@@ -487,11 +490,12 @@ Workflow ausführen.
   "triggeredByScheduleId": null,
   "triggerSource": "MANUAL",
   "definitionHash": "3f1c…e9",
-  "definitionVersionId": "version-uuid"
+  "definitionVersionId": "version-uuid",
+  "chainRunId": null
 }
 ```
 
-`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
+`definitionHash`/`definitionVersionId` sind `null`, wenn `automation.hardening.provenance` aus ist. `chainRunId` nennt den Chain-Run, der den Lauf als Eintrag gestartet hat (`triggerSource: CHAIN`, nach einem Fortsetzen `RESUME`), sonst `null` — auch bei Retry und Sub-Workflows, die `{{ chain_run_id }}` nur mit dem Kontext erben; Läufe von vor V89 haben keinen. Abgelehnte Starts erzeugen keinen Run: `409 WORKFLOW_TAMPERED` (versiegelte Definition verändert), `403 UNATTENDED_REQUIRES_SEAL` (nur bei unbeaufsichtigten Auslösern).
 
 ### `GET /api/v1/workflows/{id}/runs`
 
@@ -1862,6 +1866,18 @@ Alle Reports eines Audits, paginiert (`page`, `size`). Pflicht-Parameter: `proje
 Einzelnen Audit-Report abrufen.
 
 **Response:** `AuditReportResponse`
+
+Neben Inhalt, Gate und `findingCount` trägt jeder Report (auch in der Liste und in `AuditDetail.latestReport`) die Herkunft seines Laufs, jedes Feld `null`, wenn unbekannt:
+
+| Feld | Bedeutung |
+|---|---|
+| `workflowVersion` | Versions-Label des Workflows beim Speichern (z. B. die Pool-Version) |
+| `triggerSource` | Effektiver Auslöser; bei einem Ketteneintrag der Auslöser der Kette (`SCHEDULE`, `MANUAL`, …). Ein Kettenlauf von vor V89 bleibt `CHAIN`, ein Sub-Workflow-Lauf `SUB_WORKFLOW` |
+| `scheduleId` | Auslösender Zeitplan; bei einem Ketteneintrag der Zeitplan der Kette |
+| `chainRunId`, `chainId`, `chainName` | Chain-Run und Kette eines Ketteneintrags; `chainRunId` bleibt, wenn die Kette gelöscht ist |
+| `definitionVersionNumber` | Nummer der Definitionsversion, die der Lauf ausgeführt hat (leer ohne `automation.hardening.provenance`) |
+
+Die Liste löst Zählung und Herkunft für die ganze Seite mit je einer Abfrage auf, nicht je Report.
 
 ### `GET /api/v1/audit-findings`
 

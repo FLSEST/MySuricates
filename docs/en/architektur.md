@@ -1123,6 +1123,7 @@ The DB migrations (`src/main/resources/db/migration/`) document the feature time
 | V86 | Several named connections per integration provider: `integration_connections.connection_name` |
 | V87 | Indexes for runs per schedule (`workflow_runs`, `chain_runs`) and TODOs per run (`todos.last_fix_run_id`, `todos.workflow_run_id`) |
 | V88 | Goals: table `goal_milestones`, `todos.milestone_id`, `goals.guard_workflow_id` (goal guard) |
+| V89 | A run's chain: `workflow_runs.chain_run_id` + index |
 
 ## Architecture Gates
 
@@ -1166,7 +1167,7 @@ autotrigger/
 │           ├── application-dev.yml    ← Dev profile
 │           ├── agent-instructions.md  ← Base agent instructions
 │           ├── templates/builtin/     ← Built-in template JSON files
-│           └── db/migration/          ← 88 Flyway migrations (V1–V88)
+│           └── db/migration/          ← 89 Flyway migrations (V1–V89)
 │
 └── ai-automation-frontend/
     ├── package.json

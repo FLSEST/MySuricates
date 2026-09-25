@@ -86,6 +86,13 @@ public class WorkflowRun {
     private TriggerSource triggerSource;
 
     /**
+     * Chain run that started this run as one of its entries ({@link TriggerSource#CHAIN}); set when the
+     * run row is created, {@code null} for every other run and for runs from before V89.
+     */
+    @Column(name = "chain_run_id")
+    private String chainRunId;
+
+    /**
      * Seal state at start, recorded by RunAdmission: {@code true} = sealed and verified, {@code false}
      * = not sealed, {@code null} = run from before this was recorded. Never derived from the
      * workflow's current state, which may have changed since.

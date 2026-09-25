@@ -1,6 +1,9 @@
 package com.automation.dto.response;
 
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
+import com.automation.entity.WorkflowRun;
+import com.automation.mapper.WorkflowMapperImpl;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -69,6 +72,33 @@ class WorkflowRunResponseTest {
         assertThat(response.metadata()).isNull();
         assertThat(response.inputContext()).isNull();
         assertThat(response.triggeredByScheduleId()).isNull();
+    }
+
+    // --- chain run (TODO a3b89355) ---
+
+    @Test
+    void should_carryTheChainRun_onlyWhenTheRunRecordedOne() {
+        var inChain = new WorkflowRunResponse("run-1", "wf-1", "W", null, null, RunStatus.COMPLETED, List.of(),
+                null, null, null, null, null, null, null, null, "hash", "ver-1", TriggerSource.CHAIN, false, null,
+                "chain-run-7");
+        var beforeChainRuns = new WorkflowRunResponse("run-1", "wf-1", "W", null, null, RunStatus.COMPLETED, List.of(),
+                null, null, null, null, null, null, null, null, "hash", "ver-1", TriggerSource.CHAIN, false, null);
+
+        assertThat(inChain.chainRunId()).isEqualTo("chain-run-7");
+        assertThat(beforeChainRuns.chainRunId()).isNull();
+        assertThat(beforeChainRuns.triggerSource()).isEqualTo(TriggerSource.CHAIN);
+    }
+
+    @Test
+    void should_takeTheChainRunFromTheRun_when_mapped() {
+        WorkflowRun run = WorkflowRun.builder().id("run-1").status(RunStatus.COMPLETED)
+                .triggerSource(TriggerSource.CHAIN).chainRunId("chain-run-7").build();
+
+        WorkflowRunResponse response = new WorkflowMapperImpl().toRunResponse(run);
+
+        assertThat(response.chainRunId()).isEqualTo("chain-run-7");
+        assertThat(response.triggerSource()).isEqualTo(TriggerSource.CHAIN);
+        assertThat(new WorkflowMapperImpl().toRunResponse(WorkflowRun.builder().id("run-2").build()).chainRunId()).isNull();
     }
 
     @Test

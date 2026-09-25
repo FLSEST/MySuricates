@@ -115,10 +115,14 @@ public class WorkflowPoolService {
         if (!Boolean.TRUE.equals(request.forceCreate())) {
             Optional<Workflow> existing = findInstalled(entry, resolvedName, request.projectId());
             if (existing.isPresent()) {
+                // The pool version too: without it a reinstall kept the label of the first install
+                // (Audit Center showed v3.0.0 for a 4.4.0 pool file, and an export wrote 3.0.0 back).
+                // Blank keeps the current label, as create keeps its default.
+                String version = entry.version() == null || entry.version().isBlank() ? null : entry.version();
                 UpdateWorkflowRequest updateRequest = new UpdateWorkflowRequest(
                         resolvedName, description, entry.icon(), entry.blocks(),
                         entry.instructions(), entry.model(), null, entry.metadata(),
-                        mergedContext, "Pool install: " + poolId, null, null, entry.effort()
+                        mergedContext, "Pool install: " + poolId, null, null, entry.effort(), version
                 );
                 Workflow updated = workflowService.update(existing.get().getId(), updateRequest, ChangeSource.POOL_INSTALL);
                 log.info("Updated pool workflow '{}' in-place: workflow '{}' ({})", poolId, updated.getName(), updated.getId());

@@ -79,6 +79,7 @@ erDiagram
         TEXT error "JSON"
         TEXT metadata "JSON"
         TEXT triggered_by_schedule_id
+        TEXT chain_run_id
     }
 
     step_results {
@@ -505,8 +506,9 @@ M:N-Beziehung zwischen Workflows und Skills.
 | `error` | TEXT | | JSON: Fehlerbeschreibung |
 | `metadata` | TEXT | | JSON: Gate-Status, Zusatzinfos (`gate_status`, `gate_category`, `gate_description`) |
 | `triggered_by_schedule_id` | TEXT | | ID des auslösenden Schedules (V43) |
+| `chain_run_id` | TEXT | | Chain-Run, der den Lauf als Eintrag gestartet hat (`trigger_source` = `CHAIN`), beim Anlegen gesetzt; sonst und für Läufe von vor V89 `NULL`. Kein Fremdschlüssel: Löschen einer Chain löscht ihre Chain-Runs, die Läufe bleiben (V89) |
 
-**Indizes:** `idx_workflow_runs_status`, `idx_workflow_runs_started_at`, `idx_workflow_runs_workflow_id` (V10), `idx_workflow_runs_schedule_started` (V87)
+**Indizes:** `idx_workflow_runs_status`, `idx_workflow_runs_started_at`, `idx_workflow_runs_workflow_id` (V10), `idx_workflow_runs_schedule_started` (V87), `idx_workflow_runs_chain_run_id` (V89)
 
 ### `step_results`
 
@@ -1327,6 +1329,7 @@ Die Schlüssel, die die Executoren lesen; Standardwerte und Beispiele stehen in 
 | V86 | `V86__integration_connection_names.sql` | `connection_name` in integration_connections (Tabellenneubau: `UNIQUE(provider_id)` → `UNIQUE(provider_id, connection_name)`, Bestand wird `default`) |
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | Indizes für Läufe je Schedule (workflow_runs, chain_runs) und TODOs je Lauf (`last_fix_run_id`, `workflow_run_id`) |
 | V88 | `V88__goal_milestones_and_guard.sql` | neue Tabelle `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (Ziel-Wächter) |
+| V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (Chain-Run eines Ketteneintrags, ohne Nachtrag für Altbestand) + Index `idx_workflow_runs_chain_run_id` |
 
 ## SQLite-Besonderheiten
 

@@ -268,6 +268,32 @@ class WorkflowExecutorTest {
         assertThat(created.getDefinitionHash()).isEqualTo(new WorkflowDefinitionHasher().hash(testWorkflow));
     }
 
+    /**
+     * A chain entry's run carries its chain run from the first save on — no second save afterwards,
+     * which would race the async loop. A retry of that run keeps the context, but not the link
+     * (TODO a3b89355).
+     */
+    @Test
+    void execute_recordsTheChainRunOfAChainEntryWhenTheRowIsCreated() {
+        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenReturn(step);
+        Map<String, Object> entryContext = Map.of(TriggerSource.CHAIN_RUN_CONTEXT_KEY, "chain-run-7",
+                TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE");
+
+        workflowExecutor.execute(testWorkflow, entryContext, TriggerSource.CHAIN);
+        assertThat(firstSavedRun().getChainRunId()).isEqualTo("chain-run-7");
+
+        clearInvocations(runRepository);
+        workflowExecutor.execute(testWorkflow, entryContext, TriggerSource.RETRY);
+        assertThat(firstSavedRun().getChainRunId()).isNull();
+    }
+
+    private WorkflowRun firstSavedRun() {
+        ArgumentCaptor<WorkflowRun> captor = ArgumentCaptor.forClass(WorkflowRun.class);
+        verify(runRepository, atLeastOnce()).save(captor.capture());
+        return captor.getAllValues().getFirst();
+    }
+
     @Test
     void execute_blockFails_withStopOnFailure_savesFailedRun() {
         StepResult failed = StepResult.builder()

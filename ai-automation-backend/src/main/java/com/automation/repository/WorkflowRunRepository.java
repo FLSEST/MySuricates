@@ -1,6 +1,7 @@
 package com.automation.repository;
 
 import com.automation.entity.RunStatus;
+import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowRun;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -141,6 +142,31 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     @Query("SELECT new com.automation.dto.projection.RunStateRow(wr.id, wr.workflow.id, wr.workflowName, "
          + "wr.status, wr.startedAt, wr.completedAt) FROM WorkflowRun wr WHERE wr.id IN :ids")
     List<com.automation.dto.projection.RunStateRow> findRunStates(@Param("ids") Collection<String> ids);
+
+    /**
+     * Herkunft je Lauf in einer Abfrage (TODO a3b89355), Spalten wie {@code RunOriginRow.fromColumns}: ohne
+     * Schritte, Metadaten und Fehler, und vom Kontext nur der Eltern-Ausloeser. Den Rest — bei einem
+     * Ketteneintrag die ungekuerzte previous_chain_output — liest SQLite, nach Java kommt er nicht.
+     * <ul>
+     *   <li>Nativ, weil JPQL den Kontext nur ganz kennt: durch den JsonMapConverter, der an ungueltigem JSON
+     *       die ganze Seite scheitern liesse.</li>
+     *   <li>{@code json_valid} vor {@code json_extract}: Das wirft sonst bei ungueltigem JSON ("malformed JSON").</li>
+     *   <li>{@code COALESCE(CAST(… AS TEXT), '')}: Fuer einen Ausdruck ohne deklarierten Typ nimmt sqlite-jdbc
+     *       den Typ des Werts der ersten Zeile. Ist der NULL, meldet der Treiber NUMERIC, und Hibernate liest
+     *       die Spalte als BigDecimal ("Bad value for type BigDecimal : SCHEDULE"). Nie NULL, immer Text haelt
+     *       sie beim Typ TEXT ({@code WorkflowRunRepositoryTest}).</li>
+     * </ul>
+     */
+    @Query(value = "SELECT wr.id, wr.trigger_source, wr.triggered_by_schedule_id, wr.chain_run_id, wr.definition_version_id, "
+            + "COALESCE(CAST(CASE WHEN json_valid(wr.input_context) "
+            + "THEN json_extract(wr.input_context, '$." + TriggerSource.PARENT_CONTEXT_KEY + "') END AS TEXT), '') "
+            + "FROM workflow_runs wr WHERE wr.id IN (:ids)", nativeQuery = true)
+    List<Object[]> findOriginColumns(@Param("ids") Collection<String> ids);
+
+    /** {@link #findOriginColumns} als Zeilen — fuer die Herkunft der Audit-Reports. */
+    default List<com.automation.dto.projection.RunOriginRow> findOriginRows(Collection<String> ids) {
+        return findOriginColumns(ids).stream().map(com.automation.dto.projection.RunOriginRow::fromColumns).toList();
+    }
 
     List<WorkflowRun> findByStartedAtBetween(Instant from, Instant to);
 

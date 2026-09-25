@@ -4,13 +4,15 @@ import com.automation.dto.projection.AuditFindingCountRow;
 import com.automation.dto.projection.AuditReportSummaryRow;
 import com.automation.dto.response.PageResponse;
 import com.automation.entity.AuditFinding;
-import com.automation.entity.AuditFindingOccurrence;
 import com.automation.entity.AuditFindingStatus;
 import com.automation.entity.AuditFindingTodo;
 import com.automation.entity.AuditIngestionStatus;
 import com.automation.entity.AuditReport;
 import com.automation.entity.AuditSeverity;
 import com.automation.entity.GateStatus;
+import com.automation.entity.TriggerSource;
+import com.automation.dto.projection.ChainRunOriginRow;
+import com.automation.dto.projection.RunOriginRow;
 import com.automation.entity.Todo;
 import com.automation.event.TodoCreatedEvent;
 import com.automation.exception.ResourceNotFoundException;
@@ -22,7 +24,10 @@ import com.automation.repository.AuditFindingOccurrenceRepository;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditFindingTodoRepository;
 import com.automation.repository.AuditReportRepository;
+import com.automation.repository.ChainRunRepository;
 import com.automation.repository.TodoRepository;
+import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowVersionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +45,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +54,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -67,6 +74,9 @@ class AuditCenterServiceTest {
     @Mock private AuditFindingTodoRepository findingTodoRepository;
     @Mock private TodoRepository todoRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private WorkflowRunRepository runRepository;
+    @Mock private ChainRunRepository chainRunRepository;
+    @Mock private WorkflowVersionRepository versionRepository;
 
     private AuditCenterService service;
 
@@ -77,7 +87,8 @@ class AuditCenterServiceTest {
         service = new AuditCenterService(reportRepository, findingRepository, occurrenceRepository,
                 new AuditAcceptancePolicy(),
                 new ManagedTodoReconciler(findingRepository, findingTodoRepository, todoRepository),
-                new AuditFindingTodoLinker(findingRepository, findingTodoRepository, todoRepository, managedTodoWriter));
+                new AuditFindingTodoLinker(findingRepository, findingTodoRepository, todoRepository, managedTodoWriter),
+                new AuditReportOrigins(runRepository, chainRunRepository, versionRepository));
     }
 
     @Test
@@ -212,7 +223,7 @@ class AuditCenterServiceTest {
         when(reportRepository.findTopByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health"))
                 .thenReturn(Optional.empty());
         when(findingRepository.findByProjectIdAndAuditKey("p-1", "a.health")).thenReturn(List.of());
-        when(occurrenceRepository.findByReportId("r-2")).thenReturn(List.of(new AuditFindingOccurrence(), new AuditFindingOccurrence()));
+        when(occurrenceRepository.countByReportIds(List.of("r-2"))).thenReturn(countRows("r-2", 2));
 
         AuditDetail detail = service.getAudit("p-1", "a.health");
 
@@ -239,7 +250,6 @@ class AuditCenterServiceTest {
         invalid.setIngestionError("Schema kaputt");
         when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(1, 1)))
                 .thenReturn(new PageImpl<>(List.of(invalid), PageRequest.of(1, 1), 3));
-        when(occurrenceRepository.findByReportId("r-2")).thenReturn(List.of());
 
         PageResponse<AuditReportResponse> page = service.listReports("p-1", "a.health", 1, 1);
 
@@ -257,11 +267,141 @@ class AuditCenterServiceTest {
     void getReport_returnsTheReportOr404() {
         when(reportRepository.findById("r-1")).thenReturn(Optional.of(
                 report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
-        when(occurrenceRepository.findByReportId("r-1")).thenReturn(List.of(new AuditFindingOccurrence()));
+        when(occurrenceRepository.countByReportIds(List.of("r-1"))).thenReturn(countRows("r-1", 1));
         when(reportRepository.findById("r-missing")).thenReturn(Optional.empty());
 
         assertThat(service.getReport("r-1").findingCount()).isEqualTo(1);
         assertThatThrownBy(() -> service.getReport("r-missing")).isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    /**
+     * Herkunft je Report (TODO a3b89355): Ketteneintrag mit Kette und Zeitplan der Kette, direkter Lauf,
+     * Kettenlauf von vor V89, geloeschter Lauf — fuer die ganze Seite je eine Abfrage, nicht je Report.
+     */
+    @Test
+    void listReports_resolvesTheOriginOfEveryReport_withOneQueryPerKind() {
+        Instant now = Instant.now();
+        AuditReport viaChain = report("r-chain", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now);
+        AuditReport direct = report("r-direct", "p-1", "a.health", GateStatus.YELLOW, AuditIngestionStatus.VALID, now.minusSeconds(60));
+        AuditReport oldChain = report("r-old", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, now.minusSeconds(120));
+        AuditReport runGone = report("r-gone", "p-1", "a.health", null, AuditIngestionStatus.INVALID, now.minusSeconds(180));
+        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(viaChain, direct, oldChain, runGone), PageRequest.of(0, 20), 4));
+        when(occurrenceRepository.countByReportIds(List.of("r-chain", "r-direct", "r-old", "r-gone")))
+                .thenReturn(countRows("r-chain", 3, "r-direct", 1));
+        when(runRepository.findOriginRows(List.of("run-r-chain", "run-r-direct", "run-r-old", "run-r-gone"))).thenReturn(List.of(
+                new RunOriginRow("run-r-chain", TriggerSource.CHAIN, null, "cr-1", "v-7", "SCHEDULE"),
+                new RunOriginRow("run-r-direct", TriggerSource.SCHEDULE, "sched-direct", null, "v-8", null),
+                new RunOriginRow("run-r-old", TriggerSource.CHAIN, null, null, null, "MANUAL")));
+        when(chainRunRepository.findOriginRows(Set.of("cr-1")))
+                .thenReturn(List.of(new ChainRunOriginRow("cr-1", "chain-1", "Wochen-Audits", "sched-chain")));
+        when(versionRepository.findVersionNumbers(Set.of("v-7", "v-8")))
+                .thenReturn(List.of(new Object[]{"v-7", 7}, new Object[]{"v-8", 8}));
+
+        List<AuditReportResponse> reports = service.listReports("p-1", "a.health", 0, 20).content();
+
+        assertThat(reports).extracting(AuditReportResponse::id).containsExactly("r-chain", "r-direct", "r-old", "r-gone");
+        assertThat(reports.get(0)).satisfies(r -> {
+            assertThat(r.triggerSource()).as("der Ausloeser der Kette, nicht CHAIN").isEqualTo(TriggerSource.SCHEDULE);
+            assertThat(r.scheduleId()).as("der Zeitplan der Kette").isEqualTo("sched-chain");
+            assertThat(r.chainRunId()).isEqualTo("cr-1");
+            assertThat(r.chainId()).isEqualTo("chain-1");
+            assertThat(r.chainName()).isEqualTo("Wochen-Audits");
+            assertThat(r.definitionVersionNumber()).isEqualTo(7);
+            assertThat(r.findingCount()).isEqualTo(3);
+        });
+        assertThat(reports.get(1)).satisfies(r -> {
+            assertThat(r.triggerSource()).isEqualTo(TriggerSource.SCHEDULE);
+            assertThat(r.scheduleId()).isEqualTo("sched-direct");
+            assertThat(r.chainRunId()).isNull();
+            assertThat(r.chainName()).isNull();
+            assertThat(r.definitionVersionNumber()).isEqualTo(8);
+            assertThat(r.findingCount()).isEqualTo(1);
+        });
+        assertThat(reports.get(2)).as("Kettenlauf von vor V89: nur CHAIN, nichts Erfundenes").satisfies(r -> {
+            assertThat(r.triggerSource()).isEqualTo(TriggerSource.CHAIN);
+            assertThat(r.scheduleId()).isNull();
+            assertThat(r.chainRunId()).isNull();
+            assertThat(r.chainId()).isNull();
+            assertThat(r.chainName()).isNull();
+            assertThat(r.definitionVersionNumber()).isNull();
+            assertThat(r.findingCount()).isZero();
+        });
+        assertThat(reports.get(3)).as("Lauf geloescht").satisfies(r -> {
+            assertThat(r.triggerSource()).isNull();
+            assertThat(r.scheduleId()).isNull();
+            assertThat(r.chainRunId()).isNull();
+            assertThat(r.definitionVersionNumber()).isNull();
+        });
+        verify(occurrenceRepository).countByReportIds(any());
+        verify(runRepository).findOriginRows(any());
+        verify(chainRunRepository).findOriginRows(any());
+        verify(versionRepository).findVersionNumbers(any());
+        verifyNoMoreInteractions(occurrenceRepository, runRepository, chainRunRepository, versionRepository);
+    }
+
+    /** Die Kette ist geloescht (samt Chain-Runs): der Lauf behaelt seinen chainRunId, Name und Zeitplan fehlen. */
+    @Test
+    void getReport_chainGone_keepsTheChainRunIdAndTheStarterButNamesNothing() {
+        when(reportRepository.findById("r-1")).thenReturn(Optional.of(
+                report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
+        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(new RunOriginRow(
+                "run-r-1", TriggerSource.CHAIN, null, "cr-gone", null, "WISH")));
+        when(chainRunRepository.findOriginRows(Set.of("cr-gone"))).thenReturn(List.of());
+
+        AuditReportResponse report = service.getReport("r-1");
+
+        assertThat(report.triggerSource()).isEqualTo(TriggerSource.WISH);
+        assertThat(report.chainRunId()).isEqualTo("cr-gone");
+        assertThat(report.chainId()).isNull();
+        assertThat(report.chainName()).isNull();
+        assertThat(report.scheduleId()).isNull();
+        verify(versionRepository, never()).findVersionNumbers(any());
+    }
+
+    /**
+     * Kein lesbarer Eltern-Ausloeser — der Kontext war kein gueltiges JSON oder nannte keinen bekannten
+     * Ausloeser: der Ketteneintrag bleibt CHAIN, samt Kette und deren Zeitplan.
+     */
+    @Test
+    void getReport_unreadableParentSource_fallsBackToChain() {
+        when(reportRepository.findById("r-1")).thenReturn(Optional.of(
+                report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now())));
+        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
+                new RunOriginRow("run-r-1", TriggerSource.CHAIN, null, "cr-1", null, null)));
+        when(chainRunRepository.findOriginRows(Set.of("cr-1")))
+                .thenReturn(List.of(new ChainRunOriginRow("cr-1", "chain-1", "Wochen-Audits", "sched-chain")));
+
+        AuditReportResponse report = service.getReport("r-1");
+
+        assertThat(report.triggerSource()).isEqualTo(TriggerSource.CHAIN);
+        assertThat(report.chainName()).isEqualTo("Wochen-Audits");
+        assertThat(report.scheduleId()).isEqualTo("sched-chain");
+    }
+
+    /** Ohne Ketten und Versionen auf der Seite fragt die Aufloesung dort gar nicht erst nach. */
+    @Test
+    void listReports_withoutChainsOrVersions_asksNeitherChainRunsNorVersions() {
+        AuditReport manual = report("r-1", "p-1", "a.health", GateStatus.GREEN, AuditIngestionStatus.VALID, Instant.now());
+        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.health", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(manual), PageRequest.of(0, 20), 1));
+        when(runRepository.findOriginRows(List.of("run-r-1"))).thenReturn(List.of(
+                new RunOriginRow("run-r-1", TriggerSource.MANUAL, null, null, null, null)));
+
+        AuditReportResponse report = service.listReports("p-1", "a.health", 0, 20).content().getFirst();
+
+        assertThat(report.triggerSource()).isEqualTo(TriggerSource.MANUAL);
+        assertThat(report.definitionVersionNumber()).isNull();
+        verifyNoInteractions(chainRunRepository, versionRepository);
+    }
+
+    @Test
+    void listReports_emptyPage_asksNothingElse() {
+        when(reportRepository.findByProjectIdAndAuditKeyOrderByGeneratedAtDesc("p-1", "a.none", PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        assertThat(service.listReports("p-1", "a.none", 0, 20).content()).isEmpty();
+        verifyNoInteractions(occurrenceRepository, runRepository, chainRunRepository, versionRepository);
     }
 
     // --- Findings ---
@@ -475,6 +615,15 @@ class AuditCenterServiceTest {
         verify(findingRepository).save(open);
         verify(findingRepository, never()).save(resolved);
         verify(findingRepository, never()).findById("f-manual");
+    }
+
+    /** {@code [reportId, count]}-Zeilen wie aus {@code countByReportIds}: abwechselnd Id und Anzahl. */
+    private static List<Object[]> countRows(Object... idsAndCounts) {
+        List<Object[]> rows = new java.util.ArrayList<>();
+        for (int i = 0; i < idsAndCounts.length; i += 2) {
+            rows.add(new Object[]{idsAndCounts[i], ((Integer) idsAndCounts[i + 1]).longValue()});
+        }
+        return rows;
     }
 
     private static List<AuditReportSummaryRow> rows(AuditReport... reports) {

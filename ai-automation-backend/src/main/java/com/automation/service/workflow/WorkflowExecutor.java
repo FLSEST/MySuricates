@@ -99,7 +99,7 @@ public class WorkflowExecutor {
                 .workflowName(workflow.getName())
                 .status(RunStatus.RUNNING)
                 .startedAt(Instant.now())
-                .triggeredByScheduleId(triggeredByScheduleId)
+                .triggeredByScheduleId(triggeredByScheduleId).chainRunId(TriggerSource.chainRunIdOf(triggerSource, inputContext))
                 .triggerSource(triggerSource).definitionHash(ticket.definitionHash()).definitionVersionId(ticket.definitionVersionId())
                 .sealed(ticket.sealed()).sealedSkillPins(ticket.sealedSkillPins())
                 .build();

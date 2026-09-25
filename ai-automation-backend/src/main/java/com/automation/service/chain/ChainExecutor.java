@@ -165,6 +165,8 @@ public class ChainExecutor {
                 // resolves instead of leaking the literal placeholder to the LLM.
                 context.put("previous_chain_output", previousOutput != null ? previousOutput : "");
                 context.put(TriggerSource.PARENT_CONTEXT_KEY, startedBy.name()); // never taken from the input
+                // {{ chain_run_id }}, and the entry run records it on its row when created (WorkflowRun.chainRunId)
+                context.put(TriggerSource.CHAIN_RUN_CONTEXT_KEY, runId);
 
                 run.getEntryRuns().add(runEntry);
                 chainRunRepository.save(run);

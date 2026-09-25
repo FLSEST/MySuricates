@@ -467,9 +467,9 @@ class WorkflowPoolServiceTest {
     }
 
     /**
-     * TODO 96640e6f: {@code UpdateWorkflowRequest} nimmt 13 Positionsargumente, {@code category} und
-     * {@code effort} stehen nebeneinander und sind beide String — eine Umsortierung des Records
-     * wuerde effort sonst still als category einsetzen, ohne dass ein Test es merkt.
+     * TODO 96640e6f: {@code UpdateWorkflowRequest} nimmt 14 Positionsargumente, {@code category},
+     * {@code effort} und {@code version} stehen nebeneinander und sind alle String — eine Umsortierung
+     * des Records wuerde effort sonst still als category einsetzen, ohne dass ein Test es merkt.
      */
     @Test
     void install_onAnExistingWorkflow_passesEffortToTheUpdate() throws Exception {
@@ -487,6 +487,42 @@ class WorkflowPoolServiceTest {
         verify(workflowService).update(eq("wf-9"),
                 argThat(req -> "high".equals(req.effort()) && req.category() == null),
                 eq(ChangeSource.POOL_INSTALL));
+    }
+
+    /**
+     * TODO a3b89355: Die Neuinstallation laeuft ueber update und verlor die Pool-Version — das Audit
+     * Center zeigte v3.0.0 fuer eine 4.4.0-Pooldatei, und ein Export haette 3.0.0 zurueckgeschrieben.
+     */
+    @Test
+    void install_onAnExistingWorkflow_passesThePoolVersionToTheUpdate() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}],
+                 "effort": "high", "version": "4.4.0"}
+                """);
+        Workflow existing = Workflow.builder().id("wf-9").name("Test").version("3.0.0").build();
+        when(workflowService.findByNameAndProjectId("Test", "proj-1")).thenReturn(Optional.of(existing));
+        when(workflowService.update(eq("wf-9"), any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(existing);
+
+        poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        verify(workflowService).update(eq("wf-9"),
+                argThat(req -> "4.4.0".equals(req.version()) && "high".equals(req.effort()) && req.category() == null),
+                eq(ChangeSource.POOL_INSTALL));
+    }
+
+    /** Eine leere Version in der Pooldatei laesst das Label stehen, wie create seinen Default behaelt. */
+    @Test
+    void install_onAnExistingWorkflow_blankPoolVersionKeepsTheLabel() throws Exception {
+        writePoolFile("test-flow.json", """
+                {"name": {"en": "Test"}, "blocks": [{"type": "simple", "config": {}}], "version": " "}
+                """);
+        Workflow existing = Workflow.builder().id("wf-9").name("Test").version("3.0.0").build();
+        when(workflowService.findByNameAndProjectId("Test", "proj-1")).thenReturn(Optional.of(existing));
+        when(workflowService.update(eq("wf-9"), any(), eq(ChangeSource.POOL_INSTALL))).thenReturn(existing);
+
+        poolService.install("test-flow", new InstallPoolWorkflowRequest("proj-1", null, null));
+
+        verify(workflowService).update(eq("wf-9"), argThat(req -> req.version() == null), eq(ChangeSource.POOL_INSTALL));
     }
 
     // --- zweisprachige Pool-Dateien (TODO a129a661) ---

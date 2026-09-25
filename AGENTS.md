@@ -343,7 +343,7 @@ POST /api/v1/workflows/{id}/versions/{versionId}/restore
 **Hinweise:**
 - Versionen werden automatisch bei jedem Update erstellt (nur bei Änderung an Blocks, Instructions, Model, Provider, Metadata, DefaultContext, Skills)
 - Jede Version beschreibt den Zustand **nach** einer Änderung und trägt `definitionHash` (SHA-256 der Definition). `changeSource` bestimmt der Server, nicht der Request: `user`, `assistant`, `factory` (auch Auto-Repair), `wish`, `dialog`, `conversion`, `chain-template`, `pool-install`, `example-project`, `goal-guard`, `import`, `bpmn-import`, `restore`, `untracked` (Stand ohne Version, z. B. Altbestand oder Änderung am Service vorbei). Ältere Zeilen können noch `ai`/`api` tragen.
-- Kosmetische Änderungen (Name, Beschreibung, Icon) erzeugen keine Version
+- Kosmetische Änderungen (Name, Beschreibung, Icon, Versions-Label `version`) erzeugen keine Version
 - Context-Variablen in Workflows: `{{ workflow_version }}` (Versionsnummer), `{{ workflow_changed_since_last_run }}` (true/false), `{{ workflow_definition_hash }}`, `{{ trigger_source }}`
 
 **Härtung (optional, `automation.hardening.*`):**
@@ -357,7 +357,7 @@ DELETE /api/v1/webhooks/{id}/secret
 
 - Versiegelt: PUT/DELETE mit Definitionsänderung → `409 WORKFLOW_SEALED`; manipulierte Definition startet nicht → `409 WORKFLOW_TAMPERED`
 - `require-sealed-for-unattended`: Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair und Wishes (auch über Chains/Sub-Workflows) starten nur versiegelte Workflows → sonst `403 UNATTENDED_REQUIRES_SEAL`
-- Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`
+- Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`; Einträge einer Chain zusätzlich `chainRunId`
 
 ### 9. Test-Instanz
 
@@ -446,7 +446,7 @@ DELETE /api/v1/assistant/sessions/<session-uuid>
 
 | Aktion | Endpunkt |
 |--------|----------|
-| Workflow lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/workflows/{id}` (DELETE = Soft-Delete) |
+| Workflow lesen / ändern / löschen | `GET`/`PUT`/`DELETE /api/v1/workflows/{id}` (DELETE = Soft-Delete; PUT nimmt optional `version`, das Versions-Label wie `4.4.0` — ohne Feld bleibt es, keine Definitionsversion, auch bei Siegel erlaubt) |
 | Chains auflisten / lesen / ändern / löschen | `GET /api/v1/chains`, `GET`/`PUT`/`DELETE /api/v1/chains/{id}` |
 | Chain-Runs | `GET /api/v1/chains/runs`, `GET /api/v1/chains/{id}/runs`, `POST /api/v1/chains/runs/{runId}/cancel` |
 | TODOs auflisten (Filter) | `GET /api/v1/todos?status=OPEN&status=IN_PROGRESS&projectId=<uuid>&tag=<tag>&q=<suche>` |
