@@ -367,5 +367,87 @@ class VerifyTest(RepoCase):
         self.assertTrue((self.state / "report-draft.md").exists())
 
 
+class ReportAndHandoverTest(RepoCase):
+    def run_verify(self):
+        import verify
+        (self.state / "base.sha").write_text(run_git(self.clone, "rev-parse", "HEAD").strip())
+        (self.state / "ids.txt").write_text(f"{A}\n{B}\n")
+        b.write_json(self.state / "titles.json", {A: "Alpha", B: "Beta"})
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        call(verify.main, "--state", str(self.state), "--backend-cmd", "true", "--frontend-cmd", "true",
+             "--common-cmd", "true", "--logs", str(self.state / "logs"))
+
+    def report(self):
+        import report
+        return call(report.main, "--state", str(self.state), "--run", "run12345-x", "--date", "2026-09-25")
+
+    def handover(self, answer, *extra):
+        import handover
+        return call(handover.main, "--state", str(self.state), "--answer", answer, "--project-path", str(self.source),
+                    "--run", "run12345-x", *extra)
+
+    def test_report_gate_widget_and_approval_text(self):
+        self.run_verify()   # B ohne Commit → übersprungen
+        _, out = self.report()
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "gate_status: YELLOW")
+        widget = json.loads(lines[3].removeprefix("dashboard_widget: "))
+        self.assertEqual(widget["kpis"][0], {"label": "Angenommen", "value": "1"})
+        approval = (self.state / "approval.md").read_text()
+        self.assertIn("mysuricates/batch-run12345", approval)
+        self.assertIn("sauber", approval)
+
+    def test_report_resets_a_branch_changed_after_the_check(self):
+        self.run_verify()
+        write(self.clone / "docs" / "a.md", "verändert\n")
+        self.report()
+        self.assertEqual((self.clone / "docs" / "a.md").read_text(), "a\n")
+        self.assertIn("zurückgesetzt", (self.state / "approval.md").read_text())
+
+    def test_merge_preview_shows_conflicts(self):
+        self.run_verify()
+        self.commit(self.source, "docs/a.md", "anders\n")
+        self.report()
+        self.assertEqual(json.loads((self.state / "merge.json").read_text())["state"], "Konflikt")
+
+    def test_provide_exports_a_new_ref_and_hands_the_todos_over(self):
+        self.run_verify()
+        self.report()
+        code, out = self.handover("Übernehmen")
+        self.assertEqual(code, 0)
+        self.assertIn("mysuricates/batch-run12345", run_git(self.source, "branch", "--list", "mysuricates/*"))
+        self.assertEqual(run_git(self.source, "status", "--porcelain"), "")
+        updates = {u["id"]: u for u in last_json(out)}
+        self.assertEqual(updates[A]["add_tags"], [b.HANDED_OVER])
+        self.assertEqual((updates[B]["add_tags"], updates[B]["status"]), ([b.FAILED], "OPEN"))
+
+    def test_existing_ref_is_never_overwritten(self):
+        self.run_verify()
+        self.report()
+        run_git(self.source, "branch", "mysuricates/batch-run12345")
+        before = run_git(self.source, "rev-parse", "mysuricates/batch-run12345")
+        _, out = self.handover("Übernehmen")
+        self.assertEqual(run_git(self.source, "rev-parse", "mysuricates/batch-run12345"), before)
+        self.assertIn("gate_status: RED", out)
+        self.assertIn("Übergabe gescheitert", {u["id"]: u for u in last_json(out)}[A]["note"])
+
+    def test_discard_and_timeout(self):
+        self.run_verify()
+        self.report()
+        _, out = self.handover("Verwerfen")
+        self.assertEqual(run_git(self.source, "branch", "--list", "mysuricates/*"), "")
+        self.assertEqual({u["id"]: u for u in last_json(out)}[A]["add_tags"], [b.REJECTED])
+        _, out = self.handover("", "--on-timeout", "discard")
+        self.assertIn("keine Antwort", out)
+
+    def test_cleanup_removes_build_directories_inside_the_clone_only(self):
+        self.run_verify()
+        self.report()
+        (self.clone / "node_modules" / "x").mkdir(parents=True)
+        self.handover("Verwerfen", "--cleanup", "node_modules", "../source")
+        self.assertFalse((self.clone / "node_modules").exists())
+        self.assertTrue((self.source / ".git").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
