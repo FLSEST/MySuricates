@@ -2372,6 +2372,8 @@ export const en = {
     notFound: 'Goal not found',
     notSet: '—',
     assigned: 'Added to the goal',
+    undoAssign: 'Undo',
+    assignUndone: 'Removed from the goal again',
     views: { label: 'View', list: 'List', map: 'Map', timeline: 'Timeline' },
     timeline: {
       label: 'Timeline: TODOs by due date and milestone',

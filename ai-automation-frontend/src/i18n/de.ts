@@ -2369,6 +2369,8 @@ export const de: TranslationKeys = {
     notFound: 'Ziel nicht gefunden',
     notSet: '—',
     assigned: 'Dem Ziel zugeordnet',
+    undoAssign: 'Rückgängig',
+    assignUndone: 'Wieder vom Ziel gelöst',
     views: { label: 'Ansicht', list: 'Liste', map: 'Karte', timeline: 'Zeitstrahl' },
     timeline: {
       label: 'Zeitstrahl: TODOs nach Fälligkeit und Meilenstein',
