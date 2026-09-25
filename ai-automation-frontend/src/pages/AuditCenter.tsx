@@ -20,7 +20,7 @@ type MainView = 'overview' | 'audit' | 'legacy';
 export function AuditCenter() {
   const t = useT();
   const locale = useI18nStore((state) => state.locale);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedFinding = searchParams.get('finding');
   const [view, setView] = useState<MainView>(requestedFinding ? 'audit' : 'overview');
   const [auditTab, setAuditTab] = useState<AuditTab>(requestedFinding ? 'findings' : 'report');
@@ -31,6 +31,15 @@ export function AuditCenter() {
 
   const openAudit = (audit: AuditSummary) => {
     select(audit);
+    // A click in the overview wins over the deep link, which otherwise kept its own audit open (6ff1c580):
+    // the link is used up, and the URL says what is open.
+    if (requestedFinding) {
+      setSearchParams((params) => {
+        const next = new URLSearchParams(params);
+        next.delete('finding');
+        return next;
+      }, { replace: true });
+    }
     setView('audit');
     setAuditTab('report');
   };
@@ -57,7 +66,9 @@ export function AuditCenter() {
         <AuditOverview audits={audits} loading={loading} projectNames={projectNames} locale={locale} onOpen={openAudit} />
       )}
       {view === 'audit' && activeAudit && (
-        <AuditDetail audit={activeAudit} tab={auditTab} setTab={setAuditTab} locale={locale}
+        // Keyed by audit: another audit starts with its own chips, not those of the previous one or of a link
+        <AuditDetail key={`${activeAudit.projectId}:${activeAudit.auditKey}`}
+          audit={activeAudit} tab={auditTab} setTab={setAuditTab} locale={locale}
           projectName={projectNames.get(activeAudit.projectId)} requestedFinding={requestedFinding}
           requestedFindingStatus={linkedStatus} />
       )}

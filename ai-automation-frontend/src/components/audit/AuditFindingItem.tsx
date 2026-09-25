@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Link2, Plus } from 'lucide-react';
 import { Button } from '../ui';
@@ -11,13 +12,15 @@ import { FindingDisposition } from './FindingDisposition';
 const FINDING_STATUSES: AuditFindingStatus[] = ['OPEN', 'AWAITING_VERIFICATION', 'ACCEPTED_RISK', 'DISMISSED', 'RESOLVED'];
 
 /** One finding: what, where, evidence, disposition and TODOs — and filing it, with the forms for reason and TODO link. */
-export function AuditFindingItem({ finding, actions, highlighted, workflowId, locale }: {
+export function AuditFindingItem({ finding, actions, highlighted, workflowId, locale, sectionRef }: {
   finding: AuditFinding; actions: FindingActions; highlighted: boolean; workflowId: string; locale: Locale;
+  /** Set on the deep-linked finding, which the list scrolls into view. */
+  sectionRef?: Ref<HTMLElement>;
 }) {
   const t = useT();
   const { disposing } = actions;
   const hasManagedTodo = finding.todos.some((todo) => todo.managed);
-  return <section className={`py-5 scroll-mt-4 ${highlighted ? 'bg-accent-subtle/30 px-3 -mx-3' : ''}`}>
+  return <section ref={sectionRef} className={`py-5 scroll-mt-4 ${highlighted ? 'bg-accent-subtle/30 px-3 -mx-3' : ''}`}>
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap"><SeverityBadge severity={finding.severity} /><FindingStatusBadge status={finding.status} /><h3 className="font-medium text-text">{finding.title}</h3></div>
@@ -30,6 +33,11 @@ export function AuditFindingItem({ finding, actions, highlighted, workflowId, lo
             className="inline-flex items-center gap-1 text-warning border border-warning/40 rounded px-1.5 py-0.5"
             title={t.auditCenter.unknownRuleKeyHint} data-testid="unknown-rule-key">
             <AlertTriangle className="w-3 h-3" /> {t.auditCenter.unknownRuleKey}
+          </span>}
+          {finding.unverifiedEvidence && <span
+            className="inline-flex items-center gap-1 text-warning border border-warning/40 rounded px-1.5 py-0.5"
+            title={t.auditCenter.unverifiedEvidenceHint} data-testid="unverified-evidence">
+            <AlertTriangle className="w-3 h-3" /> {t.auditCenter.unverifiedEvidence}
           </span>}
           <span>{t.auditCenter.seenTimes.replace('{count}', String(finding.occurrenceCount))}</span>
           {finding.regressionCount > 0 && <span className="text-danger">{t.auditCenter.regressions.replace('{count}', String(finding.regressionCount))}</span>}

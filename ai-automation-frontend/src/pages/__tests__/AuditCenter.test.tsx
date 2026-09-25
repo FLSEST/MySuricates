@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
-import { http, HttpResponse } from 'msw';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { AuditCenter } from '../AuditCenter';
@@ -151,6 +151,116 @@ describe('AuditCenter deep link while the audit list loads', () => {
     renderWithProviders(<AuditCenter />, { route: '/?finding=f-accepted' });
 
     expect(await screen.findByText('The linked finding or its audit was not found.')).toBeInTheDocument();
+  });
+});
+
+// 6ff1c580: the deep link kept its audit open, was not scrolled to, and unverified evidence went unmentioned
+describe('AuditCenter deep link, audit switch and evidence marker', () => {
+  const security: AuditSummary = {
+    ...summary, auditKey: 'mysuricates.security', title: 'Security Audit', latestReportId: 'rep-s', findingsByStatus: { OPEN: 1 },
+  };
+  const finding = (id: string, status: AuditFinding['status'], title: string, extra: Partial<AuditFinding> = {}): AuditFinding => ({
+    ...accepted, id, status, title, dispositionNote: null, dispositionAt: null, dispositionEvidence: null, ...extra,
+  });
+
+  function SearchProbe() {
+    return <p data-testid="search">{useLocation().search}</p>;
+  }
+
+  it('opens the audit clicked in the overview although the URL still names a finding of another audit', async () => {
+    useAuditEndpoints();
+    server.use(http.get(`${BASE}/audits`, () => HttpResponse.json([summary, security])));
+    renderWithProviders(<><AuditCenter /><SearchProbe /></>, { route: '/?finding=f-accepted' });
+
+    expect(await screen.findByText('Big.java ist zu gross')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Accepted/, pressed: true })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    fireEvent.click(await screen.findByText('Security Audit'));
+
+    expect(await screen.findByRole('heading', { name: 'Security Audit' })).toBeInTheDocument();
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
+    // the chips of the link do not travel along to the other audit
+    fireEvent.click(screen.getByRole('button', { name: /^Findings/ }));
+    expect(screen.getByRole('button', { name: /^Accepted/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('scrolls the deep-linked finding into view once, when its list is complete', async () => {
+    let listCompleteAtScroll: boolean | null = null;
+    const scrollIntoView = vi.fn(() => { listCompleteAtScroll = screen.queryByText('Third open finding') !== null; });
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const findings = [
+        finding('f-1', 'OPEN', 'First open finding'),
+        finding('f-2', 'AWAITING_VERIFICATION', 'Linked finding'),
+        finding('f-3', 'OPEN', 'Third open finding'),
+      ];
+      useAuditEndpoints();
+      server.use(
+        http.get(`${BASE}/audits`, () => HttpResponse.json([{ ...summary, findingsByStatus: { OPEN: 2, AWAITING_VERIFICATION: 1 } }])),
+        http.get(`${BASE}/audit-findings/:id`, ({ params }) => HttpResponse.json(findings.find((item) => item.id === params.id))),
+        http.get(`${BASE}/audit-findings`, async (info) => {
+          // the open ones come last: rows arriving after the linked one would push it away again
+          if (new URL(info.request.url).searchParams.get('status') === 'OPEN') await delay(80);
+          return findingsPage(() => findings)(info);
+        }),
+        http.patch(`${BASE}/audit-findings/:id`, async ({ params, request }) => {
+          const index = findings.findIndex((item) => item.id === params.id);
+          findings[index] = { ...findings[index]!, ...(await request.json() as Partial<AuditFinding>) };
+          return HttpResponse.json(findings[index]);
+        }),
+      );
+      renderWithProviders(<AuditCenter />, { route: '/?finding=f-2' });
+
+      const linked = (await screen.findByText('Linked finding')).closest('section')!;
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(scrollIntoView.mock.contexts[0]).toBe(linked);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      expect(listCompleteAtScroll).toBe(true);
+
+      // filing it leaves the view where the person is, even when its row is drawn anew
+      fireEvent.change(within(linked).getByTestId('finding-status'), { target: { value: 'OPEN' } });
+      await waitFor(() => expect(within(screen.getByText('Linked finding').closest('section')!)
+        .getByTestId('finding-status')).toHaveValue('OPEN'));
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
+  it('does not scroll when the findings are opened without a link', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      useAuditEndpoints();
+      renderWithProviders(<AuditCenter />);
+      fireEvent.click(await screen.findByText('Health Audit'));
+      fireEvent.click(screen.getByRole('button', { name: /^Findings/ }));
+      fireEvent.click(screen.getByRole('button', { name: /^Accepted/ }));
+
+      expect(await screen.findByText('Big.java ist zu gross')).toBeInTheDocument();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
+  it('marks a finding whose evidence names no measurement of its run', async () => {
+    useAuditEndpoints();
+    server.use(http.get(`${BASE}/audit-findings`, findingsPage(() => [
+      finding('f-1', 'OPEN', 'Unverified finding', { unverifiedEvidence: true }),
+      finding('f-2', 'OPEN', 'Verified finding'),
+    ])));
+    server.use(http.get(`${BASE}/audits`, () => HttpResponse.json([{ ...summary, findingsByStatus: { OPEN: 2 } }])));
+    renderWithProviders(<AuditCenter />);
+    fireEvent.click(await screen.findByText('Health Audit'));
+    fireEvent.click(screen.getByRole('button', { name: /^Findings/ }));
+
+    const unverified = (await screen.findByText('Unverified finding')).closest('section')!;
+    const marker = within(unverified).getByTestId('unverified-evidence');
+    expect(marker).toHaveTextContent('Evidence unverified');
+    expect(marker).toHaveAttribute('title', expect.stringContaining('no managed TODO'));
+    const verified = screen.getByText('Verified finding').closest('section')!;
+    expect(within(verified).queryByTestId('unverified-evidence')).toBeNull();
   });
 });
 

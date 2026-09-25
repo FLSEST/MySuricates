@@ -2277,6 +2277,11 @@ export const de: TranslationKeys = {
     dispositionNote: 'Dispositions-Notiz',
     unknownRuleKey: 'Regel nicht im Katalog',
     unknownRuleKeyHint: 'Dieser ruleKey steht nicht in audit/rule-keys.json. Die Regel-Identität ist damit ungeprüft: Schreibt der nächste Lauf sie anders, entsteht ein neues Finding statt eines Wiedersehens.',
+    unverifiedEvidence: 'Beleg ungeprüft',
+    unverifiedEvidenceHint: 'Der Beleg nennt keinen Messwert dieses Laufs (keine FAKT- oder TREFFER-Zeile aus seinem Faktenblatt). Das Finding bleibt sichtbar, bekommt aber kein verwaltetes TODO, solange sein Beleg nicht stimmt.',
+    fileFailed: 'Finding konnte nicht eingeordnet werden',
+    createTodoFailed: 'TODO konnte nicht angelegt werden',
+    linkTodoFailed: 'TODO konnte nicht verknüpft werden',
   },
   cockpit: {
     title: 'Cockpit',

@@ -1,6 +1,8 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, apiErrorMessage } from '../api/client';
+import { useT } from '../i18n';
 import type { PageResponse, TriggerSource } from '../types';
+import { useToast } from './useToast';
 
 export type GateStatus = 'GREEN' | 'YELLOW' | 'RED';
 export type AuditIngestionStatus = 'VALID' | 'INVALID';
@@ -166,10 +168,16 @@ export function useAuditFinding(id: string | null) {
   });
 }
 
-function useFindingMutation<T>(mutationFn: (input: T) => Promise<AuditFinding>) {
+/** What failed, for the toast — the server's reason follows it (a TODO id that does not exist, …). */
+type FindingFailure = 'fileFailed' | 'createTodoFailed' | 'linkTodoFailed';
+
+function useFindingMutation<T>(mutationFn: (input: T) => Promise<AuditFinding>, failure: FindingFailure) {
   const queryClient = useQueryClient();
+  const toast = useToast();
+  const t = useT();
   return useMutation({
     mutationFn,
+    onError: (err) => toast.error(apiErrorMessage(err, t.auditCenter[failure])),
     onSuccess: (updated) => {
       // The answer goes into every cached page at once: a finding filed under another status drops
       // out of the filtered list now instead of snapping back until the refetch arrives.
@@ -187,16 +195,16 @@ function useFindingMutation<T>(mutationFn: (input: T) => Promise<AuditFinding>) 
 
 export function useUpdateAuditFinding() {
   return useFindingMutation<{ id: string; status: AuditFindingStatus; dispositionNote?: string }>(
-    ({ id, ...body }) => api.patch<AuditFinding>(`/audit-findings/${id}`, body),
+    ({ id, ...body }) => api.patch<AuditFinding>(`/audit-findings/${id}`, body), 'fileFailed',
   );
 }
 
 export function useCreateAuditTodo() {
-  return useFindingMutation<string>((id) => api.post<AuditFinding>(`/audit-findings/${id}/todos`));
+  return useFindingMutation<string>((id) => api.post<AuditFinding>(`/audit-findings/${id}/todos`), 'createTodoFailed');
 }
 
 export function useLinkAuditTodo() {
   return useFindingMutation<{ findingId: string; todoId: string }>(({ findingId, todoId }) =>
-    api.post<AuditFinding>(`/audit-findings/${findingId}/todo-links`, { todoId }),
+    api.post<AuditFinding>(`/audit-findings/${findingId}/todo-links`, { todoId }), 'linkTodoFailed',
   );
 }
