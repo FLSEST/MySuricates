@@ -1,7 +1,7 @@
 package com.automation.service.memory;
 
 import com.automation.service.ai.HostClaudeService;
-import com.automation.service.cli.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeJsonResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,5 +1,7 @@
 package com.automation.service.cli;
 
+import com.automation.service.cli.claude.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeOutputParser;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 

@@ -56,9 +56,10 @@ class PackageCycleRatchetTest {
      * RateLimitConfig moved to com.automation.security, next to the RateLimitFilter that reads it — 4.
      * OnboardingProfileSeeder moved to service.project, next to the services it seeds for — 3.
      * The HostExecutionRequest overload of StepAiMetadata.aiRequest moved to service.cli — 2.
+     * 2026-09-26: the Claude CLI output classes left service.cli for the leaf package
+     * service.cli.claude, which ai and cli both read — 1.
      */
     static final Set<String> ALLOWED_PAIRS = Set.of(
-            "com.automation.service.ai <-> com.automation.service.cli",
             "com.automation.service.project <-> com.automation.service.workflow");
 
     /**
