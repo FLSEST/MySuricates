@@ -89,6 +89,29 @@ class AuditSnapshotApplierTest {
         assertThat(occurrence.getValue().getTitle()).isEqualTo("curl | sh im Installer");
     }
 
+    // --- Fingerprint mit festen Werten: ohne ¦ wie vor 90c4f7db --------------------------------
+    //
+    // Die Werte sind unabhaengig berechnet: SHA-256 ueber "projectId\nauditKey\nruleKey\nsubject" (subject hier ohne
+    // Normalisierungsbedarf). Aendert ein Umbau die Identitaet eines Befunds ohne ¦, wird jeder gespeicherte Befund
+    // beim naechsten Report zum Wiedergaenger – das soll hier rot werden, nicht erst im Audit Center.
+
+    @Test
+    void fingerprint_ofAFindingWithoutTheMaskedSeparator_isPinned() {
+        assertThat(AuditSnapshotApplier.fingerprint("proj-1", "mysuricates.security", "shell.injection",
+                "ContainerShellService"))
+                .isEqualTo("19e1ea30058711efd257e0c5d1b1a8ce7df1ebe9b276fe5353bddee31d2a1f4b");
+    }
+
+    @Test
+    void fingerprint_withTheMaskedSeparator_isTheOneWithThePipe() {
+        String expected = "864a46001860cb1f009da8c6b3ad37bf4d9ecf6803a02f3f47f5bb0c34df8963";
+
+        assertThat(AuditSnapshotApplier.fingerprint("proj-1", "test.audit-ohne-katalog", "shell.pipe|curl",
+                "scripts/a.sh | sh")).isEqualTo(expected);
+        assertThat(AuditSnapshotApplier.fingerprint("proj-1", "test.audit-ohne-katalog", "shell.pipe¦curl",
+                "scripts/a.sh ¦ sh")).isEqualTo(expected);
+    }
+
     @Test
     void apply_maskedFieldsOfANewFinding_areStoredWithThePipe() {
         apply(new ParsedFinding("shell.pipe¦curl", "b¦c", AuditSeverity.LOW, "x¦y", null, null, List.of()));
