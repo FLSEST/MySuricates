@@ -13,6 +13,8 @@
 #      25ed5f84; die Kurzfassung "Ergebnis erklaeren" gibt es nicht mehr).
 # Abschnitt 10 prueft die Report-Prompts aller fuenf Audits: Sie bekommen die bekannten Befunde
 # ({{ audit_findings }}) und tragen denselben Regelblock, wie sie damit umgehen (1cf996df).
+# Abschnitt 11 prueft das Gate der Doku-Zehrprobe: Es zaehlt wie das der Test-Abdeckung nur den
+# letzten Envelope (d8dae725).
 #
 # Run: bash scripts/tests/test-audit-facts.sh   (exit 0 = alle Checks ok)
 set -uo pipefail
@@ -1094,6 +1096,69 @@ check "Gegenprobe: eine fehlende Zaehlregel faellt auf"           '[ "$KP_COUNTI
 check "Gegenprobe: ein Faktenblatt im Regelblock faellt auf"      '[ "$KP_FACTS" -eq 1 ]'
 check "Gegenprobe: eine fehlende Regel fuer Wiedervorlagen ohne Messung faellt auf" '[ "$KP_UNMEASURED" -eq 4 ]'
 check "Gegenprobe: eine andere Schwelle als die der Plattform faellt auf" '[ "$KP_DEGRADED" -eq 4 ]'
+
+echo "11) Doku-Zehrprobe: das Gate zaehlt nur den letzten Envelope (d8dae725)"
+# Wie AuditResultParser und das Gate der Test-Abdeckung zaehlt nur der letzte vollstaendige Envelope. Der
+# sed-Bereich las jeden: Befunde eines wiedergegebenen Vorlaufs hielten das Gate auf YELLOW, obwohl der
+# eigene Envelope leer war, und dessen snapshotComplete=false galt als eigenes.
+ZEHR="$REPO/workflow-pool/mysuricates-doku-zehrprobe.json"
+printf '%s\n' '## FAKTENBLATT' 'FAKT docs_scope_files: 12' 'FAKT docs_candidates: 3' \
+  'PFLICHT-FAKTEN: docs_scope_files docs_candidates' > "$TMP/zehr-dossier.txt"
+zehr_envelope() {  # $1 = Anzahl Befunde, $2 = snapshotComplete (Standard true)
+  local i findings=''
+  for ((i = 0; i < $1; i++)); do
+    findings="$findings{\"ruleKey\":\"docs.orphan\",\"subject\":\"docs/d$i.md\",\"severity\":\"LOW\",\"title\":\"t\"},"
+  done
+  printf '%s\n' '<!-- mysuricates:audit-result:v1' "{\"snapshotComplete\":${2:-true},\"findings\":[${findings%,}]}" '-->'
+}
+run_zehr_gate() {  # $1 = Report
+  printf '%s\n' "$1" > "$TMP/zehr-report.txt"
+  render "$ZEHR" name:gate \
+    "$(json_values block.dossier.output="$TMP/zehr-dossier.txt" block.report.output="$TMP/zehr-report.txt")" \
+    > "$TMP/zehr-gate.sh"
+  bash "$TMP/zehr-gate.sh" > "$TMP/zehr-gate.out" 2> "$TMP/zehr-gate.err"
+}
+run_zehr_gate "$(printf '### Doku-Zehrprobe\n'; zehr_envelope 1)"
+check "ein Envelope mit einem Befund: YELLOW mit der Zahl" \
+  'grep -qx "gate_status: YELLOW" "$TMP/zehr-gate.out" \
+     && grep -q "^gate_description: 3 auffaellige Dokumente gemessen, 1 davon" "$TMP/zehr-gate.out"'
+check "Gate laeuft ohne stderr" '[ ! -s "$TMP/zehr-gate.err" ]'
+run_zehr_gate "$(zehr_envelope 3; printf '### Doku-Zehrprobe\n'; zehr_envelope 0)"
+check "Vorlauf mit drei Befunden, eigener leer: GREEN" \
+  'grep -qx "gate_status: GREEN" "$TMP/zehr-gate.out" && grep -q "gemessen, 0 davon" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 0; zehr_envelope 2)"
+check "Vorlauf leer, eigener mit zwei Befunden: zwei gezaehlt" 'grep -q "gemessen, 2 davon" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 1 false; zehr_envelope 1)"
+check "snapshotComplete=false im Vorlauf gilt nicht als eigenes" \
+  'grep -qx "gate_category: documentation-weight" "$TMP/zehr-gate.out"'
+run_zehr_gate "$(zehr_envelope 2; printf '%s\n' '<!-- mysuricates:audit-result:v1' '{"snapshotComplete":true,"findings":[')"
+check "eigener abgeschnitten nach vollstaendigem Vorlauf: fehlend, RED" \
+  'grep -qx "gate_status: RED" "$TMP/zehr-gate.out" && grep -qx "gate_category: audit-invalid" "$TMP/zehr-gate.out"'
+# Derselbe awk-Baustein wie im Gate der Test-Abdeckung (wie der VERDICT-Baustein in 7b): eine Kopie, die
+# beim naechsten Fix zurueckbleibt, faellt hier auf. Und kein Audit-Gate liest Envelopes mehr per sed-Bereich.
+read -r ENV_BLOCKS ENV_TEXTS ENV_SED <<< "$(python3 - "$REPO/workflow-pool" <<'PY'
+import glob, json, os, sys
+END = 'END { printf "%s", last }\')'
+found, sed_ranges = [], 0
+for path in sorted(glob.glob(os.path.join(sys.argv[1], '*.json'))):
+    definition = json.load(open(path, encoding='utf-8'))
+    if not definition.get('metadata', {}).get('audit', {}).get('enabled'):
+        continue
+    for block in definition['blocks']:
+        command = block.get('config', {}).get('command', '')
+        if block.get('type') != 'shell':
+            continue
+        sed_ranges += '/mysuricates:audit-result:v1/,/-->/p' in command
+        start = command.find('ENVELOPE=$(')
+        end = command.find(END, start) if start >= 0 else -1
+        if end > start:
+            found.append(command[start:end + len(END)])
+print(len(found), len(set(found)), sed_ranges)
+PY
+)"
+check "Envelope-Baustein in den Gates von Test-Abdeckung und Zehrprobe" '[ "$ENV_BLOCKS" -ge 2 ]'
+check "Envelope-Baustein in allen Gates wortgleich"                     '[ "$ENV_TEXTS" -eq 1 ]'
+check "kein Audit-Gate liest Envelopes per sed-Bereich"                 '[ "$ENV_SED" -eq 0 ]'
 
 echo
 echo "passed=$PASS failed=$FAIL"

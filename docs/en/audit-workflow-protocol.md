@@ -59,8 +59,9 @@ The model's own envelope closes the answer, and an echoed previous run may stand
 includes its envelope, often cut off. An envelope starts with `<!--`, the marker and the JSON opening
 `{`; a quoted marker without JSON does not count, nor does a start inside the text of a finding. If
 another envelope starts after the last readable one, for example because the answer breaks off, the
-report is invalid; ingestion does not fall back to an earlier one. The gate block of the test
-coverage audit counts the same envelope.
+report is invalid; ingestion does not fall back to an earlier one. The gate blocks of the test
+coverage audit and the documentation weight check count the same envelope, with the same awk
+snippet (TODO `d8dae725`).
 
 A prompt that leaves the `subject` to the model gets drift: between two runs `docs/deployment.md`
 became `host-reaching-endpoints`, and the finding came back as a repeat finding without its
@@ -168,7 +169,7 @@ Converted audits in `workflow-pool/`:
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
-| Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py` |
+| Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
 
 ### When `expectedFindings` does **not** fit
 
