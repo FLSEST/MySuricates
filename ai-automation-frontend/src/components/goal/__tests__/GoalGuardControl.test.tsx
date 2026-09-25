@@ -12,6 +12,10 @@ import { useDashboardSyncStore } from '../../../stores/dashboardSyncStore';
 import { createDefaultLayout } from '../../dashboard/dashboardLayout';
 import { GoalGuardControl } from '../GoalGuardControl';
 import type { GoalDetail, GoalGuard } from '../../../types';
+// Switching on imports the dashboard registry lazily (useGoalGuard). In Vitest that import transforms the
+// registry with all its widgets and charts, under load longer than a waitFor waits for the tile
+// (b26bb8ff). Loaded here, the lazy import finds it ready and the test measures the flow, not the import.
+import '../../dashboard/workflowResultTile';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());

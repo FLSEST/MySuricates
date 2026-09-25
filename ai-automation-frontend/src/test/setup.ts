@@ -8,6 +8,11 @@ import { resetAuthStatusCache, resetRateLimitBackoff } from '../api/client';
 // projects list failed after 1.7 s, bf4c8b03/4d5d4825). Waiting longer only costs time when a test
 // fails anyway; it stays below Vitest's 5 s test timeout so the DOM dump of a real failure still shows.
 configure({ asyncUtilTimeout: 4000 });
+// Role queries are the costly part of a test here: the first getComputedStyle of a test file parses
+// jsdom's default stylesheet (every file runs in its own process, ~0.5-1 s under load), and a role
+// query runs that cascade for every element it checks. In loops and polls prefer getByLabelText for
+// controls with an aria-label and wait for the request itself rather than polling a role query; a page
+// test whose first test still pays the warm-up gets its own timeout at the describe (b26bb8ff).
 
 afterEach(() => {
   cleanup();

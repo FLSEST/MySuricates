@@ -35,18 +35,30 @@ const waiting = (runId: string): PendingInput => ({
   options: ['Yes', 'No'], rejectOptions: ['No'], stepIndex: 0, requestedAt: '2026-01-01T00:00:00Z', timeoutAt: null,
 });
 
+let modulesAnswered = false;
+
 function serve({
   disabled = [] as ModuleName[],
   projects = [project('p1', 'Mine')],
   workflows = [workflow('w1', 'Morning digest', 'News summary'), workflow('w2', 'Backup photos')],
   pending = [] as PendingInput[],
 } = {}) {
+  modulesAnswered = false;
   server.use(
-    http.get('/api/v1/system/capabilities', () => HttpResponse.json({ routes: [], blockTypes: [], ...modulesFixture('core', disabled) })),
+    http.get('/api/v1/system/capabilities', () => {
+      modulesAnswered = true;
+      return HttpResponse.json({ routes: [], blockTypes: [], ...modulesFixture('core', disabled) });
+    }),
     http.get('/api/v1/projects', () => HttpResponse.json(projects)),
     http.get('/api/v1/workflows', () => HttpResponse.json(workflows)),
     http.get('/api/v1/executions', () => HttpResponse.json({ content: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })),
     http.get('/api/v1/executions/pending-input', () => HttpResponse.json(pending)),
+    // What the command field fetches once the input settles: answered here, not by the default
+    // handlers (a todo that would count as a hit) or the network (no handler for the pool)
+    http.get('/api/v1/workflow-templates', () => HttpResponse.json([])),
+    http.get('/api/v1/pool', () => HttpResponse.json([])),
+    http.get('/api/v1/schedules', () => HttpResponse.json([])),
+    http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 3, totalElements: 0, totalPages: 0 })),
   );
 }
 
@@ -68,15 +80,23 @@ function renderHome() {
 }
 
 const command = en.simple.home.command;
-const searchField = () => screen.findByRole('combobox', { name: command.label });
+// By its aria-label (= its accessible name); a role query walks the whole page (b26bb8ff)
+const searchField = () => screen.findByLabelText(command.label);
 const workflowHits = () => screen.findByRole('group', { name: command.groups.workflows });
 
-describe('SimpleHome — without the assistant module', () => {
+// jsdom parses its default stylesheet at the first getComputedStyle of a test file (each file runs in
+// its own process) and runs that cascade for every element a role query checks: the first test pays ~1 s
+// of it on top of the whole start page, beyond the 5 s default under the load of the full suite
+// (b26bb8ff)
+describe('SimpleHome — without the assistant module', { timeout: 15_000 }, () => {
   it('searches the own workflows instead of offering the assistant', async () => {
     serve({ disabled: ['assistant'] });
     renderHome();
 
     const input = await searchField();
+    // The assistant button shows optimistically until the module answer; wait for the request
+    // instead of polling the whole page with role queries until then
+    await waitFor(() => expect(modulesAnswered).toBe(true));
     await waitFor(() => expect(screen.queryByRole('button', { name: en.simple.home.assistantLabel })).toBeNull());
 
     fireEvent.change(input, { target: { value: 'digest' } });

@@ -25,11 +25,22 @@ beforeEach(() => {
   useI18nStore.setState({ locale: 'en' });
 });
 
+let modulesAnswered = false;
 function serve(disabled: ModuleName[] = []) {
+  modulesAnswered = false;
   server.use(
-    http.get('/api/v1/system/capabilities', () => HttpResponse.json(modulesFixture('full', disabled))),
+    http.get('/api/v1/system/capabilities', () => {
+      modulesAnswered = true;
+      return HttpResponse.json(modulesFixture('full', disabled));
+    }),
   );
 }
+
+/**
+ * Module state is optimistic while unknown, so a walk before the answer can pass a panel the answer
+ * then removes. Waits for the request itself instead of polling the dialog with role queries.
+ */
+const moduleAnswer = () => waitFor(() => expect(modulesAnswered).toBe(true));
 
 const title = (id: string) => walkthroughText(id, 'en').title;
 const point = (id: string, index: number) => walkthroughText(id, 'en').points[index] ?? '';
@@ -41,25 +52,33 @@ const CORE_OFF: ModuleName[] = [
   'skills', 'debug', 'factory', 'wishes',
 ];
 
+/**
+ * "Next", on the last panel "Done". By its text: a role query with a name computes the accessible
+ * name and visibility of every element after each panel change, 13 times per walk (b26bb8ff).
+ */
+const nextButton = () => screen.getByText(/^(next|done)$/i, { selector: 'button' });
+
 /** Click "next" until the tour ends, collecting the headline of every panel on the way. */
 async function walk(): Promise<string[]> {
   const seen: string[] = [];
   for (;;) {
     const heading = await screen.findByRole('heading', { level: 2 });
     seen.push(heading.textContent ?? '');
-    const button = screen.getByRole('button', { name: /next|done/i });
+    const button = nextButton();
     if (/done/i.test(button.textContent ?? '')) break;
     fireEvent.click(button);
   }
   return seen;
 }
 
-describe('Walkthrough', () => {
+// A walk clicks through all 13 panels, and the first test of the file also pays jsdom's and React's
+// warm-up: alone up to 2 s, under the load of the full suite beyond the 5 s default (b26bb8ff)
+describe('Walkthrough', { timeout: 15_000 }, () => {
   it('shows every panel when all modules are on', async () => {
     serve();
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
     // Wait for the module answer, otherwise this passes on the optimistic default alone.
-    await waitFor(() => expect(screen.getAllByRole('button').length).toBeGreaterThan(0));
+    await moduleAnswer();
 
     expect(await walk()).toEqual(WALKTHROUGH_PANELS.map((p) => title(p.id)));
   });
@@ -71,7 +90,7 @@ describe('Walkthrough', () => {
   ])('leaves out the %s panel when the module is off', async (module, panel) => {
     serve([module as ModuleName]);
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByText(title(panel))).not.toBeInTheDocument());
+    await moduleAnswer();
 
     const seen = await walk();
     expect(seen).not.toContain(title(panel));
@@ -84,13 +103,13 @@ describe('Walkthrough', () => {
   it('mentions nothing on core that core does not have', async () => {
     serve(CORE_OFF);
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByText(title('verdict'))).not.toBeInTheDocument());
+    await moduleAnswer();
 
     const said: string[] = [];
     for (;;) {
       said.push(screen.getByRole('heading', { level: 2 }).textContent ?? '');
       said.push(...screen.getAllByRole('listitem').map((li) => li.textContent ?? ''));
-      const button = screen.getByRole('button', { name: /next|done/i });
+      const button = nextButton();
       if (/done/i.test(button.textContent ?? '')) break;
       fireEvent.click(button);
       await screen.findByRole('heading', { level: 2 });
@@ -111,7 +130,7 @@ describe('Walkthrough', () => {
   it('keeps a gated sentence while its module is on', async () => {
     serve(['bpmn']);
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.getAllByRole('button').length).toBeGreaterThan(0));
+    await moduleAnswer();
 
     await walk();
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
@@ -122,6 +141,7 @@ describe('Walkthrough', () => {
   it('still ends on the closing panel when several modules are off', async () => {
     serve(['factory', 'integrations', 'audit']);
     renderWithProviders(<Walkthrough onClose={vi.fn()} />);
+    await moduleAnswer();
 
     const seen = await walk();
     expect(seen[seen.length - 1]).toBe(title('closing'));
