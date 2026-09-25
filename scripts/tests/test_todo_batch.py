@@ -220,5 +220,70 @@ class TriageReportTest(unittest.TestCase):
             self.assertEqual(triage_report.report(state, "2026-09-25")[0], "YELLOW")
 
 
+class PrepareTest(RepoCase):
+    def test_refuses_when_the_source_is_not_on_the_target_branch(self):
+        import prepare
+        run_git(self.source, "checkout", "-q", "-b", "feature")
+        write(self.state / "details.txt", details(todo(A)))
+        code, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.source), "--run", "run12345")
+        self.assertEqual(code, 3)
+        self.assertIn("feature", out)
+
+    def test_writes_briefs_ids_base_and_starts_the_todos(self):
+        import prepare
+        write(self.state / "details.txt", details(todo(A, title="Alpha", description="Mach {das}"), todo(B)))
+        code, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.source), "--run", "run12345")
+        self.assertEqual(code, 0)
+        self.assertEqual((self.state / "ids.txt").read_text().split(), [A, B])
+        self.assertIn("Mach {das}", (self.state / "todos" / f"{A}.md").read_text())
+        self.assertEqual((self.state / "base.sha").read_text(), run_git(self.clone, "rev-parse", "HEAD").strip())
+        first = last_json(out)[0]
+        self.assertEqual((first["status"], first["require_tags"], first["require_status"]),
+                         ("IN_PROGRESS", [b.SELECTED], "OPEN"))
+
+
+class GatesTest(RepoCase):
+    def cfg(self, backend="true", frontend="true", common="true {range}"):
+        import gates
+        return gates.GateConfig("ai-automation-backend", "ai-automation-frontend", backend, frontend, common,
+                                self.state / "logs")
+
+    def test_scope_follows_changed_files(self):
+        import gates
+        self.assertEqual(gates.scope_for(["ai-automation-backend/X.java", "docs/y.md"], self.cfg()), ["backend", "common"])
+        self.assertEqual(gates.scope_for([], self.cfg()), [])
+
+    def test_red_gate_runs_twice_and_a_second_green_counts(self):
+        import gates
+        flaky = "if [ -f ../flaky.mark ]; then exit 0; else touch ../flaky.mark; exit 1; fi"
+        ok, lines = gates.run_gates(["backend"], "a..b", self.cfg(backend=flaky), "t")
+        self.assertTrue(ok)
+        self.assertIn("zweiten Versuch", lines[0])
+        ok, lines = gates.run_gates(["backend"], "a..b", self.cfg(backend="echo kaputt; exit 1"), "t")
+        self.assertFalse(ok)
+        self.assertIn("ROT", lines[0])
+        self.assertIn("kaputt", lines[0])
+
+    def test_common_command_gets_the_range(self):
+        import gates
+        ok, _ = gates.run_gates(["common"], "x..y", self.cfg(common='test "{range}" = "x..y"'), "t")
+        self.assertTrue(ok)
+
+    def test_baseline_without_todos_does_nothing(self):
+        import gates
+        write(self.state / "ids.txt", "")
+        code, _ = call(gates.main, "--state", str(self.state), "--baseline", "--backend-cmd", "false",
+                       "--logs", str(self.state / "logs"))
+        self.assertEqual(code, 0)
+
+    def test_baseline_red_is_exit_one(self):
+        import gates
+        write(self.state / "ids.txt", f"{A}\n")
+        code, out = call(gates.main, "--state", str(self.state), "--baseline", "--backend-cmd", "false",
+                         "--frontend-cmd", "true", "--logs", str(self.state / "logs"))
+        self.assertEqual(code, 1)
+        self.assertIn("erst den bestehenden Fehler beheben", out)
+
+
 if __name__ == "__main__":
     unittest.main()
