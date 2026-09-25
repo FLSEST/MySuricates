@@ -3314,7 +3314,7 @@ Pending Tool-Call ablehnen.
 
 Kontext-bezogene Vorschläge für eine Seite abrufen.
 
-**Query-Parameter:** `page` (String, Pflicht)
+**Query-Parameter:** `page` (String, Pflicht), `locale` (`de` | `en`, Vorgabe `de` – Vorschläge gibt es je Sprache)
 
 **Response:** `String[]`
 
@@ -3322,7 +3322,7 @@ Kontext-bezogene Vorschläge für eine Seite abrufen.
 
 Vorschläge für eine Seite neu generieren.
 
-**Query-Parameter:** `page` (String, Pflicht)
+**Query-Parameter:** `page` (String, Pflicht), `locale` (`de` | `en`, Vorgabe `de`)
 
 **Response:** `String[]`
 

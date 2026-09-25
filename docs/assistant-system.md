@@ -134,10 +134,11 @@ Response (`AssistantChatResponse`):
 ### Page Suggestions
 
 ```
-GET  /api/v1/assistant/suggestions?page=workflows
-POST /api/v1/assistant/suggestions/refresh?page=workflows
+GET  /api/v1/assistant/suggestions?page=workflows&locale=en
+POST /api/v1/assistant/suggestions/refresh?page=workflows&locale=en
 ```
 
+- Vorschläge gibt es je Seite **und Sprache** (`locale` = `de` | `en`, Vorgabe `de`, V91). Das Frontend sendet die Sprache der Oberfläche, und der Refresh nach einem Chat nimmt die Sprache des Chats (`AssistantChatRequest.language`).
 - `GET` gibt gecachte Vorschläge als `List<String>` zurück (sofort, kein KI-Aufruf)
 - `POST /refresh` generiert neue Vorschläge via Claude und gibt sie zurück (blocking)
 

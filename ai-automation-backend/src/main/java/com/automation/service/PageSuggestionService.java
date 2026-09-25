@@ -106,10 +106,16 @@ public class PageSuggestionService {
 
     // ── Public API ───────────────────────────────────────────────────────────
 
-    public List<String> getSuggestions(String page) {
-        return suggestionRepository.findByPage(page)
+    /** Suggestions are kept per page and language; anything but {@code en} counts as German (5157fac2). */
+    public static String normalizeLocale(String locale) {
+        return locale != null && locale.trim().toLowerCase().startsWith("en") ? "en" : "de";
+    }
+
+    public List<String> getSuggestions(String page, String locale) {
+        String lang = normalizeLocale(locale);
+        return suggestionRepository.findByPageAndLocale(page, lang)
                 .map(s -> deserialize(s.getSuggestions()))
-                .orElseGet(() -> getDefaults(page));
+                .orElseGet(() -> PageSuggestionDefaults.forPage(page, lang));
     }
 
     /**
@@ -117,14 +123,15 @@ public class PageSuggestionService {
      * pool-size 1 an enclosing transaction would hold the only DB connection for all of it. The
      * prompt is built in a short read burst, the result written in a short write burst.
      */
-    public List<String> refreshSuggestions(String page) {
+    public List<String> refreshSuggestions(String page, String locale) {
+        String lang = normalizeLocale(locale);
         PromptInput input = readOnlyTransactionTemplate.execute(status -> {
             List<AssistantSession> sessions = sessionRepository.findTop10ByPageOrderByStartedAtDesc(page);
-            return new PromptInput(buildPrompt(page, sessions), sessions.size());
+            return new PromptInput(buildPrompt(page, lang, sessions), sessions.size());
         });
-        List<String> suggestions = generateViaClaude(page, input.prompt());
-        transactionTemplate.executeWithoutResult(status -> persist(page, suggestions, input.sessionCount()));
-        lastRefreshAt.put(page, Instant.now());
+        List<String> suggestions = generateViaClaude(page, lang, input.prompt());
+        transactionTemplate.executeWithoutResult(status -> persist(page, lang, suggestions, input.sessionCount()));
+        lastRefreshAt.put(page + "|" + lang, Instant.now());
         return suggestions;
     }
 
@@ -137,10 +144,11 @@ public class PageSuggestionService {
     @EventListener
     public void onSessionUpdated(AssistantSessionUpdatedEvent event) {
         String page = event.page();
-        if (!shouldRefresh(page)) return;
+        String lang = normalizeLocale(event.locale());
+        if (!shouldRefresh(page + "|" + lang)) return;
         runningRefresh.set(Thread.currentThread());
         try {
-            refreshSuggestions(page);
+            refreshSuggestions(page, lang);
             log.debug("Refreshed suggestions for page '{}' after session update", page);
         } catch (Exception e) {
             if (Thread.currentThread().isInterrupted()) {
@@ -155,7 +163,7 @@ public class PageSuggestionService {
 
     // ── Generation ───────────────────────────────────────────────────────────
 
-    private List<String> generateViaClaude(String page, String prompt) {
+    private List<String> generateViaClaude(String page, String lang, String prompt) {
         try {
             var result = commandExecutorService.executeOnHost(
                     HostExecutionRequest.builder()
@@ -173,10 +181,10 @@ public class PageSuggestionService {
         } catch (Exception e) {
             log.warn("Could not generate suggestions via Claude for page '{}'", page, e);
         }
-        return getDefaults(page);
+        return PageSuggestionDefaults.forPage(page, lang);
     }
 
-    private String buildPrompt(String page, List<AssistantSession> sessions) {
+    private String buildPrompt(String page, String lang, List<AssistantSession> sessions) {
         var sb = new StringBuilder();
         sb.append("Generiere ").append(MAX_SUGGESTIONS)
                 .append(" kurze Schnellaktionen (Fragen/Aufgaben) für die Seite '").append(page).append("'.\n\n");
@@ -207,16 +215,20 @@ public class PageSuggestionService {
         }
 
         sb.append("Seiten-Kontext: '").append(page).append("' in der MySuricates-Plattform.\n");
+        sb.append("de".equals(lang)
+                ? "Schreibe die Schnellaktionen auf Deutsch.\n"
+                : "Write the quick actions in English.\n");
         sb.append("Gib NUR das JSON-Array zurück, keine weiteren Texte.");
         return sb.toString();
     }
 
-    private void persist(String page, List<String> suggestions, int sessionCount) {
+    private void persist(String page, String lang, List<String> suggestions, int sessionCount) {
         String json = serialize(suggestions);
-        PageSuggestion entity = suggestionRepository.findByPage(page)
+        PageSuggestion entity = suggestionRepository.findByPageAndLocale(page, lang)
                 .orElseGet(() -> PageSuggestion.builder()
                         .id(java.util.UUID.randomUUID().toString())
                         .page(page)
+                        .locale(lang)
                         .build());
         entity.setSuggestions(json);
         entity.setGeneratedAt(Instant.now());
@@ -226,28 +238,9 @@ public class PageSuggestionService {
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
-    private boolean shouldRefresh(String page) {
-        Instant last = lastRefreshAt.get(page);
+    private boolean shouldRefresh(String key) {
+        Instant last = lastRefreshAt.get(key);
         return last == null || Instant.now().minusSeconds(THROTTLE_SECONDS).isAfter(last);
-    }
-
-    private List<String> getDefaults(String page) {
-        return switch (page) {
-            case "run"       -> List.of("Erkläre diesen Run", "Warum ist das fehlgeschlagen?", "Was kann verbessert werden?");
-            case "workflow"  -> List.of("Analysiere diesen Workflow", "Zeige letzte Runs", "Gibt es Verbesserungspotenzial?");
-            case "workflows" -> List.of("Welche Workflows haben Probleme?", "Was läuft gerade?");
-            case "runs"      -> List.of("Was lief heute schief?", "Wie war die Erfolgsrate?");
-            case "todos"     -> List.of("Was ist dringend?", "Priorisiere meine Todos");
-            case "project"   -> List.of("Was steht in diesem Projekt an?", "Zeige offene Todos");
-            case "projects"  -> List.of("Wie laufen meine Projekte?", "Was braucht Aufmerksamkeit?");
-            case "schedules" -> List.of("Was steht heute an?", "Gibt es überfällige Schedules?");
-            case "activity"  -> List.of("Was ist heute passiert?", "Zeige wichtige Ereignisse");
-            case "insights"  -> List.of("Wie war die Woche?", "Was kann verbessert werden?");
-            case "wishes"    -> List.of("Was soll ich als nächstes automatisieren?");
-            case "factory"   -> List.of("Hilf mir einen Workflow zu erstellen");
-            case "chains"    -> List.of("Wie laufen meine Chains?");
-            default          -> List.of("Was lief heute?", "Gibt es Probleme?", "Was steht an?");
-        };
     }
 
     private List<String> parseJsonArray(String raw) {

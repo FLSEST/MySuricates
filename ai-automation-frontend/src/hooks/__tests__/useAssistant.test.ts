@@ -5,6 +5,7 @@ import { type ReactNode, createElement } from 'react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { useAssistantChat, useAssistantSuggestions } from '../useAssistant';
+import { useI18nStore } from '../../i18n';
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
 afterEach(() => server.resetHandlers());
@@ -25,6 +26,21 @@ describe('useAssistantSuggestions', () => {
     const { result } = renderHook(() => useAssistantSuggestions('dashboard'), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(2);
+  });
+
+  // 5157fac2: the English UI showed German suggestions – the hook asks for the UI language
+  it('asks for the suggestions in the language of the UI', async () => {
+    useI18nStore.setState({ locale: 'en' });
+    let locale: string | null = null;
+    server.use(
+      http.get('/api/v1/assistant/suggestions', ({ request }) => {
+        locale = new URL(request.url).searchParams.get('locale');
+        return HttpResponse.json(['What ran today?']);
+      }),
+    );
+    const { result } = renderHook(() => useAssistantSuggestions('dashboard'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(locale).toBe('en');
   });
 
   it('returns loading state initially', () => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useModuleEnabled } from './useModules';
+import { useI18nStore } from '../i18n';
 
 export interface AssistantHistoryEntry {
   role: 'user' | 'assistant';
@@ -112,9 +113,11 @@ export function useRejectPendingTool() {
 
 export function useAssistantSuggestions(page: string) {
   const moduleEnabled = useModuleEnabled('assistant');
+  // Suggestions are kept per page and language – without it the English UI got the German set (5157fac2)
+  const locale = useI18nStore((s) => s.locale);
   return useQuery({
-    queryKey: ['assistant-suggestions', page],
-    queryFn: () => api.get<string[]>(`/assistant/suggestions?page=${encodeURIComponent(page)}`),
+    queryKey: ['assistant-suggestions', page, locale],
+    queryFn: () => api.get<string[]>(`/assistant/suggestions?page=${encodeURIComponent(page)}&locale=${locale}`),
     staleTime: 5 * 60 * 1000,
     enabled: moduleEnabled,
   });

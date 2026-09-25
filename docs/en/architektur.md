@@ -555,9 +555,9 @@ Context-sensitive chat assistant for the platform. See also: [assistant-system.m
 - `AssistantService` — Chat logic and context preparation; `AssistantChatCaller` makes the Claude CLI call and holds the chat model and the base instructions
 - `AssistantSessionService` — Session persistence in DB (V41 migration: `assistant_sessions`, V58: `preview` column). Endpoints: `GET /sessions` (top 50), `GET /sessions/{id}` (detail), `DELETE /sessions/{id}`
 - `AssistantContextBuilder` — injects last 5 sessions (user message + response) and up to 8 active workflow memories into the system prompt — on **all** pages
-- `PageSuggestionService` — generates and caches context-sensitive UI suggestions per page (V42 migration: `page_suggestions`)
+- `PageSuggestionService` — generates and caches context-sensitive UI suggestions per page and language (`page_suggestions`, V42; unique over `page` + `locale` since V91)
 - `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`, `POST /pending-tools/{id}/confirm`, `POST /pending-tools/{id}/reject`
-- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
+- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...&locale=de|en`, `POST /api/v1/assistant/suggestions/refresh?page=...&locale=...`
 - Sessions are persisted after each chat call; `AssistantSessionUpdatedEvent` triggers page suggestion refresh
 - Default model: `sonnet` (CLI alias, newest Sonnet)
 

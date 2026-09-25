@@ -10,21 +10,21 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_returnPage_when_constructed() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard", "de");
 
         assertThat(event.page()).isEqualTo("dashboard");
     }
 
     @Test
     void should_returnNull_when_pageIsNull() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent(null);
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent(null, "de");
 
         assertThat(event.page()).isNull();
     }
 
     @Test
     void should_returnEmptyString_when_pageIsEmpty() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("", "de");
 
         assertThat(event.page()).isEmpty();
     }
@@ -33,8 +33,8 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_beEqual_when_samePageValue() {
-        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("workflows");
-        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent("workflows");
+        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("workflows", "de");
+        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent("workflows", "de");
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -42,16 +42,16 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_notBeEqual_when_differentPageValue() {
-        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("workflows");
-        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent("settings");
+        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("workflows", "de");
+        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent("settings", "de");
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void should_beEqual_when_bothPagesNull() {
-        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent(null);
-        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent(null);
+        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent(null, "de");
+        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent(null, "de");
 
         assertThat(a).isEqualTo(b);
         assertThat(a.hashCode()).isEqualTo(b.hashCode());
@@ -59,8 +59,8 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_notBeEqual_when_onePageIsNull() {
-        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("dashboard");
-        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent(null);
+        AssistantSessionUpdatedEvent a = new AssistantSessionUpdatedEvent("dashboard", "de");
+        AssistantSessionUpdatedEvent b = new AssistantSessionUpdatedEvent(null, "de");
 
         assertThat(a).isNotEqualTo(b);
         assertThat(b).isNotEqualTo(a);
@@ -68,21 +68,21 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_notBeEqual_when_comparedToNull() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard", "de");
 
         assertThat(event).isNotEqualTo(null);
     }
 
     @Test
     void should_notBeEqual_when_comparedToDifferentType() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard", "de");
 
         assertThat(event).isNotEqualTo("dashboard");
     }
 
     @Test
     void should_beEqualToItself() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard", "de");
 
         assertThat(event).isEqualTo(event);
     }
@@ -91,21 +91,21 @@ class AssistantSessionUpdatedEventTest {
 
     @Test
     void should_containPageValue_when_toStringCalled() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("workflows");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("workflows", "de");
 
         assertThat(event.toString()).contains("workflows");
     }
 
     @Test
     void should_containClassName_when_toStringCalled() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard");
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent("dashboard", "de");
 
         assertThat(event.toString()).contains("AssistantSessionUpdatedEvent");
     }
 
     @Test
     void should_containNull_when_toStringCalledWithNullPage() {
-        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent(null);
+        AssistantSessionUpdatedEvent event = new AssistantSessionUpdatedEvent(null, "de");
 
         assertThat(event.toString()).contains("null");
     }

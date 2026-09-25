@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "page_suggestions")
+@Table(name = "page_suggestions", uniqueConstraints = @UniqueConstraint(columnNames = {"page", "locale"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,8 +17,13 @@ public class PageSuggestion {
     @Id
     private String id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String page;
+
+    /** Language of the suggestions, {@code de} or {@code en} (V91). */
+    @Column(nullable = false)
+    @Builder.Default
+    private String locale = "de";
 
     @Column(columnDefinition = "text", nullable = false)
     @Builder.Default

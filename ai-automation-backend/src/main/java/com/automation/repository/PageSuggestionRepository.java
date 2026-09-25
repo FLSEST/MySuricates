@@ -7,5 +7,5 @@ import java.util.Optional;
 
 public interface PageSuggestionRepository extends JpaRepository<PageSuggestion, String> {
 
-    Optional<PageSuggestion> findByPage(String page);
+    Optional<PageSuggestion> findByPageAndLocale(String page, String locale);
 }

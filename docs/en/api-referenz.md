@@ -3286,7 +3286,7 @@ Reject a pending tool call.
 
 Retrieve context-related suggestions for a page.
 
-**Query Parameters:** `page` (String, required)
+**Query Parameters:** `page` (String, required), `locale` (`de` | `en`, default `de` – suggestions are kept per language)
 
 **Response:** `String[]`
 
@@ -3294,7 +3294,7 @@ Retrieve context-related suggestions for a page.
 
 Regenerate suggestions for a page.
 
-**Query Parameters:** `page` (String, required)
+**Query Parameters:** `page` (String, required), `locale` (`de` | `en`, default `de`)
 
 **Response:** `String[]`
 

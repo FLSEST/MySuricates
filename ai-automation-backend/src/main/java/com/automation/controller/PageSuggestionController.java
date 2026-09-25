@@ -17,12 +17,12 @@ public class PageSuggestionController {
     private final PageSuggestionService pageSuggestionService;
 
     @GetMapping("/suggestions")
-    public List<String> getSuggestions(@RequestParam String page) {
-        return pageSuggestionService.getSuggestions(page);
+    public List<String> getSuggestions(@RequestParam String page, @RequestParam(defaultValue = "de") String locale) {
+        return pageSuggestionService.getSuggestions(page, locale);
     }
 
     @PostMapping("/suggestions/refresh")
-    public List<String> refreshSuggestions(@RequestParam String page) {
-        return pageSuggestionService.refreshSuggestions(page);
+    public List<String> refreshSuggestions(@RequestParam String page, @RequestParam(defaultValue = "de") String locale) {
+        return pageSuggestionService.refreshSuggestions(page, locale);
     }
 }

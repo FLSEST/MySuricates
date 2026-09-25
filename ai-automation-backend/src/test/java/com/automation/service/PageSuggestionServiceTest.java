@@ -67,18 +67,18 @@ class PageSuggestionServiceTest {
                     .suggestions("[\"Frage 1\",\"Frage 2\"]")
                     .generatedAt(Instant.now())
                     .build();
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.of(entity));
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.of(entity));
 
-            List<String> result = service.getSuggestions("run");
+            List<String> result = service.getSuggestions("run", "de");
 
             assertThat(result).containsExactly("Frage 1", "Frage 2");
         }
 
         @Test
         void unknownPage_returnsDefaults() {
-            when(suggestionRepository.findByPage("unknown")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("unknown", "de")).thenReturn(Optional.empty());
 
-            List<String> result = service.getSuggestions("unknown");
+            List<String> result = service.getSuggestions("unknown", "de");
 
             assertThat(result).isNotEmpty();
             // Default for unknown pages
@@ -92,9 +92,9 @@ class PageSuggestionServiceTest {
                     .suggestions("not valid json")
                     .generatedAt(Instant.now())
                     .build();
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.of(entity));
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.of(entity));
 
-            List<String> result = service.getSuggestions("run");
+            List<String> result = service.getSuggestions("run", "de");
 
             // Falls back to empty list from deserialize, then handled by caller
             assertThat(result).isEmpty();
@@ -106,27 +106,27 @@ class PageSuggestionServiceTest {
 
         @Test
         void runPage_returnsRunDefaults() {
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
 
-            List<String> result = service.getSuggestions("run");
+            List<String> result = service.getSuggestions("run", "de");
 
             assertThat(result).contains("Erkläre diesen Run", "Warum ist das fehlgeschlagen?");
         }
 
         @Test
         void workflowPage_returnsWorkflowDefaults() {
-            when(suggestionRepository.findByPage("workflow")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("workflow", "de")).thenReturn(Optional.empty());
 
-            List<String> result = service.getSuggestions("workflow");
+            List<String> result = service.getSuggestions("workflow", "de");
 
             assertThat(result).contains("Analysiere diesen Workflow");
         }
 
         @Test
         void todosPage_returnsTodoDefaults() {
-            when(suggestionRepository.findByPage("todos")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("todos", "de")).thenReturn(Optional.empty());
 
-            List<String> result = service.getSuggestions("todos");
+            List<String> result = service.getSuggestions("todos", "de");
 
             assertThat(result).contains("Was ist dringend?");
         }
@@ -144,10 +144,10 @@ class PageSuggestionServiceTest {
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
                             "[\"Suggestion A\",\"Suggestion B\"]", 0, null));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            List<String> result = service.refreshSuggestions("run");
+            List<String> result = service.refreshSuggestions("run", "de");
 
             assertThat(result).containsExactly("Suggestion A", "Suggestion B");
             verify(suggestionRepository).save(any());
@@ -162,10 +162,10 @@ class PageSuggestionServiceTest {
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult("[\"A\"]", 0, null));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            service.refreshSuggestions("run");
+            service.refreshSuggestions("run", "de");
 
             verify(workflowMemoryRepository).findTop5ByActiveTrueOrderByCreatedAtDesc();
             verify(workflowMemoryRepository, never()).findByActiveTrueOrderByCreatedAtDesc();
@@ -180,10 +180,10 @@ class PageSuggestionServiceTest {
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
                             "[\"A\",\"B\",\"C\",\"D\",\"E\",\"F\"]", 0, null));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            List<String> result = service.refreshSuggestions("run");
+            List<String> result = service.refreshSuggestions("run", "de");
 
             assertThat(result).hasSize(4);
         }
@@ -197,10 +197,10 @@ class PageSuggestionServiceTest {
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
                             "not a json array at all", 0, null));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            List<String> result = service.refreshSuggestions("run");
+            List<String> result = service.refreshSuggestions("run", "de");
 
             // Falls back to defaults for "run" page
             assertThat(result).contains("Erkläre diesen Run");
@@ -214,10 +214,10 @@ class PageSuggestionServiceTest {
                     .thenReturn(List.of());
             when(commandExecutorService.executeOnHost(any()))
                     .thenThrow(new RuntimeException("AI unavailable"));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            List<String> result = service.refreshSuggestions("run");
+            List<String> result = service.refreshSuggestions("run", "de");
 
             assertThat(result).contains("Erkläre diesen Run");
         }
@@ -244,13 +244,13 @@ class PageSuggestionServiceTest {
                 txDuringModelCall.set(FakeTransactions.active());
                 return new CliSession.EnrichedCommandResult("[\"Frage A\"]", 0, null);
             });
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> {
                 txDuringWrite.set(FakeTransactions.active());
                 return inv.getArgument(0);
             });
 
-            List<String> result = proxied.refreshSuggestions("run");
+            List<String> result = proxied.refreshSuggestions("run", "de");
 
             assertThat(txDuringModelCall.get()).as("the model call must not hold the only DB connection").isFalse();
             assertThat(txDuringRead.get()).as("sessions are read in a short transaction").isTrue();
@@ -277,10 +277,10 @@ class PageSuggestionServiceTest {
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
                             "[\"new\"]", 0, null));
-            when(suggestionRepository.findByPage("run")).thenReturn(Optional.of(existing));
+            when(suggestionRepository.findByPageAndLocale("run", "de")).thenReturn(Optional.of(existing));
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            service.refreshSuggestions("run");
+            service.refreshSuggestions("run", "de");
 
             verify(suggestionRepository).save(argThat(s ->
                     s.getId().equals("ps-1") && s.getSuggestions().contains("new")));
@@ -295,10 +295,10 @@ class PageSuggestionServiceTest {
             when(commandExecutorService.executeOnHost(any()))
                     .thenReturn(new CliSession.EnrichedCommandResult(
                             "[\"Chain Frage\"]", 0, null));
-            when(suggestionRepository.findByPage("chains")).thenReturn(Optional.empty());
+            when(suggestionRepository.findByPageAndLocale("chains", "de")).thenReturn(Optional.empty());
             when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            service.refreshSuggestions("chains");
+            service.refreshSuggestions("chains", "de");
 
             verify(suggestionRepository).save(argThat(s ->
                     s.getPage().equals("chains")));
@@ -362,6 +362,50 @@ class PageSuggestionServiceTest {
 
             String cached = (String) ReflectionTestUtils.getField(service, "cachedSuggestionsModel");
             assertThat(cached).isEqualTo("claude-sonnet-4-6");
+        }
+    }
+
+    /** 5157fac2: the English UI showed German suggestions – they are kept per page and language. */
+    @Nested
+    class LanguageTests {
+
+        @Test
+        void englishUi_getsEnglishDefaults() {
+            when(suggestionRepository.findByPageAndLocale("todos", "en")).thenReturn(Optional.empty());
+
+            assertThat(service.getSuggestions("todos", "en")).containsExactly("What is urgent?", "Prioritize my todos");
+        }
+
+        @Test
+        void unknownOrMissingLanguage_fallsBackToGerman() {
+            when(suggestionRepository.findByPageAndLocale("todos", "de")).thenReturn(Optional.empty());
+
+            assertThat(service.getSuggestions("todos", "fr")).containsExactly("Was ist dringend?", "Priorisiere meine Todos");
+            assertThat(service.getSuggestions("todos", null)).containsExactly("Was ist dringend?", "Priorisiere meine Todos");
+        }
+
+        @Test
+        void cachedSuggestions_areReadForTheRequestedLanguage() {
+            PageSuggestion entity = PageSuggestion.builder().id("ps-en").page("run").locale("en")
+                    .suggestions("[\"Explain this run\"]").generatedAt(Instant.now()).build();
+            when(suggestionRepository.findByPageAndLocale("run", "en")).thenReturn(Optional.of(entity));
+
+            assertThat(service.getSuggestions("run", "en")).containsExactly("Explain this run");
+        }
+
+        @Test
+        void refreshInEnglish_asksTheModelForEnglish_andStoresTheLanguage() {
+            when(sessionRepository.findTop10ByPageOrderByStartedAtDesc("run")).thenReturn(List.of());
+            when(workflowMemoryRepository.findTop5ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(commandExecutorService.executeOnHost(any()))
+                    .thenReturn(new CliSession.EnrichedCommandResult("[\"Why did it fail?\"]", 0, null));
+            when(suggestionRepository.findByPageAndLocale("run", "en")).thenReturn(Optional.empty());
+            when(suggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.refreshSuggestions("run", "en");
+
+            verify(commandExecutorService).executeOnHost(argThat(r -> r.command().contains("English")));
+            verify(suggestionRepository).save(argThat(s -> s.getPage().equals("run") && s.getLocale().equals("en")));
         }
     }
 }

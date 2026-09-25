@@ -618,9 +618,9 @@ Kontext-sensitiver Chat-Assistent für die Plattform. Siehe auch: [assistant-sys
 - `AssistantService` — Chat-Logik und Kontext-Aufbereitung; den Claude-CLI-Aufruf samt Chat-Modell und Basisanweisungen übernimmt `AssistantChatCaller`
 - `AssistantSessionService` — Session-Persistierung in DB (V41-Migration: `assistant_sessions`, V58: `preview`-Spalte). Endpunkte: `GET /sessions` (Top 50), `GET /sessions/{id}` (Detail), `DELETE /sessions/{id}`
 - `AssistantContextBuilder` — injiziert letzte 5 Sessions (User-Nachricht + Antwort) und bis zu 8 aktive Workflow Memories in den System-Prompt — auf **allen** Seiten
-- `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite (V42-Migration: `page_suggestions`)
+- `PageSuggestionService` — generiert und cached kontextsensitive UI-Vorschläge pro Seite und Sprache (`page_suggestions`, V42; seit V91 eindeutig über `page` + `locale`)
 - `AssistantController` — `POST /api/v1/assistant/chat`, `GET /sessions`, `GET /sessions/{id}`, `DELETE /sessions/{id}`, `POST /pending-tools/{id}/confirm`, `POST /pending-tools/{id}/reject`
-- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...`, `POST /api/v1/assistant/suggestions/refresh?page=...`
+- `PageSuggestionController` — `GET /api/v1/assistant/suggestions?page=...&locale=de|en`, `POST /api/v1/assistant/suggestions/refresh?page=...&locale=...`
 - Sessions werden nach jedem Chat-Aufruf persistiert; `AssistantSessionUpdatedEvent` triggert Page-Suggestion-Refresh
 - Standard-Modell: `sonnet` (CLI-Alias, neuestes Sonnet)
 

@@ -112,12 +112,13 @@ class PageSuggestionTest {
         Instant now = Instant.now();
 
         PageSuggestion ps = new PageSuggestion(
-                "ps-id", "/settings", "[{\"tip\":\"use dark mode\"}]",
+                "ps-id", "/settings", "en", "[{\"tip\":\"use dark mode\"}]",
                 "CLAUDE", now, 5
         );
 
         assertThat(ps.getId()).isEqualTo("ps-id");
         assertThat(ps.getPage()).isEqualTo("/settings");
+        assertThat(ps.getLocale()).isEqualTo("en");
         assertThat(ps.getSuggestions()).isEqualTo("[{\"tip\":\"use dark mode\"}]");
         assertThat(ps.getGeneratedBy()).isEqualTo("CLAUDE");
         assertThat(ps.getGeneratedAt()).isEqualTo(now);

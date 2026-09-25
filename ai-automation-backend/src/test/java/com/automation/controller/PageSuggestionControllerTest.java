@@ -34,7 +34,7 @@ class PageSuggestionControllerTest {
 
     @Test
     void getSuggestions_returnsListForPage() throws Exception {
-        when(pageSuggestionService.getSuggestions("dashboard"))
+        when(pageSuggestionService.getSuggestions("dashboard", "de"))
                 .thenReturn(List.of("What happened today?", "Show active workflows"));
 
         mockMvc.perform(get("/api/v1/assistant/suggestions")
@@ -44,12 +44,12 @@ class PageSuggestionControllerTest {
                 .andExpect(jsonPath("$[0]").value("What happened today?"))
                 .andExpect(jsonPath("$[1]").value("Show active workflows"));
 
-        verify(pageSuggestionService).getSuggestions("dashboard");
+        verify(pageSuggestionService).getSuggestions("dashboard", "de");
     }
 
     @Test
     void getSuggestions_returnsEmptyListWhenNoSuggestions() throws Exception {
-        when(pageSuggestionService.getSuggestions("unknown"))
+        when(pageSuggestionService.getSuggestions("unknown", "de"))
                 .thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/assistant/suggestions")
@@ -66,7 +66,7 @@ class PageSuggestionControllerTest {
 
     @Test
     void refreshSuggestions_returnsRefreshedList() throws Exception {
-        when(pageSuggestionService.refreshSuggestions("runs"))
+        when(pageSuggestionService.refreshSuggestions("runs", "de"))
                 .thenReturn(List.of("What failed?", "Show success rate"));
 
         mockMvc.perform(post("/api/v1/assistant/suggestions/refresh")
@@ -76,12 +76,23 @@ class PageSuggestionControllerTest {
                 .andExpect(jsonPath("$[0]").value("What failed?"))
                 .andExpect(jsonPath("$[1]").value("Show success rate"));
 
-        verify(pageSuggestionService).refreshSuggestions("runs");
+        verify(pageSuggestionService).refreshSuggestions("runs", "de");
     }
 
     @Test
     void refreshSuggestions_missingPageParam_returnsError() throws Exception {
         mockMvc.perform(post("/api/v1/assistant/suggestions/refresh"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getSuggestions_passesTheLanguageOfTheUi() throws Exception {
+        when(pageSuggestionService.getSuggestions("dashboard", "en")).thenReturn(List.of("What happened today?"));
+
+        mockMvc.perform(get("/api/v1/assistant/suggestions").param("page", "dashboard").param("locale", "en"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0]").value("What happened today?"));
+
+        verify(pageSuggestionService).getSuggestions("dashboard", "en");
     }
 }

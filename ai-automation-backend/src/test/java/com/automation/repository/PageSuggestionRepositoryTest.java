@@ -33,7 +33,7 @@ class PageSuggestionRepositoryTest {
                 .build();
         repository.save(entity);
 
-        Optional<PageSuggestion> result = repository.findByPage("dashboard");
+        Optional<PageSuggestion> result = repository.findByPageAndLocale("dashboard", "de");
 
         assertThat(result).isPresent();
         assertThat(result.get().getPage()).isEqualTo("dashboard");
@@ -45,14 +45,14 @@ class PageSuggestionRepositoryTest {
 
     @Test
     void should_returnEmpty_when_pageDoesNotExist() {
-        Optional<PageSuggestion> result = repository.findByPage("non-existent");
+        Optional<PageSuggestion> result = repository.findByPageAndLocale("non-existent", "de");
 
         assertThat(result).isEmpty();
     }
 
     @Test
     void should_returnEmpty_when_pageIsNull() {
-        Optional<PageSuggestion> result = repository.findByPage(null);
+        Optional<PageSuggestion> result = repository.findByPageAndLocale(null, "de");
 
         assertThat(result).isEmpty();
     }
@@ -62,8 +62,8 @@ class PageSuggestionRepositoryTest {
         repository.save(PageSuggestion.builder().page("workflows").suggestions("[\"x\"]").build());
         repository.save(PageSuggestion.builder().page("chains").suggestions("[\"y\"]").build());
 
-        Optional<PageSuggestion> workflows = repository.findByPage("workflows");
-        Optional<PageSuggestion> chains = repository.findByPage("chains");
+        Optional<PageSuggestion> workflows = repository.findByPageAndLocale("workflows", "de");
+        Optional<PageSuggestion> chains = repository.findByPageAndLocale("chains", "de");
 
         assertThat(workflows).isPresent();
         assertThat(workflows.get().getSuggestions()).isEqualTo("[\"x\"]");
@@ -83,5 +83,17 @@ class PageSuggestionRepositoryTest {
 
         assertThat(saved.getId()).isNotBlank();
         assertThat(repository.findById(saved.getId())).isPresent();
+    }
+
+    /** 5157fac2: one set per page and language – the English UI no longer reads the German set. */
+    @Test
+    void should_keepOneSetPerLanguage_when_samePageHasGermanAndEnglish() {
+        repository.save(PageSuggestion.builder().page("run").suggestions("[\"Erkläre diesen Run\"]").build());
+        repository.save(PageSuggestion.builder().page("run").locale("en").suggestions("[\"Explain this run\"]").build());
+
+        assertThat(repository.findByPageAndLocale("run", "de")).get()
+                .extracting(PageSuggestion::getSuggestions).isEqualTo("[\"Erkläre diesen Run\"]");
+        assertThat(repository.findByPageAndLocale("run", "en")).get()
+                .extracting(PageSuggestion::getSuggestions).isEqualTo("[\"Explain this run\"]");
     }
 }

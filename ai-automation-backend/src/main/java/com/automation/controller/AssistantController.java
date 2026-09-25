@@ -56,7 +56,7 @@ public class AssistantController {
             assistantSessionService.appendMessages(sessionId, request, response);
             String page = request.context() != null && request.context().page() != null
                     ? request.context().page() : "dashboard";
-            eventPublisher.publishEvent(new AssistantSessionUpdatedEvent(page));
+            eventPublisher.publishEvent(new AssistantSessionUpdatedEvent(page, request.language()));
         }
 
         return response;
