@@ -366,7 +366,7 @@ cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
 # Optional: sync current definitions from Dev to Test
-curl -s -X POST http://localhost:9090/api/v1/testing/sync-definitions \
+curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/testing/sync-definitions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $DEV_KEY" \
   -d '{}'

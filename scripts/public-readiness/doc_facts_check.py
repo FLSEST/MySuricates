@@ -497,6 +497,58 @@ def check_block_type_enum(rel, no, line, names, findings):
                         f" Blocktypen ({'; '.join(detail)}) | {line.strip()[:120]}")
 
 
+# ---------------------------------------------------------------------------
+# curl mit API-Key ohne --noproxy (TODO 2e3cf243)
+#
+# Mit gesetztem http_proxy schickt curl auch Aufrufe an localhost ueber den Proxy -- samt
+# X-API-Key-Header. Das CLAUDE.md-Snippet traegt deshalb seit 6d54a5bf `--noproxy '*'`, die
+# Beispiele in AGENTS.md und docs/ taten es nicht. Jedes Beispiel wird kopiert; ein einziges
+# ohne die Option genuegt, damit der Key beim naechsten Leser beim Proxy landet.
+#
+# Geprueft wird der ganze Aufruf samt Fortsetzungszeilen ("\" am Zeilenende), gemeldet an
+# der Zeile mit `curl`. Ausgenommen ist nur ein Aufruf, dessen Ziel ausdruecklich eine
+# entfernte Instanz ist (https://instanz.example …): Dort kann der Proxy gewollt sein.
+# Variablen wie $BASE oder $MS gelten als lokal -- die Beispiele meinen die eigene Instanz.
+# ---------------------------------------------------------------------------
+CURL_CALL = re.compile(r"(?:^|[\s;|&(`$])curl\s")
+# Der Key als Header-Argument, nicht das blosse Wort: "per curl mit X-API-Key" in der Prosa
+# ist kein Aufruf.
+API_KEY_HEADER = re.compile(r"(?:-H|--header)\s*[\"']?X-API-Key", re.IGNORECASE)
+URL_HOST = re.compile(r"https?://(\[[^\]]*\]|[^/\s\"'`:]+)", re.IGNORECASE)
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]"}
+
+
+def curl_command(lines, no):
+    """Die Zeile no samt ihren Fortsetzungszeilen, zu einer Zeile verbunden."""
+    parts = [lines[no - 1].rstrip("\n").rstrip()]
+    k = no
+    while parts[-1].endswith("\\") and k < len(lines):
+        parts[-1] = parts[-1][:-1]
+        parts.append(lines[k].rstrip("\n").rstrip())
+        k += 1
+    return " ".join(parts)
+
+
+def check_curl_noproxy(rel, no, lines, findings):
+    line = lines[no - 1]
+    if not CURL_CALL.search(line):
+        return
+    command = curl_command(lines, no)
+    # Je curl-Aufruf fuer sich: "curl … --noproxy '*' …; curl …" darf den zweiten nicht decken.
+    starts = [m.end() for m in CURL_CALL.finditer(command)]
+    for begin, end in zip(starts, starts[1:] + [len(command)]):
+        call = command[begin:end]
+        if not API_KEY_HEADER.search(call) or "--noproxy" in call:
+            continue
+        hosts = {host.lower() for host in URL_HOST.findall(call)}
+        if hosts and not hosts & LOCAL_HOSTS:
+            continue
+        findings.append(f"DRIFT {rel}:{no} curl-ohne-noproxy: X-API-Key-Aufruf ohne"
+                        f" --noproxy '*' -- mit gesetztem http_proxy ginge der Key ueber den"
+                        f" Proxy | {line.strip()[:120]}")
+        return
+
+
 def check_absent_files(rel, no, line, absent, findings):
     for name in absent or ():
         if name in line:
@@ -594,6 +646,7 @@ def scan(root, rel, facts, findings):
         check_forbidden_patterns(rel, no, line, findings)
         check_definition_count(rel, no, lines, findings)
         check_absent_files(rel, no, line, facts.get("absent-files"), findings)
+        check_curl_noproxy(rel, no, lines, findings)
         check_block_type_enum(rel, no, line, facts.get("block-type-names"), findings)
         check_test_claim_dated(rel, no, line, lines[no] if no < len(lines) else "",
                               findings)
