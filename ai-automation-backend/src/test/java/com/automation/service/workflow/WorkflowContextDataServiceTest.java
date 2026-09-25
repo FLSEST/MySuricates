@@ -43,6 +43,7 @@ class WorkflowContextDataServiceTest {
     @Mock private RequestMetricsFactSheet requestMetricsFactSheet;
     @Mock private ActivityLogService activityLogService;
     @Mock private GoalContextSource goalContextSource;
+    @Mock private AuditContextSource auditContextSource;
 
     @InjectMocks private WorkflowContextDataService service;
 
@@ -534,5 +535,89 @@ class WorkflowContextDataServiceTest {
     @Test
     void goalVariables_areSystemVariables_andStayOutOfTheContextDelta() {
         assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(GoalContextSource.VARIABLES);
+    }
+
+    // --- injectPlatformData: audit_findings (TODO 3643beac) ------------------------------
+
+    private static final java.util.Map<String, Object> AUDIT_META = java.util.Map.of("audit", java.util.Map.of(
+            "enabled", true, "key", "project.security", "category", "security", "reportBlock", "report"));
+
+    /** Kontext ohne Vorgeschichte, die Metadaten werden als Audit-Workflow erkannt. */
+    private ExecutionContext auditContext() {
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        when(auditContextSource.auditKey(AUDIT_META)).thenReturn("project.security");
+        return ExecutionContext.builder().workflowRunId("run-1").build();
+    }
+
+    @Test
+    void injectPlatformData_auditWorkflow_setsAuditFindings_asUntrustedPlatformData() {
+        ExecutionContext ctx = auditContext();
+        when(auditContextSource.findings("proj-1", "project.security"))
+                .thenReturn("<audit_findings>\nOPEN | HIGH | shell.injection | Foo $(id) | Titel\n</audit_findings>");
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1", AUDIT_META);
+
+        assertThat((String) ctx.getVariable("audit_findings")).startsWith("<audit_findings>");
+        assertThat(ctx.isUntrusted("audit_findings")).isTrue();
+        // Wie open_todos: gesetzt faerbt die Variable den Lauf noch nicht, erst ihre Verwendung
+        assertThat(ctx.hasUntrustedInput()).isFalse();
+        assertThat(ctx.resolveShellTemplate("echo {{ audit_findings }}", false))
+                .isEqualTo("echo '<audit_findings>\nOPEN | HIGH | shell.injection | Foo $(id) | Titel\n</audit_findings>'");
+        assertThat(ctx.hasUntrustedInput()).as("in eine Shell-Zeile eingesetzt, faerbt sie den Lauf").isTrue();
+    }
+
+    @Test
+    void injectPlatformData_withoutAuditMetadata_setsNoAuditFindings() {
+        ExecutionContext normal = ExecutionContext.builder().workflowRunId("run-1").build();
+        ExecutionContext shortForm = ExecutionContext.builder().workflowRunId("run-2").build();
+        when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
+        java.util.Map<String, Object> normalMeta = java.util.Map.of("autoTodo", java.util.Map.of("enabled", true));
+
+        service.injectPlatformData(normal, "wf-1", "proj-1", normalMeta);
+        service.injectPlatformData(shortForm, "wf-1", "proj-1");
+
+        assertThat(normal.getVariables()).doesNotContainKey("audit_findings");
+        assertThat(shortForm.getVariables()).doesNotContainKey("audit_findings");
+        verify(auditContextSource).auditKey(normalMeta);
+        verify(auditContextSource, org.mockito.Mockito.never()).findings(any(), any());
+    }
+
+    @Test
+    void injectPlatformData_auditFindingsLoaderThrows_statesTheGap_andWarnsWithTheRunId() {
+        ExecutionContext ctx = auditContext();
+        when(requestMetricsFactSheet.render()).thenReturn("FAKT request_metrics_routes_measured: 1");
+        when(auditContextSource.findings("proj-1", "project.security"))
+                .thenThrow(new IllegalStateException("kaputt"));
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1", AUDIT_META);
+
+        assertThat((String) ctx.getVariable("audit_findings"))
+                .as("faellt die Abfrage aus, muss die Luecke dastehen -- sonst sieht der Prompt den rohen Platzhalter")
+                .isEqualTo("NICHT GEMESSEN: audit_findings (nicht verfügbar: IllegalStateException)");
+        assertThat(ctx.isUntrusted("audit_findings")).isTrue();
+        verify(activityLogService).warn(eq(LogCategory.EXECUTION), org.mockito.ArgumentMatchers.contains("audit_findings"),
+                eq("WorkflowContextDataService"), eq("run-1"), eq("wf-1"));
+        assertUntouched(ctx, "previous_report", "open_todos", "request_metrics");
+    }
+
+    @Test
+    void injectPlatformData_otherLoaderThrows_doesNotCostTheAuditFindings() {
+        ExecutionContext ctx = auditContext();
+        when(requestMetricsFactSheet.render()).thenThrow(new IllegalStateException("kaputt"));
+        when(auditContextSource.findings("proj-1", "project.security")).thenReturn("(keine bekannten Befunde)");
+
+        service.injectPlatformData(ctx, "wf-1", "proj-1", AUDIT_META);
+
+        assertThat(ctx.getVariable("audit_findings")).isEqualTo("(keine bekannten Befunde)");
+        assertThat((String) ctx.getVariable("request_metrics")).startsWith("NICHT GEMESSEN: request_metrics");
+    }
+
+    @Test
+    void auditFindings_isASystemVariable_soItStaysOutOfEveryStepDelta() {
+        assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS)
+                .as("sonst landet der Befundblock im Context-Delta jedes Steps")
+                .contains("audit_findings");
     }
 }

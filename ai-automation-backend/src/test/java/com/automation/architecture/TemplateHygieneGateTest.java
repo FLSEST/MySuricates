@@ -27,7 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     {@code id} aus). Korrekte Form: unquoted plus {@code "shell_escape_variables": true},
  *     sonst zerlegt ein mehrzeiliger Output in Runs ohne Taint den Befehl (TODO 1e77e717).
  *     Gleiches gilt fuer {@code previous_report} und {@code open_todos}: sie sind seit TODO c2634caa
- *     immer untrusted und werden in jedem Run single-quoted.</li>
+ *     immer untrusted und werden in jedem Run single-quoted — ebenso {@code audit_findings} in
+ *     Audit-Workflows (TODO 3643beac).</li>
  * <li>Keine datierten Claude-Modell-IDs: der Modell-Katalog liefert Aliase (opus/sonnet/haiku/fable),
  *     datierte IDs veralten und zeigen im UI "nicht im Katalog" (TODO 5770c88c).</li>
  * <li>Kein {@code $(grep -c … || echo 0)} in Shell-Feldern: grep schreibt bei null Treffern selbst
@@ -41,7 +42,7 @@ class TemplateHygieneGateTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern QUOTED_OUTPUT = Pattern.compile(
             "['\"]\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output"
-                    + "|previous_report|open_todos)\\s*}}['\"]");
+                    + "|previous_report|open_todos|audit_findings)\\s*}}['\"]");
     private static final Pattern DATED_CLAUDE_MODEL = Pattern.compile("claude-(opus|sonnet|haiku|fable)-\\d");
     private static final Pattern GREP_COUNT_ECHO_FALLBACK = Pattern.compile(
             "grep\\s+(?:-[A-Za-z]*c[A-Za-z]*|--count)\\s[^\\n|]*\\|\\|\\s*echo\\b");

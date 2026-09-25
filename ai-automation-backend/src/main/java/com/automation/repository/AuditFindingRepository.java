@@ -1,11 +1,15 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.AuditFindingContextRow;
 import com.automation.dto.projection.AuditFindingCountRow;
 import com.automation.entity.AuditFinding;
+import com.automation.entity.AuditFindingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,4 +25,16 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Stri
     @Query("SELECT new com.automation.dto.projection.AuditFindingCountRow(f.projectId, f.auditKey, f.status, "
             + "f.severity, COUNT(f)) FROM AuditFinding f GROUP BY f.projectId, f.auditKey, f.status, f.severity")
     List<AuditFindingCountRow> countByScopeStatusAndSeverity();
+
+    /**
+     * Die bekannten Befunde eines Audits fuer {@code audit_findings} (TODO 3643beac) – ohne die TEXT-Blobs
+     * (Beschreibung, Beleg, Tags, Beweis-Snapshot) und ohne Befunde mit unbekanntem {@code ruleKey}:
+     * Fuehrte ein Prompt so einen Key weiter, verwuerfe die Ingestion den ganzen Report.
+     */
+    @Query("SELECT new com.automation.dto.projection.AuditFindingContextRow(f.id, f.status, f.severity, f.ruleKey, "
+            + "f.subject, f.title, f.dispositionNote) FROM AuditFinding f WHERE f.projectId = :projectId "
+            + "AND f.auditKey = :auditKey AND f.status IN :statuses AND f.unknownRuleKey = false")
+    List<AuditFindingContextRow> findContextRows(@Param("projectId") String projectId,
+                                                 @Param("auditKey") String auditKey,
+                                                 @Param("statuses") Collection<AuditFindingStatus> statuses);
 }

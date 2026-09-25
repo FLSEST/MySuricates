@@ -56,6 +56,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 17 | `switch`: eine KI-Ausgabe mit Zeilenumbruch am Ende trifft ihren Case, statt still in `default` zu fallen (bf11e6fe) | `switch-ai-output-trailing-newline` |
 | 18 | `skill-capability`: Endet die KI-CLI mit Fehler, scheitert der Schritt; kein Folgeblock und kein Gate nimmt die Fehlermeldung als Antwort (ea0c0b3f) | `skill-capability-cli-error-fails-step` |
 | 19 | Ziel-Wächter: ein Lauf der mitgelieferten Vorlage `goal-guard` mit `goal_id` bekommt `goal_status`/`goal_guard_*` und meldet ohne KI Rot mit dem überfälligen Meilenstein und TODO an die Dashboard-Kachel (259f4f66) | `goal-guard-reports-overdue` |
+| 20 | Audit-Workflow: der zweite Lauf sieht in `{{ audit_findings }}` die Befunde des ersten, der erste „(keine bekannten Befunde)“; sein Sub-Workflow ohne `metadata.audit` bekommt die Variable auch über die Variablen-Übergabe nicht (3643beac) | `audit-findings-reach-the-next-run` (zwei Läufe) |
 
 ### Aus der Historie, noch ohne Szenario
 

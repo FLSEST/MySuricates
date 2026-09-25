@@ -39,9 +39,9 @@ class PlatformPromptQuotingGateTest {
     private static final java.util.regex.Pattern OUTPUT_PLACEHOLDER = java.util.regex.Pattern.compile(
             "\\{\\{\\s*(previous_output|step_\\d+_output|block\\.[A-Za-z0-9_-]+\\.output)\\s*}}");
 
-    /** Plattform-Daten, die den Prompt eines KI-Blocks faerben. */
+    /** Plattform-Daten, die den Prompt eines KI-Blocks faerben ({@code audit_findings}: TODO 3643beac). */
     private static final java.util.regex.Pattern PLATFORM_PLACEHOLDER =
-            java.util.regex.Pattern.compile("\\{\\{\\s*(previous_report|open_todos)\\s*}}");
+            java.util.regex.Pattern.compile("\\{\\{\\s*(previous_report|open_todos|audit_findings)\\s*}}");
 
     @Test
     void should_requireEscapeOptIn_forShellBlocksAfterAPlatformPrompt() throws IOException {

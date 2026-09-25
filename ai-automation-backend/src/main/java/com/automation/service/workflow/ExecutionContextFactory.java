@@ -23,8 +23,9 @@ import java.util.Collection;
 /**
  * Builds the {@link ExecutionContext} for a workflow run — input variables, previous-output seed,
  * system template variables, workflow-version variables, system identity run metadata, platform
- * data ({@code previous_report}, {@code open_todos}) and instruction prefix / model / provider /
- * effort — and writes the project-side context files (.claude/rules/) every CLI call picks up.
+ * data ({@code previous_report}, {@code open_todos}, for audit workflows {@code audit_findings}) and
+ * instruction prefix / model / provider / effort — and writes the project-side context files
+ * (.claude/rules/) every CLI call picks up.
  *
  * <p>Extracted from {@code WorkflowExecutor} (review C1, roadmap 3.1). The variable set is the
  * contract documented for workflow authors in docs/WORKFLOW-GUIDE.md.
@@ -49,16 +50,22 @@ public class ExecutionContextFactory {
                               String model, String provider, String effort, String resumePreviousOutput,
                               String definitionHash, TriggerSource triggerSource,
                               /** metadata.userPreferences des Workflows (TODO d49fbde0). */
-                              boolean userPreferences) {
+                              boolean userPreferences,
+                              /** Metadaten des Workflows: metadata.audit bringt audit_findings (TODO 3643beac). */
+                              Map<String, Object> workflowMeta) {
 
-        /** Kurzform ohne Arbeitspräferenzen — der Weg fuer alles, was sie nicht anfordert. */
+        public ContextSeed {
+            workflowMeta = workflowMeta != null ? workflowMeta : Map.of();
+        }
+
+        /** Kurzform ohne Arbeitspräferenzen und Metadaten — der Weg fuer alles, was sie nicht anfordert. */
         public ContextSeed(String runId, String workflowId, String workflowName, Project project,
                            String containerId, Map<String, Object> inputContext, String instructions,
                            String model, String provider, String effort, String resumePreviousOutput,
                            String definitionHash, TriggerSource triggerSource) {
             this(runId, workflowId, workflowName, project, containerId, inputContext, instructions,
                     model, provider, effort, resumePreviousOutput, definitionHash, triggerSource,
-                    false);
+                    false, Map.of());
         }
     }
 
@@ -83,6 +90,10 @@ public class ExecutionContextFactory {
         Set<String> untrustedKeys = reservedNames(inputContext, ExecutionContext.UNTRUSTED_KEYS_VARIABLE);
         inputContext.forEach((name, value) -> {
             if (name.startsWith("execution_path_")) return;
+            // audit_findings describes the running workflow itself and is set by injectPlatformData only.
+            // A value handed over by a parent run (sub-workflow copies every variable) or passed as input
+            // would otherwise stay here as a trusted variable — unquoted in shell blocks (TODO 3643beac).
+            if (AuditContextSource.VARIABLE.equals(name)) return;
             if (untrustedKeys.contains(name)) {
                 context.setUntrustedVariable(name, value);
             } else {
@@ -162,7 +173,7 @@ public class ExecutionContextFactory {
         context.setRunMetadata("systemVersion", systemIdentity.getVersion());
 
         // Inject platform data as context variables (so workflows don't need API/DB access)
-        contextDataService.injectPlatformData(context, workflowId, project.getId());
+        contextDataService.injectPlatformData(context, workflowId, project.getId(), seed.workflowMeta());
 
         // Set instruction prefix and model from workflow
         // Der Standardweg ruft weiter die einparametrige Methode: Ein Workflow ohne Opt-in soll

@@ -49,8 +49,9 @@ public final class BlockSpecs {
                     (string), `mount_docker_socket` (bool), `mounts` (list of "host:container[:ro|rw]"; the last two only \
                     with `container_image`).
                     Example config: {"command": "set -euo pipefail; git log --oneline -20", "timeout_seconds": 60}
-                    Note: placeholders carrying outside input ({{ previous_report }}, {{ open_todos }}, webhook values) are \
-                    always single-quoted — never put a placeholder in your own quotes. An earlier output goes in as \
+                    Note: placeholders carrying outside input ({{ previous_report }}, {{ open_todos }}, \
+                    {{ audit_findings }} of an audit workflow, webhook values) are always single-quoted — never put a \
+                    placeholder in your own quotes. An earlier output goes in as \
                     set -- {{ previous_output }} with `shell_escape_variables` true.
                     """),
             Map.entry("agentic", """
