@@ -221,6 +221,29 @@ mkdir -p "$SCAN_MAIN"
   for i in $(seq 1 200); do echo "    // filler $i"; done
   echo "}"
 } > "$SCAN_MAIN/PlainEvent.java"
+# Nur Felder der aeusseren Klasse (e8226de2): RunStatistics.runs und .totals sind Zustand eines
+# Wertobjekts. Die Klammer hinter https:// im Javadoc, die in Literalen und die im Textblock duerfen
+# die Tiefe nicht verschieben, sonst fiele lateCollaborator als Feld der Bean heraus.
+{ echo "package com.automation.service;"
+  echo "/**"
+  echo " * Zaehlt Laeufe, Quelle {@code https://example.invalid/runs}."
+  echo " */"
+  echo "@Service"
+  echo "public class StatsService {"
+  for i in 1 2 3 4 5 6; do echo "    private final Collaborator$i collaborator$i;"; done
+  echo "    private static final String OPEN = \"{\";"
+  echo "    private static final char BRACE = '{';"
+  echo "    private static final String TEMPLATE = \"\"\""
+  echo "            { \"offen\": true"
+  echo "            \"\"\";"
+  echo "    private final LateCollaborator lateCollaborator;"
+  echo "    static final class RunStatistics {"
+  echo "        private final RunList runs;"
+  echo "        private final Totals totals;"
+  echo "    }"
+  for i in $(seq 1 200); do echo "    // filler $i"; done
+  echo "}"
+} > "$SCAN_MAIN/StatsService.java"
 python3 - "$POOL" "$SCAN_FIX" > "$TMP/delta-scan.sh" <<'PY'
 import json, sys
 wf = json.load(open(sys.argv[1]))
@@ -234,6 +257,9 @@ check "God-Class-Liste zaehlt 7 Kollaborateure" 'grep -q "| 7 deps | service/Bus
 check "Kopplungsliste zaehlt 7 Kollaborateure"  'grep -qx "7 deps: BusyService" "$TMP/delta-scan.out"'
 check "Nicht-Bean ohne deps"                    'grep -q "| - deps | service/PlainEvent$" "$TMP/delta-scan.out"'
 check "Nicht-Bean nicht in der Kopplungsliste"  '! grep -q "deps: PlainEvent" "$TMP/delta-scan.out"'
+# 6 Kollaborateure + lateCollaborator = 7; die zwei Felder der inneren Klasse zaehlen nicht.
+check "God-Class-Liste ohne Felder innerer Klassen" 'grep -q "| 7 deps | service/StatsService$" "$TMP/delta-scan.out"'
+check "Kopplungsliste ohne Felder innerer Klassen"  'grep -qx "7 deps: StatsService" "$TMP/delta-scan.out"'
 check "Report-Prompt: Zahl meint Kollaborateure" \
   'python3 -c "import json,sys; p=next(b for b in json.load(open(sys.argv[1]))[\"blocks\"] if b.get(\"name\")==\"report\")[\"config\"][\"command\"]; sys.exit(0 if \"nur Kollaborateure\" in p and \"com.automation.executor.blocks\" in p and \"erst ab >10\" in p else 1)" "$POOL"'
 
