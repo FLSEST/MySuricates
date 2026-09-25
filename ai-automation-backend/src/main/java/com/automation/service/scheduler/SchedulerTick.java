@@ -9,6 +9,9 @@ import com.automation.service.workflow.SuspendState;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.availability.AvailabilityChangeEvent;
+import org.springframework.boot.availability.ReadinessState;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +29,8 @@ import java.util.Optional;
  * (cold start, detected on the first tick). Missed occurrences are either advanced to their next
  * future time or, for schedules opted in via {@code catchUpOnResume} (or the global setting),
  * handed to the {@link CatchUpQueue}, which runs them one after another instead of all at once.
+ * Ticks before the application is ready are skipped, so the cold start is handled only after the
+ * startup cleanup of interrupted runs ({@link #openAfterStartupCleanup}).
  * Schedule CRUD lives in {@link SchedulerService}.
  */
 @Component
@@ -49,13 +54,38 @@ public class SchedulerTick {
     /** When this backend instance came up; occurrences due before it were missed while stopped. */
     private volatile Instant startedAt = null;
 
+    /**
+     * Closed until the startup cleanup of the previous lifecycle's runs is done (TODO aa51d221).
+     * Spring starts {@code @Scheduled} tasks at ContextRefreshedEvent, but {@code RunControlService}
+     * and {@code ChainZombieRunCleaner} mark leftover RUNNING/PAUSED runs INTERRUPTED only on
+     * ApplicationReadyEvent, after the ApplicationRunners — in the dev logs 0.3–1.4 s after the first
+     * tick. A catch-up run that tick started was RUNNING by then and got marked INTERRUPTED while it
+     * went on running, and a leftover RUNNING row made its target look busy, so the occurrence was
+     * dropped. Spring Boot reports ACCEPTING_TRAFFIC right after all ApplicationReadyEvent listeners.
+     */
+    private volatile boolean startupCleanupDone = false;
+
     @PostConstruct
     void markStarted() {
         startedAt = Instant.now(clock);
     }
 
+    /** Opens the tick once the application is ready — and with that, the zombie cleanup is done. */
+    @EventListener
+    public void openAfterStartupCleanup(AvailabilityChangeEvent<ReadinessState> event) {
+        if (event.getState() == ReadinessState.ACCEPTING_TRAFFIC && !startupCleanupDone) {
+            startupCleanupDone = true;
+            log.debug("Scheduler opened — the startup cleanup of interrupted runs is done");
+        }
+    }
+
     @Scheduled(fixedRate = 60_000)
     public void checkAndExecuteScheduled() {
+        if (!startupCleanupDone) {
+            // Before lastTickAt is touched: the first tick after opening is still the cold start.
+            log.debug("Scheduler tick skipped — waiting for the startup cleanup of interrupted runs");
+            return;
+        }
         Instant now = Instant.now(clock);
         Instant prevTick = lastTickAt;
         lastTickAt = now;
