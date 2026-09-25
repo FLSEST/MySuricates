@@ -8,13 +8,14 @@ import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.NotificationConfigRepository;
 import com.automation.service.tray.SystemTrayService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -27,19 +28,33 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class NotificationService {
 
     private final NotificationConfigRepository repository;
     private final ObjectMapper objectMapper;
+    private final HttpClient httpClient;
+    private final TransactionTemplate readOnlyTransactionTemplate;
 
     @Autowired(required = false)
     private SystemTrayService systemTrayService;
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    @Autowired
+    public NotificationService(NotificationConfigRepository repository, ObjectMapper objectMapper,
+                               PlatformTransactionManager transactionManager) {
+        this(repository, objectMapper, transactionManager, HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build());
+    }
+
+    NotificationService(NotificationConfigRepository repository, ObjectMapper objectMapper,
+                        PlatformTransactionManager transactionManager, HttpClient httpClient) {
+        this.repository = repository;
+        this.objectMapper = objectMapper;
+        this.httpClient = httpClient;
+        this.readOnlyTransactionTemplate = new TransactionTemplate(transactionManager);
+        this.readOnlyTransactionTemplate.setReadOnly(true);
+    }
 
     @Transactional(readOnly = true)
     public List<NotificationConfig> findAll() {
@@ -89,12 +104,18 @@ public class NotificationService {
         repository.deleteById(id);
     }
 
+    /**
+     * Deliberately not {@code @Transactional}: a webhook waits on a foreign server (5 s to connect,
+     * 10 s for the answer), and with HikariCP pool-size 1 an enclosing transaction would hold the
+     * only DB connection all that time (TODO ab7f042a). The configs are read in a short read burst –
+     * they have no lazy associations, so they stay usable after it.
+     */
     @Async
     @EventListener
-    @Transactional(readOnly = true)
     public void onWorkflowRunCompleted(WorkflowRunCompletedEvent event) {
-        List<NotificationConfig> configs = repository.findEnabledForWorkflow(event.getWorkflowId());
-        if (configs.isEmpty()) return;
+        List<NotificationConfig> configs = readOnlyTransactionTemplate.execute(status ->
+                repository.findEnabledForWorkflow(event.getWorkflowId()));
+        if (configs == null || configs.isEmpty()) return;
 
         for (NotificationConfig config : configs) {
             if (!shouldFire(config, event.getStatus())) continue;

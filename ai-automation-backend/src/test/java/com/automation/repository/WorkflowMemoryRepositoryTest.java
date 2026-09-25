@@ -243,4 +243,21 @@ class WorkflowMemoryRepositoryTest {
                 .containsExactly(base.plusSeconds(6), base.plusSeconds(5), base.plusSeconds(4),
                         base.plusSeconds(3), base.plusSeconds(2));
     }
+
+    /** The assistant's "Learnings & Pitfalls" read only the eight newest active memories, limited in the query (TODO 8c791a45). */
+    @Test
+    void findTop8ByActiveTrue_returnsTheEightNewestActiveMemories() {
+        Instant base = Instant.parse("2999-01-01T00:00:00Z"); // newer than anything other tests leave behind
+        for (int i = 0; i < 10; i++) {
+            repository.save(memoryWithCreatedAt(i % 2 == 0 ? workflowId : otherWorkflowId, true, base.plusSeconds(i)));
+        }
+        repository.save(memoryWithCreatedAt(workflowId, false, base.plusSeconds(100)));
+
+        List<WorkflowMemory> top = repository.findTop8ByActiveTrueOrderByCreatedAtDesc();
+
+        assertThat(top).hasSize(8).allMatch(WorkflowMemory::isActive)
+                .extracting(WorkflowMemory::getCreatedAt)
+                .containsExactly(base.plusSeconds(9), base.plusSeconds(8), base.plusSeconds(7), base.plusSeconds(6),
+                        base.plusSeconds(5), base.plusSeconds(4), base.plusSeconds(3), base.plusSeconds(2));
+    }
 }

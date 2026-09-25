@@ -8,6 +8,7 @@ import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.NotificationConfigRepository;
 import com.automation.service.tray.SystemTrayService;
+import com.automation.testsupport.FakeTransactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -17,10 +18,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,7 +46,7 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new NotificationService(repository, objectMapper);
+        service = new NotificationService(repository, objectMapper, FakeTransactions.manager());
     }
 
     @Nested
@@ -259,6 +265,40 @@ class NotificationServiceTest {
 
             // Should not throw
             service.onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
+        }
+    }
+
+    @Nested
+    class TransactionBoundaryTests {
+
+        /** ab7f042a: the webhook waits on a foreign server and must not hold the only DB connection. */
+        @Test
+        void webhook_isSentOutsideAnyTransaction_afterAShortReadBurst() throws Exception {
+            PlatformTransactionManager transactions = FakeTransactions.manager();
+            HttpClient httpClient = mock(HttpClient.class);
+            NotificationService proxied = FakeTransactions.proxy(
+                    new NotificationService(repository, objectMapper, transactions, httpClient), transactions);
+            NotificationConfig config = createConfig("c-1", ChannelType.WEBHOOK);
+            config.setTriggerAlways(true);
+            AtomicReference<Boolean> txDuringRead = new AtomicReference<>();
+            AtomicReference<Boolean> txDuringSend = new AtomicReference<>();
+            when(repository.findEnabledForWorkflow("wf-1")).thenAnswer(inv -> {
+                txDuringRead.set(FakeTransactions.active());
+                return List.of(config);
+            });
+            HttpResponse<?> ok = mock(HttpResponse.class);
+            when(ok.statusCode()).thenReturn(200);
+            ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+            when(httpClient.send(request.capture(), any())).thenAnswer(inv -> {
+                txDuringSend.set(FakeTransactions.active());
+                return ok;
+            });
+
+            proxied.onWorkflowRunCompleted(createEvent(RunStatus.COMPLETED));
+
+            assertThat(txDuringSend.get()).as("the webhook call must not hold the only DB connection").isFalse();
+            assertThat(txDuringRead.get()).as("the configs are read in a short transaction").isTrue();
+            assertThat(request.getValue().uri()).hasToString("https://hooks.slack.com/test");
         }
     }
 

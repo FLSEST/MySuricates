@@ -265,7 +265,7 @@ class AssistantContextBuilderTest {
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             String result = builder.buildSystemPrompt(null, "Du bist MySuricates.", null);
@@ -285,7 +285,7 @@ class AssistantContextBuilderTest {
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             String result = builder.buildSystemPrompt(null, null, null);
@@ -302,7 +302,7 @@ class AssistantContextBuilderTest {
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
+            when(workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
             Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
@@ -450,7 +450,7 @@ class AssistantContextBuilderTest {
                     .provider("assistant")
                     .active(true)
                     .build();
-            when(workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of(memory));
+            when(workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of(memory));
 
             AssistantSession session = AssistantSession.builder()
                     .id("session-1")

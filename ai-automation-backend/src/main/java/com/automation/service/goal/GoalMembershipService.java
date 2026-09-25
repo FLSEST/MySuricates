@@ -1,5 +1,6 @@
 package com.automation.service.goal;
 
+import com.automation.dto.projection.GoalTodoRow;
 import com.automation.dto.response.GoalDetailResponse;
 import com.automation.entity.Goal;
 import com.automation.entity.Todo;
@@ -14,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -59,20 +61,25 @@ public class GoalMembershipService {
         for (int i = 0; i < ordered.size(); i++) {
             rankOf.put(ordered.get(i), i + 1);
         }
-        Map<String, Todo> byId = load(ordered).stream().collect(Collectors.toMap(Todo::getId, Function.identity()));
+        Map<String, Todo> byId = load(ordered).stream()
+                .collect(Collectors.toMap(Todo::getId, Function.identity(), (a, b) -> a, HashMap::new));
         for (String id : ordered) {
             if (!goal.getId().equals(byId.get(id).getGoalId())) {
                 throw new IllegalArgumentException("TODO " + id + " gehoert nicht zum Ziel " + goal.getId());
             }
         }
-        for (var row : todoRepository.findGoalRows(goal.getId())) {
-            Integer rank = rankOf.get(row.id());
-            if (!Objects.equals(rank, row.goalRank())) {
-                Todo todo = byId.containsKey(row.id()) ? byId.get(row.id())
-                        : todoRepository.findById(row.id()).orElseThrow();
-                todo.setGoalRank(rank);
-                todoRepository.save(todo);
-            }
+        List<GoalTodoRow> changed = todoRepository.findGoalRows(goal.getId()).stream()
+                .filter(row -> !Objects.equals(rankOf.get(row.id()), row.goalRank()))
+                .toList();
+        // Die TODOs, deren Rang wegfaellt, in einer Abfrage nachladen statt je TODO ein findById (TODO f83dcc48)
+        List<String> dropped = changed.stream().map(GoalTodoRow::id).filter(id -> !byId.containsKey(id)).toList();
+        if (!dropped.isEmpty()) {
+            todoRepository.findAllById(dropped).forEach(todo -> byId.put(todo.getId(), todo));
+        }
+        for (GoalTodoRow row : changed) {
+            Todo todo = Optional.ofNullable(byId.get(row.id())).orElseThrow();
+            todo.setGoalRank(rankOf.get(row.id()));
+            todoRepository.save(todo);
         }
         return goalService.detailOf(goal);
     }

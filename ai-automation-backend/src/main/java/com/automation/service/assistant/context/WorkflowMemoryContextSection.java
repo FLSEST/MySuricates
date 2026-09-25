@@ -34,10 +34,12 @@ public class WorkflowMemoryContextSection {
      */
     public void append(StringBuilder sb, Map<String, Workflow> workflowById) {
         try {
-            List<WorkflowMemory> memories = workflowMemoryRepository.findByActiveTrueOrderByCreatedAtDesc();
+            // The query itself stops at eight: every active memory loaded and cut here would carry
+            // all their contents through the single connection (TODO 8c791a45).
+            List<WorkflowMemory> memories = workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc();
             if (memories.isEmpty()) return;
             sb.append("## Learnings & Pitfalls\n");
-            memories.stream().limit(8).forEach(m -> {
+            memories.forEach(m -> {
                 String wfName = workflowById.containsKey(m.getWorkflowId())
                         ? workflowById.get(m.getWorkflowId()).getName()
                         : m.getWorkflowId().substring(0, Math.min(8, m.getWorkflowId().length())) + "…";
