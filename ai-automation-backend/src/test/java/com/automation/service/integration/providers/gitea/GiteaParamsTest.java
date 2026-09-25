@@ -2,6 +2,7 @@ package com.automation.service.integration.providers.gitea;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -59,5 +60,24 @@ class GiteaParamsTest {
     void requireParam_treatsBlankAsMissing() {
         assertThatThrownBy(() -> GiteaParams.requireParam(Map.of("title", "  "), "title"))
                 .hasMessage("Required parameter missing: title");
+    }
+
+    /** ac639b39: a JSON number is read like its text — 1.5 is not cut to 1, nothing wraps around. */
+    @Test
+    void paramInt_rejectsDecimalsAndValuesBeyondInt() {
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L}) {
+            assertThatThrownBy(() -> GiteaParams.paramInt(Map.of("page", bad), "page", 1))
+                    .as(String.valueOf(bad))
+                    .hasMessage("Parameter 'page' must be a number");
+        }
+    }
+
+    /** ac639b39: 12.0 used to pass as issue 12, and 2^64 + 1 as issue 1. */
+    @Test
+    void requireNumber_readsAJsonNumberLikeItsText() {
+        assertThatThrownBy(() -> GiteaParams.requireNumber(Map.of("number", 12.0), "number"))
+                .hasMessage("Parameter 'number' must be a positive number");
+        BigInteger huge = BigInteger.ONE.shiftLeft(64).add(BigInteger.ONE);
+        assertThat(GiteaParams.requireNumber(Map.of("number", huge), "number")).isEqualTo(huge.toString());
     }
 }

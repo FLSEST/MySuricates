@@ -1203,6 +1203,9 @@ Create a new schedule.
 | `conflictBehavior` | String | No (default: `SKIP`, values: `SKIP`, `OVERLAP` — see below) |
 | `catchUpOnResume` | boolean | No (default: `false` — see below) |
 
+`targetType`, `scheduleType` and `conflictBehavior` are trimmed and accepted in any case; any other
+value → `400`, and the message names the allowed values.
+
 - **`conflictBehavior`:** with `SKIP`, an occurrence is dropped while the target still has a run in
   `RUNNING` or `PAUSED`: `nextRunAt` moves on to the next occurrence, a one-off schedule (`ONCE`,
   `DELAYED`) expires, and the activity log notes “Schedule skipped (previous run still in progress)”.
@@ -1788,6 +1791,9 @@ Create a new todo trigger.
 | `processBacklog` | No | Process existing matching TODOs on creation (default: true) |
 | `contextTemplate` | No | Static context variables, merged with TODO data |
 
+`sourceFilter` and `minPriority` are accepted in any case and stored as the constant; any other value
+→ `400`, and the message names the allowed values.
+
 **Response:** `201` with `TodoTriggerResponse`
 
 **TodoTriggerResponse Fields:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
@@ -2256,6 +2262,10 @@ Set an application setting.
 ```
 
 **Response:** `200 OK`
+
+`backup-retain-count` takes 1–365; any other value → `400`, and nothing is stored. The stored value
+applies from the next rotation on and keeps applying after a restart (otherwise
+`automation.backup.retain-count`).
 
 ### `GET /api/v1/system/tray-config`
 

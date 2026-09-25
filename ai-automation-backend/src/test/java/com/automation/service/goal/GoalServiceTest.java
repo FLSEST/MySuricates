@@ -63,7 +63,9 @@ class GoalServiceTest {
     void planningValues_areNormalised_orRejected() {
         assertThat(TodoPlanningService.parseComplexity("xl")).isEqualTo(Todo.Complexity.XL);
         assertThat(TodoPlanningService.parseComplexity("")).isNull();
-        assertThatThrownBy(() -> TodoPlanningService.parseComplexity("huge")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(TodoPlanningService.parseComplexity(" m ")).isEqualTo(Todo.Complexity.M);
+        assertThatThrownBy(() -> TodoPlanningService.parseComplexity("huge")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("complexity muss S, M, L oder XL sein, nicht 'huge'");
 
         assertThat(TodoPlanningService.parseEffort("XHIGH")).isEqualTo("xhigh");
         assertThat(TodoPlanningService.parseEffort(" ")).isNull();

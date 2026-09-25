@@ -28,14 +28,23 @@ class JiraParamsTest {
     }
 
     /**
-     * Documents the intentional divergence from {@code GitHubParams.paramInt}: a blank string is
-     * NOT special-cased here, so it falls through to {@link Integer#parseInt} and throws — this is
-     * the pre-split {@code JiraProvider} behavior, kept as-is by the brief.
+     * ac639b39: the shared number path (IntegrationParams) treats blank like missing, as every other
+     * provider does. Until then Jira kept the pre-split behaviour — a bare NumberFormatException.
      */
     @Test
-    void paramInt_blankString_throwsNumberFormatException() {
-        assertThatThrownBy(() -> JiraParams.paramInt(Map.of("n", " "), "n", 0))
-                .isInstanceOf(NumberFormatException.class);
+    void paramInt_blankString_meansTheDefault() {
+        assertThat(JiraParams.paramInt(Map.of("n", " "), "n", 7)).isEqualTo(7);
+    }
+
+    /** ac639b39: a JSON number is read like its text — 1.5 is not cut to 1, nothing wraps around. */
+    @Test
+    void paramInt_rejectsDecimalsAndValuesBeyondInt() {
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L, "abc"}) {
+            assertThatThrownBy(() -> JiraParams.paramInt(Map.of("maxResults", bad), "maxResults", 0))
+                    .as(String.valueOf(bad))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'maxResults' must be a number");
+        }
     }
 
     // --- paramString (migrated from JiraProviderTest, same assertions) ---

@@ -6,6 +6,7 @@ import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -102,12 +103,15 @@ public class DockerContainerGateway {
     }
 
     /**
-     * A container that is already gone (Docker 404, "No such container") is what stop/remove wanted
-     * anyway — that is DEBUG, not a warning (TODO c1eda062). Every other failure stays WARN.
+     * A container that is already gone (Docker 404, "No such container") or already stopped (Docker
+     * 304 on stop, TODO 8ae2d8e0) is what stop/remove wanted anyway — that is DEBUG, not a warning
+     * (TODO c1eda062). Every other failure stays WARN.
      */
     private static void logFailure(String action, String containerId, Exception e) {
         if (e instanceof NotFoundException) {
             log.debug("Container {} already gone on {}: {}", containerId, action, e.getMessage());
+        } else if (e instanceof NotModifiedException) {
+            log.debug("Container {} already stopped on {}: {}", containerId, action, e.getMessage());
         } else {
             log.warn("Failed to {} container {}: {}", action, containerId, e.getMessage());
         }

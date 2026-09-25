@@ -33,4 +33,15 @@ class TrelloParamsTest {
     void urlEncode_encodesSpaceAndAmpersand() {
         assertThat(TrelloParams.urlEncode("a b&c")).isEqualTo("a+b%26c");
     }
+
+    /** ac639b39: a JSON number is read like its text; blank means the default, as elsewhere. */
+    @Test
+    void paramInt_rejectsDecimalsAndValuesBeyondInt_blankIsTheDefault() {
+        assertThat(TrelloParams.paramInt(Map.of("cards_limit", " "), "cards_limit", 5)).isEqualTo(5);
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L}) {
+            assertThatThrownBy(() -> TrelloParams.paramInt(Map.of("cards_limit", bad), "cards_limit", 5))
+                    .as(String.valueOf(bad))
+                    .hasMessage("Parameter 'cards_limit' must be a number");
+        }
+    }
 }

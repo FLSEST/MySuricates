@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.todoist;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -49,32 +51,25 @@ final class TodoistParams {
         return id(requireParam(params, key), key);
     }
 
-    /** Page size, 1..200 as documented for the paginated endpoints (default 50). */
+    /** Page size, 1..200 as documented for the paginated endpoints (default 50); read like its text. */
     static int limit(Map<String, Object> params) {
-        Object val = params.get("limit");
-        if (val == null || val.toString().isBlank()) return 50;
-        int limit;
-        try {
-            limit = val instanceof Number n ? n.intValue() : Integer.parseInt(val.toString().trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Parameter 'limit' must be a number");
-        }
+        Integer limit = IntegrationParams.optionalInt(params.get("limit"), "limit");
+        if (limit == null) return 50;
         if (limit < 1 || limit > MAX_LIMIT) {
             throw new IllegalArgumentException("Parameter 'limit' must be between 1 and " + MAX_LIMIT);
         }
         return limit;
     }
 
-    /** Todoist priority: 1 (normal) … 4 (urgent, shown as p1 in the apps). */
+    /** Todoist priority: 1 (normal) … 4 (urgent, shown as p1 in the apps); read like its text. */
     static Integer priority(Map<String, Object> params) {
-        Object val = params.get("priority");
-        if (val == null || val.toString().isBlank()) return null;
-        int p;
+        Integer p;
         try {
-            p = val instanceof Number n ? n.intValue() : Integer.parseInt(val.toString().trim());
+            p = IntegrationParams.parseInt(params.get("priority"));
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Parameter 'priority' must be a number between 1 and 4");
         }
+        if (p == null) return null;
         if (p < 1 || p > 4) {
             throw new IllegalArgumentException("Parameter 'priority' must be between 1 (normal) and 4 (urgent)");
         }

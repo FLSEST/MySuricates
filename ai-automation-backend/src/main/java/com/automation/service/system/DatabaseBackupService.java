@@ -32,6 +32,7 @@ public class DatabaseBackupService {
     private final DataSource dataSource;
     private final BackupConfig backupConfig;
     private final ActivityLogService activityLogService;
+    private final SystemSettingsService settings;
 
     @Value("${spring.datasource.url}")
     private String datasourceUrl;
@@ -111,15 +112,16 @@ public class DatabaseBackupService {
         return backup;
     }
 
-    /** Deletes the oldest backups exceeding the retain count; only our own naming scheme counts ({@link BackupFileNaming}). */
+    /** Deletes the oldest backups beyond the stored retain count (205ebd8f); only our own naming scheme counts ({@link BackupFileNaming}). */
     public int rotateBackups() throws IOException {
+        int retainCount = settings.backupRetainCount();
         Path backupDir = Path.of(backupConfig.getDirectory());
         List<Path> backups = new ArrayList<>(listBackupFiles(backupDir).stream()
                 .filter(BackupFileNaming::isOwnBackupFile)
                 .toList());
 
         int deleted = 0;
-        if (backups.size() > backupConfig.getRetainCount()) {
+        if (backups.size() > retainCount) {
             // Sort oldest first
             backups.sort(Comparator.comparing(p -> {
                 try {
@@ -129,7 +131,7 @@ public class DatabaseBackupService {
                 }
             }));
 
-            int toDelete = backups.size() - backupConfig.getRetainCount();
+            int toDelete = backups.size() - retainCount;
             for (int i = 0; i < toDelete; i++) {
                 Path backup = backups.get(i);
                 Files.deleteIfExists(backup);

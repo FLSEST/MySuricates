@@ -1,5 +1,6 @@
 package com.automation.service.integration.providers.httpapi;
 
+import com.automation.service.integration.providers.IntegrationParams;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -189,14 +190,15 @@ record HttpApiRequest(String method, URI uri, Map<String, String> headers, byte[
         return bytes;
     }
 
+    /** Read like its text ({@link IntegrationParams}): 1.5 fails instead of becoming 1; blank means the default. */
     private static Duration timeout(Object raw) {
-        if (raw == null) return Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS);
-        int seconds;
+        Integer seconds;
         try {
-            seconds = raw instanceof Number n ? n.intValue() : Integer.parseInt(String.valueOf(raw).trim());
+            seconds = IntegrationParams.parseInt(raw);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("timeout_seconds must be a number");
         }
+        if (seconds == null) return Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS);
         if (seconds < 1 || seconds > MAX_TIMEOUT_SECONDS) {
             throw new IllegalArgumentException("timeout_seconds must be between 1 and " + MAX_TIMEOUT_SECONDS);
         }

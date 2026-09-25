@@ -2,6 +2,7 @@ package com.automation.service.integration.providers.gitlab;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -67,5 +68,24 @@ class GitLabParamsTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> GitLabParams.requireIid(Map.of(), "number"))
                 .hasMessage("Required parameter missing: number");
+    }
+
+    /** ac639b39: a JSON number is read like its text — 1.5 is not cut to 1, nothing wraps around. */
+    @Test
+    void paramInt_rejectsDecimalsAndValuesBeyondInt() {
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L}) {
+            assertThatThrownBy(() -> GitLabParams.paramInt(Map.of("page", bad), "page", 1))
+                    .as(String.valueOf(bad))
+                    .hasMessage("Parameter 'page' must be a number");
+        }
+    }
+
+    /** ac639b39: 8.0 used to pass as IID 8, and 2^64 + 1 as IID 1. */
+    @Test
+    void requireIid_readsAJsonNumberLikeItsText() {
+        assertThatThrownBy(() -> GitLabParams.requireIid(Map.of("number", 8.0), "number"))
+                .hasMessage("Parameter 'number' must be a positive number");
+        BigInteger huge = BigInteger.ONE.shiftLeft(64).add(BigInteger.ONE);
+        assertThat(GitLabParams.requireIid(Map.of("number", huge), "number")).isEqualTo(huge.toString());
     }
 }

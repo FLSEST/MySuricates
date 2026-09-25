@@ -1209,6 +1209,9 @@ Neuen Schedule erstellen.
 | `conflictBehavior` | String | Nein (Standard: `SKIP`, Werte: `SKIP`, `OVERLAP` — siehe unten) |
 | `catchUpOnResume` | boolean | Nein (Standard: `false` — siehe unten) |
 
+`targetType`, `scheduleType` und `conflictBehavior` werden getrimmt und in beliebiger Schreibweise
+angenommen; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
+
 - **`conflictBehavior`:** Bei `SKIP` entfällt ein Termin, solange das Ziel noch einen Lauf in `RUNNING`
   oder `PAUSED` hat: `nextRunAt` springt auf das nächste Vorkommen, ein einmaliger Zeitplan (`ONCE`,
   `DELAYED`) verfällt, das Activity-Log vermerkt „Schedule skipped (previous run still in progress)“.
@@ -1794,6 +1797,9 @@ Neuen Todo-Trigger erstellen.
 | `processBacklog` | Nein | Bei Erstellung bestehende passende TODOs abarbeiten (Default: true) |
 | `contextTemplate` | Nein | Statische Context-Variablen, gemerged mit TODO-Daten |
 
+`sourceFilter` und `minPriority` werden in beliebiger Schreibweise angenommen und als Konstante
+gespeichert; ein anderer Wert → `400`, die Meldung nennt die erlaubten Werte.
+
 **Response:** `201` mit `TodoTriggerResponse`
 
 **TodoTriggerResponse-Felder:** `id`, `tagPattern`, `projectId`, `sourceFilter`, `minPriority`, `targetWorkflowId`, `targetWorkflowName`, `contextTemplate`, `enabled`, `maxAttempts`, `autoClose`, `processBacklog`, `description`, `lastTriggeredAt`, `triggerCount`, `createdAt`
@@ -2263,6 +2269,10 @@ Anwendungs-Einstellung setzen.
 ```
 
 **Response:** `200 OK`
+
+`backup-retain-count` nimmt 1–365; ein anderer Wert → `400`, gespeichert wird dann nichts. Der
+gespeicherte Wert gilt ab der nächsten Rotation und nach einem Neustart weiter (sonst
+`automation.backup.retain-count`).
 
 ### `GET /api/v1/system/tray-config`
 

@@ -63,4 +63,15 @@ class CalendarParamsTest {
         assertThatThrownBy(() -> CalendarParams.readBounded(new ByteArrayInputStream(new byte[11]), 10, "Feed"))
                 .isInstanceOf(IllegalStateException.class).hasMessageStartingWith("Feed exceeds the size limit");
     }
+
+    /** ac639b39: a JSON number is read like its text — 1.5 is not cut to 1, nothing wraps around. */
+    @Test
+    void paramInt_readsANumberLikeItsText() {
+        assertThat(CalendarParams.paramInt(Map.of("limit", " 7 "), "limit", 1)).isEqualTo(7);
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L}) {
+            assertThatThrownBy(() -> CalendarParams.paramInt(Map.of("limit", bad), "limit", 1))
+                    .as(String.valueOf(bad))
+                    .hasMessage("Parameter 'limit' must be a number");
+        }
+    }
 }

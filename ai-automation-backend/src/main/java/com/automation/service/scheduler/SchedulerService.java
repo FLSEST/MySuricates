@@ -99,12 +99,11 @@ public class SchedulerService {
 
         ScheduleType type = definitionParser.parseScheduleType(scheduleType);
 
-        ScheduledWorkflow.ConflictBehavior conflictBehavior = ScheduledWorkflow.ConflictBehavior.SKIP;
-        if (conflictBehaviorStr != null && !conflictBehaviorStr.isBlank()) {
-            try {
-                conflictBehavior = ScheduledWorkflow.ConflictBehavior.valueOf(conflictBehaviorStr.toUpperCase());
-            } catch (IllegalArgumentException ignored) {}
-        }
+        // Missing means SKIP; an unknown value fails like on update instead of quietly becoming SKIP
+        // (TODO a9bf13d5).
+        ScheduledWorkflow.ConflictBehavior conflictBehavior = conflictBehaviorStr == null || conflictBehaviorStr.isBlank()
+                ? ScheduledWorkflow.ConflictBehavior.SKIP
+                : definitionParser.parseConflictBehavior(conflictBehaviorStr);
 
         ScheduledWorkflow.ScheduledWorkflowBuilder builder = ScheduledWorkflow.builder()
                 .targetType(targetType)

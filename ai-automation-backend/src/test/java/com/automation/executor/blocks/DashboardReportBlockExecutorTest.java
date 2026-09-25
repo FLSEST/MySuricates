@@ -84,9 +84,25 @@ class DashboardReportBlockExecutorTest {
         StepResult step = executor.execute(block(config), ctx);
 
         assertThat(step.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(step.getOutput()).contains("RED").contains("2");
+        assertThat(step.getOutput()).isEqualTo("✓ Dashboard report RED · title · 0 KPIs · 2 items");
         assertThat(step.getOutput()).doesNotContain(SECRET).doesNotContain("finding one");
         assertThat(step.getOutput().toLowerCase(java.util.Locale.ROOT)).doesNotContain("dashboard_widget");
+    }
+
+    /** a4e39160: English like every other block's output — the UI translates, not the server. */
+    @Test
+    void the_step_output_is_english_and_counts_in_singular_and_plural() {
+        Map<String, Object> full = new LinkedHashMap<>();
+        full.put("status", "GREEN");
+        full.put("title", "Nightly QA");
+        full.put("kpis", List.of(Map.of("label", "Hunts", "value", "1361")));
+        full.put("items", List.of("one finding"));
+        full.put("summary", "All good.");
+
+        assertThat(executor.execute(block(full), context()).getOutput())
+                .isEqualTo("✓ Dashboard report GREEN · title · 1 KPI · 1 item · summary");
+        assertThat(executor.execute(block(Map.of("status", "GREEN")), context()).getOutput())
+                .isEqualTo("✓ Dashboard report GREEN · 0 KPIs · 0 items");
     }
 
     @Test
@@ -99,7 +115,8 @@ class DashboardReportBlockExecutorTest {
         StepResult step = executor.execute(block(config), ctx);
 
         assertThat(step.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(step.getOutput()).contains("summary").doesNotContain(SECRET);
+        assertThat(step.getOutput()).startsWith("dashboard-report failed: ")
+                .contains("summary").doesNotContain(SECRET);
         assertThat(ctx.getRunMetadata()).doesNotContainKey(DashboardWidgetResultParser.METADATA_KEY);
     }
 

@@ -1,10 +1,12 @@
 package com.automation.service.system;
 
 import com.automation.config.BackupConfig;
+import com.automation.repository.AppSettingsRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.context.ApplicationEventPublisher;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -13,6 +15,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -27,6 +30,7 @@ class DatabaseBackupServiceTest {
     private DataSource dataSource;
     private ActivityLogService activityLogService;
     private BackupConfig backupConfig;
+    private AppSettingsRepository appSettingsRepository;
     private DatabaseBackupService service;
 
     @BeforeEach
@@ -50,7 +54,9 @@ class DatabaseBackupServiceTest {
         backupConfig.setRetainCount(3);
         backupConfig.setDirectory(backupDir.toString());
 
-        service = new DatabaseBackupService(dataSource, backupConfig, activityLogService);
+        appSettingsRepository = mock(AppSettingsRepository.class);
+        service = new DatabaseBackupService(dataSource, backupConfig, activityLogService,
+                new SystemSettingsService(appSettingsRepository, backupConfig, mock(ApplicationEventPublisher.class)));
         // Inject datasource URL via reflection
         var field = DatabaseBackupService.class.getDeclaredField("datasourceUrl");
         field.setAccessible(true);
@@ -102,6 +108,24 @@ class DatabaseBackupServiceTest {
         assertThat(deleted).isEqualTo(2);
         List<DatabaseBackupService.BackupInfo> remaining = service.listBackups();
         assertThat(remaining).hasSize(3);
+    }
+
+    /**
+     * 205ebd8f: the stored backup-retain-count counts, read at rotation time — after a restart too,
+     * where it used to fall back to automation.backup.retain-count (here 3) until the next change.
+     */
+    @Test
+    void rotateBackups_keepsTheStoredRetainCount_notTheConfiguredOne() throws Exception {
+        when(appSettingsRepository.get("backup-retain-count")).thenReturn(Optional.of("4"));
+        for (int i = 0; i < 6; i++) {
+            Files.writeString(backupDir.resolve("mysuricates-backup-2025-01-0" + (i + 1) + "_02-00-00.db"), "backup " + i);
+            Thread.sleep(50);
+        }
+
+        int deleted = service.rotateBackups();
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(service.listBackups()).hasSize(4);
     }
 
     @Test

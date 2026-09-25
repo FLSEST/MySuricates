@@ -10,12 +10,12 @@ import com.automation.repository.GoalRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.service.ai.ReasoningEffort;
 import com.automation.service.todo.TodoResponseAssembler;
+import com.automation.util.EnumParameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Locale;
 
 /**
  * Einordnung und Einschaetzung eines einzelnen TODOs (TODO dc0566f8): Ziel, Rang, Komplexitaet,
@@ -106,15 +106,9 @@ public class TodoPlanningService {
         todo.setMilestoneId(milestoneId);
     }
 
+    /** {@code ""} clears the rating; an unknown value names S, M, L and XL (EnumParameter, TODO a9bf13d5). */
     static Todo.Complexity parseComplexity(String value) {
-        if (value.isBlank()) {
-            return null;
-        }
-        try {
-            return Todo.Complexity.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("complexity muss S, M, L oder XL sein, nicht '" + value + "'");
-        }
+        return EnumParameter.parseOptional(Todo.Complexity.class, "complexity", value);
     }
 
     static String parseEffort(String value) {

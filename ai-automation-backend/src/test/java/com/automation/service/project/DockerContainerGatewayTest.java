@@ -17,6 +17,7 @@ import com.github.dockerjava.api.command.RemoveContainerCmd;
 import com.github.dockerjava.api.command.StartContainerCmd;
 import com.github.dockerjava.api.command.StopContainerCmd;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.exception.NotModifiedException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,6 +125,36 @@ class DockerContainerGatewayTest {
                     .containsExactly(
                             tuple(Level.DEBUG, "Container c1 already gone on stop: Status 404: No such container: c1"),
                             tuple(Level.WARN, "Failed to remove container c1: Status 500: driver failed"));
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(appender);
+        }
+    }
+
+    /** 8ae2d8e0: stopping a container that is already stopped answers 304 — same noise as the 404, DEBUG. */
+    @Test
+    void remove_logsAnAlreadyStoppedContainerAtDebug_andStillRemovesIt() {
+        Logger logger = (Logger) LoggerFactory.getLogger(DockerContainerGateway.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try {
+            StopContainerCmd stop = mock(StopContainerCmd.class);
+            when(stop.withTimeout(anyInt())).thenReturn(stop);
+            when(stop.exec()).thenThrow(new NotModifiedException("container already stopped"));
+            when(dockerClient.stopContainerCmd("c1")).thenReturn(stop);
+            RemoveContainerCmd remove = mock(RemoveContainerCmd.class);
+            when(remove.withForce(true)).thenReturn(remove);
+            when(dockerClient.removeContainerCmd("c1")).thenReturn(remove);
+
+            gateway.remove("c1");
+
+            verify(remove).exec();
+            assertThat(appender.list).extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
+                    .containsExactly(tuple(Level.DEBUG,
+                            "Container c1 already stopped on stop: Status 304: container already stopped"));
         } finally {
             logger.setLevel(previous);
             logger.detachAppender(appender);

@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.slack;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -33,16 +35,10 @@ final class SlackParams {
         return val == null || val.toString().isBlank() ? null : val.toString().trim();
     }
 
-    /** Integer in {@code [min, max]}, {@code defaultValue} when absent. */
+    /** Integer in {@code [min, max]}, {@code defaultValue} when absent; read like its text ({@link IntegrationParams}). */
     static int boundedInt(Map<String, Object> params, String key, int min, int max, int defaultValue) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) return defaultValue;
-        int n;
-        try {
-            n = val instanceof Number num ? num.intValue() : Integer.parseInt(val.toString().trim());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Parameter '" + key + "' must be a number");
-        }
+        Integer n = IntegrationParams.optionalInt(params.get(key), key);
+        if (n == null) return defaultValue;
         if (n < min || n > max) {
             throw new IllegalArgumentException("Parameter '" + key + "' must be between " + min + " and " + max);
         }

@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.openmeteo;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -125,17 +127,18 @@ final class OpenMeteoParams {
         if (vars != null) q.put(key, String.join(",", vars));
     }
 
+    /**
+     * Read like its text ({@link IntegrationParams}): 5.0 fails like "5.0" always did, and a whole
+     * number beyond int fails instead of wrapping around ({@code 4294967297} used to become 1).
+     */
     private static int intParam(Object value, int defaultValue, String key) {
-        if (value == null || value.toString().isBlank()) return defaultValue;
-        if (value instanceof Number n) {
-            if (n.doubleValue() != Math.rint(n.doubleValue())) throw new IllegalArgumentException("Parameter '" + key + "' must be a whole number");
-            return n.intValue();
-        }
+        Integer parsed;
         try {
-            return Integer.parseInt(value.toString().trim());
+            parsed = IntegrationParams.parseInt(value);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Parameter '" + key + "' must be a whole number: " + value);
         }
+        return parsed != null ? parsed : defaultValue;
     }
 
     private static String plain(double d) {

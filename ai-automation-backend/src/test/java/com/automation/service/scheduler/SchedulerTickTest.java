@@ -15,6 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.availability.AvailabilityChangeEvent;
+import org.springframework.boot.availability.ReadinessState;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -50,10 +52,9 @@ class SchedulerTickTest {
     @BeforeEach
     void setUp() {
         catchUpQueue = new CatchUpQueue(activityLogService);
-        tick = new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService, schedulerConfig,
-                maintenanceMode, suspendState,
-                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode),
-                catchUpQueue, clock);
+        tick = newTick();
+        // The tests below are about ticks of a running application (aa51d221: closed before that).
+        tick.openAfterStartupCleanup(new AvailabilityChangeEvent<>(this, ReadinessState.ACCEPTING_TRAFFIC));
 
         testWorkflow = Workflow.builder()
                 .id("wf-1")
@@ -69,6 +70,61 @@ class SchedulerTickTest {
                 .description("Hourly run")
                 .inputContext(Map.of("key", "value"))
                 .build();
+    }
+
+    private SchedulerTick newTick() {
+        return new SchedulerTick(scheduledRepository, scheduledExecutor, activityLogService, schedulerConfig,
+                maintenanceMode, suspendState,
+                new ScheduleSkipPolicy(schedulerConfig, scheduledRepository, activityLogService, maintenanceMode),
+                catchUpQueue, clock);
+    }
+
+    // --- start gate (TODO aa51d221) ---
+
+    /**
+     * Spring fires the first tick at ContextRefreshedEvent, before the ApplicationReadyEvent cleanup
+     * of the previous lifecycle's RUNNING runs. That tick must touch nothing.
+     */
+    @Test
+    void beforeTheStartupCleanup_aTickTouchesNothing() {
+        SchedulerTick fresh = newTick();
+
+        fresh.checkAndExecuteScheduled();
+
+        verifyNoInteractions(scheduledRepository, scheduledExecutor, activityLogService, maintenanceMode, suspendState);
+    }
+
+    @Test
+    void onlyAcceptingTraffic_opensTheTick() {
+        SchedulerTick fresh = newTick();
+        when(scheduledRepository.findDueSchedules(any(Instant.class))).thenReturn(List.of());
+
+        fresh.openAfterStartupCleanup(new AvailabilityChangeEvent<>(this, ReadinessState.REFUSING_TRAFFIC));
+        fresh.checkAndExecuteScheduled();
+        verifyNoInteractions(scheduledRepository);
+
+        fresh.openAfterStartupCleanup(new AvailabilityChangeEvent<>(this, ReadinessState.ACCEPTING_TRAFFIC));
+        fresh.checkAndExecuteScheduled();
+        verify(scheduledRepository).findDueSchedules(FIXED_NOW);
+    }
+
+    /** Skipped ticks do not count as ticks: the first one after opening still handles the cold start. */
+    @Test
+    void theFirstTickAfterOpening_isStillTheColdStart() {
+        SchedulerTick fresh = newTick();
+        ReflectionTestUtils.setField(fresh, "startedAt", FIXED_NOW.minus(10, ChronoUnit.MINUTES));
+        ScheduledWorkflow missed = cronSchedule("missed", FIXED_NOW.minus(1, ChronoUnit.HOURS), true);
+        when(schedulerConfig.getResumeGraceMinutes()).thenReturn(5L);
+        when(scheduledRepository.findDueSchedules(FIXED_NOW)).thenReturn(List.of(missed));
+        when(scheduledExecutor.executeSingleSchedule("missed")).thenReturn(java.util.Optional.of(
+                new ScheduledWorkflowExecutor.ScheduledRunRef("run-missed", ScheduledWorkflow.TargetType.WORKFLOW)));
+
+        fresh.checkAndExecuteScheduled();
+        fresh.openAfterStartupCleanup(new AvailabilityChangeEvent<>(this, ReadinessState.ACCEPTING_TRAFFIC));
+        fresh.checkAndExecuteScheduled();
+
+        verify(scheduledExecutor).executeSingleSchedule("missed");
+        verify(activityLogService).warn(eq(LogCategory.SCHEDULE), contains("Cold start detected"), eq("SchedulerService"));
     }
 
     @Test

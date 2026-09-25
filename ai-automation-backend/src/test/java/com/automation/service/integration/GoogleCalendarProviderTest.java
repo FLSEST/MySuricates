@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.*;
 
 class GoogleCalendarProviderTest {
@@ -54,36 +56,47 @@ class GoogleCalendarProviderTest {
 
     @Test
     void unknownActionThrows() {
-        assertThatThrownBy(() -> provider.executeAction("unknown_action", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("unknown_action", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unknown_action");
     }
 
     @Test
     void createEventRequiresParams() {
-        assertThatThrownBy(() -> provider.executeAction("create_event", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("create_event", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("summary");
     }
 
     @Test
     void getEventRequiresEventId() {
-        assertThatThrownBy(() -> provider.executeAction("get_event", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("get_event", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("eventId");
     }
 
     @Test
     void deleteEventRequiresEventId() {
-        assertThatThrownBy(() -> provider.executeAction("delete_event", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("delete_event", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("eventId");
     }
 
     @Test
     void getFreeBusyRequiresTimeParams() {
-        assertThatThrownBy(() -> provider.executeAction("get_free_busy", java.util.Map.of(), "token"))
+        assertThatThrownBy(() -> provider.executeAction("get_free_busy", Map.of(), "token"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("timeMin");
+    }
+
+    /** ac639b39: maxResults 1.5 used to become 1 and 2^32 + 10 became 10 — read like its text, before any request. */
+    @Test
+    void listEvents_readsMaxResultsLikeItsText() {
+        for (Object bad : new Object[] {1.5, 4_294_967_306L}) {
+            assertThatThrownBy(() -> provider.executeAction("list_events", Map.of("maxResults", bad), "token"))
+                    .as(String.valueOf(bad))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Parameter 'maxResults' must be a number");
+        }
     }
 }

@@ -64,6 +64,14 @@ class AssistantTodoToolsTest {
     }
 
     @Test
+    void createTodo_priorityIsTrimmed_andANullPriorityIsMedium() {
+        when(todoService.create(any())).thenReturn(Todo.builder().id("id").title("T").build());
+
+        assertThat(tools.createTodo("{\"title\":\"T\",\"priority\":\" critical \"}")).contains("(priority: CRITICAL");
+        assertThat(tools.createTodo("{\"title\":\"T\",\"priority\":null}")).contains("(priority: MEDIUM");
+    }
+
+    @Test
     void createTodo_missingOrBlankTitle_errorLine() {
         assertThat(tools.createTodo("{}")).isEqualTo("⚠ Could not create todo: title is missing.");
         assertThat(tools.createTodo("{\"title\":\"  \"}")).isEqualTo("⚠ Could not create todo: title is missing.");
@@ -98,11 +106,18 @@ class AssistantTodoToolsTest {
                 .isEqualTo("⚠ update_todo_status: id and status are required fields.");
     }
 
+    /** a9bf13d5: the allowed values come from the enum — the hand-written list lacked ARCHIVED. */
     @Test
     void updateTodoStatus_invalidStatus_errorLine() {
         assertThat(tools.updateTodoStatus("{\"id\":\"x\",\"status\":\"nope\"}"))
-                .isEqualTo("⚠ Invalid status: nope. Allowed: OPEN, IN_PROGRESS, DONE, BACKLOG");
+                .isEqualTo("⚠ Invalid status: status muss OPEN, IN_PROGRESS, DONE, BACKLOG oder ARCHIVED sein, nicht 'nope'");
         verify(todoService, never()).updateStatus(any(), any());
+    }
+
+    @Test
+    void updateTodoStatus_statusIsTrimmed() {
+        assertThat(tools.updateTodoStatus("{\"id\":\"123456789\",\"status\":\" in_progress \"}"))
+                .isEqualTo("✓ Todo status updated: IN_PROGRESS (ID: 12345678…)");
     }
 
     @Test
