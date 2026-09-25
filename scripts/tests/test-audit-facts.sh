@@ -758,6 +758,107 @@ check "@EventListener(classes = {…}) ueber zwei Zeilen: Startlauf, kein N+1" \
   'grep -qx "FAKT startup_repository_loop_count: 1" "$TMP/perf-facts4.out" \
      && grep -qx "FAKT repository_loop_count: 0" "$TMP/perf-facts4.out"'
 
+echo "6f) Performance-Audit: Index-Abgleich je Tabelle (a851c42b)"
+# Global nach Spaltenname galt capabilities.skill_id als indiziert, weil skill_versions einen Index auf
+# skill_id hat. Jetzt zaehlt nur ein Index der eigenen Tabelle (Repository -> Entity -> @Table, sonst der
+# Klassenname), und zwar nach allen Migrationen in Flyway-Reihenfolge: V2 baut jobs um, der Index auf
+# status faellt mit der alten Tabelle weg, der auf queue kommt mit jobs_new; V10 (nach V2, nicht davor)
+# loescht den Index auf team. Ein Repository ohne Entity bleibt beim Abgleich ueber alle Tabellen.
+FIX5="$TMP/fixture-index"
+MAIN5="$FIX5/ai-automation-backend/src/main/java/com/automation"
+MIG5="$FIX5/ai-automation-backend/src/main/resources/db/migration"
+mkdir -p "$MAIN5/entity" "$MAIN5/repository" "$MIG5"
+cat > "$MAIN5/entity/Capability.java" <<'JAVA'
+package com.automation.entity;
+
+/** Nur im Kommentar: @Table(name = "skill_versions") */
+@Entity
+@Table(name = "capabilities")
+public class Capability {
+}
+JAVA
+cat > "$MAIN5/entity/SkillVersion.java" <<'JAVA'
+package com.automation.entity;
+
+@Entity
+@Table(uniqueConstraints = @UniqueConstraint(name = "uk_skill_versions", columnNames = {"skill_id", "version"}),
+        name = "skill_versions")
+public class SkillVersion {
+}
+JAVA
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' 'public class WorkItem {' '}' > "$MAIN5/entity/WorkItem.java"
+printf '%s\n' 'package com.automation.entity;' '' '@Entity' '@Table(name = "jobs")' 'public class Job {' '}' \
+  > "$MAIN5/entity/Job.java"
+cat > "$MAIN5/repository/CapabilityRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface CapabilityRepository extends JpaRepository<Capability, String> {
+    java.util.List<Capability> findBySkillId(String skillId);
+}
+JAVA
+cat > "$MAIN5/repository/SkillVersionRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface SkillVersionRepository extends JpaRepository<SkillVersion, String>,
+        JpaSpecificationExecutor<SkillVersion> {
+    java.util.List<SkillVersion> findBySkillIdOrderByVersionDesc(String skillId);
+}
+JAVA
+cat > "$MAIN5/repository/WorkItemRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface WorkItemRepository extends JpaRepository<WorkItem, String> {
+    java.util.List<WorkItem> findByOwner(String owner);
+    java.util.List<WorkItem> findBySkillId(String skillId);
+    java.util.List<WorkItem> findByTeam(String team);
+}
+JAVA
+cat > "$MAIN5/repository/JobRepository.java" <<'JAVA'
+package com.automation.repository;
+
+public interface JobRepository extends JpaRepository<Job, String> {
+    java.util.List<Job> findByStatus(String status);
+    java.util.List<Job> findByQueue(String queue);
+}
+JAVA
+printf '%s\n' 'package com.automation.repository;' '' 'interface LegacyRepository {' \
+  '    java.util.List<Object> findByQueue(String queue);' '}' > "$MAIN5/repository/LegacyRepository.java"
+cat > "$MIG5/V1__init.sql" <<'SQL'
+CREATE TABLE capabilities (id TEXT PRIMARY KEY, skill_id TEXT);
+CREATE TABLE skill_versions (id TEXT PRIMARY KEY, skill_id TEXT, version INTEGER);
+CREATE INDEX idx_skill_versions_skill ON skill_versions(skill_id);
+CREATE TABLE work_item (id TEXT PRIMARY KEY, owner TEXT, skill_id TEXT, team TEXT);
+CREATE INDEX idx_work_item_owner ON work_item(owner);
+CREATE INDEX idx_work_item_team ON work_item(team);
+CREATE TABLE jobs (id TEXT PRIMARY KEY, status TEXT, queue TEXT);
+CREATE INDEX idx_jobs_status ON jobs(status);
+SQL
+cat > "$MIG5/V2__rebuild_jobs.sql" <<'SQL'
+-- CREATE INDEX idx_capabilities_skill ON capabilities(skill_id);
+CREATE TABLE jobs_new (id TEXT PRIMARY KEY, status TEXT, queue TEXT);
+CREATE INDEX idx_jobs_new_queue ON jobs_new(queue);
+INSERT INTO jobs_new SELECT id, status, queue FROM jobs;
+DROP TABLE jobs;
+ALTER TABLE jobs_new RENAME TO jobs;
+SQL
+printf '%s\n' 'DROP INDEX IF EXISTS idx_work_item_team;' > "$MIG5/V10__drop_team_index.sql"
+printf '%s' "$FIX5" > "$TMP/base5.txt"
+render "$PERF" name:facts "$(json_values project_path="$TMP/base5.txt" request_metrics=)" > "$TMP/perf-facts5.sh"
+PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts5.sh" > "$TMP/perf-facts5.out" 2> "$TMP/perf-facts5.err"
+check "laeuft ohne stderr" '[ ! -s "$TMP/perf-facts5.err" ]'
+check "Index einer anderen Tabelle zaehlt nicht (capabilities.skill_id), auch nicht mit Default-Tabellenname" \
+  'grep -qx "TREFFER unindexed_findby_column: skill_id (CapabilityRepository.java -> capabilities, WorkItemRepository.java -> work_item)" "$TMP/perf-facts5.out"'
+check "Umbau: der Index der alten Tabelle faellt mit ihr weg" \
+  'grep -qx "TREFFER unindexed_findby_column: status (JobRepository.java -> jobs)" "$TMP/perf-facts5.out"'
+check "DROP INDEX in V10 wirkt nach V2, nicht davor" \
+  'grep -qx "TREFFER unindexed_findby_column: team (WorkItemRepository.java -> work_item)" "$TMP/perf-facts5.out"'
+check "FAKT unindexed_findby_columns_count: 3" 'grep -qx "FAKT unindexed_findby_columns_count: 3" "$TMP/perf-facts5.out"'
+check "eigener Index, umbenannter Index und @Table mit name an zweiter Stelle tragen" \
+  '! grep -qE "^TREFFER unindexed_findby_column: (owner|queue|version) |SkillVersionRepository" "$TMP/perf-facts5.out"'
+check "Repository ohne Entity: gegen alle Tabellen gehalten und genannt" \
+  'grep -qx "# Ohne Tabellen-Zuordnung, gegen alle Tabellen gehalten: LegacyRepository.java" "$TMP/perf-facts5.out"'
+check "FAKT migration_index_statements: 5" 'grep -qx "FAKT migration_index_statements: 5" "$TMP/perf-facts5.out"'
+
 echo "7) Performance-Audit: Gate prueft die Pflicht-Fakten deterministisch"
 run_perf_gate() {  # $1 = faktenblatt-datei
   GATE_VALUES="$(json_values block.report.output="$TMP/report-green.txt" block.facts.output="$1")"
