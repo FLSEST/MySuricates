@@ -30,6 +30,9 @@ public interface PlatformVariableSource {
     /** The variables this source sets for the run; empty when it does not apply — then none is set. Must not throw. */
     List<String> names(Request request);
 
-    /** Their values by name. May throw: every name of {@link #names} then states the gap. */
+    /**
+     * Their values by name, never {@code null} — a value that cannot be had is stated, not left out.
+     * May throw: every name of {@link #names} then states the gap.
+     */
     Map<String, String> load(Request request);
 }
