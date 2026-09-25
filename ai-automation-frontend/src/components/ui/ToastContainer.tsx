@@ -4,6 +4,8 @@ import { CheckCircle2, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { useToastStore, type Toast, type ToastType } from '../../stores/toastStore';
 
 const AUTO_DISMISS_MS = 4000;
+/** A toast with a button stays longer: time to read it and to reach the button. */
+const ACTION_DISMISS_MS = 8000;
 
 const icons: Record<ToastType, React.ReactNode> = {
   success: <CheckCircle2 className="w-5 h-5 text-success" />,
@@ -23,6 +25,8 @@ function ToastItem({ toast }: { toast: Toast }) {
   const removeToast = useToastStore((s) => s.removeToast);
   const [exiting, setExiting] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const { action } = toast;
+  const dismissMs = action ? ACTION_DISMISS_MS : AUTO_DISMISS_MS;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -35,16 +39,16 @@ function ToastItem({ toast }: { toast: Toast }) {
     const timer = setTimeout(() => {
       setExiting(true);
       setTimeout(() => removeToast(toast.id), 200);
-    }, AUTO_DISMISS_MS);
+    }, dismissMs);
     return () => clearTimeout(timer);
-  }, [toast.id, removeToast]);
+  }, [toast.id, removeToast, dismissMs]);
 
   const handleClose = () => {
     setExiting(true);
     setTimeout(() => removeToast(toast.id), 200);
   };
 
-  const progress = Math.min(elapsed / AUTO_DISMISS_MS, 1);
+  const progress = Math.min(elapsed / dismissMs, 1);
 
   return (
     <div
@@ -54,6 +58,18 @@ function ToastItem({ toast }: { toast: Toast }) {
     >
       <div className="shrink-0 mt-0.5">{icons[toast.type]}</div>
       <p className="flex-1 text-sm text-text leading-snug">{toast.message}</p>
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            action.onClick();
+            handleClose();
+          }}
+          className="shrink-0 text-sm font-medium text-accent hover:underline"
+        >
+          {action.label}
+        </button>
+      )}
       <button
         onClick={handleClose}
         className="shrink-0 p-0.5 rounded-md text-text-tertiary hover:text-text transition-colors"
