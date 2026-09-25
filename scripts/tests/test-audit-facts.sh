@@ -663,6 +663,12 @@ head -c 1024 /dev/zero | tr '\0' 'x' > "$FE3/dist/assets/index-abc.js"
 head -c 2048 /dev/zero | tr '\0' 'm' > "$FE3/dist/assets/monaco-def.js"
 printf '%s\n' '<script type="module" crossorigin src="/assets/index-abc.js"></script>' \
   '<link rel="modulepreload" crossorigin href="/assets/monaco-def.js">' > "$FE3/dist/index.html"
+# Weitere Eingaben des Builds: die Vorlage index.html, public/ und das Lockfile — zunaechst alt.
+mkdir -p "$FE3/public"
+echo '<div id="root"></div>' > "$FE3/index.html"
+echo '<svg/>' > "$FE3/public/logo.svg"
+echo '{}' > "$FE3/package-lock.json"
+touch -d '2026-09-01 12:00:00' "$FE3/index.html" "$FE3/public/logo.svg" "$FE3/package-lock.json"
 printf '%s' "$FIX3" > "$TMP/base3.txt"
 render "$PERF" name:facts "$(json_values project_path="$TMP/base3.txt" request_metrics=)" > "$TMP/perf-facts3.sh"
 run_dist_case() {  # $1 = Fall, $2..$4 = mtime von dist/index.html, src/app.tsx, vite.config.ts
@@ -683,6 +689,14 @@ check "src juenger als dist: laeuft ohne stderr" '[ ! -s "$TMP/perf-dist-src.err
 run_dist_case vite '2026-09-23 10:00:00' '2026-09-22 08:00:00' '2026-09-24 17:05:00'
 check "nur vite.config.ts juenger: ebenfalls veraltet" \
   'bundle_gaps "$TMP/perf-dist-vite.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < vite.config.ts 2026-09-24T17:05:00 — vor dem Audit npm run build"'
+for SOURCE in index.html public/logo.svg package-lock.json; do
+  run_dist_case other '2026-09-23 10:00:00' '2026-09-22 08:00:00' '2026-09-22 08:00:00'
+  touch -d '2026-09-24 12:00:00' "$FE3/$SOURCE"
+  PATH="$TMP/fakebin:$PATH" bash "$TMP/perf-facts3.sh" > "$TMP/perf-dist-other.out" 2>/dev/null
+  check "nur $SOURCE juenger: ebenfalls veraltet" \
+    'bundle_gaps "$TMP/perf-dist-other.out" "dist veraltet: dist/index.html 2026-09-23T10:00:00 < $SOURCE 2026-09-24T12:00:00 — vor dem Audit npm run build"'
+  touch -d '2026-09-01 12:00:00' "$FE3/$SOURCE"
+done
 run_dist_case fresh '2026-09-25 10:00:00' '2026-09-25 09:13:40' '2026-09-24 17:05:00'
 check "Gegenprobe: nach dem Bauen wird das Bundle gemessen" 'grep -qx "FAKT frontend_bundle_js_bytes: 3072" "$TMP/perf-dist-fresh.out"'
 check "Gegenprobe: der monaco-Preload wird gemessen" \
