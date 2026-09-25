@@ -11,7 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Haelt verwaltete TODOs im Takt ihrer Findings: ein managed TODO ist genau dann {@code DONE},
@@ -42,16 +45,32 @@ public class ManagedTodoReconciler {
      * @return Anzahl der TODOs, deren Status sich dadurch geaendert hat
      */
     public int reconcile(List<AuditFindingTodo> links) {
+        List<String> todoIds = links.stream().filter(AuditFindingTodo::isManaged)
+                .map(AuditFindingTodo::getTodoId).distinct().toList();
+        if (todoIds.isEmpty()) {
+            return 0;
+        }
+        // Je Stufe eine Abfrage statt drei je Verknuepfung (TODO 8c791a45, wie ManagedTodoWriter):
+        // TODOs, ihre Verknuepfungen und deren Findings werden gebuendelt geladen.
+        Map<String, Todo> todos = todoRepository.findAllById(todoIds).stream()
+                .collect(Collectors.toMap(Todo::getId, Function.identity()));
+        if (todos.isEmpty()) {
+            return 0;
+        }
+        Map<String, List<AuditFindingTodo>> linksByTodo = findingTodoRepository.findByTodoIdIn(todos.keySet())
+                .stream().collect(Collectors.groupingBy(AuditFindingTodo::getTodoId));
+        List<String> findingIds = linksByTodo.values().stream().flatMap(List::stream)
+                .map(AuditFindingTodo::getFindingId).distinct().toList();
+        Map<String, AuditFinding> findings = findingIds.isEmpty() ? Map.of()
+                : findingRepository.findAllById(findingIds).stream()
+                        .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
         int changed = 0;
-        for (AuditFindingTodo link : links) {
-            if (!link.isManaged()) {
-                continue;
-            }
-            Todo todo = todoRepository.findById(link.getTodoId()).orElse(null);
+        for (String todoId : todoIds) {
+            Todo todo = todos.get(todoId);
             if (todo == null) {
                 continue;
             }
-            Todo.Status target = nextStatus(todo, allTerminal(todo.getId()));
+            Todo.Status target = nextStatus(todo, allTerminal(linksByTodo.getOrDefault(todoId, List.of()), findings));
             if (target == null || todo.getStatus() == target) {
                 continue;
             }
@@ -78,9 +97,10 @@ public class ManagedTodoReconciler {
         return todo.getStatus() == Todo.Status.DONE ? Todo.Status.OPEN : null;
     }
 
-    private boolean allTerminal(String todoId) {
-        return findingTodoRepository.findByTodoId(todoId).stream()
-                .map(link -> findingRepository.findById(link.getFindingId()).orElse(null))
+    /** Alle Verknuepfungen des TODOs, ob verwaltet oder nicht; ein geloeschtes Finding zaehlt nicht. */
+    private static boolean allTerminal(List<AuditFindingTodo> todoLinks, Map<String, AuditFinding> findings) {
+        return todoLinks.stream()
+                .map(link -> findings.get(link.getFindingId()))
                 .filter(Objects::nonNull)
                 .allMatch(finding -> finding.getStatus().isTerminal());
     }

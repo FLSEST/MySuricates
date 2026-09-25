@@ -462,9 +462,13 @@ class AuditCenterServiceTest {
         when(findingRepository.findById(FINDING_ID)).thenReturn(Optional.of(finding));
         when(findingRepository.save(finding)).thenReturn(finding);
         when(findingTodoRepository.findByFindingId(FINDING_ID)).thenReturn(List.of(link));
-        when(findingTodoRepository.findByTodoId(TODO_ID)).thenReturn(List.of(link));
-        when(todoRepository.findById(TODO_ID)).thenReturn(Optional.of(todo));
+        // Der Abgleich laedt TODOs, Verknuepfungen und Findings gebuendelt (8c791a45) ...
+        when(todoRepository.findAllById(List.of(TODO_ID))).thenReturn(List.of(todo));
+        when(findingTodoRepository.findByTodoIdIn(Set.of(TODO_ID))).thenReturn(List.of(link));
+        when(findingRepository.findAllById(List.of(FINDING_ID))).thenReturn(List.of(finding));
+        // ... die Antwort danach die Verknuepfungen fuer die Anzeige.
         when(findingTodoRepository.findByFindingIdIn(List.of(FINDING_ID))).thenReturn(List.of());
+        when(todoRepository.findAllById(List.of())).thenReturn(List.of());
 
         AuditFindingResponse response = service.updateFinding(FINDING_ID, AuditFindingStatus.DISMISSED, "Fehlalarm");
 
