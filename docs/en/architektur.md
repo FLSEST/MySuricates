@@ -515,6 +515,16 @@ Audit Workflow → AutoTodoService → TODO (OPEN)
 - **Context variables** for fix workflow: `todo_id`, `todo_title`, `todo_description`, `todo_tags`, `todo_priority`, `todo_project_id`, `todo_trigger_id`
 - **Distinction — manual todo-workflow link**: The `TodoTrigger` starts workflows rule-based and automatically. Separately, a single todo can optionally be linked to a **resolver workflow** (`linkedWorkflowId`, set in the todo view) — the workflow meant to complete this one todo. The link is not global and starts nothing by itself: only the manual `Resolve` action starts the run, the todo then moves to `IN_PROGRESS` with `resolutionState=RUNNING`, is set to `DONE` automatically on success, and falls back to its previous status on a failed run (`resolutionState=FAILED`).
 
+## TODO batch — work through at night, approve in the morning
+
+A chain of two pool workflows (`scope: repo`, TODO cc0eb3ba) works through open TODOs of the own project – one after another in **one** isolated clone, with one approval for the whole batch.
+
+- **Triage** (`mysuricates-todo-batch-einordnen`): closes handed-over TODOs whose commit (trailer `Todo: <uuid>`) has reached `main`; releases orphaned ones; selects at most `batch_max` TODOs from **one** area with one AI call (opus, effort high) and sets `batch:selected`. Without candidates or while a batch is running, the AI call is skipped (`run_if`).
+- **Work through** (`mysuricates-todo-batch-abarbeiten`): baseline green? → implement each TODO (foreach, one commit with trailer) → mapping, guards (`forbidden_paths`, line limit) and gates (pre-push gate without build, backend/frontend suite by area), on red a linear re-check → review per TODO (Codex, read-only; a blocker takes the TODO out) → overall review (hints only) → report → approval → hand-over as `refs/heads/mysuricates/batch-<run8>` into the source repository. Merging stays manual; the next triage closes the TODOs.
+- **State on the TODO:** `batch:selected` → IN_PROGRESS → `batch:handed-over` → DONE; `batch:failed` / `batch:rejected` with a note keep a TODO out of further batches until a person removes the tag.
+- **Platform building blocks:** `{{ todo_details }}`, `todo-update` with `updates`, `run_if`, `timeoutMinutes` per chain entry (see WORKFLOW-GUIDE).
+- **Installation:** `python3 scripts/todo-batch/install.py` (schedule off at first; `--enable-schedule` turns it on). The scripts live in `scripts/todo-batch/`, their state in the clone under `.git/todo-batch/`.
+
 ## Project Cockpit & TODO Hygiene
 
 Since ~96% of TODOs are machine-generated and scattered across many projects, there is a cross-project overview plus a cleanup mechanism.
