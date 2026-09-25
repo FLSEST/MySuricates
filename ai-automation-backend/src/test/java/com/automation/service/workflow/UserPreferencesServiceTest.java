@@ -111,7 +111,7 @@ class UserPreferencesServiceTest {
     @Test
     void anySettingOutsideTheThreeKeysNeverReachesThePrompt() {
         set("user-pref-language", "Deutsch");
-        set("onboarding-profile", "Lebenslauf: Flo, geboren ...");
+        set("onboarding-profile", "Lebenslauf: Alex, geboren ...");
         set("user-name", "Klarname");
         set("user-pref-cv", "Berufsprofil");
 
