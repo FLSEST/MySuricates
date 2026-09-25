@@ -36,7 +36,12 @@ export interface PaletteLabels {
 export interface PaletteContextHandle {
   id: PaletteContextId;
   labels: PaletteLabels;
-  useResults: (query: string) => { items: PaletteItem[]; loading: boolean };
+  /**
+   * Results for the (debounced) query. `pending`: the search for this query is still under way and `items` do not
+   * answer it yet (a server search showing the previous results meanwhile) — keys that act on a row wait for it.
+   * Supplementary results that arrive later (the semantic search) leave it unset, Enter does not wait for them.
+   */
+  useResults: (query: string) => { items: PaletteItem[]; loading: boolean; pending?: boolean };
   useByIds: (ids: string[]) => PaletteItem[];
   onEnter: (item: PaletteItem, deps: ActionDeps) => void;
   onOpen?: (item: PaletteItem, deps: ActionDeps) => void;

@@ -821,7 +821,7 @@ What `UnifiedCalendarGrid` shows: the view (month, week, day), the month with it
 
 ### `usePaletteSelection.ts` (`components/palette/`)
 
-Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
+Selected row of the command palette and its keyboard control on the window (works with the focus in the search field too): ↑/↓, Enter runs (Shift opens the page, Cmd/Ctrl in a new tab), Alt+1–9 jumps to row N, Tab/Shift+Tab switches the context, Esc closes — with the variable form open, Esc only closes the form. Row order: empty search pinned → recent, otherwise results → assistant row. The results follow the input debounced by 250 ms; while they still show an earlier input (debounce running, or the server search of the run context, `pending` from `useResults`), Enter or Alt+N searches at once and acts only on the results of the current input, any other key in between drops it. `CommandPalette.tsx` resolves the context from the route and switches it, the dialog itself is `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 

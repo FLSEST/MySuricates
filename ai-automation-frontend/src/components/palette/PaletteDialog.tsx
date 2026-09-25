@@ -13,7 +13,7 @@ import { PaletteRow } from './PaletteRow';
 import { Section } from './Section';
 import { AssistantRow } from './AssistantRow';
 import { CollectForm, type CollectingState } from './CollectForm';
-import { useDebounced } from '../../hooks/useDebounced';
+import { useFlushableDebounce } from '../../hooks/useDebounced';
 import { useModuleEnabled } from '../../hooks/useModules';
 import { usePaletteSelection } from './usePaletteSelection';
 
@@ -42,19 +42,21 @@ export function PaletteDialog({ context, onClose, query, setQuery, contextId, cy
   const setAssistantOpen = useAssistantStore((s) => s.setOpen);
   const assistantModule = useModuleEnabled('assistant');
 
-  const debouncedQuery = useDebounced(query, 250);
+  const { debounced: debouncedQuery, flush: searchNow } = useFlushableDebounce(query, 250);
 
   // For run context we parse the query to show the status filter chip. Other contexts
   // ignore slash-tokens; the parser returns null status and the chip is hidden.
   const parsed = useMemo(() => parsePaletteQuery(query), [query]);
 
-  const { items: results, loading } = context.useResults(debouncedQuery);
+  const { items: results, loading, pending: searchPending } = context.useResults(debouncedQuery);
   const pinnedItems = context.useByIds(pins);
   const recentItems = context.useByIds(
     recents.filter((id) => !pins.includes(id)).slice(0, 5),
   );
 
   const isEmptyQuery = query.trim().length === 0;
+  // An empty query shows the pinned and recent rows, which never wait for a search
+  const resultsPending = !isEmptyQuery && (debouncedQuery !== query || searchPending === true);
   // Assistant escape-hatch row appears at the bottom once the query has substance;
   // threshold matches Fuse's minMatchCharLength so we don't offer it for stray keystrokes.
   const hasAssistantRow = assistantModule && query.trim().length >= 2;
@@ -103,7 +105,7 @@ export function PaletteDialog({ context, onClose, query, setQuery, contextId, cy
   };
 
   const { selectedIdx, select, assistantIdx } = usePaletteSelection({
-    isEmptyQuery, pinnedItems, recentItems, results, hasAssistantRow,
+    isEmptyQuery, pinnedItems, recentItems, results, hasAssistantRow, resultsPending, searchNow,
     keys: {
       close: onClose,
       cycleContext,

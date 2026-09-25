@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { useLocation } from 'react-router-dom';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
@@ -115,5 +115,51 @@ describe('CommandPalette', { timeout: 15_000 }, () => {
     key('Enter');
     expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'zz', open: true });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Enter during the debounce (9ded5db0)', () => {
+    beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('runs the match of what was just typed, not the row still on screen', async () => {
+      server.use(http.get('/api/v1/workflows', () => HttpResponse.json([workflow('w1', 'Deploy app'), workflow('w3', 'Rotate logs')])));
+      const { onClose } = renderPalette();
+      await screen.findByText('Deploy app');
+      const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+      fireEvent.change(input, { target: { value: 'Deploy' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      expect(screen.getByText('app').closest('.cursor-pointer')).toHaveClass('bg-accent/10');
+
+      // Typed and confirmed within the 250 ms: the row on screen still answers "Deploy"
+      fireEvent.change(input, { target: { value: 'Rotate' } });
+      key('Enter');
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/w3/run/run-1'));
+      expect(executed).toEqual(['w3']);
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('waits for the run search, which shows the previous runs while it loads', async () => {
+      const runs = (id: string, workflowName: string) => ({
+        content: [{ id, workflowId: `wf-${id}`, workflowName, projectName: null, status: 'COMPLETED' }],
+        page: 0, size: 20, totalElements: 1, totalPages: 1,
+      });
+      server.use(http.get('/api/v1/executions', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('search') !== 'beta') return HttpResponse.json(runs('r1', 'Alpha report'));
+        await delay(150);
+        return HttpResponse.json(runs('r2', 'Beta sync'));
+      }));
+      renderWithProviders(<><CommandPalette open onClose={vi.fn()} /><Location /></>, { route: '/runs' });
+      const input = await screen.findByPlaceholderText(en.commandPalette.contexts.run.placeholder);
+      fireEvent.change(input, { target: { value: 'alpha' } });
+      act(() => { vi.advanceTimersByTime(250); });
+      expect(await screen.findByText('Alpha report')).toBeInTheDocument();
+
+      fireEvent.change(input, { target: { value: 'beta' } });
+      key('Enter');
+      expect(screen.getByTestId('location')).toHaveTextContent('/runs');
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/workflows/wf-r2/run/r2'));
+    });
   });
 });

@@ -22,14 +22,15 @@ export function useRunContext(): PaletteContextHandle {
 
   const useResults = (query: string) => {
     const parsed = parsePaletteQuery(query);
-    const { data, isLoading } = useAllRuns({
+    const { data, isLoading, isPlaceholderData } = useAllRuns({
       search: parsed.query || undefined,
       status: parsed.status ?? undefined,
       size: 20,
       page: 0,
     });
     const items = useMemo(() => (data?.content ?? []).map(toItem), [data]);
-    return { items, loading: isLoading };
+    // useAllRuns keeps the previous page while the new search loads: those rows answer an earlier query
+    return { items, loading: isLoading, pending: isLoading || isPlaceholderData };
   };
 
   // Pins/Recents for runs intentionally return empty in MVP; rehydrating a run by id

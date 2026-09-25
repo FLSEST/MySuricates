@@ -821,7 +821,7 @@ Was `UnifiedCalendarGrid` zeigt: Ansicht (Monat, Woche, Tag), Monat mit gewählt
 
 ### `usePaletteSelection.ts` (`components/palette/`)
 
-Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
+Ausgewählte Zeile der Command-Palette und ihre Tastatursteuerung am Fenster (greift auch mit Fokus im Suchfeld): ↑/↓, Enter führt aus (Shift öffnet die Seite, Cmd/Ctrl in neuem Tab), Alt+1–9 springt auf Zeile N, Tab/Shift+Tab wechselt den Kontext, Esc schließt — bei offenem Variablen-Formular schließt Esc nur dieses. Zeilenfolge: leere Suche Angeheftet → Zuletzt, sonst Treffer → Assistenten-Zeile. Die Treffer folgen der Eingabe um 250 ms entprellt; zeigen sie noch eine frühere Eingabe (Entprellung läuft oder die Serversuche des Lauf-Kontexts, `pending` aus `useResults`), sucht Enter bzw. Alt+N sofort und wirkt erst auf die Treffer der aktuellen Eingabe, jede andere Taste dazwischen verwirft das. `CommandPalette.tsx` löst den Kontext aus der Route und wechselt ihn, der Dialog selbst ist `PaletteDialog.tsx`.
 
 ### `useTodoOverview.ts`
 
