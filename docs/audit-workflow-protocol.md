@@ -51,6 +51,15 @@ JSON-Envelope:
 Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
+Stehen mehrere Envelopes in der Ausgabe, zählt der **letzte** mit lesbarem JSON (TODO `1cf996df`).
+Der eigene schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen:
+`{{ previous_report }}` sind die ersten 3000 Zeichen des letzten Reports, bei kurzen Reports samt
+Envelope, oft abgeschnitten. Ein Envelope beginnt mit `<!--`, dem Marker und dem JSON-Beginn `{`;
+ein zitierter Marker ohne JSON zählt nicht, ebenso wenig ein Anfang im Text eines Findings. Beginnt
+hinter dem letzten lesbaren noch ein Envelope, etwa weil die Antwort abbricht, ist der Report
+ungültig; auf einen früheren greift die Ingestion nicht zurück. Der Gate-Block der Test-Abdeckung
+zählt denselben Envelope.
+
 Überlässt der Prompt das `subject` dem Modell, driftet es: Zwischen zwei Läufen wurde aus
 `docs/deployment.md` `host-reaching-endpoints`, und der Befund kam als Wiedergänger ohne seine
 Disposition zurück. Ein Prompt legt das `subject` deshalb je `ruleKey` fest — einen festen Wert
@@ -197,8 +206,11 @@ ACCEPTED_RISK | MEDIUM | performance.bundle-size | frontend/dist | Bundle über 
 
 - Enthalten sind `OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK` und `DISMISSED` in dieser
   Reihenfolge, darin nach Schwere (`CRITICAL` … `LOW`), `ruleKey` und `subject`. `RESOLVED`
-  fehlt, ebenso ein Befund mit markiertem unbekanntem `ruleKey`: Führte der Prompt so einen Key
-  weiter, verwürfe die Ingestion den ganzen Report.
+  fehlt, ebenso ein Befund, dessen `ruleKey` auch normalisiert nicht im Katalog des Audits steht,
+  etwa Altbestand aus der Zeit vor dem Katalog (TODO `1cf996df`). Führte der Prompt so einen Key
+  weiter, verwürfe die Ingestion den ganzen Report. Das entscheidet allein der Katalog, nicht die
+  Markierung `unknownRuleKey` (V75): Sie fällt erst bei erneuter Meldung weg und versteckte sonst
+  einen Befund, dessen Key inzwischen im Katalog steht.
 - Die Einordnung (`dispositionNote`) steht bei allen außer `OPEN`, auch bei
   `AWAITING_VERIFICATION`: Dort liegen Akzeptanzgrund und `Wiedervorlage nach 180 Tagen`.
 - Höchstens 250 Zeilen und 60 000 Bytes, gemessen nach dem Shell-Quoting: Ein Shell-Befehl geht
@@ -222,6 +234,36 @@ Wozu: Ein Report-Prompt kann im Markdown nur Offenes zeigen und einen schon eing
 mit **wörtlich demselben `ruleKey` und `subject`** weiterführen. Nur ein gemeldeter
 `ACCEPTED_RISK`-Befund wird neu bewertet (siehe Lebenszyklus), und ein Befund in neuer
 Schreibweise wäre ein Wiedergänger ohne seine Einordnung.
+
+### Die Report-Prompts nutzen `audit_findings`
+
+Die fünf Audits im `workflow-pool/` (Architektur-Review, Performance-Audit, Test-Abdeckung,
+Security-Audit, Health-Check) bekommen die Variable im Report-Prompt direkt nach `OFFENE TODOS`
+als Abschnitt `BEKANNTE BEFUNDE` (TODO `1cf996df`). Vor dem Envelope-Abschnitt steht in allen
+fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
+
+- **Identität:** `ruleKey` und `subject` eines bekannten Befunds werden exakt übernommen, auch
+  wenn das Modell ihn anders benennen würde.
+- **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
+  Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
+  verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert.
+- **Zählung:** `gate_status` und die Zahlen im Markdown zählen nur `OPEN`,
+  `AWAITING_VERIFICATION` und neue Befunde, eingeordnete nur, wenn sie sich laut Messung dieses
+  Laufs verschlechtert haben. Der Envelope und die Messwerte selbst bleiben unberührt. Sonst bliebe
+  etwa die Architektur dauerhaft YELLOW, weil akzeptierte HIGH-Befunde mitzählten.
+- **Envelope:** Jeder Befund, der laut Messung noch besteht, wird weitergeführt, auch
+  `ACCEPTED_RISK` und `DISMISSED`. Weg bleibt nur Behobenes und Altbestand mit einem `ruleKey`,
+  den der Prompt nicht erlaubt. Einen `AWAITING_VERIFICATION`-Befund prüft das Modell gegen die
+  Messung: Meldet es ihn, wird er wieder `OPEN`; fehlt er, ist die Behebung bestätigt. Liegt keine
+  Messung dazu vor, führt es ihn weiter, damit keine Wiedervorlage ohne Beleg `RESOLVED` wird.
+- Den Status setzt die Plattform, nicht der Envelope. Den letzten Report gibt das Modell nicht
+  wörtlich wieder, vor allem nicht seinen Envelope.
+
+Die Test-Abdeckung empfiehlt als nächsten Schritt und in der Roadmap nur Klassen, die nicht
+eingeordnet sind. Ihr Envelope enthält weiter jede gelistete Klasse, sonst stimmte
+`expectedFindings` nicht. Dass alle fünf Prompts die Variable und denselben Regelblock tragen und
+keiner mehr verlangt, bekannte Befunde wegzulassen, prüft `scripts/tests/test-audit-facts.sh`
+(Abschnitt 10).
 
 ## Lebenszyklus
 

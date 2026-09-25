@@ -13,6 +13,7 @@ import com.automation.modules.ModuleRegistry;
 import com.automation.repository.AuditFindingRepository;
 import com.automation.repository.AuditReportRepository;
 import com.automation.service.workflow.ExecutionContextFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,9 +94,8 @@ class AuditFindingsContextTest {
                 finding(AuditFindingStatus.AWAITING_VERIFICATION, AuditSeverity.LOW, "dep.outdated", "package.json")
                         .dispositionNote("Kein Build-Pfad\nWiedervorlage nach 180 Tagen"),
                 finding(AuditFindingStatus.OPEN, AuditSeverity.MEDIUM, "dep.outdated", "pom.xml"),
-                // not shown: fixed, a historic unknown ruleKey, another audit, another project
+                // not shown: fixed, another audit, another project (unknown ruleKeys: see the catalog tests)
                 finding(AuditFindingStatus.RESOLVED, AuditSeverity.CRITICAL, "dep.outdated", "build.gradle"),
-                finding(AuditFindingStatus.OPEN, AuditSeverity.CRITICAL, "dep.drifted-key", "Gemfile").unknownRuleKey(true),
                 finding(AuditFindingStatus.OPEN, AuditSeverity.CRITICAL, "dep.outdated", "other-audit.xml")
                         .auditKey("test.other-audit"),
                 finding(AuditFindingStatus.OPEN, AuditSeverity.CRITICAL, "dep.outdated", "other-project.xml")
@@ -229,6 +229,61 @@ class AuditFindingsContextTest {
                         + (AuditFindingsContext.MAX_FINDINGS - shownOpen) + ")\n</audit_findings>");
     }
 
+    /**
+     * Legacy from before the catalog: never flagged as unknown, yet its key is not in the catalog even after
+     * normalisation. A prompt carrying it forward would get the whole report rejected (TODO 1cf996df). Drift the
+     * catalog can normalise stays, and an audit without catalog entry is not checked at all.
+     */
+    @Test
+    void findings_ofACatalogCheckedAudit_leaveOutLegacyRuleKeysTheCatalogDoesNotKnow() {
+        String architecture = "mysuricates.architecture";
+        save(finding(AuditFindingStatus.ACCEPTED_RISK, AuditSeverity.HIGH, "god-class", "HostClaudeService")
+                        .auditKey(architecture).dispositionNote("Akzeptiert im Audit-Sweep"),
+                finding(AuditFindingStatus.ACCEPTED_RISK, AuditSeverity.MEDIUM, "arch.god-class",
+                        "com/automation/service/ai/HostClaudeService.java").auditKey(architecture)
+                        .dispositionNote("Nachfolger von god-class"),
+                finding(AuditFindingStatus.OPEN, AuditSeverity.HIGH, "Arch.God_Class", "Drift.java").auditKey(architecture),
+                finding(AuditFindingStatus.ACCEPTED_RISK, AuditSeverity.HIGH, "god-class", "Unchecked.java"));
+
+        String block = findingsContext.findings(projectId, architecture);
+
+        assertThat(block).contains("Audit mysuricates.architecture: OPEN 1 · AWAITING_VERIFICATION 0 · ACCEPTED_RISK 1"
+                + " · DISMISSED 0\n");
+        assertThat(findingLines(block)).containsExactly(
+                "OPEN | HIGH | Arch.God_Class | Drift.java | Titel Drift.java",
+                "ACCEPTED_RISK | MEDIUM | arch.god-class | com/automation/service/ai/HostClaudeService.java"
+                        + " | Titel com/automation/service/ai/HostClaudeService.java | Einordnung: Nachfolger von god-class");
+        assertThat(findingsContext.findings(projectId, AUDIT_KEY))
+                .as("an audit without catalog entry keeps every key")
+                .contains("\nACCEPTED_RISK | HIGH | god-class | Unchecked.java | Titel Unchecked.java | Einordnung: (keine Notiz)\n");
+    }
+
+    /**
+     * The flag {@code unknownRuleKey} (V75) is reset only when a report names the finding again. A key added to the
+     * catalog since would stay hidden behind a stale flag, so only the catalog decides (TODO 1cf996df).
+     */
+    @Test
+    void findings_ignoreTheStaleUnknownFlag_theCatalogAloneDecides() {
+        String architecture = "mysuricates.architecture";
+        save(finding(AuditFindingStatus.ACCEPTED_RISK, AuditSeverity.HIGH, "arch.package-cycle",
+                        "cycles/component/com.automation.config").auditKey(architecture).unknownRuleKey(true)
+                        .dispositionNote("Testueberwacht"),
+                finding(AuditFindingStatus.OPEN, AuditSeverity.HIGH, "coupling", "ExecutionContext")
+                        .auditKey(architecture).unknownRuleKey(true),
+                finding(AuditFindingStatus.OPEN, AuditSeverity.CRITICAL, "dep.drifted-key", "Gemfile").unknownRuleKey(true));
+
+        String checked = findingsContext.findings(projectId, architecture);
+        String unchecked = findingsContext.findings(projectId, AUDIT_KEY);
+
+        assertThat(checked).as("key in the catalog today, despite the stale flag").contains("| arch.package-cycle |");
+        assertThat(findingLines(checked)).containsExactly(
+                "ACCEPTED_RISK | HIGH | arch.package-cycle | cycles/component/com.automation.config"
+                        + " | Titel cycles/component/com.automation.config | Einordnung: Testueberwacht");
+        assertThat(unchecked).as("flagged, but the audit has no catalog entry: nothing to check against")
+                .contains("| dep.drifted-key |");
+        assertThat(findingLines(unchecked)).containsExactly("OPEN | CRITICAL | dep.drifted-key | Gemfile | Titel Gemfile");
+    }
+
     @Test
     void findings_withoutAKnownFinding_sayNoneInsteadOfStayingEmpty() {
         save(finding(AuditFindingStatus.RESOLVED, AuditSeverity.HIGH, "dep.outdated", "pom.xml"));
@@ -266,7 +321,8 @@ class AuditFindingsContextTest {
     @Test
     void findings_withTheAuditModuleOff_stateTheGapWithoutAQuery() {
         AuditFindingRepository repository = mock(AuditFindingRepository.class);
-        AuditFindingsContext moduleOff = new AuditFindingsContext(repository, ModuleRegistry.of(Map.of(), Map.of()));
+        AuditFindingsContext moduleOff = new AuditFindingsContext(repository, ModuleRegistry.of(Map.of(), Map.of()),
+                new AuditRuleKeyCatalog(new ObjectMapper()));
 
         assertThat(moduleOff.findings(projectId, AUDIT_KEY))
                 .isEqualTo("NICHT GEMESSEN: audit_findings (nicht verfügbar: Modul audit ist aus)");

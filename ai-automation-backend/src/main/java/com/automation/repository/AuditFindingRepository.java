@@ -28,12 +28,14 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Stri
 
     /**
      * Die bekannten Befunde eines Audits fuer {@code audit_findings} (TODO 3643beac) – ohne die TEXT-Blobs
-     * (Beschreibung, Beleg, Tags, Beweis-Snapshot) und ohne Befunde mit unbekanntem {@code ruleKey}:
-     * Fuehrte ein Prompt so einen Key weiter, verwuerfe die Ingestion den ganzen Report.
+     * (Beschreibung, Beleg, Tags, Beweis-Snapshot). Befunde mit unbekanntem {@code ruleKey} filtert
+     * {@code AuditFindingsContext} gegen den Katalog, nicht diese Abfrage: Die Markierung {@code unknownRuleKey}
+     * wird erst bei erneuter Meldung zurueckgesetzt und blendete sonst einen Befund aus, dessen Key inzwischen
+     * im Katalog steht (TODO 1cf996df).
      */
     @Query("SELECT new com.automation.dto.projection.AuditFindingContextRow(f.id, f.status, f.severity, f.ruleKey, "
             + "f.subject, f.title, f.dispositionNote) FROM AuditFinding f WHERE f.projectId = :projectId "
-            + "AND f.auditKey = :auditKey AND f.status IN :statuses AND f.unknownRuleKey = false")
+            + "AND f.auditKey = :auditKey AND f.status IN :statuses")
     List<AuditFindingContextRow> findContextRows(@Param("projectId") String projectId,
                                                  @Param("auditKey") String auditKey,
                                                  @Param("statuses") Collection<AuditFindingStatus> statuses);

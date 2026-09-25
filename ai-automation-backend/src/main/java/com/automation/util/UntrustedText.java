@@ -28,8 +28,8 @@ public final class UntrustedText {
     private static final Pattern WHITESPACE = Pattern.compile("(?U)\\s{2,}");
     /**
      * Ausgabe-Marker, die die Plattform auswertet (todo_item, gate_*, dashboard_widget), und der Envelope eines
-     * Audit-Reports ({@code mysuricates:audit-result}, {@code AuditResultParser} nimmt den ersten) – entschaerft
-     * durch Entfernen des Doppelpunkts.
+     * Audit-Reports ({@code mysuricates:audit-result}; {@code AuditResultParser} nimmt den letzten, und ein
+     * wiedergegebener Titel kann hinter oder statt dem eigenen stehen) – entschaerft durch Entfernen des Doppelpunkts.
      */
     private static final Pattern MARKERS = Pattern.compile("(?iU)(todo[_-]item|gate[_-](?:status|category|description)"
             + "|dashboard[_-]widget|mysuricates(?=[*`\\s]*:[*`\\s]*audit[_-]result))[*`\\s]*:");
