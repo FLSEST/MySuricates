@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.confluence;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.providers.IntegrationParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -145,8 +146,8 @@ public class ConfluenceProvider implements IntegrationProvider {
     // --- Action implementations ---
 
     private Object listSpaces(Map<String, Object> params, String accessToken) {
+        int limit = IntegrationParams.intParam(params, "limit", 25); // before the cloud-id request
         String baseUrl = resolveV1BaseUrl(accessToken);
-        int limit = paramInt(params, "limit", 25);
         String cql = "type = space";
         if (params.containsKey("type")) {
             cql += " AND space.type = " + urlEncode(params.get("type").toString());
@@ -157,8 +158,8 @@ public class ConfluenceProvider implements IntegrationProvider {
 
     private Object listPages(Map<String, Object> params, String accessToken) {
         String spaceKey = requireParam(params, "spaceKey");
+        int limit = IntegrationParams.intParam(params, "limit", 25);
         String baseUrl = resolveV1BaseUrl(accessToken);
-        int limit = paramInt(params, "limit", 25);
         String cql = "type = page AND space = " + spaceKey;
         String url = baseUrl + "/search?cql=" + urlEncode(cql) + "&limit=" + limit;
         return httpGet(url, accessToken, Object.class);
@@ -174,8 +175,8 @@ public class ConfluenceProvider implements IntegrationProvider {
 
     private Object search(Map<String, Object> params, String accessToken) {
         String cql = requireParam(params, "cql");
+        int limit = IntegrationParams.intParam(params, "limit", 20);
         String v1BaseUrl = resolveV1BaseUrl(accessToken);
-        int limit = paramInt(params, "limit", 20);
         String url = v1BaseUrl + "/search?cql=" + urlEncode(cql) + "&limit=" + limit;
         return httpGet(url, accessToken, Object.class);
     }
@@ -294,13 +295,6 @@ public class ConfluenceProvider implements IntegrationProvider {
     private static String paramString(Map<String, Object> params, String key, String defaultValue) {
         Object val = params.get(key);
         return val != null ? val.toString() : defaultValue;
-    }
-
-    private static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s) return Integer.parseInt(s);
-        return defaultValue;
     }
 
     private static String requireParam(Map<String, Object> params, String key) {

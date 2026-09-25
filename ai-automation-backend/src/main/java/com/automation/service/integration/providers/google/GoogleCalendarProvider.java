@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.google;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.providers.IntegrationParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -183,7 +184,7 @@ public class GoogleCalendarProvider implements IntegrationProvider {
 
         if (params.containsKey("timeMin")) url.append("&timeMin=").append(urlEncode(paramString(params, "timeMin", "")));
         if (params.containsKey("timeMax")) url.append("&timeMax=").append(urlEncode(paramString(params, "timeMax", "")));
-        url.append("&maxResults=").append(paramInt(params, "maxResults", 10));
+        url.append("&maxResults=").append(IntegrationParams.intParam(params, "maxResults", 10));
 
         return httpGet(url.toString(), accessToken, GoogleEventList.class);
     }
@@ -351,13 +352,6 @@ public class GoogleCalendarProvider implements IntegrationProvider {
     private static String paramString(Map<String, Object> params, String key, String defaultValue) {
         Object val = params.get(key);
         return val != null ? val.toString() : defaultValue;
-    }
-
-    private static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s) return Integer.parseInt(s);
-        return defaultValue;
     }
 
     private static String requireParam(Map<String, Object> params, String key) {

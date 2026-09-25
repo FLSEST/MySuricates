@@ -86,6 +86,16 @@ class OpenMeteoParamsTest {
                 .hasMessageContaining("days");
     }
 
+    /** ac639b39: 4294967297 used to wrap around to 1 day, and 5.0 passed while "5.0" failed. */
+    @Test
+    void days_areReadLikeTheirText() {
+        assertThat(OpenMeteoParams.days(" 3 ")).isEqualTo(3);
+        assertThatThrownBy(() -> OpenMeteoParams.days(4_294_967_297L))
+                .hasMessage("Parameter 'days' must be a whole number: 4294967297");
+        assertThatThrownBy(() -> OpenMeteoParams.days(5.0))
+                .hasMessage("Parameter 'days' must be a whole number: 5.0");
+    }
+
     @Test
     void days_numberParam() {
         assertThat(OpenMeteoParams.days(1)).isEqualTo(1);

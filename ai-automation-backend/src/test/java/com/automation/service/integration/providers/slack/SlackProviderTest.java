@@ -159,6 +159,16 @@ class SlackProviderTest {
                 .isEqualTo("types=public_channel&exclude_archived=true&limit=200&cursor=abc%3D");
     }
 
+    /** ac639b39: limit 1.5 used to become 1 and 2^32 + 1 as well — read like its text, both fail before any request. */
+    @Test
+    void limit_isReadLikeItsText() {
+        assertThatThrownBy(() -> provider.executeAction("list_channels", Map.of("limit", 1.5), CREDENTIAL))
+                .hasMessage("Parameter 'limit' must be a number");
+        assertThatThrownBy(() -> provider.executeAction("list_channels", Map.of("limit", 4_294_967_297L), CREDENTIAL))
+                .hasMessage("Parameter 'limit' must be a number");
+        assertThat(stub.requests()).isEmpty();
+    }
+
     @Test
     void listChannels_validatesTypesAndLimit() {
         assertThatThrownBy(() -> provider.executeAction("list_channels", Map.of("types", "public_channel,dm"), CREDENTIAL))

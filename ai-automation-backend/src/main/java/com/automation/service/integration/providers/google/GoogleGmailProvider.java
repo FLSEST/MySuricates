@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.google;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.providers.IntegrationParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -131,7 +132,7 @@ public class GoogleGmailProvider implements IntegrationProvider {
     private Object listMessages(Map<String, Object> params, String accessToken) {
         StringBuilder url = new StringBuilder(BASE_URL)
                 .append("/messages?maxResults=")
-                .append(paramInt(params, "maxResults", 10));
+                .append(IntegrationParams.intParam(params, "maxResults", 10));
 
         String query = paramString(params, "query", null);
         if (query != null && !query.isBlank()) {
@@ -293,13 +294,6 @@ public class GoogleGmailProvider implements IntegrationProvider {
     private static String paramString(Map<String, Object> params, String key, String defaultValue) {
         Object val = params.get(key);
         return val != null ? val.toString() : defaultValue;
-    }
-
-    private static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s && !s.isBlank()) return Integer.parseInt(s);
-        return defaultValue;
     }
 
     private static List<String> paramStringList(Map<String, Object> params, String key) {

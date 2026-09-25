@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.jira;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -16,15 +18,12 @@ final class JiraParams {
     }
 
     /**
-     * Unlike {@code GitHubParams.paramInt}, a blank string is not special-cased here: passing one
-     * lets {@link Integer#parseInt} throw {@link NumberFormatException}, matching the behavior of
-     * the pre-split {@code JiraProvider}.
+     * Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}).
+     * Until TODO ac639b39 a blank string threw a bare {@link NumberFormatException} here, unlike the
+     * other providers.
      */
     static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s) return Integer.parseInt(s);
-        return defaultValue;
+        return IntegrationParams.intParam(params, key, defaultValue);
     }
 
     static String requireParam(Map<String, Object> params, String key) {

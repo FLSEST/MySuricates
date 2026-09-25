@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.gitlab;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -85,17 +87,9 @@ final class GitLabParams {
         return val != null ? val.toString() : defaultValue;
     }
 
+    /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
     static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s && !s.isBlank()) {
-            try {
-                return Integer.parseInt(s.trim());
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Parameter '" + key + "' must be a number");
-            }
-        }
-        return defaultValue;
+        return IntegrationParams.intParam(params, key, defaultValue);
     }
 
     /** Page size clamped to 1..{@link #MAX_PER_PAGE}. */
@@ -109,10 +103,12 @@ final class GitLabParams {
         return val.toString().trim();
     }
 
-    /** Issue IID (project-local number) — digits only, so it cannot alter the request path. */
+    /**
+     * Issue IID (project-local number) — digits only, so it cannot alter the request path. A JSON
+     * number is read like its text: {@code 8.0} fails instead of becoming 8 (TODO ac639b39).
+     */
     static String requireIid(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        String s = val instanceof Number n ? String.valueOf(n.longValue()) : requireParam(params, key);
+        String s = requireParam(params, key);
         if (!s.matches("\\d+")) throw new IllegalArgumentException("Parameter '" + key + "' must be a positive number");
         return s;
     }

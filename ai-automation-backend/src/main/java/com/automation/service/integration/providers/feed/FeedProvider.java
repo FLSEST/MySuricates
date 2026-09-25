@@ -3,6 +3,7 @@ package com.automation.service.integration.providers.feed;
 import com.automation.service.integration.IntegrationAction;
 import com.automation.service.integration.IntegrationProvider;
 import com.automation.service.integration.OAuthConfig;
+import com.automation.service.integration.providers.IntegrationParams;
 import com.automation.service.integration.providers.feed.FeedParser.FeedEntry;
 import com.automation.service.integration.providers.feed.FeedParser.ParsedFeed;
 import lombok.RequiredArgsConstructor;
@@ -136,18 +137,15 @@ public class FeedProvider implements IntegrationProvider {
         return since;
     }
 
+    /** Read like its text ({@link IntegrationParams}): 1.5 fails instead of becoming 1. */
     static int limit(Object value) {
-        int limit;
-        if (value == null || value.toString().isBlank()) return DEFAULT_LIMIT;
-        if (value instanceof Number n) {
-            limit = n.intValue();
-        } else {
-            try {
-                limit = Integer.parseInt(value.toString().trim());
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Parameter 'limit' must be a number: " + value);
-            }
+        Integer limit;
+        try {
+            limit = IntegrationParams.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Parameter 'limit' must be a number: " + value);
         }
+        if (limit == null) return DEFAULT_LIMIT;
         if (limit < 1) throw new IllegalArgumentException("Parameter 'limit' must be at least 1");
         return Math.min(limit, MAX_LIMIT);
     }

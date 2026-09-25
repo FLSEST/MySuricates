@@ -49,4 +49,15 @@ class GitHubParamsTest {
     void urlEncode_encodesSlashAndSpace() {
         assertThat(GitHubParams.urlEncode("a b/c")).isEqualTo("a+b%2Fc");
     }
+
+    /** ac639b39: a JSON number is read like its text — 1.5 and 5.0 are not cut to 1 and 5, nothing wraps around. */
+    @Test
+    void paramInt_rejectsDecimalsAndValuesBeyondInt() {
+        assertThat(GitHubParams.paramInt(Map.of("page", 7L), "page", 1)).isEqualTo(7);
+        for (Object bad : new Object[] {1.5, 5.0, 3_000_000_000L}) {
+            assertThatThrownBy(() -> GitHubParams.paramInt(Map.of("page", bad), "page", 1))
+                    .as(String.valueOf(bad))
+                    .hasMessage("Parameter 'page' must be a number");
+        }
+    }
 }

@@ -1,5 +1,7 @@
 package com.automation.service.integration.providers.github;
 
+import com.automation.service.integration.providers.IntegrationParams;
+
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -41,11 +43,9 @@ final class GitHubParams {
         return val != null ? val.toString() : defaultValue;
     }
 
+    /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
     static int paramInt(Map<String, Object> params, String key, int defaultValue) {
-        Object val = params.get(key);
-        if (val instanceof Number n) return n.intValue();
-        if (val instanceof String s && !s.isBlank()) return Integer.parseInt(s);
-        return defaultValue;
+        return IntegrationParams.intParam(params, key, defaultValue);
     }
 
     static String requireParam(Map<String, Object> params, String key) {
