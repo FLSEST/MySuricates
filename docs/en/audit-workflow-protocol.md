@@ -54,9 +54,10 @@ Title and description may evolve. An empty snapshot is output as
 `"findings": []`.
 
 If the output holds several envelopes, the **last** one with readable JSON counts (TODO `1cf996df`).
-The model's own envelope closes the answer, and an echoed previous run may stand before it:
-`{{ previous_report }}` is the first 3000 characters of the last report, which for a short report
-includes its envelope, often cut off. An envelope starts with `<!--`, the marker and the JSON opening
+The model's own envelope closes the answer, and an echoed previous run may stand before it. Since
+TODO `3bf8c9d8`, `{{ previous_report }}` no longer carries the last report's envelope, not even a
+cut-off one, and `gate_status:`, `todo_item:` and the like lose their colon; the rule remains the
+second safeguard for a previous run a model repeats some other way. An envelope starts with `<!--`, the marker and the JSON opening
 `{`; a quoted marker without JSON does not count, nor does a start inside the text of a finding. If
 another envelope starts after the last readable one, for example because the answer breaks off, the
 report is invalid; ingestion does not fall back to an earlier one. The gate block of the test
