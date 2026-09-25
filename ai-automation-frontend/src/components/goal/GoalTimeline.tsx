@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  DndContext, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors,
+  DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type Announcements, type DragEndEvent, type DragMoveEvent, type Modifier, type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
@@ -18,6 +18,7 @@ import { ChipFace } from './TimelineChip';
 import { TimelineAxisView } from './TimelineAxisView';
 import { LABEL_COLUMN, TimelineLines, TimelineRowView, UnplannedBar } from './TimelineRows';
 import { MilestoneCard, MilestoneForm } from './MilestonePopovers';
+import { TIMELINE_KEYBOARD_CODES, chipDragData, timelineCollision, timelineKeyboardCoordinates } from './timelineKeyboard';
 import type { Goal, GoalMilestone, GoalTodoItem } from '../../types';
 
 /** Was gerade am Zeitstrahl offen ist: ein neuer Meilenstein (an einem Tag oder vom Knopf) oder einer. */
@@ -30,13 +31,17 @@ const PANEL_WIDTH = 256;
 /** Höhe der Achse (`h-16`): Karten öffnen sich darunter. */
 const AXIS_HEIGHT = 64;
 
-/** Beim Ziehen sitzt der Statuspunkt unter dem Mauszeiger – dort, wo das Datum landet. */
-const dotToCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+/**
+ * Beim Ziehen mit der Maus sitzt der Statuspunkt unter dem Mauszeiger – dort, wo das Datum landet.
+ * Per Tastatur gibt es keinen Zeiger: das Bild beginnt genau über dem Chip, der Punkt auf seinem Tag.
+ */
+const dotToCursor: Modifier = ({ activatorEvent, active, draggingNodeRect, transform }) => {
   const start = activatorEvent ? getEventCoordinates(activatorEvent) : null;
   if (!start || !draggingNodeRect) return transform;
+  const faceAnchor = chipDragData(active).flipped ? CHIP_WIDTH - CHIP_ANCHOR : CHIP_ANCHOR;
   return {
     ...transform,
-    x: transform.x + start.x - (draggingNodeRect.left + CHIP_ANCHOR),
+    x: transform.x + start.x - (draggingNodeRect.left + faceAnchor),
     y: transform.y + start.y - (draggingNodeRect.top + draggingNodeRect.height / 2),
   };
 };
@@ -73,12 +78,21 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
   const byId = useMemo(() => new Map(todos.map((todo) => [todo.id, todo])), [todos]);
   const { mutate: plan } = usePlanGoalTodo(goal.id);
   const [dragging, setDragging] = useState<GoalTodoItem | null>(null);
+  // Das Bild unter dem Zeiger steht wie der Chip – bei einem gespiegelten Chip ist der Punkt rechts
+  const [draggingFlipped, setDraggingFlipped] = useState(false);
   const [preview, setPreview] = useState<{ row: string; day: number } | null>(null);
   const [panel, setPanel] = useState<MilestonePanel | null>(null);
   // Milestone whose deletion waits for the confirmation (23635ef6)
   const [removing, setRemoving] = useState<GoalMilestone | null>(null);
   const removeMilestone = useDeleteMilestone(goal.id);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const keyboardOptions = useMemo(
+    () => ({ keyboardCodes: TIMELINE_KEYBOARD_CODES, coordinateGetter: timelineKeyboardCoordinates(axis, width) }),
+    [axis, width],
+  );
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, keyboardOptions),
+  );
   const closePanel = useCallback(() => setPanel(null), []);
   const planFromMenu = useCallback(
     (todoId: string, changes: PlanChanges) => plan({ todoId, changes, announce: true }),
@@ -86,11 +100,16 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
   );
 
   const todoOf = (id: UniqueIdentifier) => byId.get(String(id).replace(/^todo:/, ''));
-  /** Der Tag unter dem Mauszeiger in der Zeile, über der er steht – eingerastet auf ganze Tage. */
+  /**
+   * Der Tag unter dem Mauszeiger in der Zeile, über der er steht – eingerastet auf ganze Tage. Per
+   * Tastatur (kein Zeiger) der Tag unter dem Statuspunkt des angehobenen Chips.
+   */
   const dropDay = (event: DragMoveEvent | DragEndEvent): number | null => {
+    if (!event.over) return null;
     const start = getEventCoordinates(event.activatorEvent);
-    if (!start || !event.over) return null;
-    return dayAtX(axis, start.x + event.delta.x - event.over.rect.left, width);
+    const lifted = event.active.rect.current.translated;
+    const x = start ? start.x + event.delta.x : lifted ? lifted.left + chipDragData(event.active).anchor : null;
+    return x === null ? null : dayAtX(axis, x - event.over.rect.left, width);
   };
   const rowName = (id: UniqueIdentifier) => {
     const target = dropTargetOf(String(id));
@@ -146,10 +165,11 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
 
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={timelineCollision}
         accessibility={{ announcements, screenReaderInstructions: { draggable: tt.dragHelp } }}
         onDragStart={(event) => {
           setDragging(todoOf(event.active.id) ?? null);
+          setDraggingFlipped(chipDragData(event.active).flipped);
           setPanel(null);
         }}
         onDragMove={handleDragMove}
@@ -195,7 +215,7 @@ export function GoalTimeline({ goal, todos, milestones, onOpenTodo, now }: GoalT
         <DragOverlay modifiers={[dotToCursor]} dropAnimation={null}>
           {dragging && (
             <div style={{ width: CHIP_WIDTH }}>
-              <ChipFace todo={dragging} overdue={isOverdue(dragging, today)} lifted />
+              <ChipFace todo={dragging} overdue={isOverdue(dragging, today)} flipped={draggingFlipped} lifted />
             </div>
           )}
         </DragOverlay>

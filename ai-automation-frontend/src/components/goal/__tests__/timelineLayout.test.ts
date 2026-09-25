@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CHIP_WIDTH, FALLBACK_WIDTH, NO_MILESTONE,
   applyPlan, axisFor, buildAxis, buildRows, dateOfDay, dayAtX, dayOf, dayOfIsoDate, dropTargetOf, dueDateOfDay,
-  isOverdue, isoDateOfDay, planChanges, stackChips, xOfDay,
+  isOverdue, isoDateOfDay, planChanges, stackChips, todayLabelPlacement, xOfDay,
 } from '../timelineLayout';
 import type { GoalMilestone, GoalTodoItem } from '../../../types';
 
@@ -251,5 +251,30 @@ describe('isOverdue', () => {
     expect(isOverdue({ dueDate: endOf('2026-09-24'), status: 'IN_PROGRESS' }, today)).toBe(false);
     expect(isOverdue({ dueDate: endOf('2026-09-23'), status: 'DONE' }, today)).toBe(false);
     expect(isOverdue({ dueDate: null, status: 'OPEN' }, today)).toBe(false);
+  });
+});
+
+// ff6f08fd: at 768 px the label "today" lay on the diamond of the next day
+describe('todayLabelPlacement', () => {
+  const width = 480;
+
+  it('stays centred over today while nothing is near', () => {
+    expect(todayLabelPlacement(200, [], width)).toBe('center');
+    expect(todayLabelPlacement(200, [120, 290], width)).toBe('center');
+  });
+
+  it('moves away from a diamond or the target flag next to today', () => {
+    expect(todayLabelPlacement(200, [216], width)).toBe('left');
+    expect(todayLabelPlacement(200, [184], width)).toBe('right');
+  });
+
+  it('goes up to the day numbers when both sides are taken', () => {
+    expect(todayLabelPlacement(200, [184, 216], width)).toBe('raised');
+    expect(todayLabelPlacement(200, [200], width)).toBe('raised');
+  });
+
+  it('stays inside the axis at its ends', () => {
+    expect(todayLabelPlacement(10, [], width)).toBe('right');
+    expect(todayLabelPlacement(width - 10, [], width)).toBe('left');
   });
 });

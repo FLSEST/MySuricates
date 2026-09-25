@@ -1,0 +1,99 @@
+import { describe, it, expect } from 'vitest';
+import type { ClientRect, Collision, SensorContext, UniqueIdentifier } from '@dnd-kit/core';
+import { CHIP_ANCHOR, CHIP_WIDTH, buildAxis, dayOfIsoDate, xOfDay } from '../timelineLayout';
+import { chipDragData, timelineCollision, timelineKeyboardCoordinates } from '../timelineKeyboard';
+
+const W = 600;
+const today = dayOfIsoDate('2026-09-24')!;
+// 30 Tage à 20 px: heute ist Tag 3 der Achse
+const axis = { ...buildAxis({ today, days: [today + 20], target: null }, W), startDay: today - 3, endDay: today + 26, days: 30 };
+const DAY = W / axis.days;
+
+const rect = (left: number, top: number, width: number, height: number): ClientRect =>
+  ({ left, top, width, height, right: left + width, bottom: top + height });
+
+/** Zeilen ab x = 180 (rechts der Beschriftung), darunter die Leiste „ungeplant“ über die ganze Breite. */
+const rows = new Map<UniqueIdentifier, ClientRect>([
+  ['row:m1', rect(180, 100, W, 48)],
+  ['row:none', rect(180, 148, W, 48)],
+  ['unplanned', rect(60, 220, W + 120, 80)],
+]);
+
+/** Der angehobene Chip: Punkt `anchor` px von seinem linken Rand, Mitte senkrecht bei `middle`. */
+function context(dotX: number, middle: number, over: UniqueIdentifier | null, anchor = CHIP_ANCHOR): SensorContext {
+  return {
+    active: { id: 'todo:a', data: { current: { anchor, flipped: false } }, rect: { current: { initial: null, translated: null } } },
+    collisionRect: rect(dotX - anchor, middle - 14, CHIP_WIDTH, 28),
+    over: over === null ? null : { id: over, rect: rows.get(over)!, disabled: false, data: { current: undefined } },
+    droppableRects: rows,
+  } as unknown as SensorContext;
+}
+
+const move = (code: string, ctx: SensorContext) =>
+  timelineKeyboardCoordinates(axis, W)(new KeyboardEvent('keydown', { code }), {
+    active: 'todo:a', context: ctx, currentCoordinates: { x: ctx.collisionRect!.left, y: ctx.collisionRect!.top },
+  });
+const dayX = (day: number) => 180 + xOfDay(axis, day, W);
+
+describe('timelineKeyboardCoordinates (ff6f08fd)', () => {
+  it('moves the lifted chip by exactly one day to the right and left inside a row', () => {
+    const start = dayX(today + 5);
+    expect(move('ArrowRight', context(start, 124, 'row:m1'))).toEqual({ x: start + DAY - CHIP_ANCHOR, y: 110 });
+    expect(move('ArrowLeft', context(start, 124, 'row:m1'))).toEqual({ x: start - DAY - CHIP_ANCHOR, y: 110 });
+  });
+
+  it('keeps the dot on its day for a flipped chip, and stops at the ends of the axis', () => {
+    const anchor = CHIP_WIDTH - CHIP_ANCHOR;
+    const last = dayX(axis.endDay);
+    expect(move('ArrowLeft', context(last, 124, 'row:none', anchor))).toEqual({ x: last - DAY - anchor, y: 110 });
+    expect(move('ArrowRight', context(last, 124, 'row:none', anchor))).toBeUndefined();
+    expect(move('ArrowLeft', context(dayX(axis.startDay), 124, 'row:none'))).toBeUndefined();
+  });
+
+  it('moves days only in a row, not in "unplanned"', () => {
+    expect(move('ArrowRight', context(100, 260, 'unplanned'))).toBeUndefined();
+  });
+
+  it('steps into the row below or above, keeping the day, and from a row down into "unplanned"', () => {
+    const start = dayX(today + 5);
+    expect(move('ArrowDown', context(start, 124, 'row:m1'))).toEqual({ x: start - CHIP_ANCHOR, y: 172 - 14 });
+    expect(move('ArrowUp', context(start, 172, 'row:none'))).toEqual({ x: start - CHIP_ANCHOR, y: 124 - 14 });
+    expect(move('ArrowDown', context(start, 172, 'row:none'))).toEqual({ x: start - CHIP_ANCHOR, y: 260 - 14 });
+    expect(move('ArrowUp', context(start, 124, 'row:m1'))).toBeUndefined();
+    expect(move('ArrowDown', context(start, 260, 'unplanned'))).toBeUndefined();
+  });
+
+  it('puts a chip coming up from "unplanned" on today', () => {
+    expect(move('ArrowUp', context(80, 260, 'unplanned'))).toEqual({ x: dayX(today) - CHIP_ANCHOR, y: 172 - 14 });
+  });
+
+  it('ignores other keys', () => {
+    expect(move('KeyA', context(dayX(today), 124, 'row:m1'))).toBeUndefined();
+  });
+});
+
+describe('timelineCollision (ff6f08fd)', () => {
+  const containers = [...rows.keys()].map((id) => ({ id, key: id, data: { current: undefined }, disabled: false, node: { current: null }, rect: { current: rows.get(id)! } }));
+  const hit = (collisions: Collision[]) => collisions.map((collision) => collision.id);
+  const args = (dotX: number, middle: number, pointer: { x: number; y: number } | null) => ({
+    active: { id: 'todo:a', data: { current: { anchor: CHIP_ANCHOR, flipped: false } }, rect: { current: { initial: null, translated: null } } },
+    collisionRect: rect(dotX - CHIP_ANCHOR, middle - 14, CHIP_WIDTH, 28),
+    droppableRects: rows,
+    droppableContainers: containers,
+    pointerCoordinates: pointer,
+  }) as unknown as Parameters<typeof timelineCollision>[0];
+
+  it('takes the row under the mouse pointer', () => {
+    expect(hit(timelineCollision(args(dayX(today), 124, { x: dayX(today), y: 170 })))).toEqual(['row:none']);
+  });
+
+  it('takes the row under the dot of the lifted chip without a pointer (keyboard)', () => {
+    expect(hit(timelineCollision(args(dayX(today), 124, null)))).toEqual(['row:m1']);
+    expect(hit(timelineCollision(args(100, 260, null)))).toEqual(['unplanned']);
+  });
+
+  it('reads anchor and orientation of the lifted chip, with the plain chip as fallback', () => {
+    expect(chipDragData({ data: { current: { anchor: 140, flipped: true } } })).toEqual({ anchor: 140, flipped: true });
+    expect(chipDragData(null)).toEqual({ anchor: CHIP_ANCHOR, flipped: false });
+  });
+});

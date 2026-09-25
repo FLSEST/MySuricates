@@ -5,8 +5,10 @@ import type { DndContextProps, DragEndEvent } from '@dnd-kit/core';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
 import { useI18nStore } from '../../../i18n';
+import { createRef } from 'react';
 import { GoalTimeline } from '../GoalTimeline';
-import { FALLBACK_WIDTH, NO_MILESTONE, axisFor, dayOf, dayOfIsoDate, xOfDay } from '../timelineLayout';
+import { TimelineAxisView } from '../TimelineAxisView';
+import { CHIP_ANCHOR, CHIP_WIDTH, FALLBACK_WIDTH, NO_MILESTONE, axisFor, dayOf, dayOfIsoDate, xOfDay } from '../timelineLayout';
 import type { Goal, GoalMilestone, GoalTodoItem } from '../../../types';
 
 // Ziehen lässt sich in jsdom nicht echt ausführen (keine Layout-Maße). Der Test greift deshalb die
@@ -111,6 +113,29 @@ function dropOn(todoId: string, overId: string | null, x = 0) {
   act(() => dnd.props!.onDragEnd!(event));
 }
 
+/**
+ * Das Ende eines Zugs per Tastatur: kein Zeiger, der Tag steht unter dem Statuspunkt des angehobenen
+ * Chips – `dotX` Pixel rechts vom Anfang der Zeile (ff6f08fd).
+ */
+function keyboardDropOn(todoId: string, overId: string, dotX: number) {
+  const rowLeft = 180;
+  const left = rowLeft + dotX - CHIP_ANCHOR;
+  const event = {
+    active: {
+      id: `todo:${todoId}`, data: { current: { anchor: CHIP_ANCHOR, flipped: false } },
+      rect: { current: { initial: null, translated: { left, top: 310, width: CHIP_WIDTH, height: 28, right: left + CHIP_WIDTH, bottom: 338 } } },
+    },
+    over: {
+      id: overId, data: { current: undefined }, disabled: false,
+      rect: { left: rowLeft, top: 300, width: FALLBACK_WIDTH, height: 48, right: rowLeft + FALLBACK_WIDTH, bottom: 348 },
+    },
+    delta: { x: 3 * 30, y: 0 },
+    activatorEvent: new KeyboardEvent('keydown', { code: 'Space' }),
+    collisions: null,
+  } as unknown as DragEndEvent;
+  act(() => dnd.props!.onDragEnd!(event));
+}
+
 describe('GoalTimeline', () => {
   it('shows a row per milestone and one without, the dated TODOs in them and the undated ones as unplanned', () => {
     renderTimeline();
@@ -180,6 +205,39 @@ describe('GoalTimeline', () => {
     await waitFor(() => expect(sent).toEqual([
       { method: 'PUT', path: '/api/v1/todos/a', body: { dueDate: '' } },
     ]));
+  });
+
+  // ff6f08fd: keyboard dragging – Space lifts, the arrows move, Space or Enter drops
+  it('a keyboard drop sets the day under the dot of the lifted chip', async () => {
+    const sent = recordWrites();
+    renderTimeline();
+
+    keyboardDropOn('b', `row:${NO_MILESTONE}`, xFor('2026-10-08'));
+
+    await waitFor(() => expect(sent).toEqual([
+      { method: 'PUT', path: '/api/v1/todos/b', body: { dueDate: endOf('2026-10-08') } },
+    ]));
+  });
+
+  it('lifts a chip with Space and keeps Enter for its menu', async () => {
+    renderTimeline();
+    const chip = screen.getByRole('button', { name: /^Style probe/ });
+    expect(chip).toHaveAttribute('aria-roledescription', 'draggable');
+    const lifted = () => document.querySelector('.ring-accent');
+
+    fireEvent.keyDown(chip, { code: 'Enter', key: 'Enter' });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(lifted()).toBeNull();
+
+    act(() => { chip.focus(); });
+    fireEvent.keyDown(chip, { code: 'Space', key: ' ' });
+    await waitFor(() => expect(lifted()).not.toBeNull());
+    // the lifted chip is drawn a second time under the pointer, the original fades
+    expect(screen.getAllByText('Style probe')).toHaveLength(2);
+
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' });
+    await waitFor(() => expect(screen.getAllByText('Style probe')).toHaveLength(1));
   });
 
   it('plans a TODO from its menu, without dragging', async () => {
@@ -272,5 +330,31 @@ describe('GoalTimeline', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete milestone' })).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(sent).toContainEqual({ method: 'DELETE', path: '/api/v1/goals/g1/milestones/m-beta', body: null }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete milestone' })).not.toBeInTheDocument());
+  });
+});
+
+// ff6f08fd: at 768 px the label "Today" lay on the diamond of the next day
+describe('TimelineAxisView — the label "Today"', () => {
+  const nextDay: GoalMilestone = { ...beta, id: 'm-next', title: 'Kick-off', dueDate: endOf('2026-09-25') };
+
+  function renderAxis(width: number, milestones: GoalMilestone[]) {
+    const axis = axisFor({ todos, milestones, targetDate: goal.targetDate, today: dayOf(NOW) }, width);
+    renderWithProviders(
+      <TimelineAxisView axis={axis} width={width} milestones={milestones} targetDay={dayOf(goal.targetDate!)}
+        preview={null} measureRef={createRef()} onCreateAt={vi.fn()} onOpenMilestone={vi.fn()} />,
+    );
+    return screen.getByTestId('timeline-today');
+  }
+
+  it('stays centred over today where the axis is wide enough', () => {
+    const label = renderAxis(FALLBACK_WIDTH, [beta, nextDay]);
+    expect(label).toHaveTextContent('Today');
+    expect(label).toHaveAttribute('data-placement', 'center');
+  });
+
+  it('moves aside when a diamond sits on the next day of a narrow axis', () => {
+    const label = renderAxis(480, [beta, nextDay]);
+    expect(label).toHaveAttribute('data-placement', 'left');
+    expect(label).toHaveClass('-translate-x-full');
   });
 });
