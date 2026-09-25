@@ -24,8 +24,13 @@ class GoalVariables implements PlatformVariableSource {
     private final GoalContextSource goalContextSource;
 
     @Override
+    public List<String> allNames() {
+        return GoalContextSource.VARIABLES;
+    }
+
+    @Override
     public List<String> names(Request request) {
-        return goalId(request) != null ? GoalContextSource.VARIABLES : List.of();
+        return goalId(request) != null ? allNames() : List.of();
     }
 
     @Override

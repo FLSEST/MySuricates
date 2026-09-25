@@ -49,8 +49,13 @@ class PreviousReportVariable implements PlatformVariableSource {
     private final StepResultRepository stepResultRepository;
 
     @Override
-    public List<String> names(Request request) {
+    public List<String> allNames() {
         return List.of(NAME);
+    }
+
+    @Override
+    public List<String> names(Request request) {
+        return allNames();
     }
 
     @Override

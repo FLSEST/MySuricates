@@ -47,9 +47,15 @@ class ExecutionContextFactoryTest {
 
     private Project project;
 
+    /** What the real collector reserves (pinned against the sources in PlatformVariableSourceWiringTest). */
+    private static final java.util.Set<String> PLATFORM_NAMES = java.util.stream.Stream.concat(
+            java.util.stream.Stream.of("previous_report", "open_todos", "request_metrics", "audit_findings"),
+            GoalContextSource.VARIABLES.stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());
+
     @BeforeEach
     void setUp() {
         project = Project.builder().id("proj-1").path("/p").aiContext("ctx").build();
+        lenient().when(contextDataService.platformVariableNames()).thenReturn(PLATFORM_NAMES);
         lenient().when(agentInstructionsService.buildInstructionPrefix(any())).thenReturn("");
         lenient().when(systemIdentity.getName()).thenReturn("MySuricates");
         lenient().when(systemIdentity.getVersion()).thenReturn("0.7.4");
@@ -234,6 +240,36 @@ class ExecutionContextFactoryTest {
         assertThat(ctx.resolveShellTemplate("echo {{ audit_findings }}", false))
                 .as("left to the platform injection — the mock sets nothing, so the placeholder stays")
                 .isEqualTo("echo {{ audit_findings }}");
+    }
+
+    /**
+     * TODO 2a0695ff: no platform variable comes from an input context. For goal_status without goal_id the platform
+     * sets nothing — a handed-over or passed value would otherwise stay a trusted, unquoted variable; for
+     * previous_report and co. it would be overwritten, but was trusted until then.
+     */
+    @Test
+    void create_handedOverPlatformData_isDroppedEveryVariable_soOnlyThePlatformSetsIt() {
+        java.util.Map<String, Object> input = new java.util.HashMap<>();
+        PLATFORM_NAMES.forEach(name -> input.put(name, "gefaelscht $(id)"));
+        input.put("foo", "bar");
+
+        ExecutionContext ctx = factory.create(seed(input));
+
+        assertThat(ctx.getVariables()).doesNotContainKeys(PLATFORM_NAMES.toArray(String[]::new))
+                .containsEntry("foo", "bar");
+        assertThat(ctx.resolveShellTemplate("echo {{ goal_status }} {{ open_todos }}", false))
+                .as("left to the platform injection — the mock sets nothing, so the placeholders stay")
+                .isEqualTo("echo {{ goal_status }} {{ open_todos }}");
+    }
+
+    /** The reserved names are the collector's, not a list of the factory's own. */
+    @Test
+    void create_asksTheCollectorWhichNamesAreReserved() {
+        when(contextDataService.platformVariableNames()).thenReturn(java.util.Set.of("new_platform_variable"));
+
+        ExecutionContext ctx = factory.create(seed(Map.of("new_platform_variable", "x", "open_todos", "y")));
+
+        assertThat(ctx.getVariables()).doesNotContainKey("new_platform_variable").containsEntry("open_todos", "y");
     }
 
     @Test

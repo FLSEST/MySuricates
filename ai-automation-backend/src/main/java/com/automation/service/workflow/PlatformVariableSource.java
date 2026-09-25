@@ -27,6 +27,13 @@ public interface PlatformVariableSource {
         }
     }
 
+    /**
+     * Every name this source can set, whether it applies to a run or not. They belong to the platform: no
+     * input context brings a value under one of them — not a parent run handing its variables to a
+     * sub-workflow, not a caller (TODO 2a0695ff). Must not throw.
+     */
+    List<String> allNames();
+
     /** The variables this source sets for the run; empty when it does not apply — then none is set. Must not throw. */
     List<String> names(Request request);
 

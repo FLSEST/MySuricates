@@ -540,6 +540,8 @@ Führt einen anderen Workflow als verschachtelten Schritt aus.
 
 **Limits**: Maximale Verschachtelungstiefe von 5 Ebenen. Zirkuläre Referenzen werden erkannt. 30-Minuten-Timeout.
 
+**Kontext**: Der Child-Run bekommt die Variablen des Parent-Runs und dessen `{{ previous_output }}`, aber nicht dessen Plattform-Daten (`previous_report`, `open_todos`, `request_metrics`, `goal_status`/`goal_guard_*`, `audit_findings`): Die injiziert die Plattform dem Child-Run selbst, für ihn berechnet. Ein Wert unter einem dieser Namen wird auch aus keinem anderen Eingabe-Kontext übernommen. Der Taint des Parent-Runs reist mit.
+
 **Marker**: Der Schritt reicht die letzte Ausgabe des Child-Runs nur durch (Step-Metadatum `derivedOutput: true`). `gate_status:`- und `todo_item:`-Marker darin werden ausschliesslich im Child-Run ausgewertet — der Parent-Run übernimmt sie bewusst nicht in seine Gate-Zusammenfassung oder TODO-Liste.
 
 **Wann verwenden**: Komplexe Workflows aus kleineren, wiederverwendbaren zusammensetzen.

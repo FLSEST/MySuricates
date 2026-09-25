@@ -7,9 +7,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Injects platform data into the {@link ExecutionContext} as template variables ({@code previous_report},
@@ -77,6 +80,19 @@ public class WorkflowContextDataService {
     /** Short form without workflow metadata — a run that is no audit workflow. */
     public void injectPlatformData(ExecutionContext context, String workflowId, String projectId) {
         injectPlatformData(context, workflowId, projectId, Map.of());
+    }
+
+    /**
+     * Every name a source can set, for any run ({@link PlatformVariableSource#allNames}). Reserved for the
+     * platform (TODO 2a0695ff): {@link ExecutionContextFactory} takes none of them from an input context, and a
+     * sub-workflow is not handed its parent's — every run gets its own, injected here as untrusted platform data.
+     */
+    public Set<String> platformVariableNames() {
+        Set<String> names = new LinkedHashSet<>();
+        for (PlatformVariableSource source : sources) {
+            names.addAll(source.allNames());
+        }
+        return Collections.unmodifiableSet(names);
     }
 
     /**

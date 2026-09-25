@@ -23,8 +23,13 @@ class RequestMetricsVariable implements PlatformVariableSource {
     private final RequestMetricsFactSheet requestMetricsFactSheet;
 
     @Override
-    public List<String> names(Request request) {
+    public List<String> allNames() {
         return List.of(NAME);
+    }
+
+    @Override
+    public List<String> names(Request request) {
+        return allNames();
     }
 
     @Override
