@@ -1063,7 +1063,7 @@ else
 fi
 ```
 
-When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN). On a tie, RED and YELLOW keep the first gate – the cause, whose category also names the auto-TODO – while GREEN takes the last one, the closing verdict rather than the `Command exit 0` of a `checked_command` before it; a later GREEN without `gate_description` does not replace one that has it (TODO 2aa9ddd5).
+When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN). On a tie, RED and YELLOW keep the first gate – the cause, whose category also names the auto-TODO – while GREEN takes the last one, the closing verdict rather than the `Command exit 0` of a `checked_command` before it – unless it says less: the synthetic `Command exit N` never replaces a description in words of its own, not even after the verdict, and a GREEN without `gate_description` does not replace one that has it. If the later one has no `gate_category`, the current one stays (TODO 2aa9ddd5).
 
 **`run.metadata.gate_summary`** additionally aggregates all parsed gates of the run:
 

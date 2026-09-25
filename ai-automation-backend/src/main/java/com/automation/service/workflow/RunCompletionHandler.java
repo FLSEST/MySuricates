@@ -10,6 +10,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dashboard.DashboardWidgetResultParser;
+import com.automation.service.runoutput.CommandExitDescription;
 import com.automation.service.runoutput.GateExpectation;
 import com.automation.service.runoutput.GateStatusOutputParser;
 import com.automation.service.runoutput.TodoOutputParser;
@@ -46,7 +47,7 @@ public class RunCompletionHandler {
     public void complete(WorkflowRun run, ExecutionContext context, String workflowId,
                          String workflowName, String templateId, String projectId,
                          List<BlockDefinition> blocks) {
-        // Parse gate_status markers from ALL blocks — highest severity wins, between equals see speaksForTheRun.
+        // Parse gate_status markers from ALL blocks — highest severity wins, between equals see closingGreenVerdict.
         // GateStatus ordinal: GREEN(0) < YELLOW(1) < RED(2)
         GateStatus highestGate = null;
         String gateCategory = null;
@@ -60,9 +61,14 @@ public class RunCompletionHandler {
                 var parsedGate = GateStatusOutputParser.parse(step.getOutput());
                 if (parsedGate.isPresent()) {
                     var gate = parsedGate.get();
-                    if (speaksForTheRun(gate, highestGate, gateDescription)) {
+                    if (highestGate == null || gate.status().ordinal() > highestGate.ordinal()) {
                         highestGate = gate.status();
                         gateCategory = gate.category();
+                        gateDescription = gate.description();
+                    } else if (closingGreenVerdict(gate, highestGate, gateDescription)) {
+                        // Without a category of its own it keeps the one so far: GateStatusResolver would put in
+                        // "success" and so rename a track-mode TODO and the category: tag.
+                        if (gate.category() != null) gateCategory = gate.category();
                         gateDescription = gate.description();
                     }
                     Map<String, Object> item = new HashMap<>();
@@ -190,22 +196,28 @@ public class RunCompletionHandler {
     }
 
     /**
-     * Whether this gate replaces the one so far as the run's {@code gate_status}/{@code _category}/{@code _description}:
-     * a worse one always does. Between equals it depends on the status (TODO 2aa9ddd5).
+     * Whether an equal gate replaces the one so far as the run's {@code gate_description} (a worse one always
+     * replaces all three fields). It depends on the status (TODO 2aa9ddd5).
      *
      * <p>RED and YELLOW keep the first: the cause — typically a {@code checked_command} whose category names what
      * failed — and exactly what an AutoTodo incident is keyed and titled by, so a closing verdict must not rename it.
-     * GREEN has no cause, so the last verdict speaks for the run: the health check's first step, a
-     * {@code checked_command} with its synthetic {@code Command exit 0}, used to stand in for its closing verdict in
-     * every report. A later GREEN without a description does not replace one that has it.
+     * GREEN has no cause, so the closing verdict speaks for the run — unless it says less than the one so far
+     * ({@link #descriptionWeight}). Neither a {@code checked_command} before the verdict (the health check's first
+     * step, whose {@code Command exit 0} stood in every report) nor one after it replaces the verdict, and a bare
+     * later GREEN does not replace a described one.
      */
-    private static boolean speaksForTheRun(GateStatusOutputParser.ParsedGateStatus gate, GateStatus highest,
-                                           String highestDescription) {
-        if (highest == null || gate.status().ordinal() > highest.ordinal()) {
-            return true;
+    private static boolean closingGreenVerdict(GateStatusOutputParser.ParsedGateStatus gate, GateStatus highest,
+                                               String highestDescription) {
+        return highest == GateStatus.GREEN && gate.status() == GateStatus.GREEN
+                && descriptionWeight(gate.description()) >= descriptionWeight(highestDescription);
+    }
+
+    /** What a gate description says: words of its own (2), only a checked_command's exit code (1), nothing (0). */
+    private static int descriptionWeight(String description) {
+        if (description == null) {
+            return 0;
         }
-        return gate.status() == highest && highest == GateStatus.GREEN
-                && (gate.description() != null || highestDescription == null);
+        return CommandExitDescription.isSynthetic(description) ? 1 : 2;
     }
 
     /** Compression steps copy their source's text; markers stay authoritative only on the original step (6e5d6e2c). */

@@ -181,6 +181,39 @@ class RunCompletionHandlerTest {
                 .containsEntry("gate_description", "200 Tests gruen");
     }
 
+    /** Das synthetische „Command exit 0“ sagt nur, dass der Befehl lief – auch hinter dem Urteil verdraengt es das nicht. */
+    @Test
+    void complete_aChecksCommandExitAfterTheVerdict_doesNotReplaceIt() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                "Health Check: GUT\ngate_status: GREEN\ngate_category: project-health\n"
+                        + "gate_description: Gesundheit gut, Faktenblatt vollstaendig",
+                checkedCommandOutput("frontend-lint-failure", 0, "npm run lint: exit 0"));
+        run.getSteps().get(1).setMetadata(Map.of("checkedCommand", true, "exitCode", 0));
+
+        handler.complete(run, ctx, "wf-1", "Health", null, "proj-1", List.of());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_category", "project-health")
+                .containsEntry("gate_description", "Gesundheit gut, Faktenblatt vollstaendig");
+    }
+
+    /**
+     * Ein spaeteres Urteil ohne eigene Kategorie behaelt die bisherige – sonst setzte GateStatusResolver „success“
+     * und benennte ein track-TODO samt {@code category:}-Tag um.
+     */
+    @Test
+    void complete_laterGreenWithoutCategory_keepsTheCategorySoFar() {
+        WorkflowRun run = run(RunStatus.RUNNING,
+                checkedCommandOutput("backend-test-failure", 0, "mvn test: exit 0"),
+                "gate_status: GREEN\ngate_description: Alles gut");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", List.of());
+
+        assertThat(ctx.getRunMetadata())
+                .containsEntry("gate_category", "backend-test-failure")
+                .containsEntry("gate_description", "Alles gut");
+    }
+
     @Test
     void complete_yellowGate_logsWarning_butRunIsCompleted() {
         WorkflowRun run = run(RunStatus.RUNNING, "gate_status: YELLOW\ngate_category: lint");

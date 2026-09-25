@@ -442,7 +442,7 @@ gate_description: <description>
 
 **Processing:**
 - `GateStatusOutputParser` — parses markers from block outputs (tolerant of Markdown formatting)
-- `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED); on a tie RED/YELLOW keep the first gate (the cause, the auto-TODO's category), GREEN the last (the closing verdict, TODO 2aa9ddd5)
+- `RunCompletionHandler` scans all block outputs — highest severity wins (GREEN < YELLOW < RED); on a tie RED/YELLOW keep the first gate (the cause, the auto-TODO's category), GREEN the last (the closing verdict; a synthetic `Command exit N` or a GREEN without description does not replace a description, and without a category of its own the current one stays, TODO 2aa9ddd5)
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
 **A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about

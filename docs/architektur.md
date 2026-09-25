@@ -447,7 +447,7 @@ gate_description: <beschreibung>
 
 **Verarbeitung:**
 - `GateStatusOutputParser` — parst Marker aus Block-Ausgaben (tolerant gegenüber Markdown-Formatierung)
-- `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED); bei Gleichstand RED/YELLOW das erste Gate (Ursache, Kategorie des Auto-TODOs), GREEN das letzte (abschließendes Urteil, TODO 2aa9ddd5)
+- `RunCompletionHandler` scannt alle Block-Ausgaben — höchste Schwere gewinnt (GREEN < YELLOW < RED); bei Gleichstand RED/YELLOW das erste Gate (Ursache, Kategorie des Auto-TODOs), GREEN das letzte (abschließendes Urteil; ein synthetisches `Command exit N` oder ein GREEN ohne Beschreibung verdrängt keine Beschreibung, ohne eigene Kategorie bleibt die bisherige, TODO 2aa9ddd5)
 - Gate-Status wird in `WorkflowRun.metadata` gespeichert (`gate_status`, `gate_category`, `gate_description`)
 
 **Ausbleibendes Urteil ist kein Erfolg** (TODO 63ecc124). Gates bleiben freiwillig — aber ein

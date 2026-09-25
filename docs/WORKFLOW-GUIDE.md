@@ -1080,7 +1080,7 @@ else
 fi
 ```
 
-Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN). Bei Gleichstand gilt für RED und YELLOW das erste Gate – die Ursache, nach deren Kategorie auch das Auto-TODO heißt –, für GREEN das letzte, also das abschließende Urteil statt des `Command exit 0` eines `checked_command` davor; ein späteres GREEN ohne `gate_description` verdrängt keines mit (TODO 2aa9ddd5).
+Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN). Bei Gleichstand gilt für RED und YELLOW das erste Gate – die Ursache, nach deren Kategorie auch das Auto-TODO heißt –, für GREEN das letzte, also das abschließende Urteil statt des `Command exit 0` eines `checked_command` davor – es sei denn, es sagt weniger: Das synthetische `Command exit N` verdrängt nie eine Beschreibung mit eigenen Worten, auch nicht hinter dem Urteil, und ein GREEN ohne `gate_description` keines mit. Fehlt dem späteren die `gate_category`, bleibt die bisherige (TODO 2aa9ddd5).
 
 **Gate-Verdict nach KI-Blöcken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum grünen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollständig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) dürfen weiter `else → GREEN` nutzen.
 
