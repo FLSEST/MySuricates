@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.HttpURLConnection;
+import java.net.URLConnection;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import javax.net.ssl.HttpsURLConnection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -58,14 +60,27 @@ class SlowCallInTransactionRatchetTest {
             "com/automation/service/ai/HostClaudeService", Set.of("reason", "reasonStructured", "executeAction")::contains,
             "com/automation/service/ai/HostCodexService", "execute"::equals,
             "com/automation/service/ai/HostPiService", Set.of("reason", "executeAction")::contains);
+    /** What an HTTP(S) connection waits on: opening it, its streams and every read of the answer. */
+    private static final Predicate<String> HTTP_CONNECTION_CALLS = Set.of("connect", "getInputStream",
+            "getOutputStream", "getResponseCode", "getResponseMessage", "getHeaderField", "getErrorStream")::contains;
     /**
      * Owner → the method names that send an HTTP request and wait for the answer: the JDK clients the
      * code uses (September 2026 – no RestTemplate, RestClient or WebClient). {@code sendAsync} counts
      * too, its future is usually joined right away.
+     *
+     * <p>The owner is matched exactly, and javac records the declared type of the receiver, not the
+     * class that implements the method. So each type a connection variable can be declared as has its
+     * own entry: {@code URLConnection} as {@code URL#openConnection} returns it – only with the calls
+     * that open it, cheap for a {@code file:} or {@code jar:} URL, but the scan cannot tell the scheme –
+     * and the HTTP and HTTPS subclasses after a cast. Not listed: the other getters that connect
+     * implicitly ({@code getContentType}, {@code getHeaderFields}, …), which follow a status or stream
+     * read in practice, and connection classes of the code's own (none in September 2026).
      */
     static final Map<String, Predicate<String>> HTTP_CALLS = Map.of(
             "java/net/http/HttpClient", Set.of("send", "sendAsync")::contains,
-            "java/net/HttpURLConnection", Set.of("connect", "getInputStream", "getOutputStream", "getResponseCode")::contains);
+            "java/net/URLConnection", Set.of("connect", "getInputStream", "getOutputStream")::contains,
+            "java/net/HttpURLConnection", HTTP_CONNECTION_CALLS,
+            "javax/net/ssl/HttpsURLConnection", HTTP_CONNECTION_CALLS);
     static final String AI_PROVIDER = "com/automation/service/ai/AiProvider";
     static final Set<String> PROVIDER_CALLS = Set.of("reason", "executeAction");
 
@@ -123,6 +138,9 @@ class SlowCallInTransactionRatchetTest {
                         fixture + "#viaHttp -> HttpClient#send",
                         fixture + "#viaHttp -> HttpClient#sendAsync",
                         fixture + "#viaHttp -> HttpURLConnection#getResponseCode",
+                        fixture + "#viaUrlConnection -> URLConnection#connect",
+                        fixture + "#viaUrlConnection -> HttpsURLConnection#getHeaderField",
+                        fixture + "#viaUrlConnection -> HttpURLConnection#getErrorStream",
                         fixture + "#insideTemplate (TransactionTemplate) -> CommandExecutorService#executeOnHost",
                         classLevel + "#inheritsTheClassAnnotation -> CommandExecutorService#executeOnHost");
     }
@@ -219,6 +237,13 @@ class SlowCallInTransactionRatchetTest {
             http.send(null, null);
             http.sendAsync(null, null);
             return connection.getResponseCode();
+        }
+
+        @Transactional
+        public Object viaUrlConnection(URLConnection plain, HttpsURLConnection secure) throws IOException {
+            plain.connect();
+            secure.getHeaderField("Location");
+            return connection.getErrorStream();
         }
 
         @Transactional
