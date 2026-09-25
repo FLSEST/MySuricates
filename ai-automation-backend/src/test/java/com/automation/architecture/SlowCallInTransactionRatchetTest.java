@@ -18,8 +18,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URLConnection;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -125,6 +127,8 @@ class SlowCallInTransactionRatchetTest {
         String fixture = Fixture.class.getName();
         String classLevel = ClassLevelFixture.class.getName();
 
+        // Exactly these: a fixture method missing here must stay unreported – cheapProviderCallsStayAllowed,
+        // preparingARequestStaysAllowed, the NOT_SUPPORTED and NEVER ones, afterTemplate, the private one.
         assertThat(TransactionalCallScan.findings(classes, slowCalls(classes))).map(Finding::toString)
                 .containsExactlyInAnyOrder(
                         fixture + "#direct -> CommandExecutorService#executeOnHost",
@@ -244,6 +248,17 @@ class SlowCallInTransactionRatchetTest {
             plain.connect();
             secure.getHeaderField("Location");
             return connection.getErrorStream();
+        }
+
+        /** Building a request or setting up a connection sends nothing – only the calls that wait count. */
+        @Transactional
+        public HttpRequest preparingARequestStaysAllowed() throws IOException {
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            http.version();
+            return HttpRequest.newBuilder(URI.create("https://example.org/hook"))
+                    .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                    .build();
         }
 
         @Transactional
