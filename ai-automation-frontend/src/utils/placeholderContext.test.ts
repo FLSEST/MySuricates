@@ -95,6 +95,14 @@ describe('checkPlaceholders', () => {
     expect(marks('{"command": "R={{ open_todos }}"}', 2, 'shell')[0]!.problem).toBeUndefined();
   });
 
+  it('treats audit_findings as platform data: escaped by the backend, never quoted by hand', () => {
+    const info = ctxAt(3).items.find((i) => i.key === 'audit_findings');
+    expect(info?.kind).toBe('system');
+    expect(info?.untrusted).toBe(true);
+    expect(marks('{"command": "R={{ audit_findings }}"}', 2, 'shell')[0]!.problem).toBeUndefined();
+    expect(marks(`{"command": "R='{{ audit_findings }}'"}`, 2, 'shell')[0]!.problem?.message).toMatch(/Do not quote/);
+  });
+
   it('speaks German when asked', () => {
     const ctx = ctxAt(2, { type: 'simple' }, 'de');
     expect(checkPlaceholders('{{ block.nope.output }}', ctx)[0]!.problem?.message).toMatch(/Keinen Block/);
