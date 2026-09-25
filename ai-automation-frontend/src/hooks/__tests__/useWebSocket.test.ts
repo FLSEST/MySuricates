@@ -545,4 +545,25 @@ describe('useExecutionWebSocket', () => {
 
     await waitFor(() => expect(result.current.logs).toHaveLength(0));
   });
+
+  it('clears the open question when the runId changes', async () => {
+    const { result, rerender } = renderHook(({ id }) => useExecutionWebSocket(id, 'wf-1'), {
+      wrapper: createWrapper(), initialProps: { id: 'run-1' },
+    });
+    await waitFor(() => expect(result.current.connected).toBe(true));
+    act(() => {
+      sendMessage({ type: 'approval_required', blockId: 'approval-1', question: 'OK?', options: ['Yes', 'No'], stepIndex: 1 });
+      sendMessage({
+        type: 'human_input_required', blockId: 'input-2', prompt: 'Name?', inputType: 'text', options: [],
+        defaultValue: '', required: true, validationPattern: null, variableName: 'name', stepIndex: 2,
+      });
+    });
+    await waitFor(() => expect(result.current.pendingHumanInput).not.toBeNull());
+    expect(result.current.pendingApproval).not.toBeNull();
+
+    rerender({ id: 'run-2' });
+
+    await waitFor(() => expect(result.current.pendingApproval).toBeNull());
+    expect(result.current.pendingHumanInput).toBeNull();
+  });
 });

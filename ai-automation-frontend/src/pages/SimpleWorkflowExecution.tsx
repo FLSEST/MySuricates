@@ -14,7 +14,7 @@ import {
   usePauseExecution, useResumeExecution, useCancelExecution, useSubmitApproval,
 } from '../hooks/useWorkflows';
 import { useExecutionWebSocket } from '../hooks/useWebSocket';
-import { useRunInputRecovery } from '../hooks/useRunInputRecovery';
+import { useRunPendingInput } from '../hooks/useRunPendingInput';
 import { useI18nStore, useT } from '../i18n';
 import { formatTimestamp } from '../utils/localeFormat';
 import { formatDuration } from '../utils/formatTime';
@@ -95,14 +95,11 @@ export function SimpleWorkflowExecution() {
   const cancelExecution = useCancelExecution();
   const submitApproval = useSubmitApproval();
 
-  const { recoveredApproval, recoveredHumanInput, clearRecoveredApproval, clearRecoveredHumanInput } = useRunInputRecovery(runId);
+  const { approval: activeApproval, humanInput: activeHumanInput, settle } = useRunPendingInput(runId, run, {
+    connected, approval: pendingApproval, humanInput: pendingHumanInput,
+  });
 
   const isRunning = run?.status === 'RUNNING' || run?.status === 'PAUSED';
-
-  // Recovered dialogs only apply while the run is still active
-  const runFinished = !!run && !isRunning;
-  const activeApproval = pendingApproval ?? (runFinished ? null : recoveredApproval);
-  const activeHumanInput = pendingHumanInput ?? (runFinished ? null : recoveredHumanInput);
 
   if (runError) {
     return <ErrorState message={runError.message} onRetry={() => refetchRun()} />;
@@ -210,10 +207,10 @@ export function SimpleWorkflowExecution() {
         <ApprovalDialog
           approval={activeApproval}
           loading={submitApproval.isPending}
-          onDismiss={clearRecoveredApproval}
+          onDismiss={() => settle(activeApproval)}
           onSubmit={(answer) => {
             submitApproval.mutate({ runId: runId!, answer }, {
-              onSuccess: clearRecoveredApproval,
+              onSuccess: () => settle(activeApproval),
             });
           }}
         />
@@ -226,7 +223,7 @@ export function SimpleWorkflowExecution() {
           loading={submitApproval.isPending}
           onSubmit={(value) => {
             submitApproval.mutate({ runId: runId!, answer: value }, {
-              onSuccess: clearRecoveredHumanInput,
+              onSuccess: () => settle(activeHumanInput),
             });
           }}
         />

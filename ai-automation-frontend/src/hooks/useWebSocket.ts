@@ -187,8 +187,10 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       disposed = true;
       client.deactivate();
       clientRef.current = null;
-      // A different run must not inherit this run's lines.
+      // A different run must not inherit this run's lines or its open question.
       setLogs([]);
+      setPendingApproval(null);
+      setPendingHumanInput(null);
     };
   }, [runId, liveOutput, appendEntries]);
 

@@ -117,7 +117,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Sternebewertung (1-5) nach Abschluss
 - Fehler-Panel bei fehlgeschlagenen Runs
 - Bausteine in `components/workflow/`: `RunProvenance` (Siegel, Auslöser als `TriggerSourceChip` – den Chip nutzt auch das Audit Center –, Definitions-Hash), `RunInputVariables`, `RunPendingTodosPanel` (vorgeschlagene TODOs freigeben/verwerfen), `RunContainerPanel` (Kommando senden bzw. Terminal, nur während der Run läuft oder pausiert)
-- `hooks/useRunInputRecovery.ts` holt nach dem Laden eine wartende Freigabe oder Eingabe über `GET /executions/{id}/approval` zurück — gemeinsam mit `SimpleWorkflowExecution`
+- `hooks/useRunPendingInput.ts` ist die eine Quelle für Freigabe- und Eingabedialog, gemeinsam mit `SimpleWorkflowExecution`: WebSocket-Meldungen zuerst, dazu `GET /executions/{id}/approval` (`hooks/useRunInputRecovery.ts`) nach dem Laden und erneut, sobald der WebSocket verbindet oder Laufstatus bzw. aktueller Schritt wechseln (nur solange der Lauf läuft oder pausiert). Eine beantwortete oder geschlossene Frage verschwindet sofort, auch wenn der WebSocket sie noch meldet
 - Der Kopf mit Zurück, Status und den Aktionen je Zustand (Pausieren, Fortsetzen, Abbrechen, Löschen, ab letztem Schritt fortsetzen, TODO aus einem fehlgeschlagenen Lauf) ist `RunHeader`, die Notizen sind `RunNotesCard` (der ungespeicherte Text bleibt in der Seite). `components/workflow/useRunDiagramSync.ts` färbt die Diagramm-Kästen nach Step-Status und hebt beim Klick auf einen Kasten dessen Step hervor; das TODO eines fehlgeschlagenen Laufs baut `utils/failedRunTodo.ts` (`buildFailedRunTodo`) in der App-Sprache
 
 ### Runs (`/runs`)
