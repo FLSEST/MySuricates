@@ -248,7 +248,9 @@ rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the pro
   would name it differently.
 - **Markdown:** the findings table shows only `OPEN`, `AWAITING_VERIFICATION` and new findings.
   Classified ones are summed up in one line, `Bewusst eingeordnet: <N> (akzeptiert <x>, verworfen
-  <y>) - siehe Audit Center`, unless one has measurably degraded.
+  <y>) - siehe Audit Center`, unless one has measurably degraded. Degraded means: a supporting
+  metric lies more than 10 % above its last value. That is the threshold at which
+  `AuditAcceptancePolicy` reopens an acceptance, too; smaller fluctuations do not count.
 - **Counting:** `gate_status` and the numbers in the Markdown count only `OPEN`,
   `AWAITING_VERIFICATION` and new findings, classified ones only if this run's measurement shows they
   have degraded. The envelope and the measurements themselves are not affected. Otherwise the
@@ -265,7 +267,9 @@ rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the pro
 The test coverage audit recommends as its next step and in its roadmap only classes that are not
 classified. Its envelope still carries every listed class, otherwise `expectedFindings` would not
 match. That all five prompts carry the variable and the same rule block, and that none still asks to
-leave known findings out, is checked by `scripts/tests/test-audit-facts.sh` (section 10).
+leave known findings out, is checked by `scripts/tests/test-audit-facts.sh` (section 10). The check
+reads the threshold from `AuditAcceptancePolicy`, so that prompt and platform mean the same by
+"degraded".
 
 ## Lifecycle
 
