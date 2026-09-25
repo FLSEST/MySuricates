@@ -256,7 +256,9 @@ rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the pro
 - **Envelope:** every finding that the measurement still shows is carried forward, `ACCEPTED_RISK`
   and `DISMISSED` included. Only fixed findings stay out, and legacy ones with a `ruleKey` the prompt
   does not allow. The model checks an `AWAITING_VERIFICATION` finding against the measurement: if it
-  reports it, the finding is `OPEN` again; if it is missing, the fix is confirmed.
+  reports it, the finding is `OPEN` again; if it is missing, the fix is confirmed. Without a
+  measurement for it, the model carries it forward, so that no re-review becomes `RESOLVED` without
+  evidence.
 - The platform sets the status, not the envelope. The model does not echo the last report verbatim,
   least of all its envelope.
 

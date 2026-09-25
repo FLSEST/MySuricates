@@ -254,7 +254,8 @@ fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
 - **Envelope:** Jeder Befund, der laut Messung noch besteht, wird weitergeführt, auch
   `ACCEPTED_RISK` und `DISMISSED`. Weg bleibt nur Behobenes und Altbestand mit einem `ruleKey`,
   den der Prompt nicht erlaubt. Einen `AWAITING_VERIFICATION`-Befund prüft das Modell gegen die
-  Messung: Meldet es ihn, wird er wieder `OPEN`; fehlt er, ist die Behebung bestätigt.
+  Messung: Meldet es ihn, wird er wieder `OPEN`; fehlt er, ist die Behebung bestätigt. Liegt keine
+  Messung dazu vor, führt es ihn weiter, damit keine Wiedervorlage ohne Beleg `RESOLVED` wird.
 - Den Status setzt die Plattform, nicht der Envelope. Den letzten Report gibt das Modell nicht
   wörtlich wieder, vor allem nicht seinen Envelope.
 
