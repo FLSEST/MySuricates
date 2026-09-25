@@ -2269,6 +2269,10 @@ Anwendungs-Einstellung setzen.
 
 **Response:** `200 OK`
 
+`backup-retain-count` nimmt 1–365; ein anderer Wert → `400`, gespeichert wird dann nichts. Der
+gespeicherte Wert gilt ab der nächsten Rotation und nach einem Neustart weiter (sonst
+`automation.backup.retain-count`).
+
 ### `GET /api/v1/system/tray-config`
 
 Laufzeit-Einstellungen des Host-Tray-Icons abrufen.

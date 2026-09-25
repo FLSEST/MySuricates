@@ -126,22 +126,56 @@ class SystemSettingsServiceTest {
         verify(eventPublisher).publishEvent(new AppSettingChangedEvent("auto-repair-default"));
     }
 
+    /** 205ebd8f: the count is stored (normalised) and read by the rotation — no copy in BackupConfig any more. */
     @Test
-    void setSetting_backupRetainCount_appliesTheCountAndAnnounces() {
-        service.setSetting("backup-retain-count", "14");
+    void setSetting_backupRetainCount_storesTheCountAndAnnounces() {
+        service.setSetting("backup-retain-count", " 14 ");
 
-        verify(backupConfig).setRetainCount(14);
-        verify(eventPublisher).publishEvent(new AppSettingChangedEvent("backup-retain-count"));
+        var order = inOrder(appSettingsRepository, eventPublisher);
+        order.verify(appSettingsRepository).set("backup-retain-count", "14");
+        order.verify(eventPublisher).publishEvent(new AppSettingChangedEvent("backup-retain-count"));
+        verify(backupConfig, never()).setRetainCount(anyInt());
     }
 
-    @Test
-    void setSetting_backupRetainCountOutOfRange_throwsWithoutAnnouncing() {
-        assertThatThrownBy(() -> service.setSetting("backup-retain-count", "0"))
+    /** 205ebd8f: the range is checked before anything is stored — the old path stored first, then threw. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "366", "-1", "abc", "1.5", " "})
+    void setSetting_invalidBackupRetainCount_storesNothingAndAnnouncesNothing(String value) {
+        assertThatThrownBy(() -> service.setSetting("backup-retain-count", value))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 1 and 365");
 
+        verify(appSettingsRepository, never()).set(any(), any());
         verify(backupConfig, never()).setRetainCount(anyInt());
         verifyNoInteractions(eventPublisher);
+    }
+
+    // --- backupRetainCount (205ebd8f: the stored value holds after a restart) ---
+
+    /** A fresh service over the stored settings — as after a restart, nothing is held in memory. */
+    @Test
+    void backupRetainCount_isTheStoredValue_soItHoldsAfterARestart() {
+        when(appSettingsRepository.get("backup-retain-count")).thenReturn(Optional.of("12"));
+        SystemSettingsService afterRestart = new SystemSettingsService(appSettingsRepository, new BackupConfig(), eventPublisher);
+
+        assertThat(afterRestart.backupRetainCount()).isEqualTo(12);
+    }
+
+    @Test
+    void backupRetainCount_withoutStoredValue_isTheConfiguredCount() {
+        when(appSettingsRepository.get("backup-retain-count")).thenReturn(Optional.empty());
+        backupConfig.setRetainCount(9);
+
+        assertThat(service.backupRetainCount()).isEqualTo(9);
+    }
+
+    /** A value the old write path stored unchecked counts as not set. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "400", "viele"})
+    void backupRetainCount_ignoresAnUnusableStoredValue(String stored) {
+        when(appSettingsRepository.get("backup-retain-count")).thenReturn(Optional.of(stored));
+
+        assertThat(service.backupRetainCount()).isEqualTo(30);
     }
 
     // --- all allowed keys ---

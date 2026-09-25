@@ -2262,6 +2262,10 @@ Set an application setting.
 
 **Response:** `200 OK`
 
+`backup-retain-count` takes 1–365; any other value → `400`, and nothing is stored. The stored value
+applies from the next rotation on and keeps applying after a restart (otherwise
+`automation.backup.retain-count`).
+
 ### `GET /api/v1/system/tray-config`
 
 Retrieve runtime settings for the host tray icon.
