@@ -70,6 +70,9 @@ class GoalRelationAssemblerTest {
 
         assertThat(kind(row("audit-by-table").run("run-1").source(Todo.Source.AI).build(), lookups))
                 .as("Befund-Tabelle allein genuegt und schlaegt Lauf und Quelle").isEqualTo(OriginKind.AUDIT);
+        assertThat(kind(row("audit-by-reference").ref("audit_finding", "f-5").source(Todo.Source.WORKFLOW)
+                .run("run-4").build(), lookups))
+                .as("Audit-Referenz allein, ohne Tabelleneintrag, genuegt ebenso").isEqualTo(OriginKind.AUDIT);
         assertThat(kind(row("health-with-run").ref("health_check", "disk").run("run-2").build(), lookups))
                 .as("Health vor Lauf").isEqualTo(OriginKind.HEALTH);
         assertThat(kind(row("reference-only").ref("workflow_run", "wf-1").build(), lookups))
@@ -91,6 +94,8 @@ class GoalRelationAssemblerTest {
                 .containsExactly("f-1", "f-2");
         assertThat(GoalRelationAssembler.originOf(row("table-only").ref("audit_finding", null).build(), lookups).findingIds())
                 .as("Audit-Referenz ohne ID: nur die Tabelle").containsExactly("f-3");
+        assertThat(GoalRelationAssembler.originOf(row("reference-only").ref("audit_finding", "f-5").build(), lookups).findingIds())
+                .as("Audit nur ueber die Referenz, ohne Tabelleneintrag").containsExactly("f-5");
         assertThat(GoalRelationAssembler.originOf(row("user").build(), lookups).findingIds()).isEmpty();
     }
 
@@ -139,13 +144,14 @@ class GoalRelationAssemblerTest {
                         new TodoTriggerMatchRow("tr-other-project", null, "p2", null, null, "wf-a", "Anderes Projekt"),
                         new TodoTriggerMatchRow("tr-project", "backend", "p1", null, null, "wf-b", "Projekt"),
                         new TodoTriggerMatchRow("tr-source-ai", null, null, "AI", null, "wf-c", "Nur KI"),
+                        new TodoTriggerMatchRow("tr-target-gone", null, null, null, null, "wf-deleted", "Ziel weg"),
                         new TodoTriggerMatchRow("tr-any", null, null, null, null, "wf-d", null)));
 
         List<Worker> workers = GoalRelationAssembler.workersOf(row("t").tags("backend").project("p1")
                 .source(Todo.Source.WORKFLOW).priority(Todo.Priority.HIGH).linked("wf-fix").build(), lookups);
         List<Worker> linkedGone = GoalRelationAssembler.workersOf(row("u").linked("wf-gone").build(), lookups);
 
-        assertThat(workers).containsExactly(
+        assertThat(workers).as("tr-target-gone passt, aber sein Ziel-Workflow ist geloescht: faellt weg").containsExactly(
                 new Worker(WorkerKind.LINKED, "wf-fix", "Fix", null, null),
                 new Worker(WorkerKind.TRIGGER, "wf-b", "B", "tr-project", "Projekt"),
                 new Worker(WorkerKind.TRIGGER, "wf-d", "D", "tr-any", null));
@@ -156,7 +162,8 @@ class GoalRelationAssemblerTest {
     @Test
     void result_absentWithoutAnyFix_presentFromAttemptsAlone_runFieldsOnlyForAKnownRun() {
         Lookups lookups = new Lookups(Map.of(), Map.of(),
-                Map.of("run-live", new RunStateRow("run-live", "wf-fix", "Fix", RunStatus.RUNNING, T0, null)),
+                Map.of("run-live", new RunStateRow("run-live", "wf-fix", "Fix", RunStatus.RUNNING, T0, null),
+                        "run-done", new RunStateRow("run-done", "wf-fix", "Fix", RunStatus.COMPLETED, T0, T0.plusSeconds(90))),
                 Map.of(), List.of());
 
         assertThat(GoalRelationAssembler.resultOf(row("never").build(), lookups)).isNull();
@@ -168,6 +175,10 @@ class GoalRelationAssemblerTest {
         assertThat(GoalRelationAssembler.resultOf(row("running").fix("run-live", 1, Todo.ResolutionState.RUNNING).build(), lookups))
                 .as("laeuft noch: Startzeit")
                 .isEqualTo(new Result("run-live", "wf-fix", RunStatus.RUNNING, T0, 1, Todo.ResolutionState.RUNNING));
+        assertThat(GoalRelationAssembler.resultOf(row("done").fix("run-done", 2, Todo.ResolutionState.SUCCEEDED).build(), lookups))
+                .as("beendet: Endzeit vor Startzeit")
+                .isEqualTo(new Result("run-done", "wf-fix", RunStatus.COMPLETED, T0.plusSeconds(90), 2,
+                        Todo.ResolutionState.SUCCEEDED));
     }
 
     @Test
