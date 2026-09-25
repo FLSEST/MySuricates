@@ -224,6 +224,10 @@ ACCEPTED_RISK | MEDIUM | performance.bundle-size | frontend/dist | Bundle über 
   gekürzt (Titel 200, `subject` 300, Einordnung 200 Zeichen) und von Plattform-Markern, dem
   Envelope-Marker `mysuricates:audit-result` und Blockgrenzen befreit – auch in Verkleidung
   (Vollbreite, unsichtbare Zeichen, Unicode-Leerraum), die ein Modell als ASCII wiedergäbe.
+- Ein `|` in `ruleKey`, `subject`, Titel oder Einordnung steht als `¦` (TODO `90c4f7db`): Das
+  Trennzeichen kommt in keinem Feld vor, ein Skript darf die Zeile an `|` zerlegen. Für die
+  Identität zählt `¦` wie `|` – ein Prompt, der den Befund so weiterführt, wie der Block ihn zeigt,
+  trifft denselben Befund.
 - Ohne bekannte Befunde steht `(keine bekannten Befunde)` da. Scheitert die Abfrage, steht
   `NICHT GEMESSEN: audit_findings (nicht verfügbar: <Fehlerart>)` da, dazu eine WARN-Zeile im
   Activity-Log; ist das Modul `audit` aus, `… (nicht verfügbar: Modul audit ist aus)`.

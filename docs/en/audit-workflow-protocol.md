@@ -227,6 +227,9 @@ note.
   200, `subject` 300, disposition 200 characters) and stripped of platform markers, the envelope marker
   `mysuricates:audit-result` and block delimiters – also in disguise (full width, invisible characters,
   Unicode whitespace) that a model would echo as ASCII.
+- A `|` in `ruleKey`, `subject`, title or disposition reads `¦` (TODO `90c4f7db`): the separator occurs
+  in no field, so a script may split the line at `|`. For the identity `¦` counts as `|` – a prompt that
+  carries the finding forward as the block shows it hits the same finding.
 - Without known findings it reads `(keine bekannten Befunde)`. If the query fails, it reads
   `NICHT GEMESSEN: audit_findings (nicht verfügbar: <error type>)`, plus a WARN entry in the activity
   log; with the `audit` module off, `… (nicht verfügbar: Modul audit ist aus)`.

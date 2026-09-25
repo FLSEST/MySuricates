@@ -47,8 +47,10 @@ public class AuditFingerprintMigrationJob {
      * v2: normalisiert auch den ruleKey ueber {@link AuditRuleKeyCatalog} (Audit-TODO 8fc9a401).
      * v3: {@link AuditSubjectNormalizer} laesst {@code <art>:<wert>} ganz (TODO 94fda6ef) — die
      * Fingerprints solcher Findings werden neu berechnet.
+     * v4: {@code ¦} in Regel oder subject zaehlt im Fingerprint wie {@code |} (TODO 90c4f7db) — ein
+     * Finding, das schon mit {@code ¦} gespeichert ist, bekommt seinen neuen Fingerprint.
      */
-    static final int VERSION = 3;
+    static final int VERSION = 4;
 
     private static final Comparator<AuditFinding> OLDEST_FIRST = Comparator
             .comparing(AuditFinding::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))

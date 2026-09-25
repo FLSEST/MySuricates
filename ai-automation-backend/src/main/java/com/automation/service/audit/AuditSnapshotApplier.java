@@ -172,12 +172,15 @@ class AuditSnapshotApplier {
     /**
      * Identitaet eines Findings: Projekt, Audit, Regel und das <em>normalisierte</em> subject
      * ({@link AuditSubjectNormalizer}) — modellgenerierte Suffix-Drift im subject erzeugt damit
-     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d).
+     * keinen neuen Fingerprint mehr (Audit-TODO 0e19648d). Ein {@code ¦} in Regel oder subject zaehlt
+     * wie {@code |}: So zeigt {@code audit_findings} ein {@code |} in einem Feld, und ein Modell, das den
+     * Befund von dort weiterfuehrt, gibt es so wieder (TODO 90c4f7db).
      */
     static String fingerprint(String projectId, String auditKey, String ruleKey, String subject) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(
-                    String.join("\n", projectId, auditKey, ruleKey, AuditSubjectNormalizer.normalize(subject))
+                    String.join("\n", projectId, auditKey, AuditFindingsContext.unmask(ruleKey),
+                                    AuditSubjectNormalizer.normalize(AuditFindingsContext.unmask(subject)))
                             .getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception ex) {
