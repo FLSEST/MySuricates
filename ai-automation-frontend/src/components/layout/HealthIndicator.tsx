@@ -11,22 +11,23 @@ export function HealthIndicator({ collapsed }: Props) {
   const navigate = useNavigate();
   const t = useT();
 
+  // Status tokens, not fixed palette classes, so the dot follows the theme (6c94dc62)
   let color: string;
   let label: string;
 
   if (isLoading || !health) {
-    color = 'bg-gray-500';
+    color = 'bg-text-tertiary';
     label = '...';
   } else if (health.status === 'UP') {
-    color = 'bg-emerald-400';
+    color = 'bg-success';
     label = t.health.allSystemsOk;
   } else if (health.status === 'DEGRADED') {
-    color = 'bg-amber-400';
+    color = 'bg-warning';
     label = health.components?.docker?.status === 'DOWN'
       ? t.health.dockerOffline
       : t.health.degraded;
   } else {
-    color = 'bg-red-500';
+    color = 'bg-danger';
     label = health.components?.database?.status === 'DOWN'
       ? t.health.databaseDown
       : t.health.down;
