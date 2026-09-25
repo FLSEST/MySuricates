@@ -178,6 +178,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       },
       onDisconnect: () => setConnected(false),
       onStompError: () => setConnected(false),
+      // onDisconnect needs a DISCONNECT receipt; an abrupt close (backend restart, standby) only ends up here.
+      // A socket this effect already left must not switch off the one of the next run.
+      onWebSocketClose: () => {
+        if (!disposed) setConnected(false);
+      },
     });
 
     clientRef.current = client;
@@ -187,10 +192,11 @@ export function useExecutionWebSocket(runId: string | null, workflowId?: string,
       disposed = true;
       client.deactivate();
       clientRef.current = null;
-      // A different run must not inherit this run's lines or its open question.
+      // A different run must not inherit this run's lines, its open question or its connection.
       setLogs([]);
       setPendingApproval(null);
       setPendingHumanInput(null);
+      setConnected(false);
     };
   }, [runId, liveOutput, appendEntries]);
 
