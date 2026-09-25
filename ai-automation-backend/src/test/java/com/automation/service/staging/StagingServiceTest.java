@@ -7,8 +7,13 @@ import com.automation.entity.*;
 import com.automation.service.system.ApiKeyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -19,7 +24,11 @@ class StagingServiceTest {
     private InstanceSyncHelper syncHelper;
     private ApiKeyService apiKeyService;
     private DockerContainerManager dockerManager;
+    private StagingComposeCommand compose;
     private StagingService service;
+
+    @TempDir
+    Path tempDir;
 
     @BeforeEach
     void setUp() {
@@ -31,7 +40,8 @@ class StagingServiceTest {
         syncHelper = mock(InstanceSyncHelper.class);
         apiKeyService = mock(ApiKeyService.class);
         dockerManager = mock(DockerContainerManager.class);
-        service = new StagingService(config, syncHelper, mock(InstanceHttpClient.class), mock(SyncPreviewService.class), apiKeyService, dockerManager, mock(StagingComposeCommand.class));
+        compose = mock(StagingComposeCommand.class);
+        service = new StagingService(config, syncHelper, mock(InstanceHttpClient.class), mock(SyncPreviewService.class), apiKeyService, dockerManager, compose);
     }
 
     @Test
@@ -132,34 +142,60 @@ class StagingServiceTest {
     }
 
     @Test
-    void promote_canBeCalledFromIdleState() {
+    void promote_canBeCalledFromIdleState() throws InterruptedException {
         // This tests the IDLE singleton fix — promote() should not throw when state is IDLE.
-        // It will fail internally (no Docker etc.), but should not throw "already in progress".
-        config.setBackendDir("/tmp/nonexistent-staging-test");
-        config.setFrontendDir("/tmp/nonexistent-staging-frontend");
+        // It fails internally (no Docker, missing backend dir), but must not throw "already in progress".
+        pointAtMissingProjectDirs();
 
         assertThatCode(() -> service.promote()).doesNotThrowAnyException();
 
-        // Wait briefly for async thread to run and fail
-        try { Thread.sleep(500); } catch (InterruptedException ignored) {}
-
-        // Should be in ERROR state (because dirs don't exist), not stuck in IDLE
-        StagingStatusResponse status = service.getStatus();
-        assertThat(status.promotePhase()).isIn("ERROR", "IDLE");
+        // Ends in ERROR (step 2 cannot run in the missing backend dir), not stuck in a running phase
+        StagingStatusResponse status = awaitPromoteSettled();
+        assertThat(status.promotePhase()).isEqualTo("ERROR");
+        assertThat(status.error()).contains("mvn");
     }
 
     @Test
-    void promote_rejectsDoubleInvocation() {
-        config.setBackendDir("/tmp/nonexistent-staging-test");
-        config.setFrontendDir("/tmp/nonexistent-staging-frontend");
+    void promote_rejectsDoubleInvocation() throws InterruptedException {
+        pointAtMissingProjectDirs();
+        // Hold the first promote inside step 1 ("compose down"): its phase stays STOPPING until
+        // released, so the second call no longer races the async pipeline (TODO 0f68834a).
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(compose.command(any(), any(), eq("stable"), eq("down"))).thenAnswer(inv -> {
+            holding.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return null;
+        });
 
-        // First call succeeds
         service.promote();
+        try {
+            assertThat(holding.await(30, TimeUnit.SECONDS)).as("first promote reached step 1").isTrue();
 
-        // Second call should throw (promote is in progress)
-        // Need to call quickly before async thread finishes
-        assertThatThrownBy(() -> service.promote())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already in progress");
+            assertThatThrownBy(() -> service.promote())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("already in progress: STOPPING");
+        } finally {
+            release.countDown();
+        }
+        // Released, the first promote runs on and fails in the missing backend dir
+        assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+    }
+
+    /** Missing (not just unlikely) dirs: the pipeline fails at step 2 instead of building anything. */
+    private void pointAtMissingProjectDirs() {
+        config.setBackendDir(tempDir.resolve("missing-backend").toString());
+        config.setFrontendDir(tempDir.resolve("missing-frontend").toString());
+    }
+
+    /** Waits until the async pipeline has ended; the bound only guards against a hang, it is no timing bet. */
+    private StagingStatusResponse awaitPromoteSettled() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        StagingStatusResponse status = service.getStatus();
+        while (!Set.of("IDLE", "ERROR").contains(status.promotePhase()) && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+            status = service.getStatus();
+        }
+        return status;
     }
 }
