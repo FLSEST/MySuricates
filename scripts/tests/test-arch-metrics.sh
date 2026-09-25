@@ -188,6 +188,10 @@ assert "PackageCycleRatchetTest.CYCLE_COMPONENTS" in prompt, "Zyklen-Herabstufun
 assert "(HIGH -> MEDIUM)" in prompt and "bekannt und testueberwacht" in prompt, "Herabstufung bekannter Zyklen fehlt"
 assert "neu oder gewachsen und bleibt HIGH" in prompt, "neue oder gewachsene Zyklen muessen HIGH bleiben"
 assert "Ein CRITICAL (neues pair) wird nie herabgestuft" in prompt, "CRITICAL darf nicht herabgestuft werden"
+# Unter Last brauchte der Struktur-Scan fast 60 s; laeuft er in den Timeout, fehlen die Ratchet-Listen,
+# und jedes Paar gaelte als neu (CRITICAL).
+delta = next(b for b in blocks if b.get("name") == "delta_scan")
+assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
 PY'
 
 echo "5b) Struktur-Scan zaehlt nur Kollaborateure (59e22c53)"
