@@ -72,8 +72,10 @@ class PackageCycleRatchetTest {
 
     /**
      * The members of every strongly connected component with more than two packages, largest first,
-     * measured on 2026-09-25 (commit c0d5666c). A failure names the packages that are new against
-     * this reference. Components of exactly two packages are mutual pairs, see {@link #ALLOWED_PAIRS}.
+     * measured on 2026-09-25 (commit c0d5666c). 2026-09-26: the four packages around modules
+     * (dto.response, modules, repository, service.activitylog) no longer form a cycle – the module
+     * mapping left the response records for mapper.ModuleCapabilityMapper. A failure names the
+     * packages that are new against this reference. Components of exactly two packages are mutual pairs, see {@link #ALLOWED_PAIRS}.
      * Renaming or moving a listed package means updating its entry in the same commit.
      */
     static final List<Set<String>> CYCLE_COMPONENTS = List.of(
@@ -94,12 +96,7 @@ class PackageCycleRatchetTest {
                     "com.automation.service.system",
                     "com.automation.service.system.settings",
                     "com.automation.service.workflow",
-                    "com.automation.websocket"),
-            Set.of(
-                    "com.automation.dto.response",
-                    "com.automation.modules",
-                    "com.automation.repository",
-                    "com.automation.service.activitylog"));
+                    "com.automation.websocket"));
 
     /** Same order as arch_cycles.py: largest first, then by first member (components are disjoint). */
     private static final Comparator<SortedSet<String>> LARGEST_FIRST =
