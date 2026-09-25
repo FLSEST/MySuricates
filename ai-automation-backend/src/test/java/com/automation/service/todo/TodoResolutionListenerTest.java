@@ -196,6 +196,24 @@ class TodoResolutionListenerTest {
         assertThat(captor.getValue().getResolutionState()).isEqualTo(Todo.ResolutionState.FAILED);
     }
 
+    /** a9bf13d5: read like a request parameter (EnumParameter) — trimmed and in any case. */
+    @Test
+    void should_restorePreviousStatus_writtenInAnyCase() {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("linkedTodoId", TODO_ID);
+        meta.put("linkedTodoPreviousStatus", " backlog ");
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.FAILED, meta);
+
+        Todo todo = createTodo();
+        when(todoRepository.findById(TODO_ID)).thenReturn(Optional.of(todo));
+
+        listener.onWorkflowRunCompleted(event);
+
+        ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
+        verify(todoRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(Todo.Status.BACKLOG);
+    }
+
     @Test
     void should_defaultToOpen_when_previousStatusIsMissing() {
         Map<String, Object> meta = new HashMap<>();

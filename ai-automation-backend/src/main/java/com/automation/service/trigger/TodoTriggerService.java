@@ -15,6 +15,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
+import com.automation.util.EnumParameter;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -95,14 +96,18 @@ public class TodoTriggerService {
 
     @Transactional
     public TodoTrigger create(CreateTodoTriggerRequest req) {
+        // Stored as the constant's name (TODO a9bf13d5): the matcher compares against it, and an
+        // unknown value is a 400 naming the allowed ones instead of a trigger that never fires.
+        Todo.Source sourceFilter = EnumParameter.parseOptional(Todo.Source.class, "sourceFilter", req.sourceFilter());
+        Todo.Priority minPriority = EnumParameter.parseOptional(Todo.Priority.class, "minPriority", req.minPriority());
         Workflow target = workflowRepository.findById(req.targetWorkflowId())
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow", req.targetWorkflowId()));
 
         TodoTrigger trigger = TodoTrigger.builder()
                 .tagPattern(req.tagPattern())
                 .projectId(req.projectId())
-                .sourceFilter(req.sourceFilter())
-                .minPriority(req.minPriority())
+                .sourceFilter(sourceFilter != null ? sourceFilter.name() : null)
+                .minPriority(minPriority != null ? minPriority.name() : null)
                 .targetWorkflow(target)
                 .contextTemplate(req.contextTemplate() != null ? new HashMap<>(req.contextTemplate()) : new HashMap<>())
                 .description(req.description())
@@ -188,7 +193,7 @@ public class TodoTriggerService {
         // the global page filled up with old high-priority todos no trigger
         // matches, starving trigger-relevant todos further down the list.
         for (TodoTrigger trigger : triggers) {
-            Todo.Source sourceFilter = parseSourceFilter(trigger.getSourceFilter());
+            Todo.Source sourceFilter = TodoTriggerMatcher.sourceFilter(trigger.getSourceFilter());
             List<Todo> candidates = todoRepository.findBacklogCandidatesForTrigger(
                     trigger.getProjectId(), sourceFilter, trigger.getMaxAttempts(), PageRequest.of(0, 50));
 
@@ -235,18 +240,6 @@ public class TodoTriggerService {
                         + "firing triggers normally", raw);
             }
             return Optional.empty();
-        }
-    }
-
-    private Todo.Source parseSourceFilter(String sourceFilter) {
-        if (sourceFilter == null || sourceFilter.isBlank()) {
-            return null;
-        }
-        try {
-            return Todo.Source.valueOf(sourceFilter);
-        } catch (IllegalArgumentException e) {
-            log.warn("Unknown sourceFilter '{}' — ignoring for backlog query", sourceFilter);
-            return null;
         }
     }
 

@@ -4,6 +4,7 @@ import com.automation.dto.request.CreateTodoRequest;
 import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.entity.Todo;
 import com.automation.service.todo.TodoService;
+import com.automation.util.EnumParameter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -40,9 +41,7 @@ public class AssistantTodoTools {
             Object tagsObj = params.get("tags");
             String projectId = (String) params.getOrDefault("projectId", null);
 
-            Todo.Priority priority;
-            try { priority = Todo.Priority.valueOf(priorityStr.toUpperCase()); }
-            catch (Exception e) { priority = Todo.Priority.MEDIUM; }
+            Todo.Priority priority = priorityOrMedium(priorityStr);
 
             List<String> tags = tagsObj instanceof List<?> list
                     ? list.stream().map(Object::toString).toList()
@@ -72,14 +71,27 @@ public class AssistantTodoTools {
             if (id == null || statusStr == null) return "⚠ update_todo_status: id and status are required fields.";
 
             Todo.Status status;
-            try { status = Todo.Status.valueOf(statusStr.toUpperCase()); }
-            catch (Exception e) { return "⚠ Invalid status: " + statusStr + ". Allowed: OPEN, IN_PROGRESS, DONE, BACKLOG"; }
+            try { status = EnumParameter.parse(Todo.Status.class, "status", statusStr); }
+            catch (IllegalArgumentException e) { return "⚠ Invalid status: " + e.getMessage(); }
 
             todoService.updateStatus(id, new UpdateTodoStatusRequest(status, null));
             return "✓ Todo status updated: " + status + " (ID: " + id.substring(0, Math.min(8, id.length())) + "…)";
         } catch (Exception e) {
             log.warn("Assistant update_todo_status tool failed. Payload: {}", json, e);
             return "⚠ Could not update status: " + e.getMessage();
+        }
+    }
+
+    /**
+     * The priority the model asked for, read like a request parameter ({@link EnumParameter}, TODO
+     * a9bf13d5); an unknown or missing one stays MEDIUM, which the result line then shows.
+     */
+    private static Todo.Priority priorityOrMedium(String value) {
+        try {
+            Todo.Priority priority = EnumParameter.parseOptional(Todo.Priority.class, "priority", value);
+            return priority != null ? priority : Todo.Priority.MEDIUM;
+        } catch (IllegalArgumentException e) {
+            return Todo.Priority.MEDIUM;
         }
     }
 }

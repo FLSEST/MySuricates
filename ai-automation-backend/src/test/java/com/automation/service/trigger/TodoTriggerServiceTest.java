@@ -75,6 +75,38 @@ class TodoTriggerServiceTest {
             assertThat(result.isAutoClose()).isTrue();
         }
 
+        /** a9bf13d5: the matcher compares against the constant's name, so that is what is stored. */
+        @Test
+        void create_storesFilterValuesAsTheConstantName() {
+            Workflow wf = Workflow.builder().id("wf-1").name("Fix").build();
+            when(workflowRepository.findById("wf-1")).thenReturn(Optional.of(wf));
+            when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            TodoTrigger result = service.create(new CreateTodoTriggerRequest(
+                    "bug", null, " workflow ", "high", "wf-1", null, null, null, null, null));
+            TodoTrigger unfiltered = service.create(new CreateTodoTriggerRequest(
+                    "bug", null, " ", null, "wf-1", null, null, null, null, null));
+
+            assertThat(result.getSourceFilter()).isEqualTo("WORKFLOW");
+            assertThat(result.getMinPriority()).isEqualTo("HIGH");
+            assertThat(unfiltered.getSourceFilter()).isNull();
+            assertThat(unfiltered.getMinPriority()).isNull();
+        }
+
+        /** Before, "robot" was stored and the trigger silently never fired. */
+        @Test
+        void create_unknownFilterValue_isRejectedNamingTheAllowedValues() {
+            assertThatThrownBy(() -> service.create(new CreateTodoTriggerRequest(
+                    "bug", null, "robot", null, "wf-1", null, null, null, null, null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("sourceFilter muss USER, AI oder WORKFLOW sein, nicht 'robot'");
+            assertThatThrownBy(() -> service.create(new CreateTodoTriggerRequest(
+                    "bug", null, null, "urgent", "wf-1", null, null, null, null, null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("minPriority muss LOW, MEDIUM, HIGH oder CRITICAL sein, nicht 'urgent'");
+            verify(repository, never()).save(any());
+        }
+
         @Test
         void create_unknownWorkflow_throws() {
             when(workflowRepository.findById("wf-x")).thenReturn(Optional.empty());

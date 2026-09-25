@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -27,11 +28,12 @@ class ScheduleDefinitionParserTest {
         assertThat(parser.parseConflictBehavior(" overlap ")).isEqualTo(ConflictBehavior.OVERLAP);
     }
 
+    /** a9bf13d5: the message names the field and the allowed values (EnumParameter). */
     @Test
     void parseConflictBehavior_unknownValue_throws() {
         assertThatThrownBy(() -> parser.parseConflictBehavior("QUEUE"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid conflict behavior: QUEUE");
+                .hasMessage("conflictBehavior muss SKIP oder OVERLAP sein, nicht 'QUEUE'");
     }
 
     // --- parseDelay (moved from SchedulerServiceTest) ---
@@ -85,15 +87,28 @@ class ScheduleDefinitionParserTest {
     }
 
     @Test
-    void parseTargetType_caseInsensitive() {
+    void parseTargetType_caseInsensitive_andTrimmed() {
         assertThat(parser.parseTargetType("chain")).isEqualTo(TargetType.CHAIN);
+        assertThat(parser.parseTargetType(" Workflow ")).isEqualTo(TargetType.WORKFLOW);
     }
 
     @Test
-    void parseTargetType_invalid_throws() {
+    void parseTargetType_invalid_throws_namingTheAllowedValues() {
         assertThatThrownBy(() -> parser.parseTargetType("robot"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Invalid target type: robot");
+                .hasMessage("targetType muss WORKFLOW oder CHAIN sein, nicht 'robot'");
+    }
+
+    /** a9bf13d5: upper-casing with the default locale turned "chain" into "CHAİN" under tr-TR. */
+    @Test
+    void parseTargetType_doesNotDependOnTheDefaultLocale() {
+        Locale previous = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+        try {
+            assertThat(parser.parseTargetType("chain")).isEqualTo(TargetType.CHAIN);
+        } finally {
+            Locale.setDefault(previous);
+        }
     }
 
     @Test
@@ -105,9 +120,10 @@ class ScheduleDefinitionParserTest {
     @Test
     void parseScheduleType_caseInsensitive_andInvalidThrows() {
         assertThat(parser.parseScheduleType("once")).isEqualTo(ScheduleType.ONCE);
+        assertThat(parser.parseScheduleType(" delayed ")).isEqualTo(ScheduleType.DELAYED);
         assertThatThrownBy(() -> parser.parseScheduleType("weekly"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Invalid schedule type: weekly");
+                .hasMessage("scheduleType muss CRON, ONCE oder DELAYED sein, nicht 'weekly'");
     }
 
     @Test
