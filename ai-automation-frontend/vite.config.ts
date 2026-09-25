@@ -44,7 +44,7 @@ export default defineConfig(() => {
       // gegen ein altes Backend-JAR — der Fall, der beim Test-Container 404er und haengende
       // Seiten erzeugt (CLAUDE.md, Staging).
       __APP_VERSION__: JSON.stringify(
-        JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version,
+        JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf-8')).version,
       ),
       // Shim für sockjs-client, das bare `global` referenziert (siehe node_modules/sockjs-client/lib/*.js).
       // Ersetzt das bisherige Inline-<script>var global = globalThis;</script> in index.html (CSP-Verstoß).
