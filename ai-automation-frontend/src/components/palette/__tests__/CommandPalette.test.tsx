@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -115,6 +115,52 @@ describe('CommandPalette', { timeout: 15_000 }, () => {
     key('Enter');
     expect(useAssistantStore.getState()).toMatchObject({ pendingInput: 'zz', open: true });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves the selection back to the first row when the query changes', async () => {
+    server.use(http.get('/api/v1/workflows', () => HttpResponse.json([workflow('w1', 'Deploy app'), workflow('w3', 'Deploy db')])));
+    renderPalette();
+    const input = screen.getByPlaceholderText(en.commandPalette.contexts.workflow.placeholder);
+    fireEvent.change(input, { target: { value: 'Deploy' } });
+    // Both workflows match; the assistant row follows them
+    await waitFor(() => expect(document.querySelectorAll('.cursor-pointer')).toHaveLength(3));
+    const rows = () => document.querySelectorAll('.cursor-pointer');
+    key('ArrowDown');
+    expect(rows()[1]).toHaveClass('bg-accent/10');
+
+    // The rows still answer "Deploy" while the new query waits for the debounce
+    fireEvent.change(input, { target: { value: 'Deplo' } });
+    expect(rows()[0]).toHaveClass('bg-accent/10');
+    expect(rows()[1]).not.toHaveClass('bg-accent/10');
+  });
+
+  it('takes the context from the route at every opening and keeps the query in between', async () => {
+    server.use(http.get('/api/v1/executions', () => HttpResponse.json({ content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })));
+    const placeholder = (id: 'workflow' | 'run' | 'project') => en.commandPalette.contexts[id].placeholder;
+    function Harness({ open }: { open: boolean }) {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => navigate('/projects')}>to projects</button>
+          <CommandPalette open={open} onClose={vi.fn()} />
+        </>
+      );
+    }
+    const { rerender } = renderWithProviders(<Harness open />, { route: '/runs' });
+    expect(screen.getByPlaceholderText(placeholder('run'))).toBeInTheDocument();
+
+    // Tab switches the context for as long as the palette stays open
+    key('Tab');
+    expect(screen.getByPlaceholderText(placeholder('project'))).toBeInTheDocument();
+    rerender(<Harness open={false} />);
+    expect(screen.queryByPlaceholderText(placeholder('project'))).toBeNull();
+    rerender(<Harness open />);
+    fireEvent.change(screen.getByPlaceholderText(placeholder('run')), { target: { value: 'nightly' } });
+
+    rerender(<Harness open={false} />);
+    fireEvent.click(screen.getByText('to projects'));
+    rerender(<Harness open />);
+    expect(screen.getByPlaceholderText(placeholder('project'))).toHaveValue('nightly');
   });
 
   describe('Enter during the debounce (9ded5db0)', () => {

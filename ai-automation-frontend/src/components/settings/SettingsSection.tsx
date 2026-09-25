@@ -16,6 +16,7 @@ export function SettingsSection({ id, title, children, collapsible = false, open
       {collapsible ? (
         <button
           onClick={onToggle}
+          aria-expanded={open}
           className="flex items-center gap-2 w-full text-left group mb-4"
         >
           <ChevronRight className={`w-4 h-4 text-text-secondary transition-transform duration-200 ${open ? 'rotate-90' : ''}`} />
