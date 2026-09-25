@@ -2,7 +2,7 @@ package com.automation.service.execution;
 
 import com.automation.dto.response.PendingInputResponse;
 import com.automation.executor.ApprovalRequest;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.service.workflow.WorkflowExecutionRegistry;
 import com.automation.service.workflow.WorkflowExecutionRegistry.PendingInput;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ import java.util.Map;
 public class PendingInputService {
 
     private final WorkflowExecutionRegistry executionRegistry;
-    private final WorkflowRunRepository runRepository;
+    private final WorkflowRunProjectionRepository runProjections;
 
     @Transactional(readOnly = true)
     public List<PendingInputResponse> listPendingInputs() {
@@ -35,7 +35,7 @@ public class PendingInputService {
             return List.of();
         }
         Map<String, WorkflowRef> workflowByRun = new HashMap<>();
-        for (Object[] row : runRepository.findWorkflowRefsByRunIds(pending.stream().map(PendingInput::runId).toList())) {
+        for (Object[] row : runProjections.findWorkflowRefsByRunIds(pending.stream().map(PendingInput::runId).toList())) {
             workflowByRun.put((String) row[0], new WorkflowRef((String) row[1], (String) row[2]));
         }
         return pending.stream().map(p -> toResponse(p, workflowByRun.get(p.runId()))).toList();

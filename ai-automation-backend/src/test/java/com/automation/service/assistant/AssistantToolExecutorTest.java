@@ -12,7 +12,7 @@ import com.automation.entity.WorkflowRun;
 import com.automation.modules.ModuleRegistry;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainService;
 import com.automation.service.todo.TodoService;
@@ -64,7 +64,7 @@ class AssistantToolExecutorTest {
     /** Describer without data: every id lookup finds nothing, so ids fall back to their short form. */
     private static PendingToolDescriber describer(ObjectMapper mapper) {
         return new PendingToolDescriber(mapper, mock(WorkflowRepository.class),
-                mock(WorkflowRunRepository.class), mock(TodoRepository.class));
+                mock(WorkflowRunProjectionRepository.class), mock(TodoRepository.class));
     }
 
     /**

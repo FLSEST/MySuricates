@@ -12,7 +12,7 @@ import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +49,7 @@ public class GoalRelationsService {
     private final TodoRepository todoRepository;
     private final ProjectRepository projectRepository;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowRunRepository runRepository;
+    private final WorkflowRunProjectionRepository runProjections;
     private final TodoTriggerRepository triggerRepository;
     private final AuditFindingTodoRepository findingTodoRepository;
 
@@ -107,7 +107,7 @@ public class GoalRelationsService {
         if (runIds.isEmpty()) {
             return Map.of();
         }
-        return runRepository.findRunStates(runIds).stream()
+        return runProjections.findRunStates(runIds).stream()
                 .collect(Collectors.toMap(RunStateRow::id, Function.identity(), (a, b) -> a));
     }
 

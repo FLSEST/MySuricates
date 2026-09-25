@@ -21,7 +21,7 @@ public record RunOriginRow(
 ) {
 
     /**
-     * A row of {@code WorkflowRunRepository.findOriginColumns}, in its column order. An unknown trigger
+     * A row of {@code WorkflowRunProjectionRepository.findOriginColumns}, in its column order. An unknown trigger
      * source name reads as {@code null}; the empty string the query returns for "no parent" as well.
      */
     public static RunOriginRow fromColumns(Object[] row) {

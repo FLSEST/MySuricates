@@ -4,7 +4,7 @@ import com.automation.dto.projection.ChainRunOriginRow;
 import com.automation.dto.projection.RunOriginRow;
 import com.automation.entity.TriggerSource;
 import com.automation.repository.ChainRunRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.repository.WorkflowVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 class AuditReportOrigins {
 
-    private final WorkflowRunRepository runRepository;
+    private final WorkflowRunProjectionRepository runProjections;
     private final ChainRunRepository chainRunRepository;
     private final WorkflowVersionRepository versionRepository;
 
@@ -52,7 +52,7 @@ class AuditReportOrigins {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        List<RunOriginRow> runs = runRepository.findOriginRows(ids);
+        List<RunOriginRow> runs = runProjections.findOriginRows(ids);
         Set<String> chainRunIds = idsOf(runs, RunOriginRow::chainRunId);
         Map<String, ChainRunOriginRow> chainRuns = chainRunIds.isEmpty() ? Map.of()
                 : chainRunRepository.findOriginRows(chainRunIds).stream()

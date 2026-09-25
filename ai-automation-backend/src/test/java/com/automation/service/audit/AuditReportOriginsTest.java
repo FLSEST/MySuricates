@@ -4,7 +4,7 @@ import com.automation.dto.projection.ChainRunOriginRow;
 import com.automation.dto.projection.RunOriginRow;
 import com.automation.entity.TriggerSource;
 import com.automation.repository.ChainRunRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.automation.repository.WorkflowVersionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AuditReportOriginsTest {
 
-    @Mock private WorkflowRunRepository runRepository;
+    @Mock private WorkflowRunProjectionRepository runProjections;
     @Mock private ChainRunRepository chainRunRepository;
     @Mock private WorkflowVersionRepository versionRepository;
 
@@ -40,13 +40,13 @@ class AuditReportOriginsTest {
 
     @BeforeEach
     void setUp() {
-        origins = new AuditReportOrigins(runRepository, chainRunRepository, versionRepository);
+        origins = new AuditReportOrigins(runProjections, chainRunRepository, versionRepository);
     }
 
     /** Doppelte und fehlende Run-IDs einer Seite ergeben genau eine Abfrage; ein geloeschter Lauf fehlt in der Map. */
     @Test
     void byRunId_asksOnceWithDistinctIds_andLeavesAGoneRunOut() {
-        when(runRepository.findOriginRows(List.of("run-1", "run-gone"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-1", "run-gone"))).thenReturn(List.of(
                 new RunOriginRow("run-1", TriggerSource.MANUAL, null, null, null, null)));
 
         Map<String, AuditReportOrigins.Origin> result =
@@ -54,8 +54,8 @@ class AuditReportOriginsTest {
 
         assertThat(result).containsOnlyKeys("run-1");
         assertThat(result.get("run-1").triggerSource()).isEqualTo(TriggerSource.MANUAL);
-        verify(runRepository).findOriginRows(any());
-        verifyNoMoreInteractions(runRepository);
+        verify(runProjections).findOriginRows(any());
+        verifyNoMoreInteractions(runProjections);
         verifyNoInteractions(chainRunRepository, versionRepository);
     }
 
@@ -63,7 +63,7 @@ class AuditReportOriginsTest {
     void byRunId_withoutAnyRunId_asksNothing() {
         assertThat(origins.byRunId(Arrays.asList(null, null))).isEmpty();
         assertThat(origins.byRunId(List.of())).isEmpty();
-        verifyNoInteractions(runRepository, chainRunRepository, versionRepository);
+        verifyNoInteractions(runProjections, chainRunRepository, versionRepository);
     }
 
     /**
@@ -73,7 +73,7 @@ class AuditReportOriginsTest {
      */
     @Test
     void resumedChainEntry_saysResume_notTheChainStarter() {
-        when(runRepository.findOriginRows(List.of("run-1"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-1"))).thenReturn(List.of(
                 new RunOriginRow("run-1", TriggerSource.RESUME, null, null, "v-1", "SCHEDULE")));
         when(versionRepository.findVersionNumbers(Set.of("v-1"))).thenReturn(List.<Object[]>of(new Object[]{"v-1", 3L}));
 
@@ -86,7 +86,7 @@ class AuditReportOriginsTest {
     /** Ohne Verweis auf den Eltern-Lauf wuerde dessen Ausloeser als eigener gelesen: SUB_WORKFLOW bleibt SUB_WORKFLOW. */
     @Test
     void subWorkflowRun_staysSubWorkflow_evenWithAReadableParent() {
-        when(runRepository.findOriginRows(List.of("run-1"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-1"))).thenReturn(List.of(
                 new RunOriginRow("run-1", TriggerSource.SUB_WORKFLOW, null, null, null, "MANUAL")));
 
         AuditReportOrigins.Origin origin = origins.byRunId(List.of("run-1")).get("run-1");
@@ -98,7 +98,7 @@ class AuditReportOriginsTest {
     /** Ein direkt geplanter Lauf nennt seinen eigenen Zeitplan, ein Ketteneintrag den der Kette. */
     @Test
     void scheduleId_isTheRunsOwn_orForAChainEntryTheChains() {
-        when(runRepository.findOriginRows(List.of("run-direct", "run-chain"))).thenReturn(List.of(
+        when(runProjections.findOriginRows(List.of("run-direct", "run-chain"))).thenReturn(List.of(
                 new RunOriginRow("run-direct", TriggerSource.SCHEDULE, "sched-direct", null, null, null),
                 new RunOriginRow("run-chain", TriggerSource.CHAIN, "sched-ignored", "cr-1", null, "SCHEDULE")));
         when(chainRunRepository.findOriginRows(Set.of("cr-1")))

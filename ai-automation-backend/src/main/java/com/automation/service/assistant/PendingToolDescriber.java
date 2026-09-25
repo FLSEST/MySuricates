@@ -3,7 +3,7 @@ package com.automation.service.assistant;
 import com.automation.entity.Todo;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
-import com.automation.repository.WorkflowRunRepository;
+import com.automation.repository.WorkflowRunProjectionRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,7 @@ public class PendingToolDescriber {
 
     private final ObjectMapper objectMapper;
     private final WorkflowRepository workflowRepository;
-    private final WorkflowRunRepository workflowRunRepository;
+    private final WorkflowRunProjectionRepository runProjections;
     private final TodoRepository todoRepository;
 
     /** Builds the label for a tool proposal; never throws. */
@@ -118,7 +118,7 @@ public class PendingToolDescriber {
     }
 
     private Optional<String> runWorkflowName(Object runId) {
-        List<Object[]> rows = workflowRunRepository.findWorkflowRefsByRunIds(List.of(runId.toString()));
+        List<Object[]> rows = runProjections.findWorkflowRefsByRunIds(List.of(runId.toString()));
         if (rows.isEmpty()) return Optional.empty();
         String snapshot = text(rows.get(0)[2]);
         if (snapshot != null) return Optional.of(snapshot);
