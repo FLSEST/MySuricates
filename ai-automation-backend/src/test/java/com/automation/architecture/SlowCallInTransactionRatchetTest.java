@@ -17,6 +17,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.HttpURLConnection;
+import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -28,10 +30,10 @@ import java.util.function.Predicate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Guard for the critical rule in CLAUDE.md: no AI/CLI call inside a transaction. With HikariCP
- * pool-size 1 a transaction pins the only database connection; a model call of 30–300 s inside it
- * stalls runs, UI and scheduler until it returns, and the pool watchdog fires after 60 s. Read and
- * write in short {@code TransactionTemplate} bursts and call the model in between without a
+ * Guard for the critical rule in CLAUDE.md: no AI, CLI or HTTP call inside a transaction. With
+ * HikariCP pool-size 1 a transaction pins the only database connection; a model call of 30–300 s
+ * inside it stalls runs, UI and scheduler until it returns, and the pool watchdog fires after 60 s.
+ * Read and write in short {@code TransactionTemplate} bursts and call the model in between without a
  * transaction – {@code WorkflowMemoryService#extractKnowledge} shows the shape.
  *
  * <p>Slow calls are the ones that start a process: {@link #PROCESS_CALLS} – every {@code execute*} of
@@ -40,8 +42,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code #reason} and {@code #executeAction}, also when called through an implementing class or on a
  * provider fetched from {@code AiProviderRegistry}. The other {@code AiProvider} methods
  * ({@code getId}, {@code getCapabilities}, {@code setup}, {@code buildConversationPrompt}) start no
- * process and stay allowed. Which methods count as transactional, and what the bytecode scan cannot
- * see: {@link TransactionalCallScan}.
+ * process and stay allowed. And the ones that wait on a remote server: {@link #HTTP_CALLS} – a
+ * webhook target that runs into its timeout holds the connection just as long. Which methods count
+ * as transactional, and what the bytecode scan cannot see: {@link TransactionalCallScan}.
  *
  * <p>A ratchet: {@link #KNOWN_EXCEPTIONS} only ever shrinks. A new finding is fixed, not listed.
  */
@@ -55,6 +58,14 @@ class SlowCallInTransactionRatchetTest {
             "com/automation/service/ai/HostClaudeService", Set.of("reason", "reasonStructured", "executeAction")::contains,
             "com/automation/service/ai/HostCodexService", "execute"::equals,
             "com/automation/service/ai/HostPiService", Set.of("reason", "executeAction")::contains);
+    /**
+     * Owner → the method names that send an HTTP request and wait for the answer: the JDK clients the
+     * code uses (September 2026 – no RestTemplate, RestClient or WebClient). {@code sendAsync} counts
+     * too, its future is usually joined right away.
+     */
+    static final Map<String, Predicate<String>> HTTP_CALLS = Map.of(
+            "java/net/http/HttpClient", Set.of("send", "sendAsync")::contains,
+            "java/net/HttpURLConnection", Set.of("connect", "getInputStream", "getOutputStream", "getResponseCode")::contains);
     static final String AI_PROVIDER = "com/automation/service/ai/AiProvider";
     static final Set<String> PROVIDER_CALLS = Set.of("reason", "executeAction");
 
@@ -74,8 +85,8 @@ class SlowCallInTransactionRatchetTest {
 
         List<String> added = findings(classes).stream().filter(f -> !KNOWN_EXCEPTIONS.contains(f)).toList();
 
-        assertThat(added).as("AI/CLI call inside a transaction – with pool-size 1 it holds the only DB "
-                + "connection for the whole call. Split into TransactionTemplate bursts (read → call → "
+        assertThat(added).as("AI/CLI/HTTP call inside a transaction – with pool-size 1 it holds the only "
+                + "DB connection for the whole call. Split into TransactionTemplate bursts (read → call → "
                 + "write) instead of extending KNOWN_EXCEPTIONS: %s", added).isEmpty();
     }
 
@@ -109,6 +120,9 @@ class SlowCallInTransactionRatchetTest {
                         fixture + "#viaCliWrapper -> HostCodexService#execute",
                         fixture + "#viaShell -> ShellCommandService#execute",
                         fixture + "#viaShell -> CommandExecutorService#executeStepAsShell",
+                        fixture + "#viaHttp -> HttpClient#send",
+                        fixture + "#viaHttp -> HttpClient#sendAsync",
+                        fixture + "#viaHttp -> HttpURLConnection#getResponseCode",
                         fixture + "#insideTemplate (TransactionTemplate) -> CommandExecutorService#executeOnHost",
                         classLevel + "#inheritsTheClassAnnotation -> CommandExecutorService#executeOnHost");
     }
@@ -119,6 +133,7 @@ class SlowCallInTransactionRatchetTest {
 
     static Predicate<MethodRef> slowCalls(Map<String, ClassInfo> classes) {
         return call -> PROCESS_CALLS.getOrDefault(call.owner(), name -> false).test(call.name())
+                || HTTP_CALLS.getOrDefault(call.owner(), name -> false).test(call.name())
                 || (PROVIDER_CALLS.contains(call.name())
                         && CompiledMethods.isSubtype(call.owner(), AI_PROVIDER, classes));
     }
@@ -149,6 +164,8 @@ class SlowCallInTransactionRatchetTest {
         FixtureProvider implementation;
         HostCodexService codex;
         ShellCommandService shell;
+        HttpClient http;
+        HttpURLConnection connection;
         TransactionTemplate template;
 
         @Transactional
@@ -195,6 +212,13 @@ class SlowCallInTransactionRatchetTest {
         public Object viaShell() {
             shell.execute(null, null, 0);
             return executor.executeStepAsShell(null, null, 0, 0);
+        }
+
+        @Transactional
+        public int viaHttp() throws IOException, InterruptedException {
+            http.send(null, null);
+            http.sendAsync(null, null);
+            return connection.getResponseCode();
         }
 
         @Transactional
