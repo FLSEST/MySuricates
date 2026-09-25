@@ -9,6 +9,21 @@ const isPaused = (s: WishStatus) => s === 'AWAITING_APPROVAL' || s === 'AWAITING
 
 const statusSteps: WishStatus[] = ['RECEIVED', 'DECOMPOSING', 'EXECUTING', 'EVALUATING', 'COMPLETED'];
 
+/**
+ * Where a failed wish stopped. The backend keeps no failed phase, so the newest iteration entry tells: an
+ * evaluation, else a started run, else a finished decomposition (the iteration counter only advances once its
+ * workflows exist) mean the wish got that far. Without an entry, or with a decomposition that never finished,
+ * it failed while decomposing.
+ */
+function failedStep(wish: Wish): WishStatus {
+  const latest = wish.iterationHistory.at(-1);
+  if (!latest) return 'DECOMPOSING';
+  if (latest.evaluation) return 'EVALUATING';
+  if (latest.runId) return 'EXECUTING';
+  const unfinished = typeof latest.iteration === 'number' && latest.iteration > wish.iterationCount;
+  return unfinished ? 'DECOMPOSING' : 'EXECUTING';
+}
+
 /** Head of the wish detail: text, project, actions (cancel, retry, delete), status timeline and iteration counter. */
 export function WishHeaderCard({ wish, onCancel, onDelete }: {
   wish: Wish;
@@ -18,13 +33,15 @@ export function WishHeaderCard({ wish, onCancel, onDelete }: {
   const t = useT();
   const respond = useRespondToWish();
 
-  // Map AWAITING_* statuses to their timeline position
+  // Map AWAITING_* statuses to their timeline position; a failed wish sits where it stopped
   const effectiveStatus: WishStatus =
     wish.status === 'AWAITING_CLARIFICATION' ? 'DECOMPOSING' :
     wish.status === 'AWAITING_DECOMPOSE_APPROVAL' ? 'DECOMPOSING' :
     wish.status === 'AWAITING_APPROVAL' ? 'EVALUATING' :
+    wish.status === 'FAILED' ? failedStep(wish) :
     wish.status;
   const currentIndex = statusSteps.indexOf(effectiveStatus);
+  const failed = wish.status === 'FAILED';
 
   return (
     <Card>
@@ -72,8 +89,7 @@ export function WishHeaderCard({ wish, onCancel, onDelete }: {
           {statusSteps.map((step, i) => {
             const isActive = effectiveStatus === step;
             const isPastStep = currentIndex > i || wish.status === 'COMPLETED';
-            // Never true today: FAILED is no timeline step, currentIndex is -1 (TODO 5165ec90)
-            const isFailed = wish.status === 'FAILED' && i === currentIndex;
+            const isFailed = failed && isActive;
             const isAwaitingHere = isActive && isPaused(wish.status);
             return (
               <div key={step} className="flex items-center gap-1 flex-1">
@@ -90,13 +106,14 @@ export function WishHeaderCard({ wish, onCancel, onDelete }: {
         </div>
         <div className="flex justify-between mt-1">
           {statusSteps.map(step => {
-            const label = isPaused(wish.status) && effectiveStatus === step
+            const isHighlighted = effectiveStatus === step;
+            const label = (isPaused(wish.status) || failed) && isHighlighted
               ? (t.wishes.status[wish.status.toLowerCase() as keyof typeof t.wishes.status] ?? wish.status)
               : (t.wishes.status[step.toLowerCase() as keyof typeof t.wishes.status] ?? step);
-            const isHighlighted = effectiveStatus === step;
             return (
               <span key={step} className={`text-[10px] ${
                 isHighlighted && isPaused(wish.status) ? 'text-warning font-medium' :
+                isHighlighted && failed ? 'text-danger font-medium' :
                 isHighlighted ? 'text-accent font-medium' :
                 'text-text-tertiary'
               }`}>
