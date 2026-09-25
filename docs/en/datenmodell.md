@@ -1189,7 +1189,7 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
   "type": "simple | shell | retry | conditional | foreach | while | switch | agentic | approval | sub-workflow | skill-capability | human-input | integration | document | todo-create | todo-update | todo-close | compress | compress-ai | dashboard-report",
   "name": "Optional display name",
   "config": {
-    "prompt": "Instruction or command",
+    "command": "Instruction or command",
     "timeout_seconds": 300,
     "on_failure": "stop | continue"
   },
@@ -1209,6 +1209,9 @@ Blocks are stored as a JSON array in the `blocks` column of the `workflows` tabl
 **Type-specific config fields:**
 
 The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WORKFLOW-GUIDE.md).
+`DataModelConfigKeysGateTest` holds the table (here and in the German version) against the code: every key
+must be read where the block type runs, and every block type needs a row. Each entry starts with its key
+in backticks, parentheses behind it give the default or values, free text follows a `;`.
 
 | Type | Key Config Fields |
 |---|---|

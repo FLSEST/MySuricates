@@ -157,14 +157,14 @@ public final class BlockSpecs {
                     """),
             Map.entry("skill-capability", """
                     **Block type: skill-capability** — Runs a capability of a skill as one AI call, read-only unless it may write.
-                    Required config: `capability` (string) — capability name such as "analyze". List its skill in the \
-                    block's top-level skillIds (next to config) so the capability's description, AI context and writes \
-                    flag apply.
+                    Required config: `capability` (string) — capability name such as "review_code" (skill \
+                    builtin-code-review). List its skill in the block's top-level skillIds (next to config), e.g. \
+                    "skillIds": ["builtin-code-review"], so the capability's description, AI context and writes flag apply.
                     Optional: `input` (string, placeholders resolved), `params` (map, handed to the AI as parameters), \
                     `allow_writes` (bool, default false — required for capabilities that write; without it the CLI gets \
                     read-only tools), `timeout_seconds` (int).
                     """ + AI_OVERRIDES + """
-                    Example config: {"capability": "analyze", "input": "{{ previous_output }}", "params": {"max_entries": 5}}
+                    Example config: {"capability": "review_code", "input": "{{ previous_output }}", "params": {"max_entries": 5}}
                     Needs module skills. A skill's capabilities: <fetch type="skill" id="<skill-id>"/>.
                     """),
             Map.entry("human-input", """
