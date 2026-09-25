@@ -1328,6 +1328,8 @@ The keys the executors read; defaults and examples are in [WORKFLOW-GUIDE.md](WO
 | V87 | `V87__index_schedule_and_todo_run_lookups.sql` | indexes for runs per schedule (workflow_runs, chain_runs) and TODOs per run (`last_fix_run_id`, `workflow_run_id`) |
 | V88 | `V88__goal_milestones_and_guard.sql` | new table `goal_milestones`; `milestone_id` in todos; `guard_workflow_id` in goals (goal guard) |
 | V89 | `V89__workflow_run_chain_run_id.sql` | `chain_run_id` in workflow_runs (chain run of a chain entry, no backfill for existing runs) + index `idx_workflow_runs_chain_run_id` |
+| V90 | `V90__keyless_integration_account_names.sql` | Language-neutral account names for RSS/Atom and Open-Meteo in `integration_connections.account_info` (existing rows updated) |
+| V91 | `V91__page_suggestions_per_locale.sql` | `locale` in page_suggestions (table rebuild: `UNIQUE(page)` → `UNIQUE(page, locale)`, existing rows count as German) |
 
 ## SQLite Specifics
 
