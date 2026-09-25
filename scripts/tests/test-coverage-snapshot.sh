@@ -196,6 +196,31 @@ GATE_METRICS="$(printf 'UNTESTED gesamt: 20\n')" run_gate "$(envelope_report 20 
 check "ohne ERWARTETE FINDINGS: RED"         'grep -qx "gate_status: RED" "$TMP/gate.txt"'
 check "ohne ERWARTETE FINDINGS: incomplete"  'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
 
+echo "7) Gate zaehlt wie die Ingestion nur den letzten Envelope (1cf996df)"
+# previous_report sind die ersten 3000 Zeichen des Vorlaufs, bei kurzen Reports samt Envelope. Gibt das
+# Modell ihn wieder, steht vor dem eigenen ein alter Envelope, ganz oder abgeschnitten. Gezaehlt wird
+# nur der letzte, wie in AuditResultParser; ein offener letzter gilt als fehlend.
+CUT_ECHO="$(printf '%s\n' '<!-- mysuricates:audit-result:v1' \
+  '{"snapshotComplete":true,"findings":[{"ruleKey":"test-coverage.untested-class","subject":"p/C0.java"' \
+  '[...gekürzt]')"
+run_gate "$(envelope_report 18 true; envelope_report 20 true)"
+check "alter Envelope (18) vor dem eigenen (20): nicht RED" \
+  '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+run_gate "$(printf '%s\n' "$CUT_ECHO"; envelope_report 20 true)"
+check "abgeschnittener alter vor dem eigenen: nicht RED" \
+  '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+run_gate "$(envelope_report 20 true; printf '%s\n' '<!-- mysuricates:audit-result:v1' '{"snapshotComplete":true,"findings":[')"
+check "eigener abgeschnitten nach vollstaendigem altem: RED" \
+  'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
+# Beginnt und endet der Envelope in derselben Zeile, zaehlt er ebenso; was danach kommt, gehoert nicht dazu.
+GATE_METRICS="$(printf 'UNTESTED gesamt: 1\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 1\n')" \
+  run_gate "$(printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' \
+  '<!-- mysuricates:audit-result:v1 {"snapshotComplete":true,"findings":[{"ruleKey":"test-coverage.untested-class","subject":"p/C0.java","severity":"MEDIUM","title":"t"}]} -->' \
+  'Nachsatz ohne Envelope')"
+check "einzeiliger Envelope wird gezaehlt, der Nachsatz nicht" \
+  '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
+check "Gate laeuft auch hier ohne stderr" '[ ! -s "$TMP/gate-err.txt" ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

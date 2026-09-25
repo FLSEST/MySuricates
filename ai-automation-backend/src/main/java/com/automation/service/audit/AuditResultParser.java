@@ -16,18 +16,23 @@ import java.util.regex.Pattern;
 public class AuditResultParser {
     private static final Pattern ENVELOPE = Pattern.compile(
             "<!--\\s*mysuricates:audit-result:v1\\s*(\\{.*?})\\s*-->", Pattern.DOTALL);
+    /** Der Anfang eines Envelopes, auch eines, der nie geschlossen wird. */
+    private static final Pattern ENVELOPE_START = Pattern.compile("<!--\\s*mysuricates:audit-result:v1");
 
     private final ObjectMapper objectMapper;
 
     public ParseResult parse(String output) {
         String source = output == null ? "" : output;
-        Matcher matcher = ENVELOPE.matcher(source);
-        if (!matcher.find()) {
-            return ParseResult.invalid(source.trim(), "Audit result envelope v1 is missing");
+        Matcher matcher = lastEnvelope(source);
+        if (matcher == null) {
+            return ParseResult.invalid(withoutEnvelopes(source).trim(), ENVELOPE_START.matcher(source).find()
+                    ? "Audit result envelope v1 at the end of the output is not closed"
+                    : "Audit result envelope v1 is missing");
         }
 
         String envelopeJson = matcher.group(1);
-        String markdown = matcher.replaceAll("").trim();
+        String markdown = (withoutEnvelopes(source.substring(0, matcher.start()))
+                + source.substring(matcher.end())).trim();
         try {
             JsonNode root = objectMapper.readTree(envelopeJson);
             if (!root.path("snapshotComplete").asBoolean(false)) {
@@ -79,6 +84,34 @@ public class AuditResultParser {
         } catch (Exception ex) {
             return ParseResult.invalid(markdown, ex.getMessage());
         }
+    }
+
+    /**
+     * Der letzte vollstaendige Envelope, oder {@code null}. Der eigene schliesst laut Prompt die Antwort ab;
+     * davor kann ein wiedergegebener Vorlauf stehen: {@code previous_report} sind die ersten 3000 Zeichen des
+     * letzten Reports, bei kurzen Reports samt Envelope, auch abgeschnitten. Mit dem ersten Envelope zaehlte
+     * der alte Snapshot. Steht hinter dem letzten vollstaendigen noch ein Envelope-Anfang, ist die Antwort
+     * abgeschnitten: dann gilt keiner, statt auf den alten zurueckzufallen. Ein Anfang innerhalb des
+     * gefundenen Envelopes (etwa im Text eines Findings) ist kein eigener.
+     */
+    private static Matcher lastEnvelope(String source) {
+        List<Integer> starts = new ArrayList<>();
+        Matcher start = ENVELOPE_START.matcher(source);
+        while (start.find()) {
+            starts.add(start.start());
+        }
+        for (int i = starts.size() - 1; i >= 0; i--) {
+            Matcher envelope = ENVELOPE.matcher(source).region(starts.get(i), source.length());
+            if (envelope.lookingAt()) {
+                return starts.get(starts.size() - 1) < envelope.end() ? envelope : null;
+            }
+        }
+        return null;
+    }
+
+    /** Der Text ohne vollstaendige Envelopes – auch ohne einen wiedergegebenen alten. */
+    private static String withoutEnvelopes(String text) {
+        return ENVELOPE.matcher(text).replaceAll("");
     }
 
     private static String requiredText(JsonNode node, String field, int index) {

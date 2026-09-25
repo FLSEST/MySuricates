@@ -51,6 +51,13 @@ JSON-Envelope:
 Titel und Beschreibung dürfen sich weiterentwickeln. Ein leerer Snapshot wird als
 `"findings": []` ausgegeben.
 
+Stehen mehrere Envelopes in der Ausgabe, zählt der **letzte** (TODO `1cf996df`). Der eigene
+schließt die Antwort ab, und davor kann ein wiedergegebener Vorlauf stehen: `{{ previous_report }}`
+sind die ersten 3000 Zeichen des letzten Reports, bei kurzen Reports samt Envelope, oft
+abgeschnitten. Ist der letzte Envelope nicht geschlossen, weil die Antwort abbricht, ist der Report
+ungültig; auf einen früheren greift die Ingestion nicht zurück. Der Gate-Block der Test-Abdeckung
+zählt denselben Envelope.
+
 Überlässt der Prompt das `subject` dem Modell, driftet es: Zwischen zwei Läufen wurde aus
 `docs/deployment.md` `host-reaching-endpoints`, und der Befund kam als Wiedergänger ohne seine
 Disposition zurück. Ein Prompt legt das `subject` deshalb je `ruleKey` fest — einen festen Wert
