@@ -4,10 +4,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-  AlertTriangle, ArrowDown, ArrowRight, ArrowUp, CheckCircle2, ClipboardList,
+  AlertTriangle, ArrowDown, ArrowRight, ArrowUp, Calendar, CheckCircle2, ClipboardList,
   ExternalLink, FileClock, FileText, History, Link2, Loader2, Minus, Plus, ShieldCheck,
 } from 'lucide-react';
 import { Badge, Button } from '../components/ui';
+import { TriggerSourceChip } from '../components/workflow/TriggerSourceChip';
 import { useProjects } from '../hooks/useProjects';
 import { useReportsList, useReportContent } from '../hooks/useReports';
 import {
@@ -17,7 +18,7 @@ import {
 } from '../hooks/useAuditCenter';
 import { useI18nStore, useT, type Locale } from '../i18n';
 import { formatDateTime, formatRelativeTime } from '../utils/formatTime';
-import { formatDate } from '../utils/localeFormat';
+import { formatDate, formatTimestamp } from '../utils/localeFormat';
 import { todoDeepLink } from '../utils/todoLinks';
 
 type MainView = 'overview' | 'audit' | 'legacy';
@@ -133,7 +134,9 @@ function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding
   const t = useT();
   const reports = useAuditReports(audit.projectId, audit.auditKey);
   const findings = useAuditFindings(audit.projectId, audit.auditKey);
-  const latest = reports.data?.content.find((report) => report.ingestionStatus === 'VALID');
+  const shown = shownReport(reports.data?.content ?? [], audit);
+  // Header link, report head and history all point at the run of the report on screen.
+  const evidenceRun = shown ? `/workflows/${shown.workflowId}/run/${shown.workflowRunId}` : `/workflows/${audit.workflowId}/run/${audit.latestRunId}`;
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
@@ -149,7 +152,7 @@ function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding
           <Link className="text-xs text-accent hover:underline inline-flex items-center gap-1" to={`/workflows/${audit.workflowId}`}>
             {t.auditCenter.workflowLink} <ExternalLink className="w-3 h-3" />
           </Link>
-          <Link className="text-xs text-accent hover:underline inline-flex items-center gap-1" to={`/workflows/${audit.workflowId}/run/${audit.latestRunId}`}>
+          <Link className="text-xs text-accent hover:underline inline-flex items-center gap-1" to={evidenceRun} data-testid="evidence-run">
             {t.auditCenter.evidenceRun} <ExternalLink className="w-3 h-3" />
           </Link>
         </div>
@@ -161,39 +164,83 @@ function AuditDetail({ audit, tab, setTab, locale, projectName, requestedFinding
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto border-t border-border pt-5">
         {reports.isLoading || findings.isLoading ? <CenteredLoading /> : null}
-        {tab === 'report' && latest && <ReportContent report={latest} />}
-        {tab === 'history' && <ReportHistory reports={reports.data?.content ?? []} locale={locale} workflowId={audit.workflowId} />}
+        {tab === 'report' && shown && <ReportContent report={shown} audit={audit} locale={locale} />}
+        {tab === 'history' && <ReportHistory reports={reports.data?.content ?? []} locale={locale} />}
         {tab === 'findings' && <Findings findings={findings.data?.content ?? []} requestedFinding={requestedFinding} workflowId={audit.workflowId} locale={locale} />}
       </div>
     </div>
   );
 }
 
-function ReportContent({ report }: { report: AuditReport }) {
+/** The report the summary names (`latestReportId`) — the newest valid one; if the page lacks it, the first valid. */
+function shownReport(reports: AuditReport[], audit: AuditSummary): AuditReport | undefined {
+  return reports.find((report) => report.id === audit.latestReportId)
+    ?? reports.find((report) => report.ingestionStatus === 'VALID');
+}
+
+const REPORT_DATE: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' };
+
+function ReportContent({ report, audit, locale }: { report: AuditReport; audit: AuditSummary; locale: Locale }) {
   const t = useT();
+  const date = formatTimestamp(report.generatedAt, locale, REPORT_DATE);
   return <div className="max-w-5xl">
-    <div className="flex items-center gap-3 text-xs text-text-tertiary mb-5 flex-wrap">
+    {audit.latestAttemptStatus !== 'VALID' && <div role="note" data-testid="older-report-notice"
+      className="flex items-start gap-2 mb-4 px-3 py-2 rounded-md border border-warning/40 bg-warning-subtle text-sm text-warning">
+      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+      <div>
+        <p>{t.auditCenter.olderReport.replace('{date}', date)}</p>
+        {audit.latestAttemptError && <p className="text-xs text-text-secondary mt-1 whitespace-pre-wrap">{audit.latestAttemptError}</p>}
+      </div>
+    </div>}
+    <div className="flex items-center gap-x-3 gap-y-2 text-xs text-text-tertiary mb-5 flex-wrap" data-testid="report-origin">
+      <span className="text-text font-medium">{t.auditCenter.reportFrom.replace('{date}', date)}</span>
+      <Link to={`/workflows/${report.workflowId}/run/${report.workflowRunId}`} className="text-accent hover:underline">
+        {withValue(t.auditCenter.runShort, '{id}', <span className="font-mono">{report.workflowRunId.slice(0, 8)}</span>)}
+      </Link>
+      <TriggerSourceChip source={report.triggerSource} />
+      <ReportChain report={report} />
+      {!report.chainRunId && report.scheduleId && report.triggerSource !== 'SCHEDULE' && <span className="inline-flex items-center gap-1">
+        <Calendar className="w-3 h-3" /> {t.auditCenter.schedule}
+      </span>}
+      {report.definitionVersionNumber != null && <span>{t.auditCenter.definitionVersion.replace('{number}', String(report.definitionVersionNumber))}</span>}
+      {report.workflowVersion && <span>{t.auditCenter.workflowVersion.replace('{version}', report.workflowVersion)}</span>}
       <span>{report.provider ?? t.auditCenter.providerDefault} / {report.model ?? t.auditCenter.providerDefault}</span>
-      <span>{t.auditCenter.workflowVersion.replace('{version}', String(report.workflowVersion ?? '?'))}</span>
       <span>{t.auditCenter.findingsInSnapshot.replace('{count}', String(report.findingCount))}</span>
     </div>
     <Markdown content={report.markdownContent} />
   </div>;
 }
 
-function ReportHistory({ reports, locale, workflowId }: { reports: AuditReport[]; locale: Locale; workflowId: string }) {
+/** The chain a report's run was an entry of; its name links to that chain run (there is no chain detail page). */
+function ReportChain({ report }: { report: AuditReport }) {
+  const t = useT();
+  if (report.chainId && report.chainRunId) {
+    return <Link to={`/chains/${report.chainId}/run/${report.chainRunId}`} title={t.auditCenter.openChainRun}
+      className="inline-flex items-center gap-1 text-accent hover:underline" data-testid="report-chain">
+      <Link2 className="w-3 h-3" /> {t.auditCenter.chainNamed.replace('{name}', report.chainName ?? report.chainId.slice(0, 8))}
+    </Link>;
+  }
+  if (report.chainRunId) return <span className="inline-flex items-center gap-1" data-testid="report-chain"><Link2 className="w-3 h-3" /> {t.auditCenter.chainGone}</span>;
+  return null;
+}
+
+function ReportHistory({ reports, locale }: { reports: AuditReport[]; locale: Locale }) {
   const t = useT();
   return <div className="divide-y divide-border">
-    {reports.map((report) => <div key={report.id} className="py-4 flex items-start justify-between gap-4">
+    {reports.map((report) => <div key={report.id} className="py-4 flex items-start justify-between gap-4" data-testid="report-history-entry">
       <div className="flex items-start gap-3">
         {report.ingestionStatus === 'VALID' ? <CheckCircle2 className="w-5 h-5 text-success mt-0.5" /> : <AlertTriangle className="w-5 h-5 text-danger mt-0.5" />}
         <div>
-          <div className="flex gap-2 items-center"><GateBadge status={report.gateStatus} /><Badge variant={report.ingestionStatus === 'VALID' ? 'success' : 'danger'}>{report.ingestionStatus}</Badge></div>
+          <div className="flex gap-2 items-center flex-wrap text-xs">
+            <GateBadge status={report.gateStatus} /><Badge variant={report.ingestionStatus === 'VALID' ? 'success' : 'danger'}>{report.ingestionStatus}</Badge>
+            <TriggerSourceChip source={report.triggerSource} />
+            <ReportChain report={report} />
+          </div>
           <p className="text-sm text-text-secondary mt-2">{report.gateDescription ?? report.ingestionError ?? t.auditCenter.noDescription}</p>
           <p className="text-xs text-text-tertiary mt-1">{formatDateTime(report.generatedAt, locale)} · {t.auditCenter.findingsCount.replace('{count}', String(report.findingCount))} · v{report.workflowVersion ?? '?'}</p>
         </div>
       </div>
-      <Link to={`/workflows/${workflowId}/run/${report.workflowRunId}`} className="text-xs text-accent hover:underline shrink-0">{t.auditCenter.openRun}</Link>
+      <Link to={`/workflows/${report.workflowId}/run/${report.workflowRunId}`} className="text-xs text-accent hover:underline shrink-0">{t.auditCenter.openRun}</Link>
     </div>)}
   </div>;
 }
@@ -344,6 +391,11 @@ function Disposition({ finding, locale }: { finding: AuditFinding; locale: Local
       <pre className="font-mono whitespace-pre-wrap mt-1">{finding.dispositionEvidence}</pre>
     </details>}
   </div>;
+}
+/** `template` with `placeholder` replaced by a node — for a value that needs its own markup. */
+function withValue(template: string, placeholder: string, value: React.ReactNode) {
+  const [before, after = ''] = template.split(placeholder);
+  return <>{before}{value}{after}</>;
 }
 function NavButton({ active, disabled, onClick, icon, children }: { active: boolean; disabled?: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return <button disabled={disabled} onClick={onClick} className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md disabled:opacity-40 ${active ? 'bg-surface-overlay text-text' : 'text-text-secondary hover:text-text'}`}>{icon}{children}</button>;

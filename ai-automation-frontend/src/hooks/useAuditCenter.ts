@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { PageResponse } from '../types';
+import type { PageResponse, TriggerSource } from '../types';
 
 export type GateStatus = 'GREEN' | 'YELLOW' | 'RED';
 export type AuditIngestionStatus = 'VALID' | 'INVALID';
@@ -44,6 +44,17 @@ export interface AuditReport {
   ingestionError: string | null;
   generatedAt: string;
   findingCount: number;
+  // Where the report's run came from (a3b89355) — each null when unknown, absent on older backends.
+  /** Effective trigger: for a chain entry what started the chain; old chain runs say CHAIN. */
+  triggerSource?: TriggerSource | null;
+  /** Schedule that started the run, for a chain entry the chain's schedule. */
+  scheduleId?: string | null;
+  chainRunId?: string | null;
+  /** Null when the chain run is gone, even if `chainRunId` is set. */
+  chainId?: string | null;
+  chainName?: string | null;
+  /** Number of the workflow version whose definition the run executed. */
+  definitionVersionNumber?: number | null;
 }
 
 export interface AuditFinding {
@@ -71,6 +82,8 @@ export interface AuditFinding {
   dispositionAt: string | null;
   /** ruleKey ausserhalb von audit/rule-keys.json — die Regel-Identitaet ist ungeprueft. */
   unknownRuleKey: boolean;
+  /** Evidence nennt keinen Messwert des eigenen Laufs — Finding bleibt sichtbar, bekommt aber kein verwaltetes TODO. */
+  unverifiedEvidence: boolean;
   todos: Array<{ id: string; title: string; status: string; managed: boolean }>;
 }
 
