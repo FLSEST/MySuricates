@@ -103,7 +103,9 @@ public class AssistantWorkflowTools {
                     (String) params.getOrDefault("instructions", null),
                     (String) params.getOrDefault("model", null),
                     null, // provider
-                    metadata, defaultContext
+                    metadata, defaultContext,
+                    null, null, null, null, // changeMessage, tags, category, effort
+                    version(params)
             );
             Workflow updated = workflowService.update(workflowId, request, ChangeSource.ASSISTANT);
             return "✓ Workflow updated: \"" + updated.getName() + "\" (ID: " + workflowId + ")";
@@ -111,6 +113,15 @@ public class AssistantWorkflowTools {
             log.warn("Assistant update_workflow tool failed. Payload: {}", json, e);
             return "⚠ Could not update workflow: " + e.getMessage();
         }
+    }
+
+    /**
+     * The version label, like PUT: absent keeps it, blank is refused with the reason (TODO 5e2e73a5). A model may
+     * write it as a number ({@code 2}), which counts as its text.
+     */
+    private static String version(Map<String, Object> params) {
+        Object version = params.get("version");
+        return version != null ? String.valueOf(version) : null;
     }
 
     public String deleteWorkflow(String json) {

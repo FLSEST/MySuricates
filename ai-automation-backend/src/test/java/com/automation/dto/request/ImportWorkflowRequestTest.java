@@ -40,6 +40,18 @@ class ImportWorkflowRequestTest {
         assertThat(request.metadata()).containsEntry("version", "1.0");
     }
 
+    /** TODO 5e2e73a5: the export file's version label travels with the import; the short form has none. */
+    @Test
+    void should_carryTheVersionLabel_andLeaveItNullInTheShortForm() {
+        var withVersion = new ImportWorkflowRequest(
+                null, "Test", null, null, null, null, null, true, null, null, "4.4.0");
+        var shortForm = new ImportWorkflowRequest(
+                null, "Test", null, null, null, null, null, true, null, null);
+
+        assertThat(withVersion.version()).isEqualTo("4.4.0");
+        assertThat(shortForm.version()).isNull();
+    }
+
     @Test
     void should_defaultBlocksToEmptyList_when_blocksIsNull() {
         var request = new ImportWorkflowRequest(

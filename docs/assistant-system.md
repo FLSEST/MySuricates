@@ -210,7 +210,7 @@ Der Assistent kann über `<tool type="...">JSON</tool>`-Tags Aktionen vorschlage
 | `create_todo` | `title` | Todo anlegen (optional: description, priority, tags, projectId) |
 | `update_todo_status` | `id`, `status` | Todo-Status ändern (OPEN/IN_PROGRESS/DONE/BACKLOG) |
 | `create_workflow` | `projectId`, `name` | Workflow anlegen (optional: blocks, instructions, model, defaultContext) |
-| `update_workflow` | `workflowId` | Workflow-Felder aktualisieren (nur übergebene Felder werden geändert) |
+| `update_workflow` | `workflowId` | Workflow-Felder aktualisieren (nur übergebene Felder werden geändert, auch das Versions-Label `version` wie bei `PUT`) |
 | `delete_workflow` | `workflowId` | Workflow soft-deleten |
 | `start_workflow` | `workflowId` | Workflow starten (optional: context für Input-Variablen) |
 | `cancel_run` | `runId` | Laufenden Run abbrechen |
