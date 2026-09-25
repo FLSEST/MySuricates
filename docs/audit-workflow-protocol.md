@@ -246,7 +246,9 @@ fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
   wenn das Modell ihn anders benennen würde.
 - **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
   Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
-  verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert.
+  verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert. Verschlechtert
+  heißt: Eine belegende Kennzahl liegt um mehr als 10 % über ihrem letzten Wert. Ab dieser Schwelle
+  öffnet auch `AuditAcceptancePolicy` eine Akzeptanz wieder; kleinere Schwankungen zählen nicht.
 - **Zählung:** `gate_status` und die Zahlen im Markdown zählen nur `OPEN`,
   `AWAITING_VERIFICATION` und neue Befunde, eingeordnete nur, wenn sie sich laut Messung dieses
   Laufs verschlechtert haben. Der Envelope und die Messwerte selbst bleiben unberührt. Sonst bliebe
@@ -263,7 +265,8 @@ Die Test-Abdeckung empfiehlt als nächsten Schritt und in der Roadmap nur Klasse
 eingeordnet sind. Ihr Envelope enthält weiter jede gelistete Klasse, sonst stimmte
 `expectedFindings` nicht. Dass alle fünf Prompts die Variable und denselben Regelblock tragen und
 keiner mehr verlangt, bekannte Befunde wegzulassen, prüft `scripts/tests/test-audit-facts.sh`
-(Abschnitt 10).
+(Abschnitt 10). Die Prüfung liest die Schwelle aus `AuditAcceptancePolicy`, damit Prompt und Plattform
+dasselbe unter „verschlechtert“ verstehen.
 
 ## Lebenszyklus
 
