@@ -332,13 +332,16 @@ Update a workflow.
   "name": "New Name",
   "description": "New description",
   "icon": "✨",
-  "blocks": []
+  "blocks": [],
+  "version": "4.4.0"
 }
 ```
 
 **Response:** `WorkflowResponse`
 
-The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming still works.
+All fields are optional; a missing field stays unchanged. `version` is the version label (at most 255 characters, blank → `400`), not part of the definition: it creates no new version and changes no hash. A pool reinstall sets it to the pool file's version.
+
+The server decides the change's origin (`changeSource` of the new version). Sealed workflows: definition changes → `409 WORKFLOW_SEALED`, renaming and `version` still work.
 
 ### `DELETE /api/v1/workflows/{id}`
 

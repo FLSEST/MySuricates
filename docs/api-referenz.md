@@ -334,13 +334,16 @@ Workflow aktualisieren.
   "name": "Neuer Name",
   "description": "Neue Beschreibung",
   "icon": "✨",
-  "blocks": []
+  "blocks": [],
+  "version": "4.4.0"
 }
 ```
 
 **Response:** `WorkflowResponse`
 
-Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen bleibt möglich.
+Alle Felder sind optional; ein fehlendes Feld bleibt unverändert. `version` ist das Versions-Label (höchstens 255 Zeichen, leer → `400`), kein Teil der Definition: Es erzeugt keine neue Version und ändert keinen Hash. Die Pool-Neuinstallation setzt es auf die Version der Pool-Datei.
+
+Die Herkunft der Änderung (`changeSource` der neuen Version) bestimmt der Server. Versiegelte Workflows: Definitionsänderungen → `409 WORKFLOW_SEALED`, Umbenennen und `version` bleiben möglich.
 
 ### `DELETE /api/v1/workflows/{id}`
 

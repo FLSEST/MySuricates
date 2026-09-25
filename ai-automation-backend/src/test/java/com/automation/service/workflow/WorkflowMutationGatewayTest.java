@@ -83,6 +83,24 @@ class WorkflowMutationGatewayTest {
         verifyNoInteractions(versions, activityLog);
     }
 
+    /**
+     * The version label ({@code 4.4.0} from the pool) is a label like the name: no version row, the
+     * definition hash stays, and a sealed workflow accepts it (TODO a3b89355).
+     */
+    @Test
+    void versionLabelIsNoDefinitionChange_evenWhenSealed() {
+        workflow.setSealed(true);
+        workflow.setVersion("3.0.0");
+        WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
+        String hashBefore = hasher.hash(workflow);
+        workflow.setVersion("4.4.0");
+
+        gateway.record(workflow, before, ChangeSource.POOL_INSTALL, "Pool install: health");
+
+        verifyNoInteractions(versions, activityLog);
+        assertThat(hasher.hash(workflow)).isEqualTo(hashBefore);
+    }
+
     @Test
     void definitionChangeWritesPostStateWhenPreStateIsKnown() {
         WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
