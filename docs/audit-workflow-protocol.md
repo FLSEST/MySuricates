@@ -204,8 +204,9 @@ ACCEPTED_RISK | MEDIUM | performance.bundle-size | frontend/dist | Bundle über 
 
 - Enthalten sind `OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK` und `DISMISSED` in dieser
   Reihenfolge, darin nach Schwere (`CRITICAL` … `LOW`), `ruleKey` und `subject`. `RESOLVED`
-  fehlt, ebenso ein Befund mit markiertem unbekanntem `ruleKey`: Führte der Prompt so einen Key
-  weiter, verwürfe die Ingestion den ganzen Report.
+  fehlt, ebenso ein Befund, dessen `ruleKey` der Katalog des Audits nicht kennt: markiert (V75)
+  oder Altbestand aus der Zeit vor dem Katalog, der auch normalisiert nicht darin steht (TODO
+  `1cf996df`). Führte der Prompt so einen Key weiter, verwürfe die Ingestion den ganzen Report.
 - Die Einordnung (`dispositionNote`) steht bei allen außer `OPEN`, auch bei
   `AWAITING_VERIFICATION`: Dort liegen Akzeptanzgrund und `Wiedervorlage nach 180 Tagen`.
 - Höchstens 250 Zeilen und 60 000 Bytes, gemessen nach dem Shell-Quoting: Ein Shell-Befehl geht

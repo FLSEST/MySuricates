@@ -28,8 +28,9 @@ public interface AuditFindingRepository extends JpaRepository<AuditFinding, Stri
 
     /**
      * Die bekannten Befunde eines Audits fuer {@code audit_findings} (TODO 3643beac) – ohne die TEXT-Blobs
-     * (Beschreibung, Beleg, Tags, Beweis-Snapshot) und ohne Befunde mit unbekanntem {@code ruleKey}:
-     * Fuehrte ein Prompt so einen Key weiter, verwuerfe die Ingestion den ganzen Report.
+     * (Beschreibung, Beleg, Tags, Beweis-Snapshot) und ohne Befunde mit als unbekannt markiertem {@code ruleKey}:
+     * Fuehrte ein Prompt so einen Key weiter, verwuerfe die Ingestion den ganzen Report. Nie markierten Altbestand
+     * filtert {@code AuditFindingsContext} gegen den Katalog.
      */
     @Query("SELECT new com.automation.dto.projection.AuditFindingContextRow(f.id, f.status, f.severity, f.ruleKey, "
             + "f.subject, f.title, f.dispositionNote) FROM AuditFinding f WHERE f.projectId = :projectId "

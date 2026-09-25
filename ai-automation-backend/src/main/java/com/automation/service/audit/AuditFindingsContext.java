@@ -27,8 +27,11 @@ import java.util.StringJoiner;
  * ohne Einordnung.
  *
  * <p>Nicht dabei sind RESOLVED – Behobenes soll der Prompt nicht wiederbeleben – und Befunde mit
- * unbekanntem {@code ruleKey} (historisch, V75): Fuehrte der Prompt so einen Key weiter, verwuerfe die
- * Ingestion den ganzen Report ({@code AuditIngestionService}).
+ * unbekanntem {@code ruleKey}: markierte (historisch, V75) und Altbestand aus der Zeit vor dem Katalog, dessen
+ * Key auch normalisiert nicht im {@link AuditRuleKeyCatalog} steht (TODO 1cf996df; im Architektur- und
+ * Health-Audit eingeordnete wie {@code god-class | HostClaudeService}, nie markiert). Fuehrte der Prompt so
+ * einen Key weiter, verwuerfe die Ingestion den ganzen Report ({@code AuditIngestionService}); ein eingeordneter
+ * Altbefund bleibt ohnehin, wie er ist, auch wenn ihn kein Report mehr nennt.
  *
  * <p>Titel, subjects und Notizen stammen aus KI-Ausgaben und Nutzereingaben. Jeder Freitext wird wie in
  * {@code open_todos} auf eine Zeile gebracht, gekuerzt und von Plattform-Markern und Blockgrenzen befreit
@@ -86,6 +89,7 @@ public class AuditFindingsContext implements AuditContextSource {
 
     private final AuditFindingRepository findingRepository;
     private final ModuleRegistry modules;
+    private final AuditRuleKeyCatalog ruleKeyCatalog;
 
     @Override
     public String auditKey(Map<String, Object> workflowMeta) {
@@ -98,7 +102,10 @@ public class AuditFindingsContext implements AuditContextSource {
         if (!modules.isEnabled(ModuleCatalog.AUDIT)) {   // je Aufruf: ein Umschalten zur Laufzeit wirkt sofort
             return MODULE_OFF;
         }
-        return render(auditKey, findingRepository.findContextRows(projectId, auditKey, SHOWN));
+        // Die Abfrage laesst markierte unbekannte Keys weg, der Katalog auch die nie markierten (Klassen-Javadoc).
+        return render(auditKey, findingRepository.findContextRows(projectId, auditKey, SHOWN).stream()
+                .filter(row -> !ruleKeyCatalog.resolve(auditKey, row.ruleKey()).unknown())
+                .toList());
     }
 
     /**

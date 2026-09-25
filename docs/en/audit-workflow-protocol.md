@@ -206,8 +206,9 @@ note.
 
 - It contains `OPEN`, `AWAITING_VERIFICATION`, `ACCEPTED_RISK` and `DISMISSED` in this order, within
   each by severity (`CRITICAL` … `LOW`), `ruleKey` and `subject`. `RESOLVED` is left out, and so is a
-  finding marked with an unknown `ruleKey`: if the prompt carried such a key forward, ingestion would
-  discard the whole report.
+  finding whose `ruleKey` the audit's catalog does not know: marked (V75) or legacy from before the
+  catalog that is not in it even after normalisation (TODO `1cf996df`). If the prompt carried such a
+  key forward, ingestion would discard the whole report.
 - The disposition note (`dispositionNote`) is shown for every status but `OPEN`, including
   `AWAITING_VERIFICATION`: that is where the reason for acceptance and `Wiedervorlage nach 180 Tagen`
   are.
