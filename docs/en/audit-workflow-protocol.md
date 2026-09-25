@@ -245,6 +245,10 @@ rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the pro
 - **Markdown:** the findings table shows only `OPEN`, `AWAITING_VERIFICATION` and new findings.
   Classified ones are summed up in one line, `Bewusst eingeordnet: <N> (akzeptiert <x>, verworfen
   <y>) - siehe Audit Center`, unless one has measurably degraded.
+- **Counting:** `gate_status` and the numbers in the Markdown count only `OPEN`,
+  `AWAITING_VERIFICATION` and new findings, classified ones only if this run's measurement shows they
+  have degraded. The envelope and the measurements themselves are not affected. Otherwise the
+  architecture review, for example, would stay YELLOW for good because accepted HIGH findings counted.
 - **Envelope:** every finding that the measurement still shows is carried forward, `ACCEPTED_RISK`
   and `DISMISSED` included. Only fixed findings stay out, and legacy ones with a `ruleKey` the prompt
   does not allow. The model checks an `AWAITING_VERIFICATION` finding against the measurement: if it

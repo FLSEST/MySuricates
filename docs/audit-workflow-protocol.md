@@ -243,6 +243,10 @@ fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
 - **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
   Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
   verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert.
+- **Zählung:** `gate_status` und die Zahlen im Markdown zählen nur `OPEN`,
+  `AWAITING_VERIFICATION` und neue Befunde, eingeordnete nur, wenn sie sich laut Messung dieses
+  Laufs verschlechtert haben. Der Envelope und die Messwerte selbst bleiben unberührt. Sonst bliebe
+  etwa die Architektur dauerhaft YELLOW, weil akzeptierte HIGH-Befunde mitzählten.
 - **Envelope:** Jeder Befund, der laut Messung noch besteht, wird weitergeführt, auch
   `ACCEPTED_RISK` und `DISMISSED`. Weg bleibt nur Behobenes und Altbestand mit einem `ruleKey`,
   den der Prompt nicht erlaubt. Einen `AWAITING_VERIFICATION`-Befund prüft das Modell gegen die
