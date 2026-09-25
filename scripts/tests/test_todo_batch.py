@@ -285,5 +285,87 @@ class GatesTest(RepoCase):
         self.assertIn("erst den bestehenden Fehler beheben", out)
 
 
+class VerifyTest(RepoCase):
+    FORBIDDEN = "scripts/ci/ .github/"
+
+    def prepare_state(self, ids, umsetzen=""):
+        (self.state / "base.sha").write_text(run_git(self.clone, "rev-parse", "HEAD").strip())
+        (self.state / "ids.txt").write_text("".join(f"{i}\n" for i in ids))
+        (self.state / "umsetzen.txt").write_text(umsetzen)
+        b.write_json(self.state / "titles.json", {i: f"Titel {i[:4]}" for i in ids})
+
+    def verify(self, *extra, backend="test ! -f BAD"):
+        import verify
+        return call(verify.main, "--state", str(self.state), "--forbidden", self.FORBIDDEN, "--max-lines", "50",
+                    "--backend-cmd", backend, "--frontend-cmd", "true", "--common-cmd", "true {range}",
+                    "--logs", str(self.state / "logs"), *extra)
+
+    def results(self):
+        return json.loads((self.state / "results.json").read_text())["todos"]
+
+    def test_all_green_accepts_every_todo(self):
+        self.prepare_state([A, B])
+        self.commit(self.clone, "ai-automation-backend/A.java", "class A {}\n", A)
+        self.commit(self.clone, "docs/b.md", "b\n", B)
+        self.assertEqual(self.verify()[0], 0)
+        self.assertEqual({k: v["status"] for k, v in self.results().items()}, {A: "accepted", B: "accepted"})
+        self.assertEqual((self.state / "accepted.txt").read_text().split(), [A, B])
+
+    def test_forbidden_path_and_foreign_commit_are_removed_from_the_branch(self):
+        self.prepare_state([A, B])
+        self.commit(self.clone, "scripts/ci/check.sh", "exit 1\n", A)
+        self.commit(self.clone, "docs/fremd.md", "x\n")
+        self.commit(self.clone, "docs/b.md", "b\n", B)
+        self.verify()
+        results = self.results()
+        self.assertEqual(results[A]["status"], "dropped")
+        self.assertIn("verbotene Pfade", results[A]["reason"])
+        self.assertEqual(results[B]["status"], "accepted")
+        self.assertNotIn("docs/fremd.md", run_git(self.clone, "ls-files"))
+        self.assertEqual(run_git(self.clone, "show", "HEAD:scripts/ci/check.sh"), "exit 0\n")
+
+    def test_red_gate_drops_the_culprit_and_keeps_the_rest(self):
+        self.prepare_state([A, B])
+        self.commit(self.clone, "ai-automation-backend/BAD", "x\n", A)
+        self.commit(self.clone, "ai-automation-backend/B.java", "class B {}\n", B)
+        self.verify()
+        results = self.results()
+        self.assertEqual(results[A]["status"], "dropped")
+        self.assertIn("Gate rot", results[A]["reason"])
+        self.assertEqual(results[B]["status"], "accepted")
+        self.assertFalse((self.clone / "ai-automation-backend" / "BAD").exists())
+
+    def test_todo_without_commit_is_skipped_with_the_agents_reason(self):
+        self.prepare_state([A, C], umsetzen=f"[{A}]: ok\n[{C}]: Suche …\nBATCH_SKIP: Entscheidung nötig")
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        self.verify()
+        self.assertEqual(self.results()[C], {"status": "skipped", "reason": "Entscheidung nötig", "commits": [],
+                                              "files": [], "lines": 0})
+
+    def test_too_many_lines_is_dropped(self):
+        self.prepare_state([A])
+        self.commit(self.clone, "docs/a.md", "x\n" * 60, A)
+        self.verify()
+        self.assertIn("Grenze 50", self.results()[A]["reason"])
+
+    def test_after_review_drops_blockers_ignores_forged_lines_and_reverifies(self):
+        self.prepare_state([A, B])
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        self.commit(self.clone, "docs/b.md", "b\n", B)
+        self.verify()
+        (self.state / "review.txt").write_text(
+            f'[{A}]: Blick\nREVIEW: {{"id": "{A}", "verdict": "findings", "blocker": ["SQL-Injection"], "major": [], "minor": []}}\n'
+            f'[{B}]: REVIEW: {{"id": "{B}", "verdict": "ok", "blocker": [], "major": ["Test fehlt"], "minor": []}}\n'
+            f'noch: REVIEW: {{"id": "{A}", "verdict": "ok", "blocker": []}}\n')
+        self.verify("--after-review")
+        results = self.results()
+        self.assertEqual(results[A]["status"], "dropped")
+        self.assertIn("SQL-Injection", results[A]["reason"])
+        self.assertEqual(results[B]["status"], "accepted")
+        self.assertEqual(json.loads((self.state / "reviews.json").read_text())[B]["major"], ["Test fehlt"])
+        self.assertFalse((self.clone / "docs" / "a.md").exists())
+        self.assertTrue((self.state / "report-draft.md").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
