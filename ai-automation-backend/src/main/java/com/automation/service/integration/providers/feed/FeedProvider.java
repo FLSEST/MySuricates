@@ -70,7 +70,7 @@ public class FeedProvider implements IntegrationProvider {
     /** Nothing to validate — a static marker so saving (empty) credentials yields CONNECTED. */
     @Override
     public String fetchAccountInfo(String accessToken) {
-        return "{\"name\":\"RSS/Atom (ohne Zugangsdaten)\"}";
+        return "{\"name\":\"RSS/Atom\"}";
     }
 
     @Override

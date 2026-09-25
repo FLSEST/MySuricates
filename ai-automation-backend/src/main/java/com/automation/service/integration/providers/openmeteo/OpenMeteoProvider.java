@@ -60,7 +60,7 @@ public class OpenMeteoProvider implements IntegrationProvider {
     /** Nothing to validate — a static marker so saving (empty) credentials yields CONNECTED. */
     @Override
     public String fetchAccountInfo(String accessToken) {
-        return "{\"name\":\"Open-Meteo (ohne Zugangsdaten)\"}";
+        return "{\"name\":\"Open-Meteo\"}";
     }
 
     @Override

@@ -113,7 +113,8 @@ class OpenMeteoProviderTest {
         assertThat(provider.requiresCredentials()).isFalse();
         assertThat(provider.requiresOAuthFlow()).isFalse();
         assertThat(provider.getAvailableActions()).extracting("name").containsExactly("forecast", "geocode");
-        assertThat(provider.fetchAccountInfo("|")).contains("\"name\"");
+        // Kontoname ohne Sprache wie beim iCal-Feed – die Oberfläche zeigt ihn unverändert, auch auf Englisch (6e1e87c2)
+        assertThat(provider.fetchAccountInfo("|")).isEqualTo("{\"name\":\"Open-Meteo\"}");
     }
 
     @Test
