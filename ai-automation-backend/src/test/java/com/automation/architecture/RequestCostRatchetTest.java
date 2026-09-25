@@ -35,6 +35,8 @@ import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WishRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.EntityStatistics;
@@ -168,6 +170,15 @@ class RequestCostRatchetTest {
     private static final String CALENDAR =
             "/api/v1/schedules/calendar?from=2026-09-01T00:00:00Z&to=2026-09-08T00:00:00Z";
 
+    /**
+     * The dashboard over a window that reaches back past {@link #RUN_STARTED}. Its default window
+     * is the last 30 days up to today, and the seed has a fixed date: from 2026-10-02 on, the route
+     * would have measured an empty window — cheap, green and blind (TODO 5c56b3d1). A century back
+     * holds the seed for as long as this test lives; the queries are the same as for 30 days.
+     * {@link #windowedRoutesSeeTheWholeSeed} checks that the window actually holds it.
+     */
+    private static final String DASHBOARD = "/api/v1/learning/dashboard?days=36500";
+
     record Cost(int statements, int responseBytes) {}
 
     /**
@@ -271,7 +282,9 @@ class RequestCostRatchetTest {
      *       ten wishes. {@code /audits} reads two lean projections: the report rows without their
      *       markdown and the finding counts per audit, status and severity in one GROUP BY
      *       ({@code AuditCenterService.listAudits}, TODO 3d7e3987) — 2 statements, measured 3 301
-     *       bytes for six audits, whose markdown alone would add 20 000 bytes each.</li>
+     *       bytes for six audits, whose markdown alone would add 20 000 bytes each. Their
+     *       {@code stale} flag (older than 30 days) turns true for the fixed seed on 2026-10-01: one
+     *       byte less per audit, the same queries.</li>
      * </ul>
      */
     static final Map<String, Cost> BASELINE = new TreeMap<>(Map.ofEntries(
@@ -280,7 +293,7 @@ class RequestCostRatchetTest {
             Map.entry("/api/v1/workflows", new Cost(2, 26_000)),
             Map.entry("/api/v1/executions", new Cost(5, 60_000)),
             Map.entry("/api/v1/workflows/{wf}/runs", new Cost(4, 5_000)),
-            Map.entry("/api/v1/learning/dashboard", new Cost(10, 650_000)),
+            Map.entry(DASHBOARD, new Cost(10, 650_000)),
             Map.entry("/api/v1/search?q=Workflow", new Cost(2, 18_000)),
             Map.entry("/api/v1/schedules", new Cost(3, 20_000)),
             Map.entry("/api/v1/schedules/{sched}/runs", new Cost(5, 5_000)),
@@ -308,6 +321,7 @@ class RequestCostRatchetTest {
     @Autowired private TransactionTemplate transactions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private ObjectMapper objectMapper;
 
     /** Target of {@code {wf}} in a route: the first workflow of the first seed batch. */
     private String firstWorkflowId;
@@ -709,6 +723,38 @@ class RequestCostRatchetTest {
             System.out.println("[RequestCostRatchet] cheaper than pinned — tighten BASELINE ("
                     + slack.size() + "): " + String.join(", ", slack));
         }
+    }
+
+    /**
+     * Two routes show a time window only: the dashboard the days up to today, the calendar the week
+     * of {@link #CALENDAR}. With the seed outside its window a route measures nothing — below every
+     * ceiling, flat in the growth criterion, and blind to any N+1 (the dashboard's default window
+     * would have lost the seed on 2026-10-02, TODO 5c56b3d1). Each of them therefore has to show the
+     * whole seed, not just something.
+     */
+    @Test
+    void windowedRoutesSeeTheWholeSeed() throws Exception {
+        int seededRuns = PROJECTS * WORKFLOWS_PER_PROJECT * RUNS_PER_WORKFLOW;
+
+        JsonNode dashboard = json(DASHBOARD);
+        int runsInWindow = 0;
+        for (JsonNode day : dashboard.path("timeSeries")) {
+            runsInWindow += day.path("count").asInt();
+        }
+        assertThat(runsInWindow).as("seeded runs in the dashboard window").isEqualTo(seededRuns);
+        assertThat(dashboard.path("recentRuns").size()).as("recent runs on the dashboard").isPositive();
+
+        JsonNode calendar = json(CALENDAR);
+        assertThat(calendar.path("pastRuns").size()).as("seeded runs in the calendar week")
+                .isEqualTo(seededRuns);
+        assertThat(calendar.path("upcoming").size()).as("seeded schedules due in the calendar week")
+                .isEqualTo(PROJECTS * WORKFLOWS_PER_PROJECT);
+    }
+
+    private JsonNode json(String route) throws Exception {
+        MvcResult result = mockMvc.perform(get(resolve(route))).andReturn();
+        assertThat(result.getResponse().getStatus()).as("%s", route).isEqualTo(200);
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
     /**
