@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -91,5 +92,20 @@ class ChainRunWaiterTest {
                 StepResult.builder().stepIndex(0).output("first").build(),
                 StepResult.builder().stepIndex(1).output("last").build()));
         assertThat(waiter.extractOutput(run(RunStatus.COMPLETED))).isEqualTo("last");
+    }
+
+    @Test
+    void waitForCompletion_entryTimeout_overridesTheGlobalLimit() {
+        assertThatThrownBy(() -> waiter.waitForCompletion("r1", new AtomicBoolean(false), 0))
+                .hasMessage("Workflow timed out after 0 minutes");
+        verifyNoInteractions(workflowRunRepository);
+    }
+
+    @Test
+    void waitForCompletion_withoutEntryTimeout_usesTheGlobalLimit() {
+        chainConfig.setWorkflowTimeoutMinutes(0);
+
+        assertThatThrownBy(() -> waiter.waitForCompletion("r1", new AtomicBoolean(false), null))
+                .hasMessage("Workflow timed out after 0 minutes");
     }
 }

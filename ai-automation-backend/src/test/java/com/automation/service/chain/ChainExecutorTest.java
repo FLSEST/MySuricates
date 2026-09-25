@@ -525,4 +525,22 @@ class ChainExecutorTest {
         List<ChainRun> saved = captor.getAllValues();
         return saved.get(saved.size() - 1);
     }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(5)
+    void executeEntries_entryTimeoutReachesTheWaiter() {
+        setupSynchronousExecutor();
+        Project project = Project.builder().id("proj-1").name("Test Project").build();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").project(project).build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        testChain.setEntries(new ArrayList<>(List.of(
+                ChainEntry.builder().workflowId("wf-1").sortOrder(0).stopOnFailure(true).timeoutMinutes(0).build())));
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN)))
+                .thenReturn(WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build());
+
+        chainExecutor.execute(testChain, null);
+
+        verify(workflowRunRepository, never()).findById("wfr-1");   // die Eintrags-Frist 0 wartet nicht
+        assertThat(captureLastSavedRun().getEntryRuns().get(0).getStatus()).isEqualTo(RunStatus.FAILED);
+    }
 }

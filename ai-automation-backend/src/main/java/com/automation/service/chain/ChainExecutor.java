@@ -178,7 +178,7 @@ public class ChainExecutor {
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);
 
-                    WorkflowRun completed = runWaiter.waitForCompletion(workflowRun.getId(), cancelled);
+                    WorkflowRun completed = runWaiter.waitForCompletion(workflowRun.getId(), cancelled, entry.getTimeoutMinutes());
                     // Fresh read to avoid stale Hibernate cache
                     completed = workflowRunRepository.findById(completed.getId()).orElseThrow();
 

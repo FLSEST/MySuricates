@@ -387,4 +387,26 @@ class ChainServiceTest {
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("Chain run not found: missing");
     }
+
+    @Test
+    void create_rejectsEntryTimeoutOutsideRange() {
+        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        CreateChainRequest request = new CreateChainRequest("K", null, null,
+                List.of(new ChainEntryRequest("wf-1", null, 0, true, Map.of(), 2)), true);
+
+        assertThatThrownBy(() -> chainService.create(request)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("5 und 1440");
+    }
+
+    @Test
+    void create_keepsEntryTimeout() {
+        when(workflowRepository.existsById("wf-1")).thenReturn(true);
+        when(chainRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        CreateChainRequest request = new CreateChainRequest("K", null, null,
+                List.of(new ChainEntryRequest("wf-1", null, 0, true, Map.of(), 1200)), true);
+
+        WorkflowChain saved = chainService.create(request);
+
+        assertThat(saved.getEntries().get(0).getTimeoutMinutes()).isEqualTo(1200);
+    }
 }

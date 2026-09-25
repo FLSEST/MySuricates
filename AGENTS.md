@@ -240,6 +240,7 @@ Headers: Content-Type: application/json, X-API-Key: <dev-key>
 - Chains sind cross-project — Workflows aus verschiedenen Projekten möglich
 - `previous_chain_output` wird automatisch vom letzten Workflow propagiert
 - `stopOnFailure` auf Chain- UND Entry-Level müssen beide `true` sein, damit die Chain bei Fehler stoppt
+- `timeoutMinutes` (5–1440) am Eintrag: so lange wartet die Chain höchstens auf diesen Workflow (sonst `chain-workflow-timeout-minutes`, Vorgabe 180) – für Einträge mit Freigabe
 
 ### 3. Workflow ausführen
 

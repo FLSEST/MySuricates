@@ -1539,6 +1539,7 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
 - **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
 - **Kettenbezug**: Jeder Eintrag kennt seinen Chain-Run: `{{ chain_run_id }}` im Kontext, `chainRunId` am Lauf (`GET /api/v1/executions/{id}`). Beides setzt die Chain selbst, nach ihrem Eingabe-Kontext — ein mitgegebener `chain_run_id` überschreibt es nicht. Einzeln gestartet bleibt der Platzhalter wörtlich stehen (Analyzer-Regel `chain-only-placeholder`). `chainRunId` trägt nur der Lauf, den die Chain startet, auch nach einem Fortsetzen; ein Retry, ein Fortsetzen ohne abgeschlossenen Schritt (das startet einen neuen Lauf) und Sub-Workflows erben `{{ chain_run_id }}` mit dem Kontext, ihr `chainRunId` bleibt `null`
 - **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level müssen `true` sein)
+- **Wartezeit je Eintrag**: `timeoutMinutes` (5–1440) am Eintrag begrenzt, wie lange die Kette auf diesen Workflow wartet; ohne Angabe gilt `chain-workflow-timeout-minutes` (Vorgabe 180). Nötig für Einträge mit Freigabe, die über Nacht wartet. Läuft die Frist ab, zählt der Eintrag als FAILED – der Workflow-Lauf selbst läuft weiter
 
 ### Chain-Struktur
 
@@ -1549,18 +1550,21 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
     {
       "workflowId": "<audit-workflow-id>",
       "sortOrder": 0,
-      "context": { "scope": "backend" },
+      "inputContext": { "scope": "backend" },
       "stopOnFailure": true
     },
     {
       "workflowId": "<fix-workflow-id>",
       "sortOrder": 1,
-      "context": { "audit_report": "{{ previous_chain_output }}" },
-      "stopOnFailure": false
+      "inputContext": { "scope": "fix" },
+      "stopOnFailure": false,
+      "timeoutMinutes": 600
     }
   ]
 }
 ```
+
+Werte in `inputContext` werden nicht aufgelöst – `{{ previous_chain_output }}` gehört in die Blöcke des Workflows selbst.
 
 ### API
 

@@ -102,7 +102,8 @@ public class ChainMapper {
                 entry.getLabel(),
                 entry.getSortOrder(),
                 entry.isStopOnFailure(),
-                entry.getInputContext()
+                entry.getInputContext(),
+                entry.getTimeoutMinutes()
         );
     }
 
@@ -124,7 +125,8 @@ public class ChainMapper {
                 entry.getLabel(),
                 entry.getSortOrder(),
                 entry.isStopOnFailure(),
-                entry.getInputContext()
+                entry.getInputContext(),
+                entry.getTimeoutMinutes()
         );
     }
 

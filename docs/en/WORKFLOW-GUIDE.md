@@ -1515,6 +1515,7 @@ Chains group multiple workflows for **sequential execution**.
 - **Context passing**: Each entry can access `{{ previous_chain_output }}` from the last completed workflow
 - **Chain link**: Each entry knows its chain run: `{{ chain_run_id }}` in the context, `chainRunId` on the run (`GET /api/v1/executions/{id}`). The chain sets both itself, after its input context — a `chain_run_id` passed in does not override it. Started on its own, the placeholder stays literally (analyzer rule `chain-only-placeholder`). Only the run the chain starts carries `chainRunId`, also after a resume; a retry, a resume without a completed step (which starts a new run) and sub-workflows inherit `{{ chain_run_id }}` with the context, their `chainRunId` stays `null`
 - **stopOnFailure**: Controls whether the chain stops on workflow failure — stops only when **both** flags are set (chain-level AND entry-level must be `true`)
+- **Wait time per entry**: `timeoutMinutes` (5–1440) on an entry limits how long the chain waits for that workflow; without it `chain-workflow-timeout-minutes` applies (default 180). Needed for entries with an approval that waits overnight. When the limit runs out, the entry counts as FAILED – the workflow run itself keeps going
 
 ### Chain Structure
 
@@ -1525,18 +1526,21 @@ Chains group multiple workflows for **sequential execution**.
     {
       "workflowId": "<audit-workflow-id>",
       "sortOrder": 0,
-      "context": { "scope": "backend" },
+      "inputContext": { "scope": "backend" },
       "stopOnFailure": true
     },
     {
       "workflowId": "<fix-workflow-id>",
       "sortOrder": 1,
-      "context": { "audit_report": "{{ previous_chain_output }}" },
-      "stopOnFailure": false
+      "inputContext": { "scope": "fix" },
+      "stopOnFailure": false,
+      "timeoutMinutes": 600
     }
   ]
 }
 ```
+
+Values in `inputContext` are not resolved – `{{ previous_chain_output }}` belongs in the blocks of the workflow itself.
 
 ### API
 

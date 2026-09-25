@@ -109,7 +109,20 @@ public class ChainService {
                         .sortOrder(r.sortOrder())
                         .stopOnFailure(r.stopOnFailure() != null ? r.stopOnFailure() : true)
                         .inputContext(r.inputContext() != null ? r.inputContext() : java.util.Map.of())
+                        .timeoutMinutes(entryTimeout(r.timeoutMinutes()))
                         .build())
                 .toList();
+    }
+
+    static final int MIN_ENTRY_TIMEOUT_MINUTES = 5;
+    static final int MAX_ENTRY_TIMEOUT_MINUTES = 1440;
+
+    /** Wartezeit je Eintrag (TODO cc0eb3ba): null = globale Vorgabe, sonst 5–1440 Minuten. */
+    private static Integer entryTimeout(Integer minutes) {
+        if (minutes == null) return null;
+        if (minutes < MIN_ENTRY_TIMEOUT_MINUTES || minutes > MAX_ENTRY_TIMEOUT_MINUTES) {
+            throw new IllegalArgumentException("timeoutMinutes muss zwischen 5 und 1440 liegen: " + minutes);
+        }
+        return minutes;
     }
 }
