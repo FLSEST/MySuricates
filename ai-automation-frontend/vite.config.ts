@@ -60,7 +60,9 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api/, /^\/ws/],
           // Monaco (editor core > 2 MiB, language workers) loads on first use, not at PWA install.
           // The codeSplitting group below keeps all of monaco-editor in the `monaco` chunk.
-          globIgnores: ['**/monaco-*.js', '**/*.worker-*.js'],
+          // Its stylesheet (~146 KB) goes with it: offline the CSS is useless without the JS,
+          // it only adds to the install size. The lazy MonacoEditor chunk loads it on demand.
+          globIgnores: ['**/monaco-*.js', '**/monaco-*.css', '**/*.worker-*.js'],
         },
         manifest: {
           name: 'MySuricates',
