@@ -223,8 +223,22 @@ version/configuration. **Warning:** whichever form you pick, the outer class's o
 (`target/surefire-reports/<Class>.txt`) always reports `Tests run: 0` for the outer class itself,
 because it has no `@Test` methods of its own — that is normal, not empty. A run whose `@Nested`
 tests genuinely did not execute for some other reason can still look "green" from that single line
-if you only check it, or a truncated `tail`. What actually matters is the final
-`Results: Tests run: N` line of the whole Maven run, or its exit code.
+if you only check it, or a truncated `tail`. What actually matters is the exit code of the whole
+Maven run; count tests via the `<testcase>`, `<failure>` and `<error>` elements in
+`target/surefire-reports/TEST-<Class>.xml` (every `@Nested` class ends up there too, there is no
+separate file per inner class) or via the per-class console lines.
+
+**Caveat for same-named methods in `@Nested` classes:** the final `Results: Tests run: N` line and
+the `<testsuite tests=… failures=…>` header of the XML merge results under the key outer class +
+method name. When methods in two `@Nested` classes of the same outer class share a name, they count
+only once there; several failures of the same name show up under `Failures:` as `Run 1`, `Run 2`, …
+like reruns. Targeted failing probe (2026-09-25, Surefire 3.5.4): three `@Nested` classes with a red
+`sameName()` in each, one unique red method in two of them and a green `passesEverywhere()` in two —
+class lines 7 runs/5 failures, `Results` 5/3, XML header `tests="4" failures="3"`, XML elements
+7 `<testcase>`/5 `<failure>`; exit code 1, so correct. It turns dangerous with
+`-Dsurefire.rerunFailingTestsCount` > 0: a red test whose namesake in a sibling `@Nested` class is
+green then counts as a "flake", and the build ends with `BUILD SUCCESS` and exit code 0 although
+the test failed in both attempts. The `pom.xml` enables no reruns; keep it that way.
 
 **`ERROR` lines in a green run:** Many tests exercise failure paths — a mock throws, the code
 catches it and correctly logs it at `ERROR`, stack trace included. A green run therefore writes

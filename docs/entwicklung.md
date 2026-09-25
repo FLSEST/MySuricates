@@ -228,8 +228,24 @@ Text-Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet
 `Tests run: 0` für die äußere Klasse selbst, weil dort keine eigenen `@Test`-Methoden liegen; das
 ist normal, nicht leer. Ein Lauf, dessen `@Nested`-Tests aus irgendeinem Grund wirklich nicht
 mitgelaufen sind, sieht wegen dieser Zeile trotzdem "grün" aus, wenn man nur diese eine Zeile oder
-einen abgeschnittenen `tail` prüft. Maßgeblich ist immer die abschließende
-`Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code.
+einen abgeschnittenen `tail` prüft. Maßgeblich ist der Exit-Code des gesamten Maven-Laufs;
+gezählt wird über die `<testcase>`-, `<failure>`- und `<error>`-Elemente in
+`target/surefire-reports/TEST-<Klasse>.xml` (dort landen auch alle `@Nested`-Klassen, eine
+eigene Datei je innerer Klasse gibt es nicht) oder über die Klassenzeilen der Konsole.
+
+**Vorbehalt bei gleichnamigen Methoden in `@Nested`-Klassen:** Die abschließende
+`Results: Tests run: N`-Zeile und der `<testsuite tests=… failures=…>`-Kopf der XML fassen
+Ergebnisse unter dem Schlüssel äußere Klasse + Methodenname zusammen. Heißen Methoden in zwei
+`@Nested`-Klassen derselben äußeren Klasse gleich, zählen sie dort nur einmal; mehrere
+Fehlschläge desselben Namens erscheinen unter `Failures:` als `Run 1`, `Run 2`, … wie
+Wiederholungen. Gezielte Fehlprobe (2026-09-25, Surefire 3.5.4): drei `@Nested`-Klassen mit
+einem roten `sameName()` in jeder, je einer eindeutigen roten Methode in zweien und einem grünen
+`passesEverywhere()` in zweien — Klassenzeilen 7 Läufe/5 Fehlschläge, `Results` 5/3,
+XML-Kopf `tests="4" failures="3"`, XML-Elemente 7 `<testcase>`/5 `<failure>`; Exit-Code 1,
+also richtig. Gefährlich wird es mit `-Dsurefire.rerunFailingTestsCount` > 0: Dann gilt ein
+roter Test, dessen Namensvetter in einer Nachbar-`@Nested`-Klasse grün ist, als „Flake“, und der
+Build endet mit `BUILD SUCCESS` und Exit-Code 0, obwohl der Test in beiden Durchgängen
+scheiterte. Die `pom.xml` schaltet keine Wiederholungen ein; dabei soll es bleiben.
 
 **`ERROR`-Zeilen in einem grünen Lauf:** Viele Tests prüfen Fehlerpfade — ein Mock wirft, der
 Code fängt ab und loggt das korrekt auf `ERROR`, samt Stacktrace. Ein grüner Lauf schreibt so

@@ -26,9 +26,15 @@ BEVOR eine Änderung als fertig gilt oder committet wird, MÜSSEN alle relevante
      und sich **nie** an der Summenzeile der äußeren Klasse allein orientieren: Der eigene
      Report der äußeren Klasse (`target/surefire-reports/<Klasse>.txt`) meldet grundsätzlich
      `Tests run: 0`, weil die äußere Klasse selbst keine `@Test`-Methoden hat — das ist normal
-     und **kein** Hinweis auf einen leeren Lauf. Maßgeblich ist die abschließende
-     `Results: Tests run: N`-Zeile des gesamten Maven-Laufs bzw. dessen Exit-Code, nicht eine
-     einzelne Klassenzeile oder ein abgeschnittener `tail`.
+     und **kein** Hinweis auf einen leeren Lauf. Maßgeblich ist der Exit-Code des gesamten
+     Maven-Laufs; gezählt wird über die `<testcase>`-/`<failure>`-/`<error>`-Elemente in
+     `target/surefire-reports/TEST-<Klasse>.xml`, nicht über eine einzelne Klassenzeile oder
+     einen abgeschnittenen `tail`. **Vorbehalt:** Die abschließende `Results: Tests run: N`-Zeile
+     und der `<testsuite>`-Kopf der XML führen gleichnamige Methoden verschiedener
+     `@Nested`-Klassen zusammen (Schlüssel: äußere Klasse + Methodenname) und zählen zu wenig —
+     Fehlprobe 2026-09-25: Klassenzeilen 7 Läufe/5 Fehlschläge, `Results` 5/3, XML-Kopf 4/3,
+     XML-Elemente 7/5. Mit `-Dsurefire.rerunFailingTestsCount` > 0 gilt ein roter Test, dessen
+     Namensvetter nebenan grün ist, sogar als „Flake“ und der Build als grün — keine Reruns.
    - Frontend: `npx tsc --noEmit` + `npm run lint`
    - E2E (falls betroffen): `npm run test:e2e`
    - **Vor dem Push** prüft der `pre-push`-Hook (`scripts/ci/pre-push-checks.sh`) Commit-Nachrichten,
