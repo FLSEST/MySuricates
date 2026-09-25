@@ -293,7 +293,11 @@ describe('HomeCommand — hits while typing', () => {
     renderCommand();
 
     type('xyzzy');
+    // Not before the debounced sources have searched: "nothing found" flashed for 200 ms, then the
+    // spinner replaced it together with its buttons (a test that clicked in that window failed)
+    expect(screen.queryByText(en.simple.home.noMatch)).toBeNull();
     expect(await screen.findByText(en.simple.home.noMatch)).toBeInTheDocument();
+    expect(requests).toEqual(expect.arrayContaining(['templates', 'pool', 'schedules', 'todos:xyzzy']));
     // Only the generated "add as task" row — never highlighted
     expect(screen.getByRole('option', { name: /xyzzy/ })).toHaveAttribute('aria-selected', 'false');
     fireEvent.click(screen.getByRole('button', { name: en.simple.home.startFromTemplate }));
