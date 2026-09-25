@@ -495,7 +495,7 @@ All API data is managed via React Query:
 | `usePiCatalog()` | Query | Pi provider catalog |
 | `useAiProviderStatus()` | Query (60 s stale) | Readiness of the AI CLIs per provider |
 | `useRefreshAiProviderStatus()` | Mutation | Check readiness again at once |
-| `useUpdateSystemSetting()` | Mutation | Change system setting |
+| `useUpdateSystemSetting()` | Mutation | Change system setting; re-reads `['system', 'settings', key]` (for `default-ai-provider` also the provider list) before the mutation settles |
 | `useAssistantModelSetting()` | Query | Assistant model setting |
 | `useAutoRepairModeSetting()` | Query | Auto-repair mode setting |
 | `useSuggestionsModelSetting()` | Query | Suggestions model setting |

@@ -186,6 +186,50 @@ describe('useUpdateSystemSetting', () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
+
+  it('re-reads the saved setting, so its reader no longer holds the old value', async () => {
+    let stored = 'sonnet';
+    server.use(
+      http.get(`${apiBase}/system/settings/assistant-model`, () => HttpResponse.json({ value: stored })),
+      http.put(`${apiBase}/system/settings/:key`, async ({ request }) => {
+        stored = ((await request.json()) as { value: string }).value;
+        return HttpResponse.json({});
+      }),
+    );
+    const { Wrapper, client } = createWrapper();
+    const { result } = renderHook(() => ({ model: useAssistantModelSetting(), update: useUpdateSystemSetting() }), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.model.data).toBe('sonnet'));
+
+    await act(async () => {
+      await result.current.update.mutateAsync({ key: 'assistant-model', value: 'opus' });
+    });
+
+    // Refreshed before the mutation settles: the 5-minute staleTime no longer brings back the old value
+    expect(client.getQueryData(['system', 'settings', 'assistant-model'])).toBe('opus');
+    await waitFor(() => expect(result.current.model.data).toBe('opus'));
+  });
+
+  it('refreshes only the queries of that setting, plus the provider list for the default provider', async () => {
+    const { Wrapper, client } = createWrapper();
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useUpdateSystemSetting(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ key: 'assistant-thinking-phrases', value: '[]' });
+    });
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
+      { queryKey: ['system', 'settings', 'assistant-thinking-phrases'] },
+    ]);
+
+    invalidate.mockClear();
+    await act(async () => {
+      await result.current.mutateAsync({ key: 'default-ai-provider', value: 'PI' });
+    });
+    expect(invalidate.mock.calls.map(([filters]) => filters)).toEqual([
+      { queryKey: ['system', 'settings', 'default-ai-provider'] },
+      { queryKey: ['system', 'ai-providers'], exact: true },
+    ]);
+  });
 });
 
 // ────── New tests ──────
