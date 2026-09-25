@@ -142,7 +142,9 @@ Zwei der drei Muster wären einstufig unbrauchbar, deshalb verlangen sie ein zwe
 - `/api/v1/` allein ist kein Aufruf. `mocking-gap-audit` führt die Zeichenkette als **Suchmuster**
   in einer Liste von Netzwerk-Kennzeichen, direkt neben `fetch(` und `axios.`. Gemeldet wird
   deshalb erst ein konkreter Endpunkt (`/api/v1/todos`, nicht das nackte Präfix) zusammen mit
-  einem Aufruf in der Umgebung.
+  einem Aufruf in der Umgebung. Im **Shell-Code** eines Blocks genügt der konkrete Endpunkt: Dort
+  zählt jeder Pfad, der nicht exakt auf der Liste schlüsselfreier Sonden steht, auch wenn der
+  Aufruf weit entfernt über eine Variable läuft (`for E in /api/v1/…; do curl …$E`).
 - `automation.db` allein ist kein Datenbankzugriff. `mysuricates-performance-audit` sieht sich
   mit `stat -c %s` nur die **Dateigröße** an und schreibt das auch dazu. Verboten ist das Lesen
   des Inhalts, das an Hibernate und der einzigen Connection (pool-size 1) vorbeigeht.
