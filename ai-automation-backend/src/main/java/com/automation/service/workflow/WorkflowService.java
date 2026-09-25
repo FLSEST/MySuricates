@@ -9,30 +9,28 @@ import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
-import com.automation.executor.ExecutionMode;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.activitylog.ActivityLogService;
-import com.automation.service.ai.ReasoningEffort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Reads workflows and writes their definitions: every create, update, restore, delete and skill change
+ * is saved here, recorded through {@link WorkflowMutationGateway} and announced. Which request field
+ * goes where, and how it is checked, is {@link WorkflowRequestFields}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class WorkflowService {
-
-    static final int MAX_VERSION_LENGTH = 255;
 
     private final WorkflowRepository workflowRepository;
     private final ProjectRepository projectRepository;
@@ -71,33 +69,7 @@ public class WorkflowService {
     public Workflow create(CreateWorkflowRequest request, ChangeSource source) {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Project", request.projectId()));
-        BlockNameRules.rejectReservedNames(request.blocks());
-        ExecutionMode.rejectUnknown(request.blocks());
-
-        Workflow workflow = Workflow.builder()
-                .project(project)
-                .name(request.name())
-                .description(request.description())
-                .icon(request.icon())
-                .blocks(request.blocks() != null ? request.blocks() : new ArrayList<>())
-                .instructions(request.instructions())
-                .model(request.model())
-                .provider(request.provider())
-                .effort(normalizeEffort(request.effort()))
-                .templateId(request.templateId())
-                .build();
-
-        if (request.version() != null && !request.version().isBlank()) { // blank keeps the default 1.0.0
-            workflow.setVersion(normalizeVersion(request.version()));
-        }
-
-        if (request.metadata() != null) {
-            workflow.getMetadata().putAll(request.metadata());
-        }
-
-        if (request.defaultContext() != null) {
-            workflow.getDefaultContext().putAll(request.defaultContext());
-        }
+        Workflow workflow = WorkflowRequestFields.newWorkflow(project, request);
 
         // Activate skills if provided
         if (request.activatedSkillIds() != null) {
@@ -119,58 +91,7 @@ public class WorkflowService {
         Workflow workflow = findById(id);
         WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
 
-        if (request.name() != null) {
-            workflow.setName(request.name());
-        }
-        if (request.description() != null) {
-            workflow.setDescription(request.description());
-        }
-        if (request.icon() != null) {
-            workflow.setIcon(request.icon());
-        }
-        if (request.blocks() != null) {
-            BlockNameRules.rejectReservedNames(request.blocks());
-            ExecutionMode.rejectUnknown(request.blocks());
-            workflow.setBlocks(request.blocks());
-        }
-        if (request.instructions() != null) {
-            workflow.setInstructions(request.instructions());
-        }
-        if (request.model() != null) {
-            workflow.setModel(request.model());
-        }
-        if (request.provider() != null) {
-            workflow.setProvider(request.provider());
-        }
-        if (request.effort() != null) {
-            workflow.setEffort(normalizeEffort(request.effort()));
-        }
-        if (request.metadata() != null) {
-            Map<String, Object> merged = new HashMap<>(workflow.getMetadata());
-            merged.putAll(request.metadata());
-            workflow.setMetadata(merged);
-        }
-        if (request.defaultContext() != null) {
-            workflow.setDefaultContext(new HashMap<>(request.defaultContext()));
-        }
-        if (request.tags() != null) {
-            // User-provided tags lock the workflow from auto-regeneration.
-            workflow.setTags(new ArrayList<>(request.tags()));
-            workflow.setTagsUserEdited(true);
-            workflow.setTagsGeneratedAt(java.time.Instant.now());
-        }
-        if (request.category() != null) {
-            workflow.setCategory(request.category());
-            workflow.setTagsUserEdited(true);
-        }
-        if (request.version() != null) {
-            // A label like the name: not in WorkflowSnapshot, so the gateway writes no version row for it.
-            workflow.setVersion(normalizeVersion(request.version()));
-        }
-
-        boolean contentChanged = request.name() != null
-                || request.description() != null
-                || request.blocks() != null;
+        boolean contentChanged = WorkflowRequestFields.apply(workflow, request);
 
         Workflow saved = workflowRepository.save(workflow);
         mutations.record(saved, before, source, request.changeMessage());
@@ -190,47 +111,13 @@ public class WorkflowService {
         Workflow workflow = findById(id);
         WorkflowSnapshot before = WorkflowSnapshot.from(workflow);
 
-        // Set ALL versioned fields unconditionally (including null)
-        workflow.setBlocks(snapshot.blocks() != null ? snapshot.blocks() : new ArrayList<>());
-        workflow.setInstructions(snapshot.instructions());
-        workflow.setModel(snapshot.model());
-        workflow.setProvider(snapshot.provider());
-        workflow.setEffort(snapshot.effort());
-        workflow.setMetadata(snapshot.metadata() != null ? new HashMap<>(snapshot.metadata()) : new HashMap<>());
-        workflow.setDefaultContext(snapshot.defaultContext() != null ? new HashMap<>(snapshot.defaultContext()) : new HashMap<>());
+        WorkflowRequestFields.restore(workflow, snapshot);
 
         Workflow saved = workflowRepository.save(workflow);
         mutations.record(saved, before, ChangeSource.RESTORE, changeMessage);
         log.info("Restored workflow: {} ({}) from snapshot", saved.getName(), saved.getId());
         activityLogService.info(LogCategory.SYSTEM, "Workflow restored: " + saved.getName(), "WorkflowService", saved.getId(), saved.getId());
         return saved;
-    }
-
-    /**
-     * The version label, trimmed. Blank is rejected (400) — {@code null} in the update request is the
-     * way to leave it unchanged; create checks for blank itself and keeps the default. The column is
-     * TEXT without a limit (V5); 255 is the entity's mapped length.
-     */
-    private static String normalizeVersion(String version) {
-        String trimmed = version.strip();
-        if (trimmed.isEmpty()) {
-            throw new IllegalArgumentException("Invalid version: must not be blank (omit it to keep the current one)");
-        }
-        if (trimmed.length() > MAX_VERSION_LENGTH) {
-            throw new IllegalArgumentException("Invalid version: at most " + MAX_VERSION_LENGTH + " characters");
-        }
-        return trimmed;
-    }
-
-    /** Blank clears the level (null); invalid values are rejected with 400. */
-    private static String normalizeEffort(String effort) {
-        if (effort == null || effort.isBlank()) {
-            return null;
-        }
-        return ReasoningEffort.parse(effort)
-                .map(ReasoningEffort::cliValue)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Invalid effort level: '" + effort + "' (valid: low, medium, high, xhigh)"));
     }
 
     @Transactional(readOnly = true)

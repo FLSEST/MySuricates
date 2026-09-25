@@ -312,7 +312,7 @@ class WorkflowServiceTest {
 
         assertThatThrownBy(() -> workflowService.update("wf-1", versionOnly("  "), ChangeSource.USER))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("version");
-        String overlong = "1." + "0".repeat(WorkflowService.MAX_VERSION_LENGTH);
+        String overlong = "1." + "0".repeat(WorkflowRequestFields.MAX_VERSION_LENGTH);
         assertThatThrownBy(() -> workflowService.update("wf-1", versionOnly(overlong), ChangeSource.USER))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("255");
         verify(workflowRepository, never()).save(any());
@@ -341,7 +341,7 @@ class WorkflowServiceTest {
     @Test
     void create_overlongVersion_isRejectedBeforeSaving() {
         when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
-        String overlong = "1." + "0".repeat(WorkflowService.MAX_VERSION_LENGTH);
+        String overlong = "1." + "0".repeat(WorkflowRequestFields.MAX_VERSION_LENGTH);
 
         assertThatThrownBy(() -> workflowService.create(createWithVersion(overlong), ChangeSource.POOL_INSTALL))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("255");
