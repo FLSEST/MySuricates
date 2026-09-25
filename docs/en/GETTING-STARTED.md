@@ -155,7 +155,8 @@ The application is running. A first way in, without building anything:
 1. **Create a project** — every workflow belongs to a project; a project points at a directory on
    your machine (in the container: inside the projects folder). To try things out there is the
    **example project**: the dashboard, workflows and projects offer it while no project exists yet.
-   One click, and its example workflows run without AI and without any setup. The dashboard gets
+   One click, and its five example workflows run without AI and without any setup: approval,
+   if-then-else, loop, TODO lifecycle and a report to the dashboard. The dashboard gets
    a view of its own that shows only this project.
 2. **Take a template** — *Templates* holds 55 ready-made workflows. Pick one, copy it into the
    project, run it. The run shows step by step what happens. Templates that need a module switched

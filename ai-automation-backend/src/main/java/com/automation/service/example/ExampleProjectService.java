@@ -55,9 +55,11 @@ public class ExampleProjectService {
      * The shipped templates the example project gets, in this order. Named by id on purpose: the
      * first version picked them by the category {@code EXAMPLE}, and when its only template moved to
      * the blueprints (TODO 268ae0db) the example project silently came out empty (TODO 5162bd54).
-     * {@code ExampleTemplatesShippedTest} checks the ids against the shipped files.
+     * {@code ExampleTemplatesShippedTest} checks the ids against the shipped files. One ability each,
+     * in the blueprints' own order (TODO 2d782949): approval, branch, loop, TODOs, dashboard report.
+     * Keep the list on one line — the claims fact sheet of the public-readiness chain counts it there.
      */
-    static final List<String> EXAMPLE_TEMPLATE_IDS = List.of("blueprint-approval");
+    static final List<String> EXAMPLE_TEMPLATE_IDS = List.of("blueprint-approval", "blueprint-if", "blueprint-loop", "blueprint-todo", "blueprint-report");
 
     private static final Map<String, String> NAME = Map.of(
             "de", "Beispielprojekt",
@@ -66,9 +68,11 @@ public class ExampleProjectService {
             "de", "Mitgelieferte Beispiele zum Ausprobieren",
             "en", "Bundled examples to try out");
     private static final Map<String, String> DESCRIPTION = Map.of(
-            "de", "Die Beispiel-Workflows kommen ohne KI aus und schreiben nichts außerhalb ihres Laufs. "
+            "de", "Die Beispiel-Workflows kommen ohne KI aus. Außerhalb ihres Laufs bleibt nur das erledigte "
+                    + "TODO des TODO-Beispiels zurück. "
                     + "Das Verzeichnis ist eine Kopie der mitgelieferten Vorlage, Änderungen daran sind erlaubt.",
-            "en", "The example workflows need no AI and write nothing outside their run. "
+            "en", "The example workflows need no AI. All they leave behind outside their run is the done TODO "
+                    + "of the TODO example. "
                     + "The directory is a copy of the bundled template, so feel free to change it.");
 
     public record Result(Project project, boolean created, int workflowsAdded) {}
