@@ -19,7 +19,8 @@ export function useActiveAudit(requestedFinding: string | null) {
     activeAudit,
     /** Status of the deep-linked finding — its chip starts switched on. */
     linkedStatus: requestedFinding ? linkedFinding.data?.status : undefined,
-    linkPending: linkedFinding.isLoading,
+    // The audit of the link is only known once both are there: the finding can arrive before the list (d2e66569)
+    linkPending: linkedFinding.isLoading || isLoading,
     select: (audit: AuditSummary) => setSelectedKey({ projectId: audit.projectId, auditKey: audit.auditKey }),
   };
 }

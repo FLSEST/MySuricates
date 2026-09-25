@@ -123,6 +123,37 @@ describe('AuditCenter accepted findings', () => {
   });
 });
 
+// d2e66569: the finding came back before the audit list, and "not found" flashed up meanwhile
+describe('AuditCenter deep link while the audit list loads', () => {
+  it('says nothing about "not found" until the audit list is there', async () => {
+    useAuditEndpoints();
+    let releaseAudits!: () => void;
+    const auditsHeld = new Promise<void>((resolve) => { releaseAudits = resolve; });
+    let findingServed = false;
+    server.use(
+      http.get(`${BASE}/audits`, async () => { await auditsHeld; return HttpResponse.json([summary]); }),
+      http.get(`${BASE}/audit-findings/:id`, () => { findingServed = true; return HttpResponse.json(accepted); }),
+    );
+    renderWithProviders(<AuditCenter />, { route: '/?finding=f-accepted' });
+
+    await waitFor(() => expect(findingServed).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText('The linked finding or its audit was not found.')).toBeNull();
+
+    releaseAudits();
+    expect(await screen.findByText('Big.java ist zu gross')).toBeInTheDocument();
+    expect(screen.queryByText('The linked finding or its audit was not found.')).toBeNull();
+  });
+
+  it('still says so when the linked finding has no audit', async () => {
+    useAuditEndpoints();
+    server.use(http.get(`${BASE}/audits`, () => HttpResponse.json([])));
+    renderWithProviders(<AuditCenter />, { route: '/?finding=f-accepted' });
+
+    expect(await screen.findByText('The linked finding or its audit was not found.')).toBeInTheDocument();
+  });
+});
+
 // d75fbfef: dispositionNote existed only in the API — the page accepted without a reason
 describe('AuditCenter disposition reason', () => {
   const open: AuditFinding = { ...accepted, id: 'f-open', status: 'OPEN', dispositionNote: null, dispositionAt: null, dispositionEvidence: null };
