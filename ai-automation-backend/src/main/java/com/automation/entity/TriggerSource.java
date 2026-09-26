@@ -23,6 +23,11 @@ public enum TriggerSource {
     COMPLETION_TRIGGER(true, false),
     AUTO_REPAIR(true, false),
     WISH(true, false),
+    /**
+     * The platform resumed a run that a restart or a system standby interrupted — only for workflows
+     * that opted in ({@code metadata.autoResume.enabled}). Nobody is watching: unattended.
+     */
+    AUTO_RESUME(true, false),
     /** Attendedness comes from whatever started the chain. */
     CHAIN(false, true),
     /** Attendedness comes from the parent run. */

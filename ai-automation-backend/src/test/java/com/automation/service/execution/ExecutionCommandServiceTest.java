@@ -65,7 +65,7 @@ class ExecutionCommandServiceTest {
     void resumeFromStep_delegatesToExecutorAndMaps() {
         WorkflowRun resumed = WorkflowRun.builder().id("run-1").status(RunStatus.RUNNING).build();
         WorkflowRunResponse response = mock(WorkflowRunResponse.class);
-        when(workflowExecutor.resumeFromStep("run-1")).thenReturn(resumed);
+        when(workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME)).thenReturn(resumed);
         when(workflowMapper.toRunResponse(resumed)).thenReturn(response);
 
         assertThat(service.resumeFromStep("run-1")).isSameAs(response);

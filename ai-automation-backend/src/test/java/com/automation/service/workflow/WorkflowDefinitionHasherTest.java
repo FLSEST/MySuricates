@@ -46,6 +46,21 @@ class WorkflowDefinitionHasherTest {
         assertThat(hasher.hash(s)).isEqualTo(expected).hasSize(64);
     }
 
+    /**
+     * TODO 90d10ba1: the auto-resume opt-in lives in the metadata, so it is hashed and sealed — and a
+     * workflow without it keeps the hash it had before the opt-in existed (same vector as above).
+     */
+    @Test
+    void autoResumeOptIn_changesTheHash_withoutItTheHashStaysAsBefore() {
+        List<BlockDefinition> blocks = List.of(block("shell", Map.of("command", "echo hi")));
+        String without = hasher.hash(snapshot(blocks, Map.of("audit", Map.of("enabled", true)), List.of("s2", "s1")));
+        String with = hasher.hash(snapshot(blocks,
+                Map.of("audit", Map.of("enabled", true), "autoResume", Map.of("enabled", true)), List.of("s2", "s1")));
+
+        assertThat(without).isEqualTo("69c15899e368f22372548814ee406d8c3295f59d3e93966b1575586b5b9ff98b");
+        assertThat(with).isNotEqualTo(without);
+    }
+
     @Test
     void mapKeyOrderDoesNotMatter() {
         Map<String, Object> ab = new LinkedHashMap<>();

@@ -824,7 +824,7 @@ The following variables are automatically set by the `WorkflowExecutor` on every
 | `{{ workflow_version }}` | Current version number of the workflow |
 | `{{ workflow_changed_since_last_run }}` | `"true"` or `"false"` — whether the definition has changed since the last successful run (hash comparison; timestamps when no hash exists) |
 | `{{ workflow_definition_hash }}` | SHA-256 of the executed definition (empty when `automation.hardening.provenance` is off) |
-| `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `WISH` |
+| `{{ trigger_source }}` | What started the run: `MANUAL`, `RETRY`, `RESUME`, `SCHEDULE`, `WEBHOOK`, `TODO_TRIGGER`, `TODO_RESOLUTION`, `COMPLETION_TRIGGER`, `CHAIN`, `SUB_WORKFLOW`, `ASSISTANT`, `AUTO_REPAIR`, `AUTO_RESUME`, `WISH` |
 | `{{ previous_report }}` | Longest non-shell step output from the last COMPLETED run of the same workflow (max 3000 characters), or `"(no previous report available)"`. An audit envelope is cut off, platform markers lose their colon (`gate_status GREEN` stays readable but is no longer taken as a verdict when a model repeats the line), block boundaries such as `</audit_findings>` read `[audit_findings]`. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 | `{{ open_todos }}` | Markdown list of open/in-progress TODOs for the project inside an `<open_todos>…</open_todos>` block, or `"(keine offenen TODOs)"`. Titles and tags are flattened to one line, capped at 200/80 chars and stripped of platform markers (`todo_item:`, `gate_*:`, `dashboard_widget:`) — they may originate from imported issues and are data, not instructions. At most 150 entries. Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
 | `{{ audit_findings }}` | **Only in audit workflows** (valid `metadata.audit`): the known findings of the workflow's own audit in the project — open, awaiting verification, accepted, dismissed — inside an `<audit_findings>…</audit_findings>` block, one line per finding with status, severity, `ruleKey`, `subject`, title and disposition, at most 250 lines and 60,000 bytes (classified findings first, the rest as a count per status); without findings `"(keine bekannten Befunde)"`. Other workflows do not have the variable, not even through the variable hand-over to a sub-workflow; there the placeholder would stay literally (analyzer rule `audit-only-placeholder`). Format and purpose: [audit-workflow-protocol.md](audit-workflow-protocol.md) → "Known findings in the prompt". Always treated as untrusted → always single-quoted in shell blocks, so write it unquoted |
@@ -1810,6 +1810,24 @@ Besides **templates** (finished tasks) and the **pool** there are **blueprints**
 - **Explanation per step:** `config.description` (bilingual) says what the step does in the pattern and what to replace. The editor shows it under the block, the run view under the step header (`metadata.blockDescription`). This works in every workflow, since `description` is a common key with no effect on execution. The exceptions are `todo-create` and `todo-update`, where `description` is the TODO's text.
 
 ---
+
+## Resume automatically after a restart or standby
+
+A backend restart or a system standby interrupts running runs; they end up `INTERRUPTED`. Without the opt-in they only continue via the "Resume from Step" button. With it, the platform resumes the run by itself (TODO 90d10ba1):
+
+```json
+{ "metadata": { "autoResume": { "enabled": true } } }
+```
+
+In the UI: workflow detail page → "Resume automatically after a restart". The key is part of the definition — it changes the definition hash (a new version), is locked on a sealed workflow, and a workflow without it keeps its previous hash.
+
+**What is resumed** — only runs that the restart cleanup or the standby watchdog marked `INTERRUPTED` in this backend lifetime **and that were `RUNNING` before**. Not resumed: paused runs (a person pauses), chain entries and sub-workflows (their parent run decides — if it resumes, the sub-workflow block runs again), runs of deleted workflows and older `INTERRUPTED` runs. Every run gets **at most one** automatic attempt (`autoResumeAttempts` in the run metadata, counted before the start); if it is interrupted again, it waits for a person.
+
+**Side effects** — The run continues after its last finished block; **the interrupted block runs again from the start**. Blocks with external effects (appending to files, sending messages, deploying) must tolerate a repeat. If the run was waiting for an approval (`approval`) or input (`human-input`), that block had not finished: the question is asked again and the run waits again — the unattended rules do not answer it (a block's `auto_answer` applies as always). Without any finished block — as with the button — a new run of the same workflow starts. That new run takes the counter over (`autoResumeAttempts`, origin in `autoResumedFrom`) and is not resumed automatically again if it is interrupted too; the old run stays `INTERRUPTED` and names the new one in `autoRestartedAs`.
+
+**Unattended** — The run then carries `trigger_source = AUTO_RESUME`. With `automation.hardening.require-sealed-for-unattended` the workflow needs a seal; otherwise `RunAdmission` refuses, the run stays `INTERRUPTED`, the activity log gets a `SECURITY` entry, and there is no second attempt.
+
+**Global** — Settings → Execution: "Resume interrupted runs automatically" (`run-auto-resume-enabled`, default on) and "Wait before each resume" (`run-auto-resume-delay-seconds`, default 30 s, 0–3600). Runs are resumed one after another with this wait, also before the first. Startup values: `automation.execution.auto-resume.enabled` / `.delay-seconds`.
 
 ## Auto-Repair
 

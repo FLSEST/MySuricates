@@ -5,7 +5,7 @@ import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSys
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
 
-type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'dashboardReportAssistEnabled'>;
+type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'runAutoResumeEnabled' | 'dashboardReportAssistEnabled'>;
 
 interface FieldConfig {
   key: string;
@@ -28,6 +28,8 @@ interface FormState {
   assistantChatTimeoutSeconds: number;
   schedulerCatchUpOnResume: boolean;
   schedulerResumeGraceMinutes: number;
+  runAutoResumeEnabled: boolean;
+  runAutoResumeDelaySeconds: number;
   summarizationTimeoutSeconds: number;
   factoryTimeoutSeconds: number;
   runRetentionDays: number;
@@ -48,6 +50,8 @@ const DEFAULT_FORM: FormState = {
   assistantChatTimeoutSeconds: 240,
   schedulerCatchUpOnResume: true,
   schedulerResumeGraceMinutes: 5,
+  runAutoResumeEnabled: true,
+  runAutoResumeDelaySeconds: 30,
   summarizationTimeoutSeconds: 120,
   factoryTimeoutSeconds: 600,
   runRetentionDays: 90,
@@ -69,6 +73,8 @@ function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['
     assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
     schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
     schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
+    runAutoResumeEnabled: (config.runAutoResumeEnabled ?? 1) === 1,
+    runAutoResumeDelaySeconds: config.runAutoResumeDelaySeconds ?? 30,
     summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
     factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
     runRetentionDays: config.runRetentionDays ?? 90,
@@ -100,6 +106,8 @@ export function ExecutionSettingsCard() {
     form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240) ||
     form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1) ||
     form.schedulerResumeGraceMinutes !== (config.schedulerResumeGraceMinutes ?? 5) ||
+    form.runAutoResumeEnabled !== ((config.runAutoResumeEnabled ?? 1) === 1) ||
+    form.runAutoResumeDelaySeconds !== (config.runAutoResumeDelaySeconds ?? 30) ||
     form.summarizationTimeoutSeconds !== (config.summarizationTimeoutSeconds ?? 120) ||
     form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
     form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
@@ -118,6 +126,7 @@ export function ExecutionSettingsCard() {
     { key: 'rateRpm', label: t.settings.executionRateLimitRpm, hint: t.settings.executionRateLimitRpmHint, min: 10, max: 10000, configKey: 'rateLimitRequestsPerMinute' },
     { key: 'assistantTimeout', label: t.settings.executionAssistantChatTimeout, hint: t.settings.executionAssistantChatTimeoutHint, min: 30, max: 900, configKey: 'assistantChatTimeoutSeconds' },
     { key: 'resumeGrace', label: t.settings.schedulerResumeGraceMinutes, hint: t.settings.schedulerResumeGraceMinutesHint, min: 1, max: 60, configKey: 'schedulerResumeGraceMinutes' },
+    { key: 'autoResumeDelay', label: t.settings.runAutoResumeDelaySeconds, hint: t.settings.runAutoResumeDelaySecondsHint, min: 0, max: 3600, configKey: 'runAutoResumeDelaySeconds' },
     { key: 'summarizationTimeout', label: t.settings.summarizationTimeoutSeconds, hint: t.settings.summarizationTimeoutSecondsHint, min: 30, max: 600, configKey: 'summarizationTimeoutSeconds' },
     { key: 'factoryTimeout', label: t.settings.factoryTimeoutSeconds, hint: t.settings.factoryTimeoutSecondsHint, min: 60, max: 3600, configKey: 'factoryTimeoutSeconds' },
     { key: 'runRetentionDays', label: t.settings.runRetentionDays, hint: t.settings.runRetentionDaysHint, min: 0, max: 730, configKey: 'runRetentionDays' },
@@ -138,6 +147,8 @@ export function ExecutionSettingsCard() {
       assistantChatTimeoutSeconds: form.assistantChatTimeoutSeconds,
       schedulerCatchUpOnResume: form.schedulerCatchUpOnResume ? 1 : 0,
       schedulerResumeGraceMinutes: form.schedulerResumeGraceMinutes,
+      runAutoResumeEnabled: form.runAutoResumeEnabled ? 1 : 0,
+      runAutoResumeDelaySeconds: form.runAutoResumeDelaySeconds,
       summarizationTimeoutSeconds: form.summarizationTimeoutSeconds,
       factoryTimeoutSeconds: form.factoryTimeoutSeconds,
       runRetentionDays: form.runRetentionDays,
@@ -209,6 +220,19 @@ export function ExecutionSettingsCard() {
           <Toggle
             enabled={form.schedulerCatchUpOnResume}
             onChange={(v) => setForm(prev => ({ ...prev, schedulerCatchUpOnResume: v }))}
+          />
+        </div>
+
+        {/* Automatic resume of interrupted runs (TODO 90d10ba1) */}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="block text-sm font-medium text-text">{t.settings.runAutoResumeEnabled}</label>
+            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.runAutoResumeEnabledHint}</p>
+          </div>
+          <Toggle
+            enabled={form.runAutoResumeEnabled}
+            onChange={(v) => setForm(prev => ({ ...prev, runAutoResumeEnabled: v }))}
+            ariaLabel={t.settings.runAutoResumeEnabled}
           />
         </div>
 

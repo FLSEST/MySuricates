@@ -358,8 +358,8 @@ public class WorkflowExecutor {
         }
     }
 
-    /** Resumes an INTERRUPTED run after its last completed step; no completed step ⇒ full retry. */
-    public WorkflowRun resumeFromStep(String runId) {
+    /** Resumes an INTERRUPTED run after its last completed step (none ⇒ full retry) — RESUME by a person, AUTO_RESUME by {@link RunAutoResumer}. */
+    public WorkflowRun resumeFromStep(String runId, TriggerSource source) {
         WorkflowRun run = runRepository.findById(runId)
                 .orElseThrow(() -> new ResourceNotFoundException("WorkflowRun", runId));
 
@@ -374,7 +374,7 @@ public class WorkflowExecutor {
 
         if (completedSteps.isEmpty() && !run.getMetadata().containsKey("workspace")) {
             log.info("Resume requested for run {} but no completed steps found — falling back to full retry", runId);
-            return execute(run.getWorkflow(), run.getInputContext(), TriggerSource.RESUME);
+            return execute(run.getWorkflow(), run.getInputContext(), null, RunAutoResumer.carryOver(run, source), source);
         }
 
         ResumePlan plan = ResumePlan.after(persistedSteps);
@@ -408,8 +408,8 @@ public class WorkflowExecutor {
                 "WorkflowExecutor", runId, workflow.getId());
 
         // Reset run to RUNNING — the resumed segment runs today's definition, so provenance is re-taken
-        RunAdmission.Ticket ticket = admission.admit(workflow, TriggerSource.RESUME, contextForResume);
-        run.setTriggerSource(TriggerSource.RESUME); run.setDefinitionHash(ticket.definitionHash()); run.setDefinitionVersionId(ticket.definitionVersionId());
+        RunAdmission.Ticket ticket = admission.admit(workflow, source, contextForResume);
+        run.setTriggerSource(source); run.setDefinitionHash(ticket.definitionHash()); run.setDefinitionVersionId(ticket.definitionVersionId());
         run.setSealed(ticket.sealed()); run.setSealedSkillPins(ticket.sealedSkillPins());
         run.setStatus(RunStatus.RUNNING);
         run.setError(null);

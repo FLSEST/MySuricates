@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public enum TriggerCategory {
     MANUAL, SCHEDULED, WEBHOOK, COMPLETION_TRIGGER, TODO_TRIGGER,
-    /** Started by the platform in another way: chain, sub-workflow, wish, auto-repair. */
+    /** Started by the platform in another way: chain, sub-workflow, wish, auto-repair, auto-resume. */
     OTHER_AUTOMATIC;
 
     public static TriggerCategory of(WorkflowRun run) {
@@ -32,7 +32,7 @@ public enum TriggerCategory {
             case WEBHOOK -> WEBHOOK;
             case COMPLETION_TRIGGER -> COMPLETION_TRIGGER;
             case TODO_TRIGGER -> TODO_TRIGGER;
-            case AUTO_REPAIR, WISH, CHAIN, SUB_WORKFLOW -> OTHER_AUTOMATIC;
+            case AUTO_REPAIR, AUTO_RESUME, WISH, CHAIN, SUB_WORKFLOW -> OTHER_AUTOMATIC;
         };
     }
 

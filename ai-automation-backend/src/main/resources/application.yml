@@ -191,6 +191,12 @@ automation:
     # Ghost-Run-Watchdog: maximal tolerierte Zeit zwischen save(RUNNING) und register().
     # Muss laenger sein als der laengste legitime Semaphore-Wait + Container-Init.
     ghost-watchdog-stale-minutes: ${AUTOMATION_GHOST_WATCHDOG_STALE:30}
+    # Unterbrochene Runs nach Neustart/Standby automatisch fortsetzen – nur Workflows mit
+    # metadata.autoResume.enabled, hoechstens einmal je Run, nacheinander mit delay-seconds Abstand.
+    # Zur Laufzeit ueber die Einstellungen (run-auto-resume-enabled / run-auto-resume-delay-seconds).
+    auto-resume:
+      enabled: ${AUTOMATION_AUTO_RESUME_ENABLED:true}
+      delay-seconds: ${AUTOMATION_AUTO_RESUME_DELAY_SECONDS:30}
   executions:
     # false = DELETE /api/v1/executions/{id} answers 403 RUN_DELETION_DISABLED and the UI hides the
     # delete buttons. Startup-only (no REST/settings switch). Retention/cleanup jobs are not affected

@@ -3,6 +3,7 @@ import { Plus, Pencil, Zap, FileText, Trash2 } from 'lucide-react';
 import { Card, CardHeader, Button, Toggle } from '../ui';
 import { WorkflowMemoryPanel } from './WorkflowMemoryPanel';
 import { WorkflowAiSettingsCards } from './WorkflowAiSettingsCards';
+import { WorkflowAutoResumeCard } from './WorkflowAutoResumeCard';
 import { DefaultContextEditor } from './DefaultContextEditor';
 import { RECENT_RUNS_PAGE_SIZE, WorkflowRecentRuns } from './WorkflowRecentRuns';
 import { useUpdateWorkflow, useWorkflowRuns } from '../../hooks/useWorkflows';
@@ -92,6 +93,8 @@ export function WorkflowDetailSidebar({
 
       <fieldset disabled={sealed} className="min-w-0 space-y-4" title={sealed ? t.workflows.sealedLocked : undefined}>
         <WorkflowAiSettingsCards workflow={workflow} />
+
+        <WorkflowAutoResumeCard workflow={workflow} />
 
         {factoryModule && (
           <Card>

@@ -1,5 +1,6 @@
 package com.automation.service.system.settings;
 
+import com.automation.config.AutoResumeConfig;
 import com.automation.config.CompressionConfig;
 import com.automation.config.DashboardReportAssistConfig;
 import com.automation.config.FactoryConfig;
@@ -14,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Einstellungen einzelner Funktionen: Scheduler-Nachholen, Zusammenfassung, Factory, Wuensche, Modellkatalog, Kompression, Dashboard-Assistent. */
+/** Einstellungen einzelner Funktionen: Scheduler-Nachholen, automatisches Fortsetzen unterbrochener Runs, Zusammenfassung, Factory, Wuensche, Modellkatalog, Kompression, Dashboard-Assistent. */
 @Component
 @Order(4)
 public class FeatureSettings implements RuntimeSettingsGroup {
@@ -26,10 +27,12 @@ public class FeatureSettings implements RuntimeSettingsGroup {
     private final ModelCatalogService modelCatalogService;
     private final CompressionConfig compressionConfig;
     private final DashboardReportAssistConfig dashboardReportAssistConfig;
+    private final AutoResumeConfig autoResumeConfig;
 
     public FeatureSettings(SchedulerConfig schedulerConfig, SummarizationConfig summarizationConfig,
                            FactoryConfig factoryConfig, WishConfig wishConfig, ModelCatalogService modelCatalogService,
-                           CompressionConfig compressionConfig, DashboardReportAssistConfig dashboardReportAssistConfig) {
+                           CompressionConfig compressionConfig, DashboardReportAssistConfig dashboardReportAssistConfig,
+                           AutoResumeConfig autoResumeConfig) {
         this.schedulerConfig = schedulerConfig;
         this.summarizationConfig = summarizationConfig;
         this.factoryConfig = factoryConfig;
@@ -37,6 +40,7 @@ public class FeatureSettings implements RuntimeSettingsGroup {
         this.modelCatalogService = modelCatalogService;
         this.compressionConfig = compressionConfig;
         this.dashboardReportAssistConfig = dashboardReportAssistConfig;
+        this.autoResumeConfig = autoResumeConfig;
     }
 
     @Override
@@ -44,6 +48,8 @@ public class FeatureSettings implements RuntimeSettingsGroup {
         Map<String, Consumer<String>> m = new LinkedHashMap<>();
         m.put("scheduler-catch-up-on-resume", v -> schedulerConfig.setCatchUpOnResume(Integer.parseInt(v) == 1));
         m.put("scheduler-resume-grace-minutes", v -> schedulerConfig.setResumeGraceMinutes(Long.parseLong(v)));
+        m.put("run-auto-resume-enabled", v -> autoResumeConfig.setEnabled(Integer.parseInt(v) == 1));
+        m.put("run-auto-resume-delay-seconds", v -> autoResumeConfig.setDelaySeconds(Long.parseLong(v)));
         m.put("summarization-timeout-seconds", v -> summarizationConfig.setTimeoutSeconds(Integer.parseInt(v)));
         m.put("factory-timeout-seconds", v -> factoryConfig.setTimeoutSeconds(Integer.parseInt(v)));
         m.put("wish-total-timeout-minutes", v -> wishConfig.setTotalTimeoutMinutes(Integer.parseInt(v)));
@@ -60,6 +66,8 @@ public class FeatureSettings implements RuntimeSettingsGroup {
     public void currentValues(Map<String, Object> out) {
         out.put("schedulerCatchUpOnResume", schedulerConfig.isCatchUpOnResume() ? 1 : 0);
         out.put("schedulerResumeGraceMinutes", schedulerConfig.getResumeGraceMinutes());
+        out.put("runAutoResumeEnabled", autoResumeConfig.isEnabled() ? 1 : 0);
+        out.put("runAutoResumeDelaySeconds", autoResumeConfig.getDelaySeconds());
         out.put("summarizationTimeoutSeconds", summarizationConfig.getTimeoutSeconds());
         out.put("factoryTimeoutSeconds", factoryConfig.getTimeoutSeconds());
         out.put("wishTotalTimeoutMinutes", wishConfig.getTotalTimeoutMinutes());
