@@ -63,6 +63,11 @@ A provider implements this contract (`service/integration/IntegrationProvider.ja
 | `IntegrationVerification getVerification()` | ⬜ (from `VerifiedProviders`) | Verification: `VERIFIED` = checked against the real service, `SIMULATED` = only against simulated responses |
 | `String getVerifiedAgainst()` | ⬜ (from `VerifiedProviders`) | What a `VERIFIED` provider was checked against, e.g. "Gitea 1.24, local container" |
 | `boolean requiresOAuthFlow()` | ⬜ (default `true`) | `false` = direct auth via API key/token instead of OAuth2 authorization code flow |
+| `boolean requiresCredentials()` | ⬜ (default `true`) | `false` = connecting also works with empty credential fields (e.g. Taskwarrior, iCal feed, ntfy) — see [Direct Auth Flow](#direct-auth-flow-providers-without-oauth-eg-trello) |
+| `boolean connectionOptional()` | ⬜ (default `false`) | `true` = block and action run without any stored connection (token `null`); implies `requiresCredentials() == false` |
+| `String fetchGrantedScopes(String accessToken)` | ⬜ (default `null`) | With direct auth: the scopes the token actually grants, `null` = unknown |
+| `void validateCredentialInput(String, String)` | ⬜ (default: accept everything) | Checks the two credential fields before they are stored, `IllegalArgumentException` → `400` |
+| `ModuleCatalog requiredModule()` | ⬜ (default `null`) | Module needed on top of `integrations`; while it is off, the provider counts as absent |
 
 ### `IntegrationAction` (Record)
 
@@ -93,9 +98,12 @@ record OAuthConfig(
 )
 ```
 
-`revocationUrl` is the 8th component and optional — the shorter constructors set it to `null`.
-For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wither
-`withRevocationUrl(url)`, so a provider config stays a single constructor call.
+`revocationUrl` is the 8th component and optional. Besides the full constructor the record has
+three shorter ones (`OAuthConfig.java`): without `revocationUrl`; additionally without
+`optionalScopes`; additionally without `extraAuthParams` — the missing values become `null` or
+empty. For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` and the method
+`withRevocationUrl(url)`, which returns a copy with the revoke endpoint set (a "wither"), so a
+provider config stays a single constructor call.
 
 ---
 
@@ -105,11 +113,11 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 |---|---|---|---|---|---|
 | Google Calendar | `google-calendar` | OAuth2 (Google) | `providers/google/` | `list_events`, `get_event`, `create_event`, `update_event`, `delete_event`, `get_free_busy` | verified |
 | Gmail | `google-gmail` | OAuth2 (Google, readonly) | `providers/google/` | `list_messages`, `get_message` | verified |
-| Jira | `jira` | OAuth2 (Atlassian 3LO) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` | verified |
+| Jira | `jira` | OAuth2 (Atlassian 3LO, see below) | `providers/jira/` | `list_projects`, `search_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment`, `get_transitions`, `transition_issue` | verified |
 | Confluence | `confluence` | OAuth2 (Atlassian 3LO) | `providers/confluence/` | `list_spaces`, `list_pages`, `get_page`, `search` | verified |
 | Trello | `trello` | API key + token (no OAuth flow) | `providers/trello/` | `list_boards`, `get_board_lists`, `get_list_cards`, `get_card`, `create_card`, `update_card`, `delete_card`, `add_comment`, `search` | verified |
 | Taskwarrior | `taskwarrior` | Local CLI (no OAuth, optional TASKDATA/TASKRC) | `providers/taskwarrior/` | `list_tasks`, `get_task`, `add_task`, `complete_task`, `modify_task`, `annotate_task`, `delete_task`, `list_projects`, `sync_task` | verified |
-| GitHub | `github` | Personal Access Token (no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified |
+| GitHub | `github` | Personal Access Token (PAT, no OAuth flow) | `providers/github/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified |
 | Gitea / Forgejo | `gitea` | Server URL + access token (no OAuth flow) | `providers/gitea/` | `list_repos`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | verified (local container) |
 | GitLab | `gitlab` | Server URL (default `https://gitlab.com`) + access token (no OAuth flow) | `providers/gitlab/` | `list_projects`, `list_issues`, `get_issue`, `create_issue`, `update_issue`, `add_comment` | simulated |
 | CalDAV | `caldav` | URL + user:app-password (Basic auth, no OAuth flow) | `providers/caldav/` | `list_calendars`, `list_events`, `create_event`, `update_event`, `delete_event` | verified (Radicale 3.8.0, local container) |
@@ -124,20 +132,19 @@ For Google there is the constant `OAuthConfig.GOOGLE_REVOCATION_URL` plus the wi
 
 **Verification:** every provider states via `getVerification()` whether it was checked against the real service. The default is `SIMULATED` — a new provider is marked "simulated tests only" without any extra step, and the integrations page, the setup area and the block editor show a notice. A provider moves to `VERIFIED` only through an entry in `service/integration/VerifiedProviders` (provider id → what it was checked against) after a run against the real service — a local container of the real software counts. `IntegrationVerificationGateTest` finds all providers by classpath scan and checks that every entry names an existing provider.
 
-**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Gitea/Forgejo
-(issue, target `owner/repo`; tags become labels where the repository has them), GitLab (issue, target =
-project path `group/project` or numeric ID; tags become labels), Jira (issue of type Task,
-target = project key, labels without spaces; browse URL from the accessible resources) and Trello (card,
-target = list ID, `listTargets` returns "board / list"; tags are not transferred as labels because Trello
-expects label IDs). Discovery via `instanceof`, contract test `TaskExportContractTest`.
-| Todoist | `todoist` | API token (no OAuth flow) | `providers/todoist/` | `list_projects`, `list_tasks`, `get_task`, `create_task`, `update_task`, `close_task`, `add_comment` | simulated only |
-
-
-**Task export (TODO → tracker, `TaskExportCapable`):** GitHub (issue, target `owner/repo`), Jira (issue of type
-Task, target = project key, labels without spaces; browse URL from the accessible resources), Trello (card, target =
-list ID, `listTargets` returns "Board / List"; tags are not sent as labels because Trello expects label IDs) and
-Todoist (task, target = project ID, `listTargets` returns the projects; tags become label names, link
-`app.todoist.com/app/task/<id>`). Detected via `instanceof`, contract test `TaskExportContractTest`.
+**Task export (TODO → tracker):** MySuricates keeps its own task list (TODOs, page `/todos`, API
+`/api/v1/todos`). A TODO can be transferred to an external tracker as an issue or card
+(`POST /api/v1/todos/{id}/export`). Providers that additionally implement the interface
+`TaskExportCapable` can do this: `createTask(input, accessToken)` creates the item,
+`listTargets(accessToken)` optionally returns the selectable targets. Supported: GitHub (issue,
+target `owner/repo`), Gitea/Forgejo (issue, target `owner/repo`; tags become labels where the
+repository has them), GitLab (issue, target = project path `group/project` or numeric ID; tags
+become labels), Jira (issue of type Task, target = project key, labels without spaces; browse URL
+from the accessible resources), Trello (card, target = list ID, `listTargets` returns "Board / List";
+tags are not sent as labels because Trello expects label IDs) and Todoist (task, target = project
+ID, `listTargets` returns the projects; tags become label names, link
+`app.todoist.com/app/task/<id>`). The platform detects such providers via `instanceof`, there is no
+list to maintain; contract test `TaskExportContractTest`.
 
 > **Taskwarrior is a special case:** not an HTTP service, but the local `task` CLI. `executeAction()` calls `task` via `ProcessBuilder` (argument array, no `bash -c`) on the backend host — via `service/cli/TaskCommandService.java` + `util/HostProcessUtils.drain()`. Requires `task` to be installed on the host. Without a stored connection it runs on the host's default paths (page: "No sign-in – needs `task`"); the optional setup checks `task _version` — if that fails, the connection stays disconnected and the page shows "Setup required". Timeout is runtime-configurable via `ExecutionSettingsService` (`task-command-timeout-seconds`). Security: filter tokens with `rc.` overrides or Taskwarrior commands (e.g. `execute`) are rejected, IDs are validated, free text is placed after `--`. Split internally: action list in `TaskwarriorActionCatalog`, argument building and validation in `TaskwarriorArgs`.
 
@@ -179,7 +186,7 @@ The calendar view shows CalDAV through `caldavAdapter` (all calendars, series al
 server). An iCal feed has no adapter because the feed URL is only known inside a workflow.
 ### HTTP API Connection (`http-api`)
 
-General connection to an HTTP service you enter yourself (TODO 78fae34c). Own feature module
+General connection to an HTTP service you enter yourself. Own feature module
 **`http-api`** (tier `advanced`, risks network + credentials, requires `integrations`), on in no
 preset except `full`: `AUTOMATION_MODULES_HTTP_API=true` or `automation.modules.http-api: true`.
 While the module is off, `IntegrationRegistry` hides the provider (list, lookup, block), and
@@ -222,6 +229,10 @@ effect at once.
 
 ### OAuth Endpoints & Scopes per Provider
 
+The table covers the providers with an OAuth2 flow (and Trello, which uses its fields for key and
+token). Providers with a token instead of an OAuth flow follow under
+[Providers with a token instead of an OAuth flow](#providers-with-a-token-instead-of-an-oauth-flow).
+
 | Provider | Authorize URL | Token URL | Default Scopes | Optional Scopes | Client Env Vars |
 |---|---|---|---|---|---|
 | Google Calendar | `accounts.google.com/o/oauth2/v2/auth` | `oauth2.googleapis.com/token` | `calendar.events`, `userinfo.email`, `userinfo.profile` | – | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` |
@@ -234,7 +245,12 @@ Notes:
 - **Google** sets `extraAuthParams` `access_type=offline` + `prompt=consent` so that a
   refresh token is delivered.
 - **Atlassian** (Jira/Confluence) sets `audience=api.atlassian.com` + `prompt=consent` and
-  uses the 3LO flow; after the token exchange the `cloudId` is resolved to build the base URL.
+  uses the 3LO flow — Atlassian's name for OAuth 2.0 "three-legged": user, app and Atlassian take
+  part, and the user consents in the browser. Such a token is not tied to an address like
+  `company.atlassian.net`; after the token exchange the provider therefore asks
+  `api.atlassian.com/oauth/token/accessible-resources` for the `cloudId`, the ID of the granted
+  Atlassian site. The base URL is built from it, for Jira
+  `https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3` (`JiraProvider.buildBaseUrl`).
   `write:jira-work` is an optional scope for Jira (only needed for writes).
   Split internally: action catalog in `JiraActionCatalog`, HTTP via `JiraHttpClient` (no
   `Accept` header, no 401 special case), parameter parsing in `JiraParams`; the per-token
@@ -243,7 +259,10 @@ Notes:
   are stored combined as `apiKey|token` and appended to every request as query parameters
   (`key=…&token=…`). Split internally: HTTP via `TrelloHttpClient`, parameter parsing in
   `TrelloParams`, action catalog in `TrelloActionCatalog`.
-- **GitHub (PAT)** needs no OAuth flow: the token is validated via `GET /user` when saved and
+
+### Providers with a token instead of an OAuth flow
+
+- **GitHub (PAT = Personal Access Token)** needs no OAuth flow: the token is validated via `GET /user` when saved and
   its scopes are taken from the `X-OAuth-Scopes` response header and stored on the connection
   (`fetchGrantedScopes`, classic tokens). Fine-grained PATs send no scope header — the
   connection then has `scopes = null` (unknown), which is **not** treated as "no scopes".
@@ -377,7 +396,7 @@ Open-Meteo, the HTTP API),
 `getValidAccessToken()` returns `null` instead of throwing when no connection row exists or
 decryption fails — providers that need no credentials are allowed to run without a token.
 
-Which of them actually **work** with `null` is what `connectionOptional()` says (TODO cdccc1e5):
+Which of them actually **work** with `null` is what `connectionOptional()` says:
 Open-Meteo, RSS/Atom, the iCal feed, ntfy and Taskwarrior — not the HTTP API, which needs its
 stored base URL. `GET /api/v1/integrations` carries the field; the integrations page shows such a
 provider without a stored connection as "Ready – no sign-in needed" instead of "Setup required"
@@ -388,7 +407,7 @@ list (`components/integrations/providerReadiness.ts`, pinned by `ConnectionOptio
 
 ### Several Connections per Provider
 
-A provider can have several **named connections** (since V86, TODO 0b3cbcc3) — for example a
+A provider can have several **named connections** (since database migration V86) — for example a
 private and a work account at Google, or two GitHub tokens. Each connection is its own row in
 `integration_connections`, unique by `(provider_id, connection_name)`.
 
@@ -415,7 +434,10 @@ private and a work account at Google, or two GitHub tokens. Each connection is i
 ## Credential Storage & Encryption
 
 - Tokens and client credentials are stored in `integration_connections` (`IntegrationConnection`),
-  status enum `ConnectionStatus`: `CONNECTED`, `DISCONNECTED`, `EXPIRED`.
+  status enum `ConnectionStatus`: `CONNECTED`, `DISCONNECTED`, `EXPIRED`. The labels "Setup
+  required" and "Ready – no sign-in needed" on the integrations page are not further states; the UI
+  derives them from the status and `connectionOptional`
+  ([Direct Auth Flow](#direct-auth-flow-providers-without-oauth-eg-trello)).
 - Encryption: **AES/GCM/NoPadding**, 128-bit auth tag, 12-byte IV
   (`IntegrationEncryptionService`).
 - The key comes from the env var `AUTOMATION_INTEGRATION_KEY` (Base64-AES key) or from the
@@ -510,8 +532,10 @@ is meant.
    JSON schema (`type: object`, `properties`, `required`).
 5. **Implement `executeAction(action, params, accessToken)`** — typically a
    `switch` over action names that calls the respective private method and hits the
-   external REST API (`java.net.http.HttpClient`). Read parameters defensively via helpers like
-   `requireParam` / `paramString` / `paramInt`.
+   external REST API (`java.net.http.HttpClient`). Read parameters defensively: there is no
+   shared helper class, each provider brings small static helpers of its own (`requireParam` /
+   `paramString` / `paramInt`, e.g. in `providers/jira/JiraParams.java`). Calendar providers can
+   use `providers/ical/CalendarParams`, whose helpers are public.
 6. **Optionally override `fetchAccountInfo(accessToken)`** to display the account (name/email)
    after connecting — for direct auth providers this call also serves as credential validation.
 7. **Add a setup guide** in `frontend/src/data/integrationSetupGuides.ts`
