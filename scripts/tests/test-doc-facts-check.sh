@@ -722,6 +722,35 @@ check "Gegenprobe: kein curl-Befund"          '! grep -q "curl-ohne-noproxy" <<<
 check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/curl.md"
 
+# Nachbesserung: Der Body ist kein Ziel, "--noproxy ''" wirkt nicht, NO_PROXY='*' vor dem Aufruf
+# wirkt, und ein zweites curl in einer Fortsetzungszeile wird nicht doppelt gemeldet.
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s "$BASE/webhooks" -H "X-API-Key: $K" -d '{"url":"https://hooks.example.com"}'
+curl -s --noproxy '' http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K" \
+  | jq . ; curl -s http://localhost:9090/api/v1/goals -H "X-API-Key: $K"
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "URL im Body macht den Aufruf nicht entfernt" \
+  'grep -qE "^DRIFT docs/curl.md:2 curl-ohne-noproxy" <<<"$OUT"'
+check "--noproxy mit leerem Wert zaehlt nicht" \
+  'grep -qE "^DRIFT docs/curl.md:3 curl-ohne-noproxy" <<<"$OUT"'
+check "zwei curl ueber eine Fortsetzung: ein Befund an der Startzeile" \
+  'grep -qE "^DRIFT docs/curl.md:4 curl-ohne-noproxy" <<<"$OUT" && ! grep -q "docs/curl.md:5" <<<"$OUT"'
+cat > "$FAKE/docs/curl.md" <<'MD_EOF'
+# curl
+curl -s https://mysuricates.example.org/api/v1/webhooks -H "X-API-Key: $K" --json '{"target":"http://localhost:9090/x"}'
+NO_PROXY='*' curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+no_proxy=* curl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $K"
+MD_EOF
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "Gegenprobe: localhost im Body macht einen entfernten Aufruf nicht lokal" '! grep -q "docs/curl.md:2" <<<"$OUT"'
+check "Gegenprobe: NO_PROXY='*' / no_proxy=* vor curl gilt als erfuellt" \
+  '! grep -qE "docs/curl.md:[34]" <<<"$OUT"'
+check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
+rm "$FAKE/docs/curl.md"
+
 # AGENTS.md steht im Default-Umfang: ihre Beispiele werden woertlich kopiert.
 printf '# Agents\ncurl -s http://localhost:9090/api/v1/todos -H "X-API-Key: $DEV_KEY"\n' > "$FAKE/AGENTS.md"
 OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?

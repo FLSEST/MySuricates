@@ -516,6 +516,15 @@ CURL_CALL = re.compile(r"(?:^|[\s;|&(`$])curl\s")
 API_KEY_HEADER = re.compile(r"(?:-H|--header)\s*[\"']?X-API-Key", re.IGNORECASE)
 URL_HOST = re.compile(r"https?://(\[[^\]]*\]|[^/\s\"'`:]+)", re.IGNORECASE)
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]"}
+# Was curl sendet, ist kein Ziel: eine URL im Body (-d '{"url":"https://hooks.example.com"}')
+# machte den Aufruf sonst "entfernt", ein localhost im Body einen entfernten Aufruf "lokal".
+BODY_ARGUMENT = re.compile(
+    r"(?<!\S)(?:-d|-F|--data(?:-raw|-binary|-urlencode|-ascii)?|--json|--form(?:-string)?)(?:=|\s*)"
+    r"(?:'[^']*'|\"(?:\\.|[^\"\\])*\"|\S+)")
+# --noproxy mit nichtleerem Wert; "--noproxy ''" wirkt nicht.
+NOPROXY_OPTION = re.compile(r"--noproxy(?:=|\s+)(?:'([^']+)'|\"([^\"]+)\"|([^\s'\"]+))")
+# Dieselbe Wirkung als Umgebungsvariable vor dem Aufruf: NO_PROXY='*' curl …
+NOPROXY_ENV = re.compile(r"\b(?:NO_PROXY|no_proxy)=(?:'\*'|\"\*\"|\*)(?:\s|$)")
 
 
 def curl_command(lines, no):
@@ -531,16 +540,21 @@ def curl_command(lines, no):
 
 def check_curl_noproxy(rel, no, lines, findings):
     line = lines[no - 1]
-    if not CURL_CALL.search(line):
+    # Eine Fortsetzungszeile gehoert zum Befehl der Zeile davor; der wird dort geprueft und
+    # gemeldet -- ein zweites curl darin sonst doppelt.
+    if no >= 2 and lines[no - 2].rstrip().endswith("\\"):
         return
     command = curl_command(lines, no)
+    if not CURL_CALL.search(command):
+        return
     # Je curl-Aufruf fuer sich: "curl … --noproxy '*' …; curl …" darf den zweiten nicht decken.
-    starts = [m.end() for m in CURL_CALL.finditer(command)]
-    for begin, end in zip(starts, starts[1:] + [len(command)]):
-        call = command[begin:end]
-        if not API_KEY_HEADER.search(call) or "--noproxy" in call:
+    matches = list(CURL_CALL.finditer(command))
+    for k, match in enumerate(matches):
+        call = command[match.end():matches[k + 1].start() if k + 1 < len(matches) else len(command)]
+        prefix = command[matches[k - 1].end() if k else 0:match.start()]
+        if not API_KEY_HEADER.search(call) or NOPROXY_OPTION.search(call) or NOPROXY_ENV.search(prefix):
             continue
-        hosts = {host.lower() for host in URL_HOST.findall(call)}
+        hosts = {host.lower() for host in URL_HOST.findall(BODY_ARGUMENT.sub(" ", call))}
         if hosts and not hosts & LOCAL_HOSTS:
             continue
         findings.append(f"DRIFT {rel}:{no} curl-ohne-noproxy: X-API-Key-Aufruf ohne"
