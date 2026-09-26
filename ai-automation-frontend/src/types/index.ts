@@ -1554,6 +1554,7 @@ export interface ChainEntry {
   sortOrder: number;
   stopOnFailure: boolean;
   inputContext: Record<string, unknown>;
+  timeoutMinutes?: number | null;
 }
 
 export interface CreateChainRequest {
@@ -1578,6 +1579,7 @@ export interface ChainEntryRequest {
   sortOrder: number;
   stopOnFailure?: boolean;
   inputContext?: Record<string, unknown>;
+  timeoutMinutes?: number;
 }
 
 export interface ChainRun {

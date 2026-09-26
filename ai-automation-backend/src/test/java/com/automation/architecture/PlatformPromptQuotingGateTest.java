@@ -33,7 +33,7 @@ class PlatformPromptQuotingGateTest {
 
     /** Felder, die ein Block als Kommandozeile ausfuehrt (identisch zu {@link TemplateHygieneGateTest}). */
     private static final List<String> SHELL_FIELDS =
-            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command");
+            List.of("command", "condition", "then_command", "else_command", "items_command", "condition_command", "run_if");
 
     /** Ausgabe-Platzhalter, die ein Shell-Block von einem Vorgaengerblock uebernimmt. */
     private static final java.util.regex.Pattern OUTPUT_PLACEHOLDER = java.util.regex.Pattern.compile(
@@ -41,7 +41,7 @@ class PlatformPromptQuotingGateTest {
 
     /** Plattform-Daten, die den Prompt eines KI-Blocks faerben ({@code audit_findings}: TODO 3643beac). */
     private static final java.util.regex.Pattern PLATFORM_PLACEHOLDER =
-            java.util.regex.Pattern.compile("\\{\\{\\s*(previous_report|open_todos|audit_findings)\\s*}}");
+            java.util.regex.Pattern.compile("\\{\\{\\s*(previous_report|open_todos|audit_findings|todo_details)\\s*}}");
 
     @Test
     void should_requireEscapeOptIn_forShellBlocksAfterAPlatformPrompt() throws IOException {

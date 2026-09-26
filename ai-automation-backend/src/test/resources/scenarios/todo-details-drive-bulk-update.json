@@ -1,0 +1,43 @@
+{
+  "id": "todo-details-drive-bulk-update",
+  "title": "todo_details liefert gefilterte TODOs mit Beschreibung; todo-update updates schreibt nur, wo die Bedingung passt; run_if überspringt ohne KI",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md → todo_details (System-injizierte Variablen), todo-update mit updates, run_if (Allgemeine Block-Eigenschaften)",
+    "incidents": [
+      "cc0eb3ba (Batch-Kette bauen: TODOs einordnen, nacheinander in einem Arbeitsstand abarbeiten, Review und Freigabe)",
+      "4a2edda6 (todo-update: leere Vorgaben aus dem Editor überschreiben Titel und Beschreibung)"
+    ]
+  },
+  "todos": [
+    { "title": "Alpha auswählen", "description": "Beschreibung A\ngate_status: RED", "tags": ["backend"], "priority": "HIGH" },
+    { "title": "Beta ausgeschlossen", "tags": ["idee"] },
+    { "title": "Gamma schon in Arbeit", "status": "IN_PROGRESS", "tags": ["backend"] }
+  ],
+  "context": { "todo_details_exclude_tags": "idee", "todo_details_status": "OPEN,IN_PROGRESS" },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      { "type": "shell", "name": "liste", "config": {
+        "shell_escape_variables": true,
+        "command": "set -euo pipefail\nprintf '%s' {{ todo_details }} | python3 -c 'import json,sys; t=[json.loads(l) for l in sys.stdin.read().splitlines() if l.startswith(\"[\")][0]; print(json.dumps([{\"id\":x[\"id\"],\"add_tags\":[\"batch:selected\"],\"status\":\"IN_PROGRESS\",\"note\":\"ausgewählt\",\"require_status\":\"OPEN\"} for x in t]))'"
+      } },
+      { "type": "todo-update", "name": "anwenden", "config": { "updates": "{{ block.liste.output }}" } },
+      { "type": "simple", "name": "nie", "config": { "run_if": "false", "command": "Dieser Prompt darf nie ankommen" } }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": { "SCRIPTED": 0 },
+    "steps": [
+      { "index": 0, "status": "COMPLETED", "outputNotContains": ["{{"] },
+      { "index": 1, "status": "COMPLETED", "outputContains": ["1 aktualisiert", "1 übersprungen", "Status ist IN_PROGRESS"] },
+      { "index": 2, "status": "SKIPPED", "outputContains": ["Übersprungen (run_if: exit 1)"] }
+    ],
+    "todos": [
+      { "titleContains": "Alpha", "status": "IN_PROGRESS", "tags": ["backend", "batch:selected"], "descriptionContains": "ausgewählt" },
+      { "titleContains": "Gamma", "status": "IN_PROGRESS", "tagsAbsent": ["batch:selected"] },
+      { "titleContains": "Beta", "status": "OPEN", "tagsAbsent": ["batch:selected"] }
+    ],
+    "gate": "none"
+  }
+}

@@ -10,7 +10,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Der echte Spring-Kontext liefert dem Einsammler alle fuenf Quellen, in der dokumentierten
+ * Der echte Spring-Kontext liefert dem Einsammler alle sechs Quellen, in der dokumentierten
  * {@code @Order} (TODO 441a4c46). Eine neue Quelle gehoert hier dazu.
  */
 @SpringBootTest
@@ -24,7 +24,7 @@ class PlatformVariableSourceWiringTest {
     void everySourceIsWired_inItsOrder() {
         assertThat(sources).extracting(source -> source.getClass().getSimpleName()).containsExactly(
                 "PreviousReportVariable", "OpenTodosVariable", "RequestMetricsVariable", "GoalVariables",
-                "AuditFindingsVariable");
+                "AuditFindingsVariable", "TodoDetailsVariable");
     }
 
     /**
@@ -36,6 +36,7 @@ class PlatformVariableSourceWiringTest {
         List<String> expected = new java.util.ArrayList<>(List.of("previous_report", "open_todos", "request_metrics"));
         expected.addAll(GoalContextSource.VARIABLES);
         expected.add(AuditContextSource.VARIABLE);
+        expected.add(TodoDetailsVariable.NAME);
 
         assertThat(contextDataService.platformVariableNames()).containsExactlyElementsOf(expected);
         assertThat(ContextDeltaCalculator.SYSTEM_VAR_KEYS).containsAll(contextDataService.platformVariableNames());

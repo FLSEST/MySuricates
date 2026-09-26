@@ -198,7 +198,8 @@ class WorkflowExecutorTest {
                 registry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
+                        activityLogService, containerRepository, mock(RunLiveLogService.class),
+                        new RunIfGate(commandExecutorService)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService)
@@ -1264,7 +1265,8 @@ class WorkflowExecutorTest {
                 executionRegistry,
                 new BlockSkillContext(commandExecutorService),
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
-                        activityLogService, containerRepository, mock(RunLiveLogService.class)),
+                        activityLogService, containerRepository, mock(RunLiveLogService.class),
+                        new RunIfGate(commandExecutorService)),
                 new RunFinalizer(runRepository, broadcaster, eventPublisher),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService)

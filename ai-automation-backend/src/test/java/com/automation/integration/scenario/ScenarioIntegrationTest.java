@@ -194,6 +194,9 @@ class ScenarioIntegrationTest {
         if (scenario.has("goal")) {
             refs.put("goal", goals.create(project, scenario.path("goal")));
         }
+        if (scenario.has("todos")) {
+            ScenarioTodos.create(todoRepository, project, scenario.path("todos"));
+        }
         if (scenario.has("chain")) {
             runChain(project, id, scenario, refs);
             return;

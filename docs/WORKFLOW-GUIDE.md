@@ -88,6 +88,7 @@ Jeder Block unterstützt neben seinen typspezifischen Config-Feldern auch diese 
 | Config-Schlüssel | Typ | Default | Beschreibung |
 |---|---|---|---|
 | `on_failure` | string | `"stop"` | Verhalten bei Fehler: `"stop"` (Workflow beenden) oder `"continue"` (mit nächstem Block fortfahren) |
+| `run_if` | string | null | **Nur oberste Ebene**: Shell-Test vor dem Block, im Arbeitsverzeichnis des Laufs (bei Isolation im Klon), höchstens 60 s. Exit 0 → der Block läuft; sonst ist er `SKIPPED` mit der Ausgabe `Übersprungen (run_if: exit N)` – sein Executor wird nicht gerufen (kein KI-Aufruf, keine Freigabe, nichts geschrieben), eine `variable_name`-Variable bleibt ungesetzt. Platzhalter wie in jedem Shell-Feld (fremde Werte immer gequotet, `shell_escape_variables` für alle). Typisch: `test -s .git/state/ids.txt`. |
 | `provider` | string | null | **Nur KI-fähige Blöcke** (`simple`, `agentic`, `skill-capability`, `compress-ai` sowie der Inline-`command` von `retry`, `foreach`, `while`, `conditional`, `switch`): KI-Anbieter nur für diesen Block (`CLAUDE`, `PI`, `CODEX`; bei `compress-ai` nur `CLAUDE`). Präzedenz Block > Workflow > System-Default. Beim `integration`-Block bezeichnet `provider` dagegen den Integrations-Provider (`google-calendar`, …). |
 | `model` | string | null | **Nur KI-fähige Blöcke** (inkl. `compress-ai`): Modell nur für diesen Block (CLI-Alias `opus`/`sonnet`, konkrete ID oder pi `<backend>/<model>`). Präzedenz Block > Workflow > Provider-Default. Setzt ein Block einen *anderen* `provider` als der Workflow, wird das Workflow-Modell nicht vererbt (Modell-IDs sind anbieterspezifisch). |
 | `effort` | string | null | **Nur KI-fähige Blöcke**: Denkaufwand `low`/`medium`/`high`/`xhigh` nur für diesen Block, siehe [Reasoning-Effort](#reasoning-effort-denkaufwand). |
@@ -656,7 +657,19 @@ Legen TODOs direkt über den TodoService an bzw. ändern sie — **kein REST-Sel
 | `source_agent` | string | `workflow` | Quell-Agent-Label |
 | `variable_name` | string | `todo_id` | Kontext-Variable, die die neue TODO-ID erhält |
 
-**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert.
+**`todo-update`**: `id` (erforderlich, Template-fähig — z. B. `{{ todo_id }}`), optional `title`/`description`/`priority`/`tags` — nur gesetzte Felder werden geändert, leere Texte gelten als nicht gesetzt.
+
+**`todo-update` mit `updates`** (statt `id`): ändert viele TODOs **des Lauf-Projekts** in einem Schritt. `updates` ist eine JSON-Liste (als Text, Template-fähig, meist `{{ block.<shell>.output }}`; ist die ganze Ausgabe kein JSON, gilt ihre letzte nicht-leere Zeile – ein Skript darf also vorher Zeilen für Menschen ausgeben):
+
+| Schlüssel je Eintrag | Bedeutung |
+|---|---|
+| `id` | volle UUID eines TODOs im Projekt des Laufs |
+| `status` | `OPEN`, `IN_PROGRESS`, `DONE` oder `BACKLOG` (DONE wie beim Schließen, auch für Audit-TODOs) |
+| `add_tags` / `remove_tags` | Tags hinzufügen / entfernen (je höchstens 10, Zeichen `A–Z a–z 0–9 _ : . -`) |
+| `note` | Vermerk, an die Beschreibung angehängt als `— <Datum> · <Workflow> (Lauf <id8>): <note>` (≤ 1000 Zeichen, Marker entschärft) |
+| `require_tags` / `require_status` | Bedingung – sonst wird der Eintrag übersprungen |
+
+Höchstens 50 Einträge. Kaputtes JSON, keine Liste oder ein unbekannter Schlüssel lassen den Schritt scheitern, bevor etwas geschrieben ist; ein unpassender Eintrag (ungültige ID, fremdes Projekt, Bedingung nicht erfüllt) wird mit Grund übersprungen. Ausgabe: `✓ N aktualisiert, M übersprungen` und je Eintrag eine Zeile.
 
 **`todo-close`**: `id` (erforderlich, Template-fähig) — setzt den Status auf DONE.
 
@@ -828,6 +841,7 @@ Folgende Variablen werden vom `WorkflowExecutor` automatisch bei jedem Run geset
 | `{{ previous_report }}` | Längster Non-Shell-Step-Output des letzten COMPLETED-Runs desselben Workflows (max. 3000 Zeichen), oder `"(kein vorheriger Report vorhanden)"`. Ein Audit-Envelope ist abgeschnitten, Plattform-Marker verlieren ihren Doppelpunkt (`gate_status GREEN` bleibt lesbar, wird aber nicht mehr als Urteil gewertet, wenn ein Modell die Zeile wiedergibt), Blockgrenzen wie `</audit_findings>` stehen als `[audit_findings]` da. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ open_todos }}` | Markdown-Liste offener/in-Bearbeitung-TODOs des Projekts in einem `<open_todos>…</open_todos>`-Block, oder `"(keine offenen TODOs)"`. Titel und Tags sind auf eine Zeile geglättet, auf 200/80 Zeichen gekürzt und von Plattform-Markern (`todo_item:`, `gate_*:`, `dashboard_widget:`) befreit — sie können aus importierten Issues stammen und gelten als Daten, nicht als Anweisung. Maximal 150 Einträge. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 | `{{ audit_findings }}` | **Nur in Audit-Workflows** (gültiges `metadata.audit`): die bekannten Befunde des eigenen Audits im Projekt — offen, Wiedervorlage, akzeptiert, verworfen — in einem `<audit_findings>…</audit_findings>`-Block, je Befund eine Zeile mit Status, Schwere, `ruleKey`, `subject`, Titel und Einordnung, höchstens 250 Zeilen und 60 000 Bytes (eingeordnete zuerst, der Rest als Anzahl je Status); ohne Befunde `"(keine bekannten Befunde)"`. In anderen Workflows gibt es die Variable nicht, auch nicht über die Variablen-Übergabe an einen Sub-Workflow; der Platzhalter bliebe dort wörtlich stehen (Analyzer-Regel `audit-only-placeholder`). Format und Zweck: [audit-workflow-protocol.md](audit-workflow-protocol.md) → „Bekannte Befunde im Prompt“. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
+| `{{ todo_details }}` | **Nur mit Filter** (`todo_details_tags` und/oder `todo_details_exclude_tags` im Lauf-Kontext, meist `defaultContext`): TODOs des Lauf-Projekts **mit Beschreibung** als JSON-Liste im Block `<todo_details>…</todo_details>` – je Eintrag `id`, `status`, `priority`, `tags`, `title`, `complexity`, `suggestedEffort`, `openQuestion`, `updatedAt`, `description`. Weitere Filter: `todo_details_status` (OPEN/IN_PROGRESS/BACKLOG, Vorgabe OPEN), `todo_details_first_tags` (nach vorn), `todo_details_limit` (≤ 150, Vorgabe 40), `todo_details_chars` (je Beschreibung ≤ 8000, Vorgabe 1500); die ganze Liste höchstens 100 000 Bytes UTF-8, damit ein Shell-Befehl unter der Grenze von 128 KiB je Argument bleibt. Tags vergleicht die Plattform genau; `batch:*` heißt „jedes Tag mit diesem Anfang“. Reihenfolge: `first_tags`, dann Priorität, dann Alter. Titel geglättet, Beschreibungen zeilenweise von Markern befreit. Gilt immer als nicht vertrauenswürdig → in Shell-Blöcken stets single-quoted, deshalb unquoted schreiben |
 
 > **Plattform-Daten fehlen nie stillschweigend.** `previous_report`, `open_todos` und
 > `request_metrics` (in Audit-Workflows auch `audit_findings`) werden einzeln injiziert: Scheitert
@@ -1566,6 +1580,7 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
 - **Kontextweitergabe**: Jeder Eintrag kann auf `{{ previous_chain_output }}` des letzten abgeschlossenen Workflows zugreifen
 - **Kettenbezug**: Jeder Eintrag kennt seinen Chain-Run: `{{ chain_run_id }}` im Kontext, `chainRunId` am Lauf (`GET /api/v1/executions/{id}`). Beides setzt die Chain selbst, nach ihrem Eingabe-Kontext — ein mitgegebener `chain_run_id` überschreibt es nicht. Einzeln gestartet bleibt der Platzhalter wörtlich stehen (Analyzer-Regel `chain-only-placeholder`). `chainRunId` trägt nur der Lauf, den die Chain startet, auch nach einem Fortsetzen; ein Retry, ein Fortsetzen ohne abgeschlossenen Schritt (das startet einen neuen Lauf) und Sub-Workflows erben `{{ chain_run_id }}` mit dem Kontext, ihr `chainRunId` bleibt `null`
 - **stopOnFailure**: Steuert ob die Chain bei Workflow-Fehler stoppt — stoppt nur wenn **beide** Flags gesetzt sind (Chain-Level UND Entry-Level müssen `true` sein)
+- **Wartezeit je Eintrag**: `timeoutMinutes` (5–1440) am Eintrag begrenzt, wie lange die Kette auf diesen Workflow wartet; ohne Angabe gilt `chain-workflow-timeout-minutes` (Vorgabe 180). Nötig für Einträge mit Freigabe, die über Nacht wartet. Läuft die Frist ab, zählt der Eintrag als FAILED – der Workflow-Lauf selbst läuft weiter
 
 ### Chain-Struktur
 
@@ -1576,18 +1591,21 @@ Chains gruppieren mehrere Workflows zur **sequentiellen Ausführung**.
     {
       "workflowId": "<audit-workflow-id>",
       "sortOrder": 0,
-      "context": { "scope": "backend" },
+      "inputContext": { "scope": "backend" },
       "stopOnFailure": true
     },
     {
       "workflowId": "<fix-workflow-id>",
       "sortOrder": 1,
-      "context": { "audit_report": "{{ previous_chain_output }}" },
-      "stopOnFailure": false
+      "inputContext": { "scope": "fix" },
+      "stopOnFailure": false,
+      "timeoutMinutes": 600
     }
   ]
 }
 ```
+
+Werte in `inputContext` werden nicht aufgelöst – `{{ previous_chain_output }}` gehört in die Blöcke des Workflows selbst.
 
 ### API
 

@@ -56,6 +56,7 @@ const ON_FAILURE: Field = {
 const COMMON_FIELDS: Record<string, Field> = {
   label: { type: 'string', doc: s('Anzeigename des Schritts, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.', 'Display label of the step, description only. No effect on execution.') },
   description: { type: 'string', doc: s('Notiz zum Schritt, nur zur Beschreibung. Bei der Ausführung ohne Wirkung.', 'Note on the step, description only. No effect on execution.') },
+  run_if: { type: 'string', doc: s('Shell-Test vor dem Block (nur oberste Ebene): Exit 0 → der Block läuft, sonst wird er übersprungen (SKIPPED, ohne KI-Aufruf). Läuft im Arbeitsverzeichnis des Laufs, höchstens 60 s; Platzhalter wie in jedem Shell-Feld.', 'Shell test before the block (top level only): exit 0 → the block runs, otherwise it is skipped (SKIPPED, no AI call). Runs in the run working directory, at most 60 s; placeholders as in any shell field.') },
   workspace: {
     type: 'object',
     doc: s(
@@ -361,13 +362,13 @@ const SPECS: Record<BlockType, BlockSpec> = {
     },
   },
   'todo-update': {
-    required: ['id'],
     fields: {
-      id: { type: 'string', doc: s('ID des TODOs, z. B. `{{ todo_id }}`.', 'ID of the TODO, e.g. `{{ todo_id }}`.') },
-      title: { type: 'string', doc: s('Neuer Titel (nur gesetzte Felder werden geändert).', 'New title (only set fields are changed).') },
+      id: { type: 'string', doc: s('ID des TODOs, z. B. `{{ todo_id }}`. Entweder `id` oder `updates`.', 'ID of the TODO, e.g. `{{ todo_id }}`. Either `id` or `updates`.') },
+      title: { type: 'string', doc: s('Neuer Titel (nur gesetzte, nicht leere Felder werden geändert).', 'New title (only set, non-empty fields are changed).') },
       description: { type: 'string', doc: s('Neue Beschreibung.', 'New description.') },
       priority: { type: 'string', doc: s('Neue Priorität.', 'New priority.'), values: [['CRITICAL', s('Kritisch', 'Critical')], ['HIGH', s('Hoch', 'High')], ['MEDIUM', s('Mittel', 'Medium')], ['LOW', s('Niedrig', 'Low')]] },
       tags: { type: ['array', 'string'], items: STRING_LIST, doc: s('Neue Tags.', 'New tags.') },
+      updates: { type: ['array', 'string'], doc: s('Viele TODOs des Lauf-Projekts auf einmal: JSON-Liste, meist `{{ block.<shell>.output }}` (ist die ganze Ausgabe kein JSON, gilt ihre letzte Zeile). Je Eintrag `id`, optional `status` (OPEN/IN_PROGRESS/DONE/BACKLOG), `add_tags`, `remove_tags`, `note`, `require_tags`, `require_status`. Höchstens 50; ein unpassender Eintrag wird mit Grund übersprungen.', 'Many TODOs of the run project at once: a JSON list, usually `{{ block.<shell>.output }}` (if the whole output is no JSON, its last line counts). Per entry `id`, optional `status` (OPEN/IN_PROGRESS/DONE/BACKLOG), `add_tags`, `remove_tags`, `note`, `require_tags`, `require_status`. At most 50; an entry that does not fit is skipped with a reason.') },
     },
   },
   'todo-close': {

@@ -8,11 +8,16 @@ import com.automation.entity.Todo;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.service.todo.TodoService;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -20,7 +25,8 @@ import java.util.Set;
  * den TodoService — ersetzt REST-Self-Calls (PUT /api/v1/todos/{id}).
  *
  * Config: id (Pflicht, Template-fähig), optional title/description/priority/tags —
- * nur gesetzte Felder werden geändert (Null-Semantik von TodoService.update).
+ * nur gesetzte, nicht leere Felder werden geändert (Null-Semantik von TodoService.update, 4a2edda6).
+ * Statt id: updates – viele TODOs des Lauf-Projekts auf einmal, siehe {@link TodoBulkUpdates} (TODO cc0eb3ba).
  */
 @Component
 @RequiredArgsConstructor
@@ -34,14 +40,33 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
         Map<String, Object> config = block.getConfig();
         StepResult result = TodoBlockSupport.startResult(context);
         try {
+            if (config.containsKey("updates")) {
+                if (config.containsKey("id")) {
+                    throw new IllegalArgumentException("todo-update: entweder 'id' oder 'updates', nicht beides");
+                }
+                String projectId = Objects.toString(context.getVariable("project_id"), "");
+                if (projectId.isBlank()) {
+                    throw new IllegalArgumentException("todo-update mit 'updates' braucht ein Projekt");
+                }
+                Object raw = config.get("updates");
+                String text = raw instanceof String ? TodoBlockSupport.resolved(context, raw) : TodoBulkUpdates.toJson(raw);
+                List<JsonNode> entries = TodoBulkUpdates.parse(text);
+                TodoBulkUpdates.Result bulk = TodoBulkUpdates.apply(entries, projectId,
+                        Objects.toString(context.getVariable("workflow_name"), ""),
+                        context.getWorkflowRunId(), todoService, LocalDate.now(ZoneOffset.UTC));
+                result.setInput("todo-update: " + entries.size() + " Einträge");
+                result.setOutput(bulk.summary());
+                result.setStatus(StepStatus.COMPLETED);
+                return TodoBlockSupport.finishResult(result);
+            }
             String id = TodoBlockSupport.resolved(context, config.get("id"));
             if (id == null || id.isBlank()) {
                 throw new IllegalArgumentException("todo-update requires 'id' in config");
             }
 
             UpdateTodoRequest request = new UpdateTodoRequest(
-                    TodoBlockSupport.resolved(context, config.get("title")),
-                    TodoBlockSupport.resolved(context, config.get("description")),
+                    unlessBlank(TodoBlockSupport.resolved(context, config.get("title"))),
+                    unlessBlank(TodoBlockSupport.resolved(context, config.get("description"))),
                     null,
                     config.containsKey("priority")
                             ? TodoBlockSupport.parsePriority(TodoBlockSupport.resolved(context, config.get("priority")), null)
@@ -67,5 +92,10 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
     @Override
     public Set<String> supportedTypes() {
         return Set.of("todo-update");
+    }
+
+    /** Leer oder nur Leerraum heißt „nicht ändern“ – der Editor legt den Block mit leeren Feldern an (4a2edda6). */
+    private static String unlessBlank(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

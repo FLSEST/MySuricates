@@ -49,7 +49,8 @@ class ExecutionContextFactoryTest {
 
     /** What the real collector reserves (pinned against the sources in PlatformVariableSourceWiringTest). */
     private static final java.util.Set<String> PLATFORM_NAMES = java.util.stream.Stream.concat(
-            java.util.stream.Stream.of("previous_report", "open_todos", "request_metrics", "audit_findings"),
+            java.util.stream.Stream.of("previous_report", "open_todos", "request_metrics", "audit_findings",
+                    "todo_details"),
             GoalContextSource.VARIABLES.stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     @BeforeEach

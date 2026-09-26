@@ -200,7 +200,7 @@ Response: 201 Created
 | `compress` | `description`, `source`, `stages`, `max_chars?`, `timeout_seconds?` | Regelbasierte Komprimierung einer Blockausgabe |
 | `compress-ai` | `description`, `source`, `instruction?`, `max_chars?`, `model?`, `effort?`, `provider` (nur `CLAUDE`; setzen, wenn der Workflow einen anderen Provider nutzt), `timeout_seconds?` | KI-Komprimierung einer Blockausgabe (nur CLAUDE, ohne Tools) |
 | `todo-create` | `description`, `title`, `priority?`, `tags?`, `project_id?`, `source?`, `source_agent?`, `variable_name?` | TODO anlegen (`variable_name` default `todo_id`) |
-| `todo-update` | `description`, `id`, `title?`, `description?`, `priority?`, `tags?` | TODO ändern |
+| `todo-update` | `description`, `id` oder `updates`, `title?`, `description?`, `priority?`, `tags?` | TODO ändern; mit `updates` viele TODOs des Lauf-Projekts (Status, Tags, Vermerk) |
 | `todo-close` | `description`, `id` | TODO auf DONE setzen |
 | `dashboard-report` | `status` (erforderlich), `title`, `summary`, `kpis`, `items` | Dashboard-Ergebnis des Runs aus Config-Feldern, ohne Marker; Modul `dashboard-report` |
 
@@ -243,6 +243,7 @@ Headers: Content-Type: application/json, X-API-Key: <dev-key>
 - Chains sind cross-project — Workflows aus verschiedenen Projekten möglich
 - `previous_chain_output` wird automatisch vom letzten Workflow propagiert
 - `stopOnFailure` auf Chain- UND Entry-Level müssen beide `true` sein, damit die Chain bei Fehler stoppt
+- `timeoutMinutes` (5–1440) am Eintrag: so lange wartet die Chain höchstens auf diesen Workflow (sonst `chain-workflow-timeout-minutes`, Vorgabe 180) – für Einträge mit Freigabe
 
 ### 3. Workflow ausführen
 

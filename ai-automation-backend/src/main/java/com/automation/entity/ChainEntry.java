@@ -21,4 +21,13 @@ public class ChainEntry {
 
     @Builder.Default
     private Map<String, Object> inputContext = new HashMap<>();
+
+    /** Wie lange die Kette höchstens auf diesen Eintrag wartet (5–1440 min); null = globale Vorgabe (TODO cc0eb3ba). */
+    private Integer timeoutMinutes;
+
+    /** Aufrufe von vor {@code timeoutMinutes} (TODO cc0eb3ba). */
+    public ChainEntry(String workflowId, String label, int sortOrder, boolean stopOnFailure,
+                      Map<String, Object> inputContext) {
+        this(workflowId, label, sortOrder, stopOnFailure, inputContext, null);
+    }
 }

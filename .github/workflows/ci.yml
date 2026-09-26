@@ -58,6 +58,9 @@ jobs:
       # (cf662c01): echte Aufrufe gegen fake_instance.py, braucht nur python3.
       - name: Eigene Instanz ohne Proxy (Python-Skripte)
         run: python3 -m unittest discover -s scripts/tests -p 'test_local_api_proxy.py'
+      # TODO-Batch (cc0eb3ba): Skripte gegen Wegwerf-Repos, braucht nur python3 und git.
+      - name: TODO-Batch-Skripte
+        run: python3 -m unittest discover -s scripts/tests -p 'test_todo_batch.py'
       # Liefen bisher nur lokal (cad7d821): Dev-Starter (JAR-Laufzeit, Run-Waechter, Proxy, Container-
       # Modus mit Stubs), das Integritaets-Gate von cleanup-runs.sh und die Seed-Vorlage gegen einen
       # curl-Stub. Brauchen python3, curl, git, jq, node und script — kein Backend, kein Docker, keine KI-CLI.

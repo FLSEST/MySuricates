@@ -36,8 +36,10 @@ public final class UntrustedText {
      */
     private static final Pattern MARKERS = Pattern.compile("(?iU)(todo[_-]item|gate[_-](?:status|category|description)"
             + "|dashboard[_-]widget|mysuricates(?=[*`\\s]*:[*`\\s]*audit[_-]result))[*`\\s]*:");
-    /** Die Blockgrenzen selbst ({@code open_todos}, {@code goal_status}, {@code audit_findings}) duerfen aus einem Titel heraus nicht faelschbar sein. */
-    private static final Pattern DELIMITER = Pattern.compile("(?iU)</?\\s*(open_todos|goal_status|audit_findings)\\s*>");
+    /** Die Blockgrenzen selbst ({@code open_todos}, {@code goal_status}, {@code audit_findings}, {@code todo_details}) duerfen aus einem Titel heraus nicht faelschbar sein. */
+    private static final Pattern DELIMITER = Pattern.compile("(?iU)</?\\s*(open_todos|goal_status|audit_findings|todo_details)\\s*>");
+    /** Vertikaler Leerraum ausser {@code \n}: CR (auch CRLF), VT, FF, NEL, U+2028/2029. */
+    private static final Pattern OTHER_LINE_BREAKS = Pattern.compile("\\r\\n?|[\\u000B\\u000C\\u0085\\u2028\\u2029]");
     private static final Pattern FORMAT_CHARS = Pattern.compile("\\p{Cf}");
 
     private UntrustedText() {
@@ -51,6 +53,23 @@ public final class UntrustedText {
             // nie ein Emoji halbieren: ein einzelnes Surrogat waere kein gueltiges Zeichen mehr
             int end = maxChars > 0 && Character.isHighSurrogate(s.charAt(maxChars - 1)) ? maxChars - 1 : maxChars;
             s = s.substring(0, end).trim() + "…";
+        }
+        return s;
+    }
+
+    /**
+     * Mehrzeiliger fremder Text – die Beschreibung eines TODOs –, Zeile fuer Zeile wie {@link #inline} entschaerft:
+     * Marker ohne Doppelpunkt, Blockgrenzen neutralisiert, verkleidete Formen (NFKC ohne Formatzeichen) erkannt.
+     * Zeilen bleiben erhalten, Tabs werden Leerzeichen, gekuerzt auf {@code maxChars} mit „…“ (TODO cc0eb3ba).
+     */
+    public static String block(String raw, int maxChars) {
+        if (raw == null) return "";
+        String normalized = OTHER_LINE_BREAKS.matcher(raw).replaceAll("\n").replace('\t', ' ');
+        String s = defuseLines(normalized).stripTrailing();
+        if (s.length() > maxChars) {
+            // nie ein Emoji halbieren: ein einzelnes Surrogat waere kein gueltiges Zeichen mehr
+            int end = maxChars > 0 && Character.isHighSurrogate(s.charAt(maxChars - 1)) ? maxChars - 1 : maxChars;
+            s = s.substring(0, end).stripTrailing() + "…";
         }
         return s;
     }

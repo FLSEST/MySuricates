@@ -32,7 +32,12 @@ public class ChainRunWaiter {
     private final StepResultRepository stepResultRepository;
 
     public WorkflowRun waitForCompletion(String runId, AtomicBoolean cancelled) {
-        Duration maxWait = Duration.ofMinutes(chainConfig.getWorkflowTimeoutMinutes());
+        return waitForCompletion(runId, cancelled, null);
+    }
+
+    /** Wie oben, mit eigener Obergrenze für diesen Ketten-Eintrag (TODO cc0eb3ba); null = globale Vorgabe. */
+    public WorkflowRun waitForCompletion(String runId, AtomicBoolean cancelled, Integer timeoutMinutes) {
+        Duration maxWait = Duration.ofMinutes(timeoutMinutes != null ? timeoutMinutes : chainConfig.getWorkflowTimeoutMinutes());
         Instant deadline = Instant.now().plus(maxWait);
         while (Instant.now().isBefore(deadline)) {
             if (cancelled != null && cancelled.get()) {

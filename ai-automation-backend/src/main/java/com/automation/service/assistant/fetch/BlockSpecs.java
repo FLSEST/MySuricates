@@ -214,9 +214,9 @@ public final class BlockSpecs {
                     Note: for one tracking TODO; dynamically many TODOs from an analysis come from "todo_item:" markers instead.
                     """),
             Map.entry("todo-update", """
-                    **Block type: todo-update** — Changes fields of an existing TODO by id. 0 tokens.
-                    Required config: `id` (string, template variables supported, e.g. {{ todo_id }} from a todo-create block).
-                    Optional: `title`, `description`, `priority`, `tags` — only the fields that are set change.
+                    **Block type: todo-update** — Changes fields of an existing TODO by id, or of several TODOs of the run's project at once. 0 tokens.
+                    Required config: `id` (string, template variables supported, e.g. {{ todo_id }} from a todo-create block) — or `updates` instead.
+                    Optional: `title`, `description`, `priority`, `tags` — only the fields that are set change; empty strings count as not set. `updates` (JSON list as string, template variables supported, usually {{ block.<shell block>.output }}; if the whole text is no JSON, its last non-empty line counts): one object per TODO of the run's project with "id" (full UUID), optional "status" (OPEN | IN_PROGRESS | DONE | BACKLOG), "add_tags", "remove_tags", "note" (appended to the description with date and run), "require_tags", "require_status"; at most 50 entries; a non-matching entry is skipped with a reason, broken JSON or an unknown key fails the step.
                     Example config: {"id": "{{ todo_id }}", "priority": "LOW", "tags": ["waiting"]}
                     """),
             Map.entry("todo-close", """

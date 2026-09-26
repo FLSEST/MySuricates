@@ -54,7 +54,7 @@ class SubWorkflowBlockExecutorTest {
 
     private static Set<String> platformNames() {
         Set<String> names = new HashSet<>(Set.of("previous_report", "open_todos", "request_metrics",
-                AuditContextSource.VARIABLE));
+                AuditContextSource.VARIABLE, "todo_details"));
         names.addAll(GoalContextSource.VARIABLES);
         return Set.copyOf(names);
     }

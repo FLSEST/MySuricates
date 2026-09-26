@@ -25,6 +25,8 @@ export function ChainFormModal({ title, chain, workflows, onSave, onClose, savin
       label: e.label ?? undefined,
       sortOrder: e.sortOrder,
       stopOnFailure: e.stopOnFailure,
+      inputContext: e.inputContext,
+      timeoutMinutes: e.timeoutMinutes ?? undefined,
     })) ?? []
   );
   const [workflowSearch, setWorkflowSearch] = useState('');

@@ -116,4 +116,60 @@ class TodoUpdateBlockExecutorTest {
         assertThat(result.getOutput()).contains("id");
         verify(todoService, never()).update(anyString(), any());
     }
+
+    @Test
+    void execute_updates_appliesTheListAndReportsCounts() {
+        String id = "11111111-1111-1111-1111-111111111111";
+        when(todoService.findById(id)).thenReturn(Todo.builder().id(id).projectId("proj-1").status(Todo.Status.OPEN).build());
+        when(todoService.update(eq(id), any())).thenReturn(Todo.builder().id(id).build());
+        ExecutionContext ctx = buildContext();
+        ctx.setVariable("project_id", "proj-1");
+        ctx.setVariable("workflow_name", "Batch");
+        ctx.setVariable("list", "[{\"id\":\"" + id + "\",\"status\":\"IN_PROGRESS\"}]");
+        Map<String, Object> config = new HashMap<>();
+        config.put("updates", "{{ list }}");
+
+        StepResult result = executor.execute(block(config), ctx);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).startsWith("✓ 1 aktualisiert, 0 übersprungen");
+    }
+
+    @Test
+    void execute_idAndUpdates_fail() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "x");
+        config.put("updates", "[]");
+
+        StepResult result = executor.execute(block(config), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("entweder 'id' oder 'updates'");
+    }
+
+    @Test
+    void execute_updatesWithoutProject_fail() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("updates", "[]");
+
+        StepResult result = executor.execute(block(config), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).contains("braucht ein Projekt");
+    }
+
+    @Test
+    void execute_emptyTitleAndDescription_areNotSet_4a2edda6() {
+        when(todoService.update(eq("todo-5"), any())).thenReturn(Todo.builder().id("todo-5").title("Alt").build());
+        Map<String, Object> config = new HashMap<>();
+        config.put("id", "todo-5");
+        config.put("title", "");
+        config.put("description", "  ");
+        config.put("priority", "LOW");
+
+        executor.execute(block(config), buildContext());
+
+        verify(todoService).update(eq("todo-5"), argThat(req -> req.title() == null && req.description() == null
+                && req.priority() == Todo.Priority.LOW));
+    }
 }
