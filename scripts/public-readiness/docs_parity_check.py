@@ -54,10 +54,10 @@ KNOWN_GAPS: dict[str, str] = {}
 # Der Schluessel ist die Ueberschrift, die WIRKLICH fehlt: Bis TODO 2d553479 verglich die Pruefung
 # nur die Folge der Ebenen und schrieb eine Luecke dem letzten gleichrangigen Abschnitt zu. So
 # standen hier "entwicklung.md::## Bekannte Einschränkungen" (fehlend war "## Diagramm-Seiten")
-# und "architektur.md::## Completion Triggers (V39)" (fehlend war das Audit Center).
+# und "architektur.md::## Completion Triggers (V39)" (fehlend war das Audit Center, seit TODO
+# 49f15990 uebersetzt).
 KNOWN_SECTION_GAPS: dict[str, str] = {
     "architektur.md::## Scheduler: verpasste Termine (Standby und Kaltstart)": "c58d7402",
-    "architektur.md::## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)": "49f15990",
 }
 
 
