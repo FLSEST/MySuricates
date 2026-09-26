@@ -164,6 +164,7 @@ Die Seite rendert die Widgets aus der Registry `components/dashboard/widgetRegis
 - Badge-Anzeige in der Sidebar für offene TODOs
 - Filter-, Ansichts- und Seitenzustand (persistiert, Suche entprellt, `?projectId=` aus dem Cockpit) liefert `hooks/useTodoFilters.ts`; die Quick-Add-Leiste ist `components/todo/TodoQuickAdd.tsx`, ihr Zustand und das Kürzel `n` (fokussiert den Titel außerhalb von Eingabefeldern) liegen in `hooks/useTodoQuickAdd.ts` und damit in der Seite — Eingaben überstehen den Lade-Spinner beim Filterwechsel
 - `hooks/useTodoBoard.ts` liefert die Daten der aktiven Ansicht: in der Liste eine Seite, im Board eine Abfrage je Spalte, die der Statusfilter zeigt (nie eine gemischte Seite auf Spalten verteilt); `hooks/useTodoEditor.ts` den Bearbeiten-Dialog samt Deep-Link `?todoId=` (öffnet das TODO einmal, lockert verbergende Filter, hebt die Zeile bis kurz nach dem Schließen hervor), Speichern und Export. Filterleiste und Tag-Chips sind `components/todo/TodoFilterBar.tsx` und `TodoTagChips.tsx`
+- Der Bearbeiten-Dialog `components/todo/TodoEditModal.tsx` (auch in der Ziel-Ansicht über `GoalTodoEditor`) hält die Formularfelder; „Übertragung / Verknüpfungen“ ist `TodoExportSection.tsx` (Tracker und Ziel aus eigener Wahl, sonst aus der Projekt-Konfiguration, sonst dem ersten verbundenen Tracker: `hooks/useTodoExportTarget.ts`, die eigene Wahl beginnt je TODO leer), die schreibgeschützten Angaben (Quelle, Session, Läufe, Workflow, Daten) sind `TodoMetadata.tsx`
 
 ### ActivityLog (`/activity`)
 
