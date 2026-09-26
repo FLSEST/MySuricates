@@ -147,6 +147,21 @@ class ConfigKeyRulesTest {
             assertThat(shell).isEmpty();
         }
 
+        /** RunIfGate quotet die Platzhalter der run_if-Bedingung mit shell_escape_variables — bei jedem Blocktyp. */
+        @Test
+        void shellEscapeVariablesWirktBeiJedemBlockMitRunIf() {
+            assertThat(keyFindings(block("simple", "s", Map.of("command", "Fasse zusammen",
+                    "run_if", "test -n {{ ziel }}", "shell_escape_variables", true)))).isEmpty();
+            assertThat(keyFindings(block("simple", "s", Map.of("command", "Fasse zusammen",
+                    "shell_escape_variables", true))))
+                    .singleElement().satisfies(f -> {
+                        assertThat(f.rule()).isEqualTo("unknown-config-key");
+                        assertThat(f.detail()).contains("shell_escape_variables wirkt nur mit run_if");
+                    });
+            assertThat(keyFindings(block("shell", "s", Map.of("command", "ls", "shell_escape_variables", true))))
+                    .as("Shell-Blöcke lesen den Schlüssel selbst").isEmpty();
+        }
+
         @Test
         void gemeinsameKiUndValidierungsschluesselSindBekannt() {
             Map<String, Object> config = new LinkedHashMap<>();

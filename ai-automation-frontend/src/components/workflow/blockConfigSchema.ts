@@ -31,7 +31,7 @@ interface Field {
   ignoreCase?: boolean;
   /** Old name of another key, still read by the executor: valid, never suggested. */
   legacyFor?: string;
-  /** The executor reads the key only when these other keys have these values (e.g. `execution_mode: shell`). */
+  /** The executor reads the key only when these other keys have these values (e.g. `execution_mode: shell`; `"*"` = the key is set). */
   onlyWith?: Record<string, string>;
 }
 

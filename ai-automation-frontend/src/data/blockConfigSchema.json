@@ -1,5 +1,5 @@
 {
-  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values. Whoever teaches an executor a new config key adds it here.",
+  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values (\"*\" = the key is set). Whoever teaches an executor a new config key adds it here.",
   "onFailure": {
     "type": "string",
     "doc": {
@@ -44,6 +44,17 @@
       "doc": {
         "de": "Shell-Test vor dem Block (nur oberste Ebene): Exit 0 → der Block läuft, sonst wird er übersprungen (SKIPPED, ohne KI-Aufruf). Läuft im Arbeitsverzeichnis des Laufs, höchstens 60 s; Platzhalter wie in jedem Shell-Feld.",
         "en": "Shell test before the block (top level only): exit 0 → the block runs, otherwise it is skipped (SKIPPED, no AI call). Runs in the run working directory, at most 60 s; placeholders as in any shell field."
+      }
+    },
+    "shell_escape_variables": {
+      "type": "boolean",
+      "doc": {
+        "de": "Alle `{{ }}`-Platzhalter der `run_if`-Bedingung POSIX-sicher in Single-Quotes setzen. Bei Blöcken ohne eigene Shell wirkt der Schlüssel nur zusammen mit `run_if`.",
+        "en": "Put every `{{ }}` placeholder of the `run_if` condition in POSIX-safe single quotes. On blocks without a shell of their own the key only takes effect together with `run_if`."
+      },
+      "default": false,
+      "onlyWith": {
+        "run_if": "*"
       }
     },
     "workspace": {

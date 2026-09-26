@@ -98,13 +98,19 @@ final class ConfigKeyRules {
                         + String.join(", ", field.values())));
     }
 
+    /** {@code onlyWith}: jeder genannte Schlüssel hat den Wert — {@code "*"} heißt: ist gesetzt. */
     private static boolean onlyWithMet(BlockConfigSchema.Field field, Map<String, Object> cfg) {
-        return field.onlyWith().entrySet().stream().allMatch(e -> e.getValue().equals(cfg.get(e.getKey())));
+        return field.onlyWith().entrySet().stream().allMatch(e -> ANY.equals(e.getValue())
+                ? cfg.get(e.getKey()) != null && !(cfg.get(e.getKey()) instanceof String s && s.isBlank())
+                : e.getValue().equals(cfg.get(e.getKey())));
     }
 
     private static String condition(BlockConfigSchema.Field field) {
-        return String.join(", ", field.onlyWith().entrySet().stream().map(e -> e.getKey() + ": " + e.getValue()).toList());
+        return String.join(", ", field.onlyWith().entrySet().stream()
+                .map(e -> ANY.equals(e.getValue()) ? e.getKey() : e.getKey() + ": " + e.getValue()).toList());
     }
+
+    private static final String ANY = "*";
 
     /** foreach mit items_command: {@link ForEachRules} meldet einen falschen items_source-Wert schon genauer. */
     private static boolean skipValueCheck(String type, String key, Map<String, Object> cfg) {
