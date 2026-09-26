@@ -12,6 +12,13 @@ describe('TriggerSourceChip', () => {
     expect(screen.getByTestId('trigger-source')).toHaveTextContent(`${en.workflows.triggeredBy}${en.workflows.triggerSources.SCHEDULE}`);
   });
 
+  it('names the automatic resume after a restart or standby (TODO 90d10ba1)', () => {
+    render(<TriggerSourceChip source="AUTO_RESUME" />);
+
+    expect(screen.getByTestId('trigger-source')).toHaveTextContent(en.workflows.triggerSources.AUTO_RESUME);
+    expect(en.workflows.triggerSources.AUTO_RESUME).not.toBe(en.workflows.triggerSources.RESUME);
+  });
+
   it('renders nothing while the source is unknown', () => {
     const { container } = render(<TriggerSourceChip source={null} />);
 
