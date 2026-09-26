@@ -40,8 +40,8 @@ const ON_FAILURE: Field = {
   type: 'string',
   default: 'stop',
   doc: s(
-    'Was passiert, wenn dieser Block fehlschlägt (Status FAILED).',
-    'What happens when this block fails (status FAILED).',
+    'Was passiert, wenn dieser Block fehlschlägt (Status FAILED). Jeder andere Wert als `continue` stoppt wie `stop`.',
+    'What happens when this block fails (status FAILED). Any value other than `continue` stops like `stop`.',
   ),
   values: [
     ['stop', s('Workflow beenden, der Run wird FAILED (Standard).', 'Stop the workflow, the run becomes FAILED (default).')],

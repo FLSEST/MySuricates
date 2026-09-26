@@ -339,6 +339,36 @@ class WorkflowExecutorTest {
         verify(simpleBlockExecutor, times(2)).execute(any(), any());
     }
 
+    /**
+     * An unknown on_failure value ("fail" is neither "stop" nor "continue") must stop the run like
+     * "stop" — before 2b361abe it silently carried on and the second block ran (seen live on a
+     * simple block of a job-shortlist workflow).
+     */
+    @Test
+    void execute_blockFails_withUnknownOnFailureValue_stopsTheRun() {
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder()
+                        .type("simple")
+                        .config(new HashMap<>(Map.of("command", "fail", "on_failure", "fail")))
+                        .build(),
+                BlockDefinition.builder()
+                        .type("simple")
+                        .config(new HashMap<>(Map.of("command", "must not run")))
+                        .build()
+        )));
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("error").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(failed);
+
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).containsEntry("step", 0);
+        verify(simpleBlockExecutor, times(1)).execute(any(), any());
+    }
+
     @Test
     void execute_noMatchingExecutor_throwsAndFails() {
         testWorkflow.setBlocks(new ArrayList<>(List.of(
