@@ -14,16 +14,23 @@ const SHARED_IMPORT_MESSAGE =
   'components/shared importiert keine Fachordner, nur ui, api, hooks, utils, types, stores und i18n '
   + '(docs/frontend.md → Shared-Komponenten). Die Komponente gehoert in den Fachordner oder der Helfer nach src/utils.';
 
+// Die Tiefen, fuer die es Muster gibt; tiefer liegt unter shared heute nichts (nur __tests__).
+const SHARED_DEPTHS = [0, 1, 2, 3, 4];
+
 function sharedImportPatterns(depth) {
-  const toShared = '(?:\\.\\./)'.repeat(depth);
+  // Ein Schritt nach oben, auch mit eingestreutem `./` (`./../x`, `.././x`)
+  const up = '(?:\\./)*\\.\\./';
+  // Ende der Aufwaerts-Schritte: danach weder `.` noch `..`
+  const stop = '(?:\\./)*(?!\\.\\.?(?:/|$))';
+  const toShared = up.repeat(depth);
   const oneOf = (dirs) => `(?:${dirs.join('|')})(?:/|$)`;
   return [
     // ../X → src/components/X
-    `^${toShared}\\.\\./(?!\\.\\./)(?!${oneOf(SHARED_ALLOWED_IN_COMPONENTS)})`,
+    `^${toShared}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_COMPONENTS)})`,
     // ../../X → src/X
-    `^${toShared}\\.\\./\\.\\./(?!\\.\\./)(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
+    `^${toShared}${up}${up}${stop}(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
     // ../../../ → ausserhalb von src
-    `^${toShared}\\.\\./\\.\\./\\.\\./`,
+    `^${toShared}${up}${up}${up}`,
     // @/X → src/X (Pfad-Alias aus tsconfig.json)
     `^@/(?!${oneOf(SHARED_ALLOWED_IN_SRC)})`,
   ];
@@ -69,7 +76,7 @@ export default tseslint.config(
       }],
     },
   },
-  ...[0, 1, 2].map((depth) => ({
+  ...SHARED_DEPTHS.map((depth) => ({
     files: [`src/components/shared/${'*/'.repeat(depth)}*.{ts,tsx}`],
     rules: sharedImportRules(depth),
   })),
