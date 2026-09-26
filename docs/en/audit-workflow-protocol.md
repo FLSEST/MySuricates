@@ -165,12 +165,38 @@ Converted audits in `workflow-pool/`:
 
 | Workflow | Measurement | Self-test |
 |---|---|---|
-| Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, lines, churn) | `scripts/tests/test-arch-metrics.sh` |
+| Architecture review | block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, churn, collaborators) and `arch-findings.py` (grading) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh` |
 | Architecture review (frontend) | block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (source imports, lines, module cycles) | `scripts/tests/test-frontend-metrics.sh` |
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
 | Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`, gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
 | Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
+
+### Architecture review: grading in the script
+
+In the architecture review the shell does not only measure, it also grades (TODO `b8c06b94`,
+version 4.6.0): `scripts/public-readiness/arch-findings.py` reads both fact sheets and emits the
+section `## findings`, with `ruleKey`, `subject`, severity and evidence per finding. The report
+copies these lines unchanged into its table and envelope; the AI writes title and description,
+explains and prioritises, but assigns no severity of its own and adds no further findings. The
+rules:
+
+- **Size in NCLOC** (`ncloc.py`: without blank, comment and import lines) in bands instead of
+  edges: below 250 nothing, 250–400 observation, above 400 finding `MEDIUM`, above 600 `HIGH`;
+  `CRITICAL` only with more than 10 collaborators.
+- **Hotspots only**: size and dependency findings exist only for files with at least 5 changes in
+  90 days. Large, stable files are an observation. The 300-line limit stays the hard build limit of
+  `SourceSizeRatchetTest`; the review never reports files on its allowlist for size alone.
+- **Collaborators** (injected beans of a Spring bean): from 10, and only for hotspots,
+  `arch.high-coupling`; 5–9 is no finding.
+- **Package coupling** is no longer a finding, only a trend figure in the report. Cycles and layer
+  edges are graded by the script under the previous rules.
+
+The thresholds are calibrated on the code base of 2026-09-26 (1048 backend files, none above 400
+NCLOC; 598 frontend modules, 7 above 400) and are documented with their reasoning in the script.
+Findings that only existed under the old rules are no longer reported: the platform sets open ones
+to `RESOLVED` on the next run, classified ones (`ACCEPTED_RISK`, `DISMISSED`) stay in the Audit
+Center with their classification.
 
 ### When `expectedFindings` does **not** fit
 

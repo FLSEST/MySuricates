@@ -14,7 +14,12 @@
 #                tatsaechlichen Zyklus nichts geaendert hat.
 #   ## sizes     Zeilen je Java-Datei, Top 30, plus Schwellenzaehler (300/500)
 #   ## churn     geaenderte Dateien der letzten 90 Tage aus git log
-#   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend
+#   ## coupling  ein-/ausgehende Paketabhaengigkeiten, Top 15 nach ausgehend (seit Review 4.6.0
+#                nur noch Trendzahl, kein Befund)
+#   ## files     je Datei NCLOC (ncloc.py), Zeilen, Aenderungen in 90 Tagen und Kollaborateure je
+#                Spring-Bean — vollstaendig, Eingabe fuer arch-findings.py (TODO b8c06b94)
+#   ## ratchet   ALLOWLIST von SourceSizeRatchetTest, ALLOWED_PAIRS und CYCLE_COMPONENTS von
+#                PackageCycleRatchetTest, maschinenlesbar
 #   ## summary   Kennzahlen als key=value
 #   ## run       Laufzeit-Zustand (compile=reused|cached|compiled|…, jdeps=) — bewusst NICHT
 #                deterministisch
@@ -255,6 +260,11 @@ FILES_OVER_500=$(awk -F'\t' '$1 > 500' "$TMP/sizes.tsv" | wc -l | tr -d ' ')
 COMMIT="unknown"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  # Ein flacher Klon (git clone --depth 1) kennt nur den letzten Commit: jede Datei haette dann
+  # 0 oder 1 Aenderung, und kein Hotspot waere eine Messluecke, die wie Sauberkeit aussieht.
+  if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    note_error "shallow_history"
+  fi
   git -C "$ROOT" log --since=90.days --name-only --format= -- ai-automation-backend/src/main/java 2>/dev/null \
     | grep -v '^$' \
     | sed 's#^ai-automation-backend/src/main/java/##' \
@@ -265,6 +275,115 @@ else
   note_error "no_git_repo"
 fi
 CHURN_FILES=$(wc -l < "$TMP/churn.tsv" | tr -d ' ')
+
+# ---------------------------------------------------------------------------
+# Je Datei: NCLOC (ncloc.py), Kollaborateure je Spring-Bean, Aenderungen — die Grundlage
+# der deterministischen Einstufung (arch-findings.py, TODO b8c06b94).
+# ---------------------------------------------------------------------------
+: > "$TMP/ncloc.tsv"
+: > "$TMP/deps.tsv"
+if [ -d "$SRC" ]; then
+  ( cd "$SRC" && find . -type f -name '*.java' | sed 's#^\./##' | sort ) > "$TMP/java-files.txt"
+  if ! python3 "$SCRIPT_DIR/ncloc.py" "$SRC" < "$TMP/java-files.txt" > "$TMP/ncloc.tsv" 2>"$TMP/ncloc.err"; then
+    note_error "ncloc_failed"
+    : > "$TMP/ncloc.tsv"
+  fi
+  # Kollaborateure = injizierte Felder "private final <Typ> <name>;" (ohne Initialisierer, nicht
+  # static) der aeusseren Klasse einer Spring-Bean. Diese Typen sind keine Kollaborateure, sondern
+  # Werkzeug, Konfigurationswert oder Zustand — einzige Ausschlussliste. List, Map und Set stehen
+  # bewusst nicht darauf: ohne Initialisierer ist so ein Feld fast immer eine per Konstruktor
+  # injizierte Bean-Sammlung (List<BlockExecutor>), Zustand hat einen Initialisierer.
+  # Gezaehlt werden die Zeilen, die auf Klammertiefe 1 beginnen, im Rumpf des Top-Level-Typs; ein Feld
+  # einer inneren Klasse (WorkflowStatsService.RunStatistics.runs) ist Zustand eines Wertobjekts.
+  # Klammern in Kommentaren (auch hinter https:// im Javadoc), Literalen und Textbloecken zaehlen nicht.
+  # Bis 4.5.2 lief diese Zaehlung im Block delta_scan des Workflows; hier ist sie testbar.
+  BEAN_RE='^@(Service|Component|RestController|Controller|Configuration|Repository)\b'
+  NON_COLLAB_RE='^(String|int|long|boolean|double|Integer|Long|Boolean|Path|Duration|Instant|Pattern|Clock|ObjectMapper|TransactionTemplate|SimpMessagingTemplate|MeterRegistry|Logger|ExecutorService|ScheduledExecutorService|[A-Za-z]*Supplier|UnaryOperator|Deque|Concurrent[A-Za-z]*|Atomic[A-Za-z]*|[A-Za-z]*Lock|[A-Za-z]*Config|[A-Za-z]*Properties)$'
+  ( cd "$SRC" && [ -s "$TMP/java-files.txt" ] \
+      && tr '\n' '\0' < "$TMP/java-files.txt" | xargs -0 grep -lE "$BEAN_RE" 2>/dev/null ) \
+    | sort > "$TMP/beans.txt"
+  if [ -s "$TMP/beans.txt" ]; then
+    ( cd "$SRC" && tr '\n' '\0' < "$TMP/beans.txt" | xargs -0 awk -v nonre="$NON_COLLAB_RE" '
+    FNR == 1 { if (file != "") print deps "\t" file; file = FILENAME; deps = depth = intext = incomment = 0 }
+    {
+      if (depth == 1 && !intext && !incomment) {
+        s = $0; sub(/[[:space:]]*\/\/.*$/, "", s)
+        if (s ~ /^[[:space:]]*private final ([A-Za-z_][A-Za-z0-9_.]*\.)?[A-Za-z_][A-Za-z0-9_]*(<.*>)?(\[\])?[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*;[[:space:]]*$/) {
+          t = s; sub(/^[[:space:]]*private final /, "", t); sub(/[[:space:]].*$/, "", t); sub(/[<[].*$/, "", t); sub(/^.*\./, "", t)
+          if (t !~ nonre) deps++
+        }
+      }
+      line = $0; n = length(line); i = 1
+      while (i <= n) {
+        if (intext) {
+          if (!match(substr(line, i), /[\\"]/)) break
+          i += RSTART - 1
+          if (substr(line, i, 1) == "\\") i += 2
+          else if (substr(line, i, 3) == "\"\"\"") { intext = 0; i += 3 }
+          else i++
+        } else if (incomment) {
+          at = index(substr(line, i), "*/")
+          if (!at) break
+          incomment = 0; i += at + 1
+        } else {
+          if (!match(substr(line, i), /[{}"'\''\/]/)) break
+          i += RSTART - 1; c = substr(line, i, 1)
+          if (c == "{") { depth++; i++ }
+          else if (c == "}") { depth--; i++ }
+          else if (c == "/") {
+            if (substr(line, i + 1, 1) == "/") break
+            if (substr(line, i + 1, 1) == "*") { incomment = 1; i += 2 } else i++
+          } else if (substr(line, i, 3) == "\"\"\"") { intext = 1; i += 3 }
+          else {
+            for (i++; i <= n && substr(line, i, 1) != c; i++) if (substr(line, i, 1) == "\\") i++
+            i++
+          }
+        }
+      }
+    }
+    END { if (file != "") print deps "\t" file }' ) > "$TMP/deps.tsv" 2>/dev/null || note_error "collaborators_failed"
+  fi
+fi
+# Zusammenfuehren: ncloc, zeilen, aenderungen (90 Tage), deps ("-" = keine Spring-Bean), datei.
+awk -F'\t' 'FILENAME == ARGV[1] { deps[$2] = $1; next }
+            FILENAME == ARGV[2] { churn[$2] = $1; next }
+            { d = ($3 in deps) ? deps[$3] : "-"; c = ($3 in churn) ? churn[$3] : 0
+              print $1 "\t" $2 "\t" c "\t" d "\t" $3 }' \
+    "$TMP/deps.tsv" "$TMP/churn.tsv" "$TMP/ncloc.tsv" \
+  | sort -t "$(printf '\t')" -k1,1rn -k5,5 > "$TMP/files.tsv"
+
+# ---------------------------------------------------------------------------
+# Grenzen der Architektur-Tests: SourceSizeRatchetTest.ALLOWLIST (Obergrenze je Datei),
+# PackageCycleRatchetTest.ALLOWED_PAIRS und .CYCLE_COMPONENTS. Die Einstufung stuft danach
+# bekannte, testueberwachte Zyklen herab und nennt Ratchet-Obergrenzen in der evidence.
+# ---------------------------------------------------------------------------
+ARCH_TESTS="$BACKEND/src/test/java/com/automation/architecture"
+python3 - "$ARCH_TESTS" > "$TMP/ratchet.tsv" 2>/dev/null <<'PY' || printf 'state\tfailed\n' > "$TMP/ratchet.tsv"
+import os, re, sys
+base = sys.argv[1]
+def read(name):
+    path = os.path.join(base, name)
+    return open(path, encoding='utf-8').read() if os.path.isfile(path) else None
+size, cycles = read('SourceSizeRatchetTest.java'), read('PackageCycleRatchetTest.java')
+if size is None or cycles is None:
+    print('state\tmissing')
+    sys.exit(0)
+limit = re.search(r'MAX_LINES\s*=\s*(\d+)\s*;', size)
+pinned = re.search(r'CYCLE_COMPONENTS\s*=\s*List\.of\((.*?)\);', cycles, re.DOTALL)
+pairs = re.search(r'ALLOWED_PAIRS\s*=\s*Set\.of\((.*?)\);', cycles, re.DOTALL)
+if not limit or not pinned or not pairs:
+    print('state\tunparsed')
+    sys.exit(0)
+print('state\tok')
+print('max_lines\t%s' % limit.group(1))
+for path, ceiling in sorted(re.findall(r'entry\("([^"]+)",\s*(\d+)\)', size)):
+    print('allowlist\t%s\t%s' % (ceiling, path))
+for a, b in sorted(tuple(sorted(p)) for p in re.findall(r'"([^"\s]+)\s*<->\s*([^"\s]+)"', pairs.group(1))):
+    print('pair\t%s\t%s' % (a, b))
+for members in (sorted(re.findall(r'"([^"]+)"', group)) for group in re.findall(r'Set\.of\(([^)]*)\)', pinned.group(1))):
+    print('component\t%d\t%s' % (len(members), ','.join(members)))
+PY
+RATCHET_STATE=$(awk -F'\t' '$1 == "state" { print $2; exit }' "$TMP/ratchet.tsv")
 
 # ---------------------------------------------------------------------------
 # Ausgabe
@@ -317,6 +436,24 @@ else
   printf '# keine Kopplung gemessen\n'
 fi
 
+printf '\n## files\n'
+printf '# je Java-Datei: NCLOC (ohne Leer-, Kommentar- und Importzeilen), Zeilen wie oben, Aenderungen\n'
+printf '# der letzten 90 Tage, Kollaborateure (injizierte Beans; "-" = keine Spring-Bean), absteigend\n'
+printf '# nach NCLOC. Vollstaendig fuer arch-findings.py; der Workflow reicht den Abschnitt nicht an die KI.\n'
+printf '# ncloc\tzeilen\taenderungen\tdeps\tdatei\n'
+if [ -s "$TMP/files.tsv" ]; then
+  cat "$TMP/files.tsv"
+else
+  printf '# nicht gemessen — siehe error= in ## summary\n'
+fi
+
+printf '\n## ratchet\n'
+printf '# Grenzen der Architektur-Tests unter ai-automation-backend/src/test/java/com/automation/architecture\n'
+printf '# state\tok|missing|unparsed|failed   max_lines\tSourceSizeRatchetTest.MAX_LINES\n'
+printf '# allowlist\tobergrenze\tdatei (SourceSizeRatchetTest.ALLOWLIST)\n'
+printf '# pair\ta\tb (PackageCycleRatchetTest.ALLOWED_PAIRS)   component\tgroesse\tpakete (.CYCLE_COMPONENTS)\n'
+cat "$TMP/ratchet.tsv"
+
 PACKAGES=0
 if [ -d "$CLASSES/com/automation" ]; then
   PACKAGES=$(find "$CLASSES/com/automation" -type f -name '*.class' | sed 's#/[^/]*$##' | sort -u | wc -l | tr -d ' ')
@@ -338,6 +475,9 @@ printf 'files_over_300=%s\n' "$FILES_OVER_300"
 printf 'files_over_500=%s\n' "$FILES_OVER_500"
 printf 'max_file_lines=%s\n' "${MAX_LINES:-0}"
 printf 'churn_files_90d=%s\n' "$CHURN_FILES"
+printf 'ncloc_total=%s\n' "$(awk -F'\t' '{ s += $1 } END { print s + 0 }' "$TMP/files.tsv")"
+printf 'beans=%s\n' "$(wc -l < "$TMP/deps.tsv" | tr -d ' ')"
+printf 'ratchet_state=%s\n' "${RATCHET_STATE:-failed}"
 printf 'commit=%s\n' "$COMMIT"
 [ -n "$ERRORS" ] && printf 'error=%s\n' "$ERRORS"
 

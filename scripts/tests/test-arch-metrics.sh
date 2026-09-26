@@ -110,7 +110,7 @@ echo "2) Skriptlauf gegen das Repository"
 bash "$SCRIPT" "$REPO" > "$TMP/run1.txt" 2> "$TMP/run1.err"; RC1=$?
 check "exit 0"                      '[ "$RC1" -eq 0 ]'
 check "Ausgabe nicht leer"          '[ -s "$TMP/run1.txt" ]'
-for s in packages cycles sizes churn coupling summary run; do
+for s in packages cycles sizes churn coupling files ratchet summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/run1.txt'"
 done
 for k in packages edges cycles files files_over_300 files_over_500 churn_files_90d; do
@@ -155,7 +155,7 @@ check "leeres Verzeichnis: exit 0"            '[ "$RC" -eq 0 ]'
 check "leeres Verzeichnis: summary vorhanden" 'grep -qx "## summary" "$TMP/leer.out"'
 check "leeres Verzeichnis: error-Markierung"  'grep -qE "^error=" "$TMP/leer.out"'
 
-echo "5) Pool-Workflow ruft das Skript auf und uebergibt es an den KI-Block"
+echo "5) Pool-Workflow ruft Mess- und Einstufungsskript auf und uebergibt beides an den KI-Block"
 POOL="$REPO/workflow-pool/mysuricates-architektur-review.json"
 check "Pool-Datei ist valides JSON"      'python3 -m json.tool "$POOL" > /dev/null'
 check "Shell-Block ruft arch-metrics.sh" 'grep -q "arch-metrics.sh" "$POOL"'
@@ -163,38 +163,48 @@ check "Pool-Vertrag (Reihenfolge, Name, Prompt)" 'python3 - "$POOL" <<'"'"'PY'"'
 import json, sys
 wf = json.load(open(sys.argv[1]))
 blocks = wf["blocks"]
-i_metrics = next(i for i, b in enumerate(blocks)
-                 if b["type"] == "shell" and "arch-metrics.sh" in b["config"].get("command", ""))
+# Nach Namen: seit b8c06b94 ruft auch der Block arch_metrics frontend-metrics.sh auf (fuer die Einstufung).
+i_metrics = next(i for i, b in enumerate(blocks) if b.get("name") == "arch_metrics")
+assert "arch-metrics.sh" in blocks[i_metrics]["config"].get("command", ""), "Block arch_metrics ruft arch-metrics.sh nicht auf"
 i_report = next(i for i, b in enumerate(blocks) if b.get("name") == "report")
 assert i_metrics < i_report, "Metrik-Block muss vor dem Report-Block liegen"
 metrics = blocks[i_metrics]
 name = metrics.get("name")
 assert name, "Metrik-Block braucht einen Namen"
 assert metrics["config"].get("timeout_seconds") == 600
-assert "set -euo pipefail" in metrics["config"]["command"], "Shell-Block ohne set -euo pipefail"
+command = metrics["config"]["command"]
+assert "set -euo pipefail" in command, "Shell-Block ohne set -euo pipefail"
+# b8c06b94: die Einstufung laeuft im selben Block, aus beiden Faktenblaettern.
+assert "arch-findings.py" in command and "frontend-metrics.sh" in command, "Einstufung fehlt im Metrik-Block"
+assert command.index("arch-findings.py") < command.index("awk"), "## findings muss vor dem Backend-Blatt stehen"
+assert "not_measured=classification" in command, "fehlendes Einstufungsskript muss als nicht gemessen erscheinen"
 prompt = blocks[i_report]["config"]["command"]
 assert "{{ block.%s.output }}" % name in prompt, "Report-Prompt referenziert das Faktenblatt nicht"
 assert "mysuricates:audit-result:v1" in prompt, "Envelope fehlt"
 assert "gate_status:" in prompt, "Gate-Marker fehlt"
 assert "Miss nichts selbst" in prompt, "Interpretations-Anweisung fehlt"
 assert "Fehlt das Faktenblatt ganz" in prompt, "Regel fuer fehlendes Faktenblatt fehlt"
-# Zweifaktoriges God-Class-Kriterium (Zeilen UND Abhaengigkeiten) muss erhalten sein.
-assert ">300 Zeilen" in prompt and ">7 Abhaengigkeiten" in prompt, "God-Class-Kriterium nicht zweifaktorig"
-assert ">200 Zeilen" in prompt and ">5 Abhaengigkeiten" in prompt, "HIGH-Stufe der God Classes fehlt"
-assert "Ratchet" in prompt and "herabstufen" in prompt, "Ratchet-Herabstufung fehlt"
-assert "## cycles" in prompt, "Zyklen-Kriterium fehlt"
-# 810b12e9: bekannte Zyklus-Komponenten (CYCLE_COMPONENTS) eine Stufe tiefer, neue und gewachsene nicht.
-assert "PackageCycleRatchetTest.CYCLE_COMPONENTS" in prompt, "Zyklen-Herabstufung liest CYCLE_COMPONENTS nicht"
-assert "(HIGH -> MEDIUM)" in prompt and "bekannt und testueberwacht" in prompt, "Herabstufung bekannter Zyklen fehlt"
-assert "neu oder gewachsen und bleibt HIGH" in prompt, "neue oder gewachsene Zyklen muessen HIGH bleiben"
-assert "Ein CRITICAL (neues pair) wird nie herabgestuft" in prompt, "CRITICAL darf nicht herabgestuft werden"
-# Unter Last brauchte der Struktur-Scan fast 60 s; laeuft er in den Timeout, fehlen die Ratchet-Listen,
-# und jedes Paar gaelte als neu (CRITICAL).
+# Rollenteilung: Befunde und Schwere kommen unveraendert aus ## findings, die KI stuft nicht selbst ein.
+assert "## findings" in prompt and "UNVERAENDERT" in prompt, "Uebernahme aus ## findings fehlt"
+assert "keine eigene Schwere" in prompt, "KI darf keine eigene Schwere vergeben"
+assert "not_measured" in prompt, "nicht gemessene Dimensionen fehlen im Prompt"
+# Die alten Kanten sind weg: keine rohen Zeilenkanten, keine Paketkopplung als Befund.
+for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigkeiten", "herabstufen",
+             "Backend-Paket (Paketkopplung)", "Pakete und Verzeichnisse bekommen arch.high-coupling",
+             "arch.duplicated-logic"):
+    assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
+assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
+assert "Regelwechsel 4.6.0:" in prompt, "einmalige Erklaerung des Regelwechsels fehlt"
+assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
+assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
+assert wf["version"] == "4.6.0", wf["version"]
 delta = next(b for b in blocks if b.get("name") == "delta_scan")
 assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
+# Die Kollaborateur-Zaehlung und die Ratchet-Listen leben seit 4.6.0 in arch-metrics.sh.
+assert "NON_COLLAB_RE" not in delta["config"]["command"], "Kollaborateur-Zaehlung doppelt"
 PY'
 
-echo "5b) Struktur-Scan zaehlt nur Kollaborateure (59e22c53)"
+echo "5b) Faktenblatt zaehlt je Spring-Bean nur Kollaborateure (59e22c53, seit b8c06b94 in ## files)"
 # Werkzeuge, Konfigurationswerte und Zustand sind keine Abhaengigkeiten: gezaehlt werden nur
 # injizierte "private final <Typ> <name>;"-Felder ausserhalb der Ausschlussliste. Eine List/Map/Set
 # ohne Initialisierer ist eine injizierte Bean-Sammlung und zaehlt mit; Deque, Atomic* und Locks
@@ -253,39 +263,31 @@ mkdir -p "$SCAN_MAIN"
   for i in $(seq 1 200); do echo "    // filler $i"; done
   echo "}"
 } > "$SCAN_MAIN/StatsService.java"
-python3 - "$POOL" "$SCAN_FIX" > "$TMP/delta-scan.sh" <<'PY'
-import json, sys
-wf = json.load(open(sys.argv[1]))
-block = next(b for b in wf["blocks"] if b.get("name") == "delta_scan")
-assert block["config"].get("shell_escape_variables") is True
-print(block["config"]["command"].replace("{{ project_path }}", "'" + sys.argv[2] + "'"))
-PY
-bash "$TMP/delta-scan.sh" > "$TMP/delta-scan.out" 2> /dev/null
-# 6 einzelne Kollaborateure + die injizierte List<BlockExecutor> = 7.
-check "God-Class-Liste zaehlt 7 Kollaborateure" 'grep -q "| 7 deps | service/BusyService$" "$TMP/delta-scan.out"'
-check "Kopplungsliste zaehlt 7 Kollaborateure"  'grep -qx "7 deps: BusyService" "$TMP/delta-scan.out"'
-check "Nicht-Bean ohne deps"                    'grep -q "| - deps | service/PlainEvent$" "$TMP/delta-scan.out"'
-check "Nicht-Bean nicht in der Kopplungsliste"  '! grep -q "deps: PlainEvent" "$TMP/delta-scan.out"'
-# 6 Kollaborateure + lateCollaborator = 7; die zwei Felder der inneren Klasse zaehlen nicht.
-check "God-Class-Liste ohne Felder innerer Klassen" 'grep -q "| 7 deps | service/StatsService$" "$TMP/delta-scan.out"'
-check "Kopplungsliste ohne Felder innerer Klassen"  'grep -qx "7 deps: StatsService" "$TMP/delta-scan.out"'
-check "Report-Prompt: Zahl meint Kollaborateure" \
-  'python3 -c "import json,sys; p=next(b for b in json.load(open(sys.argv[1]))[\"blocks\"] if b.get(\"name\")==\"report\")[\"config\"][\"command\"]; sys.exit(0 if \"nur Kollaborateure\" in p and \"com.automation.executor.blocks\" in p and \"erst ab >10\" in p else 1)" "$POOL"'
-
-echo "5c) Struktur-Scan nennt die festgehaltenen Zyklus-Komponenten (810b12e9)"
-# PackageCycleRatchetTest haelt jede Zyklus-Komponente mit mehr als zwei Paketen fest. Der Scan gibt sie
-# aus wie die cycle-Zeilen von ## cycles (Groesse, Mitglieder sortiert), damit der Report bekannte,
-# testueberwachte Komponenten erkennt und eine Stufe herabsetzt.
-delta_scan_on() {  # $1 = Wurzel, $2 = Ausgabe
-  python3 - "$POOL" "$1" > "$TMP/delta-scan-on.sh" <<'PY'
-import json, sys
-block = next(b for b in json.load(open(sys.argv[1]))["blocks"] if b.get("name") == "delta_scan")
-print(block["config"]["command"].replace("{{ project_path }}", "'" + sys.argv[2] + "'"))
-PY
-  bash "$TMP/delta-scan-on.sh" > "$2" 2> /dev/null
+metrics_on() {  # $1 = Wurzel, $2 = Ausgabe — ohne Kompilieren, nur Quelltext-Abschnitte zaehlen hier
+  ARCH_METRICS_COMPILE=0 bash "$SCRIPT" "$1" > "$2" 2> /dev/null
 }
-cycle_lines() {  # $1 = Scan-Ausgabe -> Zeilen des Abschnitts CYCLE_COMPONENTS
-  sed -n '/^--- PackageCycleRatchetTest.CYCLE_COMPONENTS/,/^$/p' "$1" | sed '1d;/^$/d'
+files_row() {  # $1 = Ausgabe, $2 = Pfad unter src/main/java -> Spalte deps der ## files-Zeile
+  sed -n '/^## files$/,/^## ratchet$/p' "$1" | awk -F'\t' -v p="$2" '$5 == p { print $4 }'
+}
+metrics_on "$SCAN_FIX" "$TMP/scan-metrics.out"
+# 6 einzelne Kollaborateure + die injizierte List<BlockExecutor> = 7.
+check "BusyService: 7 Kollaborateure"            '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/BusyService.java)" = 7 ]'
+check "Nicht-Bean ohne deps (-)"                 '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/PlainEvent.java)" = - ]'
+# 6 Kollaborateure + lateCollaborator = 7; die zwei Felder der inneren Klasse zaehlen nicht.
+check "StatsService: ohne Felder innerer Klassen" '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/StatsService.java)" = 7 ]'
+check "summary zaehlt zwei Beans"                'grep -qx "beans=2" "$TMP/scan-metrics.out"'
+check "## files nennt NCLOC, Zeilen und Aenderungen je Datei" \
+  "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -E '^[0-9]+${TAB}[0-9]+${TAB}[0-9]+${TAB}(-|[0-9]+)${TAB}com/automation/service/BusyService\.java\$' >/dev/null"
+# NCLOC der Bean: 3 Kopfzeilen + 21 Felder + schliessende Klammer; die 200 Filler-Kommentare zaehlen nicht.
+check "BusyService: NCLOC ohne Kommentarzeilen (25 von 225 Zeilen)" \
+  "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -qx '25${TAB}225${TAB}0${TAB}7${TAB}com/automation/service/BusyService.java'"
+
+echo "5c) Faktenblatt nennt die Grenzen der Architektur-Tests (810b12e9, seit b8c06b94 in ## ratchet)"
+# PackageCycleRatchetTest haelt jede Zyklus-Komponente mit mehr als zwei Paketen fest. ## ratchet gibt sie
+# aus wie die cycle-Zeilen von ## cycles (Groesse, Mitglieder sortiert), dazu ALLOWED_PAIRS und die
+# ALLOWLIST von SourceSizeRatchetTest — die Einstufung stuft danach herab bzw. nennt die Obergrenze.
+ratchet_lines() {  # $1 = Ausgabe, $2 = Art -> Zeilen dieser Art aus ## ratchet
+  sed -n '/^## ratchet$/,/^## summary$/p' "$1" | awk -F'\t' -v k="$2" '$1 == k'
 }
 ARCH_TESTS="ai-automation-backend/src/test/java/com/automation/architecture"
 mkdir -p "$SCAN_FIX/$ARCH_TESTS"
@@ -295,7 +297,7 @@ package com.automation.architecture;
 /** Grenzen in {@link #CYCLE_COMPONENTS} und {@link #ALLOWED_PAIRS}. */
 class PackageCycleRatchetTest {
     static final Set<String> ALLOWED_PAIRS = Set.of(
-            "com.automation.a <-> com.automation.b");
+            "com.automation.b <-> com.automation.a");
 
     static final int MAX_CYCLE_COMPONENT_SIZE = 4;
 
@@ -312,33 +314,54 @@ class PackageCycleRatchetTest {
     }
 }
 JAVA
-delta_scan_on "$SCAN_FIX" "$TMP/delta-cycles.out"
-cycle_lines "$TMP/delta-cycles.out" > "$TMP/cycle-lines.txt"
-printf '%s\n' "4 com.automation.a,com.automation.b,com.automation.c,com.automation.d" \
-  "3 com.automation.x,com.automation.y,com.automation.z" > "$TMP/cycle-lines.exp"
+cat > "$SCAN_FIX/$ARCH_TESTS/SourceSizeRatchetTest.java" <<'JAVA'
+package com.automation.architecture;
+
+class SourceSizeRatchetTest {
+    static final int MAX_LINES = 300;
+    static final Map<String, Integer> ALLOWLIST = Map.ofEntries(
+            entry("com/automation/service/BusyService.java", 330),
+            entry("com/automation/service/StatsService.java", 310)
+    );
+}
+JAVA
+metrics_on "$SCAN_FIX" "$TMP/ratchet-fix.out"
+printf '%s\n' "component${TAB}4${TAB}com.automation.a,com.automation.b,com.automation.c,com.automation.d" \
+  "component${TAB}3${TAB}com.automation.x,com.automation.y,com.automation.z" > "$TMP/cycle-lines.exp"
+ratchet_lines "$TMP/ratchet-fix.out" component > "$TMP/cycle-lines.txt"
 check "je Komponente eine Zeile, Mitglieder sortiert, Reihenfolge wie im Test" \
   'diff -q "$TMP/cycle-lines.exp" "$TMP/cycle-lines.txt" >/dev/null'
-check "ALLOWED_PAIRS stehen weiter daneben" \
-  'grep -qx "com.automation.a <-> com.automation.b" "$TMP/delta-cycles.out"'
-# Die echte Testdatei: faellt ihre Schreibweise aus dem Muster, faellt es hier auf und nicht erst im
-# Report (dort hiesse ein leerer Abschnitt nur "nicht herabstufen").
+check "ALLOWED_PAIRS als sortiertes Paar" \
+  '[ "$(ratchet_lines "$TMP/ratchet-fix.out" pair)" = "pair${TAB}com.automation.a${TAB}com.automation.b" ]'
+check "ALLOWLIST mit Obergrenze je Datei" \
+  'ratchet_lines "$TMP/ratchet-fix.out" allowlist | grep -qx "allowlist${TAB}330${TAB}com/automation/service/BusyService.java"'
+check "state ok und MAX_LINES gelesen" \
+  'ratchet_lines "$TMP/ratchet-fix.out" state | grep -qx "state${TAB}ok" && ratchet_lines "$TMP/ratchet-fix.out" max_lines | grep -qx "max_lines${TAB}300"'
+check "summary nennt ratchet_state=ok" 'grep -qx "ratchet_state=ok" "$TMP/ratchet-fix.out"'
+# Die echten Testdateien: faellt ihre Schreibweise aus dem Muster, faellt es hier auf und nicht erst im
+# Review (dort hiesse ein leerer Abschnitt nur "nicht herabstufen").
 REAL_CYCLES="$REPO/$ARCH_TESTS/PackageCycleRatchetTest.java"
+REAL_SIZES="$REPO/$ARCH_TESTS/SourceSizeRatchetTest.java"
 mkdir -p "$TMP/scan-real/$ARCH_TESTS"
-cp "$REAL_CYCLES" "$TMP/scan-real/$ARCH_TESTS/"
-delta_scan_on "$TMP/scan-real" "$TMP/delta-real-cycles.out"
-cycle_lines "$TMP/delta-real-cycles.out" > "$TMP/real-cycle-lines.txt"
+cp "$REAL_CYCLES" "$REAL_SIZES" "$TMP/scan-real/$ARCH_TESTS/"
+metrics_on "$TMP/scan-real" "$TMP/ratchet-real.out"
+ratchet_lines "$TMP/ratchet-real.out" component > "$TMP/real-cycle-lines.txt"
 REAL_MAX="$(sed -nE 's/.*MAX_CYCLE_COMPONENT_SIZE = ([0-9]+);.*/\1/p' "$REAL_CYCLES")"
 REAL_GROUPS="$(sed -n '/CYCLE_COMPONENTS = List.of(/,/);/p' "$REAL_CYCLES" | grep -c 'Set.of(')"
+REAL_ENTRIES="$(grep -cE 'entry\("[^"]+", [0-9]+\)' "$REAL_SIZES")"
+check "echter Test: state ok"                      'ratchet_lines "$TMP/ratchet-real.out" state | grep -qx "state${TAB}ok"'
 check "echter Test: eine Zeile je Set.of-Gruppe" \
   '[ "$REAL_GROUPS" -ge 1 ] && [ "$(wc -l < "$TMP/real-cycle-lines.txt")" -eq "$REAL_GROUPS" ]'
 check "echter Test: die erste Komponente hat MAX_CYCLE_COMPONENT_SIZE Pakete" \
-  '[ -n "$REAL_MAX" ] && head -1 "$TMP/real-cycle-lines.txt" | grep -q "^$REAL_MAX com\.automation\."'
+  '[ -n "$REAL_MAX" ] && head -1 "$TMP/real-cycle-lines.txt" | grep -q "^component${TAB}$REAL_MAX${TAB}com\.automation\."'
 check "echter Test: jede Zeile nennt so viele Pakete wie ihre Groesse" \
-  'awk "{ if (split(\$2, m, \",\") != \$1) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
+  'awk -F"\t" "{ if (split(\$3, m, \",\") != \$2) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
+check "echter Test: jede ALLOWLIST-Zeile gelesen" \
+  '[ "$REAL_ENTRIES" -ge 1 ] && [ "$(ratchet_lines "$TMP/ratchet-real.out" allowlist | wc -l)" -eq "$REAL_ENTRIES" ]'
 mkdir -p "$TMP/scan-none"
-delta_scan_on "$TMP/scan-none" "$TMP/delta-none.out"
-check "ohne Testdatei: nicht gefunden statt einer leeren Liste" \
-  '[ "$(cycle_lines "$TMP/delta-none.out")" = "(nicht gefunden)" ]'
+metrics_on "$TMP/scan-none" "$TMP/ratchet-none.out"
+check "ohne Testdateien: state missing statt einer leeren Liste" \
+  '[ "$(ratchet_lines "$TMP/ratchet-none.out" state)" = "state${TAB}missing" ] && grep -qx "ratchet_state=missing" "$TMP/ratchet-none.out"'
 
 # ---------------------------------------------------------------------------
 # Fixture-Repo: zwei Pakete mit wechselseitiger Abhaengigkeit, eine leere Datei,

@@ -11,7 +11,10 @@
 #                Zone bei zirkulaeren ES-Modulen), nicht die auf Verzeichnisebene
 #   ## sizes     Zeilen je Datei (Top 30) und je Verzeichnis (Top 15), plus Schwellenzaehler
 #   ## churn     geaenderte Frontend-Quelldateien der letzten 90 Tage aus git log
-#   ## coupling  ein-/ausgehende Abhaengigkeiten je Verzeichnis und je Modul
+#   ## coupling  ein-/ausgehende Abhaengigkeiten je Verzeichnis und je Modul (seit Review 4.6.0
+#                nur noch Trendzahl, kein Befund)
+#   ## files     je Produktionsmodul NCLOC (ncloc.py), Zeilen und Aenderungen in 90 Tagen —
+#                vollstaendig, Eingabe fuer arch-findings.py (TODO b8c06b94)
 #   ## summary   Kennzahlen als key=value
 #   ## run       Laufzeit-Zustand (scan=, aliases=) — bewusst NICHT deterministisch
 #
@@ -350,6 +353,11 @@ fi
 COMMIT="unknown"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  # Ein flacher Klon (git clone --depth 1) kennt nur den letzten Commit: jede Datei haette dann
+  # 0 oder 1 Aenderung, und kein Hotspot waere eine Messluecke, die wie Sauberkeit aussieht.
+  if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    note_error "shallow_history"
+  fi
   git -C "$ROOT" log --since=90.days --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
     | grep -v '^$' \
     | sed 's#^ai-automation-frontend/src/##' \
@@ -360,6 +368,22 @@ else
   note_error "no_git_repo"
 fi
 CHURN_FILES=$(wc -l < "$TMP/churn.tsv" | tr -d ' ')
+
+# Je Modul: NCLOC (ncloc.py), Zeilen, Aenderungen der letzten 90 Tage — die Grundlage der
+# deterministischen Einstufung (arch-findings.py, TODO b8c06b94). Nur Produktionsmodule wie
+# ## sizes; die Aenderungen stammen aus ## churn.
+: > "$TMP/files.tsv"
+if [ -s "$TMP/modules.tsv" ]; then
+  cut -f2 "$TMP/modules.tsv" | sort > "$TMP/module-list.txt"
+  if python3 "$SCRIPT_DIR/ncloc.py" "$SRC" < "$TMP/module-list.txt" > "$TMP/ncloc.tsv" 2>"$TMP/ncloc.err"; then
+    awk -F'\t' 'FILENAME == ARGV[1] { churn[$2] = $1; next }
+                { c = ($3 in churn) ? churn[$3] : 0; print $1 "\t" $2 "\t" c "\t" $3 }' \
+        "$TMP/churn.tsv" "$TMP/ncloc.tsv" \
+      | sort -t "$(printf '\t')" -k1,1rn -k4,4 > "$TMP/files.tsv"
+  else
+    note_error "ncloc_failed"
+  fi
+fi
 
 MODULES=$(wc -l < "$TMP/modules.tsv" | tr -d ' ')
 EDGES=$(wc -l < "$TMP/edges.tsv" | tr -d ' ')
@@ -461,6 +485,17 @@ if [ -s "$TMP/edges.tsv" ]; then
   awk -F'\t' '{ out_m[$1]++; in_m[$2]++; seen[$1]=1; seen[$2]=1 }
               END { for (m in seen) printf "%s\t%d\t%d\n", m, out_m[m]+0, in_m[m]+0 }' "$TMP/edges.tsv" \
     | sort -k3,3rn -k2,2rn -k1,1 | head -15
+else
+  printf '# NICHT GEMESSEN (scan=%s)\n' "$SCAN_STATE"
+fi
+
+printf '\n## files\n'
+printf '# je Produktionsmodul: NCLOC (ohne Leer-, Kommentar- und Importzeilen), Zeilen, Aenderungen der\n'
+printf '# letzten 90 Tage, absteigend nach NCLOC. Vollstaendig fuer arch-findings.py; der Workflow reicht\n'
+printf '# den Abschnitt nicht an die KI.\n'
+printf '# ncloc\tzeilen\taenderungen\tmodul\n'
+if [ -s "$TMP/files.tsv" ]; then
+  cat "$TMP/files.tsv"
 else
   printf '# NICHT GEMESSEN (scan=%s)\n' "$SCAN_STATE"
 fi

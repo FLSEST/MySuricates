@@ -106,6 +106,10 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
       - name: Audit-Fakten Selbsttest
         run: bash scripts/tests/test-audit-facts.sh
+      # Einstufung des Architektur-Reviews (b8c06b94): liest nur Fixture-Faktenblaetter, kein jdeps,
+      # kein Maven. Die Mess-Suiten test-arch-metrics.sh/test-frontend-metrics.sh laufen lokal.
+      - name: Architektur-Einstufung Selbsttest
+        run: bash scripts/tests/test-arch-findings.sh
       - name: Coverage-Snapshot Selbsttest
         run: bash scripts/tests/test-coverage-snapshot.sh
       - name: Schwachstellen-Scan Selbsttest (ohne Netz)
