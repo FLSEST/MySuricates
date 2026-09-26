@@ -195,7 +195,7 @@ describe('Integrations — ready without a connection', () => {
 
   async function card() {
     renderWithProviders(<Integrations />);
-    const [badge] = await screen.findAllByText(/Ready – no sign-in needed|Setup required|Not connected/);
+    const [badge] = await screen.findAllByText(/Ready – no sign-in needed|No sign-in – needs `task`|Setup required|Not connected/);
     return badge!.closest('.flex.items-start') as HTMLElement;
   }
 
@@ -210,7 +210,7 @@ describe('Integrations — ready without a connection', () => {
     expect(shown.firstElementChild).not.toHaveClass('bg-warning/10');
   });
 
-  it.each(['open-meteo', 'feed', 'ical-feed', 'taskwarrior', 'ntfy'])(
+  it.each(['open-meteo', 'feed', 'ical-feed', 'ntfy'])(
     'derives ready for %s from the fields an older backend already sends',
     async (providerId) => {
       useProviders([credentialFree(providerId)]);
@@ -219,6 +219,17 @@ describe('Integrations — ready without a connection', () => {
       expect(within(shown).getByText('Ready – no sign-in needed')).toBeInTheDocument();
     },
   );
+
+  // Nothing checks the host for `task` until the optional setup — the card must not promise more
+  it.each([undefined, true])('says Taskwarrior needs the task CLI on the host (connectionOptional: %s)', async (connectionOptional) => {
+    useProviders([credentialFree('taskwarrior', { connectionOptional })]);
+    const shown = await card();
+
+    expect(within(shown).getByText('No sign-in – needs `task`')).toBeInTheDocument();
+    expect(within(shown).getByTestId('provider-ready-hint')).toHaveTextContent('Needs the `task` CLI on the backend host');
+    expect(within(shown).queryByText('Ready – no sign-in needed')).toBeNull();
+    expect(within(shown).getByRole('button', { name: /Optional setup/ })).toBeInTheDocument();
+  });
 
   it.each([undefined, false])('keeps "Setup required" for the HTTP API, which needs its base URL (connectionOptional: %s)',
     async (connectionOptional) => {
@@ -240,7 +251,7 @@ describe('Integrations — ready without a connection', () => {
     const shown = await card();
 
     expect(within(shown).getAllByText('Setup required').length).toBeGreaterThan(0);
-    expect(within(shown).queryByText('Ready – no sign-in needed')).toBeNull();
+    expect(within(shown).queryByText('No sign-in – needs `task`')).toBeNull();
   });
 
   it('opens the setup guide from the optional setup, so the connection check stays reachable', async () => {

@@ -1272,6 +1272,8 @@ export const en = {
     statusReady: 'Ready – no sign-in needed',
     readyHint: 'Runs in workflows without a stored connection. Setting it up is optional: it checks the connection and stores your own settings.',
     setupOptional: 'Optional setup',
+    statusReadyNeedsCli: 'No sign-in – needs `task`',
+    readyHintNeedsCli: 'Needs the `task` CLI on the backend host. Without a stored connection it runs on the default paths; “Optional setup” checks whether `task` is installed.',
     verificationSimulated: 'Simulated tests only',
     verificationSimulatedHint: 'So far this integration has only been tested against simulated responses, not against the real service. Feedback from real use is welcome.',
     verificationVerified: 'Checked against: {target}',

@@ -3,7 +3,7 @@ import { Card, Button, Badge } from '../ui';
 import { useT } from '../../i18n';
 import { useProviderCopy } from '../../hooks/useProviderCopy';
 import { VerificationBadge } from './IntegrationVerification';
-import { isReadyWithoutConnection } from './providerReadiness';
+import { isReadyWithoutConnection, needsHostCli } from './providerReadiness';
 import type { IntegrationProviderInfo } from '../../types';
 
 const ICON_MAP: Record<string, typeof Calendar> = {
@@ -52,7 +52,7 @@ function ProviderStatusBadge({ provider }: { provider: IntegrationProviderInfo }
     return (
       <Badge variant="info">
         <CheckCircle2 className="w-3 h-3 mr-1" />
-        {t.integrations.statusReady}
+        {needsHostCli(provider) ? t.integrations.statusReadyNeedsCli : t.integrations.statusReady}
       </Badge>
     );
   }
@@ -121,7 +121,7 @@ export function ProviderCard({
             <VerificationBadge provider={provider} />
           </div>
           <p className="text-sm text-text-secondary mb-3">{copy.description(provider)}</p>
-          {ready && <p className="text-xs text-text-tertiary mb-3" data-testid="provider-ready-hint">{t.integrations.readyHint}</p>}
+          {ready && <p className="text-xs text-text-tertiary mb-3" data-testid="provider-ready-hint">{needsHostCli(provider) ? t.integrations.readyHintNeedsCli : t.integrations.readyHint}</p>}
 
           {provider.status === 'CONNECTED' && provider.accountEmail && (
             <p className="text-xs text-text-tertiary mb-3">

@@ -7,6 +7,12 @@ import type { IntegrationProviderInfo } from '../../types';
  */
 const CONNECTION_OPTIONAL_FALLBACK = new Set(['open-meteo', 'feed', 'ical-feed', 'taskwarrior', 'ntfy']);
 
+/**
+ * Providers that run without a connection only if a program is installed on the backend host —
+ * nothing checks that until the optional setup does (Taskwarrior: `task _version`).
+ */
+const NEEDS_HOST_CLI = new Set(['taskwarrior']);
+
 /** The provider works in the integration block without any stored connection. */
 export function isConnectionOptional(provider: IntegrationProviderInfo): boolean {
   return provider.connectionOptional
@@ -21,4 +27,9 @@ export function isConnectionOptional(provider: IntegrationProviderInfo): boolean
  */
 export function isReadyWithoutConnection(provider: IntegrationProviderInfo): boolean {
   return provider.status !== 'CONNECTED' && isConnectionOptional(provider) && provider.connectedSince == null;
+}
+
+/** Ready without a connection, but only with its CLI on the backend host — say so instead of plain "ready". */
+export function needsHostCli(provider: IntegrationProviderInfo): boolean {
+  return NEEDS_HOST_CLI.has(provider.providerId);
 }

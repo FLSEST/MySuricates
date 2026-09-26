@@ -1274,6 +1274,8 @@ export const de: TranslationKeys = {
     statusReady: 'Bereit – ohne Anmeldung',
     readyHint: 'Läuft in Workflows auch ohne gespeicherte Verbindung. Einrichten ist optional: Es prüft die Verbindung und speichert eigene Einstellungen.',
     setupOptional: 'Optional einrichten',
+    statusReadyNeedsCli: 'Ohne Anmeldung – braucht `task`',
+    readyHintNeedsCli: 'Setzt das `task`-CLI auf dem Backend-Host voraus. Ohne gespeicherte Verbindung läuft es mit den Standardpfaden; „Optional einrichten“ prüft, ob `task` installiert ist.',
     verificationSimulated: 'Nur simuliert getestet',
     verificationSimulatedHint: 'Diese Integration wurde bisher nur gegen nachgebaute Antworten getestet, noch nicht gegen den echten Dienst. Rückmeldungen aus dem echten Einsatz sind willkommen.',
     verificationVerified: 'Geprüft gegen: {target}',
