@@ -111,6 +111,17 @@ describe('blockConfigSchema', () => {
     ]);
   });
 
+  // Keys the executors read that the editor used to flag (TODO f5153c47, ExecutorConfigKeyDriftTest on the backend)
+  it('knows the output check, shell-mode container keys of wrappers and the old workflowId spelling', () => {
+    for (const type of BLOCK_TYPES) expect(knownConfigKeys(type), type).toContain('validation');
+    for (const type of ['retry', 'foreach', 'while', 'conditional']) {
+      expect(knownConfigKeys(type), type).toEqual(expect.arrayContaining(['container_image', 'mount_docker_socket', 'mounts']));
+    }
+    const workflowId = (buildBlockConfigSchema('sub-workflow', 'en').properties as Record<string, Record<string, unknown>>).workflowId!;
+    expect(workflowId.doNotSuggest).toBe(true);
+    expect(requiredConfigKeys('sub-workflow')).toEqual(['workflow_id']);
+  });
+
   it('lets an unknown (server-only) block type through without key warnings', () => {
     expect(buildBlockConfigSchema('future-block', 'en').additionalProperties).toBe(true);
     expect(buildBlockConfigSchema('shell', 'en').additionalProperties).toBe(false);

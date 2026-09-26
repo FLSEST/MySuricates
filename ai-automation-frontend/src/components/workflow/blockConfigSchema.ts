@@ -31,6 +31,8 @@ interface Field {
   ignoreCase?: boolean;
   /** Old name of another key, still read by the executor: valid, never suggested. */
   legacyFor?: string;
+  /** The executor reads the key only when these other keys have these values (e.g. `execution_mode: shell`). */
+  onlyWith?: Record<string, string>;
 }
 
 /** A field, or `"#name"` for an entry of `sharedFields`. */
@@ -97,6 +99,8 @@ function fieldSchema(field: Field, locale: SchemaLocale): JsonSchema {
   if (field.default !== undefined) schema.default = field.default;
   if (field.minimum !== undefined) schema.minimum = field.minimum;
   if (field.items) schema.items = field.items;
+  // An old key name the executor still reads: valid, never offered
+  if (field.legacyFor) schema.doNotSuggest = true;
   if (field.values) {
     const values = field.values.map(({ value }) => value);
     const docs = field.values.map(({ doc }) => doc[locale]);

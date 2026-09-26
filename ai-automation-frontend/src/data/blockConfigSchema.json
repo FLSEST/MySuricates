@@ -1,5 +1,5 @@
 {
-  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. Whoever teaches an executor a new config key adds it here.",
+  "$comment": "Config keys of every block type: key, type, allowed values, legacy value, required, de/en text. Single source for the Monaco config editor (blockConfigSchema.ts) and the backend analyzer (ConfigKeyRules, copied onto the classpath by the backend build). A string value \"#name\" in a field list refers to sharedFields.name. \"legacy\" = old value still accepted, \"legacyFor\" = old key name of another key, \"ignoreCase\" = the executor compares case-insensitively, \"onlyWith\" = the executor reads the key only when these other keys have these values. Whoever teaches an executor a new config key adds it here.",
   "onFailure": {
     "type": "string",
     "doc": {
@@ -52,6 +52,13 @@
         "de": "Arbeitsverzeichnis des Runs — wirkt nur am **ersten** Block. `{\"mode\": \"isolated\"}` lässt den Run in einem eigenen Git-Klon laufen (weitere Schlüssel: `source`, `source_path`, `branch`, `install_npm`, `additional_sources`).",
         "en": "Working directory of the run — only honoured on the **first** block. `{\"mode\": \"isolated\"}` runs it in its own Git clone (more keys: `source`, `source_path`, `branch`, `install_npm`, `additional_sources`)."
       }
+    },
+    "validation": {
+      "type": "object",
+      "doc": {
+        "de": "Prüft die Ausgabe des erfolgreich gelaufenen Blocks: `contains` (Teilstring), `min_length`, `max_length`. Mit `retry_on_fail: true` läuft der Block bei einem Verstoß bis zu `max_retries`-mal erneut (Standard 1), sonst wird der Verstoß nur an die Ausgabe gehängt.",
+        "en": "Checks the output of the block after it succeeded: `contains` (substring), `min_length`, `max_length`. With `retry_on_fail: true` the block runs again up to `max_retries` times on a violation (default 1), otherwise the violation is only appended to the output."
+      }
     }
   },
   "ai": {
@@ -95,7 +102,8 @@
               "en": "Codex CLI (read-only)"
             }
           }
-        ]
+        ],
+        "ignoreCase": true
       },
       "model": {
         "type": "string",
@@ -139,7 +147,8 @@
               "en": "Very high reasoning, most expensive."
             }
           }
-        ]
+        ],
+        "ignoreCase": true
       }
     }
   },
@@ -176,6 +185,40 @@
         "en": "Put every `{{ }}` placeholder in POSIX-safe single quotes. Then write placeholders **without** your own quotes."
       },
       "default": false
+    },
+    "wrapper_container_image": {
+      "type": "string",
+      "doc": {
+        "de": "Docker-Image, in dem der Befehl im Shell-Modus (`execution_mode: shell`) läuft. Ohne Angabe läuft er auf dem Host.",
+        "en": "Docker image the command runs in in shell mode (`execution_mode: shell`). Unset ⇒ runs on the host."
+      },
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
+    },
+    "wrapper_mount_docker_socket": {
+      "type": "boolean",
+      "doc": {
+        "de": "Docker-Socket in den Container mounten (nur im Shell-Modus mit `container_image`).",
+        "en": "Mount the Docker socket into the container (shell mode with `container_image` only)."
+      },
+      "default": false,
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
+    },
+    "wrapper_mounts": {
+      "type": "array",
+      "doc": {
+        "de": "Zusätzliche Volumes `host:container[:ro|rw]` (nur im Shell-Modus mit `container_image`).",
+        "en": "Extra volumes `host:container[:ro|rw]` (shell mode with `container_image` only)."
+      },
+      "items": {
+        "type": "string"
+      },
+      "onlyWith": {
+        "execution_mode": "shell"
+      }
     }
   },
   "blockTypes": {
@@ -396,7 +439,10 @@
           },
           "default": 300,
           "minimum": 1
-        }
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
       }
     },
     "conditional": {
@@ -435,7 +481,10 @@
           },
           "default": 300,
           "minimum": 1
-        }
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
       }
     },
     "switch": {
@@ -549,7 +598,10 @@
             "en": "Failed items do not fail the block, it ends COMPLETED."
           },
           "default": false
-        }
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
       }
     },
     "while": {
@@ -590,7 +642,10 @@
           },
           "default": 300,
           "minimum": 1
-        }
+        },
+        "container_image": "#wrapper_container_image",
+        "mount_docker_socket": "#wrapper_mount_docker_socket",
+        "mounts": "#wrapper_mounts"
       }
     },
     "approval": {
@@ -855,6 +910,14 @@
             "de": "ID des Workflows, der als Schritt läuft (max. 5 Ebenen tief).",
             "en": "ID of the workflow to run as a step (max. 5 levels deep)."
           }
+        },
+        "workflowId": {
+          "type": "string",
+          "doc": {
+            "de": "Alte Schreibweise von `workflow_id`, wird weiter gelesen.",
+            "en": "Old spelling of `workflow_id`, still read."
+          },
+          "legacyFor": "workflow_id"
         }
       }
     },
@@ -1032,7 +1095,8 @@
               }
             }
           ],
-          "default": "MEDIUM"
+          "default": "MEDIUM",
+          "ignoreCase": true
         },
         "tags": {
           "type": [
@@ -1083,7 +1147,8 @@
               }
             }
           ],
-          "default": "WORKFLOW"
+          "default": "WORKFLOW",
+          "ignoreCase": true
         },
         "source_agent": {
           "type": "string",
@@ -1161,7 +1226,8 @@
                 "en": "Low"
               }
             }
-          ]
+          ],
+          "ignoreCase": true
         },
         "tags": {
           "type": [
