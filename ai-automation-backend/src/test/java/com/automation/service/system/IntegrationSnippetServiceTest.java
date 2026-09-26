@@ -7,9 +7,9 @@ import com.automation.entity.Project;
 import com.automation.entity.Workflow;
 import com.automation.entity.BlockDefinition;
 import com.automation.repository.OnboardingProfileRepository;
+import com.automation.repository.WorkflowRepository;
 import com.automation.service.project.OnboardingRenderer;
 import com.automation.service.project.ProjectService;
-import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,14 +31,14 @@ class IntegrationSnippetServiceTest {
     @Mock
     private ProjectService projectService;
     @Mock
-    private WorkflowService workflowService;
+    private WorkflowRepository workflowRepository;
 
     private IntegrationSnippetService service;
 
     @BeforeEach
     void setUp() {
         service = new IntegrationSnippetService(profileRepository, projectService,
-                new OnboardingRenderer(profileRepository, workflowService, new InstanceAddress("", "", 9090),
+                new OnboardingRenderer(profileRepository, workflowRepository, new InstanceAddress("", "", 9090),
                         com.automation.modules.ModuleRegistry.allEnabled()));
     }
 
@@ -95,7 +95,7 @@ class IntegrationSnippetServiceTest {
 
         Project project = Project.builder().id("proj-123").path("/my/project").build();
         when(projectService.findAll()).thenReturn(List.of(project));
-        when(workflowService.findByProjectId("proj-123")).thenReturn(List.of());
+        when(workflowRepository.findByProjectId("proj-123")).thenReturn(List.of());
 
         String result = service.render("/my/project", null);
 
@@ -134,7 +134,7 @@ class IntegrationSnippetServiceTest {
                         BlockDefinition.builder().type("simple").build()
                 )))
                 .build();
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of(wf));
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
 
         String result = service.render("/test", "de");
 
@@ -156,7 +156,7 @@ class IntegrationSnippetServiceTest {
                 .name("Empty")
                 .build();
         wf.setBlocks(null);
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of(wf));
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
 
         String result = service.render("/test", null);
 
@@ -173,7 +173,7 @@ class IntegrationSnippetServiceTest {
         Workflow wf = Workflow.builder().id("wf-1").build();
         wf.setName(null);
         wf.setDescription(null);
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of(wf));
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
 
         String result = service.render("/test", null);
 
@@ -193,7 +193,7 @@ class IntegrationSnippetServiceTest {
                 .name("WF")
                 .description(longDesc)
                 .build();
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of(wf));
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
 
         String result = service.render("/test", null);
 
@@ -213,7 +213,7 @@ class IntegrationSnippetServiceTest {
                 .name("WF")
                 .description("A | B")
                 .build();
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of(wf));
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of(wf));
 
         String result = service.render("/test", null);
 
@@ -226,7 +226,7 @@ class IntegrationSnippetServiceTest {
 
         Project project = Project.builder().id("proj-1").path("/test").build();
         when(projectService.findAll()).thenReturn(List.of(project));
-        when(workflowService.findByProjectId("proj-1")).thenReturn(List.of());
+        when(workflowRepository.findByProjectId("proj-1")).thenReturn(List.of());
 
         String result = service.render("/test", "de");
 

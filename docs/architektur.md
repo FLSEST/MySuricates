@@ -219,7 +219,8 @@ com.automation
 │   ├── learning/        LearningService, AgenticLearningService, ExecutionInsightsService, WorkflowStatsService, WorkflowSimilarityService, BlockTypesBackfillService, MetadataExtractor, PlatformStatsService
 │   ├── system/          ApiKeyService, DatabaseBackupService, ExecutionSettingsService (+ ExecutionSettingKeys; Setter je Thema in `settings/`: ExecutionCapacitySettings, AccessLimitSettings, HousekeepingSettings, FeatureSettings, RequestMetricsSettings), SystemIdentityService, TailscaleService, FileBrowserService, IntegrationSnippetService, SystemSettingsService (+ AppSettingChangedEvent: Dienste mit gecachter Einstellung lesen sie darauf neu, statt direkt gerufen zu werden)
 │   ├── ai/              HostClaudeService, HostCodexService, HostPiService, AiProviderRegistry, AiProvider, AiProviderCapabilities, AiResponseMetadata, ClaudeAiProvider, CodexAiProvider, PiAiProvider, PiCatalogService
-│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, ClaudeOutputParser, ClaudeJsonResponse, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   ├── cli/             CommandExecutorService (+ HostRequestAiMetadata), CliSessionManager, CliSession, HostExecutionRequest, ShellCommandService, ContainerShellService, TaskCommandService
+│   │   └── claude/      ClaudeOutputParser, ClaudeJsonResponse, ClaudeStreamEventFormatter — lesen die Ausgabe der Claude-CLI (Blatt-Paket für ai/ und cli/, damit ai/ nicht auf cli/ zurückzeigt)
 │   ├── chain/           ChainService, ChainExecutor (+ ChainRunWaiter, ChainZombieRunCleaner), ChainTemplateService, BuiltInChainTemplate
 │   ├── memory/          WorkflowMemoryService, ClaudeSummarizer, CodexSummarizer, KnowledgeSummarizer, ConversationPreprocessor, SummarizationSetupService, AutoMemoryExtractionListener
 │   ├── staging/         StagingService, TestingService, InstanceSyncHelper (+ InstanceHttpClient, SyncPreviewService), DockerContainerManager
@@ -266,7 +267,7 @@ com.automation
 ├── skills/handlers/     CapabilityHandler, LintHandler, SecurityScanHandler, FactCheckHandler, GrammarCheckHandler, OCRHandler
 ├── exception/           GlobalExceptionHandler, ErrorCode + Exception-Klassen
 ├── websocket/           LogWebSocketHandler, TerminalWebSocketHandler, TerminalSession (+ TerminalStdinStream), Message-DTOs
-├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent
+├── event/               WorkflowRunCompletedEvent, AssistantSessionUpdatedEvent, TodoCreatedEvent, ProjectWorkflowsChangedEvent
 └── util/                JPA-Converter (JSON, BlockDefinitions), RuntimeClasspathGuard (Startsperre gegen `target/classes`)
 ```
 

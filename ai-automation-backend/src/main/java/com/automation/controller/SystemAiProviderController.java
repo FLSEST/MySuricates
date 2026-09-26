@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.response.SystemCapabilitiesResponse;
 import com.automation.executor.BlockTypeModules;
+import com.automation.mapper.ModuleCapabilityMapper;
 import com.automation.modules.ModuleRegistry;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.PiCatalogService;
@@ -84,7 +85,7 @@ public class SystemAiProviderController {
                 routes,
                 blockTypes,
                 moduleRegistry.preset().key(),
-                moduleRegistry.describe().stream().map(SystemCapabilitiesResponse.ModuleCapabilityResponse::from).toList(),
+                ModuleCapabilityMapper.modules(moduleRegistry),
                 Instant.now(),
                 moduleRegistry.uiEditable(),
                 runDeletionPolicy.isAllowed(),

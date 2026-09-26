@@ -8,6 +8,7 @@ import com.automation.entity.Project;
 import com.automation.entity.Skill;
 import com.automation.entity.Workflow;
 import com.automation.entity.ActivityLog.LogCategory;
+import com.automation.event.ProjectWorkflowsChangedEvent;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.SkillRepository;

@@ -9,7 +9,7 @@ import com.automation.service.ai.ClaudeAiProvider;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.ai.HostClaudeService.ReasoningResult;
 import com.automation.service.ai.ShellScriptCli;
-import com.automation.service.cli.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.CliSession;
 import com.automation.entity.Workflow;
 import com.automation.entity.WorkflowRun;

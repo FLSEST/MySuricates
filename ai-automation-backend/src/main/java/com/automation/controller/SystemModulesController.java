@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.dto.request.ModuleToggleRequest;
 import com.automation.dto.response.SystemModulesResponse;
+import com.automation.mapper.ModuleCapabilityMapper;
 import com.automation.modules.ModuleOverrideService;
 import com.automation.modules.ModuleRegistry;
 import jakarta.validation.Valid;
@@ -29,12 +30,12 @@ public class SystemModulesController {
     @PutMapping("/{name}")
     public SystemModulesResponse setEnabled(@PathVariable String name, @Valid @RequestBody ModuleToggleRequest request) {
         overrides.setEnabled(name, request.enabled());
-        return SystemModulesResponse.of(registry);
+        return ModuleCapabilityMapper.modulesResponse(registry);
     }
 
     @DeleteMapping("/{name}/override")
     public SystemModulesResponse resetToConfig(@PathVariable String name) {
         overrides.resetToConfig(name);
-        return SystemModulesResponse.of(registry);
+        return ModuleCapabilityMapper.modulesResponse(registry);
     }
 }

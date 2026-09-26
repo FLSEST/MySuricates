@@ -1,6 +1,6 @@
 package com.automation.service.ai;
 
-import com.automation.service.cli.ClaudeJsonResponse;
+import com.automation.service.cli.claude.ClaudeJsonResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

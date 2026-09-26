@@ -1,4 +1,4 @@
-package com.automation.service.cli;
+package com.automation.service.cli.claude;
 
 import org.junit.jupiter.api.Test;
 
