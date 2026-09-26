@@ -50,7 +50,14 @@ describe('Staging Card', () => {
     }));
   }
 
+  /** The Stable card; the Test card next to it has its own Start/Stop/Sync buttons. */
+  const card = () => cy.get('[data-testid="staging-card"]');
+
   function interceptDefaults(stagingStatus = stagingStopped) {
+    // Safety net: no click in this spec may reach the real staging.sh/Docker actions. Stubs registered
+    // later in a test take precedence over these.
+    cy.intercept('POST', '/api/v1/staging/**', { body: { success: true } });
+    cy.intercept('POST', '/api/v1/testing/**', { body: { success: true } });
     cy.intercept('GET', '/api/v1/staging/status', { body: stagingStatus }).as('stagingStatus');
     cy.intercept('GET', '/api/v1/system/info', { body: sysInfo }).as('sysInfo');
     cy.intercept('GET', '/api/v1/app-settings', { body: {} }).as('appSettings');
@@ -70,14 +77,14 @@ describe('Staging Card', () => {
       cy.visit('/settings');
       // The environments section may be collapsible; click to open
       cy.contains('Environments').should('be.visible').click();
-      cy.contains('Stable').should('be.visible');
+      card().contains('Stable').should('be.visible');
     });
 
     it('shows container status section', () => {
       interceptDefaults();
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('localhost:9091').should('be.visible');
+      card().contains('localhost:9091').should('be.visible');
     });
   });
 
@@ -86,21 +93,22 @@ describe('Staging Card', () => {
       interceptDefaults(stagingStopped);
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('Stopped').should('be.visible');
+      card().contains('Stopped').should('be.visible');
     });
 
     it('shows RUNNING badge when container is running and healthy', () => {
       interceptDefaults(stagingRunning);
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('Running').should('be.visible');
+      card().contains('Running').should('be.visible');
     });
 
     it('shows STARTING badge when container is running but not healthy', () => {
       interceptDefaults(stagingStarting);
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('Starting').should('be.visible');
+      card().contains('Starting').should('be.visible');
+      card().contains('Running').should('not.exist');
     });
   });
 
@@ -112,15 +120,15 @@ describe('Staging Card', () => {
     });
 
     it('shows Start button', () => {
-      cy.contains('button', 'Start').should('be.visible');
+      card().contains('button', 'Start').should('be.visible');
     });
 
     it('does not show Stop button', () => {
-      cy.contains('button', 'Stop').should('not.exist');
+      card().contains('button', 'Stop').should('not.exist');
     });
 
     it('does not show Open Stable UI button', () => {
-      cy.contains('button', 'Open Stable UI').should('not.exist');
+      card().contains('button', 'Open Stable UI').should('not.exist');
     });
   });
 
@@ -132,15 +140,15 @@ describe('Staging Card', () => {
     });
 
     it('shows Stop button', () => {
-      cy.contains('button', 'Stop').should('be.visible');
+      card().contains('button', 'Stop').should('be.visible');
     });
 
     it('shows Open Stable UI button', () => {
-      cy.contains('button', 'Open Stable UI').should('be.visible');
+      card().contains('button', 'Open Stable UI').should('be.visible');
     });
 
     it('does not show Start button', () => {
-      cy.contains('button', 'Start').should('not.exist');
+      card().contains('button', 'Start').should('not.exist');
     });
   });
 
@@ -150,7 +158,7 @@ describe('Staging Card', () => {
       cy.intercept('POST', '/api/v1/staging/start', { body: { success: true } }).as('start');
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('button', 'Start').click();
+      card().contains('button', 'Start').click();
       cy.wait('@start');
     });
 
@@ -159,7 +167,7 @@ describe('Staging Card', () => {
       cy.intercept('POST', '/api/v1/staging/stop', { body: { success: true } }).as('stop');
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('button', 'Stop').click();
+      card().contains('button', 'Stop').click();
       cy.wait('@stop');
     });
   });
@@ -173,11 +181,11 @@ describe('Staging Card', () => {
     });
 
     it('shows Promote button', () => {
-      cy.contains('button', 'Promote Current Code').should('be.visible');
+      card().contains('button', 'Promote Current Code').should('be.visible');
     });
 
     it('Promote triggers correct API call', () => {
-      cy.contains('button', 'Promote Current Code').click();
+      card().contains('button', 'Promote Current Code').click();
       cy.wait('@promote');
     });
 
@@ -190,7 +198,7 @@ describe('Staging Card', () => {
       });
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('2/5').should('be.visible');
+      card().contains('2/5').should('be.visible');
     });
 
     it('shows cancel button during promote', () => {
@@ -203,8 +211,8 @@ describe('Staging Card', () => {
       cy.intercept('POST', '/api/v1/staging/promote/cancel', { body: { success: true } }).as('cancelPromote');
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('button', 'Cancel').should('be.visible');
-      cy.contains('button', 'Cancel').click();
+      card().contains('button', 'Cancel').should('be.visible');
+      card().contains('button', 'Cancel').click();
       cy.wait('@cancelPromote');
     });
 
@@ -216,7 +224,7 @@ describe('Staging Card', () => {
       });
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('Docker build failed').should('be.visible');
+      card().contains('Docker build failed').should('be.visible');
     });
   });
 
@@ -228,26 +236,26 @@ describe('Staging Card', () => {
     });
 
     it('shows Sync All button when healthy', () => {
-      cy.contains('button', 'Sync All').should('be.visible');
+      card().contains('button', 'Sync All').should('be.visible');
     });
 
     it('shows Selective Sync button when healthy', () => {
-      cy.contains('button', 'Selective Sync').should('be.visible');
+      card().contains('button', 'Selective Sync').should('be.visible');
     });
 
     it('Sync All shows confirmation dialog on first click', () => {
-      cy.contains('button', 'Sync All').click();
+      card().contains('button', 'Sync All').click();
       // Should show confirmation text
-      cy.contains('will be updated').should('be.visible');
-      cy.contains('button', 'Confirm').should('be.visible');
+      card().contains('will be updated').should('be.visible');
+      card().contains('button', 'Confirm').should('be.visible');
     });
 
     it('Sync All confirm triggers API call', () => {
       cy.intercept('POST', '/api/v1/staging/sync-definitions', {
         body: { workflowsSynced: 3, projectsSynced: 1, skillsSynced: 0, skipped: 2, errors: [] },
       }).as('sync');
-      cy.contains('button', 'Sync All').click();
-      cy.contains('button', 'Confirm').click();
+      card().contains('button', 'Sync All').click();
+      card().contains('button', 'Confirm').click();
       cy.wait('@sync');
     });
 
@@ -255,34 +263,34 @@ describe('Staging Card', () => {
       cy.intercept('POST', '/api/v1/staging/sync-definitions', {
         body: { workflowsSynced: 3, projectsSynced: 1, skillsSynced: 0, skipped: 2, errors: [] },
       }).as('sync');
-      cy.contains('button', 'Sync All').click();
-      cy.contains('button', 'Confirm').click();
+      card().contains('button', 'Sync All').click();
+      card().contains('button', 'Confirm').click();
       cy.wait('@sync');
-      cy.contains('3 workflows').should('be.visible');
+      card().contains('3 workflows').should('be.visible');
     });
 
     it('shows sync errors when present', () => {
       cy.intercept('POST', '/api/v1/staging/sync-definitions', {
         body: { workflowsSynced: 1, projectsSynced: 0, skillsSynced: 0, skipped: 0, errors: ['Failed to sync workflow X'] },
       }).as('syncWithErrors');
-      cy.contains('button', 'Sync All').click();
-      cy.contains('button', 'Confirm').click();
+      card().contains('button', 'Sync All').click();
+      card().contains('button', 'Confirm').click();
       cy.wait('@syncWithErrors');
-      cy.contains('Failed to sync workflow X').should('be.visible');
+      card().contains('Failed to sync workflow X').should('be.visible');
     });
 
     it('cancel button dismisses sync confirmation', () => {
-      cy.contains('button', 'Sync All').click();
-      cy.contains('will be updated').should('be.visible');
-      cy.contains('button', 'Cancel').click();
-      cy.contains('will be updated').should('not.exist');
+      card().contains('button', 'Sync All').click();
+      card().contains('will be updated').should('be.visible');
+      card().contains('button', 'Cancel').click();
+      card().contains('will be updated').should('not.exist');
     });
 
     it('Sync buttons are disabled when not healthy', () => {
       interceptDefaults({ ...stagingStopped, containerRunning: true, healthy: false });
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('button', 'Sync All').should('be.disabled');
+      card().contains('button', 'Sync All').should('be.disabled');
     });
   });
 
@@ -291,22 +299,22 @@ describe('Staging Card', () => {
       interceptDefaults(stagingRunning);
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('v0.6.0').should('be.visible');
-      cy.contains('v0.5.0').should('be.visible');
+      card().contains('v0.6.0').should('be.visible');
+      card().contains('v0.5.0').should('be.visible');
     });
 
     it('shows promote available hint when versions differ', () => {
       interceptDefaults({ ...stagingRunning, stableVersion: '0.5.0' });
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('promote recommended').should('be.visible');
+      card().contains('promote recommended').should('be.visible');
     });
 
     it('shows last snapshot timestamp', () => {
       interceptDefaults(stagingStopped);
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('2026-03-30 14:22').should('be.visible');
+      card().contains('2026-03-30 14:22').should('be.visible');
     });
   });
 
@@ -318,7 +326,7 @@ describe('Staging Card', () => {
       }).as('syncPreview');
       cy.visit('/settings');
       cy.contains('Environments').click();
-      cy.contains('button', 'Selective Sync').click();
+      card().contains('button', 'Selective Sync').click();
       cy.wait('@syncPreview');
     });
   });
