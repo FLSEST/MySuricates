@@ -599,6 +599,12 @@ class PoolDefinitionTest(unittest.TestCase):
             text = json.dumps(block["config"])
             self.assertNotIn("python3 scripts/todo-batch", text, f"{name}/{block.get('name')} ruft den Baum auf")
 
+    def test_gates_never_rerun_failing_tests(self):
+        # CLAUDE.md: Surefire-Reruns werten einen roten Test mit grünem Namensvetter als Flake – das Gate wäre grün
+        context = json.loads((REPO / "workflow-pool" / self.FILES[1]).read_text())["defaultContext"]
+        for key in ("gate_backend", "gate_frontend", "gate_common"):
+            self.assertNotIn("rerunFailingTestsCount", context[key], key)
+
     def test_steps_after_starting_do_not_stop_the_run(self):
         config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}
         for step in ("umsetzen", "pruefen", "review", "review_folgen", "gesamtreview", "bericht", "freigabe_text", "freigabe"):

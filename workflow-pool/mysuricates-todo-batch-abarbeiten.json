@@ -36,7 +36,7 @@
     "target_branch": "main",
     "backend_dir": "ai-automation-backend",
     "frontend_dir": "ai-automation-frontend",
-    "gate_backend": "mvn -q clean test -Dsurefire.rerunFailingTestsCount=1",
+    "gate_backend": "mvn -q clean test",
     "gate_frontend": "npx tsc --noEmit && npm run lint && npx vitest run",
     "gate_common": "bash scripts/ci/pre-push-checks.sh --range {range} --skip-build",
     "forbidden_paths": ".github/ scripts/ci/ scripts/git-hooks/ scripts/todo-batch/ ai-automation-backend/config/ ai-automation-backend/src/main/resources/db/migration/ deploy/ certs/",
