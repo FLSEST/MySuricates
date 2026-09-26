@@ -211,7 +211,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### WorkflowDetail (`/workflows/:id`) — Extensions
 
-- **Memory tab:** View, activate, delete, re-extract workflow memory entries
+- **Memory tab:** View, activate, delete, re-extract workflow memory entries (`WorkflowMemoryPanel.tsx`; one entry is `WorkflowMemoryItem.tsx`, the extraction dialog `MemoryExtractModal.tsx` with its state in `hooks/useMemoryExtraction.ts`: chosen runs, provider, seconds counter, closing on success)
 - **Instructions tab:** Edit workflow-specific agent instructions in Monaco Editor
 - **Gate status:** Display of the last gate status in the run history
 - **BPMN diagram:** `BpmnDiagramView.tsx` draws the BPMN export as SVG (zoom, click/hover per block, live status during a run). The pure logic — reading the XML, top-to-bottom layout, wrapping labels, element id → block selection — lives in `bpmnLayout.ts` (test `bpmnLayout.test.ts`), the shapes and markers per element type in `BpmnShapes.tsx`.
