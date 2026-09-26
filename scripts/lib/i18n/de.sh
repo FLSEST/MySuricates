@@ -93,6 +93,8 @@ M_ai_choose="Welchen Anbieter sollen Workflows standardmäßig nutzen?"
 M_ai_none="Keine KI-CLI gefunden. MySuricates startet trotzdem; KI-Blöcke brauchen eine davon:"
 M_ai_install="%s — installieren: %s   anmelden: %s"
 M_ai_login_hint="Vor dem ersten KI-Workflow bei %s anmelden: %s"
+# Was nach dem Anmeldebefehl noch zu tun ist — Schluessel aus dem Anbieter-Katalog (login_note, eab43a8b)
+M_login_note_pi_slash_login="dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)"
 M_ai_access_q="Was soll von den KI-Anbietern dieses Rechners in den Container?"
 M_ai_access_login="Nur die Anmeldung|Programme und je Anbieter die Anmeldung (empfohlen)"
 M_ai_access_programs="Nur die Programme|jede Instanz meldet sich selbst an"

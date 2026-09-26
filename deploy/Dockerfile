@@ -39,9 +39,16 @@ FROM eclipse-temurin:21-jre-noble AS runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl git gosu python3 jq ca-certificates gnupg \
  && rm -rf /var/lib/apt/lists/*
+# Fremd-Repos (NodeSource, Docker) nie nur aus einem alten Layer-Cache: sonst bleiben Schluessel,
+# Paketlisten und Pakete beim ersten Bau stehen, und ein spaeteres apt-get update — hier oder in der
+# Tryout-Stufe — scheitert an einem rotierten Schluessel (NO_PUBKEY, wie bei agent-devops 97e1529d).
+# Ein neuer Wert baut ab hier neu: MYSURICATES_APT_REFRESH (Instanz-Datei oder Umgebung, etwa der
+# Monat) bei scripts/instance.sh up und scripts/tryout.sh build (8b7a39b9).
+ARG APT_REFRESH=
 # Node fuer die KI-CLIs (codex >= 16, pi >= 20.6) — wie docker/Dockerfile.stable
 ARG NODE_MAJOR=22
-RUN install -m 0755 -d /etc/apt/keyrings \
+RUN echo "APT_REFRESH=${APT_REFRESH:-unset}" \
+ && install -m 0755 -d /etc/apt/keyrings \
  && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
  && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
  && apt-get update && apt-get install -y --no-install-recommends nodejs \
@@ -104,8 +111,10 @@ RUN apt-get update \
 COPY --from=backend /opt/java/openjdk /opt/java/jdk
 COPY --from=backend /usr/share/maven /usr/share/maven
 RUN ln -s /usr/share/maven/bin/mvn /usr/local/bin/mvn
-# Die Links auf codex/pi aus der runtime-Stufe zeigen genau auf diese Pakete
-RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent \
+# Die Links auf codex/pi aus der runtime-Stufe zeigen genau auf diese Pakete. pi in derselben Version
+# wie der Installer (PiAiProvider.PINNED_VERSION, ProviderCatalogTest prueft den Gleichstand; c3a4cbf6)
+ARG PI_VERSION=0.74.2
+RUN npm install -g --no-audit --no-fund @anthropic-ai/claude-code @openai/codex @earendil-works/pi-coding-agent@${PI_VERSION} \
  && npm cache clean --force
 # HOME auf dem Daten-Volume: KI-Logins, API-Key und eigene Projekte ueberstehen einen Neuaufbau.
 # Preset research: Chains, Memory, Assistent … ja; Netz- und Host-Module (Fernzugriff, Staging,

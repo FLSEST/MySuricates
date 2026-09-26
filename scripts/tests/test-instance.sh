@@ -223,7 +223,7 @@ check "no git: starts the build it has"        '[ "$(builds)" = 0 ] && [ -s "$ST
 GIT_CEILING_DIRECTORIES="$TMP" inst down >/dev/null 2>&1
 mv "$REPO2/.git-weg" "$REPO2/.git"
 check "built is host-only (container: exit 2)" 'bash "$SCRIPT" built --name demo >/dev/null 2>&1; [ $? -eq 2 ]'
-check "container up always builds the image"   'grep -q "^build -f deploy/Dockerfile --target runtime -t mysuricates:local -$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
+check "container up always builds the image"   'grep -q "^build -f deploy/Dockerfile --target runtime --build-arg APT_REFRESH= -t mysuricates:local -$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
 
 echo "6) the image gets only tracked files — nothing kept out by .git/info/exclude (890e8e9c)"
 # Auf dem Rechner des Autors lagen private Pool-Definitionen, nur per .git/info/exclude
@@ -250,6 +250,13 @@ check "context: untracked file stays out"       '! grep -q "loose.json" <<<"$LIS
 check "context: a changed tracked file as it is" '[ "$(tar -xOf "$DOCKER_CTX" docs/page.md 2>/dev/null)" = neu ]'
 check "context: a deleted tracked file is left out" '! grep -q "gone.json" <<<"$LIST"'
 check "image first, then up without compose build" '[ "$(grep -n "^build " "$DOCKER_LOG" | cut -d: -f1)" -lt "$(grep -n "up -d --no-build" "$DOCKER_LOG" | cut -d: -f1)" ] && ! grep -q -e "--build$" -e "compose.* build$" "$DOCKER_LOG"'
+# Ein neuer Wert holt die Fremd-Repos des Images frisch (8b7a39b9) — aus der Instanz-Datei oder der Umgebung
+printf 'MYSURICATES_APT_REFRESH=2026-10\n' >> "$TMP/inst/ctx.env"; : > "$DOCKER_LOG"
+INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
+check "APT_REFRESH from the instance file goes to the build" 'grep -q "^build .*--build-arg APT_REFRESH=2026-10 -t mysuricates:local -$" "$DOCKER_LOG"'
+printf 'MYSURICATES_PORT=19406\n' > "$TMP/inst/ctx.env"; : > "$DOCKER_LOG"
+MYSURICATES_APT_REFRESH=2026-11 INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
+check "... or from the environment"            'grep -q "^build .*--build-arg APT_REFRESH=2026-11 -t mysuricates:local -$" "$DOCKER_LOG"'
 mv "$CREPO/.git" "$CREPO/.git-weg"; : > "$DOCKER_LOG"
 GIT_CEILING_DIRECTORIES="$TMP" INSTANCE_HEALTH_TIMEOUT=0 bash "$CREPO/scripts/instance.sh" up --name ctx --no-wait >/dev/null 2>&1
 check "without git: compose builds from the folder" 'grep -q "compose .* build$" "$DOCKER_LOG" && grep -q "up -d --no-build" "$DOCKER_LOG"'
@@ -414,7 +421,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 \
   binst() { env PATH="$TMP/bbin:$PATH" INSTANCE_HEALTH_TIMEOUT=6 GIT_CEILING_DIRECTORIES="$TMP" bash "$HSCRIPT" "$@" --name bound 2>&1; }
   OTHER="$(listen 127.0.0.1 proxy "$BPORT" "$TMP/other.log")"
   OUT="$(binst up)"; RC=$?
-  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -q "^mysuricates-bound läuft"'
+  check "up: healthy on the bound address; 127.0.0.1 taken by someone else does not count" '[ "$RC" = 0 ] && printf "%s" "$OUT" | grep -qF "mysuricates-bound läuft: http://$BADDR:$BPORT"'
   check "status: running healthy"                 '[ "$(binst status)" = "running healthy" ]'
   OUT="$(binst down)"
   check "down: the runs asked at the bound address" 'printf "%s" "$OUT" | grep -qF "mysuricates-bound: 1 Workflow-Run(s) laufen noch" && printf "%s" "$OUT" | grep -q gestoppt'

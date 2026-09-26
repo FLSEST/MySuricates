@@ -54,6 +54,8 @@ check "0.0.0.0: VPN hint"                         'printf "%s" "$OUT" | grep "VP
 OUT="$(run none de "netaddr_lines 0.0.0.0 9090")"
 check "nothing found: placeholder (de)"           'printf "%s" "$OUT" | grep -F "http://<Adresse dieses Rechners>:9090" >/dev/null'
 check "nothing found: VPN hint (de)"              'printf "%s" "$OUT" | grep "VPN davor" >/dev/null'
+check "another loopback address: named as it is, not localhost (065144ee)" '[ "$(run linux en "netaddr_lines 127.0.0.2 9090")" = "→  http://127.0.0.2:9090" ] && [ "$(run linux en "netaddr_lines ::1 9090")" = "→  http://[::1]:9090" ]'
+check "local URL: localhost for 127.0.0.1, localhost and all interfaces" '[ "$(run none en "netaddr_local_url localhost 9090; netaddr_local_url [::] 9090; netaddr_local_url \"\" 9090")" = "http://localhost:9090http://localhost:9090http://localhost:9090" ]'
 OUT="$(run linux en "netaddr_lines 192.168.5.5 9090")"
 check "specific address: no localhost line"       '! printf "%s" "$OUT" | grep localhost >/dev/null && printf "%s" "$OUT" | grep -F "http://192.168.5.5:9090" >/dev/null'
 

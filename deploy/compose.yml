@@ -8,6 +8,9 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
       target: runtime
+      args:
+        # Neuer Wert (etwa der Monat) = NodeSource- und Docker-Repo frisch statt aus dem Layer-Cache (8b7a39b9)
+        APT_REFRESH: ${MYSURICATES_APT_REFRESH:-}
     image: mysuricates:local
     container_name: mysuricates-${MYSURICATES_NAME:?}
     ports:

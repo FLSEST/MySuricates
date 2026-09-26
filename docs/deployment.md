@@ -25,6 +25,7 @@ scripts/instance.sh down --name main     # stoppen; Daten bleiben in den Volumes
 | `MYSURICATES_AI_PROVIDERS` | Auswahl aus `claude,codex,pi`, Default: alle vorhandenen |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | Härtung, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | Anzeigename, z. B. `Prod` |
+| `MYSURICATES_APT_REFRESH` | ein neuer Wert (etwa der Monat) holt beim nächsten `up` NodeSource- und Docker-Repo des Images frisch, statt Schlüssel, Paketlisten und Pakete aus dem Schichten-Cache des ersten Baus zu nehmen; geht auch als Umgebungsvariable (8b7a39b9) |
 
 Das Image entsteht aus den getrackten Dateien des Klons (`git ls-files`), wie sie im Arbeitsbaum
 liegen: Geänderte getrackte Dateien kommen mit, was nur lokal liegt — etwa per `.git/info/exclude`
@@ -51,7 +52,8 @@ Was ein Container vom Rechner bekommt, entscheidet eine Stelle: `scripts/lib/hos
 Sie gilt für Instanzen über `instance.sh`, für Stable und Test über `staging.sh` — auch wenn sie aus
 der Oberfläche gestartet werden — und für den Dev-Container. Die Schalter stehen außerhalb der App und
 wirken erst beim nächsten Start: Weder ein Workflow noch jemand mit dem API-Key kann sie ändern. Die
-Karte „Startkonfiguration“ in den Einstellungen zeigt sie an, nur lesend.
+Karte „Startkonfiguration“ in den Einstellungen zeigt sie an, nur lesend — und je Anbieter, ob eine
+Anmeldung da ist, nach derselben Regel wie der Installer und die Karte „KI-Anbieter“ (7296ad45).
 
 | `…AI_FROM_HOST` | Vom Rechner im Container | Einrichtung | Was eine KI im Container damit kann |
 |---|---|---|---|
@@ -110,7 +112,8 @@ Schaltern. Tests ohne Docker: `bash scripts/tests/test-host-mounts.sh`,
 
 `deploy/Dockerfile` hat zwei Ziele. `runtime` ist das Image einer eingerichteten Instanz (oben; die
 Werkzeuge und KI-Anmeldungen kommen vom Rechner). `tryout` baut darauf auf und bringt alles selbst
-mit, damit man MySuricates ohne Installation ausprobieren kann: KI-CLIs, `python3-pip`/`-venv`, JDK
+mit, damit man MySuricates ohne Installation ausprobieren kann: KI-CLIs (pi in derselben festen Version
+wie der Installer, [entwicklung.md → pi-Version](entwicklung.md#pi-version-installer-und-tryout)), `python3-pip`/`-venv`, JDK
 und Maven aus der Build-Stufe (`JAVA_HOME=/opt/java/jdk`), Preset `research`. `HOME` liegt auf dem
 Daten-Volume (`/app/data/home`), Anmeldungen und API-Key überstehen also einen Neuaufbau. Bewusst
 nicht enthalten: gcc/make, Go, Rust, Gradle — wer mehr braucht, baut `FROM mysuricates:tryout`.
@@ -128,7 +131,8 @@ Tag, Uncommittetes und die lokale `config/` kommen nicht hinein. Das Dockerfile 
 Tag selbst; Tags vor v0.7.6 kennen die Stufe `tryout` noch nicht und werden abgewiesen. Getaggt
 wird `mysuricates:<version>-tryout` und `mysuricates:tryout` (zuletzt gebaut), mit den Labels
 `org.opencontainers.image.version`/`.revision`. Für eine neue Version: `build`, dann
-`remove` (Daten bleiben) und `start`.
+`remove` (Daten bleiben) und `start`. `MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/tryout.sh build`
+holt NodeSource- und Docker-Repo frisch statt aus dem Schichten-Cache — und damit auch die KI-CLIs.
 
 Der Container bindet nichts vom Rechner ein (kein Projektordner, kein Docker-Socket, keine
 Anmeldung) — ein Shell-Block oder `--dangerously-skip-permissions` wirkt nur im Container. Der
@@ -191,7 +195,9 @@ Die Agent-Images werden nur gebaut (`profiles: build-only`), nicht direkt über 
 
 - **Base:** `python:3.12-slim`
 - **Tools:** git, curl, jq
-- **Pakete:** anthropic, pandas, numpy, requests, beautifulsoup4
+- **Pakete:** anthropic, pandas, numpy, requests, beautifulsoup4 — ungepinnt, hinter `ARG PIP_REFRESH`:
+  Derselbe `AGENT_APT_REFRESH` wie bei agent-devops installiert die aktuellen, sonst blieben sie auf dem
+  Stand des ersten Baus (8b7a39b9)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 
@@ -776,6 +782,10 @@ Die Test-Instanz ist ein dedizierter Docker-Container für automatisierte Workfl
 ./scripts/staging.sh write-override stable|test   # Override-Datei (was vom Rechner kommt) schreiben, Pfad ausgeben
 ./scripts/staging.sh login stable|test claude     # eigene Anmeldung im Container (nur *_AI_FROM_HOST=programs)
 ```
+
+`MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (ebenso `test-promote`) holt
+NodeSource- und Docker-Repo des Images (`Dockerfile.stable`) frisch, statt sie aus dem Schichten-Cache
+des ersten Baus zu übernehmen (8b7a39b9).
 
 ### Definition-Sync (Dev → Stable / Dev → Test)
 

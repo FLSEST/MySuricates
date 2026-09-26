@@ -44,10 +44,12 @@ public record AiProviderStatusReport(boolean container, Instant checkedAt, List<
      * @param loginSource     the variable name, or the login file as {@code ~/…} or {@code $VARIABLE/…} —
      *                        never a value; null without a login
      * @param install         how to install the program
-     * @param login           how to log in
+     * @param login           the command to log in — only the command, it is what gets copied
      * @param defaultProvider the provider a workflow uses when it names none
+     * @param loginNote       what to do after the command, as a key the interface translates
+     *                        ({@code ProviderSetup#loginNote}, eab43a8b); null when the command says it all
      */
     public record ProviderStatus(String id, String cli, State state, boolean installed, boolean loggedIn,
                                  LoginVia loginVia, String loginSource, String install, String login,
-                                 boolean defaultProvider) {}
+                                 boolean defaultProvider, String loginNote) {}
 }

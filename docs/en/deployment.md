@@ -25,6 +25,7 @@ scripts/instance.sh down --name main     # stop; data stays in the volumes, runn
 | `MYSURICATES_AI_PROVIDERS` | selection from `claude,codex,pi`, default: all present |
 | `MYSURICATES_HARDENING_SEALING`, `MYSURICATES_HARDENING_REQUIRE_SEALED` | hardening, `true`/`false` |
 | `MYSURICATES_ENVIRONMENT` | display name, e.g. `Prod` |
+| `MYSURICATES_APT_REFRESH` | a new value (e.g. the month) makes the next `up` fetch the image's NodeSource and Docker repos afresh instead of taking keys, package lists and packages from the layer cache of the first build; also works as an environment variable (8b7a39b9) |
 
 The image is built from the tracked files of the clone (`git ls-files`) as they are in the working
 tree: changed tracked files go in, whatever exists only locally — such as pool definitions kept out
@@ -51,7 +52,8 @@ What a container gets from the machine is decided in one place: `scripts/lib/hos
 It applies to instances run by `instance.sh`, to Stable and Test run by `staging.sh` — also when they are
 started from the UI — and to the dev container. The switches live outside the app and take effect on the
 next start: neither a workflow nor anyone with the API key can change them. The "Startup configuration"
-card in the settings shows them, read-only.
+card in the settings shows them, read-only — and per provider whether a login is there, by the same rule
+as the installer and the "AI providers" card (7296ad45).
 
 | `…AI_FROM_HOST` | From the machine into the container | Setup | What an AI in the container can do with it |
 |---|---|---|---|
@@ -109,7 +111,8 @@ without Docker: `bash scripts/tests/test-host-mounts.sh`, `bash scripts/tests/te
 
 `deploy/Dockerfile` has two targets. `runtime` is the image of an installed instance (above; tools
 and AI logins come from the machine). `tryout` builds on it and brings everything itself, so
-MySuricates can be tried without installing it: AI CLIs, `python3-pip`/`-venv`, JDK and Maven from
+MySuricates can be tried without installing it: AI CLIs (pi in the same fixed version as the
+installer, [entwicklung.md → pi version](entwicklung.md#pi-version-installer-and-tryout)), `python3-pip`/`-venv`, JDK and Maven from
 the build stage (`JAVA_HOME=/opt/java/jdk`), preset `research`. `HOME` lives on the data volume
 (`/app/data/home`), so logins and the API key survive a rebuild. Deliberately left out: gcc/make,
 Go, Rust, Gradle — if you need more, build `FROM mysuricates:tryout`.
@@ -127,7 +130,8 @@ uncommitted changes and the local `config/` never get in. The Dockerfile itself 
 tags before v0.7.6 do not know the `tryout` stage yet and are refused. Tags are
 `mysuricates:<version>-tryout` and `mysuricates:tryout` (last built), with the labels
 `org.opencontainers.image.version`/`.revision`. For a new version: `build`, then `remove` (data
-stays) and `start`.
+stays) and `start`. `MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/tryout.sh build` fetches the
+NodeSource and Docker repos afresh instead of from the layer cache — and with them the AI CLIs.
 
 The container mounts nothing from the machine (no project folder, no Docker socket, no login) — a
 shell block or `--dangerously-skip-permissions` only affects the container. The instance name
@@ -189,7 +193,9 @@ The agent images are only built (`profiles: build-only`), not started directly v
 
 - **Base:** `python:3.12-slim`
 - **Tools:** git, curl, jq
-- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4
+- **Packages:** anthropic, pandas, numpy, requests, beautifulsoup4 — unpinned, behind `ARG PIP_REFRESH`:
+  the same `AGENT_APT_REFRESH` as for agent-devops installs the current ones, otherwise they would stay
+  at the state of the first build (8b7a39b9)
 
 ### Agent DevOps (`docker/Dockerfile.agent-devops`)
 
@@ -769,6 +775,10 @@ The test instance is a dedicated Docker container for automated workflow tests:
 ./scripts/staging.sh write-override stable|test   # write the override file (what comes from the machine), print its path
 ./scripts/staging.sh login stable|test claude     # own login inside the container (only *_AI_FROM_HOST=programs)
 ```
+
+`MYSURICATES_APT_REFRESH=$(date +%Y-%m) ./scripts/staging.sh promote` (likewise `test-promote`) fetches
+the image's NodeSource and Docker repos (`Dockerfile.stable`) afresh instead of taking them from the
+layer cache of the first build (8b7a39b9).
 
 ### Definition Sync (Dev → Stable / Dev → Test)
 

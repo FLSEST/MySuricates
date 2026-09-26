@@ -15,7 +15,7 @@ PROVIDER_IDS=()
 
 providers_ids() { local id; for id in "${PROVIDER_IDS[@]}"; do printf '%s\n' "$id"; done; }
 
-# provider_get ID FELD  (cli, install, login, login_files, login_env)
+# provider_get ID FELD  (cli, install, login, login_note, login_files, login_env)
 provider_get() {
   local name="PROVIDER__$(printf '%s' "${1:-}" | tr -c 'a-z0-9_' '_')__${2:-}"
   printf '%s' "${!name-}"

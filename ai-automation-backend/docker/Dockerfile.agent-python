@@ -8,8 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl jq && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
-RUN pip install --no-cache-dir anthropic pandas numpy requests beautifulsoup4
+# Python packages, unpinned on purpose — but never frozen at the first build: a layer taken from the
+# cache kept them at that day's versions for good (8b7a39b9). A new PIP_REFRESH value (docker-compose.yml:
+# the same AGENT_APT_REFRESH as agent-devops, e.g. the month) installs the current ones.
+ARG PIP_REFRESH=
+RUN echo "PIP_REFRESH=${PIP_REFRESH:-unset}" && \
+    pip install --no-cache-dir anthropic pandas numpy requests beautifulsoup4
 
 # Prepare Claude CLI directories (binary + config mounted from host)
 RUN mkdir -p /home/agent/.claude /home/agent/.local/bin /home/agent/.local/share \

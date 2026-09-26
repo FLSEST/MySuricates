@@ -62,9 +62,11 @@ function ProviderRow({ provider, showCommands }: { provider: AiProviderStatus; s
   const ready = provider.state === 'READY';
   // Only the default provider's gap is a problem for sure; the others are choices, not errors.
   const dot = ready ? 'bg-success' : provider.defaultProvider ? 'bg-warning' : 'bg-text-tertiary';
-  const commands: { label: string; text: string }[] = [];
+  const commands: { label: string; text: string; note?: string }[] = [];
   if (showCommands && provider.state === 'NOT_INSTALLED') commands.push({ label: t.install, text: provider.install });
-  if (showCommands && !provider.loggedIn) commands.push({ label: t.login, text: provider.login });
+  if (showCommands && !provider.loggedIn) {
+    commands.push({ label: t.login, text: provider.login, note: loginNoteText(t.loginNotes, provider.loginNote) });
+  }
   const [sourceBefore, sourceAfter = ''] =
     (provider.loginVia === 'ENVIRONMENT' ? t.loginViaEnvironment : t.loginViaFile).split('{source}');
 
@@ -86,7 +88,7 @@ function ProviderRow({ provider, showCommands }: { provider: AiProviderStatus; s
       {commands.length > 0 && (
         <div className="mt-1.5 ml-4 space-y-1">
           {commands.map((command) => (
-            <CommandLine key={command.label} label={command.label} text={command.text} />
+            <CommandLine key={command.label} label={command.label} text={command.text} note={command.note} />
           ))}
         </div>
       )}
@@ -94,14 +96,25 @@ function ProviderRow({ provider, showCommands }: { provider: AiProviderStatus; s
   );
 }
 
-function CommandLine({ label, text }: { label: string; text: string }) {
+/**
+ * The note after the login command in the interface language (eab43a8b). The catalog sends a key; an
+ * unknown one (a newer backend) shows nothing rather than the bare key — the command stays usable.
+ */
+function loginNoteText(notes: Record<string, string>, key: string | null | undefined): string | undefined {
+  return key ? notes[key] : undefined;
+}
+
+function CommandLine({ label, text, note }: { label: string; text: string; note?: string }) {
   return (
     <div className="flex items-start gap-2 text-xs">
       <span className="w-20 shrink-0 pt-1 text-text-tertiary">{label}</span>
-      <div className="flex min-w-0 flex-1 items-start gap-2 rounded-md border border-border bg-surface px-2 py-1 font-mono text-text">
-        {/* pre-wrap keeps the catalog's spacing; break-words wraps at spaces and splits only a long URL */}
-        <code className="min-w-0 flex-1 whitespace-pre-wrap break-words">{text}</code>
-        <CopyButton text={text} className="shrink-0 p-0.5 rounded-sm text-text-tertiary hover:text-accent transition-colors" />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-start gap-2 rounded-md border border-border bg-surface px-2 py-1 font-mono text-text">
+          {/* pre-wrap keeps the catalog's spacing; break-words wraps at spaces and splits only a long URL */}
+          <code className="min-w-0 flex-1 whitespace-pre-wrap break-words">{text}</code>
+          <CopyButton text={text} className="shrink-0 p-0.5 rounded-sm text-text-tertiary hover:text-accent transition-colors" />
+        </div>
+        {note && <p className="text-text-tertiary" data-testid="ai-provider-login-note">{note}</p>}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.ProviderSetup;
 import com.automation.service.ai.status.AiProviderStatusReport.ProviderStatus;
 import com.automation.service.ai.status.AiProviderStatusReport.State;
+import com.automation.service.system.ProviderLoginCheck;
 import com.automation.util.HostProcessUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,9 +28,12 @@ import java.util.function.UnaryOperator;
  * cached for {@code automation.ai-provider-status.ttl-seconds} (default 60) and {@code refresh} looks
  * again at once, e.g. right after logging in. Only the default provider is resolved per call, so a
  * changed setting shows without waiting for the cache. No DB access, no transaction.
+ *
+ * <p>As {@link ProviderLoginCheck} it answers the startup configuration card with the same rule, the
+ * same environment and the same home directory (7296ad45) — freshly, like that card, not from the cache.
  */
 @Service
-public class AiProviderStatusService {
+public class AiProviderStatusService implements ProviderLoginCheck {
 
     private final List<AiProvider> providers;
     private final AiProviderRegistry registry;
@@ -51,7 +55,7 @@ public class AiProviderStatusService {
             State state = !installed ? State.NOT_INSTALLED : login == null ? State.LOGIN_MISSING : State.READY;
             return new ProviderStatus(id, setup.cli(), state, installed, login != null,
                     login == null ? null : login.via(), login == null ? null : login.source(),
-                    setup.install(), setup.login(), id.equalsIgnoreCase(defaultProviderId));
+                    setup.install(), setup.login(), id.equalsIgnoreCase(defaultProviderId), setup.loginNote());
         }
     }
 
@@ -93,6 +97,13 @@ public class AiProviderStatusService {
         String defaultProviderId = registry.getDefaultProviderId();
         return new AiProviderStatusReport(container, Instant.ofEpochMilli(current.takenAt()),
                 current.probes().stream().map(p -> p.status(defaultProviderId)).toList());
+    }
+
+    @Override
+    public Boolean loggedIn(String cli) {
+        return providers.stream().map(AiProvider::setup).filter(setup -> setup.cli().equals(cli)).findFirst()
+                .map(setup -> ProviderLoginProbe.find(setup, env, home).isPresent())
+                .orElse(null);
     }
 
     private boolean isStale(Snapshot current) {

@@ -7,11 +7,7 @@ import com.automation.util.HostProcessUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,15 +16,19 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * The startup configuration card: switches, selection, programs — and the logins, which it takes from
+ * {@link ProviderLoginCheck}. That the check gives the answer of the AI provider card, with the real
+ * login rule, {@code AiProviderStatusServiceTest} shows (7296ad45); here it is a stub.
+ */
 class ContainerAccessReportTest {
-
-    @TempDir
-    Path tmp;
 
     /** Plausible by length and characters; "secret" in it lets the leak check below find it. */
     private static final String TOKEN = "sk-ant-oat01-secret-value-0123456789abcdefghij";
 
     private final Map<String, String> env = new HashMap<>();
+    /** Logins as the check answers them; a program without an entry is not registered (null). */
+    private final Map<String, Boolean> logins = new HashMap<>();
     private HostProcessUtils processUtils;
     private DockerExpectation docker;
 
@@ -40,7 +40,7 @@ class ContainerAccessReportTest {
     }
 
     private ContainerAccessResponse report() {
-        return new ContainerAccessReport(processUtils, docker, env::get, tmp.resolve("home")).report();
+        return new ContainerAccessReport(processUtils, docker, logins::get, env::get).report();
     }
 
     private static ProviderAccessResponse provider(ContainerAccessResponse r, String id) {
@@ -48,8 +48,9 @@ class ContainerAccessReportTest {
     }
 
     @Test
-    void hostRuntimeHasNoSwitchesAndCannotTellLogins() {
+    void hostRuntimeHasNoSwitchesButTellsTheLoginsLikeTheProviderCard() {
         when(docker.isConfigured()).thenReturn(true);
+        logins.putAll(Map.of("claude", true, "codex", false));
 
         ContainerAccessResponse r = report();
 
@@ -59,25 +60,22 @@ class ContainerAccessReportTest {
         assertThat(r.switchPrefix()).isNull();
         assertThat(r.dockerSocket()).isTrue();
         assertThat(r.providers()).extracting(ProviderAccessResponse::id).containsExactly("claude", "codex", "pi");
-        assertThat(r.providers()).allSatisfy(p -> {
-            assertThat(p.selected()).isTrue();
-            assertThat(p.login()).isNull();
-        });
+        assertThat(r.providers()).allSatisfy(p -> assertThat(p.selected()).isTrue());
+        // Formerly null ("cannot tell") on the host, while the AI provider card next to it knew (7296ad45)
+        assertThat(provider(r, "claude").login()).isTrue();
+        assertThat(provider(r, "codex").login()).isFalse();
+        assertThat(provider(r, "pi").login()).as("no provider with this program registered").isNull();
     }
 
     @Test
-    void containerInLoginModeReportsSelectionProgramsAndLogins() throws IOException {
-        Path codexHome = Files.createDirectories(tmp.resolve("providers/codex"));
-        Files.writeString(codexHome.resolve("auth.json"), "{}");
+    void containerInLoginModeReportsSelectionProgramsAndLogins() {
         env.putAll(Map.of(
                 "MYSURICATES_RUNTIME", "container",
                 "MYSURICATES_AI_FROM_HOST", "login",
                 "MYSURICATES_AI_PROVIDERS", "claude,codex",
                 "MYSURICATES_SWITCH_SOURCE", "/home/u/.config/mysuricates/staging.env",
-                "MYSURICATES_SWITCH_PREFIX", "STABLE_",
-                "CLAUDE_CODE_OAUTH_TOKEN", TOKEN,
-                "CODEX_HOME", codexHome.toString(),
-                "PI_CODING_AGENT_DIR", tmp.resolve("providers/pi").toString()));
+                "MYSURICATES_SWITCH_PREFIX", "STABLE_"));
+        logins.putAll(Map.of("claude", true, "codex", true, "pi", false));
         when(processUtils.isOnPath("pi")).thenReturn(false);
 
         ContainerAccessResponse r = report();
@@ -93,10 +91,9 @@ class ContainerAccessReportTest {
 
     @Test
     void neverCarriesATokenOrAFileContent() throws Exception {
-        Path claudeDir = Files.createDirectories(tmp.resolve("providers/claude"));
-        Files.writeString(claudeDir.resolve(".credentials.json"), "{\"claudeAiOauth\":\"file-secret\"}");
         env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "programs",
-                "CLAUDE_CODE_OAUTH_TOKEN", TOKEN, "CLAUDE_CONFIG_DIR", claudeDir.toString()));
+                "CLAUDE_CODE_OAUTH_TOKEN", TOKEN, "MYSURICATES_SWITCH_SOURCE", "/srv/staging.env"));
+        logins.put("claude", true);
 
         String json = new ObjectMapper().writeValueAsString(report());
 
@@ -105,40 +102,10 @@ class ContainerAccessReportTest {
     }
 
     @Test
-    void aPlaceholderTokenIsNoLogin() {
-        env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "login",
-                "CLAUDE_CONFIG_DIR", tmp.resolve("providers/claude").toString()));
-
-        for (String placeholder : new String[]{"<token>", "…", "sk-ant-oat-secret-value"}) {
-            env.put("CLAUDE_CODE_OAUTH_TOKEN", placeholder);
-            assertThat(provider(report(), "claude").login()).as(placeholder).isFalse();
-        }
-        env.put("CLAUDE_CODE_OAUTH_TOKEN", TOKEN);
-        assertThat(provider(report(), "claude").login()).isTrue();
-    }
-
-    @Test
-    void ownLoginInProgramsModeIsFoundInThePrivateDirectory() throws IOException {
-        Path claudeDir = Files.createDirectories(tmp.resolve("providers/claude"));
-        env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "programs",
-                "CLAUDE_CONFIG_DIR", claudeDir.toString()));
-        assertThat(provider(report(), "claude").login()).isFalse();
-
-        Files.writeString(claudeDir.resolve(".credentials.json"), "{}");
-        assertThat(provider(report(), "claude").login()).isTrue();
-    }
-
-    @Test
-    void allModeUsesTheHomeDirectoriesAndAnEmptySelectionMeansAll() throws IOException {
-        Path piAgent = Files.createDirectories(tmp.resolve("home/.pi/agent"));
-        Files.writeString(piAgent.resolve("auth.json"), "{}");
+    void anEmptySelectionMeansAll() {
         env.putAll(Map.of("MYSURICATES_RUNTIME", "container", "MYSURICATES_AI_FROM_HOST", "all",
                 "MYSURICATES_AI_PROVIDERS", " "));
 
-        ContainerAccessResponse r = report();
-
-        assertThat(r.providers()).allSatisfy(p -> assertThat(p.selected()).isTrue());
-        assertThat(provider(r, "pi").login()).isTrue();
-        assertThat(provider(r, "codex").login()).isFalse();
+        assertThat(report().providers()).allSatisfy(p -> assertThat(p.selected()).isTrue());
     }
 }

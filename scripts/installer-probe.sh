@@ -15,6 +15,7 @@
 #                     --image <image> apt- oder dnf-Image (Default ubuntu:24.04; z. B. rockylinux:9)
 #                     --out <dir>     Report-Verzeichnis (Default: ~/.local/state/mysuricates/installer-probe/<zeit>-<sha>)
 #                     --port <n>      Port auf 127.0.0.1 (Default: automatisch; nur automatischer Lauf)
+#                     --setup-flags "<flags>"  zusaetzliche Flags fuer Phase 2, z. B. "--with-pi" (c3a4cbf6)
 #                     --no-screenshots
 #
 # Automatischer Lauf (Weg „eine Instanz auf dem Rechner“): 1-pruefen `setup.sh --check`, 2-einrichten
@@ -43,6 +44,7 @@ KEEP=0
 INTERACTIVE=0
 SCREENSHOTS=1
 FRONTEND_PORT=""
+SETUP_FLAGS=""
 PHASE_TIMEOUT="${INSTALLER_PROBE_PHASE_TIMEOUT:-1800}"
 
 die() { echo "installer-probe: $*" >&2; exit 2; }
@@ -59,6 +61,8 @@ while [ "$#" -gt 0 ]; do
     --out=*)          OUT="${1#--out=}" ;;
     --port)           FRONTEND_PORT="${2:-}"; shift ;;
     --port=*)         FRONTEND_PORT="${1#--port=}" ;;
+    --setup-flags)    SETUP_FLAGS="${2:-}"; shift ;;
+    --setup-flags=*)  SETUP_FLAGS="${1#--setup-flags=}" ;;
     --keep)           KEEP=1 ;;
     --interactive)    INTERACTIVE=1 ;;
     --no-screenshots) SCREENSHOTS=0 ;;
@@ -75,6 +79,11 @@ if [ -n "$FRONTEND_PORT" ] && ! [[ "$FRONTEND_PORT" =~ ^[0-9]+$ && "$FRONTEND_PO
 fi
 if [ "$INTERACTIVE" = 1 ] && [ -n "$FRONTEND_PORT" ]; then
   die "--port gilt nur für den automatischen Lauf — interaktiv nennt setup.sh den Port selbst"
+fi
+# Die Flags landen in bash -c '…' im Container: nur Flag-Zeichen, kein Quote, keine Shell-Syntax
+case "$SETUP_FLAGS" in *[!A-Za-z0-9\ =,._/:-]*) die "--setup-flags: nur Flags wie --with-pi oder --preset research, ohne Anführungszeichen und Shell-Zeichen" ;; esac
+if [ "$INTERACTIVE" = 1 ] && [ -n "$SETUP_FLAGS" ]; then
+  die "--setup-flags gilt nur für den automatischen Lauf — interaktiv tippt man sie selbst"
 fi
 git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1 || die "Kein Git-Repo: $REPO"
 SHA="$(git -C "$REPO" rev-parse --verify --quiet "${REF}^{commit}")" || die "Unbekannter Stand: $REF"
@@ -209,7 +218,7 @@ run_phase() {  # name, command, input
 }
 
 run_phase 1-pruefen    "./scripts/setup.sh --check --runtime host --lang de" ""; RC1=$?
-run_phase 2-einrichten "./scripts/setup.sh --yes --runtime host --bind 0.0.0.0 --lang de" ""; RC2=$?
+run_phase 2-einrichten "./scripts/setup.sh --yes --runtime host --bind 0.0.0.0 --lang de${SETUP_FLAGS:+ $SETUP_FLAGS}" ""; RC2=$?
 
 echo "Prüfungen:"
 P1="$(sed 's/\x1b\[[0-9;]*m//g' "$OUT/logs/1-pruefen.log" | tr -d '\r')"

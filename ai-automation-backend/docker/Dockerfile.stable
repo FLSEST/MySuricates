@@ -16,8 +16,13 @@ RUN apt-get update && \
 # zu alt fuer zwei der drei KI-CLIs — codex verlangt >=16, pi >=20.6, beide sind ES-Module und
 # scheitern unter v12 im Modul-Loader. Genau daran lag es, dass Claude im Container lief und Codex
 # und Pi nicht (TODO a1236a64). Die JVM-Anwendung selbst benutzt Node nicht.
+# Fremd-Repos (NodeSource, Docker) nie nur aus einem alten Layer-Cache (8b7a39b9, Muster aus
+# Dockerfile.agent-devops, 97e1529d): ein neuer APT_REFRESH baut ab hier neu — Compose reicht
+# MYSURICATES_APT_REFRESH durch, etwa den Monat: MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/staging.sh promote
+ARG APT_REFRESH=
 ARG NODE_MAJOR=22
-RUN install -m 0755 -d /etc/apt/keyrings && \
+RUN echo "APT_REFRESH=${APT_REFRESH:-unset}" && \
+    install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
       | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     chmod a+r /etc/apt/keyrings/nodesource.gpg && \

@@ -19,7 +19,8 @@
 # Klon, nie ganz $HOME), DOCKER_SOCKET 0|1 (volle Kontrolle ueber Docker!), AI_FROM_HOST
 # programs|login|all (was von den KI-Anbietern des Rechners in den Container kommt; Default login =
 # Programme + je Anbieter nur die Anmeldung), AI_PROVIDERS (Auswahl aus claude,codex,pi), HARDENING_SEALING,
-# HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename). Jede AUTOMATION_*-Zeile geht
+# HARDENING_REQUIRE_SEALED (true|false), ENVIRONMENT (Anzeigename), APT_REFRESH (Container: ein neuer
+# Wert, etwa der Monat, holt NodeSource- und Docker-Repo des Images frisch). Jede AUTOMATION_*-Zeile geht
 # unveraendert an die Instanz (Einzelmodule, Haertung, AUTOMATION_AI_DEFAULT_PROVIDER …).
 #
 # Host: gebaut wird in eine Kopie unter ${XDG_STATE_HOME:-~/.local/state}/mysuricates/NAME/ (JAR +
@@ -104,7 +105,7 @@ export HOST_UID HOST_GID HOST_USER HOST_HOME
 # "läuft"-Meldung: lokal eine Zeile wie bisher; bindet die Instanz ins Netz (--bind 0.0.0.0), dazu
 # die Netzadresse(n) dieses Rechners und der VPN-Hinweis (b8aa3866, scripts/lib/netaddr.sh)
 say_running() {  # WORT
-  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: http://localhost:$PORT"; return 0; fi
+  if netaddr_is_local "$BIND"; then echo "mysuricates-$NAME $1: $(netaddr_local_url "$BIND" "$PORT")"; return 0; fi
   i18n_load "${MYSURICATES_LANG:-de}"
   echo "mysuricates-$NAME $1:"
   netaddr_lines "$BIND" "$PORT" | sed 's/^/  /'
@@ -154,7 +155,9 @@ container_cmd() {
   build_image() {
     if is_git_clone; then
       echo "Baue Image mysuricates:local aus den getrackten Dateien des Klons ..."
-      tracked_files_tar | docker build -f deploy/Dockerfile --target runtime -t mysuricates:local -
+      # APT_REFRESH wie in deploy/compose.yml: ein neuer Wert holt die Fremd-Repos frisch (8b7a39b9)
+      tracked_files_tar | docker build -f deploy/Dockerfile --target runtime \
+        --build-arg "APT_REFRESH=${MYSURICATES_APT_REFRESH:-}" -t mysuricates:local -
     else
       # Ohne git (etwa ein entpacktes Release-Archiv, das ohnehin nur Getracktes enthaelt): der Ordner
       compose build

@@ -336,7 +336,7 @@ step_ai() {
     case "$p:$l" in
       present:logged-in) lines[${#lines[@]}]="  ${C_GREEN}$T_OK${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_logged_in)${C_RESET}"; present="$present $id" ;;
       present:*) lines[${#lines[@]}]="  ${C_AMBER}$T_WARN${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_logged_out)${C_RESET}"; present="$present $id"
-        hints="$hints  $(msg ai_login_hint "$id" "$(provider_shell_cmd "$id" login)")
+        hints="$hints  $(msg ai_login_hint "$id" "$(provider_login_line "$id")")
 " ;;
       *) lines[${#lines[@]}]="  ${C_GREY}–${C_RESET} $(printf '%-8s' "$id") ${C_GREY}$(msg ai_missing)${C_RESET}" ;;
     esac
@@ -346,7 +346,7 @@ EOF
   if [ -z "$present" ]; then
     hints="  $(msg ai_none)
 "
-    for id in $(providers_ids); do hints="$hints    $(msg ai_install "$id" "$(provider_shell_cmd "$id" install)" "$(provider_shell_cmd "$id" login)")
+    for id in $(providers_ids); do hints="$hints    $(msg ai_install "$id" "$(provider_shell_cmd "$id" install)" "$(provider_login_line "$id")")
 "; done
   fi
   tui_box "$(msg step_of 5 ${#STEPS[@]}) · $(msg ai_title)" "${lines[@]}"
@@ -416,7 +416,7 @@ ai_env_only_hints() {
     provider_login_file "$id" && continue
     vars="$(provider_login_env_names "$id")"
     [ -n "$vars" ] || continue
-    printf '  %s\n' "$(msg ai_env_only "$id" "$(printf '%s' "$vars" | sed 's/ /, /g')" "$(provider_shell_cmd "$id" login)")"
+    printf '  %s\n' "$(msg ai_env_only "$id" "$(printf '%s' "$vars" | sed 's/ /, /g')" "$(provider_login_line "$id")")"
   done
   return 0
 }
@@ -491,6 +491,15 @@ offer_profile() {
     fi
   fi
   printf '  %s\n' "$(msg profile_hint "$(deps_tilde "$profile")" "$(deps_profile_hint)")"
+}
+
+# Der Anmeldebefehl eines Anbieters, dazu was danach zu tun ist — in der Sprache des Installers: der
+# Katalog nennt dafuer nur einen Schluessel (login_note, eab43a8b), der Text steht in lib/i18n
+provider_login_line() {  # ID
+  local note
+  note="$(provider_get "$1" login_note)"
+  printf '%s' "$(provider_shell_cmd "$1" login)"
+  [ -z "$note" ] || printf ', %s' "$(msg "login_note_$note")"
 }
 
 # Ein Befehl eines Anbieters so, wie er in der Shell des Nutzers laeuft (2605ed1f): Kommt das Programm —
@@ -687,7 +696,7 @@ ADDR
   [ "$RUNTIME" = host ] && printf '  %s\n' "$(msg done_no_autostart "$n" "scripts/instance.sh up --name $n")"
   # Unter dem Kasten: der kuerzte den Befehl, und mit env.sh davor wird er lang (2605ed1f)
   logged="$(providers_status | awk -v i="$PROVIDER" '$1==i{print $3}')"
-  [ "$logged" = logged-in ] || printf '  %s%s%s\n' "$C_AMBER" "$(msg ai_login_hint "$PROVIDER" "$(provider_shell_cmd "$PROVIDER" login)")" "$C_RESET"
+  [ "$logged" = logged-in ] || printf '  %s%s%s\n' "$C_AMBER" "$(msg ai_login_hint "$PROVIDER" "$(provider_login_line "$PROVIDER")")" "$C_RESET"
   return 0
 }
 

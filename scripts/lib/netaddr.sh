@@ -19,6 +19,19 @@ netaddr_is_wildcard() {
   case "${1:-}" in 0.0.0.0|::|"[::]") return 0 ;; *) return 1 ;; esac
 }
 
+# netaddr_local_url BIND PORT — die Adresse fuer diesen Rechner: localhost, wenn die Instanz dort lauscht
+# (127.0.0.1 oder alle Schnittstellen); bei einer anderen Loopback-Adresse wie 127.0.0.2 oder ::1 diese —
+# unter localhost antwortet die Instanz dann nicht (065144ee)
+netaddr_local_url() {
+  local a="${1:-}"
+  a="${a#\[}"; a="${a%\]}"
+  case "$a" in
+    ""|localhost|127.0.0.1|0.0.0.0|::) printf 'http://localhost:%s' "$2" ;;
+    *:*) printf 'http://[%s]:%s' "$a" "$2" ;;
+    *) printf 'http://%s:%s' "$a" "$2" ;;
+  esac
+}
+
 # IPv4-Adressen dieses Rechners ohne Loopback, eine je Zeile, ohne Dubletten
 netaddr_host_addresses() {
   local out="" ifc a
@@ -51,12 +64,12 @@ netaddr_urls() {
 }
 
 # netaddr_lines BIND PORT — die Adresszeilen der Abschlussmeldung (setzt i18n.sh voraus):
-# localhost, sofern die Instanz dort lauscht; bei Bind ins Netz zusaetzlich die Netzadresse(n) bzw.
-# ein Platzhalter und der VPN-Hinweis aus --help.
+# localhost bzw. die Loopback-Adresse, sofern die Instanz dort lauscht; bei Bind ins Netz zusaetzlich die
+# Netzadresse(n) bzw. ein Platzhalter und der VPN-Hinweis aus --help.
 netaddr_lines() {
   local bind="${1:-}" port="${2:-}" urls u
   if netaddr_is_local "$bind" || netaddr_is_wildcard "$bind"; then
-    printf '%s\n' "$(msg done_open "http://localhost:$port")"
+    printf '%s\n' "$(msg done_open "$(netaddr_local_url "$bind" "$port")")"
   fi
   netaddr_is_local "$bind" && return 0
   urls="$(netaddr_urls "$bind" "$port")"
