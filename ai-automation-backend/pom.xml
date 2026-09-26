@@ -370,8 +370,9 @@
                         analyzer (ConfigKeyRules, TODO f5153c47). Source of truth is
                         ai-automation-frontend/src/data/blockConfigSchema.json — the frontend
                         imports it directly, the backend gets a build-time copy on the classpath
-                        (schema/blockConfigSchema.json). Copied straight into the output
-                        directory, so no second copy ever lands in the source tree.
+                        (schema/blockConfigSchema.json). Like the docs above it lands in
+                        src/main/resources/schema (git-ignored), so process-resources bundles it
+                        for every output directory — also target-ide/ of the IDE profile.
                         deploy/Dockerfile copies the file into its backend stage for this step.
                     -->
                     <execution>
@@ -381,7 +382,7 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${project.build.outputDirectory}/schema</outputDirectory>
+                            <outputDirectory>${project.basedir}/src/main/resources/schema</outputDirectory>
                             <overwrite>true</overwrite>
                             <resources>
                                 <resource>

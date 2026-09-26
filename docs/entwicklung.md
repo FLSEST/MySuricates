@@ -127,7 +127,7 @@ gehören ausschließlich nach `docs/`. Der Assistent liest die Kopie zur Laufzei
 **Block-Config-Schema:** `ai-automation-frontend/src/data/blockConfigSchema.json` beschreibt je Blocktyp die
 Config-Schlüssel (Typ, erlaubte Werte, Legacy-Wert, Pflicht, de/en-Text). Der Monaco-Config-Editor importiert
 die Datei direkt, das Backend bekommt beim Build eine Kopie nach `classpath:schema/` (Execution
-`sync-block-config-schema` in `pom.xml`, direkt ins Ausgabeverzeichnis, keine zweite Datei im Repo;
+`sync-block-config-schema` in `pom.xml`, wie die Doku oben über das git-ignorierte `src/main/resources/schema/`;
 `deploy/Dockerfile` kopiert sie dafür in die Backend-Stufe). Der Analyzer (`ConfigKeyRules`) prüft damit
 dieselben Schlüssel, die der Editor anbietet. Zwei Wächter: `blockConfigSchema.test.ts` hält das Schema
 gegen die ausgelieferten Definitionen, `ExecutorConfigKeyDriftTest` gegen die Schlüssel, die die Executoren

@@ -122,7 +122,7 @@ assistant reads the copy at runtime via `ClassPathResource`.
 **Block config schema:** `ai-automation-frontend/src/data/blockConfigSchema.json` describes the config keys of
 every block type (type, allowed values, legacy value, required, de/en text). The Monaco config editor imports
 the file directly, the backend gets a build-time copy in `classpath:schema/` (execution
-`sync-block-config-schema` in `pom.xml`, straight into the output directory, no second file in the repo;
+`sync-block-config-schema` in `pom.xml`, like the docs above via the git-ignored `src/main/resources/schema/`;
 `deploy/Dockerfile` copies it into the backend stage for that). The analyzer (`ConfigKeyRules`) thus checks
 the same keys the editor offers. Two guards: `blockConfigSchema.test.ts` holds the schema against the shipped
 definitions, `ExecutorConfigKeyDriftTest` against the keys the executors read in their source. Whoever
