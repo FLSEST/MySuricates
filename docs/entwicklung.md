@@ -309,7 +309,7 @@ Welches Werkzeug wann:
 | Alles langsam, CPU niedrig | JFR `jdk.ThreadPark` |
 | Verdacht auf Leck oder GC | JFR `jdk.GCPhasePause`, dazu `/actuator/metrics/jvm.memory.used` (mit API-Key) oder ohne Key die Heap-Zahlen von `/api/v1/system/jvm-memory` |
 
-**Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist. Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
+**Kein Scheduling im Integrationstest-Profil:** `@EnableScheduling` steht in `config/SchedulingConfig` mit `@Profile("!integration")`. Alle `@SpringBootTest`-Klassen laufen mit `@ActiveProfiles("integration")` und damit ohne Hintergrund-Jobs. Grund: Die Jobs schreiben sonst mitten im Testlauf in dieselbe SQLite-Datei — `HealthAutoTodoService` legt z. B. ein TODO an, sobald Stable oder Test nicht erreichbar ist (die beiden Container-Umgebungen neben der Dev-Instanz, siehe [deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Solche Zeilen überleben den `@Transactional`-Rollback (eigener Thread, eigene Transaktion) und lassen global zählende Assertions davon abhängen, ob gerade ein Container läuft. Scheduled-Methoden werden in Tests direkt aufgerufen, ihre Logik bleibt abgedeckt. Wer einen neuen `@Scheduled`-Job baut, testet ihn also per direktem Methodenaufruf — nicht, indem er auf den Tick wartet.
 
 **Integration-Encryption-Key im Testprofil auf Temp-Pfad gepinnt:** Genau wie `integration.db.path` setzt `IntegrationTestDbSessionListener` seit 2026-09-12 zusätzlich `integration.key.path` (per-JVM-Temp-Datei, im Teardown gelöscht), auf das `application-integration.yml` `automation.integration.key-file` verweist — ohne diesen Pin generiert `IntegrationEncryptionService.init()` bei jedem `@SpringBootTest` mit leeren `app_settings` sonst einen frischen AES-Key ins echte `~/.autotrigger/` des Entwicklers (geschehen 2026-08-06, hat den echten Key monatelang überschattet).
 
@@ -361,14 +361,19 @@ npm run cy:run
 npm run test:e2e
 ```
 
-Der Dev-API-Key wird automatisch aus `ai-automation-backend/data/automation.db` gelesen, falls vorhanden.
+Den API-Key sucht `cypress.config.ts` in dieser Reihenfolge: `CYPRESS_API_KEY`, `CYPRESS_DEV_API_KEY`,
+der Eintrag `api-key` in `app_settings` der Dev-Datenbank `ai-automation-backend/data/automation.db`
+(einmal beim Start von Cypress, nur lesend), zuletzt `AUTOMATION_API_KEY`. Unabhängig davon schreibt
+das Backend seinen Schlüssel bei jedem Start nach `~/.autotrigger/api-key` (`ApiKeyService`); für die
+curl-Beispiele dieser Seite also `export DEV_KEY=$(cat ~/.autotrigger/api-key)`.
 
 ### Test-Target (isoliert, keine fachlichen Testdaten in Dev)
 
 **Voraussetzung:** Test-Instanz auf Port `8090` läuft.
 
 ```bash
-# Beispiel: Test-Instanz mit festem API-Key starten
+# Beispiel: Test-Instanz mit festem API-Key starten — <test-api-key> ist ein selbst gewählter Wert,
+# den die Instanz übernimmt; ohne ihn erzeugt sie beim ersten Start einen eigenen
 cd ai-automation-backend
 AUTOMATION_API_KEY=<test-api-key> docker compose -f docker-compose.test.yml up -d
 
@@ -519,7 +524,9 @@ Die Screenshots macht Playwright aus `ai-automation-frontend/node_modules` auf d
 der Browser zur installierten Playwright-Version (typisch nach einem Update), wird die Login-Prüfung
 rot mit „Browser fehlt — im Frontend `npm run pw:install` ausführen“; die Probe lädt nichts nach.
 
-Vor einem Release läuft er als Workflow **Installer-Probe** (Pool-Eintrag
+Vor einem Release läuft er als Workflow **Installer-Probe** (Eintrag im Workflow-Pool — den
+mitgelieferten, in jede Instanz installierbaren Workflow-Definitionen unter `workflow-pool/`, siehe
+[architektur.md → Workflow Pool](architektur.md#workflow-pool) —, Eintrag
 `mysuricates-installer-probe`, Variable `ref`, Default `main`). Der Workflow holt das Probe-Skript
 aus dem geprüften Stand, nicht aus dem gerade ausgecheckten Branch. Die Skript-Tests laufen ohne
 Docker: `bash scripts/tests/test-installer-probe.sh` und
@@ -583,7 +590,7 @@ Das Script:
 
 ### Zusammenspiel mit Staging
 
-Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
+Die Stable-Umgebung ist ein Docker-Container auf Port 9091 mit einem eingefrorenen Stand des Codes für den Alltagsbetrieb, neben der Dev-Instanz aus dem Quellcode; `scripts/staging.sh` baut und verwaltet ihn ([deployment.md → Drei-Umgebungs-Setup](deployment.md#drei-umgebungs-setup)). Nach einem Release kann `./scripts/staging.sh promote` ausgeführt werden, um die neue Version in die Stable-Umgebung zu deployen. Die Settings-Seite zeigt dann einen Versionsvergleich (Dev vs. Stable) und empfiehlt ein Promote, wenn die Versionen abweichen.
 
 ### Git-Tags
 
@@ -703,7 +710,7 @@ Das Backend nutzt drei Annotation-Prozessoren, die in der Compiler-Konfiguration
 
 Das Backend umfasst **51 REST-Controller** und **20 Block-Typen**:
 
-**Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, WebSocketTicket, Webhook, Wish, Workflow, WorkflowAnalyzer, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowTemplate
+**Controller:** ActivityLog, Assistant, Audit, Chain, ChainTemplate, CompletionTrigger, Conversion, DashboardLayout, DashboardReportAssist, DashboardWorkflow, DeadLetter, Dialog, Docs, Execution, Goal, Integration, Learning, Notification, OnboardingProfile, PageSuggestion, Project, Reports, Schedule, Search, Skill, Staging, System, SystemAccess, SystemAiProvider, SystemMaintenance, SystemModules, SystemRequestMetrics, SystemSettings, Testing, Todo, TodoTrigger, Webhook, WebSocketTicket, Wish, Workflow, WorkflowAnalyzer, WorkflowAssist, WorkflowDebug, WorkflowFactory, WorkflowImport, WorkflowMemory, WorkflowPool, WorkflowSeal, WorkflowSealStatus, WorkflowTemplate, WorkflowVersion
 
 **Block-Typen:** `simple`, `shell`, `retry`, `conditional`, `foreach`, `while`, `switch`, `agentic`, `approval`, `sub-workflow`, `skill-capability`, `human-input`, `document`, `integration`, `todo-create`, `todo-update`, `todo-close`, `compress`, `compress-ai`, `dashboard-report`
 
@@ -734,7 +741,8 @@ Chains verketten mehrere Workflows sequenziell:
 Workflows können Wissen über Runs hinweg akkumulieren:
 - `WorkflowMemoryService.extractKnowledge()` — AI-basierte Extraktion via `KnowledgeSummarizer`
 - Aktive Einträge werden in nachfolgende Runs injiziert
-- Provider: `CLAUDE` (Standard) oder `CODEX`
+- Extraktion nur mit `CLAUDE` (Standard) oder `CODEX` (`WorkflowMemoryService.getSummarizer`) — anders als
+  bei Workflow-Blöcken ist Pi hier nicht angebunden
 
 ### Soft-Delete Pattern
 
@@ -785,7 +793,9 @@ Geprüft wird:
    `scripts/ci/hygiene-allowlist.txt` — nur Pfade, nie Musterliterale, damit die Allowlist selbst
    nichts preisgibt.
 2. **Verbotene Literale** in getrackten Dateien bzw. in hinzugefügten Zeilen.
-3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`. Dasselbe Skript nutzt das
+3. **Pool-Neutralität** über `scripts/ci/pool-neutrality.sh`: Die Definitionen unter `workflow-pool/`
+   werden mitgeliefert und von Lesern installiert, dürfen also nichts Instanz- oder
+   Personenbezogenes enthalten. Dasselbe Skript nutzt das
    Built-in-Template `pool-neutrality-audit` (dort mit `--all`, weil es den Pool einer laufenden
    Instanz prüft und nicht nur den getrackten Release-Bestand).
 4. **Repo-Gewicht**: zwei getrackte Pfade mit identischer Blob-Prüfsumme ab 256 KiB sind ein
