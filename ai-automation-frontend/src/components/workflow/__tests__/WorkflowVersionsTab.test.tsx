@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -45,6 +45,33 @@ describe('WorkflowVersionsTab provenance', () => {
 
     expect(await screen.findByText('Goal guard')).toBeInTheDocument();
     expect(screen.queryByText('goal-guard')).not.toBeInTheDocument();
+  });
+
+  // 23635ef6: the app's own dialog instead of window.confirm
+  it('restores a version only after confirming it', async () => {
+    const restored: string[] = [];
+    server.use(
+      http.get('/api/v1/workflows/wf-1/versions', () => HttpResponse.json({
+        content: [version('v1', 1, HASH_OLD)], page: 0, size: 20, totalElements: 1, totalPages: 1,
+      })),
+      http.post('/api/v1/workflows/wf-1/versions/:versionId/restore', ({ params }) => {
+        restored.push(String(params.versionId));
+        return HttpResponse.json({});
+      }),
+    );
+    renderWithProviders(<WorkflowVersionsTab workflowId="wf-1" />);
+
+    fireEvent.click(await screen.findByText('bbbbbbbb'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    const dialog = screen.getByRole('dialog', { name: 'Restore' });
+    expect(within(dialog).getByText('Restore version 1? The current state will be saved as a new version.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(restored).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore' })).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(restored).toEqual(['v1']));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('marks nothing when the current hash is unknown', async () => {

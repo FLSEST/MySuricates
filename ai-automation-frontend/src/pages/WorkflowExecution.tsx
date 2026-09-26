@@ -27,13 +27,14 @@ import { useRunPendingInput } from '../hooks/useRunPendingInput';
 import { useRunDiagramSync } from '../components/workflow/useRunDiagramSync';
 import { useRateRun } from '../hooks/useLearning';
 import { useModuleEnabled } from '../hooks/useModules';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
 import type { PendingTodoItem } from '../types';
 
 export function WorkflowExecution() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   const { data: workflow } = useWorkflow(id!);
   const { data: run, error: runError, refetch: refetchRun } = useWorkflowRun(id!, runId);
@@ -86,7 +87,7 @@ export function WorkflowExecution() {
       <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2 text-text-secondary">
           <Clock className="w-4 h-4" />
-          <span>{t.workflows.execution.duration}: {formatDuration(run.durationMs)}</span>
+          <span>{t.workflows.execution.duration}: {formatDuration(run.durationMs, locale)}</span>
         </div>
         {run.status === 'COMPLETED' && (
           <div className="flex items-center gap-1">

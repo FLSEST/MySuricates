@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Sparkles, Loader2 } from 'lucide-react';
 import { useT } from '../i18n';
 import { useTodos, useCreateTodo, useUpdateTodoStatus, useUpdateTodo, useDeleteTodo, useResolveTodo } from '../hooks/useTodos';
-import { Spinner, Button, Modal, Input, Select } from '../components/ui';
+import { Spinner, Button, Modal, Input, Select, ConfirmModal } from '../components/ui';
 import { ErrorState } from '../components/shared/ErrorState';
 import { EmptyState } from '../components/shared/EmptyState';
 import { SimplePage, SimplePageHeader, SectionLabel, SimpleRow } from '../components/simple/kit';
@@ -36,6 +36,8 @@ export function SimpleTodos() {
 
   const [newTitle, setNewTitle] = useState('');
   const [selected, setSelected] = useState<Todo | null>(null);
+  // Deleting the open task asks first, in a dialog above the edit dialog (23635ef6)
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [draft, setDraft] = useState({ title: '', description: '', priority: 'MEDIUM' as TodoPriority, dueDate: '' });
 
   const isLoading = openQ.isLoading || inProgQ.isLoading;
@@ -94,9 +96,10 @@ export function SimpleTodos() {
 
   const removeTodo = () => {
     if (!selected) return;
-    if (window.confirm(t.common.deleteConfirm)) {
-      deleteTodo.mutate(selected.id, { onSuccess: () => setSelected(null) });
-    }
+    deleteTodo.mutate(selected.id, {
+      onSuccess: () => setSelected(null),
+      onSettled: () => setConfirmDelete(false),
+    });
   };
 
   const doResolve = (id: string) =>
@@ -187,7 +190,7 @@ export function SimpleTodos() {
         footer={
           selected ? (
             <>
-              <Button variant="ghost" onClick={removeTodo} loading={deleteTodo.isPending}>{t.common.delete}</Button>
+              <Button variant="ghost" onClick={() => setConfirmDelete(true)} loading={deleteTodo.isPending}>{t.common.delete}</Button>
               {target && (
                 <Button variant="secondary" onClick={() => { navigate(target); setSelected(null); }}>
                   {t.simple.todos.openLinked}
@@ -234,6 +237,17 @@ export function SimpleTodos() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={confirmDelete && selected !== null}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={removeTodo}
+        title={selected ? t.simple.todos.deleteTitle.replace('{title}', () => selected.title) : ''}
+        message={t.common.deleteConfirm}
+        confirmLabel={t.common.delete}
+        variant="danger"
+        isPending={deleteTodo.isPending}
+      />
     </SimplePage>
   );
 }

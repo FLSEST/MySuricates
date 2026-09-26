@@ -438,3 +438,61 @@ describe('Dashboard on a fresh installation', { timeout: 20_000 }, () => {
     expect(screen.queryByTestId('first-steps')).toBeNull();
   });
 });
+
+// 23635ef6: taking a view over unsaved changes asks in the app's own dialog, above the history
+describe('Dashboard history — taking a view', { timeout: 20_000 }, () => {
+  const summary = (id: string) => ({
+    id, createdAt: '2026-09-15T10:00:00Z', deviceLabel: 'Desktop', name: null, formatVersion: 2, viewCount: 2, contentHash: `h-${id}`,
+  });
+
+  it('replaces the local view only after the question is answered with Replace', async () => {
+    useDashboardLayoutStore.setState({
+      activeViewId: 'default',
+      views: [
+        { id: 'default', name: '', widgets: [] },
+        { id: 'ops', name: 'Ops', widgets: [{ instanceId: 'todos', type: 'todos' }] },
+      ],
+    });
+    useDashboardSyncStore.setState({ baseVersionId: 'v2', dirty: true });
+    let posts = 0;
+    server.use(
+      http.get('/api/v1/dashboard/layouts', () => HttpResponse.json({
+        content: [summary('v2'), summary('v1')], page: 0, size: 20, totalElements: 2, totalPages: 1,
+      })),
+      http.get('/api/v1/dashboard/layouts/:id', ({ params }) => HttpResponse.json({
+        ...summary(String(params.id)),
+        layout: { activeViewId: 'default', views: [{ id: 'default', name: '', widgets: [] }, { id: 'ops', name: 'Ops', widgets: [] }] },
+      })),
+      http.post('/api/v1/dashboard/layouts', () => {
+        posts += 1;
+        return HttpResponse.json({ ...summary('v3'), viewCount: 2 }, { status: 201 });
+      }),
+    );
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'History' }));
+    const history = await screen.findByRole('dialog', { name: 'Dashboard history' });
+    const row = await waitFor(() => {
+      const found = history.querySelector<HTMLElement>('[data-version-id="v1"]');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    fireEvent.click(within(row).getByRole('button', { name: 'Take a view' }));
+    fireEvent.click(await within(row).findByRole('button', { name: 'Take “Ops”' }));
+
+    const question = await screen.findByRole('dialog', { name: 'Replace view' });
+    expect(question).toHaveTextContent('This device has unsaved dashboard changes. Replace the view “Ops” with the one from this version?');
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Replace view' })).not.toBeInTheDocument());
+    expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual([{ instanceId: 'todos', type: 'todos' }]);
+    expect(posts).toBe(0);
+
+    await waitFor(() => expect(within(row).getByRole('button', { name: 'Take “Ops”' })).toBeEnabled());
+    fireEvent.click(within(row).getByRole('button', { name: 'Take “Ops”' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Replace view' })).getByRole('button', { name: 'Replace' }));
+    await waitFor(() => expect(posts).toBe(1));
+    expect(useDashboardLayoutStore.getState().views[1]?.widgets).toEqual([]);
+    expect(screen.getByRole('dialog', { name: 'Dashboard history' })).toBeInTheDocument();
+  });
+});

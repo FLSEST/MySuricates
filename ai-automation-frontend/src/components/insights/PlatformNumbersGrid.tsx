@@ -3,7 +3,8 @@ import {
   Globe, Link2, Brain, ListChecks, Wand2, MessageSquare, Archive,
 } from 'lucide-react';
 import { Card } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatDecimal } from '../../utils/localeFormat';
 import type { PlatformStats } from '../../types';
 
 function MiniStat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: number | string; sub?: string }) {
@@ -21,6 +22,7 @@ function MiniStat({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 
 export function PlatformNumbersGrid({ data }: { data?: PlatformStats }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   if (!data) return null;
 
   return (
@@ -36,7 +38,7 @@ export function PlatformNumbersGrid({ data }: { data?: PlatformStats }) {
       <MiniStat icon={<ListChecks className="w-3.5 h-3.5 text-rose-500" />} label={t.insights.triggers} value={data.activeTodoTriggers + data.activeCompletionTriggers} sub={`${data.activeTodoTriggers} Todo / ${data.activeCompletionTriggers} Completion`} />
       <MiniStat icon={<Brain className="w-3.5 h-3.5 text-purple-500" />} label={t.insights.memoryEntries} value={data.activeMemoryEntries} />
       <MiniStat icon={<Wand2 className="w-3.5 h-3.5 text-pink-500" />} label={t.insights.wishes} value={data.wishStats?.total ?? 0} sub={`${data.wishStats?.completed ?? 0} ${t.insights.wishCompleted}`} />
-      <MiniStat icon={<MessageSquare className="w-3.5 h-3.5 text-cyan-500" />} label={t.insights.assistantSection} value={data.assistantStats?.totalSessions ?? 0} sub={`${t.insights.avgMessages}: ${(data.assistantStats?.avgMessagesPerSession ?? 0).toFixed(1)}`} />
+      <MiniStat icon={<MessageSquare className="w-3.5 h-3.5 text-cyan-500" />} label={t.insights.assistantSection} value={data.assistantStats?.totalSessions ?? 0} sub={`${t.insights.avgMessages}: ${formatDecimal(data.assistantStats?.avgMessagesPerSession ?? 0, locale)}`} />
     </div>
   );
 }

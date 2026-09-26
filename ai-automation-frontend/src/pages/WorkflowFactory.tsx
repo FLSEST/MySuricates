@@ -44,9 +44,9 @@ export function WorkflowFactory() {
       onSuccess: (result) => {
         upsertResult(workflowId, result);
         if (result.status === 'VERIFIED') {
-          toast.success('Workflow verified!');
+          toast.success(t.factory.verified);
         } else {
-          toast.error(`Verification failed: ${result.testError ?? 'Unknown error'}`);
+          toast.error(t.factory.verifyFailed.replace('{error}', () => result.testError ?? t.factory.unknownError));
         }
       },
     });
@@ -56,7 +56,7 @@ export function WorkflowFactory() {
     promoteMutation.mutate(workflowId, {
       onSuccess: (result) => {
         upsertResult(workflowId, result);
-        toast.success('Workflow promoted as template!');
+        toast.success(t.factory.promoted);
       },
     });
   };

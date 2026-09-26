@@ -1,5 +1,6 @@
 import { Card, CardHeader } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
+import { formatUsd } from '../../utils/localeFormat';
 import type { ProviderStats } from '../../types';
 
 interface ProviderStatsCardProps {
@@ -18,6 +19,7 @@ function providerColor(provider: string): string {
 
 export function ProviderStatsCard({ data }: ProviderStatsCardProps) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
 
   if (!data?.length) return null;
 
@@ -47,7 +49,7 @@ export function ProviderStatsCard({ data }: ProviderStatsCardProps) {
                   ? `${(p.totalTokens / 1000).toFixed(0)}k ${t.charts.tokens}`
                   : '—'}
                 {p.totalCostUsd > 0
-                  ? ` · $${p.totalCostUsd < 0.01 ? p.totalCostUsd.toFixed(4) : p.totalCostUsd.toFixed(2)}`
+                  ? ` · ${formatUsd(p.totalCostUsd, locale)}`
                   : ''}
               </span>
             </div>

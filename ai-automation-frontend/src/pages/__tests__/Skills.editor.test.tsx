@@ -192,6 +192,32 @@ describe('Skills page — seal lock', () => {
   });
 });
 
+// 23635ef6: the app's own dialog instead of window.confirm, above the slide-over
+describe('Skills page — delete', () => {
+  it('deletes a custom skill only after confirmation and closes the slide-over', async () => {
+    const deleted: string[] = [];
+    serveSkills([custom]);
+    server.use(http.delete('/api/v1/skills/:id', ({ params }) => {
+      deleted.push(String(params.id));
+      return new HttpResponse(null, { status: 204 });
+    }));
+    renderWithProviders(<Skills />);
+
+    const actions = await openDetail('Reviewer');
+    fireEvent.click(within(actions).getByRole('button', { name: /Delete/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete skill' });
+    expect(within(dialog).getByText(/Delete skill "Reviewer"\?/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Delete skill' })).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(within(actions).getByRole('button', { name: /Delete/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete skill' })).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deleted).toEqual(['c1']));
+    await waitFor(() => expect(screen.queryByTestId('skill-actions')).not.toBeInTheDocument());
+  });
+});
+
 describe('Skills page — import', () => {
   it('rejects a file that is not a skill export', async () => {
     serveSkills([builtin]);

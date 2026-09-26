@@ -72,6 +72,38 @@ describe('Modal', () => {
     expect(document.body.style.overflow).toBe('hidden');
   });
 
+  // 23635ef6: a confirmation can open above another dialog (e.g. deleting from a detail dialog)
+  it('closes only the dialog on top with Escape and keeps the page locked until the last one closes', () => {
+    const closeOuter = vi.fn();
+    const closeInner = vi.fn();
+    const { rerender } = render(
+      <Modal open onClose={closeOuter} title="Outer">
+        <Modal open={false} onClose={closeInner} title="Inner">Sure?</Modal>
+      </Modal>,
+    );
+    rerender(
+      <Modal open onClose={closeOuter} title="Outer">
+        <Modal open onClose={closeInner} title="Inner">Sure?</Modal>
+      </Modal>,
+    );
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(closeInner).toHaveBeenCalledTimes(1);
+    expect(closeOuter).not.toHaveBeenCalled();
+
+    rerender(
+      <Modal open onClose={closeOuter} title="Outer">
+        <Modal open={false} onClose={closeInner} title="Inner">Sure?</Modal>
+      </Modal>,
+    );
+    expect(document.body.style.overflow).toBe('hidden');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(closeOuter).toHaveBeenCalledTimes(1);
+
+    rerender(<Modal open={false} onClose={closeOuter} title="Outer">Content</Modal>);
+    expect(document.body.style.overflow).toBe('');
+  });
+
   it('stays fixed-size without resizable (no maximise button)', () => {
     render(<Modal open={true} onClose={vi.fn()} title="Test">Content</Modal>);
     expect(screen.queryByRole('button', { name: /maxim/i })).not.toBeInTheDocument();

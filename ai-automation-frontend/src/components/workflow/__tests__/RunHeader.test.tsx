@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
@@ -109,19 +109,24 @@ describe('RunHeader', () => {
     expect((todos[0] as { description: string }).description).toContain('**Fehlgeschlagener Step:** Step 1 (shell)');
   });
 
+  // 23635ef6: the app's own dialog instead of window.confirm
   it('deletes a finished run after confirmation and goes to the workflow', async () => {
     const calls: string[] = [];
     recordActions(calls);
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     renderHeader(run('COMPLETED'));
 
     const del = await screen.findByRole('button', { name: 'Delete run' });
     fireEvent.click(del);
+    const dialog = screen.getByRole('dialog', { name: 'Delete run' });
+    expect(within(dialog).getByText(/Permanently delete this run\?/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls).toEqual([]);
+
     fireEvent.click(del);
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete run' })).getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('workflow page')).toBeInTheDocument();
     expect(calls).toEqual(['delete run-1']);
-    expect(confirm).toHaveBeenCalledTimes(2);
   });
 
   it('offers no deletion when the instance forbids it', async () => {

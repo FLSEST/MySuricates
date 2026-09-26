@@ -90,8 +90,8 @@ export function Sidebar() {
           <>
             {systemInfo?.environment && (
               <span className={`w-2 h-2 rounded-full mt-1 ${
-                systemInfo.environment === 'Produktiv' ? 'bg-emerald-400' : 'bg-amber-400'
-              }`} title={systemInfo.environment} />
+                systemInfo.environment === 'Produktiv' ? 'bg-success' : 'bg-warning'
+              }`} title={systemInfo.environment} data-testid="sidebar-environment-dot" />
             )}
             <SidebarModeToggle collapsed />
           </>

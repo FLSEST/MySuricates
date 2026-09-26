@@ -7,7 +7,7 @@ import { useProjects } from '../../hooks/useProjects';
 import { useRemainingToday, useRemainingThisWeek } from '../../hooks/useSchedules';
 import { useSystemInfo } from '../../hooks/useSystem';
 import { useI18nStore, useT, type Locale } from '../../i18n';
-import { formatTimestamp } from '../../utils/localeFormat';
+import { formatTimestamp, formatUsd } from '../../utils/localeFormat';
 import { WidgetSkeleton } from './WidgetSkeleton';
 
 function StatCard({ icon, label, value, accent, hint }: {
@@ -94,6 +94,7 @@ export function SuccessRateStat() {
 
 export function TotalCostStat() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   // The range of the numbers on screen: while another filter loads, the previous result is still shown.
   const { data: stats, isLoading, dataDays } = useDashboardData();
   if (isLoading) return <WidgetSkeleton size="stat" />;
@@ -102,9 +103,7 @@ export function TotalCostStat() {
     <StatCard
       icon={<Coins className="w-4 h-4 text-warning" />}
       label={t.dashboard.totalCostDays.replace('{days}', () => String(dataDays))}
-      value={!stats ? '-' : cost != null && cost > 0
-        ? `$${cost < 0.01 ? cost.toFixed(4) : cost.toFixed(2)}`
-        : '$0.00'}
+      value={!stats ? '-' : formatUsd(cost != null && cost > 0 ? cost : 0, locale)}
       accent="bg-warning-subtle"
     />
   );

@@ -29,6 +29,16 @@ export function formatDate(value: DateInput, locale: Locale, options?: Intl.Date
   return toDate(value).toLocaleDateString(intlLocale(locale), options);
 }
 
+/**
+ * A span of dates as the app language writes it, shared parts once ("September 21 – 27, 2026" /
+ * „21.–27. September 2026“).
+ */
+export function formatDateRange(
+  start: DateInput, end: DateInput, locale: Locale, options: Intl.DateTimeFormatOptions,
+): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), options).formatRange(toDate(start), toDate(end));
+}
+
 /** The time of day ("2:05:33 PM" / "14:05:33"), or the fields in `options`. */
 export function formatTimeOfDay(value: DateInput, locale: Locale, options?: Intl.DateTimeFormatOptions): string {
   return toDate(value).toLocaleTimeString(intlLocale(locale), options);
@@ -37,6 +47,22 @@ export function formatTimeOfDay(value: DateInput, locale: Locale, options?: Intl
 /** A number with the separators of the app language ("1,234.5" / "1.234,5"). */
 export function formatNumber(value: number, locale: Locale, options?: Intl.NumberFormatOptions): string {
   return value.toLocaleString(intlLocale(locale), options);
+}
+
+/** Exactly `digits` decimals like `toFixed`, but with the separators of the app language ("1.5" / "1,5"). */
+export function formatDecimal(value: number, locale: Locale, digits = 1): string {
+  return formatNumber(value, locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+/**
+ * A US-dollar amount ("$0.12" / "0,12 $"). Below a cent with four decimals, so the fractions of a
+ * cent an AI call costs do not read as zero; `fractionDigits` fixes the decimals instead.
+ */
+export function formatUsd(value: number, locale: Locale, fractionDigits?: number): string {
+  const digits = fractionDigits ?? (value !== 0 && Math.abs(value) < 0.01 ? 4 : 2);
+  return formatNumber(value, locale, {
+    style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits,
+  });
 }
 
 /** `value` units away from now ("in 3 hours", "vor 5 Minuten"); negative values lie in the past. */

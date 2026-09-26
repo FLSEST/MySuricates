@@ -3,7 +3,8 @@ import { useDraggable } from '@dnd-kit/core';
 import { Button } from '../ui';
 import { useI18nStore, useT } from '../../i18n';
 import { formatDate } from '../../utils/localeFormat';
-import { CHIP_WIDTH, dayOf, dayOfIsoDate, dueDateOfDay, isOverdue, isoDateOfDay, type PlanChanges } from './timelineLayout';
+import { CHIP_ANCHOR, CHIP_WIDTH, dayOf, dayOfIsoDate, dueDateOfDay, isOverdue, isoDateOfDay, type PlanChanges } from './timelineLayout';
+import type { ChipDragData } from './timelineKeyboard';
 import { SHORT_DATE, dueTitle } from './planDisplay';
 import { TimelinePopover } from './TimelinePopover';
 import type { GoalMilestone, GoalTodoItem, TodoStatus } from '../../types';
@@ -42,23 +43,28 @@ interface TimelineChipProps {
   todo: GoalTodoItem;
   milestones: GoalMilestone[];
   today: number;
-  /** Platz im Zeitstrahl; ohne steht der Chip im Fluss (Leiste „ungeplant“). */
-  placement?: { left: number; top: number; flipped: boolean };
+  /**
+   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Leiste „ungeplant“). `anchor`: Abstand vom
+   * linken Rand zum Tag, auf dem der Statuspunkt sitzt.
+   */
+  placement?: { left: number; top: number; flipped: boolean; anchor: number };
   /** Aus dem Menü des Chips – dem Weg ohne Ziehen. */
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
 }
 
 /**
- * Ein TODO auf dem Zeitstrahl (TODO e192df18): mit der Maus ziehbar, ein Klick (oder Enter) öffnet
- * sein Menü mit „Datum setzen“ und „Meilenstein“ – so bleibt alles auch ohne Ziehen bedienbar.
+ * Ein TODO auf dem Zeitstrahl (TODO e192df18): mit der Maus oder per Tastatur (Leertaste, dann
+ * Pfeiltasten – TODO ff6f08fd) ziehbar, ein Klick (oder Enter) öffnet sein Menü mit „Datum setzen“
+ * und „Meilenstein“.
  */
 export function TimelineChip({ todo, milestones, today, placement, onPlan, onOpenTodo }: TimelineChipProps) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `todo:${todo.id}` });
+  const dragData: ChipDragData = { anchor: placement?.anchor ?? CHIP_ANCHOR, flipped: placement?.flipped ?? false };
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `todo:${todo.id}`, data: dragData });
   const close = useCallback(() => setOpen(false), []);
   const overdue = isOverdue(todo, today);
   const milestone = milestones.find((m) => m.id === todo.milestoneId);

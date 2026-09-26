@@ -78,7 +78,7 @@ describe('useFactoryForm', () => {
       workflowId: 'wf-1', workflowName: 'Review Pipeline', status: 'CREATED', testRunId: null, testStatus: null,
       testError: null, promotedAsTemplate: false, durationMs: 0, retryErrors: [],
     });
-    expect(toasts()).toContain('success: Workflow "Review Pipeline" created');
+    expect(toasts()).toContain('success: Workflow “Review Pipeline” created');
     expect(result.current.isRunning).toBe(false);
   });
 
@@ -119,7 +119,7 @@ describe('useFactoryForm', () => {
     expect(requests).toEqual([{ path: 'run', body: {
       topic: 'Code review', projectId: 'p1', testInputs: {}, autoPromote: false, autoFix: true, maxRetries: 4, provider: 'CODEX',
     } }]);
-    expect(toasts()).toContain('success: Workflow "Tested Pipeline" verified!');
+    expect(toasts()).toContain('success: Workflow “Tested Pipeline” verified!');
   });
 
   it('reports a failed pipeline run with its error', async () => {
@@ -132,5 +132,27 @@ describe('useFactoryForm', () => {
     act(() => result.current.createAndTest());
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ status: 'FAILED' })));
     expect(toasts()).toContain('error: Workflow failed: step 2 timed out');
+  });
+
+  it('speaks the UI language and passes the server error on (38a32469)', async () => {
+    useI18nStore.setState({ locale: 'de' });
+    const { result, onResult } = setup();
+    act(() => {
+      result.current.setTopic('Code review');
+      result.current.setProjectId('p1');
+      result.current.setTestInputs('{ not json');
+    });
+    act(() => result.current.create());
+    await waitFor(() => expect(onResult).toHaveBeenCalled());
+    expect(toasts()).toEqual([
+      'error: Ungültiges JSON in den Test-Eingaben',
+      'success: Workflow „Review Pipeline“ erstellt',
+    ]);
+
+    useToastStore.setState({ toasts: [] });
+    server.use(http.post('/api/v1/factory/run', () => HttpResponse.json({ error: 'Test instance busy' }, { status: 503 })));
+    act(() => result.current.setTestInputs(''));
+    act(() => result.current.createAndTest());
+    await waitFor(() => expect(toasts()).toEqual(['error: Factory-Pipeline fehlgeschlagen: Test instance busy']));
   });
 });

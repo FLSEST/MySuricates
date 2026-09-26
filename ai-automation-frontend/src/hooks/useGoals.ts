@@ -88,19 +88,33 @@ export function useGoalCandidates(filter: { q: string; tag: string }, enabled = 
   );
 }
 
-/** Ordnet TODOs einem Ziel zu – ohne Rang, sie stehen hinter den eingeordneten. */
+/**
+ * Ordnet TODOs einem Ziel zu – ohne Rang, sie stehen hinter den eingeordneten. Der Kandidat
+ * verschwindet dabei sofort aus der Liste; gegen Fehlklicks bietet der Toast „Rückgängig“
+ * (TODO c9fcccc3). Das läuft auch, wenn die Zielseite schon verlassen ist: nur Client und Store.
+ */
 export function useAssignGoalTodos() {
   const qc = useQueryClient();
   const toast = useToast();
   const t = useT();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: goalKeys.all });
+    qc.invalidateQueries({ queryKey: ['todos'] });
+  };
+  const undo = (todoIds: string[]) => {
+    // `goalId: ''` löst die Zuordnung (mit Rang und Meilenstein); null hieße „unverändert“
+    void Promise.all(todoIds.map((todoId) => api.patch<Todo>(`/todos/${todoId}/planning`, { goalId: '' })))
+      .then(() => toast.success(t.goals.assignUndone))
+      .catch((err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)))
+      .finally(refresh);
+  };
   return useMutation({
     mutationFn: ({ id, todoIds }: { id: string; todoIds: string[] }) =>
       api.post<GoalDetail>(`/goals/${id}/todos`, { todoIds }),
-    onSuccess: (detail) => {
+    onSuccess: (detail, { todoIds }) => {
       qc.setQueryData(goalKeys.detail(detail.goal.id), normalizeGoalDetail(detail));
-      qc.invalidateQueries({ queryKey: goalKeys.all });
-      qc.invalidateQueries({ queryKey: ['todos'] });
-      toast.success(t.goals.assigned);
+      refresh();
+      toast.success(t.goals.assigned, { label: t.goals.undoAssign, onClick: () => undo(todoIds) });
     },
     onError: (err) => toast.error(apiErrorMessage(err, t.goals.saveFailed)),
   });

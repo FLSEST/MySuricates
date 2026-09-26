@@ -1,22 +1,18 @@
 import { Coins, Cpu, Zap, Wrench } from 'lucide-react';
 import { Card, CardHeader, Badge } from '../ui';
 import { useRunInsights } from '../../hooks/useInsights';
-import { useT } from '../../i18n';
+import { useI18nStore, useT, type Locale } from '../../i18n';
+import { formatDecimal, formatUsd } from '../../utils/localeFormat';
 
-function formatCost(usd: number): string {
-  if (usd === 0) return '$0.00';
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  return `$${usd.toFixed(2)}`;
-}
-
-function formatTokens(count: number): string {
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+function formatTokens(count: number, locale: Locale): string {
+  if (count >= 1_000_000) return `${formatDecimal(count / 1_000_000, locale)}M`;
+  if (count >= 1_000) return `${formatDecimal(count / 1_000, locale)}k`;
   return String(count);
 }
 
 export function InsightsPanel({ runId }: { runId: string }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const { data: insights, isLoading } = useRunInsights(runId);
 
   if (isLoading || !insights || insights.totalTokens === 0) return null;
@@ -31,28 +27,28 @@ export function InsightsPanel({ runId }: { runId: string }) {
           <Coins className="w-4 h-4 text-warning shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.totalCost}</p>
-            <p className="text-sm font-semibold text-text">{formatCost(insights.totalCostUsd)}</p>
+            <p className="text-sm font-semibold text-text">{formatUsd(insights.totalCostUsd, locale)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-surface">
           <Cpu className="w-4 h-4 text-accent shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.totalTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalTokens)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalTokens, locale)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-surface">
           <Zap className="w-4 h-4 text-success shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.inputTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalInputTokens)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalInputTokens, locale)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-surface">
           <Zap className="w-4 h-4 text-danger shrink-0" />
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.outputTokens}</p>
-            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalOutputTokens)}</p>
+            <p className="text-sm font-semibold text-text">{formatTokens(insights.totalOutputTokens, locale)}</p>
           </div>
         </div>
       </div>
@@ -88,8 +84,8 @@ export function InsightsPanel({ runId }: { runId: string }) {
                       )}
                     </div>
                   )}
-                  <span>{formatTokens(step.inputTokens + step.outputTokens)} tok</span>
-                  <span className="font-medium text-text">{formatCost(step.costUsd)}</span>
+                  <span>{formatTokens(step.inputTokens + step.outputTokens, locale)} tok</span>
+                  <span className="font-medium text-text">{formatUsd(step.costUsd, locale)}</span>
                 </div>
               </div>
             )

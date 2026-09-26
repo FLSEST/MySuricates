@@ -27,8 +27,9 @@ import { TodoStatsChart } from '../components/insights/TodoStatsChart';
 import { WishStatsChart } from '../components/insights/WishStatsChart';
 import { useDashboard, usePlatformStats } from '../hooks/useLearning';
 import { useProjects } from '../hooks/useProjects';
-import { useT } from '../i18n';
+import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
+import { formatDecimal, formatUsd } from '../utils/localeFormat';
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
@@ -54,14 +55,9 @@ function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }
   );
 }
 
-function formatCost(usd: number | undefined): string {
-  if (!usd) return '$0.00';
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  return `$${usd.toFixed(2)}`;
-}
-
 export function Insights() {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const [days, setDays] = useState(30);
   const [projectId, setProjectId] = useState<string>();
 
@@ -78,9 +74,9 @@ export function Insights() {
     return <ErrorState onRetry={dashRefetch} />;
   }
 
-  const successRate = stats?.successRate != null ? `${(stats.successRate * 100).toFixed(1)}%` : '—';
-  const failRate = stats?.successRate != null ? `${((1 - stats.successRate) * 100).toFixed(1)}%` : '—';
-  const avgDuration = stats?.averageDurationMs ? formatDuration(stats.averageDurationMs) : '—';
+  const successRate = stats?.successRate != null ? `${formatDecimal(stats.successRate * 100, locale)}%` : '—';
+  const failRate = stats?.successRate != null ? `${formatDecimal((1 - stats.successRate) * 100, locale)}%` : '—';
+  const avgDuration = stats?.averageDurationMs ? formatDuration(stats.averageDurationMs, locale) : '—';
   const costLabel = `${t.insights.cost} (${days}${t.insights.days30.replace('30', '')})`;
 
   // Automation degree
@@ -121,7 +117,7 @@ export function Insights() {
           <StatCard icon={<CheckCircle className="w-5 h-5" />} label={t.insights.successRate} value={successRate} sub={`${stats.successfulRuns} / ${stats.totalRuns}`} />
           <StatCard icon={<AlertTriangle className="w-5 h-5" />} label={t.insights.failureRate} value={failRate} sub={`${stats.failedRuns} ${t.insights.failedRuns}`} />
           <StatCard icon={<Clock className="w-5 h-5" />} label={t.insights.avgDuration} value={avgDuration} />
-          <StatCard icon={<DollarSign className="w-5 h-5" />} label={costLabel} value={formatCost(stats.totalCostUsd30d)} sub={stats.totalTokens30d ? `${(stats.totalTokens30d / 1_000_000).toFixed(1)}M tokens` : undefined} />
+          <StatCard icon={<DollarSign className="w-5 h-5" />} label={costLabel} value={formatUsd(stats.totalCostUsd30d ?? 0, locale)} sub={stats.totalTokens30d ? `${formatDecimal(stats.totalTokens30d / 1_000_000, locale)}M tokens` : undefined} />
           <StatCard icon={<Zap className="w-5 h-5" />} label={t.insights.totalRuns} value={String(stats.totalRuns)} />
           <StatCard icon={<TrendingUp className="w-5 h-5" />} label={t.insights.runsToday} value={String(stats.runsToday)} />
         </div>
@@ -263,7 +259,7 @@ export function Insights() {
           <SectionHeader icon={<MessageSquare className="w-4 h-4" />} title={t.insights.assistantSection} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard icon={<MessageSquare className="w-5 h-5" />} label={t.insights.sessions} value={String(platform.assistantStats.totalSessions)} />
-            <StatCard icon={<BarChart3 className="w-5 h-5" />} label={t.insights.avgMessages} value={(platform.assistantStats.avgMessagesPerSession ?? 0).toFixed(1)} />
+            <StatCard icon={<BarChart3 className="w-5 h-5" />} label={t.insights.avgMessages} value={formatDecimal(platform.assistantStats.avgMessagesPerSession ?? 0, locale)} />
           </div>
         </>
       )}

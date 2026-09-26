@@ -5,7 +5,7 @@ import {
   Bot, Cog, User, CircleHelp, Shrink, LayoutDashboard,
 } from 'lucide-react';
 import { Badge } from '../ui';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { formatDuration } from '../../utils/formatTime';
 import { BLOCK_TYPES, type BlockType, type StepResult } from '../../types';
 import { stepBlockName, stepBlockNote, stepBlockType, stepKind, type StepKind } from './stepMetadata';
@@ -112,6 +112,7 @@ export function StepBlockTypeBadge({ step }: { step: StepResult }) {
 /** Header row shared by all step cards: number, kind chip, block badge (or `badge` override), block name, duration. */
 export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: StepResult; badge?: ReactNode; className?: string }) {
   const t = useT();
+  const locale = useI18nStore((s) => s.locale);
   const blockName = stepBlockName(step);
   const note = stepBlockNote(step);
   return (
@@ -125,7 +126,7 @@ export function StepCardHeader({ step, badge, className = 'mb-1' }: { step: Step
       {step.durationMs != null && (
         <span className="text-xs text-text-tertiary flex items-center gap-1">
           <Clock className="w-3 h-3" />
-          {formatDuration(step.durationMs)}
+          {formatDuration(step.durationMs, locale)}
         </span>
       )}
       {note && <p className="basis-full text-xs text-text-tertiary" data-testid="step-note">{note}</p>}

@@ -7,6 +7,7 @@ import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleRow, StatusDot } from '../components/simple/kit';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
 import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
+import { DeleteWorkflowModal } from '../components/workflow/DeleteWorkflowModal';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
 import {
   useWorkflows,
@@ -20,7 +21,7 @@ import { resolveTemplateName } from '../utils/templateUtils';
 import { curateWorkflows } from '../utils/curateWorkflows';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
-import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry } from '../types';
+import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry, Workflow } from '../types';
 import { useInstallPoolWorkflow, usePoolWorkflows } from '../hooks/usePool';
 import { useTemplates } from '../hooks/useTemplates';
 
@@ -48,6 +49,8 @@ export function SimpleWorkflows() {
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
   const [search, setSearch] = useState('');
   const [showAll, setShowAll] = useState(false);
+  // Workflow whose deletion waits for the confirmation (23635ef6)
+  const [deleting, setDeleting] = useState<Workflow | null>(null);
   const { pinnedWorkflowIds, togglePinnedWorkflow } = useSettingsStore();
   const latestStatus = useLatestRunStatuses();
 
@@ -241,7 +244,7 @@ export function SimpleWorkflows() {
                 <button
                   aria-label={t.common.delete}
                   className="text-text-tertiary hover:text-danger transition-colors"
-                  onClick={() => { if (window.confirm(t.common.deleteConfirm)) deleteWorkflow.mutate(workflow.id); }}
+                  onClick={() => setDeleting(workflow)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -269,6 +272,14 @@ export function SimpleWorkflows() {
       )}
 
       {simpleRun.dialog}
+
+      <DeleteWorkflowModal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        workflowName={deleting?.name ?? ''}
+        deleting={deleteWorkflow.isPending}
+        onDelete={() => deleting && deleteWorkflow.mutate(deleting.id, { onSettled: () => setDeleting(null) })}
+      />
 
       <WorkflowCreateFlow
         t={t}

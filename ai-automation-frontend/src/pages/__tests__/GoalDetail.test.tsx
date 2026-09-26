@@ -5,6 +5,8 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
+import { useToastStore } from '../../stores/toastStore';
+import { ToastContainer } from '../../components/ui/ToastContainer';
 import { GoalDetail } from '../GoalDetail';
 import type { GoalDetail as GoalDetailData, GoalRelations, GoalTodoItem, Todo } from '../../types';
 
@@ -14,6 +16,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   localStorage.clear();
   useI18nStore.setState({ locale: 'en' });
+  useToastStore.setState({ toasts: [] });
 });
 
 function item(overrides: Partial<GoalTodoItem>): GoalTodoItem {
@@ -217,6 +220,41 @@ describe('GoalDetail', () => {
     await waitFor(() => expect(assigned).toEqual({ todoIds: ['c1'] }));
   });
 
+  // c9fcccc3: the candidate leaves the list at once – the toast offers to take it back
+  it('undoes an assignment from the toast by releasing the todo from the goal', async () => {
+    const assigned: unknown[] = [];
+    const planned: { id: string; body: unknown }[] = [];
+    const asked = { todos: [] as URLSearchParams[], include: [] as (string | null)[] };
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.post('/api/v1/goals/g1/todos', async ({ request }) => {
+        assigned.push(await request.json());
+        return HttpResponse.json(detail);
+      }),
+      http.patch('/api/v1/todos/:id/planning', async ({ params, request }) => {
+        planned.push({ id: String(params.id), body: await request.json() });
+        return HttpResponse.json(candidate(String(params.id), 'Release notes'));
+      }),
+    );
+    serveMapAndCandidates([candidate('c1', 'Release notes', ['release'])], asked);
+    renderWithProviders(
+      <>
+        <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+        <ToastContainer />
+      </>,
+      { route: '/goals/g1' },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add: Release notes' }));
+    await waitFor(() => expect(assigned).toEqual([{ todoIds: ['c1'] }]));
+    const toast = await screen.findByText('Added to the goal');
+    fireEvent.click(within(toast.closest('[data-testid="toast"]') as HTMLElement).getByRole('button', { name: 'Undo' }));
+
+    // goalId '' releases the todo; null would mean "unchanged" to the planning endpoint
+    await waitFor(() => expect(planned).toEqual([{ id: 'c1', body: { goalId: '' } }]));
+    expect(await screen.findByText('Removed from the goal again')).toBeInTheDocument();
+  });
+
   it('opens the edit dialog of a todo from the map', async () => {
     localStorage.setItem('mysuricates-goal-view', 'map');
     server.use(
@@ -273,6 +311,37 @@ describe('GoalDetail', () => {
     expect(await screen.findByRole('button', { name: 'No TODOs yet – add some below under “Might belong here”' })).toBeInTheDocument();
     expect(screen.queryByTestId('goal-relation-map')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  // 23635ef6: the app's own dialog instead of window.confirm
+  it('deletes the goal only after confirmation and goes back to the goals', async () => {
+    const deleted: string[] = [];
+    server.use(
+      http.get('/api/v1/goals/g1', () => HttpResponse.json(detail)),
+      http.delete('/api/v1/goals/g1', () => {
+        deleted.push('g1');
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderWithProviders(
+      <Routes>
+        <Route path="/goals/:goalId" element={<GoalDetail />} />
+        <Route path="/goals" element={<p>goal list</p>} />
+      </Routes>,
+      { route: '/goals/g1' },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete goal' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete goal' });
+    expect(within(dialog).getByText('Delete this goal? Its TODOs stay and only lose the assignment.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(deleted).toEqual([]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete goal' })).getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('goal list')).toBeInTheDocument();
+    expect(deleted).toEqual(['g1']);
   });
 
   it('keeps the error card with retry for other errors of the map', async () => {

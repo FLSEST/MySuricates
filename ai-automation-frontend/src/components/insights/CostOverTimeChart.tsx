@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartCard } from '../dashboard/ChartCard';
 import { useI18nStore, useT } from '../../i18n';
-import { formatDate } from '../../utils/localeFormat';
+import { formatDate, formatUsd } from '../../utils/localeFormat';
 import type { TimeSeriesPoint } from '../../types';
 
 export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
@@ -29,10 +29,10 @@ export function CostOverTimeChart({ data }: { data?: TimeSeriesPoint[] }) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
             <XAxis dataKey="date" tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
+            <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatUsd(Number(v), locale)} />
             <Tooltip
               contentStyle={{ backgroundColor: 'var(--color-surface-overlay)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text)', fontSize: 12 }}
-              formatter={(value) => [`$${Number(value ?? 0).toFixed(4)}`, t.insights.cost]}
+              formatter={(value) => [formatUsd(Number(value ?? 0), locale, 4), t.insights.cost]}
             />
             <Area type="monotone" dataKey="cost" stroke="var(--color-chart-3)" strokeWidth={2} fill="url(#costGradient)" />
           </AreaChart>

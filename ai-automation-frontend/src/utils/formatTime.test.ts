@@ -3,23 +3,30 @@ import { formatDuration, formatDateTime } from './formatTime';
 
 describe('formatDuration', () => {
   it('returns dash for null', () => {
-    expect(formatDuration(null)).toBe('-');
+    expect(formatDuration(null, 'en')).toBe('-');
   });
 
   it('returns dash for 0', () => {
-    expect(formatDuration(0)).toBe('-');
+    expect(formatDuration(0, 'en')).toBe('-');
   });
 
   it('formats milliseconds', () => {
-    expect(formatDuration(500)).toBe('500ms');
+    expect(formatDuration(500, 'en')).toBe('500ms');
   });
 
   it('formats seconds', () => {
-    expect(formatDuration(3500)).toBe('3.5s');
+    expect(formatDuration(3500, 'en')).toBe('3.5s');
   });
 
   it('formats minutes', () => {
-    expect(formatDuration(150_000)).toBe('2.5m');
+    expect(formatDuration(150_000, 'en')).toBe('2.5m');
+  });
+
+  // 6bb7ed36: the German UI read "3.5s" with a decimal point
+  it('writes the decimal separator of the app language', () => {
+    expect(formatDuration(3500, 'de')).toBe('3,5s');
+    expect(formatDuration(150_000, 'de')).toBe('2,5m');
+    expect(formatDuration(500, 'de')).toBe('500ms');
   });
 });
 

@@ -62,6 +62,8 @@ export function AssistantComposer({ value, onChange, onSend, inputRef }: {
         <button
           onClick={onSend}
           disabled={!value.trim()}
+          aria-label={t.assistant.send}
+          title={t.assistant.send}
           className="shrink-0 w-7 h-7 rounded-lg bg-accent text-text-inverse flex items-center justify-center
                      disabled:opacity-40 hover:bg-accent-hover transition-colors"
         >
@@ -69,7 +71,7 @@ export function AssistantComposer({ value, onChange, onSend, inputRef }: {
         </button>
       </div>
       <p className="text-[10px] text-text-tertiary text-center mt-1.5">
-        Shift+Enter für Zeilenumbruch
+        {t.assistant.newlineHint}
       </p>
     </div>
   );

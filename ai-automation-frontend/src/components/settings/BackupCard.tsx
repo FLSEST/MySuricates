@@ -4,7 +4,7 @@ import { Card, CardHeader, Button } from '../ui';
 import { downloadFromResponse } from '../../utils/downloadFile';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useI18nStore, useT } from '../../i18n';
-import { formatTimestamp } from '../../utils/localeFormat';
+import { formatDecimal, formatTimestamp } from '../../utils/localeFormat';
 import { useBackupList, useUpdateSystemSetting } from '../../hooks/useSystem';
 import { api } from '../../api/client';
 import { Database, Download, HardDrive, Archive } from 'lucide-react';
@@ -64,8 +64,8 @@ export function BackupCard() {
 
   const formatBytes = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024) return `${formatDecimal(bytes / 1024, locale)} KB`;
+    return `${formatDecimal(bytes / (1024 * 1024), locale)} MB`;
   };
 
   return (

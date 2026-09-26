@@ -2,6 +2,7 @@ import { History } from 'lucide-react';
 import { useScheduleRuns } from '../../hooks/useSchedules';
 import { useI18nStore, useT } from '../../i18n';
 import { formatTimestamp } from '../../utils/localeFormat';
+import { formatDuration } from '../../utils/formatTime';
 import { statusDot } from './statusDot';
 
 export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
@@ -43,7 +44,7 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
               {run.startedAt ? formatTimestamp(run.startedAt, locale) : '-'}
             </span>
             {run.durationMs != null && (
-              <span className="text-text-tertiary shrink-0">{(run.durationMs / 1000).toFixed(1)}s</span>
+              <span className="text-text-tertiary shrink-0">{formatDuration(run.durationMs, locale)}</span>
             )}
           </div>
         ))}
@@ -56,7 +57,7 @@ export function ScheduleRunsPanel({ scheduleId }: { scheduleId: string }) {
               {run.startedAt ? formatTimestamp(run.startedAt, locale) : '-'}
             </span>
             {run.durationMs != null && (
-              <span className="text-text-tertiary shrink-0">{(run.durationMs / 1000).toFixed(1)}s</span>
+              <span className="text-text-tertiary shrink-0">{formatDuration(run.durationMs, locale)}</span>
             )}
           </div>
         ))}

@@ -248,3 +248,34 @@ describe('Sidebar in simple mode', () => {
     expect(useSettingsStore.getState()).toMatchObject({ simpleMode: false, modeChoiceMade: true });
   });
 });
+
+// 6c94dc62: the dot of the collapsed sidebar used fixed emerald/amber classes that ignored the theme
+describe('Sidebar environment', () => {
+  const serveEnvironment = (environment: string) =>
+    server.use(http.get('/api/v1/system/info', () => HttpResponse.json({ version: '0.7.8', environment })));
+
+  it('marks production with the success token and every other environment with warning', async () => {
+    useSidebarStore.setState({ collapsed: true });
+    serveEnvironment('Produktiv');
+    const { unmount } = renderWithProviders(<Sidebar />);
+    const dot = await screen.findByTestId('sidebar-environment-dot');
+    expect(dot).toHaveAttribute('title', 'Produktiv');
+    expect(dot).toHaveClass('bg-success');
+    unmount();
+
+    serveEnvironment('Dev');
+    renderWithProviders(<Sidebar />);
+    const devDot = await screen.findByTestId('sidebar-environment-dot');
+    expect(devDot).toHaveClass('bg-warning');
+    // the health dot next to it as well
+    await waitFor(() => expect(screen.getByTitle('Systems OK').querySelector('span')).toHaveClass('bg-success'));
+    expect(document.querySelector('[class*="emerald-"], [class*="amber-"], [class*="gray-"], [class*="red-"]')).toBeNull();
+  });
+
+  it('shows the environment as a labelled pill in the open sidebar', async () => {
+    serveEnvironment('Dev');
+    renderWithProviders(<Sidebar />);
+    expect(await screen.findByText('Dev')).toHaveClass('bg-warning-subtle', 'text-warning');
+    expect(screen.queryByTestId('sidebar-environment-dot')).not.toBeInTheDocument();
+  });
+});

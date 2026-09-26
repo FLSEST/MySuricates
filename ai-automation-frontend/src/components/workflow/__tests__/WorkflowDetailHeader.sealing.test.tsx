@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/server';
 import { renderWithProviders } from '../../../test/utils';
@@ -52,18 +52,42 @@ describe('WorkflowDetailHeader sealing', () => {
     expect(screen.queryByRole('button', { name: en.workflows.seal })).not.toBeInTheDocument();
   });
 
+  // 23635ef6: the app's own dialog instead of window.confirm
   it('seals after confirmation when the module is on', async () => {
     let sealedCalls = 0;
     server.use(http.post('/api/v1/workflows/wf-1/seal', () => {
       sealedCalls += 1;
       return HttpResponse.json(workflow({ sealed: true }));
     }));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderHeader(workflow());
     fireEvent.click(screen.getByRole('button', { name: en.workflows.seal }));
+    const dialog = screen.getByRole('dialog', { name: en.workflows.seal });
+    expect(within(dialog).getByText(en.workflows.sealConfirm)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: en.common.cancel }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: en.workflows.seal }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: en.workflows.seal })).getByRole('button', { name: en.workflows.seal }));
 
     await waitFor(() => expect(sealedCalls).toBe(1));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('unseals only after confirming the unseal question', async () => {
+    const unsealed: string[] = [];
+    server.use(http.post('/api/v1/workflows/wf-1/unseal', () => {
+      unsealed.push('wf-1');
+      return HttpResponse.json(workflow());
+    }));
+
+    renderHeader(workflow({ sealed: true, sealedHash: 'a'.repeat(64) }));
+    fireEvent.click(screen.getByRole('button', { name: en.workflows.unseal }));
+    const dialog = screen.getByRole('dialog', { name: en.workflows.unseal });
+    expect(within(dialog).getByText(en.workflows.unsealConfirm)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: en.workflows.unseal }));
+
+    await waitFor(() => expect(unsealed).toEqual(['wf-1']));
   });
 
   it('turns the badge red when the seal is broken', async () => {

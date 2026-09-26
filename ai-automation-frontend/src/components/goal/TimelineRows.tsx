@@ -79,7 +79,7 @@ export function TimelineRowView({ row, axis, width, today, milestones, onPlan, o
         )}
         {row.items.map((item) => (
           <TimelineChip key={item.todo.id} todo={item.todo} milestones={milestones} today={today}
-            placement={{ left: item.left, top: ROW_PADDING + item.lane * LANE_HEIGHT, flipped: item.flipped }}
+            placement={{ left: item.left, top: ROW_PADDING + item.lane * LANE_HEIGHT, flipped: item.flipped, anchor: item.anchor }}
             onPlan={onPlan} onOpenTodo={onOpenTodo} />
         ))}
       </div>

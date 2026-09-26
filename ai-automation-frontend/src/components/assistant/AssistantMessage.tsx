@@ -7,7 +7,7 @@ import { CopyButton } from '../shared/CopyButton';
 import { MeerkatIcon } from '../layout/MeerkatIcon';
 import { formatAssistantTime, formatAssistantResponseTime, visibleActions } from '../assistantPanelUtils';
 import { isInternalAppPath } from '../../utils/internalAppPath';
-import { useT } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import { apiErrorMessage } from '../../api/client';
 import type { ChatMessage, AssistantAction, PendingTool, ToolExecutionResult } from '../../hooks/useAssistant';
 import { useConfirmPendingTool, useRejectPendingTool } from '../../hooks/useAssistant';
@@ -205,6 +205,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
   onRetry?: () => void;
 }) {
   const navigate = useNavigate();
+  const locale = useI18nStore((s) => s.locale);
   const isUser = msg.role === 'user';
   const contentRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -222,7 +223,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
   };
 
   const time = formatAssistantTime(msg.timestamp);
-  const respTime = formatAssistantResponseTime(msg.responseTimeMs);
+  const respTime = formatAssistantResponseTime(msg.responseTimeMs, locale);
 
   return (
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
