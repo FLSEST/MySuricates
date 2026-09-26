@@ -42,6 +42,32 @@ describe('MonacoValueSync', () => {
     expect(sync.shouldApply('x', 'xy')).toBe(true);
   });
 
+  it('keeps keystrokes that arrive between the mount and the first sync', () => {
+    // mounted with "", typed "abc" before React re-rendered the wrapper; the parent still says ""
+    const sync = new MonacoValueSync();
+    sync.mountedWith('');
+    for (const text of ['a', 'ab', 'abc']) sync.reportedChange(text);
+    expect(sync.shouldApply('', 'abc')).toBe(false);
+    expect(sync.shouldApply('a', 'abc')).toBe(false);
+    expect(sync.shouldApply('abc', 'abc')).toBe(false);
+  });
+
+  it('forgets the mount text after the first sync, so a later reset to it is written', () => {
+    const sync = new MonacoValueSync();
+    sync.mountedWith('');
+    expect(sync.shouldApply('', '')).toBe(false);
+    sync.reportedChange('x');
+    expect(sync.shouldApply('x', 'x')).toBe(false);
+    expect(sync.shouldApply('', 'x')).toBe(true);
+  });
+
+  it('writes a value that differs from the mount text at the first sync', () => {
+    // loaded while the editor was mounting
+    const sync = new MonacoValueSync();
+    sync.mountedWith('');
+    expect(sync.shouldApply('{"command": ""}', '')).toBe(true);
+  });
+
   it('keeps only a bounded number of reports for a parent that never echoes them', () => {
     const sync = new MonacoValueSync(3);
     for (const text of ['1', '2', '3', '4', '5']) sync.reportedChange(text);

@@ -44,7 +44,7 @@ export default defineConfig(() => {
       // gegen ein altes Backend-JAR — der Fall, der beim Test-Container 404er und haengende
       // Seiten erzeugt (CLAUDE.md, Staging).
       __APP_VERSION__: JSON.stringify(
-        JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8')).version,
+        JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf-8')).version,
       ),
       // Shim für sockjs-client, das bare `global` referenziert (siehe node_modules/sockjs-client/lib/*.js).
       // Ersetzt das bisherige Inline-<script>var global = globalThis;</script> in index.html (CSP-Verstoß).
@@ -60,7 +60,9 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api/, /^\/ws/],
           // Monaco (editor core > 2 MiB, language workers) loads on first use, not at PWA install.
           // The codeSplitting group below keeps all of monaco-editor in the `monaco` chunk.
-          globIgnores: ['**/monaco-*.js', '**/*.worker-*.js'],
+          // Its stylesheet (~146 KB) goes with it: offline the CSS is useless without the JS,
+          // it only adds to the install size. The lazy MonacoEditor chunk loads it on demand.
+          globIgnores: ['**/monaco-*.js', '**/monaco-*.css', '**/*.worker-*.js'],
         },
         manifest: {
           name: 'MySuricates',

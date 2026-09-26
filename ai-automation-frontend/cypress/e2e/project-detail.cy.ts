@@ -36,9 +36,10 @@ describe('Project Detail', () => {
     cy.contains('Status').should('be.visible');
   });
 
-  it('shows edit and delete buttons', () => {
+  // Projects are archived, not deleted, since the archive (soft delete) came in
+  it('shows edit and archive buttons', () => {
     cy.contains('button', 'Edit').should('be.visible');
-    cy.contains('button', 'Delete').should('be.visible');
+    cy.contains('button', 'Archive').should('be.visible');
   });
 
   it('opens edit modal with pre-filled data', () => {
@@ -132,10 +133,10 @@ describe('Project Detail', () => {
     cy.contains('button', 'Start Container').should('be.visible');
   });
 
-  it('shows delete confirmation modal', () => {
-    cy.contains('button', 'Delete').click();
-    cy.contains('This action cannot be undone').should('be.visible');
-    // Cancel without deleting
+  it('shows archive confirmation modal', () => {
+    cy.contains('button', 'Archive').click();
+    cy.contains('The project will be archived. It can be restored later.').should('be.visible');
+    // Cancel without archiving
     cy.get('[role="dialog"]').contains('button', 'Cancel').click();
     cy.get('[role="dialog"]').should('not.exist');
   });

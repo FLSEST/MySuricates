@@ -251,7 +251,7 @@ The page renders the widgets from the registry `components/dashboard/widgetRegis
 
 ### Shared Components (`src/components/shared/`)
 
-**Rule:** `shared` imports no feature folders (`workflow`, `goal`, `hints`, `todo`, `settings` …) and not `assistantPanelUtils`, only `ui`, `api`, `hooks`, `utils`, `types`, `stores` and `i18n`. A component that needs a feature folder belongs in that folder; feature-free helpers live in `src/utils/` (e.g. `placeholderContext.ts`, `internalAppPath.ts`). That is why `AgenticStepCard`, `ForEachStepCard` and `ApprovalDialog` (approval dialog in a run, uses `Hint`) live in `components/workflow/`, and `TodoEditModal` in `components/todo/`.
+**Rule:** `shared` imports no feature folders (`workflow`, `goal`, `hints`, `todo`, `settings` …) and not `assistantPanelUtils`, only `ui`, `api`, `hooks`, `utils`, `types`, `stores` and `i18n`. A component that needs a feature folder belongs in that folder; feature-free helpers live in `src/utils/` (e.g. `placeholderContext.ts`, `internalAppPath.ts`). That is why `AgenticStepCard`, `ForEachStepCard` and `ApprovalDialog` (approval dialog in a run, uses `Hint`) live in `components/workflow/`, and `TodoEditModal` in `components/todo/`. ESLint enforces the rule (`no-restricted-imports`, `no-restricted-syntax` for `import()`, in `eslint.config.js`); `npm run lint` fails on a violation.
 
 | Component | Description |
 |---|---|

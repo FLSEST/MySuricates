@@ -97,7 +97,9 @@ function renderBoard(statusFilter = 'ALL') {
   return renderWithProviders(<Todos />, { route: '/todos' });
 }
 
-describe('Todos — kanban queries one page per column', () => {
+// The first test renders the whole Todos page as a board: four column queries and about 1,000 elements
+// (50 cards in DONE alone), ~2 s alone, beyond the 5 s default under the load of the full suite (b26bb8ff)
+describe('Todos — kanban queries one page per column', { timeout: 15_000 }, () => {
   it('fills the OPEN column from its own query, not from a mixed page', async () => {
     renderBoard();
 

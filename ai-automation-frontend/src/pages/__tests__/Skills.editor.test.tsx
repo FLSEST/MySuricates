@@ -53,7 +53,11 @@ async function openDetail(name: string) {
   return screen.findByTestId('skill-actions');
 }
 
-describe('Skills page — creating and editing', () => {
+// jsdom parses its default stylesheet at the first getComputedStyle of a test file (each file runs in
+// its own process) and runs that cascade for every element a role query checks: the first test pays ~1 s
+// of it on top of the page, the editor dialog and its emoji picker (~50 buttons), beyond the 5 s default
+// under the load of the full suite (b26bb8ff)
+describe('Skills page — creating and editing', { timeout: 15_000 }, () => {
   it('creates a skill and opens it afterwards', async () => {
     const list: Skill[] = [builtin];
     let posted: Record<string, unknown> | undefined;

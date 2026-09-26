@@ -196,6 +196,7 @@ export function MonacoEditor({
       ...(prose ? PROSE_OPTIONS : {}),
     });
     editorRef.current = editor as unknown as MonacoEditorInstance;
+    valueSync.current.mountedWith(editor.getValue());
     doReveal();
     setMounted(true);
   };

@@ -34,6 +34,12 @@ describe('Webhooks', () => {
     });
 
     cy.shouldShowToast('Webhook created successfully');
+    // The full URL and token are shown once, right after creating
+    cy.get('[role="dialog"]').within(() => {
+      cy.contains('Token shown only now').should('be.visible');
+      cy.contains('button', 'Close').click();
+    });
+    cy.get('[role="dialog"]').should('not.exist');
   });
 
   it('shows the webhook in the table with URL and token', () => {
@@ -67,17 +73,26 @@ describe('Webhooks', () => {
     });
   });
 
-  it('has a copy button that provides visual feedback', () => {
+  // The table shows the token masked; copying happens in the one-time reveal after creating or
+  // regenerating it
+  it('offers copy buttons in the one-time reveal after regenerating the token', () => {
     cy.get('table').should('exist');
-    // Click the first copy button (aria-label="Copy")
-    cy.get('[aria-label="Copy"]').first().click();
-    // After clicking, the icon should change to a check mark briefly
-    // Verify the copy button still exists (no crash)
-    cy.get('[aria-label="Copy"]').should('exist');
+    cy.get('[aria-label="Regenerate token"]').first().click();
+    cy.get('[role="dialog"]').contains('button', 'Regenerate token').click();
+    cy.get('[role="dialog"]').within(() => {
+      cy.contains('Token shown only now').should('be.visible');
+      // One for the trigger URL, one for the token
+      cy.get('[aria-label="Copy"]').should('have.length', 2).first().click();
+      // After clicking, the icon should change to a check mark briefly; the button stays (no crash)
+      cy.get('[aria-label="Copy"]').should('exist');
+      cy.contains('button', 'Close').click();
+    });
+    cy.get('[role="dialog"]').should('not.exist');
   });
 
-  it('deletes a webhook', () => {
+  it('deletes a webhook after confirmation', () => {
     cy.get('[aria-label="Delete"]').first().click();
+    cy.get('[role="dialog"]').contains('button', 'Delete').click();
     cy.shouldShowToast('Webhook deleted successfully');
   });
 });

@@ -21,6 +21,8 @@ const fake = vi.hoisted(() => {
     path: undefined as string | undefined,
     /** Text of the models not shown, by path. */
     models: new Map<string, string>(),
+    /** Typed right after the mount, before React re-renders the wrapper with `mounted`. */
+    typeOnMount: [] as string[],
   };
   const change = (text: string) => {
     state.text = text;
@@ -80,6 +82,10 @@ vi.mock('@monaco-editor/react', async () => {
       fake.state.onChange = props.onChange ? (text) => props.onChange!(text) : undefined;
     });
     useEffect(() => {
+      // same commit as the mount, once onChange is wired: React has not re-rendered the wrapper yet
+      for (const chars of fake.state.typeOnMount) fake.type(chars);
+    }, []);
+    useEffect(() => {
       if (first.current) { first.current = false; return; }
       fake.state.options = { ...fake.state.options, ...props.options };
     }, [props.options]);
@@ -102,6 +108,7 @@ beforeEach(() => {
   fake.state.mounted = false;
   fake.state.path = undefined;
   fake.state.models.clear();
+  fake.state.typeOnMount = [];
 });
 
 describe('MonacoEditor', () => {
@@ -117,6 +124,22 @@ describe('MonacoEditor', () => {
     rerender(<MonacoEditor value="a" onChange={onChange} language="markdown" />);
     expect(fake.state.text).toBe('abc');
     rerender(<MonacoEditor value="ab" onChange={onChange} language="markdown" />);
+    expect(fake.state.text).toBe('abc');
+    rerender(<MonacoEditor value="abc" onChange={onChange} language="markdown" />);
+    expect(fake.state.text).toBe('abc');
+  });
+
+  // Under load the test above sometimes typed before the wrapper had seen the mount, and its first
+  // sync wrote the stale "" over "abc" (e1075575). The fake types in exactly that window here.
+  it('keeps keystrokes that arrive before the wrapper has seen the mount', async () => {
+    fake.state.typeOnMount = ['a', 'b', 'c'];
+    const onChange = vi.fn();
+    const { rerender } = render(<MonacoEditor value="" onChange={onChange} language="markdown" />);
+    await waitFor(() => expect(fake.state.mounted).toBe(true));
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith('abc'));
+    expect(fake.state.text).toBe('abc');
+
+    rerender(<MonacoEditor value="a" onChange={onChange} language="markdown" />);
     expect(fake.state.text).toBe('abc');
     rerender(<MonacoEditor value="abc" onChange={onChange} language="markdown" />);
     expect(fake.state.text).toBe('abc');

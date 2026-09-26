@@ -54,6 +54,12 @@ function serve({ disabled = [] as ModuleName[], answers = [] as (AssistantChatRe
     ])),
     http.get('/api/v1/executions', () => HttpResponse.json({ content: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })),
     http.get('/api/v1/executions/pending-input', () => HttpResponse.json([])),
+    // What the command field fetches once the input settles: answered here, not by the default
+    // handlers (a todo that would count as a hit) or the network (no handler for the pool)
+    http.get('/api/v1/workflow-templates', () => HttpResponse.json([])),
+    http.get('/api/v1/pool', () => HttpResponse.json([])),
+    http.get('/api/v1/schedules', () => HttpResponse.json([])),
+    http.get('/api/v1/todos', () => HttpResponse.json({ content: [], page: 0, size: 3, totalElements: 0, totalPages: 0 })),
     http.post('/api/v1/assistant/chat', async ({ request }) => {
       chats.push((await request.json()) as AssistantChatRequest);
       const next = answers.shift() ?? reply('…');
