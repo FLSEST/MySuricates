@@ -3,13 +3,25 @@ describe('Settings', () => {
     cy.visit('/settings');
   });
 
+  /** Since a8cc678d most sections start collapsed; their header button opens them. */
+  function openSection(id: string) {
+    cy.get(`#${id} > button[aria-expanded]`).click();
+    cy.get(`#${id} > button[aria-expanded]`).should('have.attr', 'aria-expanded', 'true');
+  }
+
   it('shows the page title and all sections', () => {
     cy.get('h1').should('contain.text', 'Settings');
-    cy.contains('General').should('be.visible');
-    cy.contains('Appearance').should('be.visible');
-    cy.contains('Security').should('be.visible');
-    cy.contains('Remote Access').should('be.visible');
-    cy.contains('System Info').should('be.visible');
+    for (const title of ['General', 'Appearance', 'Execution', 'Infrastructure', 'System']) {
+      cy.contains('h2', title).should('be.visible');
+    }
+    // The general section is always open
+    cy.get('#general').contains('h3', 'Security').should('be.visible');
+    // Collapsed sections hide their cards until opened
+    cy.get('#infrastructure').contains('h3', 'Remote Access').should('not.be.visible');
+    openSection('infrastructure');
+    cy.get('#infrastructure').contains('h3', 'Remote Access').should('be.visible');
+    openSection('system');
+    cy.get('#system').contains('h3', 'System Info').should('be.visible');
   });
 
   it('switches language between English and Deutsch', () => {
@@ -27,15 +39,17 @@ describe('Settings', () => {
     cy.get('h1').should('contain.text', 'Settings');
   });
 
-  it('toggles theme between light and dark', () => {
-    // Click Light
-    cy.contains('button', 'Light').click();
-    // Verify the Light button has the active style (bg-accent)
-    cy.contains('button', 'Light').should('have.class', 'bg-accent');
+  it('switches between a light and a dark theme', () => {
+    // Since a8cc678d the appearance section offers theme swatches instead of a Light/Dark switch
+    openSection('appearance');
+    cy.get('#appearance button[title="MySuricates Light"]').click();
+    cy.get('#appearance button[title="MySuricates Light"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('html').should('not.have.class', 'dark');
 
-    // Click Dark
-    cy.contains('button', 'Dark').click();
-    cy.contains('button', 'Dark').should('have.class', 'bg-accent');
+    cy.get('#appearance button[title="MySuricates Dark"]').click();
+    cy.get('#appearance button[title="MySuricates Dark"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('#appearance button[title="MySuricates Light"]').should('have.attr', 'aria-pressed', 'false');
+    cy.get('html').should('have.class', 'dark');
   });
 
   it('has an API key input field', () => {
@@ -45,10 +59,10 @@ describe('Settings', () => {
   });
 
   it('shows system health status', () => {
-    cy.contains('System Info').should('be.visible');
-    // Health status badge should appear
-    cy.contains('System Info').parents('[class*="rounded"]').first().within(() => {
-      cy.get('[class*="rounded"]').should('exist');
+    openSection('system');
+    // The side instance under test is up: the badge shows the health status of /system/health
+    cy.get('#system').contains('h3', 'System Info').closest('.rounded-xl').within(() => {
+      cy.contains('UP').should('be.visible');
     });
   });
 
