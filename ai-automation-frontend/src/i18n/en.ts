@@ -881,6 +881,15 @@ export const en = {
     unsealedToast: 'Workflow unsealed',
     sealFailed: 'Could not change the seal',
     sealedLocked: 'Sealed — unseal to edit',
+    analysis: {
+      summary: '{count} finding(s) of the build check',
+      severity: { HIGH: 'severe', MEDIUM: 'medium', LOW: 'minor' },
+      show: 'Show findings',
+      hide: 'Hide findings',
+      hint: 'Checked deterministically, without an AI call. The check only reports – saving and running still work.',
+      block: 'Block {n}',
+      definition: 'Definition',
+    },
     sealView: {
       intact: 'Seal intact',
       violated: 'Seal broken',

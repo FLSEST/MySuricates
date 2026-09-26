@@ -15,6 +15,7 @@ import { useWorkflowBlockEditor } from '../components/workflow/useWorkflowBlockE
 import { useWorkflowDetailActions } from '../hooks/useWorkflowDetailActions';
 import { WorkflowDetailHeader } from '../components/workflow/WorkflowDetailHeader';
 import { SealBanner } from '../components/workflow/SealBanner';
+import { WorkflowAnalysisNotice } from '../components/workflow/WorkflowAnalysisNotice';
 import { useSealStatus } from '../hooks/useSealStatus';
 import { WorkflowDetailSidebar } from '../components/workflow/WorkflowDetailSidebar';
 import { WorkflowDetailModals } from '../components/workflow/WorkflowDetailModals';
@@ -82,6 +83,8 @@ export function WorkflowDetail() {
       />
 
       <SealBanner workflow={workflow} status={sealStatus} />
+
+      <WorkflowAnalysisNotice workflow={workflow} />
 
       <Hint id="workflow-versions" />
 
