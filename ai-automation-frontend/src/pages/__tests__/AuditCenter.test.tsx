@@ -412,6 +412,17 @@ describe('AuditCenter report head', () => {
     expect(detailRequests).toEqual(['rep-1']);
   });
 
+  it('says so when the text of the shown report cannot be loaded, instead of an empty report', async () => {
+    useReports([{ ...report, markdownContent: null }]);
+    server.use(http.get(`${BASE}/audit-reports/:id`, () =>
+      HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 })));
+    await openAudit();
+
+    expect(await screen.findByTestId('report-text-error'))
+      .toHaveTextContent('The report text could not be loaded.: Datenbank belegt');
+    expect(screen.getByTestId('report-origin')).toBeInTheDocument();
+  });
+
   it('takes the text from the list while an older backend still sends it there', async () => {
     let detailRequested = false;
     useReports([report]);

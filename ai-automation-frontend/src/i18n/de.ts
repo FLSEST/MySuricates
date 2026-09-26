@@ -2269,6 +2269,7 @@ export const de: TranslationKeys = {
     olderReport: 'Der neueste Versuch war ungültig. Angezeigt wird der ältere Bericht vom {date}.',
     findingsInSnapshot: '{count} Findings im Snapshot',
     noDescription: 'Keine Beschreibung',
+    reportTextFailed: 'Der Text des Berichts ließ sich nicht laden.',
     findingsCount: '{count} Findings',
     openRun: 'Run öffnen',
     noFindings: 'Keine Findings in diesem Audit.',

@@ -2272,6 +2272,7 @@ export const en = {
     olderReport: 'The latest attempt was invalid. Showing the older report from {date}.',
     findingsInSnapshot: '{count} findings in the snapshot',
     noDescription: 'No description',
+    reportTextFailed: 'The report text could not be loaded.',
     findingsCount: '{count} findings',
     openRun: 'Open run',
     noFindings: 'No findings in this audit.',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ExternalLink, FileText, History } from 'lucide-react';
 import { type AuditFindingStatus, type AuditSummary, useShownAuditReport } from '../../hooks/useAuditCenter';
+import { apiErrorMessage } from '../../api/client';
 import { useT, type Locale } from '../../i18n';
 import { filterCount, initialFindingFilter } from '../../utils/auditFindingFilter';
 import { AuditFindings } from './AuditFindings';
@@ -17,7 +18,7 @@ export function AuditDetail({ audit, tab, setTab, locale, projectName, requested
   projectName?: string; requestedFinding: string | null; requestedFindingStatus?: AuditFindingStatus;
 }) {
   const t = useT();
-  const { reports, shown, markdown, markdownLoading, isLoading } = useShownAuditReport(audit);
+  const { reports, shown, markdown, markdownLoading, markdownError, isLoading } = useShownAuditReport(audit);
   // Kept here, not in the tab: switching to the report and back keeps the chosen chips.
   const [findingFilter, setFindingFilter] = useState(() => initialFindingFilter(requestedFindingStatus));
   // The header link follows the report on screen, like the run link in its head — not the latest attempt.
@@ -52,7 +53,9 @@ export function AuditDetail({ audit, tab, setTab, locale, projectName, requested
         {tab === 'report' && shown && <div className="max-w-5xl">
           <OlderReportNotice audit={audit} report={shown} locale={locale} />
           <ReportOrigin report={shown} locale={locale} />
-          {markdownLoading ? <CenteredLoading /> : <AuditMarkdown content={markdown ?? ''} />}
+          {markdownLoading ? <CenteredLoading /> : markdownError
+            ? <p role="alert" data-testid="report-text-error" className="text-sm text-danger">{apiErrorMessage(markdownError, t.auditCenter.reportTextFailed)}</p>
+            : <AuditMarkdown content={markdown ?? ''} />}
         </div>}
         {tab === 'history' && <ReportHistory reports={reports} locale={locale} />}
         {tab === 'findings' && <AuditFindings audit={audit} filter={findingFilter} setFilter={setFindingFilter}

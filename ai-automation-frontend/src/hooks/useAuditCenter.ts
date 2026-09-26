@@ -120,7 +120,10 @@ export function useShownAuditReport(audit: AuditSummary) {
   const shown = reports.find((report) => report.id === audit.latestReportId)
     ?? reports.find((report) => report.ingestionStatus === 'VALID');
   const text = useAuditReportText(shown);
-  return { reports, shown, markdown: text.markdown, markdownLoading: text.isLoading, isLoading: query.isLoading };
+  return {
+    reports, shown, markdown: text.markdown, markdownLoading: text.isLoading, markdownError: text.error,
+    isLoading: query.isLoading,
+  };
 }
 
 /**
@@ -137,6 +140,8 @@ export function useAuditReportText(report: AuditReport | undefined) {
   return {
     markdown: inline ?? query.data?.markdownContent ?? null,
     isLoading: !!report && inline === null && query.isLoading,
+    /** The detail request failed — the report would otherwise show up empty. */
+    error: inline === null && query.isError ? query.error : null,
   };
 }
 
