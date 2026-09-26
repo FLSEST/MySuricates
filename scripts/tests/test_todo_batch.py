@@ -79,6 +79,7 @@ class RepoCase(unittest.TestCase):
         run_git(self.clone, "checkout", "-q", "-b", "fix/workflow-run")
         self.state = self.clone / ".git" / "todo-batch"
         self.state.mkdir()
+        (self.state / "isolated.ok").write_text("1")
         self._cwd = os.getcwd()
         os.chdir(self.clone)
 
@@ -126,9 +127,9 @@ class HousekeepingTest(RepoCase):
     def test_plan_closes_merged_releases_lost_and_frees_orphans(self):
         import housekeeping
         todos = [todo(A, "IN_PROGRESS", [b.HANDED_OVER]), todo(B, "OPEN", [b.HANDED_OVER]),
-                 todo(C, "OPEN", [b.SELECTED]), todo(D, "IN_PROGRESS", [b.SELECTED])]
+                 todo(C, "OPEN", [b.SELECTED, b.STARTED]), todo(D, "IN_PROGRESS", [b.SELECTED, b.STARTED])]
         updates, summary = housekeeping.plan(todos, merged={A}, in_branches=set())
-        self.assertEqual(summary, {"closed": [A], "released": [B], "orphans": [C]})
+        self.assertEqual(summary, {"closed": [A], "released": [B], "orphans": [C], "stale": []})
         self.assertEqual(updates[0]["status"], "DONE")
         self.assertEqual(updates[2]["require_status"], "OPEN")
 
@@ -148,12 +149,12 @@ class HousekeepingTest(RepoCase):
 class CandidatesTest(unittest.TestCase):
     def test_active_batch_means_no_candidates(self):
         import candidates
-        self.assertEqual(candidates.select([todo(A, "IN_PROGRESS", [b.SELECTED]), todo(B)], 40), (True, []))
+        self.assertEqual(candidates.select([todo(A, "IN_PROGRESS", [b.SELECTED, b.STARTED]), todo(B)], 40)[:2], (True, []))
 
     def test_filters_batch_tags_open_questions_and_status(self):
         import candidates
-        active, chosen = candidates.select([todo(A), todo(B, tags=[b.FAILED]), todo(C, question="Welche?"),
-                                            todo(D, "IN_PROGRESS")], 40)
+        active, chosen, _ = candidates.select([todo(A), todo(B, tags=[b.FAILED]), todo(C, question="Welche?"),
+                                               todo(D, "IN_PROGRESS")], 40)
         self.assertFalse(active)
         self.assertEqual([c["id"] for c in chosen], [A])
 
@@ -447,6 +448,155 @@ class ReportAndHandoverTest(RepoCase):
         self.handover("Verwerfen", "--cleanup", "node_modules", "../source")
         self.assertFalse((self.clone / "node_modules").exists())
         self.assertTrue((self.source / ".git").exists())
+
+
+class ReviewFixesTest(RepoCase):
+    """Befunde aus dem Abschluss-Review (C1, I2–I6)."""
+
+    def gate_args(self, backend="true"):
+        return ["--backend-cmd", backend, "--frontend-cmd", "true", "--common-cmd", "true",
+                "--logs", str(self.state / "logs")]
+
+    def base_state(self, ids):
+        (self.state / "base.sha").write_text(run_git(self.clone, "rev-parse", "HEAD").strip())
+        (self.state / "ids.txt").write_text("".join(f"{i}\n" for i in ids))
+        b.write_json(self.state / "titles.json", {i: f"Titel {i[:4]}" for i in ids})
+
+    # C1 – geprüft wird der Commit, nicht der Arbeitsbaum
+    def test_uncommitted_leftovers_are_discarded_before_the_gate(self):
+        import verify
+        self.base_state([A])
+        self.commit(self.clone, "ai-automation-backend/App.java", "class App { Needed n; }\n", A)
+        write(self.clone / "ai-automation-backend" / "Needed.java", "class Needed {}\n")   # vergessen zu committen
+        call(verify.main, "--state", str(self.state), *self.gate_args(backend="test -f Needed.java"))
+        data = json.loads((self.state / "results.json").read_text())
+        self.assertEqual(data["todos"][A]["status"], "dropped")
+        self.assertIn("ai-automation-backend/Needed.java", data["discarded"])
+        self.assertFalse((self.clone / "ai-automation-backend" / "Needed.java").exists())
+
+    def test_linear_steps_leave_no_untracked_files_of_dropped_todos(self):
+        import verify
+        self.base_state([A, B])
+        self.commit(self.clone, "ai-automation-backend/BAD", "x\n", A)
+        self.commit(self.clone, "docs/b.md", "b\n", B)
+        call(verify.main, "--state", str(self.state), *self.gate_args(backend="test ! -f BAD"))
+        self.assertEqual(run_git(self.clone, "status", "--porcelain", "--untracked-files=all"), "")
+
+    # I2 – ein Abbruch darf die TODOs nicht festhalten
+    def test_handover_without_results_returns_every_todo(self):
+        import handover
+        (self.state / "ids.txt").write_text(f"{A}\n")
+        code, out = call(handover.main, "--state", str(self.state), "--answer", "", "--project-path", str(self.source),
+                         "--run", "run12345-x")
+        self.assertEqual(code, 0)
+        [entry] = last_json(out)
+        self.assertEqual((entry["status"], entry["add_tags"]), ("OPEN", [b.FAILED]))
+        self.assertIn(b.STARTED, entry["remove_tags"])
+        self.assertIn("unvollständig", entry["note"])
+
+    def test_report_without_results_is_red_not_empty(self):
+        import report
+        (self.state / "ids.txt").write_text(f"{A}\n")
+        _, out = call(report.main, "--state", str(self.state), "--run", "run12345-x", "--date", "2026-09-25")
+        self.assertEqual(out.splitlines()[0], "gate_status: RED")
+        self.assertIn("unvollständig", out)
+
+    def test_gate_timeout_counts_as_red(self):
+        import gates
+        cfg = gates.GateConfig("ai-automation-backend", "ai-automation-frontend", "sleep 5", "", "", self.state / "logs", 1)
+        ok, lines = gates.run_gates(["backend"], "", cfg, "t")
+        self.assertFalse(ok)
+        self.assertIn("Zeitüberschreitung", lines[0])
+
+    def test_stale_started_batch_is_released_and_no_longer_blocks(self):
+        import candidates, housekeeping
+        stale = dict(todo(A, "IN_PROGRESS", [b.SELECTED, b.STARTED]), updatedAt="2026-09-20T01:30:00Z")
+        fresh = dict(todo(B, "IN_PROGRESS", [b.SELECTED, b.STARTED]), updatedAt="2026-09-25T01:30:00Z")
+        now = "2026-09-25T12:00:00Z"
+        updates, summary = housekeeping.plan([stale, fresh], set(), set(), now=now, stale_hours=30)
+        self.assertEqual(summary["stale"], [A])
+        self.assertEqual((updates[0]["status"], updates[0]["require_status"]), ("OPEN", "IN_PROGRESS"))
+        self.assertTrue(candidates.select([stale, todo(C)], 40, now=now)[0] is False)
+        self.assertTrue(candidates.select([fresh, todo(C)], 40, now=now)[0] is True)
+
+    # I3 – von Hand gesetztes batch:selected überlebt das Aufräumen
+    def test_hand_tagged_selection_is_kept_and_counts_against_batch_max(self):
+        import candidates, choose, housekeeping
+        hand = todo(A, "OPEN", [b.SELECTED])
+        updates, summary = housekeeping.plan([hand], set(), set())
+        self.assertEqual((updates, summary["orphans"]), ([], []))
+        self.assertEqual(candidates.select([hand, todo(B), todo(C)], 40, batch_max=1)[1:], ([], 1))
+        self.assertEqual(len(candidates.select([hand, todo(B), todo(C)], 40, batch_max=2)[1]), 2)
+        wanted = ",".join(f'{{"id": "{i}", "reason": "r", "verify": "v"}}' for i in (B, C))
+        decision = choose.decide('TRIAGE: {"area": "docs", "selected": [' + wanted + "]}",
+                                 [{"id": B}, {"id": C}], 2, preselected=1)
+        self.assertEqual([s["id"] for s in decision["selected"]], [B])
+
+    def test_prepare_marks_started(self):
+        import prepare
+        write(self.state / "details.txt", details(todo(A, tags=[b.SELECTED])))
+        (self.state / "isolated.ok").unlink()
+        code, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.source), "--run", "run12345")
+        self.assertEqual(code, 0)
+        self.assertEqual(last_json(out)[0]["add_tags"], [b.STARTED])
+        self.assertTrue((self.state / "isolated.ok").exists())
+
+    # I4 – ein fehlendes Review ist kein sauberes
+    def test_accepted_without_review_is_a_warning(self):
+        import report, verify
+        self.base_state([A])
+        self.commit(self.clone, "docs/a.md", "a\n", A)
+        call(verify.main, "--state", str(self.state), *self.gate_args())
+        b.write_json(self.state / "reviews.json", {})
+        _, out = call(report.main, "--state", str(self.state), "--run", "run12345-x", "--date", "2026-09-25")
+        self.assertEqual(out.splitlines()[0], "gate_status: YELLOW")
+        self.assertIn("kein Review", (self.state / "approval.md").read_text())
+
+    # I6 – nie im echten Checkout
+    def test_scripts_refuse_to_work_outside_an_isolated_clone(self):
+        import handover, prepare, verify
+        write(self.state / "details.txt", details(todo(A, tags=[b.SELECTED])))
+        code, out = call(prepare.main, "--state", str(self.state), "--project-path", str(self.clone), "--run", "r")
+        self.assertEqual(code, 3)
+        self.assertIn("isoliert", out)
+        (self.state / "isolated.ok").unlink()
+        self.base_state([A])
+        self.assertEqual(call(verify.main, "--state", str(self.state), *self.gate_args())[0], 2)
+        self.assertEqual(call(handover.main, "--state", str(self.state), "--project-path", str(self.source),
+                              "--run", "r")[0], 2)
+
+
+class PoolDefinitionTest(unittest.TestCase):
+    """Die Pool-Workflows rufen die Skripte mit Argumenten auf, die diese kennen – und aus der Kopie vom Basis-Commit (I5)."""
+
+    FILES = ("mysuricates-todo-batch-einordnen.json", "mysuricates-todo-batch-abarbeiten.json")
+
+    def blocks(self):
+        for name in self.FILES:
+            for block in json.loads((REPO / "workflow-pool" / name).read_text())["blocks"]:
+                yield name, block
+
+    def test_every_script_call_uses_known_arguments(self):
+        import re
+        helps = {}
+        for name, block in self.blocks():
+            for field in ("command", "items_command"):
+                for script, args in re.findall(r"scripts/todo-batch/(\w+)\.py((?:[^\n])*)", block["config"].get(field, "")):
+                    if script not in helps:
+                        helps[script] = subprocess.run([sys.executable, str(SCRIPTS / f"{script}.py"), "--help"],
+                                                       capture_output=True, text=True).stdout
+                    for flag in re.findall(r"(--[a-z][a-z-]*)", args):
+                        self.assertIn(flag, helps[script], f"{name}/{block.get('name')}: {script}.py kennt {flag} nicht")
+
+    def test_later_steps_run_the_scripts_copied_at_the_base_commit(self):
+        for name, block in self.blocks():
+            text = json.dumps(block["config"])
+            self.assertNotIn("python3 scripts/todo-batch", text, f"{name}/{block.get('name')} ruft den Baum auf")
+
+    def test_steps_after_starting_do_not_stop_the_run(self):
+        config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}
+        for step in ("umsetzen", "pruefen", "review", "review_folgen", "gesamtreview", "bericht", "freigabe_text", "freigabe"):
+            self.assertEqual(config[step].get("on_failure"), "continue", step)
 
 
 if __name__ == "__main__":

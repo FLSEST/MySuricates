@@ -2,7 +2,7 @@
 """TODO-Batch, Abarbeiten (TODO cc0eb3ba): Bericht, Merge-Vorschau, Ampel und Dashboard-Kachel – ohne KI.
 
 Prüft zuerst, dass seit der Prüfung niemand den Branch verändert hat (Review und Gesamt-Review dürfen nur lesen);
-sonst zurück auf `head.sha`. Schreibt `approval.md` (die Frage der Freigabe), `merge.json` und `widget.json`.
+sonst zurück auf `head.sha`. Ein angenommenes TODO ohne lesbares Review gilt als „mit Hinweis“, nicht als sauber. Schreibt `approval.md` (die Frage der Freigabe), `merge.json` und `widget.json`.
 """
 from __future__ import annotations
 
@@ -45,7 +45,13 @@ def merge_preview(target: str) -> dict:
 
 def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, dict, str]:
     notes = guard_head(state)
-    data = b.read_json(state / "results.json", {"order": [], "todos": {}})
+    data = b.read_json(state / "results.json", None)
+    if data is None and b.read_text(state / "ids.txt").strip():
+        summary = "Lauf unvollständig – die Prüfung lieferte keine Ergebnisse; alle TODOs gehen mit batch:failed zurück."
+        widget = {"status": "RED", "title": f"TODO-Batch {date}", "summary": summary,
+                  "kpis": [{"label": "Angenommen", "value": "0"}], "items": []}
+        return "RED", summary, widget, ""
+    data = data or {"order": [], "todos": {}}
     reviews = b.read_json(state / "reviews.json", {})
     titles = b.read_json(state / "titles.json", {})
     order = data["order"]
@@ -56,7 +62,12 @@ def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, d
     kinds = {}
     for todo_id in order:
         status = data["todos"][todo_id]["status"] or "skipped"
-        kinds[todo_id] = "warned" if status == "accepted" and reviews.get(todo_id, {}).get("major") else status
+        review = reviews.get(todo_id)
+        kinds[todo_id] = "warned" if status == "accepted" and (not review or review.get("major")) else status
+    if data.get("discarded"):
+        shown = ", ".join(b.plain(f, 80) for f in data["discarded"][:5])
+        notes.append(f"Nicht committete Reste verworfen, geprüft wurde nur Committetes: {shown}"
+                     + (" …" if len(data["discarded"]) > 5 else ""))
     count = {kind: sum(1 for value in kinds.values() if value == kind) for kind in ICONS}
     accepted = count["accepted"] + count["warned"]
     merge = merge_preview(target) if accepted else {"state": "–", "files": []}
@@ -78,7 +89,8 @@ def build(state: Path, target: str, run_id: str, date: str) -> tuple[str, str, d
     for todo_id in order:
         result, review = data["todos"][todo_id], reviews.get(todo_id, {})
         detail = {"accepted": f"{len(result['commits'])} Commit(s), {len(result['files'])} Datei(en), {result['lines']} Zeilen",
-                  "warned": "angenommen; Review: " + "; ".join(review.get("major", [])),
+                  "warned": ("angenommen; Review: " + "; ".join(review["major"]) if review.get("major")
+                             else "angenommen; kein Review (fehlt oder nicht lesbar)"),
                   "dropped": result.get("reason") or "herausgefallen",
                   "skipped": result.get("reason") or "übersprungen"}[kinds[todo_id]]
         lines.append(f"| {ICONS[kinds[todo_id]]} | {b.short(todo_id)} {b.plain(titles.get(todo_id, ''), 100)} "

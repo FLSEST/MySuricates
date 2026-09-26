@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """TODO-Batch, Abarbeiten (TODO cc0eb3ba): Commits den TODOs zuordnen, Wächter, Gates, lineare Nachprüfung.
 
+Geprüft wird nur, was committet ist: Nicht-Committetes im Klon wird vorher verworfen und in `results.json`
+unter `discarded` genannt. Läuft nur in einem Klon, den prepare als isoliert bestätigt hat (sonst Exit 2).
 Nach dem Umsetzen: Zuordnung über den Trailer `Todo: <uuid>` (Commits ohne gültigen Trailer fallen heraus),
 Wächter je TODO (verbotene Pfade, Zeilen-Obergrenze), dann die Gates auf dem ganzen Bereich. Rot → vom
 Basis-Commit aus je TODO übernehmen und prüfen; rote TODOs fallen heraus, die übrigen bauen auf dem geprüften
@@ -64,34 +66,40 @@ def pick(shas: list[str]) -> bool:
     return False
 
 
+def reset_to(sha: str) -> None:
+    """Harter Rücksprung samt unversionierter Reste, damit kein herausgefallenes TODO im Baum weiterlebt."""
+    b.git("reset", "-q", "--hard", sha)
+    b.git("clean", "-fdq")
+
+
 def rebuild(base: str, ordered: list[tuple[str, list[str]]], results: dict) -> list[str]:
     """Baut den Branch vom Basis-Commit aus nur aus diesen TODOs neu auf; Konflikt → TODO fällt heraus."""
-    b.git("reset", "-q", "--hard", base)
+    reset_to(base)
     kept = []
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
         if pick(shas):
             kept.append(todo_id)
         else:
-            b.git("reset", "-q", "--hard", before)
+            reset_to(before)
             results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
     return kept
 
 
 def linear(base: str, ordered: list[tuple[str, list[str]]], cfg: GateConfig, results: dict) -> None:
     """Je TODO übernehmen und prüfen; rot → zurück, die übrigen bauen auf dem geprüften Stand weiter."""
-    b.git("reset", "-q", "--hard", base)
+    reset_to(base)
     for todo_id, shas in ordered:
         before = b.git("rev-parse", "HEAD").strip()
         if not pick(shas):
-            b.git("reset", "-q", "--hard", before)
+            reset_to(before)
             results[todo_id].update(status="dropped", reason="Konflikt beim Übernehmen")
             continue
         ok, lines = run_gates(scope_for(changed_files(before), cfg), f"{base}..HEAD", cfg, f"linear-{b.short(todo_id)}")
         if ok:
             results[todo_id].update(status="accepted", reason=None)
         else:
-            b.git("reset", "-q", "--hard", before)
+            reset_to(before)
             red = [line.split("\n")[0] for line in lines if "ROT" in line]
             results[todo_id].update(status="dropped", reason="Gate rot: " + "; ".join(red))
 
@@ -101,6 +109,7 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
     if not base:
         raise b.BatchError("base.sha fehlt")
     ids = [line.strip() for line in b.read_text(state / "ids.txt").splitlines() if line.strip()]
+    discarded = b.clean_tree()
     segments = b.item_segments(b.read_text(state / "umsetzen.txt"))
     groups, foreign = group(base, ids)
     results = {t: {"status": None, "reason": None, "commits": groups[t], "files": [], "lines": 0} for t in ids}
@@ -131,7 +140,8 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
                 results[todo_id].update(status="accepted")
         else:
             linear(base, ordered, cfg, results)
-    return {"base": base, "order": ids, "todos": results, "foreign": foreign, "gates": gate_lines}
+    return {"base": base, "order": ids, "todos": results, "foreign": foreign, "gates": gate_lines,
+            "discarded": discarded}
 
 
 def parse_reviews(text: str) -> dict[str, dict]:
@@ -162,6 +172,7 @@ def after_review(state: Path, cfg: GateConfig) -> dict:
     data = b.read_json(state / "results.json", None)
     if data is None:
         raise b.BatchError("results.json fehlt – erst prüfen")
+    data["discarded"] = sorted(set(data.get("discarded") or []) | set(b.clean_tree()))
     reviews = parse_reviews(b.read_text(state / "review.txt"))
     b.write_json(state / "reviews.json", reviews)
     results = data["todos"]
@@ -188,7 +199,8 @@ def finish(state: Path, data: dict) -> None:
     counts = {s: sum(1 for t in order if results[t]["status"] == s) for s in ("accepted", "dropped", "skipped")}
     print(f"Geprüft: {counts['accepted']} angenommen, {counts['dropped']} herausgefallen, "
           f"{counts['skipped']} übersprungen"
-          + (f", {len(data['foreign'])} Commit(s) ohne Trailer entfernt" if data.get("foreign") else ""))
+          + (f", {len(data['foreign'])} Commit(s) ohne Trailer entfernt" if data.get("foreign") else "")
+          + (f", {len(data['discarded'])} nicht committete Datei(en) verworfen" if data.get("discarded") else ""))
     for todo_id in order:
         r = results[todo_id]
         print(f"  {b.short(todo_id)} {r['status']}" + (f" – {b.plain(r['reason'], 160)}" if r.get("reason") else ""))
@@ -218,6 +230,7 @@ def main(argv=None) -> int:
     state = b.state(args.state)
     cfg = GateConfig.from_args(args)
     try:
+        b.require_isolated(state)
         data = after_review(state, cfg) if args.after_review else initial(state, cfg, args.forbidden.split(), args.max_lines)
     except b.BatchError as error:
         print(f"Prüfung nicht möglich: {error}")

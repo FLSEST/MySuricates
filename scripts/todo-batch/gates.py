@@ -8,6 +8,8 @@ Ergebnis und bei Rot die letzten Zeilen ohne Stacktrace-Zeilen.
 from __future__ import annotations
 
 import argparse
+import os
+import signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ class GateConfig:
     frontend_cmd: str
     common_cmd: str
     logs: Path
+    timeout: int = 3600
 
     @staticmethod
     def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -37,11 +40,12 @@ class GateConfig:
         parser.add_argument("--frontend-cmd", default="")
         parser.add_argument("--common-cmd", default="")
         parser.add_argument("--logs", default=".git/todo-batch/logs")
+        parser.add_argument("--gate-timeout", type=int, default=3600, help="Sekunden je Gate-Lauf")
 
     @staticmethod
     def from_args(args) -> "GateConfig":
         return GateConfig(args.backend_dir.rstrip("/"), args.frontend_dir.rstrip("/"), args.backend_cmd,
-                          args.frontend_cmd, args.common_cmd, Path(args.logs))
+                          args.frontend_cmd, args.common_cmd, Path(args.logs), args.gate_timeout)
 
 
 def changed_files(base: str, head: str = "HEAD") -> list[str]:
@@ -63,8 +67,18 @@ def _run(name: str, command: str, cwd: str, cfg: GateConfig, label: str) -> tupl
     cfg.logs.mkdir(parents=True, exist_ok=True)
     log = cfg.logs / f"{label}-{name}-{next(_SEQUENCE)}.log"
     with log.open("w", encoding="utf-8") as out:
-        code = subprocess.run(["bash", "-c", command], cwd=cwd, stdout=out, stderr=subprocess.STDOUT).returncode
+        # eigene Prozessgruppe: bei Zeitüberschreitung stirbt auch die JVM/der Node-Prozess unter bash
+        process = subprocess.Popen(["bash", "-c", command], cwd=cwd, stdout=out, stderr=subprocess.STDOUT,
+                                   start_new_session=True)
+        try:
+            code = process.wait(timeout=cfg.timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+            code = None
     lines = [l for l in log.read_text(encoding="utf-8", errors="replace").splitlines() if not l.lstrip().startswith("at ")]
+    if code is None:
+        lines.append(f"Zeitüberschreitung nach {cfg.timeout} s")
     return code == 0, "\n".join(lines[-15:])
 
 

@@ -7,15 +7,20 @@ Nur Standardbibliothek.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 SELECTED = "batch:selected"
+STARTED = "batch:started"
 HANDED_OVER = "batch:handed-over"
 FAILED = "batch:failed"
 REJECTED = "batch:rejected"
 BATCH_PREFIX = "batch:"
+ISOLATED_MARKER = "isolated.ok"
+STALE_HOURS = 30
 
 _TRAILER = re.compile(r"^Todo:[ \t]*([0-9a-fA-F-]{36})[ \t]*$", re.MULTILINE)
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
@@ -134,3 +139,51 @@ def plain(text, limit: int = 200) -> str:
     flat = " ".join(str(text or "").split())
     flat = _MARKER_WORDS.sub(lambda m: f"{m.group(1)} {m.group(2)}", flat)
     return flat if len(flat) <= limit else flat[: limit - 1] + "…"
+
+
+def ensure_isolated(project_path: str) -> None:
+    """Bricht ab, wenn das Arbeitsverzeichnis der echte Checkout ist statt eines Klons (Workflow ohne Isolation)."""
+    toplevel = os.path.realpath(git("rev-parse", "--show-toplevel").strip())
+    if toplevel == os.path.realpath(project_path):
+        raise BatchError("kein isolierter Klon – der Workflow braucht metadata.workspace.mode isolated")
+
+
+def require_isolated(state: Path) -> None:
+    """Die späteren Schritte arbeiten nur in einem Klon, den prepare als isoliert bestätigt hat."""
+    if not (Path(state) / ISOLATED_MARKER).exists():
+        raise BatchError("kein bestätigter isolierter Klon (prepare lief nicht oder nicht isoliert)")
+
+
+def clean_tree() -> list[str]:
+    """Verwirft alles Nicht-Committete im Klon und nennt es; geprüft wird nur, was committet ist."""
+    leftovers = [line[3:].strip() for line in git("status", "--porcelain", "--untracked-files=all").splitlines()
+                 if line.strip()]
+    git("reset", "-q", "--hard", "HEAD")
+    git("clean", "-fdq")
+    return leftovers
+
+
+def parse_time(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def now_utc(value: str | None = None) -> datetime:
+    return parse_time(value) or datetime.now(timezone.utc)
+
+
+def is_stale(todo: dict, hours: int, now: datetime) -> bool:
+    """Ein gestarteter Batch-TODO, der seit `hours` Stunden nicht verändert wurde – sein Lauf ist verloren."""
+    updated = parse_time(todo.get("updatedAt"))
+    return updated is not None and now - updated > timedelta(hours=hours)
+
+
+def active_batch(todo: dict, hours: int, now: datetime) -> bool:
+    tags = todo.get("tags") or []
+    return (todo.get("status") == "IN_PROGRESS" and SELECTED in tags and STARTED in tags
+            and not is_stale(todo, hours, now))
+

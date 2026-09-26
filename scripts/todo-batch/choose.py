@@ -19,7 +19,8 @@ def _result(area, selected=(), dropped=(), error=None) -> dict:
     return {"area": area, "selected": list(selected), "dropped": list(dropped), "error": error}
 
 
-def decide(triage_text: str, candidates: list[dict], limit: int) -> dict:
+def decide(triage_text: str, candidates: list[dict], limit: int, preselected: int = 0) -> dict:
+    limit = max(0, limit - preselected)
     raw = b.last_marker(triage_text, "TRIAGE:")
     if raw is None:
         return _result(None, error="keine TRIAGE-Zeile")
@@ -34,7 +35,7 @@ def decide(triage_text: str, candidates: list[dict], limit: int) -> dict:
     if area == "none" or not wanted:
         return _result("none")
     if area not in AREAS:
-        return _result(area, error=f"unbekannter Bereich '{b.plain(area, 40)}'")
+        return _result(b.plain(area, 40), error=f"unbekannter Bereich '{b.plain(area, 40)}'")
     by_id = {c.get("id"): c for c in candidates}
     chosen, seen, dropped = [], set(), []
     for item in wanted if isinstance(wanted, list) else []:
@@ -63,7 +64,8 @@ def main(argv=None) -> int:
     parser.add_argument("--run", required=True)
     args = parser.parse_args(argv)
     state = b.state(args.state)
-    decision = decide(b.read_text(state / "triage.txt"), b.read_json(state / "candidates.json", []), args.max)
+    preselected = int(b.read_text(state / "preselected.txt").strip() or 0)
+    decision = decide(b.read_text(state / "triage.txt"), b.read_json(state / "candidates.json", []), args.max, preselected)
     b.write_json(state / "selection.json", decision)
     print(f"Auswahl: {len(decision['selected'])} TODO(s), Bereich {decision['area']}"
           + (f" – {decision['error']}" if decision.get("error") else ""))

@@ -42,7 +42,7 @@
         "description": "Gemergte Batch-TODOs schliessen, verwaiste freigeben – das Quell-Repo wird nur gelesen",
         "shell_escape_variables": true,
         "timeout_seconds": 120,
-        "command": "set -euo pipefail\ncd {{ execution_path }}\nS=.git/todo-batch\nmkdir -p \"$S\"\nprintf '%s' {{ todo_details }} > \"$S/details.txt\"\npython3 scripts/todo-batch/housekeeping.py --state \"$S\" --project-path {{ project_path }} --target-branch {{ target_branch }}"
+        "command": "set -euo pipefail\ncd {{ execution_path }}\nS=.git/todo-batch\nmkdir -p \"$S\"\nBIN=\"$S/bin\"\nmkdir -p \"$BIN\"\n# Skripte vom Basis-Commit: spaetere Schritte laufen nie aus dem Baum, den die KI bearbeitet\ngit archive HEAD scripts/todo-batch | tar -x -C \"$BIN\"\nprintf '%s' {{ todo_details }} > \"$S/details.txt\"\npython3 \"$BIN/scripts/todo-batch/housekeeping.py\" --state \"$S\" --project-path {{ project_path }} --target-branch {{ target_branch }}"
       }
     },
     {
@@ -59,7 +59,7 @@
         "description": "Kandidaten ohne KI vorfiltern; laeuft noch ein Batch, gibt es keine",
         "shell_escape_variables": true,
         "timeout_seconds": 60,
-        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 scripts/todo-batch/candidates.py --state .git/todo-batch --max 40"
+        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 .git/todo-batch/bin/scripts/todo-batch/candidates.py --state .git/todo-batch --max 40 --batch-max {{ batch_max }}"
       }
     },
     {
@@ -81,7 +81,7 @@
         "run_if": "test -s .git/todo-batch/candidates.json",
         "shell_escape_variables": true,
         "timeout_seconds": 60,
-        "command": "set -euo pipefail\ncd {{ execution_path }}\nprintf '%s' {{ block.triage.output }} > .git/todo-batch/triage.txt\npython3 scripts/todo-batch/choose.py --state .git/todo-batch --max {{ batch_max }} --run {{ workflow_run_id }}"
+        "command": "set -euo pipefail\ncd {{ execution_path }}\nprintf '%s' {{ block.triage.output }} > .git/todo-batch/triage.txt\npython3 .git/todo-batch/bin/scripts/todo-batch/choose.py --state .git/todo-batch --max {{ batch_max }} --run {{ workflow_run_id }}"
       }
     },
     {
@@ -99,7 +99,7 @@
         "description": "Ampel und Dashboard-Kachel ohne KI",
         "shell_escape_variables": true,
         "timeout_seconds": 60,
-        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 scripts/todo-batch/triage_report.py --state .git/todo-batch --date \"$(date +%F)\""
+        "command": "set -euo pipefail\ncd {{ execution_path }}\npython3 .git/todo-batch/bin/scripts/todo-batch/triage_report.py --state .git/todo-batch --date \"$(date +%F)\""
       }
     }
   ]
