@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBackOr } from '../../hooks/useBackNavigation';
 import { ArrowLeft, Pause, Play, XCircle, FolderOpen, ListTodo, Trash2 } from 'lucide-react';
 import { Button } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -39,6 +40,7 @@ interface RunHeaderProps {
  */
 export function RunHeader({ run, workflow, workflowId, connected, isRunning, onOpenApproval }: RunHeaderProps) {
   const navigate = useNavigate();
+  const goBack = useBackOr(`/workflows/${workflowId}`);
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const toast = useToast();
@@ -54,7 +56,7 @@ export function RunHeader({ run, workflow, workflowId, connected, isRunning, onO
   return (
     <div className="flex items-center gap-4">
       <button
-        onClick={() => window.history.length > 1 ? navigate(-1) : navigate(`/workflows/${workflowId}`)}
+        onClick={goBack}
         className="p-2 rounded-lg hover:bg-surface-raised text-text-secondary hover:text-text transition-colors"
         title={t.common.back}
         aria-label={t.common.back}
