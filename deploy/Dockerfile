@@ -25,6 +25,8 @@ RUN mvn -q -B dependency:go-offline
 COPY ai-automation-backend/src/main ./src/main
 # maven-resources-plugin kopiert ../docs ins JAR (Doku-Seiten der App)
 COPY docs /src/docs
+# ... und das Block-Config-Schema aus dem Frontend (Editor und Analyzer lesen dieselbe Datei)
+COPY ai-automation-frontend/src/data/blockConfigSchema.json /src/ai-automation-frontend/src/data/blockConfigSchema.json
 RUN mvn -q -B -DskipTests package \
  && cp target/ai-automation-backend-*.jar /app.jar
 

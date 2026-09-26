@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { BLOCK_TYPES } from '../../../types';
+import { AI_BLOCK_TYPES, BLOCK_TYPES } from '../../../types';
 import {
   BLOCK_DEFAULT_CONFIG,
+  aiOverrideBlockTypes,
   allSchemaTexts,
   allowedConfigValues,
   buildBlockConfigSchema,
@@ -89,6 +90,11 @@ describe('blockConfigSchema', () => {
       expect((onFailure.markdownEnumDescriptions as string[]).length).toBe(2);
       expect(onFailure.markdownDescription).toMatch(/fehlschlägt[\s\S]*- `stop` — [\s\S]*- `continue` — /);
     }
+  });
+
+  // The shared schema file carries its own list for the backend analyzer; it must match the one the UI uses
+  it('lists the same AI block types as the UI (AI_BLOCK_TYPES)', () => {
+    expect([...aiOverrideBlockTypes()].sort()).toEqual([...AI_BLOCK_TYPES].sort());
   });
 
   it('offers the AI override keys only where the block makes an AI call', () => {
