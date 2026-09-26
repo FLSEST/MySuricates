@@ -47,7 +47,7 @@ export interface ContainerAccess {
     id: 'claude' | 'codex' | 'pi';
     selected: boolean;
     program: boolean;
-    /** null where the instance cannot tell (host) */
+    /** null only when no provider of this id is registered */
     login: boolean | null;
   }>;
 }
