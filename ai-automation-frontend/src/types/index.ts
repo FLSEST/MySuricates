@@ -1083,6 +1083,9 @@ export interface StepInsight {
   costUsd: number;
   inputTokens: number;
   outputTokens: number;
+  /** Input served from / written to Claude's prompt cache, apart from inputTokens; absent for other providers and older backends. */
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
   model: string | null;
   provider: string | null;
   numTurns: number | null;
@@ -1097,6 +1100,9 @@ export interface RunInsights {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalTokens: number;
+  /** Absent from backends before the cache figures (TODO 20adda30). */
+  totalCacheReadInputTokens?: number;
+  totalCacheCreationInputTokens?: number;
   durationMs: number | null;
   steps: StepInsight[];
 }

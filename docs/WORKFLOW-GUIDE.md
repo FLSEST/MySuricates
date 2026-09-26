@@ -1284,7 +1284,9 @@ Zusätzlich zum Modell kann pro Workflow ein einheitlicher Effort-Level gesetzt 
 }
 ```
 
-Faustregel: `high`/`xhigh` für Analyse-/Audit-Blöcke, `low` für mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar.
+Faustregel: `high`/`xhigh` für Analyse-/Audit-Blöcke, `low` für mechanische Transformationen. Der gesetzte Effort ist im Step-Metadata (`aiRequest.effort`) der Run-Details sichtbar, wenn der Anbieter ihn anwendet (bei Codex fehlt er). Ohne gesetzten Effort gilt der Standard der CLI; den meldet die CLI nicht, `aiRequest.effort` fehlt dann.
+
+Tokens im Step-Metadata: `inputTokens` ist bei Claude nur der Teil der Eingabe, den der Prompt-Cache nicht bedient hat, bei einem Claude-Code-Aufruf oft einstellig. Der Rest steht in `cacheReadInputTokens` (aus dem Cache gelesen) und `cacheCreationInputTokens` (in den Cache geschrieben); die Insights-Karte des Laufs zeigt beides als „+… Cache“. Codex und Pi melden keine echten Zahlen (`estimated: true`), dort fehlen die Cache-Schlüssel. Das Budget `max_total_tokens` des `agentic`-Blocks zählt die Cache-Tokens nicht mit.
 
 ### Provider und Modell pro Block
 

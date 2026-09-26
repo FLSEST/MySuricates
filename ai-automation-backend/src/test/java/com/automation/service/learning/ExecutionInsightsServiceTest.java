@@ -90,6 +90,34 @@ class ExecutionInsightsServiceTest {
         assertThat((List<?>) result.get("steps")).hasSize(1);
     }
 
+    /** Cache figures per step and summed per run; a step without them gets no key (TODO 20adda30). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void getRunInsights_reportsCacheTokensBesideTheUncachedInput() {
+        StepResult claude = StepResult.builder()
+                .stepIndex(0).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 2, "outputTokens", 918, "cacheReadInputTokens", 13720,
+                        "cacheCreationInputTokens", 48462))
+                .build();
+        StepResult codex = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED)
+                .metadata(Map.of("inputTokens", 400, "outputTokens", 100, "estimated", true))
+                .build();
+        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
+                .steps(new ArrayList<>(List.of(claude, codex))).build();
+        when(runRepository.findById("r1")).thenReturn(Optional.of(run));
+
+        Map<String, Object> result = service.getRunInsights("r1");
+
+        assertThat(result).containsEntry("totalInputTokens", 402L)
+                .containsEntry("totalCacheReadInputTokens", 13720L)
+                .containsEntry("totalCacheCreationInputTokens", 48462L);
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) result.get("steps");
+        assertThat(steps.get(0)).containsEntry("cacheReadInputTokens", 13720L)
+                .containsEntry("cacheCreationInputTokens", 48462L);
+        assertThat(steps.get(1)).doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
+    }
+
     @Test
     void getRunInsights_notFound_throwsException() {
         when(runRepository.findById("missing")).thenReturn(Optional.empty());

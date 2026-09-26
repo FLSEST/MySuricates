@@ -22,7 +22,7 @@ class HostRequestAiMetadataTest {
                 .allowedTools(List.of("Read", "Grep"))
                 .build();
 
-        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "CLAUDE");
+        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "CLAUDE", true);
 
         assertThat(aiRequest)
                 .containsEntry("provider", "CLAUDE")
@@ -33,6 +33,24 @@ class HostRequestAiMetadataTest {
                 .doesNotContainKeys("priority", "disallowedTools");
     }
 
+    /** Codex has no effort flag and ignores the setting, so the step does not claim one (TODO 20adda30). */
+    @Test
+    void aiRequest_providerWithoutEffort_omitsTheEffort() {
+        HostExecutionRequest request = HostExecutionRequest.builder()
+                .projectPath("/p")
+                .command("task")
+                .model("gpt-5.5")
+                .effort("high")
+                .build();
+
+        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "CODEX", false);
+
+        assertThat(aiRequest)
+                .containsEntry("provider", "CODEX")
+                .containsEntry("model", "gpt-5.5")
+                .doesNotContainKey("effort");
+    }
+
     @Test
     void aiRequest_noTools_omitsTheEmptyAllowedToolsEntry() {
         HostExecutionRequest request = HostExecutionRequest.builder()
@@ -41,7 +59,7 @@ class HostRequestAiMetadataTest {
                 .allowedTools(AiProvider.NO_TOOLS)
                 .build();
 
-        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "CLAUDE");
+        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "CLAUDE", true);
 
         assertThat(aiRequest).containsExactly(Map.entry("provider", "CLAUDE"));
     }
@@ -55,7 +73,7 @@ class HostRequestAiMetadataTest {
                 .disallowedTools(List.of("Bash", " ", "Edit"))
                 .build();
 
-        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "PI");
+        Map<String, Object> aiRequest = HostRequestAiMetadata.aiRequest(request, "PI", true);
 
         assertThat(aiRequest)
                 .containsEntry("provider", "PI")

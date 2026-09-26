@@ -7,7 +7,9 @@ import com.automation.entity.StepStatus;
 import com.automation.entity.StepResult;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderCapabilities;
 import com.automation.service.ai.AiProviderRegistry;
+import com.automation.service.ai.AiResponseMetadata;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +57,8 @@ class CommandExecutorServiceTest {
         commandExecutorService = new CommandExecutorService(sessionManager, shellCommandService, containerShellService, aiProviderRegistry);
         lenient().when(sessionManager.getOrCreateSession(anyString(), anyString())).thenReturn(cliSession);
         lenient().when(aiProviderRegistry.resolve(any())).thenReturn(aiProvider);
+        // Claude-like: the effort reaches the CLI, so aiRequest carries it
+        lenient().when(aiProvider.getCapabilities()).thenReturn(AiProviderCapabilities.full());
     }
 
     @Test
@@ -363,6 +367,49 @@ class CommandExecutorServiceTest {
 
         Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
         assertThat(aiRequest).containsEntry("effort", "high");
+    }
+
+    /** Codex ignores the effort (no CLI flag): the call still gets it, the step does not claim it (TODO 20adda30). */
+    @SuppressWarnings("unchecked")
+    @Test
+    void executeStepOnHost_providerWithoutEffortSupport_omitsEffortFromMetadata() throws IOException {
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, null));
+        when(aiProvider.getId()).thenReturn("CODEX");
+        when(aiProvider.getCapabilities()).thenReturn(AiProviderCapabilities.codex());
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(BlockDefinition.builder().type("simple").config(Map.of("command", "task")).build())
+                        .effort("high")
+                        .build());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(AiProvider.ActionRequest.class);
+        verify(aiProvider).executeAction(captor.capture());
+        assertThat(captor.getValue().effort()).isEqualTo("high");
+        Map<String, Object> aiRequest = (Map<String, Object>) result.getMetadata().get("aiRequest");
+        assertThat(aiRequest).containsEntry("provider", "CODEX").doesNotContainKey("effort");
+    }
+
+    /** The cache figures of the response reach the step metadata next to the uncached input (TODO 20adda30). */
+    @Test
+    void executeStepOnHost_carriesCacheTokensIntoStepMetadata() throws IOException {
+        var metadata = new AiResponseMetadata(2, 918, 0.408808, "claude-opus-5-5", false, 8794L, 1, "sess",
+                List.of(), 13720, 48462);
+        when(aiProvider.executeAction(any())).thenReturn(new AiProvider.ActionResult("ok", 0, metadata));
+        when(aiProvider.getId()).thenReturn("CLAUDE");
+
+        StepResult result = commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder()
+                        .projectPath("/project")
+                        .block(BlockDefinition.builder().type("simple").config(Map.of("command", "task")).build())
+                        .build());
+
+        assertThat(result.getMetadata())
+                .containsEntry("inputTokens", 2)
+                .containsEntry("cacheReadInputTokens", 13720)
+                .containsEntry("cacheCreationInputTokens", 48462)
+                .containsEntry("outputTokens", 918);
     }
 
     @Test

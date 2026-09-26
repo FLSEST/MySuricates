@@ -1262,7 +1262,9 @@ In addition to the model, a uniform effort level can be set per workflow (`workf
 }
 ```
 
-Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details.
+Rule of thumb: `high`/`xhigh` for analysis/audit blocks, `low` for mechanical transformations. The effort actually used is visible in the step metadata (`aiRequest.effort`) of the run details when the provider applies it (Codex does not). Without a configured effort the CLI's default applies; the CLI does not report it, so `aiRequest.effort` is absent then.
+
+Tokens in the step metadata: for Claude, `inputTokens` is only the part of the input the prompt cache did not serve, often a single digit for a Claude Code call. The rest is in `cacheReadInputTokens` (read from the cache) and `cacheCreationInputTokens` (written to the cache); the run's insights card shows both as "+… cache". Codex and Pi report no real figures (`estimated: true`), so they have no cache keys. The `max_total_tokens` budget of the `agentic` block does not count cache tokens.
 
 ### Provider and Model per Block
 

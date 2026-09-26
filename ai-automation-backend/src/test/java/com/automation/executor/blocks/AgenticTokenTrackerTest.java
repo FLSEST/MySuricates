@@ -32,6 +32,41 @@ class AgenticTokenTrackerTest {
         assertThat(meta).doesNotContainKey("estimated");
     }
 
+    /**
+     * Cache figures are summed into the step, but stay out of the budget: {@code max_total_tokens}
+     * was sized for the uncached input and would trip after one call (TODO 20adda30).
+     */
+    @Test
+    void cacheTokens_areSummedIntoTheStep_butNotIntoTheBudget() {
+        AiResponseMetadata reason = new AiResponseMetadata(3, 200, 0.01, "claude-opus-5-5", false, null, null, null,
+                List.of(), 10000, 5000);
+        AiResponseMetadata act = new AiResponseMetadata(5, 300, 0.02, "claude-opus-5-5", false, null, null, null,
+                List.of(), 40000, 0);
+        Map<String, Object> iterData = new LinkedHashMap<>();
+        tracker.captureReasonMeta(iterData, reason, "prompt", "response", 1);
+        tracker.captureActMeta(iterData, act, "action", "output", 1);
+        tracker.trackIteration(iterData);
+
+        assertThat(tracker.getRunningTotalTokens()).isEqualTo(3 + 200 + 5 + 300);
+        assertThat(tracker.checkBudget(1000)).isNull();
+        Map<String, Object> result = tracker.buildFinalMetadata("goal", "criteria", 1, true, null, "opus", "CLAUDE");
+        assertThat(result)
+                .containsEntry("inputTokens", 8)
+                .containsEntry("cacheReadInputTokens", 50000L)
+                .containsEntry("cacheCreationInputTokens", 5000L);
+    }
+
+    @Test
+    void cacheTokens_notReported_leaveNoKeys() {
+        Map<String, Object> iterData = new LinkedHashMap<>();
+        tracker.captureReasonMeta(iterData, AiResponseMetadata.estimated(10, 5), "prompt", "response", 1);
+        tracker.captureActMeta(iterData, null, "action", "output", 1);
+        tracker.trackIteration(iterData);
+
+        assertThat(tracker.buildFinalMetadata("goal", "criteria", 1, true, null, null, "CODEX"))
+                .doesNotContainKeys("cacheReadInputTokens", "cacheCreationInputTokens");
+    }
+
     @Test
     void captureReasonMeta_withoutUsage_storesFallback() {
         Map<String, Object> iterData = new LinkedHashMap<>();
