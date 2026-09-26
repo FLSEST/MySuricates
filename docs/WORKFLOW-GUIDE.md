@@ -46,8 +46,9 @@ POST /api/v1/workflows
 
 Alle Workflow-CRUD- und Ausführungsoperationen liegen unter `/api/v1/workflows`. Ein Run wird gestartet mit `POST /api/v1/workflows/{id}/execute`.
 
-Jeder Aufruf braucht den Header `X-API-Key`. Den Schlüssel legt das Backend beim ersten Start an und
-schreibt ihn nach `~/.autotrigger/api-key` (Installer: `scripts/setup.sh --show-key`). Die `projectId`
+Jeder Aufruf braucht den Header `X-API-Key`. Den Schlüssel legt das Backend beim ersten Start an; bei
+einer vom Installer eingerichteten Instanz zeigt ihn `scripts/instance.sh key --name <name>`, beim
+Quellcode-Setup steht er in `~/.autotrigger/api-key`. Die `projectId`
 ist die ID eines vorhandenen Projekts — `GET /api/v1/projects` listet die Projekte mit ihrem Feld `id`,
 in der Oberfläche steht sie in der Adresse der Projektseite (`/projects/<id>`). Vollständige Referenz:
 [api-referenz.md](api-referenz.md).
