@@ -6,9 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,5 +43,22 @@ class ExampleTemplatesShippedTest {
             assertThat(rootsById.get(id).path("category").asText())
                     .as("category of %s", id).isNotEqualTo("AI");
         }
+    }
+
+    /**
+     * The claims fact sheet ({@code workflow-pool/public-readiness-behauptungen.json}) counts the
+     * example workflows with a grep on the declaration line (TODO 2d782949). A list wrapped over
+     * several lines would still compile, and the fact sheet would quietly report too few.
+     */
+    @Test
+    void theIdListStaysOnTheOneLineTheClaimsFactSheetCounts() throws IOException {
+        Path source = Path.of("src/main/java/com/automation/service/example/ExampleProjectService.java");
+        List<String> declaration = Files.readAllLines(source).stream()
+                .filter(line -> line.contains("EXAMPLE_TEMPLATE_IDS = List.of("))
+                .toList();
+
+        assertThat(declaration).hasSize(1);
+        assertThat(Pattern.compile("\"[^\"]*\"").matcher(declaration.get(0)).results().count())
+                .as("quoted ids on the declaration line").isEqualTo(ExampleProjectService.EXAMPLE_TEMPLATE_IDS.size());
     }
 }

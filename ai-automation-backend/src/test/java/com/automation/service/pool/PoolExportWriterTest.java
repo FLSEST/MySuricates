@@ -73,7 +73,7 @@ class PoolExportWriterTest {
                 .metadata(new LinkedHashMap<>(Map.of("factoryGenerated", true, "origin", "hand")))
                 .build();
         ExportToPoolRequest req = new ExportToPoolRequest("Daily Report", "Tagesbericht", "Desc EN", null,
-                "REPORTING", List.of("report"), "Flo");
+                "REPORTING", List.of("report"), "Alex");
 
         ExportToPoolResponse res = writer.write(wf, req, PoolScope.REPO, tmp);
 
@@ -84,7 +84,7 @@ class PoolExportWriterTest {
         assertThat(json.get("name")).isEqualTo(Map.of("de", "Tagesbericht", "en", "Daily Report"));
         assertThat(json.get("description")).isEqualTo(Map.of("de", "Beschreibung", "en", "Desc EN"));
         assertThat(json).containsEntry("category", "REPORTING").containsEntry("scope", "repo")
-                .containsEntry("tags", List.of("report")).containsEntry("author", "Flo")
+                .containsEntry("tags", List.of("report")).containsEntry("author", "Alex")
                 .containsEntry("version", "2.1.0");
         assertThat(json.get("metadata")).isEqualTo(Map.of("origin", "hand"));
     }

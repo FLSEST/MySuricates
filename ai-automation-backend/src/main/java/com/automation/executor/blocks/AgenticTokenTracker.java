@@ -143,6 +143,8 @@ public class AgenticTokenTracker {
         if (provider != null) metadata.put("provider", provider);
         metadata.put("inputTokens", totalInputTokens);
         metadata.put("outputTokens", totalOutputTokens);
+        putCacheTotal(metadata, "cacheReadInputTokens");
+        putCacheTotal(metadata, "cacheCreationInputTokens");
         metadata.put("costUsd", totalCostUsd);
         if (!allToolNames.isEmpty()) {
             metadata.put("toolNames", allToolNames);
@@ -169,6 +171,27 @@ public class AgenticTokenTracker {
     }
 
     // --- Private helpers ---
+
+    /**
+     * Sums a cache field over all phases that reported it (TODO 20adda30). Stays out of the budget
+     * on purpose: {@code max_total_tokens} was sized for input without cache and would trip at once.
+     * No phase reported it (Codex, Pi, estimates) — no key at all instead of a misleading 0.
+     */
+    private void putCacheTotal(Map<String, Object> metadata, String field) {
+        long total = 0;
+        boolean reported = false;
+        for (Map<String, Object> iter : iterationLog) {
+            for (String metaKey : List.of("reasonMeta", "actMeta")) {
+                if (iter.get(metaKey) instanceof Map<?, ?> map && map.get(field) instanceof Number n) {
+                    total += n.longValue();
+                    reported = true;
+                }
+            }
+        }
+        if (reported) {
+            metadata.put(field, total);
+        }
+    }
 
     @SuppressWarnings("unchecked")
     private boolean isEstimated(Map<String, Object> iterData, String metaKey) {

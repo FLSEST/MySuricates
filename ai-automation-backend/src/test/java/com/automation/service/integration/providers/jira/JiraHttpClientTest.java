@@ -98,11 +98,11 @@ class JiraHttpClientTest {
     void get_sendsBearerAndNoAccept() {
         AtomicReference<String> auth = new AtomicReference<>();
         AtomicReference<String> accept = new AtomicReference<>();
-        respond("/myself", 200, "{\"displayName\":\"Flo\"}", auth, accept);
+        respond("/myself", 200, "{\"displayName\":\"Alex\"}", auth, accept);
 
         Object user = client.get(base + "/myself", "tok", Object.class);
 
-        assertThat(((Map<?, ?>) user).get("displayName")).isEqualTo("Flo");
+        assertThat(((Map<?, ?>) user).get("displayName")).isEqualTo("Alex");
         assertThat(auth.get()).isEqualTo("Bearer tok");
         assertThat(accept.get()).isNull();
     }

@@ -1949,6 +1949,8 @@ export const de: TranslationKeys = {
     totalTokens: 'Tokens Gesamt',
     inputTokens: 'Input-Tokens',
     outputTokens: 'Output-Tokens',
+    cacheTokens: 'Cache',
+    cacheTokensHint: '{read} aus dem Prompt-Cache gelesen, {write} in den Cache geschrieben – kommt zu den Input-Tokens hinzu',
     perStep: 'Aufschlüsselung pro Schritt',
     model: 'Modell',
     tools: 'Verwendete Tools',

@@ -34,11 +34,29 @@ public record ClaudeJsonResponse(
         this(result, sessionId, totalCostUsd, durationMs, durationApiMs, numTurns, usage, modelUsage, null, toolUses);
     }
 
+    /**
+     * {@code usage} of the result line, summed over all turns of the call. {@code input_tokens} counts
+     * only the input the prompt cache did not serve — with Claude Code's cached system prompt that is
+     * a handful of tokens (TODO 20adda30); the bulk sits in the two cache fields. They are nullable in
+     * the CLI's schema and missing in older versions: {@code null} then, never a made-up 0.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Usage(
             @JsonProperty("input_tokens") int inputTokens,
-            @JsonProperty("output_tokens") int outputTokens
-    ) {}
+            @JsonProperty("output_tokens") int outputTokens,
+            @JsonProperty("cache_read_input_tokens") Integer cacheReadInputTokens,
+            @JsonProperty("cache_creation_input_tokens") Integer cacheCreationInputTokens
+    ) {
+        public Usage(int inputTokens, int outputTokens) {
+            this(inputTokens, outputTokens, null, null);
+        }
+
+        /** Puts the cache fields that the CLI reported into step/run metadata. */
+        public void putCacheTokens(Map<String, Object> meta) {
+            if (cacheReadInputTokens != null) meta.put("cacheReadInputTokens", cacheReadInputTokens);
+            if (cacheCreationInputTokens != null) meta.put("cacheCreationInputTokens", cacheCreationInputTokens);
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ModelUsage(int inputTokens, int outputTokens, double costUSD) {}
@@ -60,6 +78,7 @@ public record ClaudeJsonResponse(
         if (usage != null) {
             meta.put("inputTokens", usage.inputTokens());
             meta.put("outputTokens", usage.outputTokens());
+            usage.putCacheTokens(meta);
         }
         if (totalCostUsd != null) meta.put("costUsd", totalCostUsd);
         if (durationApiMs != null) meta.put("apiDurationMs", durationApiMs);

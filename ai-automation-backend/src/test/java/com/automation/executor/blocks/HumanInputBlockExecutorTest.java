@@ -232,11 +232,11 @@ class HumanInputBlockExecutorTest {
         ));
 
         var block = BlockDefinition.builder().type("human-input").config(config).build();
-        var context = buildContextWithPrecompletedApproval("{\"name\":\"Flo\"}");
+        var context = buildContextWithPrecompletedApproval("{\"name\":\"Alex\"}");
 
         executor.execute(block, context);
 
-        assertThat(context.getVariable("name")).isEqualTo("Flo");
+        assertThat(context.getVariable("name")).isEqualTo("Alex");
         assertThat(context.getVariable("age")).isEqualTo("");
     }
 
@@ -281,13 +281,13 @@ class HumanInputBlockExecutorTest {
         config.put("variable_name", "name");
 
         var block = BlockDefinition.builder().type("human-input").config(config).build();
-        var context = buildContextWithPrecompletedApproval("Flo");
+        var context = buildContextWithPrecompletedApproval("Alex");
 
         var result = executor.execute(block, context);
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(context.getVariable("name")).isEqualTo("Flo");
-        assertThat(result.getOutput()).isEqualTo("Flo");
+        assertThat(context.getVariable("name")).isEqualTo("Alex");
+        assertThat(result.getOutput()).isEqualTo("Alex");
     }
 
     // --- Helpers ---

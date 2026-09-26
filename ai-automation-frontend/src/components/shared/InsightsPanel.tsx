@@ -10,6 +10,27 @@ function formatTokens(count: number, locale: Locale): string {
   return String(count);
 }
 
+/**
+ * Claude reports the input its prompt cache served apart from inputTokens — with Claude Code's cached
+ * system prompt that is nearly all of it (TODO 20adda30). Older backends and other providers send no
+ * cache figures: then there is nothing to add and no label.
+ */
+function CacheTokens({ read, write, locale, className = '' }: {
+  read?: number; write?: number; locale: Locale; className?: string;
+}) {
+  const t = useT();
+  const total = (read ?? 0) + (write ?? 0);
+  if (total <= 0) return null;
+  const hint = t.insights.cacheTokensHint
+    .replace('{read}', formatTokens(read ?? 0, locale))
+    .replace('{write}', formatTokens(write ?? 0, locale));
+  return (
+    <span className={`text-text-tertiary ${className}`} title={hint}>
+      +{formatTokens(total, locale)} {t.insights.cacheTokens}
+    </span>
+  );
+}
+
 export function InsightsPanel({ runId }: { runId: string }) {
   const t = useT();
   const locale = useI18nStore((s) => s.locale);
@@ -42,6 +63,8 @@ export function InsightsPanel({ runId }: { runId: string }) {
           <div>
             <p className="text-xs text-text-tertiary">{t.insights.inputTokens}</p>
             <p className="text-sm font-semibold text-text">{formatTokens(insights.totalInputTokens, locale)}</p>
+            <CacheTokens read={insights.totalCacheReadInputTokens} write={insights.totalCacheCreationInputTokens} locale={locale}
+              className="block text-[11px]" />
           </div>
         </div>
         <div className="flex items-center gap-2 p-2 rounded-lg bg-surface">
@@ -85,6 +108,7 @@ export function InsightsPanel({ runId }: { runId: string }) {
                     </div>
                   )}
                   <span>{formatTokens(step.inputTokens + step.outputTokens, locale)} tok</span>
+                  <CacheTokens read={step.cacheReadInputTokens} write={step.cacheCreationInputTokens} locale={locale} />
                   <span className="font-medium text-text">{formatUsd(step.costUsd, locale)}</span>
                 </div>
               </div>

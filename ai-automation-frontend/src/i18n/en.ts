@@ -1947,6 +1947,8 @@ export const en = {
     totalTokens: 'Total Tokens',
     inputTokens: 'Input Tokens',
     outputTokens: 'Output Tokens',
+    cacheTokens: 'cache',
+    cacheTokensHint: '{read} read from the prompt cache, {write} written to the cache – on top of the input tokens',
     perStep: 'Per Step Breakdown',
     model: 'Model',
     tools: 'Tools Used',

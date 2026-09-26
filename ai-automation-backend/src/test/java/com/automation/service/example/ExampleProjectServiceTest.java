@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -132,6 +133,33 @@ class ExampleProjectServiceTest {
 
         assertThat(service.ensure("de").workflowsAdded()).isZero();
         verify(workflowService, never()).create(any(), any());
+    }
+
+    /**
+     * An example project from before the list grew (TODO 2d782949): it gets the new examples in
+     * list order, and its existing copy — possibly changed by now — is left alone.
+     */
+    @Test
+    void anOlderExampleProject_getsTheNewExamplesInOrder_andKeepsItsCopy() throws Exception {
+        Files.createDirectories(target());
+        Project existing = project("ex", target().toString());
+        when(projectService.findAll()).thenReturn(List.of(existing));
+        Workflow changedCopy = Workflow.builder().id("wf").templateId("blueprint-approval").name("mine").build();
+        when(workflowService.findByProjectId("ex")).thenReturn(List.of(changedCopy));
+        when(templateService.findAll()).thenReturn(ExampleProjectService.EXAMPLE_TEMPLATE_IDS.stream()
+                .map(id -> template(id, "BASICS", true)).toList());
+
+        ExampleProjectService.Result result = service.ensure("de");
+
+        assertThat(result.created()).isFalse();
+        assertThat(result.workflowsAdded()).isEqualTo(ExampleProjectService.EXAMPLE_TEMPLATE_IDS.size() - 1);
+        ArgumentCaptor<CreateWorkflowRequest> workflowRequest = ArgumentCaptor.forClass(CreateWorkflowRequest.class);
+        verify(workflowService, times(result.workflowsAdded()))
+                .create(workflowRequest.capture(), eq(ChangeSource.EXAMPLE_PROJECT));
+        assertThat(workflowRequest.getAllValues()).extracting(CreateWorkflowRequest::templateId)
+                .containsExactly("blueprint-if", "blueprint-loop", "blueprint-todo", "blueprint-report");
+        verify(workflowService, never()).update(any(), any(), any());
+        verify(workflowService, never()).delete(any());
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.automation.service.cli;
 
 import com.automation.executor.StepAiMetadata;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.ai.AiProviderCapabilities;
 
 import java.util.List;
 import java.util.Map;
@@ -15,9 +17,21 @@ final class HostRequestAiMetadata {
     private HostRequestAiMetadata() {
     }
 
-    /** The {@code aiRequest} map of a host call: the request settings plus the resolved provider id. */
-    static Map<String, Object> aiRequest(HostExecutionRequest request, String resolvedProviderId) {
-        Map<String, Object> params = StepAiMetadata.aiRequest(resolvedProviderId, request.model(), request.effort());
+    /** The {@code aiRequest} map of a host call made through {@code provider}. */
+    static Map<String, Object> aiRequest(HostExecutionRequest request, AiProvider provider) {
+        AiProviderCapabilities capabilities = provider.getCapabilities();
+        return aiRequest(request, provider.getId(), capabilities != null && capabilities.supportsEffort());
+    }
+
+    /**
+     * The {@code aiRequest} map of a host call: the request settings plus the resolved provider id.
+     *
+     * @param effortApplies whether the provider passes an effort on to its CLI. Codex has no flag for it
+     *                      and ignores it, so its steps do not claim one (TODO 20adda30).
+     */
+    static Map<String, Object> aiRequest(HostExecutionRequest request, String resolvedProviderId, boolean effortApplies) {
+        Map<String, Object> params = StepAiMetadata.aiRequest(resolvedProviderId, request.model(),
+                effortApplies ? request.effort() : null);
         if (request.timeoutSeconds() != null) {
             params.put("timeoutSeconds", request.timeoutSeconds());
         }
