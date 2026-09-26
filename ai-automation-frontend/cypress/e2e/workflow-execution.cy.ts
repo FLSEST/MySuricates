@@ -85,24 +85,14 @@ function makeRun(
   };
 }
 
-function makeRunsPage(run: ReturnType<typeof makeRun>) {
-  return {
-    content: [run],
-    page: 0,
-    size: 50,
-    totalElements: 1,
-    totalPages: 1,
-  };
-}
-
 // ── Intercept Helpers ───────────────────────────────────
 
 function setupBaseIntercepts(run: ReturnType<typeof makeRun>) {
   // Workflow detail
   cy.intercept('GET', `/api/v1/workflows/${WORKFLOW_ID}`, { statusCode: 200, body: mockWorkflow }).as('getWorkflow');
 
-  // Workflow runs (paginated)
-  cy.intercept('GET', `/api/v1/workflows/${WORKFLOW_ID}/runs*`, { statusCode: 200, body: makeRunsPage(run) }).as('getRuns');
+  // The run itself: since 50c14850 the page loads it by id (the run list no longer carries steps)
+  cy.intercept('GET', `/api/v1/workflows/${WORKFLOW_ID}/runs/${RUN_ID}`, { statusCode: 200, body: run }).as('getRun');
 
   // Approval recovery check
   cy.intercept('GET', `/api/v1/executions/${RUN_ID}/approval`, { statusCode: 200, body: { pending: false } }).as('getApproval');
@@ -125,7 +115,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('renders step cards for each step', () => {
@@ -170,7 +160,7 @@ describe('WorkflowExecution', () => {
       const run = makeRun({ status: 'RUNNING', steps: [], durationMs: null, completedAt: null });
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('button', 'Pause').should('be.visible');
       cy.contains('button', 'Cancel').should('be.visible');
@@ -180,7 +170,7 @@ describe('WorkflowExecution', () => {
       const run = makeRun({ status: 'PAUSED', steps: [], durationMs: null, completedAt: null });
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('button', 'Resume').should('be.visible');
       cy.contains('button', 'Cancel').should('be.visible');
@@ -193,7 +183,7 @@ describe('WorkflowExecution', () => {
       setupBaseIntercepts(run);
       cy.intercept('POST', `/api/v1/executions/${RUN_ID}/pause`, { statusCode: 200, body: {} }).as('pauseExecution');
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('button', 'Pause').click();
       cy.wait('@pauseExecution');
@@ -204,7 +194,7 @@ describe('WorkflowExecution', () => {
       setupBaseIntercepts(run);
       cy.intercept('POST', `/api/v1/executions/${RUN_ID}/cancel`, { statusCode: 200, body: {} }).as('cancelExecution');
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('button', 'Cancel').click();
       cy.wait('@cancelExecution');
@@ -215,7 +205,7 @@ describe('WorkflowExecution', () => {
       setupBaseIntercepts(run);
       cy.intercept('POST', `/api/v1/executions/${RUN_ID}/resume`, { statusCode: 200, body: {} }).as('resumeExecution');
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('button', 'Resume').click();
       cy.wait('@resumeExecution');
@@ -232,7 +222,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows step input for each step', () => {
@@ -264,7 +254,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows COMPLETED status badge', () => {
@@ -318,7 +308,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows FAILED status badge', () => {
@@ -360,7 +350,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows input variables when present', () => {
@@ -378,7 +368,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows command input and send button', () => {
@@ -405,7 +395,7 @@ describe('WorkflowExecution', () => {
       const run = makeRun({ status: 'RUNNING', steps: [], durationMs: null, completedAt: null });
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('Waiting for steps').should('be.visible');
     });
@@ -414,7 +404,7 @@ describe('WorkflowExecution', () => {
       const run = makeRun({ status: 'COMPLETED', steps: [], durationMs: 0 });
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
 
       cy.contains('No steps recorded').should('be.visible');
     });
@@ -426,7 +416,7 @@ describe('WorkflowExecution', () => {
     beforeEach(() => {
       setupBaseIntercepts(run);
       cy.visit(PAGE_URL);
-      cy.wait(['@getWorkflow', '@getRuns']);
+      cy.wait(['@getWorkflow', '@getRun']);
     });
 
     it('shows back button', () => {
