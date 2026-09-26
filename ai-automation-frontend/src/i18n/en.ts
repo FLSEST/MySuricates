@@ -2969,6 +2969,9 @@ export const en = {
     historyToggle: 'Conversation history',
     resizeWidth: 'Adjust width',
     resizeHeight: 'Adjust height',
+    /** Avatar of the user's own messages (fits a 28 px circle). */
+    userAvatar: 'You',
+    errorReply: 'Sorry, something went wrong. Please try again.',
   },
   modules: {
     navTitle: 'Modules & hardening',

@@ -2966,6 +2966,9 @@ export const de: TranslationKeys = {
     historyToggle: 'Gesprächsverlauf',
     resizeWidth: 'Breite anpassen',
     resizeHeight: 'Höhe anpassen',
+    /** Avatar of the user's own messages (fits a 28 px circle). */
+    userAvatar: 'Du',
+    errorReply: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
   },
   modules: {
     navTitle: 'Module & Härtung',

@@ -1,3 +1,11 @@
+import { en } from '../../src/i18n/en';
+
+// Selectors come from the English texts (the locale support/e2e.ts sets), not from literals (b2cf6861).
+const a = en.assistant;
+const TOGGLE = `button[title="${a.toggle}"]`;
+const INPUT = `textarea[placeholder="${a.inputPlaceholder}"]`;
+const SEND = `button[aria-label="${a.send}"]`;
+
 describe('AssistantPanel', () => {
   const chatResponse = {
     message: 'Hier ist meine Antwort auf deine Frage.',
@@ -15,25 +23,25 @@ describe('AssistantPanel', () => {
   });
 
   function openPanel() {
-    cy.get('button[title="MySuricates Assistent"]').click();
+    cy.get(TOGGLE).click();
   }
 
   it('shows the floating toggle button', () => {
-    cy.get('button[title="MySuricates Assistent"]').should('be.visible');
+    cy.get(TOGGLE).should('be.visible');
   });
 
   it('opens panel when toggle button clicked', () => {
     openPanel();
     cy.contains('MySuricates').should('be.visible');
-    cy.contains('Frag mich alles').should('be.visible');
+    cy.contains(a.greetingSubtitle).should('be.visible');
   });
 
   it('closes panel on X button click', () => {
     openPanel();
     cy.contains('MySuricates').should('be.visible');
     // The X button in the header (last one in the header row)
-    cy.get('button[title="MySuricates Assistent"]').click();
-    cy.contains('Frag mich alles').should('not.be.visible');
+    cy.get(TOGGLE).click();
+    cy.contains(a.greetingSubtitle).should('not.be.visible');
   });
 
   it('shows suggestions on initial open', () => {
@@ -46,58 +54,43 @@ describe('AssistantPanel', () => {
   it('clicking a suggestion fills the input', () => {
     openPanel();
     cy.contains('Was lief heute?').click();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').should('have.value', 'Was lief heute?');
+    cy.get(INPUT).should('have.value', 'Was lief heute?');
   });
 
   it('send button is disabled when input is empty', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').should('have.value', '');
+    cy.get(INPUT).should('have.value', '');
     // The send button (round accent button) should be disabled
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .should('be.disabled');
+    cy.get(SEND).should('be.disabled');
   });
 
   it('typing a message enables send button', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Hallo');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .should('not.be.disabled');
+    cy.get(INPUT).type('Hallo');
+    cy.get(SEND).should('not.be.disabled');
   });
 
   it('sending a message shows user bubble', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Test Nachricht');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Test Nachricht');
+    cy.get(SEND).click();
     cy.contains('Test Nachricht').should('be.visible');
-    // User avatar shows "Du"
-    cy.contains('Du').should('be.visible');
+    // User avatar in the UI language
+    cy.contains(a.userAvatar).should('be.visible');
   });
 
   it('response appears as assistant bubble', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Hallo');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Hallo');
+    cy.get(SEND).click();
     cy.wait('@chat');
     cy.contains('Hier ist meine Antwort auf deine Frage.').should('be.visible');
   });
 
   it('shows model info after response', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Test');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Test');
+    cy.get(SEND).click();
     cy.wait('@chat');
     // Model name is displayed in header subtitle (stripped prefix)
     cy.contains('sonnet').should('be.visible');
@@ -113,11 +106,8 @@ describe('AssistantPanel', () => {
     }).as('chatWithActions');
 
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Zeig mir einen Workflow');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Zeig mir einen Workflow');
+    cy.get(SEND).click();
     cy.wait('@chatWithActions');
     cy.contains('Workflow anzeigen').should('be.visible');
   });
@@ -132,11 +122,8 @@ describe('AssistantPanel', () => {
     }).as('chatWithChoice');
 
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Frage');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Frage');
+    cy.get(SEND).click();
     cy.wait('@chatWithChoice');
     cy.contains('Option A').should('be.visible');
     cy.contains('Option B').should('be.visible');
@@ -145,60 +132,54 @@ describe('AssistantPanel', () => {
   it('new session button creates fresh chat', () => {
     openPanel();
     // Send a message first
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Erste Nachricht');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Erste Nachricht');
+    cy.get(SEND).click();
     cy.wait('@chat');
     cy.contains('Hier ist meine Antwort').should('be.visible');
 
     // Click new session button
-    cy.get('button[title="Neues Gespräch"]').click();
+    cy.get(`button[title="${a.newSession}"]`).click();
     // Old messages should be gone, empty state should show
     cy.contains('Hier ist meine Antwort').should('not.exist');
-    cy.contains('Frag mich alles').should('be.visible');
+    cy.contains(a.greetingSubtitle).should('be.visible');
   });
 
   it('Enter key sends message', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Enter Test{enter}');
+    cy.get(INPUT).type('Enter Test{enter}');
     cy.wait('@chat');
     cy.contains('Hier ist meine Antwort').should('be.visible');
   });
 
   it('Shift+Enter does not send message', () => {
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Zeile 1{shift+enter}Zeile 2');
+    cy.get(INPUT).type('Zeile 1{shift+enter}Zeile 2');
     // Message should NOT be sent
     cy.get('@chat.all').should('have.length', 0);
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').should('contain.value', 'Zeile 1');
+    cy.get(INPUT).should('contain.value', 'Zeile 1');
   });
 
   it('history button opens conversation history', () => {
     openPanel();
-    cy.get('button[title="Gesprächsverlauf"]').click();
-    cy.contains('Bisherige Gespräche').should('be.visible');
+    cy.get(`button[title="${a.historyToggle}"]`).click();
+    cy.contains(a.history).should('be.visible');
   });
 
   it('ESC closes the panel', () => {
     openPanel();
     cy.contains('MySuricates').should('be.visible');
     cy.get('body').type('{esc}');
-    cy.contains('Frag mich alles').should('not.be.visible');
+    cy.contains(a.greetingSubtitle).should('not.be.visible');
   });
 
   it('error response shows error bubble with retry', () => {
     cy.intercept('POST', '/api/v1/assistant/chat', { statusCode: 500, body: { message: 'Server Error' } }).as('chatError');
 
     openPanel();
-    cy.get('textarea[placeholder*="Nachricht eingeben"]').type('Fehler Test');
-    cy.get('textarea[placeholder*="Nachricht eingeben"]')
-      .parent()
-      .find('button')
-      .click();
+    cy.get(INPUT).type('Fehler Test');
+    cy.get(SEND).click();
     cy.wait('@chatError');
-    cy.contains('Fehler ist aufgetreten').should('be.visible');
-    cy.contains('Erneut versuchen').should('be.visible');
+    cy.contains(a.errorReply).should('be.visible');
+    cy.contains('button', en.common.retry).should('be.visible');
   });
 });
