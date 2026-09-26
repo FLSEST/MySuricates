@@ -9,7 +9,9 @@ Einstieg siehe [README.de.md](../README.de.md), zum Bauen von Workflows
 > Kuerzel in Klammern wie `(182bd224)` oder `TODO 63ecc124` sind Herkunftsnachweise:
 > Commits dieses Repositories bzw. Vorgaenge in der begleitenden MySuricates-Instanz.
 > Sie belegen, wann und warum etwas entstanden ist — von aussen nachschlagen laesst
-> sich davon nur der Commit.
+> sich davon nur der Commit. Nummern wie `(V39)` in Überschriften nennen dagegen die
+> Datenbank-Migration (Flyway-Skript `V39__….sql`), mit der ein Feature kam — Liste unter
+> [Datenbankmigrationen](#datenbankmigrationen-flyway).
 
 > Die Abläufe dieser Seite gibt es auch als Diagramme: [docs/diagramme.md](diagramme.md)
 > — Engine, Scheduler, Skills, Memory, Request-Pfad, Frontend, Deployment.
@@ -236,7 +238,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 18 Provider in Unterverzeichnissen (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
+│   ├── integration/providers/ 18 Provider in 17 Unterverzeichnissen — google/ enthält zwei, Calendar und Gmail (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; gemeinsam genutzt: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── assistant/format/  AssistantFormatUtils (Formatier-Helfer für Prompt-Bausteine; eigenes Blatt-Paket, damit context/ und fetch/ nicht auf assistant/ zurückzeigen)
@@ -438,7 +440,12 @@ Der Switch-Block evaluiert einen Ausdruck gegen mehrere Cases:
 
 ## Gate Status System
 
-Workflow-Blöcke können Quality-Gate-Marker in ihre Ausgabe schreiben:
+Ein Quality Gate ist das Urteil, das ein prüfender Workflow (Audit, Test, Review) über sein
+Ergebnis fällt: GREEN = in Ordnung, YELLOW = nicht-blockierende Befunde, RED = kritisch. Die
+Plattform wertet es aus: RED (im Modus `auto` auch YELLOW) erzeugt ein TODO, wenn Auto-TODO für
+den Workflow an ist (Standard aus), und nach einem Reparatur-Lauf schließt ein GREEN
+das auslösende TODO (`TodoFeedbackListener`, siehe [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
+Dazu schreiben Workflow-Blöcke Marker in ihre Ausgabe:
 
 ```
 gate_status: GREEN|YELLOW|RED
@@ -464,8 +471,11 @@ bleibt RED). Hintergrund: Ein Prüf-Workflow, dessen KI-Schritt still fehlschlä
 einem Workflow ohne Gate nicht zu unterscheiden — beide wurden GREEN.
 
 **Ein Gate ändert den Run-Status nicht.** Weder YELLOW noch RED: Das Gate ist ein Befund über
-das Ergebnis, kein Fehlschlag der Ausführung. RED erzeugt über `AutoTodoService` ein TODO und
-eine Warnung im Aktivitätslog, YELLOW nur die Warnung — der Lauf bleibt `COMPLETED`.
+das Ergebnis, kein Fehlschlag der Ausführung. RED und YELLOW schreiben eine Warnung ins
+Aktivitätslog (`RunCompletionHandler`). Ist Auto-TODO für den Workflow an (Workflow-Metadatum
+`autoTodo.enabled`, sonst Einstellung `auto-todo-default`, Standard aus), legt `AutoTodoService`
+bei RED ein TODO mit Priorität HIGH an, im Modus `auto` bei YELLOW eines mit MEDIUM — der Lauf
+bleibt `COMPLETED`.
 
 Den Run-Status bestimmt etwas Unabhängiges: `RunCompletionHandler` setzt
 `COMPLETED_WITH_ERRORS`, wenn ein Schritt mit `checkedCommand`-Metadatum fehlgeschlagen ist,
@@ -908,12 +918,13 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Sprache, Theme)
 │
-├── Pages (28 Routen)
+├── Pages (je Route in App.tsx eine Seite; im Simple Mode — der vereinfachten, in den
+│   │   Einstellungen umschaltbaren Oberfläche — tauschen neun Routen ihre Seite gegen eine Simple*-Variante)
 │   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
 │   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
 │   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
-│   ├── Runs, ActivityLog, Todos, DeadLetterQueue
-│   ├── Chains, ChainExecution
+│   ├── Runs, Approvals, ActivityLog, Todos, DeadLetterQueue, AuditCenter
+│   ├── Goals, GoalDetail, Chains, ChainExecution
 │   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
 │   ├── Simple*-Varianten (SimpleHome, SimpleWorkflows, etc.)
 │
@@ -1251,7 +1262,7 @@ autotrigger/
         ├── index.css                  ← Globale Styles + Tailwind-4-Konfiguration (@theme inline)
         ├── api/client.ts              ← HTTP-Client (Singleton)
         ├── types/index.ts             ← TypeScript-Typen
-        ├── pages/                     ← 37 Seiten (inkl. Simple-Mode-Varianten)
+        ├── pages/                     ← alle Seiten inkl. Simple-Mode-Varianten
         ├── components/
         │   ├── ui/                    ← Basis-UI-Primitives
         │   ├── layout/                ← App-Shell, Sidebar, Navigation

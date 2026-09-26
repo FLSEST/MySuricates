@@ -24,7 +24,7 @@ Not just for developers. For anyone who wants to solve real problems.
 
 Perfection is not a state — it is a direction. A system that considers perfection achievable will eventually stop learning. This one won't.
 
-Every run produces data. Every iteration refines the next attempt. Learning, Memory, Factory, and Wishes are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step it gets closer to perfection — and that's exactly the point.
+Every run produces data. Every iteration refines the next attempt. Learning (feedback from runs), Memory (knowledge per workflow), Factory (generates and tests workflows) and Wishes (from a wish in your own words to a finished process) — described in [Pillar 2](#pillar-2-self-improving-ai-platform) — are not features — they are the mechanisms of this continuous approximation. The system will never be perfect. But with every step it gets closer to perfection — and that's exactly the point.
 
 ---
 
@@ -77,7 +77,9 @@ MySuricates:
   6. Iterate → Fix issues, re-run if needed
 ```
 
-The Decompose-Approval Gate lets the user review and adjust the plan before execution. Pre-flight verification catches errors before they waste compute.
+The test instance is a second, isolated MySuricates instance (Docker container, port 8090,
+[deployment.md → Three-Environment Setup](deployment.md#three-environment-setup)); experiments run
+there without touching your own data. The Decompose-Approval Gate lets the user review and adjust the plan before execution. Pre-flight verification catches errors before they waste compute.
 
 ### Factory — Workflow Generation Pipeline
 
@@ -112,7 +114,7 @@ Workflows accumulate knowledge across runs:
 
 ---
 
-## What's Already Built (v0.7.4)
+## What's Already Built
 
 | Component | Status |
 |-----------|--------|
@@ -129,9 +131,9 @@ Workflows accumulate knowledge across runs:
 | 55 Built-in Templates (Dev + Office + Everyday) | Done |
 | 19 Built-in Skills (Code Review, Test Generator, Security Analyzer, etc.) | Done |
 | Staging (Dev + Stable + Test) | Done |
-| Multi-Provider (Claude + Codex + Pi) | Done |
+| Several AI providers (Claude + Codex + Pi) | Done |
 | Assistant System (contextual floating chat with page suggestions) | Done |
-| Gate Status System (Quality Gates, AutoTodo Integration) | Done |
+| Gate Status System (checking workflows report GREEN/YELLOW/RED; with auto-TODO, RED — in mode auto also YELLOW — becomes a TODO) | Done |
 | Agent Instructions System (base and per-workflow instructions) | Done |
 | CompletionTrigger System (automatic actions after workflow completion) | Done |
 | TodoTrigger System (Self-Improvement Loop: TODO → Fix Workflow → Verify → Close) | Done |
@@ -154,25 +156,26 @@ Workflows accumulate knowledge across runs:
 
 ## Roadmap
 
-### Phase 2: Cost & Intelligence (next step)
+### Next: Cost & Intelligence
 
-- **Cost Estimation Before Execution** — User sees expected token costs before a Wish runs
-- **Model Selection Per Wish** — Automatic or manual choice of the appropriate model
-- ~~**Auto-Refine Without User Intervention**~~ — Done (`Wish.autoRefine` + auto-approve in `WishDecomposeService`)
-- ~~**Iteration History With Delta Tracking**~~ — Done (`Wish.iterationHistory` + `iterationDiff.ts` diff view)
+- **Cost estimation before execution** — the user sees the expected token costs before a Wish runs
+- **Model selection per Wish** — automatic or manual choice of the appropriate model
+- **Wish analytics dashboard** — add costs and trends of Wishes (success rate and status counts exist already)
 
-### Phase 3: Crystallize & Discovery
+### Later: Ecosystem
 
-- ~~**Crystallize Wizard**~~ — Done (`WishService.crystallize()` + Controller)
-- ~~**Template Discovery & Search**~~ — Done (WorkflowPoolService + PoolBrowser)
-- **Wish Analytics Dashboard** — Visualize success rates, costs, trends
+- **External skill packages** — installable packages (Git repo/ZIP) with new Skills and Capabilities
+- **MCP servers as skills** — automatically make MCP servers available as Skills/Capabilities
+- **Integration plugins** — integrations as loadable packages; today the providers of the
+  `integration` block (Slack, Jira, GitHub and others) are built in
+- **Workflow marketplace** — share and discover community templates
 
-### Long-term: Ecosystem
+### Done from earlier roadmap steps
 
-- **External Skill Packages** — Installable packages (Git repo/ZIP) with new Skills + Capabilities
-- **MCP Servers as Skills** — Automatically make MCP servers available as Skills/Capabilities
-- **Integration Plugins** — Slack, Jira, GitHub, Email as workflow blocks
-- **Workflow Marketplace** — Share and discover community templates
+- **Refining on its own** — a Wish can approve and refine its plan without asking (option "Auto-Refine")
+- **Iteration history** — every pass of a Wish is kept, with a diff view against the previous one
+- **Crystallize** — a successfully completed Wish becomes a reusable template
+- **Finding templates** — search and take over from the workflow pool (bundled workflow definitions)
 
 ---
 
@@ -206,5 +209,5 @@ Workflows accumulate knowledge across runs:
 
 - **Backend**: Spring Boot 3.5, Java 21, SQLite, Flyway
 - **Frontend**: React 19, TypeScript, TailwindCSS, TanStack Query, Zustand
-- **Execution**: Docker containers (Python/Node/Go), Host Claude CLI, Host Codex CLI, Host Pi CLI
+- **Execution**: Docker containers (Node, Python, DevOps, Java agent images), Host Claude CLI, Host Codex CLI, Host Pi CLI
 - **Deployment**: Dev (source) + Stable (Docker, port 9091) + Test (Docker, port 8090)

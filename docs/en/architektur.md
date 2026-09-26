@@ -9,7 +9,9 @@ This page describes its internal structure. For getting started see
 > Short identifiers in parentheses such as `(182bd224)` or `TODO 63ecc124` are
 > provenance markers: commits of this repository, or items in the accompanying
 > MySuricates instance. They record when and why something came about — from the
-> outside, only the commit can be looked up.
+> outside, only the commit can be looked up. Numbers such as `(V39)` in headings, in
+> contrast, name the database migration (Flyway script `V39__….sql`) that brought a
+> feature — list under [Database Migrations](#database-migrations-flyway).
 
 > The flows on this page also exist as diagrams: [docs/en/diagramme.md](diagramme.md)
 > — engine, scheduler, skills, memory, request path, frontend, deployment.
@@ -235,7 +237,7 @@ com.automation
 │   ├── health/          HealthAutoTodoService
 │   ├── audit/           AuditResultParser, AuditIngestionService (+ AuditSnapshotApplier), AuditIngestionListener, AuditCenterService (+ AuditFindingTodoLinker)
 │   ├── integration/     IntegrationRegistry, IntegrationOAuthService, IntegrationEncryptionService, IntegrationProvider, OAuthConfig, TaskExportCapable
-│   ├── integration/providers/ 18 Providers in subdirectories (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
+│   ├── integration/providers/ 18 Providers in 17 subdirectories — google/ holds two, Calendar and Gmail (caldav/, confluence/, feed/, gitea/, github/, gitlab/, google/, httpapi/, icalfeed/, jira/, ntfy/, openmeteo/, slack/, taskwarrior/, telegram/, todoist/, trello/; shared: ical/)
 │   ├── assistant/       AssistantContextBuilder (+ PageContextRenderer, ProjectFileListing), AssistantChatCaller, AssistantChatBroadcaster, AssistantFetchService, AssistantToolExecutor (+ AssistantTodoTools, AssistantWorkflowTools, AssistantChainTools, AssistantToolPayloads), AssistantActionSuggestionService, AssistantErrorClassifier, AssistantFetchPolicy, AssistantMutationGate, AssistantActionMerger, AssistantResponseParser, PendingToolRegistry, ToolExecutionResult
 │   ├── assistant/context/ AssistantContextSection, BlockTypesIndexSection, ChainsIndexSection, FailedWorkflowsContextSection, IntegrationsIndexSection, RunsContextSection, SchedulesContextSection, SkillsIndexSection, TodosContextSection, WishesContextSection
 │   ├── assistant/format/  AssistantFormatUtils (formatting helpers for prompt parts; a leaf package of its own, so context/ and fetch/ do not point back to assistant/)
@@ -433,7 +435,12 @@ The switch block evaluates an expression against multiple cases:
 
 ## Gate Status System
 
-Workflow blocks can write quality gate markers into their output:
+A quality gate is the verdict a checking workflow (audit, test, review) passes on its result:
+GREEN = fine, YELLOW = non-blocking findings, RED = critical. The platform evaluates it: RED (in
+mode `auto` also YELLOW) creates a TODO when auto-TODO is on for the workflow (off by default), and
+after a repair run a GREEN closes the TODO that triggered it
+(`TodoFeedbackListener`, see [Todo Triggers](#todo-triggers--self-improvement-loop-v51v52)).
+To do so, workflow blocks write markers into their output:
 
 ```
 gate_status: GREEN|YELLOW|RED
@@ -447,8 +454,11 @@ gate_description: <description>
 - Gate status is stored in `WorkflowRun.metadata` (`gate_status`, `gate_category`, `gate_description`)
 
 **A gate does not change the run status.** Neither YELLOW nor RED: the gate is a finding about
-the result, not a failure of the execution. RED creates a todo via `AutoTodoService` plus a
-warning in the activity log, YELLOW only the warning — the run stays `COMPLETED`.
+the result, not a failure of the execution. RED and YELLOW write a warning to the activity log
+(`RunCompletionHandler`). When auto-TODO is on for the workflow (workflow metadata
+`autoTodo.enabled`, otherwise the setting `auto-todo-default`, off by default), `AutoTodoService`
+creates a TODO with priority HIGH on RED and, in mode `auto`, one with MEDIUM on YELLOW — the run
+stays `COMPLETED`.
 
 The run status is decided by something independent: `RunCompletionHandler` sets
 `COMPLETED_WITH_ERRORS` when a step carrying `checkedCommand` metadata has failed, and
@@ -487,6 +497,28 @@ Pre-built chain definitions composed from existing workflow templates. Every ent
 - `ChainTemplateService` — manages built-in chain templates (`BuiltInChainTemplate` records)
 - `ChainTemplateController` — `/api/v1/chain-templates` with list, get, install endpoints
 - Install: Creates a new chain (optionally with associated workflows) in a target project
+
+## Scheduler: missed occurrences (standby and cold start)
+
+The scheduler is a 60-s tick in the backend (`SchedulerTick`); without a running backend nothing starts. For occurrences that fell due during a gap, **one** rule applies since 2026-09-14, regardless of whether the JVM was frozen (standby, detected as a tick gap > `automation.scheduler.resume-grace-minutes`) or the process was not running at all (cold start, detected on the first tick; the reference is the backend's start time, occurrences after it are due normally):
+
+- **Without opt-in** the occurrence is skipped and the schedule is set to its next occurrence (`ScheduleSkipPolicy`, activity log "Schedule skipped (system suspend/resume)" or "(backend was stopped)").
+- **With opt-in** — per schedule `catchUpOnResume` or globally `scheduler-catch-up-on-resume` (settings UI) — the occurrence goes into the `CatchUpQueue`. It starts the entries **one after another** in the order they originally fell due: the next one only once the previous catch-up run has reached a final state (`ScheduledWorkflowExecutor.isFinished`). Waiting entries keep their old `nextRunAt` but are left out by the normal tick. An entry the executor rejects (target already running, schedule disabled in the meantime) does not block the queue.
+- An active `skip-until` pause wins: then nothing is caught up, even with opt-in.
+- The queue is deliberately not persistent: after a restart the same occurrences are due again and the cold-start path queues them again — nothing is lost, nothing runs twice.
+- Visibility: one WARN line in the activity log per event ("Cold start detected … N missed schedule(s): X skipped forward, Y queued for sequential catch-up", on errors "…, Z failed"), `GET /api/v1/schedules/catch-up` (running and waiting entries) and a banner on the schedules page.
+- `resume-grace-minutes: 0` switches both detections off (legacy behaviour: everything due starts at once).
+- The tick only starts once Spring Boot reports `ACCEPTING_TRAFFIC` — that is, after the startup cleanup that sets leftover RUNNING/PAUSED runs to INTERRUPTED (`ApplicationReadyEvent`). Spring fires `@Scheduled` already on `ContextRefreshedEvent`, 0.3–1.4 s earlier: a catch-up run started there was marked INTERRUPTED by the cleanup in mid-run, and a stale run in state RUNNING made the target look busy, so the catch-up occurrence was dropped (TODO aa51d221). Skipped ticks do not count; the first real tick is the cold start and therefore comes about one tick period (60 s) after startup — the immediate tick on `ContextRefreshedEvent` is gone, and catch-up runs start correspondingly later.
+
+Further rules of the tick:
+
+- **An error only affects its own schedule** (TODO 68a3d91e): every schedule of a tick is started, skipped or queued on its own (`SchedulerTick.runIsolated`). If one fails — say, on a cron expression that no longer parses — the activity log shows "Schedule execution failed: …" or "Schedule skip failed: …", and the tick moves on to the next one. Until 2026-09-24 the exception while skipping (`skip-until`) ended the loop: the remaining due schedules of the tick were neither started nor skipped.
+- **Conflict `SKIP`** (default): if the target still has a run in `RUNNING` or `PAUSED` when the occurrence falls due, the occurrence is dropped — `nextRunAt` jumps to the next occurrence, `ONCE`/`DELAYED` expire, `lastRunAt` and `runCount` stay (`ScheduledWorkflowExecutor.skipOccurrence`). Until 2026-09-24 `nextRunAt` stayed in the past, the tick retried every minute and started the occurrence late as soon as the other run ended (TODO ade3fef8). `OVERLAP` starts alongside.
+- **`maxRuns`** counts every start, including failed or rejected ones, but not occurrences dropped by `SKIP`. Re-enabling does not reset `runCount`.
+- **End date** (`endDate`, `CRON` only, TODO 9a3e6c91): an occurrence on or after the end date does not start — measured by the occurrence, not by the time of the tick, so the last occurrence before it does not depend on where the 60-s tick lands. After a run or `SKIP`, `ScheduledWorkflowExecutor.advance` sets no next occurrence past the end date but disables the schedule; an occurrence already stored past it (old data, end date moved forward) ends the schedule without a start when it falls due (activity log "Schedule ended (end date reached)"). Until 2026-09-24 the first occurrence after the end date still ran once.
+- **`skip-until` in the views** (TODO a776fd2a): the tick only winds an occurrence past the window once it falls due. Until then the read paths recalculate — `ScheduleSkipPolicy.effectiveNextRun` (the same rule as `skipScheduleUntil`, without writing): `ScheduleMapper` returns the first occurrence after the pause as `nextRunAt`, plus `pausedUntil`; `UpcomingRunsCalculator` leaves occurrences inside the pause out of the dashboard, calendar, cron preview and assistant context; `GET /schedules/maintenance` names the end of the pause. The read paths parse `skip-until` without an activity log entry; the tick reports an invalid value.
+- **Maintenance mode** (`scheduler.maintenance-mode`, pause switch on the schedules page): the tick keeps running but starts nothing; `nextRunAt` stays put. When it is switched off, every overdue schedule starts once immediately, all at the same time — neither standby/cold-start detection nor the catch-up queue applies, the ticks during the pause have already used up the gap.
+- **Maintenance mode in the views** (TODO 7704b1e9): the same rule as for `skip-until`, not a second one. `ScheduleSkipPolicy.activePause` reads both pauses once per view (`SchedulerPause`); for a schedule held by maintenance mode, `effectiveNextRun` returns no next run — nobody knows when the switch goes off. `ScheduleMapper` then reports `nextRunAt: null` plus `maintenance: true`, `UpcomingRunsCalculator` leaves all occurrences out of the dashboard (`maintenance: true`), and calendar and assistant context show none. The dashboard card and the schedule list say "Maintenance mode – nothing starts".
 
 ## Completion Triggers (V39)
 
@@ -866,12 +898,13 @@ App.tsx (Router)
 │   ├── Sidebar (Navigation, Collapse)
 │   └── Header (Language, Theme)
 │
-├── Pages (28 Routes)
+├── Pages (one page per route in App.tsx; in Simple Mode — the simplified UI, switchable in
+│   │   the settings — nine routes swap their page for a Simple* variant)
 │   ├── Dashboard, Projects, ProjectDetail, ProjectCockpit
 │   ├── Workflows, WorkflowDetail, WorkflowExecution, WorkflowDebug, WorkflowFactory
 │   ├── Skills, Schedules, Calendar, Webhooks, Integrations, Settings
-│   ├── Runs, ActivityLog, Todos, DeadLetterQueue
-│   ├── Chains, ChainExecution
+│   ├── Runs, Approvals, ActivityLog, Todos, DeadLetterQueue, AuditCenter
+│   ├── Goals, GoalDetail, Chains, ChainExecution
 │   ├── Wishes, Docs, Reports, Insights, OnboardingProfiles, DialogImport
 │   ├── Simple* variants (SimpleHome, SimpleWorkflows, etc.)
 │
@@ -1206,7 +1239,7 @@ autotrigger/
         ├── index.css                  ← Global styles + Tailwind 4 configuration (@theme inline)
         ├── api/client.ts              ← HTTP client (singleton)
         ├── types/index.ts             ← TypeScript types
-        ├── pages/                     ← 37 pages (incl. simple mode variants)
+        ├── pages/                     ← all pages incl. simple mode variants
         ├── components/
         │   ├── ui/                    ← Base UI primitives
         │   ├── layout/                ← App shell, sidebar, navigation

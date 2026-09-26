@@ -46,6 +46,13 @@ POST /api/v1/workflows
 
 All workflow CRUD and execution operations are under `/api/v1/workflows`. A run is started with `POST /api/v1/workflows/{id}/execute`.
 
+Every call needs the `X-API-Key` header. The backend creates the key on first start; for an instance
+set up by the installer `scripts/instance.sh key --name <name>` shows it, with the source setup it is
+in `~/.autotrigger/api-key`. The `projectId` is the ID of an
+existing project — `GET /api/v1/projects` lists the projects with their `id` field, and in the UI it
+is part of the project page's address (`/projects/<id>`). Full reference:
+[api-referenz.md](api-referenz.md).
+
 ### Context Variables
 
 Pass variables at start:
@@ -85,10 +92,11 @@ In addition to its type-specific config fields, every block also supports these 
 | `model` | string | null | **AI-capable blocks only** (including `compress-ai`): model for this block only (CLI alias `opus`/`sonnet`, concrete id or pi `<backend>/<model>`). Precedence block > workflow > provider default. If a block sets a *different* `provider` than the workflow, the workflow model is not inherited (model ids are provider-specific). |
 | `effort` | string | null | **AI-capable blocks only**: reasoning effort `low`/`medium`/`high`/`xhigh` for this block only. Precedence block > workflow (`workflow.effort`) > provider default; unset emits no flag at all. Claude maps it to `--effort`, pi to `--thinking`, codex ignores it. The value actually used is visible in the run details as step metadata `aiRequest.effort`. |
 
-Additionally, every block supports an optional top-level field (not inside `config`):
+Additionally, every block supports optional top-level fields (next to `type`, not inside `config`):
 
 | Field | Type | Default | Description |
 |---|---|---|---|
+| `name` | string | – | Name under which later blocks read this block's output via `{{ block.<name>.output }}`. Letters, digits, `_` and `-` are recommended, no dots and no whitespace — this is not checked on save; only the reserved name `previous_output` is rejected (`BlockNameRules`) |
 | `skillIds` | string[] | `[]` | Skill IDs that are activated **in addition to** the workflow skills for this block |
 
 **Default behavior**: When a block fails (status `FAILED`), the workflow stops and the run is marked as `FAILED`. With `"on_failure": "continue"`, the workflow proceeds with the next block.
@@ -148,6 +156,12 @@ Executes a shell command on the host or inside a Docker container.
 > `PROJECT_ID={{ project_id }} python3 - <<'PY'` … `os.environ['PROJECT_ID']`, block option
 > `"shell_escape_variables": true`. Shell blocks receive no other environment variables.
 
+> **The term "taint":** A run counts as *tainted* as soon as data from outside — such as a webhook
+> payload — has flowed into it. From then on the platform also puts block outputs into single quotes
+> in shell commands, because a block can pass on foreign bytes. The detailed rules follow below under
+> "Taint propagation", the trust model is in
+> [deployment.md → Three trust classes](deployment.md#three-trust-classes-for-context-values).
+>
 > **Untrusted variables:** Everything a webhook caller supplies (payload fields and the derived
 > `git_*` fields) is single-quoted in shell commands (`shell`, `foreach`, `while`, `retry`, `conditional` and
 > blocks nested in `switch`, each in shell mode) — even without `shell_escape_variables`. Write such placeholders **unquoted**
@@ -643,7 +657,7 @@ Create or change TODOs directly through the TodoService — **no REST self-call,
 ]
 ```
 
-**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see §Auto-TODO/detector format). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
+**When to use**: Deterministic single-TODO operations (create a tracking TODO and close it at the end). For **dynamically many** TODOs out of general analysis workflows use `todo_item:` markers instead (see [TODO markers](#todo-markers-todo_item)). Structured v4 audit templates use the versioned `mysuricates:audit-result:v1` envelope instead; the Audit Center manages findings and TODO links from it.
 
 ---
 
@@ -718,9 +732,9 @@ JSON stages need JSON as input and must come before text stages.
 
 ### `dashboard-report` — report the dashboard result without a marker
 
-Fills the **dashboard result** of this run directly from block config — the same fields, the same bounds and the same validation as the marker `dashboard_widget:` (see api-referenz.md), but **without a marker line and without text search**. Deterministic: no AI call, no shell, 0 tokens.
+Fills the **dashboard result** of this run directly from block config — the same fields, the same bounds and the same validation as the marker `dashboard_widget:` (a JSON line in a step's output, see [api-referenz.md](api-referenz.md#the-dashboard_widget-marker-in-a-workflow)), but **without a marker line and without text search**. Deterministic: no AI call, no shell, 0 tokens.
 
-Module: `dashboard-report` (standard on, can be switched off). When off, the block is refused and the type is not offered in the editor.
+Module: `dashboard-report` (standard on, can be switched off). Modules are optional features that the startup configuration switches on or off, here via `automation.modules.dashboard-report: false` ([architektur.md → Module System](architektur.md#module-system-startup-configuration)). When off, the block is refused and the type is not offered in the editor.
 
 | Config Key | Type | Default | Description |
 |---|---|---|---|
@@ -1087,6 +1101,28 @@ curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN1" | jq '.metad
 curl -s --noproxy '*' -H "X-API-Key: $KEY" "$BASE/executions/$RUN2" | jq '.metadata.gate_summary' > b.json
 diff <(jq -S . a.json) <(jq -S . b.json)
 ```
+
+### TODO markers (`todo_item:`)
+
+Besides the gate, every block can propose any number of TODOs, one line each in its output:
+
+```
+todo_item: <title> | <CRITICAL|HIGH|MEDIUM|LOW> | <tag1,tag2> | <description, optional>
+```
+
+```
+todo_item: Test ChainExecutor | HIGH | backend,testing | Execution loop without a test
+todo_item: Test the useWebSocket hook | MEDIUM | frontend,testing
+```
+
+- The output of **all** steps is read (`TodoOutputParser`); Markdown in front (`#`, `**`, backticks)
+  and the `[<item>]: ` prefix of a `foreach` iteration do no harm.
+- The TODOs are created only when auto-TODO is on for the workflow — workflow metadata
+  `autoTodo.enabled`, otherwise the global setting `auto-todo-default` — and not for audit
+  workflows (`audit.enabled`), whose findings the Audit Center manages (`AutoTodoService`).
+- The title is the identity: the same title in a later run updates the TODO; what a run with markers
+  no longer names, it closes (`GranularTodoService`). An AI similarity search links a new TODO to an
+  identical or related open TODO (`relatedTodoId`); it is created all the same.
 
 ### `checked_command` / `check_category` — Gate Derived Automatically from the Exit Code
 
