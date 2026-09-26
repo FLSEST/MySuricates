@@ -144,6 +144,16 @@ def initial(state: Path, cfg: GateConfig, forbidden: list[str], max_lines: int) 
             "discarded": discarded}
 
 
+# Was ein Modell aus der Formatvorlage abschreibt, statt einen Befund zu nennen
+PLACEHOLDERS = {"", "…", "...", "-", "–", "keine", "keiner", "nichts", "none", "n/a", "na", "null"}
+
+
+def findings(values) -> list[str]:
+    items = values if isinstance(values, list) else []
+    return [b.plain(x, 300) for x in items if str(x).strip().strip(".").lower() not in PLACEHOLDERS
+            and str(x).strip().lower() not in PLACEHOLDERS][:10]
+
+
 def parse_reviews(text: str) -> dict[str, dict]:
     """Je TODO die letzte REVIEW-Zeile in dessen eigenem foreach-Abschnitt, die auch dessen ID nennt."""
     reviews = {}
@@ -161,8 +171,7 @@ def parse_reviews(text: str) -> dict[str, dict]:
                 chosen = data
         if chosen is None:
             continue
-        entry = {key: [b.plain(x, 300) for x in (chosen.get(key) or []) if str(x).strip()][:10]
-                 for key in ("blocker", "major", "minor")}
+        entry = {key: findings(chosen.get(key)) for key in ("blocker", "major", "minor")}
         entry["verdict"] = b.plain(chosen.get("verdict", ""), 20)
         reviews[todo_id] = entry
     return reviews

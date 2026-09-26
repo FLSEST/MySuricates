@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +49,7 @@ class RunControlServiceTest {
     @Mock private ExecutionBroadcaster broadcaster;
     @Mock private ActivityLogService activityLogService;
     @Mock private CommandExecutorService commandExecutorService;
+    @Mock private ApplicationEventPublisher events;
 
     private WorkflowExecutionRegistry registry;
     private RunControlService runControl;
@@ -56,7 +58,7 @@ class RunControlServiceTest {
     void setUp() {
         registry = new WorkflowExecutionRegistry();
         runControl = new RunControlService(registry, runRepository, broadcaster, activityLogService,
-                commandExecutorService);
+                commandExecutorService, events);
     }
 
     /** A run whose execution thread has taken over (promoted from its provisional context). */
@@ -280,6 +282,29 @@ class RunControlServiceTest {
                 "Startup cleanup: marked 2 run(s) as INTERRUPTED", "WorkflowExecutor");
     }
 
+    /** TODO 90d10ba1: the status before the cleanup decides whether a run may be resumed automatically. */
+    @Test
+    void cleanupZombieRuns_recordsThePreviousStatus_andAnnouncesTheRunsAfterMarking() {
+        WorkflowRun running = persistedRun("orphan-1", RunStatus.RUNNING);
+        WorkflowRun paused = persistedRun("orphan-2", RunStatus.PAUSED);
+        paused.setMetadata(Map.of("notes", "kept"));
+        when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of(running));
+        when(runRepository.findByStatus(RunStatus.PAUSED)).thenReturn(List.of(paused));
+
+        runControl.cleanupZombieRuns();
+
+        assertThat(running.getMetadata())
+                .containsEntry(RunInterruption.FROM_KEY, "RUNNING")
+                .containsEntry(RunInterruption.BY_KEY, "RESTART");
+        assertThat(paused.getMetadata())
+                .containsEntry(RunInterruption.FROM_KEY, "PAUSED")
+                .containsEntry("notes", "kept");
+        var order = org.mockito.Mockito.inOrder(runRepository, events);
+        order.verify(runRepository, times(2)).save(any(WorkflowRun.class));
+        order.verify(events).publishEvent(new RunInterruption.Event(List.of("orphan-1", "orphan-2"),
+                RunInterruption.Cause.RESTART));
+    }
+
     @Test
     void cleanupZombieRuns_noZombies_doesNothing() {
         when(runRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
@@ -288,6 +313,6 @@ class RunControlServiceTest {
         runControl.cleanupZombieRuns();
 
         verify(runRepository, never()).save(any(WorkflowRun.class));
-        verifyNoInteractions(activityLogService);
+        verifyNoInteractions(activityLogService, events);
     }
 }

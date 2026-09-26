@@ -115,7 +115,7 @@ public final class BlockSpecs {
                     Optional: `default` (list of blocks for no match).
                     Nested blocks: {"type": "shell" or "simple", "name": optional, `config`} — no other types. In `config`: \
                     `command`, `timeout_seconds`, `shell_escape_variables`, `on_failure` ("stop" default ends the case at a \
-                    failed block, "continue" runs the next), AI overrides for "simple". The blocks of a case pass \
+                    failed block, as does any value but "continue"; "continue" runs the next), AI overrides for "simple". The blocks of a case pass \
                     {{ previous_output }} along; a named one is {{ block.<name>.output }} later on.
                     Example config: {"expression": "{{ environment }}", "cases": [{"value": "prod", "blocks": [{"type": \
                     "shell", "config": {"command": "echo deploy to prod"}}]}, {"value": "staging|test", "blocks": [{"type": \

@@ -40,7 +40,7 @@ public class ExecutionCommandService {
 
     @Transactional
     public WorkflowRunResponse resumeFromStep(String runId) {
-        return workflowMapper.toRunResponse(workflowExecutor.resumeFromStep(runId));
+        return workflowMapper.toRunResponse(workflowExecutor.resumeFromStep(runId, TriggerSource.RESUME));
     }
 
     /** Stores free-text notes in the run metadata; blank notes remove the entry. */

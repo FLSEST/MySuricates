@@ -8,6 +8,8 @@ import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -298,6 +300,34 @@ class SwitchBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("deployment error");
+    }
+
+    /** Same fail-closed on_failure rule as the top level (2b361abe): only "continue" runs the next case block. */
+    @ParameterizedTest
+    @CsvSource({"fail, 1", "stop, 1", "Continue, 2", "continue, 2"})
+    void execute_nestedBlockFailure_onlyContinueRunsTheNextBlock(String onFailure, int expectedCalls) {
+        context.setVariable("status", "deploy");
+        StepResult failedResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.FAILED).output("deployment error").build();
+        StepResult okResult = StepResult.builder()
+                .stepIndex(1).status(StepStatus.COMPLETED).output("notified").build();
+        when(commandExecutor.executeStepOnHost(any(HostExecutionRequest.class)))
+                .thenReturn(failedResult, okResult);
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("expression", "${status}");
+        config.put("cases", List.of(
+                Map.of("value", "deploy", "blocks", List.of(
+                        Map.of("type", "simple", "config", Map.of("command", "deploy now", "on_failure", onFailure)),
+                        Map.of("type", "simple", "config", Map.of("command", "notify"))
+                ))
+        ));
+        BlockDefinition block = BlockDefinition.builder().type("switch").config(config).build();
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        verify(commandExecutor, times(expectedCalls)).executeStepOnHost(any(HostExecutionRequest.class));
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.automation.service.cli.CommandExecutorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
@@ -43,8 +44,13 @@ public class RunControlService {
     private final ExecutionBroadcaster broadcaster;
     private final ActivityLogService activityLogService;
     private final CommandExecutorService commandExecutorService;
+    private final ApplicationEventPublisher events;
 
-    /** Cleans up runs stuck in RUNNING/PAUSED from a previous application lifecycle. */
+    /**
+     * Cleans up runs stuck in RUNNING/PAUSED from a previous application lifecycle. Records the
+     * status each run had ({@link RunInterruption}) and then announces the marked runs, so
+     * {@link RunAutoResumer} can pick the opted-in ones — ordered by this call, not by listener order.
+     */
     @EventListener(ApplicationReadyEvent.class)
     public void cleanupZombieRuns() {
         // Collect all runs that were in-flight when the application was last shut down
@@ -53,17 +59,21 @@ public class RunControlService {
         zombies.addAll(runRepository.findByStatus(RunStatus.PAUSED));
         if (zombies.isEmpty()) return;
         log.warn("Found {} run(s) stuck in RUNNING/PAUSED status — marking as INTERRUPTED", zombies.size());
+        List<String> marked = new java.util.ArrayList<>();
         for (WorkflowRun zombie : zombies) {
+            RunInterruption.record(zombie, zombie.getStatus(), RunInterruption.Cause.RESTART);
             zombie.setStatus(RunStatus.INTERRUPTED);
             zombie.setCompletedAt(Instant.now());
             zombie.setDurationMs(zombie.getCompletedAt().toEpochMilli() - zombie.getStartedAt().toEpochMilli());
             zombie.setError(Map.of("message", "Workflow was interrupted by an application restart"));
             runRepository.save(zombie);
+            marked.add(zombie.getId());
             log.info("Marked interrupted run: {}", zombie.getId());
         }
         activityLogService.warn(LogCategory.EXECUTION,
                 "Startup cleanup: marked " + zombies.size() + " run(s) as INTERRUPTED",
                 "WorkflowExecutor");
+        events.publishEvent(new RunInterruption.Event(marked, RunInterruption.Cause.RESTART));
     }
 
     public void pauseExecution(String runId) {

@@ -3,8 +3,8 @@
   "onFailure": {
     "type": "string",
     "doc": {
-      "de": "Was passiert, wenn dieser Block fehlschlägt (Status FAILED).",
-      "en": "What happens when this block fails (status FAILED)."
+      "de": "Was passiert, wenn dieser Block fehlschlägt (Status FAILED). Jeder andere Wert als `continue` stoppt wie `stop`.",
+      "en": "What happens when this block fails (status FAILED). Any value other than `continue` stops like `stop`."
     },
     "values": [
       {

@@ -94,6 +94,8 @@ export interface WorkflowMetadata {
   autoTodo?: AutoTodoConfig;
   autoRepair?: AutoRepairConfig;
   autoMemoryExtraction?: AutoMemoryConfig;
+  /** Resume a run interrupted by a restart or standby without a click (TODO 90d10ba1). Part of the definition hash. */
+  autoResume?: { enabled?: boolean };
   contextSchema?: Record<string, ContextVariableSpec>;
   [key: string]: unknown;
 }
@@ -413,7 +415,7 @@ export interface WorkflowRunListItem extends Omit<WorkflowRun, 'steps'> {
 
 export type TriggerSource =
   | 'MANUAL' | 'RETRY' | 'RESUME' | 'TODO_RESOLUTION' | 'ASSISTANT'
-  | 'SCHEDULE' | 'WEBHOOK' | 'TODO_TRIGGER' | 'COMPLETION_TRIGGER' | 'AUTO_REPAIR' | 'WISH'
+  | 'SCHEDULE' | 'WEBHOOK' | 'TODO_TRIGGER' | 'COMPLETION_TRIGGER' | 'AUTO_REPAIR' | 'AUTO_RESUME' | 'WISH'
   | 'CHAIN' | 'SUB_WORKFLOW';
 
 export interface StepResult {

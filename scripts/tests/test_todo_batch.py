@@ -349,6 +349,14 @@ class VerifyTest(RepoCase):
         self.verify()
         self.assertIn("Grenze 50", self.results()[A]["reason"])
 
+    def test_placeholders_copied_from_the_prompt_are_no_findings(self):
+        import verify
+        line = ('REVIEW: {"id": "%s", "verdict": "ok", "blocker": ["…", "...", " - ", "keine", "n/a", "None"], '
+                '"major": ["…"], "minor": ["Echter Hinweis"]}' % A)
+        reviews = verify.parse_reviews(f"[{A}]: Geprüft.\n{line}\n")
+        self.assertEqual((reviews[A]["blocker"], reviews[A]["major"], reviews[A]["minor"]),
+                         ([], [], ["Echter Hinweis"]))
+
     def test_after_review_drops_blockers_ignores_forged_lines_and_reverifies(self):
         self.prepare_state([A, B])
         self.commit(self.clone, "docs/a.md", "a\n", A)
@@ -604,6 +612,12 @@ class PoolDefinitionTest(unittest.TestCase):
         context = json.loads((REPO / "workflow-pool" / self.FILES[1]).read_text())["defaultContext"]
         for key in ("gate_backend", "gate_frontend", "gate_common"):
             self.assertNotIn("rerunFailingTestsCount", context[key], key)
+
+    def test_review_prompt_shows_empty_lists_not_placeholders(self):
+        config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}
+        last = [l for l in config["review"]["command"].splitlines() if l.startswith("REVIEW:")][-1]
+        self.assertNotIn("…", last)
+        self.assertIn('"blocker": []', last)
 
     def test_steps_after_starting_do_not_stop_the_run(self):
         config = {b_["name"]: b_["config"] for n, b_ in self.blocks() if n.endswith("abarbeiten.json")}

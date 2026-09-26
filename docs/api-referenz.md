@@ -2343,6 +2343,8 @@ Aktuelle Execution-Konfiguration abrufen (Timeouts, Token-Limits etc.). Enthält
 | `assistant-max-actions-per-hour` | 1–500 |
 | `scheduler-catch-up-on-resume` | 0–1 |
 | `scheduler-resume-grace-minutes` | 1–60 |
+| `run-auto-resume-enabled` | 0–1 |
+| `run-auto-resume-delay-seconds` | 0–3600 |
 | `summarization-timeout-seconds` | 30–600 |
 | `factory-timeout-seconds` | 60–3600 |
 | `wish-total-timeout-minutes` | 5–1440 |

@@ -26,7 +26,8 @@ class TriggerCategoryTest {
         assertThat(TriggerCategory.of(run(TriggerSource.COMPLETION_TRIGGER))).isEqualTo(TriggerCategory.COMPLETION_TRIGGER);
         assertThat(TriggerCategory.of(run(TriggerSource.TODO_TRIGGER))).isEqualTo(TriggerCategory.TODO_TRIGGER);
         for (TriggerSource source : new TriggerSource[] {
-                TriggerSource.CHAIN, TriggerSource.SUB_WORKFLOW, TriggerSource.WISH, TriggerSource.AUTO_REPAIR}) {
+                TriggerSource.CHAIN, TriggerSource.SUB_WORKFLOW, TriggerSource.WISH, TriggerSource.AUTO_REPAIR,
+                TriggerSource.AUTO_RESUME}) {
             assertThat(TriggerCategory.of(run(source))).as(source.name()).isEqualTo(TriggerCategory.OTHER_AUTOMATIC);
         }
     }

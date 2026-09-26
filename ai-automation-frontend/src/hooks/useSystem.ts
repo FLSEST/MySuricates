@@ -294,6 +294,8 @@ export interface ExecutionConfig {
   assistantChatTimeoutSeconds: number;
   schedulerCatchUpOnResume: number;
   schedulerResumeGraceMinutes: number;
+  runAutoResumeEnabled?: number;
+  runAutoResumeDelaySeconds?: number;
   summarizationTimeoutSeconds: number;
   factoryTimeoutSeconds: number;
   runRetentionDays?: number;

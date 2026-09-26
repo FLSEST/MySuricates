@@ -7,6 +7,7 @@ import com.automation.config.CompressionConfig;
 import com.automation.config.FactoryConfig;
 import com.automation.config.HostClaudeConfig;
 import com.automation.config.RequestMetricsConfig;
+import com.automation.config.AutoResumeConfig;
 import com.automation.config.SchedulerConfig;
 import com.automation.config.SummarizationConfig;
 import com.automation.config.TaskCommandConfig;
@@ -61,6 +62,7 @@ class ExecutionSettingsServiceTest {
     private ChainConfig chainConfig;
     private RateLimitConfig rateLimitConfig;
     private SchedulerConfig schedulerConfig;
+    private AutoResumeConfig autoResumeConfig;
     private TodoHygieneConfig todoHygieneConfig;
     private TodoGhostWatchdogConfig todoGhostWatchdogConfig;
     private AssistantGuardrailsConfig assistantGuardrailsConfig;
@@ -83,6 +85,7 @@ class ExecutionSettingsServiceTest {
         chainConfig = new ChainConfig();
         rateLimitConfig = new RateLimitConfig();
         schedulerConfig = new SchedulerConfig();
+        autoResumeConfig = new AutoResumeConfig();
         todoHygieneConfig = new TodoHygieneConfig();
         todoGhostWatchdogConfig = new TodoGhostWatchdogConfig();
         assistantGuardrailsConfig = new AssistantGuardrailsConfig();
@@ -108,7 +111,7 @@ class ExecutionSettingsServiceTest {
                 new HousekeepingSettings(todoHygieneConfig, runRetentionConfig, dashboardLayoutConfig,
                         todoGhostWatchdogConfig, todoSimilarityConfig, runDeletionPolicy),
                 new FeatureSettings(schedulerConfig, summarizationConfig, factoryConfig, wishConfig,
-                        modelCatalogService, compressionConfig, dashboardReportAssistConfig),
+                        modelCatalogService, compressionConfig, dashboardReportAssistConfig, autoResumeConfig),
                 new RequestMetricsSettings(requestMetricsConfig)));
     }
 
@@ -367,6 +370,23 @@ class ExecutionSettingsServiceTest {
 
         verify(appSettingsRepository).set("scheduler-catch-up-on-resume", "1");
         assertThat(schedulerConfig.isCatchUpOnResume()).isTrue();
+    }
+
+    /** TODO 90d10ba1: Schalter und Wartezeit des automatischen Fortsetzens sind Laufzeit-Einstellungen. */
+    @Test
+    void validateAndApply_runAutoResume_updatesConfigAndReportsCurrentValues() {
+        service.validateAndApply("runAutoResumeEnabled", "0");
+        service.validateAndApply("run-auto-resume-delay-seconds", "120");
+
+        verify(appSettingsRepository).set("run-auto-resume-enabled", "0");
+        verify(appSettingsRepository).set("run-auto-resume-delay-seconds", "120");
+        assertThat(autoResumeConfig.isEnabled()).isFalse();
+        assertThat(autoResumeConfig.getDelaySeconds()).isEqualTo(120L);
+        assertThat(service.getCurrentSettings())
+                .containsEntry("runAutoResumeEnabled", 0)
+                .containsEntry("runAutoResumeDelaySeconds", 120L);
+        assertThatThrownBy(() -> service.validateAndApply("run-auto-resume-delay-seconds", "3601"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

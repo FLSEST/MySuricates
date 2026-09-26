@@ -209,7 +209,7 @@ class WorkflowExecutorTest {
     /** Control of the runs an executor built on {@code executionRegistry} starts. */
     private RunControlService runControlFor(WorkflowExecutionRegistry executionRegistry) {
         return new RunControlService(executionRegistry, runRepository, broadcaster, activityLogService,
-                commandExecutorService);
+                commandExecutorService, eventPublisher);
     }
 
     @org.junit.jupiter.api.AfterEach
@@ -337,6 +337,36 @@ class WorkflowExecutorTest {
         WorkflowRun saved = captureLastSavedRun();
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED);
         verify(simpleBlockExecutor, times(2)).execute(any(), any());
+    }
+
+    /**
+     * An unknown on_failure value ("fail" is neither "stop" nor "continue") must stop the run like
+     * "stop" — before 2b361abe it silently carried on and the second block ran (seen live on a
+     * simple block of a job-shortlist workflow).
+     */
+    @Test
+    void execute_blockFails_withUnknownOnFailureValue_stopsTheRun() {
+        testWorkflow.setBlocks(new ArrayList<>(List.of(
+                BlockDefinition.builder()
+                        .type("simple")
+                        .config(new HashMap<>(Map.of("command", "fail", "on_failure", "fail")))
+                        .build(),
+                BlockDefinition.builder()
+                        .type("simple")
+                        .config(new HashMap<>(Map.of("command", "must not run")))
+                        .build()
+        )));
+        StepResult failed = StepResult.builder()
+                .stepIndex(0).status(StepStatus.FAILED).output("error").build();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(failed);
+
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+        WorkflowRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).containsEntry("step", 0);
+        verify(simpleBlockExecutor, times(1)).execute(any(), any());
     }
 
     @Test
@@ -756,7 +786,7 @@ class WorkflowExecutorTest {
                     return StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("second-output").build();
                 });
 
-        workflowExecutor.resumeFromStep("run-1");
+        workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         ArgumentCaptor<ExecutionContext> ctx = ArgumentCaptor.forClass(ExecutionContext.class);
         verify(simpleBlockExecutor, times(1)).execute(any(BlockDefinition.class), ctx.capture());   // only block 2 ran
@@ -792,7 +822,7 @@ class WorkflowExecutorTest {
                 .build();
         when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
 
-        executor.resumeFromStep("run-1");
+        executor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         ArgumentCaptor<StepResult> saved = ArgumentCaptor.forClass(StepResult.class);
         verify(stepResultRepository, atLeastOnce()).save(saved.capture());
@@ -812,7 +842,7 @@ class WorkflowExecutorTest {
         WorkflowRun completed = WorkflowRun.builder().id("run-1").workflow(testWorkflow).status(RunStatus.COMPLETED).build();
         when(runRepository.findById("run-1")).thenReturn(Optional.of(completed));
 
-        assertThatThrownBy(() -> workflowExecutor.resumeFromStep("run-1"))
+        assertThatThrownBy(() -> workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME))
                 .isInstanceOf(WorkflowExecutionException.class)
                 .hasMessageContaining("cannot be resumed");
     }
@@ -826,9 +856,57 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-        workflowExecutor.resumeFromStep("run-1");
+        workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         verify(simpleBlockExecutor, times(2)).execute(any(BlockDefinition.class), any(ExecutionContext.class));   // both blocks
+    }
+
+    /** TODO 90d10ba1: the platform resumes as AUTO_RESUME — recorded on the run in place of the earlier source. */
+    @Test
+    void resumeFromStep_recordsTheGivenSource() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).triggerSource(TriggerSource.SCHEDULE).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        StepResult done = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("first-output").build();
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("ok").build());
+
+        WorkflowRun resumed = workflowExecutor.resumeFromStep("run-1", TriggerSource.AUTO_RESUME);
+
+        assertThat(resumed.getTriggerSource()).isEqualTo(TriggerSource.AUTO_RESUME);
+    }
+
+    @Test
+    void resumeFromStep_fullRetry_startsTheNewRunWithTheGivenSource() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of());
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        WorkflowRun started = workflowExecutor.resumeFromStep("run-1", TriggerSource.AUTO_RESUME);
+
+        assertThat(started.getTriggerSource()).isEqualTo(TriggerSource.AUTO_RESUME);
+        // The new run carries the attempt over — a second interruption must not be resumed again.
+        assertThat(started.getMetadata())
+                .containsEntry(RunAutoResumer.ATTEMPTS_KEY, 1)
+                .containsEntry(RunAutoResumer.RESUMED_FROM_KEY, "run-1");
+    }
+
+    @Test
+    void resumeFromStep_fullRetryByAPerson_startsTheNewRunWithoutAutoResumeMarks() {
+        WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                .status(RunStatus.INTERRUPTED).startedAt(Instant.now()).build();
+        when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of());
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class)))
+                .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
+
+        WorkflowRun started = workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
+
+        assertThat(started.getMetadata()).doesNotContainKeys(RunAutoResumer.ATTEMPTS_KEY, RunAutoResumer.RESUMED_FROM_KEY);
     }
 
     @Test
@@ -847,7 +925,7 @@ class WorkflowExecutorTest {
         when(simpleBlockExecutor.execute(any(), any()))
                 .thenReturn(StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build());
 
-        WorkflowRun resumed = workflowExecutor.resumeFromStep("run-1");
+        WorkflowRun resumed = workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         assertThat(resumed.getId()).isEqualTo("run-1");
         verify(runWorkspaceService).prepare(eq(interrupted), eq(testProject),
@@ -1985,7 +2063,7 @@ class WorkflowExecutorTest {
         AtomicReference<WorkflowRun> stored = statefulRunRepository();
         GhostRunWatchdogService watchdog = new GhostRunWatchdogService(
                 runRepository, liveRegistry, singleSlot, broadcaster, activityLogService,
-                mock(SuspendState.class));
+                mock(SuspendState.class), eventPublisher);
 
         realThreads = Executors.newVirtualThreadPerTaskExecutor();
         WorkflowExecutor executor =
@@ -2110,7 +2188,7 @@ class WorkflowExecutorTest {
                     return StepResult.builder().stepIndex(1).status(StepStatus.COMPLETED).output("done").build();
                 });
 
-        workflowExecutor.resumeFromStep("run-1");
+        workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         assertThat(resolved).containsExactly("echo 'x; id' 'x; id'");
     }
