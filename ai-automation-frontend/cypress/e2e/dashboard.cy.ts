@@ -25,6 +25,25 @@ describe('Dashboard', () => {
     // A bare "dashboard/" pattern silently excluded src/components/dashboard/,
     // so utility classes (h-40) were never generated and charts got 0px height.
 
+    // Charts only draw with data (an empty ChartCard shows its empty state instead). A fresh instance has
+    // no runs and no todos, so the data is added to the real answers for these tests.
+    beforeEach(() => {
+      const day = (offset: number) => new Date(Date.now() - offset * 86_400_000).toISOString().slice(0, 10);
+      const timeSeries = [2, 1, 0].map((offset, i) => ({
+        date: day(offset), count: 3 + i, successRate: 0.8, failedCount: 1, avgDurationMs: 1200, totalCostUsd: 0, totalTokens: 0,
+      }));
+      cy.intercept('GET', '/api/v1/learning/dashboard*', (req) => {
+        req.continue((res) => {
+          res.body = { ...res.body, timeSeries };
+        });
+      }).as('dashboardWithSeries');
+      cy.intercept('GET', '/api/v1/todos/count*', {
+        body: { open: 3, inProgress: 1, done: 5, backlog: 2, archived: 0 },
+      }).as('todoCount');
+      cy.visit('/');
+      cy.wait('@dashboardWithSeries');
+    });
+
     it('renders all dashboard charts as SVGs with non-zero dimensions', () => {
       // Wait for charts to render — Recharts adds .recharts-surface to each SVG
       cy.get('.recharts-surface', { timeout: 15000 }).should('have.length.at.least', 3);

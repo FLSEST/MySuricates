@@ -1614,6 +1614,7 @@ export const de: TranslationKeys = {
     testing: 'Test-Umgebung',
     testingHint: 'Docker-basierte Test-Instanz für Workflow-Testing',
     testingRunning: 'Aktiv',
+    testingStarting: 'Startet',
     testingStopped: 'Gestoppt',
     testingStart: 'Starten',
     testingStop: 'Stoppen',
@@ -1639,6 +1640,7 @@ export const de: TranslationKeys = {
     stagingHint: 'Docker-basierte Stable-Version parallel zur Entwicklung',
     stagingStatus: 'Status',
     stagingRunning: 'Aktiv',
+    stagingStarting: 'Startet',
     stagingStopped: 'Gestoppt',
     stagingStart: 'Starten',
     stagingStop: 'Stoppen',
@@ -2964,6 +2966,9 @@ export const de: TranslationKeys = {
     historyToggle: 'Gesprächsverlauf',
     resizeWidth: 'Breite anpassen',
     resizeHeight: 'Höhe anpassen',
+    /** Avatar of the user's own messages (fits a 28 px circle). */
+    userAvatar: 'Du',
+    errorReply: 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.',
   },
   modules: {
     navTitle: 'Module & Härtung',

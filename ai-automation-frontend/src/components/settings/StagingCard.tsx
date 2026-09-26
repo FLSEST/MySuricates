@@ -53,7 +53,7 @@ export function StagingCard({ staging, devVersion, onStart, onStop, onPromote, o
   };
 
   return (
-    <Card>
+    <Card data-testid="staging-card">
       <CardHeader title={t.settings.staging} />
       <SyncSelectModal
         open={syncModalOpen}
@@ -80,7 +80,7 @@ export function StagingCard({ staging, devVersion, onStart, onStop, onPromote, o
           <div className="flex items-center gap-2">
             <StatusBadge
               status={staging?.containerRunning ? (staging.healthy ? 'RUNNING' : 'STARTING') : 'STOPPED'}
-              label={staging?.containerRunning ? t.settings.stagingRunning : t.settings.stagingStopped}
+              label={staging?.containerRunning ? (staging.healthy ? t.settings.stagingRunning : t.settings.stagingStarting) : t.settings.stagingStopped}
             />
           </div>
         </div>

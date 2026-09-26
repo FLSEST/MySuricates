@@ -1,7 +1,7 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useAssistantStore } from '../stores/assistantStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import { useI18nStore } from '../i18n';
+import { getTranslations, useI18nStore } from '../i18n';
 import { generateId } from '../utils/uuid';
 import { postAssistantChat, type AssistantPageContext, type ChatMessage } from './useAssistant';
 
@@ -25,8 +25,6 @@ interface Turn {
 // share one request at a time and one queue.
 let controller: AbortController | null = null;
 const queue: Turn[] = [];
-
-const ERROR_TEXT = 'Entschuldigung, ein Fehler ist aufgetreten. Bitte versuche es erneut.';
 
 function dispatch(turn: Turn) {
   const store = useAssistantStore.getState();
@@ -83,7 +81,8 @@ function dispatch(turn: Turn) {
         s.appendMessage(sessionId, {
           id: generateId(),
           role: 'assistant',
-          content: ERROR_TEXT,
+          // In the language of the moment the answer failed; the text is stored with the message
+          content: getTranslations().assistant.errorReply,
           timestamp: Date.now(),
           isError: true,
           replyTo: userMsgId,

@@ -4,6 +4,9 @@ import { waitFor } from '@testing-library/react';
 import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../test/server';
 import { useAssistantStore } from '../../stores/assistantStore';
+import { useI18nStore } from '../../i18n';
+import { de } from '../../i18n/de';
+import { en } from '../../i18n/en';
 import { cancelAssistantMessage, resetAssistantConversation, sendAssistantMessage } from '../useAssistantConversation';
 import type { AssistantChatRequest } from '../useAssistant';
 
@@ -81,5 +84,21 @@ describe('assistant conversation', () => {
     await waitFor(() => expect(messages(sessionId)).toHaveLength(2));
     expect(messages(sessionId)[0]).toMatchObject({ status: 'error' });
     expect(messages(sessionId)[1]).toMatchObject({ isError: true, replyTo: userMsgId });
+  });
+
+  it.each([['en', en], ['de', de]] as const)('writes the error message in the UI language (%s)', async (locale, texts) => {
+    const before = useI18nStore.getState().locale;
+    useI18nStore.setState({ locale });
+    try {
+      server.use(http.post('/api/v1/assistant/chat', () => HttpResponse.json({ error: 'boom' }, { status: 500 })));
+      const sessionId = useAssistantStore.getState().startNewSession();
+
+      sendAssistantMessage('Hi', sessionId, params());
+
+      await waitFor(() => expect(messages(sessionId)).toHaveLength(2));
+      expect(messages(sessionId)[1].content).toBe(texts.assistant.errorReply);
+    } finally {
+      useI18nStore.setState({ locale: before });
+    }
   });
 });

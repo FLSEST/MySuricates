@@ -1555,6 +1555,7 @@ export const en = {
     stagingHint: 'Docker-based stable version running alongside development',
     stagingStatus: 'Status',
     stagingRunning: 'Running',
+    stagingStarting: 'Starting',
     stagingStopped: 'Stopped',
     stagingStart: 'Start',
     stagingStop: 'Stop',
@@ -1663,6 +1664,7 @@ export const en = {
     testing: 'Test Environment',
     testingHint: 'Docker-based test instance for workflow testing',
     testingRunning: 'Running',
+    testingStarting: 'Starting',
     testingStopped: 'Stopped',
     testingStart: 'Start',
     testingStop: 'Stop',
@@ -2967,6 +2969,9 @@ export const en = {
     historyToggle: 'Conversation history',
     resizeWidth: 'Adjust width',
     resizeHeight: 'Adjust height',
+    /** Avatar of the user's own messages (fits a 28 px circle). */
+    userAvatar: 'You',
+    errorReply: 'Sorry, something went wrong. Please try again.',
   },
   modules: {
     navTitle: 'Modules & hardening',

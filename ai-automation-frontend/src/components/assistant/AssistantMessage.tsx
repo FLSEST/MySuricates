@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, RefreshCw, CheckCheck, XCircle } from 'lucide-r
 import { CopyButton } from '../shared/CopyButton';
 import { MeerkatIcon } from '../layout/MeerkatIcon';
 import { formatAssistantTime, formatAssistantResponseTime, visibleActions } from '../assistantPanelUtils';
-import { useI18nStore } from '../../i18n';
+import { useI18nStore, useT } from '../../i18n';
 import type { ChatMessage } from '../../hooks/useAssistant';
 import { ActionButton } from './ActionButton';
 import { AssistantMarkdown } from './AssistantMarkdown';
@@ -21,6 +21,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
   onRetry?: () => void;
 }) {
   const navigate = useNavigate();
+  const t = useT();
   const locale = useI18nStore((s) => s.locale);
   const isUser = msg.role === 'user';
   const contentRef = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
                          : 'bg-[var(--color-assistant-raised)] border border-[var(--color-assistant-border)]'
                        }`}>
         {isUser
-          ? <span className="text-[10px] font-bold text-accent">Du</span>
+          ? <span className="text-[10px] font-bold text-accent">{t.assistant.userAvatar}</span>
           : <MeerkatIcon className="text-accent" size={18} />
         }
       </div>
@@ -130,7 +131,7 @@ export function MessageBubble({ msg, sessionId, onClose, onSend, onExecute, onRe
             className="flex items-center gap-1 text-[11px] text-danger hover:text-danger/80 font-medium mt-0.5"
           >
             <RefreshCw className="w-3 h-3" />
-            Erneut versuchen
+            {t.common.retry}
           </button>
         )}
 
