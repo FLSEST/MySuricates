@@ -25,8 +25,7 @@
     "arch.god-component",
     "arch.high-coupling",
     "arch.cross-layer-violation",
-    "arch.package-cycle",
-    "arch.duplicated-logic"
+    "arch.package-cycle"
   ],
   "mysuricates.health": [
     "health.tests-failing",

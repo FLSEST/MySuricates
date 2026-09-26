@@ -96,7 +96,7 @@ echo "1) Fixture: Abschnitte und Grundzahlen"
 bash "$SCRIPT" "$TMP/fixture" > "$TMP/fix1.txt" 2> "$TMP/fix1.err"; RC=$?
 check "exit 0"           '[ "$RC" -eq 0 ]'
 check "Ausgabe nicht leer" '[ -s "$TMP/fix1.txt" ]'
-for s in packages cycles sizes churn coupling summary run; do
+for s in packages cycles sizes churn coupling files summary run; do
   check "Abschnitt ## $s vorhanden" "grep -qx '## $s' '$TMP/fix1.txt'"
 done
 check "modules=9 (Testdateien und *.d.ts zaehlen nicht)" 'grep -qx "modules=9" "$TMP/fix1.txt"'
@@ -111,6 +111,12 @@ check "deep/c.tsx hat 12 Zeilen"   "grep -qx '12${TAB}deep/c.tsx' '$TMP/fix1.txt
 check "leere Datei mit 0 Zeilen"   "grep -qx '0${TAB}leer.ts' '$TMP/fix1.txt'"
 check "max_file_lines=12"          'grep -qx "max_file_lines=12" "$TMP/fix1.txt"'
 check "Verzeichnissumme deep=12"   "grep -qx '12${TAB}1${TAB}deep' '$TMP/fix1.txt'"
+# ## files (b8c06b94): NCLOC ohne die zehn Importzeilen (auch mehrzeilig und Seiteneffekt), Zeilen, Aenderungen
+# (kein git in der Fixture: 0) — Eingabe der Einstufung arch-findings.py.
+check "## files: deep/c.tsx mit 2 NCLOC von 12 Zeilen" \
+  "sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -qx '2${TAB}12${TAB}0${TAB}deep/c.tsx'"
+check "## files: eine Zeile je Produktionsmodul" \
+  "[ \"\$(sed -n '/^## files\$/,/^## summary\$/p' '$TMP/fix1.txt' | grep -cE '^[0-9]+${TAB}[0-9]+${TAB}[0-9]+${TAB}')\" -eq 9 ]"
 
 echo "3) Fixture: bekannter Zyklus A -> B -> A"
 check "cycles=1"                  'grep -qx "cycles=1" "$TMP/fix1.txt"'
@@ -265,8 +271,9 @@ check "Pool-Vertrag (Reihenfolge, Name, Prompt)" 'python3 - "$POOL" <<'"'"'PY'"'
 import json, sys
 wf = json.load(open(sys.argv[1]))
 blocks = wf["blocks"]
-i_metrics = next(i for i, b in enumerate(blocks)
-                 if b["type"] == "shell" and "frontend-metrics.sh" in b["config"].get("command", ""))
+# Nach Namen: seit b8c06b94 ruft auch der Block arch_metrics frontend-metrics.sh auf (fuer die Einstufung).
+i_metrics = next(i for i, b in enumerate(blocks) if b.get("name") == "frontend_metrics")
+assert "frontend-metrics.sh" in blocks[i_metrics]["config"].get("command", ""), "Block frontend_metrics ruft frontend-metrics.sh nicht auf"
 i_report = next(i for i, b in enumerate(blocks) if b.get("name") == "report")
 assert i_metrics < i_report, "Frontend-Metrik-Block muss vor dem Report-Block liegen"
 metrics = blocks[i_metrics]

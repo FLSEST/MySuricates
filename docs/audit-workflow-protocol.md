@@ -165,12 +165,39 @@ Umgestellte Audits im `workflow-pool/`:
 
 | Workflow | Messung | Selbsttest |
 |---|---|---|
-| Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, Zeilen, Churn) | `scripts/tests/test-arch-metrics.sh` |
+| Architektur-Review | Block `arch_metrics` → `scripts/public-readiness/arch-metrics.sh` (jdeps, NCLOC, Churn, Kollaborateure) und `arch-findings.py` (Einstufung) | `scripts/tests/test-arch-metrics.sh`, `scripts/tests/test-arch-findings.sh` |
 | Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
 | Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`, Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
 | Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py`, Gate: `scripts/tests/test-audit-facts.sh` |
+
+### Architektur-Review: Einstufung im Skript
+
+Beim Architektur-Review misst die Shell nicht nur, sie stuft auch ein (TODO `b8c06b94`, Version
+4.6.0): `scripts/public-readiness/arch-findings.py` liest beide Faktenblätter und gibt den
+Abschnitt `## findings` aus, je Befund `ruleKey`, `subject`, Schwere und Evidenz. Der Report
+übernimmt diese Zeilen unverändert in Tabelle und Envelope; die KI schreibt Titel und
+Beschreibung, ordnet ein und priorisiert, vergibt aber keine eigene Schwere und keine weiteren
+Befunde. Die Regeln:
+
+- **Größe in NCLOC** (`ncloc.py`: ohne Leer-, Kommentar- und Importzeilen) in Bändern statt
+  Kanten: unter 250 nichts, 250–400 Beobachtung, über 400 Befund `MEDIUM`, über 600 `HIGH`;
+  `CRITICAL` nur mit mehr als 10 Kollaborateuren.
+- **Nur Hotspots**: Größen- und Abhängigkeitsbefunde gibt es nur für Dateien mit mindestens
+  5 Änderungen in 90 Tagen. Große, stabile Dateien sind eine Beobachtung. Die 300-Zeilen-Grenze
+  bleibt die harte Build-Grenze von `SourceSizeRatchetTest`; das Review meldet Dateien auf dessen
+  Allowlist nie wegen reiner Größe.
+- **Kollaborateure** (injizierte Beans einer Spring-Bean): ab 10 und nur für Hotspots
+  `arch.high-coupling`; 5–9 sind kein Befund.
+- **Paketkopplung** ist kein Befund mehr, nur noch Trendzahl im Bericht. Zyklen und Schichtkanten
+  stuft das Skript nach den bisherigen Regeln ein.
+
+Die Schwellen sind am Bestand vom 2026-09-26 kalibriert (1048 Backend-Dateien, keine über 400
+NCLOC; 598 Frontend-Module, 7 über 400) und stehen samt Begründung im Skript. Befunde, die nur
+nach den alten Regeln bestanden, meldet der Report nicht mehr: Offene setzt die Plattform beim
+nächsten Lauf auf `RESOLVED`, eingeordnete (`ACCEPTED_RISK`, `DISMISSED`) bleiben mit ihrer
+Einordnung im Audit Center stehen.
 
 ### Wann `expectedFindings` **nicht** passt
 
