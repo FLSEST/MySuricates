@@ -53,8 +53,9 @@ class AiProviderStatusServiceTest {
         when(registry.getDefaultProviderId()).thenReturn("CLAUDE");
         // registration order on purpose not alphabetical: the report sorts by id
         providers = List.of(
-                provider("PI", new ProviderSetup("pi", "npm install -g pi", "pi, then /login",
-                        List.of(".pi/agent/auth.json:\""), List.of("GEMINI_API_KEY"), ".pi/agent", "PI_CODING_AGENT_DIR")),
+                provider("PI", new ProviderSetup("pi", "npm install -g pi", "pi",
+                        List.of(".pi/agent/auth.json:\""), List.of("GEMINI_API_KEY"), ".pi/agent", "PI_CODING_AGENT_DIR",
+                        "pi_slash_login")),
                 provider("CLAUDE", new ProviderSetup("claude", "curl claude", "claude auth login",
                         List.of(".claude/.credentials.json"), List.of("CLAUDE_CODE_OAUTH_TOKEN"), ".claude", "CLAUDE_CONFIG_DIR")),
                 provider("CODEX", new ProviderSetup("codex", "npm install -g codex", "codex login",
@@ -100,13 +101,16 @@ class AiProviderStatusServiceTest {
         assertThat(codex.loginVia()).isNull();
         assertThat(codex.loginSource()).isNull();
         assertThat(codex.login()).isEqualTo("codex login");
+        assertThat(codex.loginNote()).as("the command says it all").isNull();
         assertThat(codex.defaultProvider()).isFalse();
 
         ProviderStatus pi = provider(report, "PI");
         assertThat(pi.state()).isEqualTo(State.NOT_INSTALLED);
         assertThat(pi.cli()).isEqualTo("pi");
         assertThat(pi.install()).isEqualTo("npm install -g pi");
-        assertThat(pi.login()).isEqualTo("pi, then /login");
+        // Only the command; what follows comes as a key the interface translates (eab43a8b)
+        assertThat(pi.login()).isEqualTo("pi");
+        assertThat(pi.loginNote()).isEqualTo("pi_slash_login");
     }
 
     /** A key in the environment without the program: still not installed, the login is kept for later. */

@@ -2146,12 +2146,20 @@ Whether the AI CLIs on the backend's machine are ready: per provider the program
       "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
       "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    },
+    {
+      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
+      "loginNote": "pi_slash_login", "defaultProvider": false
     }
   ]
 }
 ```
 
 `state`: `READY` (program and login found), `LOGIN_MISSING` (program found, no login), `NOT_INSTALLED` (program missing). `loginSource`: the variable name or the login file as `~/…` — or as `$VARIABLE/…` when a container instance moves the directory (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` means the backend runs in a container: the programs and logins inside it are what counts.
+`login` is only the command; what to do after it comes as a key in `loginNote` (missing when the command says it
+all) — the interface translates it (`aiProviderStatus.loginNotes`), and so does the installer (`M_login_note_<key>`).
 
 ### `POST /api/v1/system/ai-providers/status/refresh`
 

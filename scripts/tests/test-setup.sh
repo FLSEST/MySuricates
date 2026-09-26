@@ -236,6 +236,9 @@ check "ports: the port of the file, marked"             '[ "$(step Ports)" = "97
 check "AI: the provider of the file, marked"            '[ "$(step AI)" = "pi · from deploy/instances/main.env" ]'
 check "mode and modules: from the file, marked"         '[ "$(step Mode)" = "One instance — on this machine · from deploy/instances/main.env" ] && [ "$(step Modules)" = "full · from deploy/instances/main.env" ]'
 check "the login hint names the provider of the file"   'out | grep -qF "Log in to pi before the first AI workflow"'
+# Nach dem Befehl der Hinweis in der Sprache des Installers: der Katalog nennt nur den Schluessel (eab43a8b)
+check "... pi's note after the command, English"        'out | grep -qF "pi, then /login in pi — or an API key as environment variable (see pi --help)"'
+check "... and German with --lang de"                   '[ "$(run --yes --dry-run --lang de)" = 0 ] && out | grep -qF "Vor dem ersten KI-Workflow bei pi anmelden:" && out | grep -qF "pi, dann /login in pi — oder ein API-Schlüssel als Umgebungsvariable (siehe pi --help)" && ! out | grep -q "then /login"'
 check "flags that do not apply are named"              '[ "$(run --yes --dry-run --port 9555 --provider codex --runtime container)" = 0 ] && out | grep -qF "not used: --runtime container, --port 9555, --provider codex" && cmp -s "$INST/main.env" "$TMP/kept.env" && [ "$(step Ports)" = "9777 · from deploy/instances/main.env" ]'
 check "--preset --force: the preset goes into the file" '[ "$(run --yes --dry-run --preset research --force)" = 0 ] && [ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(step Modules)" = "research · written into deploy/instances/main.env" ] && ! out | grep -q "not used"'
 cp "$TMP/kept.env" "$INST/main.env"

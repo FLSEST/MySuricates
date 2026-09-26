@@ -2153,12 +2153,20 @@ Ob die KI-CLIs auf dem Rechner des Backends bereit sind: je Anbieter das Program
       "id": "CODEX", "cli": "codex", "state": "LOGIN_MISSING",
       "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
       "install": "npm install -g @openai/codex", "login": "codex login", "defaultProvider": false
+    },
+    {
+      "id": "PI", "cli": "pi", "state": "LOGIN_MISSING",
+      "installed": true, "loggedIn": false, "loginVia": null, "loginSource": null,
+      "install": "npm install -g @earendil-works/pi-coding-agent@<version>", "login": "pi",
+      "loginNote": "pi_slash_login", "defaultProvider": false
     }
   ]
 }
 ```
 
 `state`: `READY` (Programm und Anmeldung gefunden), `LOGIN_MISSING` (Programm gefunden, keine Anmeldung), `NOT_INSTALLED` (Programm fehlt). `loginSource`: der Variablenname oder die Anmeldedatei als `~/…` — bzw. als `$VARIABLE/…`, wenn eine Container-Instanz das Verzeichnis umlenkt (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR`). `container: true` heißt, das Backend läuft in einem Container: Es zählen Programme und Anmeldungen darin.
+`login` ist nur der Befehl; was danach zu tun ist, steht als Schlüssel in `loginNote` (fehlt, wenn der Befehl alles
+sagt) — die Oberfläche übersetzt ihn (`aiProviderStatus.loginNotes`), der Installer ebenso (`M_login_note_<schlüssel>`).
 
 ### `POST /api/v1/system/ai-providers/status/refresh`
 

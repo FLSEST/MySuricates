@@ -11,7 +11,7 @@ import java.util.List;
  *
  * @param cli         Programmname auf dem PATH
  * @param install     Installationsbefehl bzw. -weg
- * @param login       wie man sich anmeldet
+ * @param login       der Befehl zum Anmelden — nur der Befehl, er landet so in der Zwischenablage
  * @param loginFiles  Dateien relativ zu {@code $HOME}, deren Vorhandensein eine Anmeldung anzeigt;
  *                    {@code datei:muster} heisst, die Datei muss das Muster enthalten. Eine Heuristik:
  *                    Installer und Statusanzeige sehen, dass eine Anmeldung da ist, nicht, ob sie gilt.
@@ -24,16 +24,26 @@ import java.util.List;
  *                    Instanzen setzen sie (scripts/lib/host-mounts.sh), die Statusanzeige sucht
  *                    Anmeldedateien unter {@code loginDir} dann dort. Der Installer liest beides nicht:
  *                    er laeuft auf dem Rechner, wo die Verzeichnisse an ihrem Platz liegen.
+ * @param loginNote   was nach dem Befehl noch zu tun ist, als Schluessel statt als Text (eab43a8b): Installer
+ *                    ({@code M_login_note_<schluessel>} in scripts/lib/i18n) und Oberflaeche
+ *                    ({@code aiProviderStatus.loginNotes}) uebersetzen ihn — ein englischer Satz hier
+ *                    erschien auch in der deutschen Oberflaeche. null, wenn der Befehl alles sagt.
  */
 public record ProviderSetup(String cli, String install, String login, List<String> loginFiles,
-                            List<String> loginEnv, String loginDir, String loginDirEnv) {
+                            List<String> loginEnv, String loginDir, String loginDirEnv, String loginNote) {
     public ProviderSetup {
         loginFiles = List.copyOf(loginFiles);
         loginEnv = List.copyOf(loginEnv);
     }
 
+    /** Ein Anbieter, dessen Anmeldebefehl alles sagt. */
+    public ProviderSetup(String cli, String install, String login, List<String> loginFiles, List<String> loginEnv,
+                         String loginDir, String loginDirEnv) {
+        this(cli, install, login, loginFiles, loginEnv, loginDir, loginDirEnv, null);
+    }
+
     /** Ein Anbieter ohne umlenkbares Anmeldeverzeichnis. */
     public ProviderSetup(String cli, String install, String login, List<String> loginFiles, List<String> loginEnv) {
-        this(cli, install, login, loginFiles, loginEnv, null, null);
+        this(cli, install, login, loginFiles, loginEnv, null, null, null);
     }
 }

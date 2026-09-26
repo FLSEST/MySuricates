@@ -49,6 +49,10 @@ class ProviderCatalogTest {
             assertThat(setup.cli()).as(provider.getId() + ": cli").matches("[a-z][a-z0-9-]*");
             assertThat(setup.install()).as(provider.getId() + ": install").isNotBlank();
             assertThat(setup.login()).as(provider.getId() + ": login").isNotBlank();
+            // Ein Schluessel, kein Satz: er wird Teil eines Bash-Variablennamens und eines i18n-Schluessels
+            if (setup.loginNote() != null) {
+                assertThat(setup.loginNote()).as(provider.getId() + ": loginNote").matches("[a-z][a-z0-9_]*");
+            }
             assertThat(setup.loginFiles()).as(provider.getId() + ": loginFiles").isNotEmpty()
                     .allSatisfy(f -> assertThat(f).as("relativ zu $HOME").doesNotStartWith("/").doesNotStartWith("~"));
             // Namen landen unquotiert in ${!name} des Installers — nur Grossbuchstaben, Ziffern, _
@@ -102,6 +106,28 @@ class ProviderCatalogTest {
                 .noneSatisfy(line -> assertThat(line).containsPattern("@earendil-works/pi-coding-agent(\\s|$)"));
     }
 
+    /**
+     * Der Hinweis nach dem Anmeldebefehl ist ein Schluessel (eab43a8b) — ein englischer Satz erschien
+     * auch in der deutschen Oberflaeche. Jeder Schluessel braucht einen Text in beiden Sprachen, im
+     * Installer wie in der Oberflaeche; sonst zeigte eine Seite gar nichts.
+     */
+    @Test
+    void everyLoginNoteIsTranslatedForInstallerAndInterface() throws Exception {
+        List<String> notes = providers().stream().map(p -> p.setup().loginNote())
+                .filter(java.util.Objects::nonNull).toList();
+        assertThat(notes).as("pi meldet sich in pi selbst an: es gibt mindestens einen Hinweis").isNotEmpty();
+        for (String lang : List.of("de", "en")) {
+            String installer = Files.readString(Path.of("..", "scripts", "lib", "i18n", lang + ".sh"));
+            String frontend = Files.readString(Path.of("..", "ai-automation-frontend", "src", "i18n", lang + ".ts"));
+            assertThat(notes).allSatisfy(note -> {
+                assertThat(installer).as("scripts/lib/i18n/" + lang + ".sh: M_login_note_" + note)
+                        .containsPattern("(?m)^M_login_note_" + note + "=\"[^\"]+\"$");
+                assertThat(frontend).as("ai-automation-frontend/src/i18n/" + lang + ".ts: loginNotes." + note)
+                        .containsPattern("(?m)^\\s+" + note + ": '[^']+',$");
+            });
+        }
+    }
+
     // ── Anbieter finden, ohne Spring-Kontext ─────────────────────────────────
 
     /**
@@ -145,6 +171,9 @@ class ProviderCatalogTest {
                 # muss das Muster enthalten. Die erste zutreffende zaehlt als angemeldet.
                 # login_env: Umgebungsvariablen, durch Leerzeichen getrennt; eine gesetzte, nicht leere
                 # zaehlt ebenfalls als angemeldet (der Wert wird nie ausgegeben).
+                # login: nur der Befehl. login_note: was danach zu tun ist, als Schluessel — den Text dazu
+                # liefert scripts/lib/i18n/<sprache>.sh (M_login_note_<schluessel>); leer, wenn der Befehl
+                # alles sagt (eab43a8b).
 
                 PROVIDER_IDS=(
                 """);
@@ -159,6 +188,7 @@ class ProviderCatalogTest {
             out.append(prefix).append("login=\"").append(quote(setup.login())).append("\"\n");
             out.append(prefix).append("login_files=\"").append(quote(String.join(" ", setup.loginFiles()))).append("\"\n");
             out.append(prefix).append("login_env=\"").append(quote(String.join(" ", setup.loginEnv()))).append("\"\n");
+            out.append(prefix).append("login_note=\"").append(quote(setup.loginNote() == null ? "" : setup.loginNote())).append("\"\n");
         }
         return out.toString();
     }

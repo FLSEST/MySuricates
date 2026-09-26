@@ -51,7 +51,7 @@ public class AiProviderStatusService {
             State state = !installed ? State.NOT_INSTALLED : login == null ? State.LOGIN_MISSING : State.READY;
             return new ProviderStatus(id, setup.cli(), state, installed, login != null,
                     login == null ? null : login.via(), login == null ? null : login.source(),
-                    setup.install(), setup.login(), id.equalsIgnoreCase(defaultProviderId));
+                    setup.install(), setup.login(), id.equalsIgnoreCase(defaultProviderId), setup.loginNote());
         }
     }
 

@@ -30,6 +30,9 @@ public class PiAiProvider implements AiProvider {
      */
     public static final String PINNED_VERSION = "0.74.2";
 
+    /** „dann /login in pi — oder ein API-Schluessel als Umgebungsvariable“, uebersetzt je Oberflaeche. */
+    static final String LOGIN_NOTE = "pi_slash_login";
+
     private final HostPiService hostPiService;
 
     @Override
@@ -40,15 +43,16 @@ public class PiAiProvider implements AiProvider {
     @Override
     public ProviderSetup setup() {
         // pi ist selbst ein Hub: angemeldet ist, wer in auth.json mindestens ein Backend hat — ein
-        // Anfuehrungszeichen heisst "mindestens ein Schluessel", ein leeres {} zaehlt nicht
+        // Anfuehrungszeichen heisst "mindestens ein Schluessel", ein leeres {} zaehlt nicht.
+        // Angemeldet wird in pi selbst (/login) — das sagt der Hinweis LOGIN_NOTE, uebersetzt (eab43a8b)
         return new ProviderSetup("pi", "npm install -g @earendil-works/pi-coding-agent@" + PINNED_VERSION,
-                "pi, then /login   (or an API key as environment variable, see pi --help)",
+                "pi",
                 java.util.List.of(".pi/agent/auth.json:\""),
                 // die gaengigen Backends aus "pi --help" (Environment Variables); jeder Schluessel
                 // reicht, weil pi das Backend je Modell waehlt (<backend>/<model>)
                 java.util.List.of("ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN", "OPENAI_API_KEY",
                         "GEMINI_API_KEY", "OPENROUTER_API_KEY"),
-                ".pi/agent", "PI_CODING_AGENT_DIR");
+                ".pi/agent", "PI_CODING_AGENT_DIR", LOGIN_NOTE);
     }
 
     @Override
