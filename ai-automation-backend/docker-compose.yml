@@ -14,8 +14,9 @@ services:
       - AUTOMATION_DB_PATH=/app/data/automation.db
       - DOCKER_HOST=unix:///var/run/docker.sock
       - AUTOMATION_SECURITY_ENABLED=true
-      # Leer lassen -> das Backend erzeugt beim ersten Start einen Schluessel und gibt ihn
-      # im Log aus (docker compose logs backend | grep -i 'API KEY'). Eigenen Wert setzen:
+      # Leer lassen -> das Backend erzeugt beim ersten Start einen Schluessel; das Log zeigt nur
+      # die letzten vier Zeichen, voll steht er in der Datei:
+      # docker compose exec backend cat /home/appuser/.autotrigger/api-key. Eigenen Wert setzen:
       # AUTOMATION_API_KEY=... exportieren oder in eine .env neben dieser Datei schreiben.
       - AUTOMATION_API_KEY=${AUTOMATION_API_KEY:-}
       # Optionale Module: core (Default) | research | full; einzelne Module per AUTOMATION_MODULES_<NAME>=true
