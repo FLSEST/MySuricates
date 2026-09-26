@@ -15,7 +15,8 @@ flowchart LR
     subgraph CORE["Core pages"]
         DASH["/ Dashboard<br/>/projects + /projects/:id<br/>/workflows + /workflows/:id"]
         RUN["/workflows/:id/run/:runId<br/>/runs (/runs/:runId redirects)<br/>/approvals"]
-        SCH["/schedules + /calendar<br/>/todos, /cockpit, /goals/:goalId"]
+        SCH["/schedules + /calendar<br/>/todos, /cockpit"]
+        GOAL["/goals overview<br/>/goals/:goalId with relation map"]
         ACT["/activity + /dlq<br/>/docs<br/>/settings"]
     end
     subgraph MOD["ModuleRoute (optional modules)"]
@@ -60,6 +61,7 @@ A key such as `['workflows']` matches all queries below it as a prefix — detai
 | Skill activation | `useWorkflow` | activate/deactivate | `workflows` |
 | Schedules | `useSchedules` | create/update/toggle/delete | `schedules` (list, calendar, preview) |
 | Webhooks | `useWebhooks` | create/toggle/delete, token and secret | `webhooks` |
+| Goals | `useGoals`, `useGoal`, `useGoalRelations` | create/update/delete, assign and order TODOs, assessment, milestones, goal guard | `goals`; whatever touches TODOs also `todos`; the guard also `schedules` and `workflows` |
 | System | `useSystemHealth`, `useSystemInfo` | — | none; health refetches every 30 s |
 
 ## State — *Zustand Stores*
