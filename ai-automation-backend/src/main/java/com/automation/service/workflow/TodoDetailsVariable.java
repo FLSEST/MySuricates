@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -45,7 +46,11 @@ class TodoDetailsVariable implements PlatformVariableSource {
     static final int MAX_LIMIT = 150;
     static final int DEFAULT_CHARS = 1500;
     static final int MAX_CHARS = 8000;
-    static final int MAX_TOTAL_CHARS = 120_000;
+    /**
+     * Obergrenze der JSON-Liste in UTF-8-Bytes: Ein Shell-Block übergibt seinen ganzen Befehl als ein Argument an
+     * {@code bash -c}, und Linux nimmt höchstens 128 KiB je Argument (TODO cc0eb3ba).
+     */
+    static final int MAX_TOTAL_BYTES = 100_000;
     static final int MAX_TAG_CHARS = 60;
     static final int MAX_QUESTION_CHARS = 300;
     static final String NOTICE =
@@ -118,12 +123,12 @@ class TodoDetailsVariable implements PlatformVariableSource {
                 .sorted(order(params))
                 .toList();
         List<Map<String, Object>> rendered = new ArrayList<>();
-        int total = 0;
+        int total = 2;   // [ ]
         for (Todo todo : matching) {
             if (rendered.size() == params.limit()) break;
             Map<String, Object> entry = entry(todo, params.chars());
-            int size = String.valueOf(entry.get("description")).length() + String.valueOf(entry.get("title")).length();
-            if (!rendered.isEmpty() && total + size > MAX_TOTAL_CHARS) break;
+            int size = json(entry).getBytes(StandardCharsets.UTF_8).length + 1;
+            if (total + size > MAX_TOTAL_BYTES) break;
             total += size;
             rendered.add(entry);
         }
@@ -167,6 +172,7 @@ class TodoDetailsVariable implements PlatformVariableSource {
         e.put("suggestedEffort", todo.getSuggestedEffort() == null ? null : UntrustedText.inline(todo.getSuggestedEffort(), 10));
         e.put("openQuestion", todo.getOpenQuestion() == null || todo.getOpenQuestion().isBlank()
                 ? null : UntrustedText.inline(todo.getOpenQuestion(), MAX_QUESTION_CHARS));
+        e.put("updatedAt", todo.getUpdatedAt() == null ? null : todo.getUpdatedAt().toString());
         e.put("description", UntrustedText.block(todo.getDescription(), chars));
         return e;
     }
@@ -190,13 +196,16 @@ class TodoDetailsVariable implements PlatformVariableSource {
         return s.length() > MAX_TAG_CHARS ? s.substring(0, MAX_TAG_CHARS) : s;
     }
 
-    private static String render(List<Map<String, Object>> entries, int omitted) {
-        String json;
+    private static String json(Object value) {
         try {
-            json = JSON.writeValueAsString(entries);
+            return JSON.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("todo_details: JSON nicht erzeugbar", e);
         }
+    }
+
+    private static String render(List<Map<String, Object>> entries, int omitted) {
+        String json = json(entries);
         StringBuilder sb = new StringBuilder("<todo_details>\n").append(NOTICE).append('\n').append(json).append('\n');
         if (omitted > 0) sb.append("(+").append(omitted).append(" weitere)\n");
         return sb.append("</todo_details>").toString();

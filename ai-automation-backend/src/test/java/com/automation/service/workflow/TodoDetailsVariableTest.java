@@ -167,4 +167,30 @@ class TodoDetailsVariableTest {
         assertThat(row.path("openQuestion").asText()).isEqualTo("Welcher Stil?");
         assertThat(row.path("description").asText()).isEqualTo("Text");
     }
+
+    @Test
+    void value_rendersUpdatedAt_forStaleBatchDetection() throws Exception {
+        Todo t = todo("a", "A", Todo.Priority.LOW, null, "x");
+        t.setUpdatedAt(Instant.parse("2026-09-24T01:30:00Z"));
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of(t));
+
+        JsonNode row = list(source.load(request(Map.of("todo_details_exclude_tags", "idee"))).get("todo_details")).get(0);
+
+        assertThat(row.path("updatedAt").asText()).isEqualTo("2026-09-24T01:30:00Z");
+    }
+
+    @Test
+    void value_staysBelowTheShellArgumentLimit_countedInUtf8Bytes() {
+        List<Todo> many = new java.util.ArrayList<>();
+        for (int i = 0; i < 150; i++) {
+            many.add(todo("id-" + i, "Titel " + i, Todo.Priority.LOW, null, "ä".repeat(8000)));
+        }
+        when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(many);
+
+        String value = source.load(request(Map.of("todo_details_exclude_tags", "idee",
+                "todo_details_limit", "150", "todo_details_chars", "8000"))).get("todo_details");
+
+        assertThat(value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length).isLessThan(110_000);
+        assertThat(value).contains(" weitere)");
+    }
 }
