@@ -21,8 +21,9 @@ Backend-Dateien und 598 Frontend-Modulen; die Begruendung steht an jeder Konstan
   Abhaengigkeiten (Kollaborateure je Spring-Bean, nur Backend): ab 10 und nur fuer Hotspots ein
     Befund arch.high-coupling, MEDIUM, HIGH mit Groesse ab dem Beobachtungsband. 5-9 ist kein
     Befund; ab 10 ohne Hotspot eine Beobachtung.
-  Ein Befund je Datei: arch.high-coupling, wenn die Kollaborateur-Schwelle erreicht ist, sonst
-    arch.god-class (Backend) bzw. arch.god-component (Frontend); severity ist die hoehere Stufe.
+  Ein Befund je Datei, severity ist die hoehere Stufe: arch.high-coupling fuer einen reinen
+    Kopplungsbefund und fuer einen Groessenbefund mit mehr als 10 Kollaborateuren (Wechselgrenze wie
+    bis 4.5.2, Identitaet stabil), sonst arch.god-class (Backend) bzw. arch.god-component (Frontend).
   Frontend: Groessenbefunde nur fuer .tsx-Komponenten; .ts-Module (Daten, i18n, Typen, Hooks)
     sind hoechstens eine Beobachtung. Eine Kollaborateur-Zahl gibt es dort nicht, CRITICAL also nicht.
   Paketkopplung (## coupling, Pakete und Verzeichnisse): KEIN Befund mehr, nur Trendzahl im Bericht.
@@ -33,7 +34,7 @@ Backend-Dateien und 598 Frontend-Modulen; die Begruendung steht an jeder Konstan
   Frontend-Import-Zyklen (## cycles, nur Laufzeitkanten): jede Komponente HIGH, > 3 Module CRITICAL.
 
 Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state != ok,
-unaufgeloeste Importe, kein git) stehen als not_measured= in ## findings_summary; fuer sie gibt
+unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
 es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
 
 Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>]
@@ -64,6 +65,13 @@ DEPS_FINDING = 10    # ab hier Kopplungsbefund (nur Hotspot)
 DEPS_CRITICAL = 10   # darueber (also ab 11) zusammen mit > BAND_HIGH NCLOC: CRITICAL
 
 FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
+
+# Faktenblatt-Fehler, nach denen Groessen und Hotspots nicht gemessen sind. Ohne Git-Historie (kein
+# Repo, flacher Klon) fehlen die Aenderungen, also jeder Hotspot; ohne NCLOC bzw. Kollaborateur-
+# Zaehlung fehlen Groesse bzw. deps. Die Einstufung saehe sonst sauber aus, und bekannte Befunde
+# liefen still aus.
+BACKEND_SIZE_ERRORS = {"source_missing", "no_git_repo", "shallow_history", "ncloc_failed", "collaborators_failed"}
+FRONTEND_SIZE_ERRORS = {"no_git_repo", "shallow_history", "ncloc_failed"}
 
 SEVERITY_RANK = {"MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 RULE_KEYS = ("arch.god-class", "arch.god-component", "arch.high-coupling",
@@ -152,7 +160,9 @@ class Classifier:
 
         severity = higher(size_sev, coupling_sev)
         if severity:
-            if coupling_sev:
+            # Wechselgrenze wie bis 4.5.2: ein Groessenbefund wird erst ab mehr als DEPS_CRITICAL
+            # Kollaborateuren zu arch.high-coupling, damit seine Identitaet bei genau 10 stabil bleibt.
+            if coupling_sev and (size_sev is None or deps > DEPS_CRITICAL):
                 rule = "arch.high-coupling"
             else:
                 rule = "arch.god-component" if frontend else "arch.god-class"
@@ -188,7 +198,7 @@ class Classifier:
         ratchet = self.ratchet(sheet.get("ratchet"))
 
         files = parse_files(sheet.get("files"), backend=True)
-        if files is None or "source_missing" in errors or "no_git_repo" in errors:
+        if files is None or errors & BACKEND_SIZE_ERRORS:
             self.not_measured.append("backend_sizes")
         else:
             self.classify_files(files, frontend=False, ceilings=ratchet["allowlist"])
@@ -290,12 +300,12 @@ class Classifier:
             self.not_measured += ["frontend_sizes", "frontend_cycles"]
             return
         files = parse_files(sheet.get("files"), backend=False)
-        if files is None or "no_git_repo" in errors:
+        if files is None or errors & FRONTEND_SIZE_ERRORS:
             self.not_measured.append("frontend_sizes")
         else:
             self.classify_files(files, frontend=True, ceilings={})
         unresolved = summary.get("unresolved_imports", "0")
-        if summary.get("cycles_state") not in ("ok", "no_edges") or unresolved != "0" or errors - {"no_git_repo"}:
+        if summary.get("cycles_state") not in ("ok", "no_edges") or unresolved != "0" or errors - FRONTEND_SIZE_ERRORS:
             self.not_measured.append("frontend_cycles")
             return
         components, _ = parse_cycles(sheet.get("cycles") or [])

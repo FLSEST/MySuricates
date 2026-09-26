@@ -353,6 +353,11 @@ fi
 COMMIT="unknown"
 if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   COMMIT=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  # Ein flacher Klon (git clone --depth 1) kennt nur den letzten Commit: jede Datei haette dann
+  # 0 oder 1 Aenderung, und kein Hotspot waere eine Messluecke, die wie Sauberkeit aussieht.
+  if [ "$(git -C "$ROOT" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    note_error "shallow_history"
+  fi
   git -C "$ROOT" log --since=90.days --name-only --format= -- ai-automation-frontend/src 2>/dev/null \
     | grep -v '^$' \
     | sed 's#^ai-automation-frontend/src/##' \

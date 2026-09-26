@@ -183,8 +183,9 @@ check "400 NCLOC: noch Beobachtung"           '[ "$(observed "$TMP/out.txt" "$P/
 check "401 NCLOC: Befund MEDIUM"              '[ "$(finding "$TMP/out.txt" "$P/Band401.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "600 NCLOC: noch MEDIUM"                '[ "$(finding "$TMP/out.txt" "$P/Band600.java")" = "arch.god-class${TAB}MEDIUM" ]'
 check "601 NCLOC: HIGH"                       '[ "$(finding "$TMP/out.txt" "$P/Band601.java")" = "arch.god-class${TAB}HIGH" ]'
-check "601 NCLOC + 10 deps: HIGH, kein CRITICAL (erst ueber 10)" \
-  '[ "$(finding "$TMP/out.txt" "$P/Band601Deps10.java")" = "arch.high-coupling${TAB}HIGH" ]'
+# Wechselgrenze wie bis 4.5.2: ein Groessenbefund wird erst ab 11 Kollaborateuren zu arch.high-coupling.
+check "601 NCLOC + 10 deps: HIGH, kein CRITICAL, bleibt arch.god-class (Identitaet stabil)" \
+  '[ "$(finding "$TMP/out.txt" "$P/Band601Deps10.java")" = "arch.god-class${TAB}HIGH" ]'
 check "601 NCLOC + 11 deps: CRITICAL, ein Befund als arch.high-coupling" \
   '[ "$(finding "$TMP/out.txt" "$P/Band601Deps11.java")" = "arch.high-coupling${TAB}CRITICAL" ]'
 check "Nicht-Bean ueber 600: HIGH, nie CRITICAL" \
@@ -284,6 +285,27 @@ check "jdeps gescheitert: keine Zyklen- oder Schichtbefunde" \
   '! section "$TMP/nojdeps.txt" findings | grep -qE "^arch\.(package-cycle|cross-layer-violation)${TAB}(cycles/component/com|cycles/pair|layer)"'
 check "jdeps gescheitert: Groessenbefunde bleiben (Quelltext gemessen)" \
   '[ "$(finding "$TMP/nojdeps.txt" "$P/HotBig.java")" = "arch.god-class${TAB}MEDIUM" ]'
+with_error() {  # $1 = Blatt, $2 = Fehlermarke, $3 = Ziel — haengt error=<marke> an ## summary
+  awk -v e="$2" '{ print } $0 == "## summary" { print "error=" e }' "$1" > "$3"
+}
+for MARK in collaborators_failed ncloc_failed shallow_history no_git_repo; do
+  with_error "$TMP/backend.txt" "$MARK" "$TMP/backend-$MARK.txt"
+  python3 "$FINDINGS" "$TMP/backend-$MARK.txt" "$TMP/frontend.txt" > "$TMP/be-$MARK.txt"
+  check "Backend error=$MARK: Groessen nicht gemessen, keine Datei-Befunde" \
+    '[ "$(summary "$TMP/be-$MARK.txt" not_measured)" = "backend_sizes" ] \
+       && ! section "$TMP/be-$MARK.txt" findings | cut -f2 | grep -q "\.java$"'
+  check "Backend error=$MARK: Zyklen und Frontend bleiben gemessen" \
+    '[ -n "$(finding "$TMP/be-$MARK.txt" cycles/component/com.automation.k1)" ] \
+       && [ -n "$(finding "$TMP/be-$MARK.txt" frontend/src/pages/Big.tsx)" ]'
+done
+for MARK in ncloc_failed shallow_history; do
+  with_error "$TMP/frontend.txt" "$MARK" "$TMP/frontend-$MARK.txt"
+  python3 "$FINDINGS" "$TMP/backend.txt" "$TMP/frontend-$MARK.txt" > "$TMP/fe-$MARK.txt"
+  check "Frontend error=$MARK: Groessen nicht gemessen, Zyklen schon" \
+    '[ "$(summary "$TMP/fe-$MARK.txt" not_measured)" = "frontend_sizes" ] \
+       && [ -z "$(finding "$TMP/fe-$MARK.txt" frontend/src/pages/Big.tsx)" ] \
+       && [ -n "$(finding "$TMP/fe-$MARK.txt" cycles/component/frontend/src/a.ts)" ]'
+done
 python3 "$FINDINGS" "$TMP/backend.txt" "$TMP/fehlt.txt" > "$TMP/nofront.txt"
 check "Frontend-Blatt fehlt: Frontend nicht gemessen" \
   '[ "$(summary "$TMP/nofront.txt" not_measured)" = "frontend_cycles,frontend_sizes" ] && ! grep -q "frontend/src/" "$TMP/nofront.txt"'
@@ -359,15 +381,65 @@ const lazy = () =>
 /* Block */ export const X = (p: T) => <div>{url}{lazy}</div>;
 TSX
 # Zaehlbar: export-from, url, const lazy, import('./lazy'), export const X = 5 von 13 Zeilen.
+cat > "$TMP/nc/tricky.tsx" <<'TSX'
+const a = '/* kein Kommentar';
+const clean = (s: string) => s.replace(/[#*_`>]/g, '');
+const half = a.length / 2;
+export const V = () => (
+  <div>
+    {/* JSX-Kommentar */}
+    {clean(a)}{half}
+  </div>
+);
+const b = `ende`;
+TSX
+# Zaehlbar: alle Zeilen ausser {/* JSX-Kommentar */} = 9 von 10. Der String mit /* oeffnet keinen
+# Kommentar, der Backtick im Regex keinen Template-String (sonst fiele alles bis zum naechsten
+# Backtick als String durch), und a.length / 2 ist eine Division, kein Regex.
 printf '' > "$TMP/nc/Empty.java"
-printf 'Sample.java\nsample.tsx\nEmpty.java\n' | python3 "$NCLOC" "$TMP/nc" > "$TMP/nc.out" 2> "$TMP/nc.err"; RC_NC=$?
+printf 'Sample.java\nsample.tsx\ntricky.tsx\nEmpty.java\n' | python3 "$NCLOC" "$TMP/nc" > "$TMP/nc.out" 2> "$TMP/nc.err"; RC_NC=$?
 check "ncloc.py exit 0, stderr leer" '[ "$RC_NC" -eq 0 ] && [ ! -s "$TMP/nc.err" ]'
 check "Java: Leer-, Kommentar- und Importzeilen zaehlen nicht, Textblock zaehlt" \
   'grep -qx "8${TAB}18${TAB}Sample.java" "$TMP/nc.out"'
 check "TSX: mehrzeiliger Import, import type und Seiteneffekt-Import zaehlen nicht" \
   'grep -qx "5${TAB}13${TAB}sample.tsx" "$TMP/nc.out"'
+check "TSX: /* im String, {/* */} in JSX, Regex mit Backtick, Division" \
+  'grep -qx "9${TAB}10${TAB}tricky.tsx" "$TMP/nc.out"'
 check "leere Datei: 0 und 0" 'grep -qx "0${TAB}0${TAB}Empty.java" "$TMP/nc.out"'
-check "Reihenfolge wie die Eingabe" '[ "$(cut -f3 "$TMP/nc.out" | tr "\n" " ")" = "Sample.java sample.tsx Empty.java " ]'
+check "Reihenfolge wie die Eingabe" '[ "$(cut -f3 "$TMP/nc.out" | tr "\n" " ")" = "Sample.java sample.tsx tricky.tsx Empty.java " ]'
+
+echo "12) Flacher Klon: fehlende Historie ist eine Messluecke, keine Sauberkeit"
+# git clone --depth 1 kennt nur den letzten Commit: jede Datei haette 0 oder 1 Aenderung, kein Hotspot
+# waere messbar, und alle Groessen-/Kopplungsbefunde liefen still aus. Beide Messskripte markieren das
+# als error=shallow_history, die Einstufung meldet die Groessen dann als nicht gemessen.
+ORIGIN="$TMP/origin"
+mkdir -p "$ORIGIN/ai-automation-backend/src/main/java/com/automation/x" "$ORIGIN/ai-automation-frontend/src"
+g() { git -C "$ORIGIN" -c user.name=test -c user.email=test@example.invalid -c core.hooksPath=/dev/null -c commit.gpgsign=false "$@"; }
+g init -q
+for i in 1 2 3; do
+  printf 'package com.automation.x;\npublic class X {\n    int v = %s;\n}\n' "$i" > "$ORIGIN/ai-automation-backend/src/main/java/com/automation/x/X.java"
+  printf 'export const v = %s;\n' "$i" > "$ORIGIN/ai-automation-frontend/src/v.ts"
+  g add -A && g commit -q -m "stand $i"
+done
+git clone -q --depth 1 "file://$ORIGIN" "$TMP/shallow" 2>/dev/null
+git clone -q "file://$ORIGIN" "$TMP/full" 2>/dev/null
+for KIND in shallow full; do
+  ARCH_METRICS_COMPILE=0 AUTOMATION_ARCH_CACHE="$TMP/cache" \
+    bash "$REPO/scripts/public-readiness/arch-metrics.sh" "$TMP/$KIND" > "$TMP/$KIND-backend.txt" 2>/dev/null
+  bash "$REPO/scripts/public-readiness/frontend-metrics.sh" "$TMP/$KIND" > "$TMP/$KIND-frontend.txt" 2>/dev/null
+  python3 "$FINDINGS" "$TMP/$KIND-backend.txt" "$TMP/$KIND-frontend.txt" > "$TMP/$KIND-findings.txt"
+done
+check "flacher Klon ist wirklich flach" '[ "$(git -C "$TMP/shallow" rev-parse --is-shallow-repository)" = true ]'
+check "arch-metrics.sh: error=shallow_history" 'grep -qE "^error=.*shallow_history" "$TMP/shallow-backend.txt"'
+check "frontend-metrics.sh: error=shallow_history" 'grep -qE "^error=.*shallow_history" "$TMP/shallow-frontend.txt"'
+check "Einstufung: Groessen beider Seiten nicht gemessen" \
+  'summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -qx backend_sizes \
+     && summary "$TMP/shallow-findings.txt" not_measured | tr "," "\n" | grep -qx frontend_sizes'
+check "Gegenprobe voller Klon: keine shallow_history, Groessen gemessen" \
+  '! grep -q shallow_history "$TMP/full-backend.txt" "$TMP/full-frontend.txt" \
+     && ! summary "$TMP/full-findings.txt" not_measured | grep -qE "(backend|frontend)_sizes"'
+check "Gegenprobe voller Klon: Aenderungen gezaehlt (3 je Datei)" \
+  'grep -qE "^[0-9]+${TAB}[0-9]+${TAB}3${TAB}-${TAB}com/automation/x/X.java$" "$TMP/full-backend.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"
