@@ -100,7 +100,7 @@ Zusätzlich unterstützt jeder Block optionale Top-Level-Felder (neben `type`, n
 | `name` | string | – | Name, unter dem spätere Blöcke die Ausgabe dieses Blocks per `{{ block.<name>.output }}` lesen. Empfohlen sind Buchstaben, Ziffern, `_` und `-`, keine Punkte und kein Leerraum — geprüft wird das beim Speichern nicht; abgelehnt wird nur der reservierte Name `previous_output` (`BlockNameRules`) |
 | `skillIds` | string[] | `[]` | Skill-IDs die **zusätzlich** zu den Workflow-Skills für diesen Block aktiviert werden |
 
-**Standard-Verhalten**: Wenn ein Block fehlschlägt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` fährt der Workflow mit dem nächsten Block fort.
+**Standard-Verhalten**: Wenn ein Block fehlschlägt (Status `FAILED`), stoppt der Workflow und der Run wird als `FAILED` markiert. Mit `"on_failure": "continue"` fährt der Workflow mit dem nächsten Block fort. Jeder andere Wert (etwa `"fail"` oder ein Tippfehler) stoppt wie `"stop"` — nur `continue` (Groß-/Kleinschreibung egal) lässt weiterlaufen.
 
 **Per-Block Skills**: Blöcke können über `skillIds` eigene Skills mitbringen, die additiv zu den Workflow-Level-Skills gelten. Der `WorkflowExecutor` merged beide Listen vor der Ausführung und stellt den Baseline-Zustand nach dem Block wieder her. Beispiel:
 
